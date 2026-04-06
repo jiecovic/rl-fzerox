@@ -55,7 +55,9 @@ watch:
 
 Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` is an optional savestate file used as the reset baseline. The root `seed` is the master seed for Python/env randomness.
 
-`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Once that path is stable for your setup, press `K` in `watch` to save a dedicated race-start baseline. When a custom baseline is active, that baseline takes precedence and the scripted bootstrap is skipped.
+`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Once that path is stable for your setup, press `K` in `watch` to save a dedicated race-start baseline. When a custom baseline is active, that baseline takes precedence and the scripted bootstrap is skipped. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
+
+`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it.
 
 ## Commands
 
@@ -105,6 +107,8 @@ Watch controls:
 - `Enter`: Start
 - `Backspace`: Select
 - `K`: promote the current state to the reset baseline and save it when `emulator.baseline_state_path` is set
+
+The watch sidebar shows live telemetry plus the current step reward and total episode return.
 
 ## Quality
 
