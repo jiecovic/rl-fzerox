@@ -1,63 +1,40 @@
 # src/rl_fzerox/core/config/loader.py
 from __future__ import annotations
 
-from collections.abc import Sequence
 from pathlib import Path
 
-from hydra import compose, initialize_config_dir
-from hydra.errors import HydraException
-from omegaconf import OmegaConf
-from omegaconf.errors import OmegaConfBaseException
+import yaml
 from pydantic import ValidationError
 
 from rl_fzerox.core.config.models import WatchAppConfig
 
 
-def default_config_dir() -> Path:
-    return Path(__file__).resolve().parents[4] / "conf"
-
-
-def load_watch_app_config(
-    *,
-    config_name: str = "watch",
-    overrides: Sequence[str] | None = None,
-    config_dir: Path | None = None,
-) -> WatchAppConfig:
-    resolved_config_dir = (config_dir or default_config_dir()).resolve()
+def load_watch_app_config(config_path: Path) -> WatchAppConfig:
+    resolved_config_path = config_path.expanduser().resolve()
     try:
-        config_data = _compose_config_data(
-            config_name=config_name,
-            overrides=overrides,
-            config_dir=resolved_config_dir,
-        )
+        config_data = _load_yaml_mapping(resolved_config_path)
         return WatchAppConfig.model_validate(config_data)
-    except (HydraException, OmegaConfBaseException, ValidationError) as exc:
+    except (OSError, TypeError, ValidationError, yaml.YAMLError) as exc:
         raise ValueError(
-            f"Could not load config '{config_name}' from {resolved_config_dir}: {exc}"
+            f"Could not load watch config from {resolved_config_path}: {exc}"
         ) from exc
 
 
-def _compose_config_data(
-    *,
-    config_name: str,
-    overrides: Sequence[str] | None = None,
-    config_dir: Path | None = None,
-) -> dict[str, object]:
-    resolved_config_dir = (config_dir or default_config_dir()).resolve()
-    with initialize_config_dir(
-        config_dir=str(resolved_config_dir),
-        version_base=None,
-    ):
-        composed = compose(config_name=config_name, overrides=list(overrides or []))
+def _load_yaml_mapping(config_path: Path) -> dict[str, object]:
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
 
-    data = OmegaConf.to_container(composed, resolve=True)
-    if not isinstance(data, dict):
+    with config_path.open("r", encoding="utf-8") as handle:
+        loaded = yaml.safe_load(handle)
+
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, dict):
         raise TypeError("Config must resolve to a mapping")
 
     normalized: dict[str, object] = {}
-    for key, value in data.items():
+    for key, value in loaded.items():
         if not isinstance(key, str):
             raise TypeError("Config keys must be strings")
         normalized[key] = value
-    normalized.pop("hydra", None)
     return normalized

@@ -21,13 +21,13 @@ class WatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     episodes: PositiveInt = 1
-    seed: int | None = None
     fps: PositiveFloat | None = None
 
 
 class WatchAppConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    seed: int | None = None
     emulator: EmulatorConfig
     env: EnvConfig = Field(default_factory=EnvConfig)
     watch: WatchConfig = Field(default_factory=WatchConfig)

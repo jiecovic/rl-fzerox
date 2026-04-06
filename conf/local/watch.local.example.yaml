@@ -1,3 +1,5 @@
+seed: 123
+
 emulator:
   core_path: /absolute/path/to/mupen64plus_next_libretro.so
   rom_path: /absolute/path/to/F-Zero X (USA).n64
@@ -7,5 +9,4 @@ env:
 
 watch:
   episodes: 1
-  seed: 123
   fps: 30

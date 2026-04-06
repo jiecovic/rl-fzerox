@@ -32,10 +32,14 @@ pip install -e .[dev,watch]
 Put your local paths in `conf/local/watch.local.yaml`:
 
 ```yaml
+seed: 123
+
 emulator:
   core_path: /abs/path/to/mupen64plus_next_libretro.so
   rom_path: /abs/path/to/fzerox.n64
 ```
+
+The root `seed` is the master seed for Python/env randomness. Emulator resets restore a deterministic baseline savestate.
 
 ## Commands
 
@@ -54,7 +58,7 @@ python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/pa
 Watch the game:
 
 ```bash
-python -m rl_fzerox.apps.watch --config-file conf/local/watch.local.yaml
+python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml
 ```
 
 Watch controls:
