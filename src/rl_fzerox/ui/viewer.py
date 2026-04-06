@@ -102,6 +102,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                     continue
 
                 if paused and viewer_input.step_once:
+                    # Pause-mode stepping should advance exactly one emulator
+                    # frame, independent of env action-repeat settings.
                     frame_step = env.backend.step_frame()
                     frame = frame_step.frame
                     episode_reward += frame_step.reward

@@ -32,7 +32,12 @@ def resolve_config_path_value(raw_path: str, *, config_dir: Path) -> Path:
 
 
 def config_path_resolution_base_dir(config_dir: Path) -> Path:
-    """Return the base directory used to resolve relative config paths."""
+    """Return the base directory used to resolve relative config paths.
+
+    Repository-owned configs deliberately resolve from the project root so
+    checked-in examples can use stable `local/...` paths. Ad hoc external
+    configs still resolve relative to the config file itself.
+    """
 
     resolved_config_dir = config_dir.resolve()
     if resolved_config_dir.is_relative_to(config_root_dir().resolve()):
