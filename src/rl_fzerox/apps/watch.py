@@ -10,6 +10,8 @@ from rl_fzerox.ui import run_viewer
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for the watch app."""
+
     parser = argparse.ArgumentParser(
         description="Watch the F-Zero X environment from a YAML config file.",
         allow_abbrev=False,
@@ -25,6 +27,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Load the watch config and launch the viewer."""
+
     args = parse_args(argv)
     try:
         config = load_watch_app_config(Path(str(args.config_path)))

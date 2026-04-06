@@ -3,6 +3,8 @@ from __future__ import annotations
 
 
 def display_size(frame_shape: tuple[int, int, int], aspect_ratio: float) -> tuple[int, int]:
+    """Convert a raw frame shape into a human display size."""
+
     frame_height, frame_width, _ = frame_shape
     if aspect_ratio <= 0.0:
         return frame_width, frame_height

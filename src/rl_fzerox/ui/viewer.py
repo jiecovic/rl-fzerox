@@ -15,12 +15,16 @@ from rl_fzerox.core.seed import episode_seed, seed_process
 
 @dataclass(frozen=True)
 class ViewerInput:
+    """Normalized viewer input state for one polling cycle."""
+
     quit_requested: bool = False
     toggle_pause: bool = False
     step_once: bool = False
 
 
 def run_viewer(config: WatchAppConfig) -> None:
+    """Run the real-time watch UI against the configured emulator."""
+
     try:
         import pygame
     except ImportError as exc:

@@ -10,6 +10,8 @@ from rl_fzerox.core.emulator.probe import probe_core
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for the core probe command."""
+
     parser = argparse.ArgumentParser(
         description="Load a libretro core natively and print its system metadata.",
         allow_abbrev=False,
@@ -19,6 +21,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Run the core probe CLI."""
+
     args = parse_args(argv)
     core_info = probe_core(str(Path(args.core_path).expanduser().resolve()))
     print(

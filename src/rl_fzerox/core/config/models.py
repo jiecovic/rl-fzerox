@@ -5,12 +5,16 @@ from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveFloat, Posi
 
 
 class EnvConfig(BaseModel):
+    """Environment-level rollout settings that affect frame stepping."""
+
     model_config = ConfigDict(extra="forbid")
 
     action_repeat: PositiveInt = 2
 
 
 class EmulatorConfig(BaseModel):
+    """Paths required to boot the libretro core and the ROM."""
+
     model_config = ConfigDict(extra="forbid")
 
     core_path: FilePath
@@ -18,6 +22,8 @@ class EmulatorConfig(BaseModel):
 
 
 class WatchConfig(BaseModel):
+    """Human-facing watch UI settings."""
+
     model_config = ConfigDict(extra="forbid")
 
     episodes: PositiveInt = 1
@@ -25,6 +31,8 @@ class WatchConfig(BaseModel):
 
 
 class WatchAppConfig(BaseModel):
+    """Top-level watch application configuration."""
+
     model_config = ConfigDict(extra="forbid")
 
     seed: int | None = None

@@ -10,6 +10,8 @@ from rl_fzerox.core.config.models import WatchAppConfig
 
 
 def load_watch_app_config(config_path: Path) -> WatchAppConfig:
+    """Load and validate a watch configuration file."""
+
     resolved_config_path = config_path.expanduser().resolve()
     try:
         config_data = _load_yaml_mapping(resolved_config_path)
