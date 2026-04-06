@@ -55,7 +55,7 @@ watch:
 
 Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` is an optional savestate file used as the reset baseline. The root `seed` is the master seed for Python/env randomness.
 
-`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Once that path is stable for your setup, press `K` in `watch` to save a dedicated race-start baseline. When `emulator.baseline_state_path` already exists, that saved baseline takes precedence and the scripted bootstrap is skipped.
+`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Once that path is stable for your setup, press `K` in `watch` to save a dedicated race-start baseline. When a custom baseline is active, that baseline takes precedence and the scripted bootstrap is skipped.
 
 ## Commands
 
@@ -75,6 +75,12 @@ Headless smoke test with race bootstrap:
 
 ```bash
 python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/path/to/fzerox.n64 --reset-to-race --frames 60
+```
+
+If you want to reuse a saved baseline state from the local watch flow, pass the same runtime directory as well:
+
+```bash
+python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/path/to/fzerox.n64 --runtime-dir /abs/path/to/runtime --baseline-state /abs/path/to/first-race.state --frames 0
 ```
 
 Watch the game:

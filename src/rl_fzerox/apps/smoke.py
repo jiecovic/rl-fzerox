@@ -31,6 +31,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional path to a savestate used as the reset baseline.",
     )
     parser.add_argument(
+        "--runtime-dir",
+        dest="runtime_dir",
+        help="Optional runtime directory for emulator-generated state.",
+    )
+    parser.add_argument(
         "--reset-to-race",
         action="store_true",
         help="Run the deterministic first-race bootstrap after reset.",
@@ -48,6 +53,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     emulator = Emulator(
         core_path=Path(args.core_path).expanduser().resolve(),
         rom_path=Path(args.rom_path).expanduser().resolve(),
+        runtime_dir=(
+            None
+            if args.runtime_dir is None
+            else Path(args.runtime_dir).expanduser().resolve()
+        ),
         baseline_state_path=(
             None
             if args.baseline_state_path is None
@@ -57,7 +67,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         reset_state = emulator.reset()
         boot_info: dict[str, object] = {}
-        if args.reset_to_race:
+        if args.reset_to_race and emulator.baseline_kind != "custom":
             _, boot_info = boot_into_first_race(emulator)
         emulator.step_frames(args.frames)
         frame = emulator.render()
@@ -70,6 +80,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "native_fps": emulator.native_fps,
                     "frame_shape": list(emulator.frame_shape),
                     "frame_index": emulator.frame_index,
+                    "baseline_kind": emulator.baseline_kind,
                     "reset_mode": boot_info.get("reset_mode", "baseline"),
                     "reset_frame_shape": list(reset_state.frame.shape),
                     "final_frame_shape": list(frame.shape),

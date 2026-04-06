@@ -61,6 +61,11 @@ impl PyEmulator {
         self.host.frame_index()
     }
 
+    #[getter]
+    fn baseline_kind(&self) -> &'static str {
+        self.host.baseline_kind()
+    }
+
     fn reset(&mut self, py: Python<'_>) -> PyResult<()> {
         py.detach(|| self.host.reset()).map_err(map_core_error)
     }
