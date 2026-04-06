@@ -1,0 +1,63 @@
+[build-system]
+requires = ["maturin>=1.12,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rl-fzerox"
+version = "0.1.0"
+description = "Gymnasium scaffold for F-Zero X emulator control and observation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Thomas" }]
+dependencies = [
+  "gymnasium>=0.29,<1.1",
+  "hydra-core>=1.3,<2",
+  "numpy>=1.26,<3",
+  "pydantic>=2.8,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "maturin>=1.12,<2",
+  "pyright>=1.1.390,<2",
+  "pytest>=8,<9",
+  "ruff>=0.11.0,<0.12",
+]
+watch = [
+  "pygame>=2.5,<3",
+]
+
+[project.scripts]
+fzerox-probe = "rl_fzerox.apps.probe:main"
+fzerox-smoke = "rl_fzerox.apps.smoke:main"
+fzerox-watch = "rl_fzerox.apps.watch:main"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "B",
+  "E",
+  "F",
+  "I",
+  "UP",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.maturin]
+bindings = "pyo3"
+module-name = "rl_fzerox._native"
+python-source = "src"

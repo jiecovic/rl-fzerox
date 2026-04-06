@@ -1,0 +1,14 @@
+{
+  "typeCheckingMode": "standard",
+  "pythonVersion": "3.11",
+  "include": ["src", "tests"],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "venvPath": ".",
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    "build",
+    "dist"
+  ]
+}

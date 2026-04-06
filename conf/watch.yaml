@@ -1,0 +1,16 @@
+emulator: {}
+
+env:
+  action_repeat: 2
+
+watch:
+  episodes: 1
+  seed: 123
+  fps: null
+
+hydra:
+  run:
+    dir: .
+  output_subdir: null
+  job:
+    chdir: false
