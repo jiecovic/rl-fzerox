@@ -133,7 +133,6 @@ class Emulator:
     def _frame_info(self) -> dict[str, object]:
         return {
             "backend": self.name,
-            "runtime": "libretro",
             "frame_index": self.frame_index,
             "core_path": str(self._core_path),
             "rom_path": str(self._rom_path),

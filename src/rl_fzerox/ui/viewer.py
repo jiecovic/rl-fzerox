@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 
@@ -23,6 +24,107 @@ from rl_fzerox.core.emulator import Emulator
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.seed import seed_process
+
+Color = tuple[int, int, int]
+
+
+class TextSurface(Protocol):
+    """Minimal surface contract used by the panel layout code."""
+
+    def get_width(self) -> int: ...
+
+    def get_height(self) -> int: ...
+
+
+class RenderFont(Protocol):
+    """Minimal font contract used by the panel renderer."""
+
+    def render(
+        self,
+        text: str,
+        antialias: bool,
+        color: Color,
+    ) -> TextSurface: ...
+
+
+@dataclass(frozen=True)
+class ViewerLayout:
+    """Spacing and sizing used by the watch window layout."""
+
+    panel_width: int = 336
+    panel_padding: int = 12
+    title_gap: int = 2
+    title_section_gap: int = 8
+    section_gap: int = 8
+    section_title_gap: int = 4
+    section_rule_gap: int = 4
+    line_gap: int = 2
+
+
+@dataclass(frozen=True)
+class ViewerPalette:
+    """Color palette for the watch window."""
+
+    app_background: Color = (11, 14, 18)
+    panel_background: Color = (20, 24, 30)
+    panel_border: Color = (46, 54, 66)
+    text_primary: Color = (238, 241, 245)
+    text_muted: Color = (155, 165, 178)
+    text_accent: Color = (126, 214, 170)
+    text_warning: Color = (241, 206, 108)
+
+
+@dataclass(frozen=True)
+class PanelLine:
+    """One labeled line in the side panel."""
+
+    label: str
+    value: str
+    color: Color
+
+
+@dataclass(frozen=True)
+class PanelSection:
+    """One titled section in the side panel."""
+
+    title: str
+    lines: list[PanelLine]
+
+
+@dataclass(frozen=True)
+class ViewerFonts:
+    """Font bundle used by the watch panel renderer."""
+
+    title: RenderFont
+    section: RenderFont
+    body: RenderFont
+    small: RenderFont
+
+
+@dataclass(frozen=True)
+class ViewerFontSizes:
+    """Point sizes for the watch panel fonts."""
+
+    title: int = 24
+    section: int = 20
+    body: int = 18
+    small: int = 16
+
+
+LAYOUT = ViewerLayout()
+PALETTE = ViewerPalette()
+FONT_SIZES = ViewerFontSizes()
+
+BUTTON_LABELS: tuple[tuple[int, str], ...] = (
+    (JOYPAD_UP, "Up"),
+    (JOYPAD_DOWN, "Down"),
+    (JOYPAD_LEFT, "Left"),
+    (JOYPAD_RIGHT, "Right"),
+    (JOYPAD_A, "A"),
+    (JOYPAD_B, "B"),
+    (JOYPAD_START, "Start"),
+    (JOYPAD_SELECT, "Select"),
+)
 
 
 @dataclass(frozen=True)
@@ -60,17 +162,19 @@ def run_viewer(config: WatchAppConfig) -> None:
 
     try:
         screen = None
-        font = None
+        fonts = None
         paused = False
         target_seconds: float | None = None
 
         for episode in range(config.watch.episodes):
             reset_seed = config.seed if episode == 0 else None
             frame, info = env.reset(seed=reset_seed)
+            reset_info = dict(info)
+            current_joypad_mask = 0
 
-            if screen is None or font is None:
+            if screen is None or fonts is None:
                 screen = _create_screen(pygame, emulator.display_size)
-                font = pygame.font.Font(None, 24)
+                fonts = _create_fonts(pygame)
                 target_fps = config.watch.fps or (env.backend.native_fps / config.env.action_repeat)
                 target_seconds = 1.0 / target_fps
 
@@ -79,6 +183,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 return
             if viewer_input.toggle_pause:
                 paused = not paused
+            current_joypad_mask = viewer_input.joypad_mask
             emulator.set_joypad_mask(viewer_input.joypad_mask)
             if viewer_input.save_state:
                 _save_baseline_state(
@@ -91,12 +196,14 @@ def run_viewer(config: WatchAppConfig) -> None:
             _draw_frame(
                 pygame=pygame,
                 screen=screen,
-                font=font,
+                fonts=fonts,
                 frame=frame,
                 episode=episode,
                 info=info,
+                reset_info=reset_info,
                 episode_reward=0.0,
                 paused=paused,
+                joypad_mask=current_joypad_mask,
             )
 
             terminated = False
@@ -109,6 +216,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     return
                 if viewer_input.toggle_pause:
                     paused = not paused
+                current_joypad_mask = viewer_input.joypad_mask
                 emulator.set_joypad_mask(viewer_input.joypad_mask)
                 if viewer_input.save_state:
                     _save_baseline_state(
@@ -119,12 +227,14 @@ def run_viewer(config: WatchAppConfig) -> None:
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
-                        font=font,
+                        fonts=fonts,
                         frame=frame,
                         episode=episode,
                         info=info,
+                        reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
+                        joypad_mask=current_joypad_mask,
                     )
                     time.sleep(0.01)
                     continue
@@ -141,12 +251,14 @@ def run_viewer(config: WatchAppConfig) -> None:
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
-                        font=font,
+                        fonts=fonts,
                         frame=frame,
                         episode=episode,
                         info=info,
+                        reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
+                        joypad_mask=current_joypad_mask,
                     )
                     continue
 
@@ -158,12 +270,14 @@ def run_viewer(config: WatchAppConfig) -> None:
                 _draw_frame(
                     pygame=pygame,
                     screen=screen,
-                    font=font,
+                    fonts=fonts,
                     frame=frame,
                     episode=episode,
                     info=info,
+                    reset_info=reset_info,
                     episode_reward=episode_reward,
                     paused=paused,
+                    joypad_mask=current_joypad_mask,
                 )
 
                 if paused:
@@ -180,59 +294,305 @@ def run_viewer(config: WatchAppConfig) -> None:
         pygame.quit()
 
 
-def _create_screen(pygame, display_size: tuple[int, int]):
-    screen = pygame.display.set_mode(display_size)
+def _create_screen(pygame, game_display_size: tuple[int, int]):
+    screen = pygame.display.set_mode(_window_size(game_display_size))
     pygame.display.set_caption("F-Zero X Watch")
     return screen
 
 
-def _ensure_screen(pygame, screen, display_size: tuple[int, int]):
-    if screen.get_size() == display_size:
+def _ensure_screen(pygame, screen, game_display_size: tuple[int, int]):
+    if screen.get_size() == _window_size(game_display_size):
         return screen
-    return _create_screen(pygame, display_size)
+    return _create_screen(pygame, game_display_size)
+
+
+def _create_fonts(pygame) -> ViewerFonts:
+    return ViewerFonts(
+        title=pygame.font.Font(None, FONT_SIZES.title),
+        section=pygame.font.Font(None, FONT_SIZES.section),
+        body=pygame.font.Font(None, FONT_SIZES.body),
+        small=pygame.font.Font(None, FONT_SIZES.small),
+    )
 
 
 def _draw_frame(
     *,
     pygame,
     screen,
-    font,
+    fonts,
     frame: np.ndarray,
     episode: int,
     info: dict[str, object],
+    reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
+    joypad_mask: int,
 ) -> None:
     frame_height, frame_width, _ = frame.shape
     surface = pygame.image.frombuffer(frame.tobytes(), (frame_width, frame_height), "RGB")
     target_size = display_size(frame.shape, _display_aspect_ratio(info))
     if surface.get_size() != target_size:
         surface = pygame.transform.scale(surface, target_size)
+    screen.fill(PALETTE.app_background)
     screen.blit(surface, (0, 0))
-
-    overlay = font.render(
-        (
-            f"{'paused' if paused else 'running'}  "
-            "P pause/resume  N next frame  K save state  "
-            "Arrows pad  X=A  Z=B  Enter=Start  "
-            f"episode={episode} frame={info.get('frame_index', 0):6d} "
-            f"reward={episode_reward:8.2f}"
-        ),
-        True,
-        (255, 255, 255),
+    panel_rect = pygame.Rect(
+        target_size[0],
+        0,
+        LAYOUT.panel_width,
+        _window_size(target_size)[1],
     )
-    overlay_background = pygame.Surface(
-        (overlay.get_width() + 12, overlay.get_height() + 8),
-        pygame.SRCALPHA,
+    _draw_side_panel(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        panel_rect=panel_rect,
+        episode=episode,
+        info=info,
+        reset_info=reset_info,
+        episode_reward=episode_reward,
+        paused=paused,
+        joypad_mask=joypad_mask,
+        game_display_size=target_size,
     )
-    overlay_background.fill((0, 0, 0, 180))
-    screen.blit(overlay_background, (8, 8))
-    screen.blit(overlay, (8, 8))
     pygame.display.flip()
+
+
+def _draw_side_panel(
+    *,
+    pygame,
+    screen,
+    fonts: ViewerFonts,
+    panel_rect,
+    episode: int,
+    info: dict[str, object],
+    reset_info: dict[str, object],
+    episode_reward: float,
+    paused: bool,
+    joypad_mask: int,
+    game_display_size: tuple[int, int],
+) -> None:
+    pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
+    pygame.draw.line(
+        screen,
+        PALETTE.panel_border,
+        panel_rect.topleft,
+        panel_rect.bottomleft,
+        width=2,
+    )
+
+    x = panel_rect.x + LAYOUT.panel_padding
+    y = panel_rect.y + LAYOUT.panel_padding
+    panel_width = panel_rect.width - (2 * LAYOUT.panel_padding)
+    sections = _build_panel_sections(
+        episode=episode,
+        info=info,
+        reset_info=reset_info,
+        episode_reward=episode_reward,
+        paused=paused,
+        joypad_mask=joypad_mask,
+        game_display_size=game_display_size,
+    )
+
+    y = _draw_panel_title(
+        screen=screen,
+        fonts=fonts,
+        x=x,
+        y=y,
+        title="F-Zero X Watch",
+        subtitle="live emulator session",
+    )
+    y += LAYOUT.title_section_gap
+
+    for section_index, section in enumerate(sections):
+        y = _draw_section(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            section=section,
+        )
+        if section_index < len(sections) - 1:
+            y += LAYOUT.section_gap
+
+
+def _build_panel_sections(
+    *,
+    episode: int,
+    info: dict[str, object],
+    reset_info: dict[str, object],
+    episode_reward: float,
+    paused: bool,
+    joypad_mask: int,
+    game_display_size: tuple[int, int],
+) -> list[PanelSection]:
+    return [
+        PanelSection(
+            title="Session",
+            lines=[
+                _panel_line(
+                    "State",
+                    "paused" if paused else "running",
+                    PALETTE.text_warning if paused else PALETTE.text_accent,
+                ),
+                _panel_line("Episode", str(episode), PALETTE.text_primary),
+                _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
+                _panel_line("Reward", f"{episode_reward:.2f}", PALETTE.text_primary),
+            ],
+        ),
+        PanelSection(
+            title="Reset",
+            lines=[
+                _panel_line(
+                    "Mode",
+                    str(reset_info.get("reset_mode", "baseline")),
+                    PALETTE.text_primary,
+                ),
+                _panel_line(
+                    "Baseline",
+                    str(reset_info.get("baseline_kind", "unknown")),
+                    PALETTE.text_primary,
+                ),
+                _panel_line(
+                    "Boot",
+                    str(reset_info.get("boot_state", "-")),
+                    PALETTE.text_primary,
+                ),
+            ],
+        ),
+        PanelSection(
+            title="Input",
+            lines=[
+                _panel_line(
+                    "Held",
+                    _pressed_button_labels(joypad_mask),
+                    PALETTE.text_primary,
+                ),
+            ],
+        ),
+        PanelSection(
+            title="Display",
+            lines=[
+                _panel_line(
+                    "Game",
+                    f"{game_display_size[0]}x{game_display_size[1]}",
+                    PALETTE.text_primary,
+                ),
+                _panel_line(
+                    "FPS",
+                    f"{_float_info(info, 'native_fps'):.1f}",
+                    PALETTE.text_primary,
+                ),
+            ],
+        ),
+        PanelSection(
+            title="Controls",
+            lines=[
+                _panel_line("Pad", "Arrows", PALETTE.text_muted),
+                _panel_line("A / B", "X / Z", PALETTE.text_muted),
+                _panel_line("Start", "Enter", PALETTE.text_muted),
+                _panel_line("Select", "Backspace", PALETTE.text_muted),
+                _panel_line("Playback", "P pause | N step", PALETTE.text_muted),
+                _panel_line("Baseline", "K save", PALETTE.text_muted),
+            ],
+        ),
+    ]
+
+
+def _draw_panel_title(*, screen, fonts, x: int, y: int, title: str, subtitle: str) -> int:
+    title_surface = fonts.title.render(title, True, PALETTE.text_primary)
+    subtitle_surface = fonts.small.render(subtitle, True, PALETTE.text_muted)
+    screen.blit(title_surface, (x, y))
+    subtitle_y = y + title_surface.get_height() + LAYOUT.title_gap
+    screen.blit(subtitle_surface, (x, subtitle_y))
+    return subtitle_y + subtitle_surface.get_height()
+
+
+def _draw_section(
+    *,
+    pygame,
+    screen,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    section: PanelSection,
+) -> int:
+    section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
+    screen.blit(section_title, (x, y))
+    y += section_title.get_height() + LAYOUT.section_title_gap
+    pygame.draw.line(screen, PALETTE.panel_border, (x, y), (x + width, y), width=1)
+    y += LAYOUT.section_rule_gap
+
+    for line in section.lines:
+        if line.label:
+            label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
+            screen.blit(label_surface, (x, y))
+            value_surface = fonts.body.render(line.value, True, line.color)
+            value_x = x + width - value_surface.get_width()
+            screen.blit(value_surface, (value_x, y - 1))
+            y += max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+            continue
+
+        value_surface = fonts.small.render(line.value, True, line.color)
+        screen.blit(value_surface, (x, y))
+        y += value_surface.get_height() + LAYOUT.line_gap
+
+    return y
+
+
+def _panel_line(label: str, value: str, color: Color) -> PanelLine:
+    return PanelLine(label=label, value=value, color=color)
+
+
+def _panel_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> int:
+    title_surface = fonts.title.render("F-Zero X Watch", True, PALETTE.text_primary)
+    subtitle_surface = fonts.small.render("live emulator session", True, PALETTE.text_muted)
+    y = LAYOUT.panel_padding
+    y += title_surface.get_height() + LAYOUT.title_gap + subtitle_surface.get_height()
+    y += LAYOUT.title_section_gap
+
+    for section_index, section in enumerate(sections):
+        section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
+        y += section_title.get_height() + LAYOUT.section_title_gap
+        y += LAYOUT.section_rule_gap
+        for line in section.lines:
+            if line.label:
+                label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
+                value_surface = fonts.body.render(line.value, True, line.color)
+                y += max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+            else:
+                value_surface = fonts.small.render(line.value, True, line.color)
+                y += value_surface.get_height() + LAYOUT.line_gap
+        if section_index < len(sections) - 1:
+            y += LAYOUT.section_gap
+
+    return y + LAYOUT.panel_padding
+
+
+def _window_size(game_display_size: tuple[int, int]) -> tuple[int, int]:
+    return game_display_size[0] + LAYOUT.panel_width, game_display_size[1]
+
+
+def _pressed_button_labels(joypad_mask_value: int) -> str:
+    pressed = [
+        label
+        for button_id, label in BUTTON_LABELS
+        if joypad_mask_value & (1 << button_id)
+    ]
+    return " ".join(pressed) if pressed else "none"
 
 
 def _display_aspect_ratio(info: dict[str, object]) -> float:
     value = info.get("display_aspect_ratio")
+    if isinstance(value, int | float):
+        return float(value)
+    return 0.0
+
+
+def _float_info(info: dict[str, object], key: str) -> float:
+    value = info.get(key)
     if isinstance(value, int | float):
         return float(value)
     return 0.0
