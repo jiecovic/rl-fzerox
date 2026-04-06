@@ -43,8 +43,7 @@ class SyntheticBackend:
     def frame_index(self) -> int:
         return self._state.frame_index
 
-    def reset(self, seed: int | None = None) -> ResetState:
-        _ = seed
+    def reset(self) -> ResetState:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
         return ResetState(

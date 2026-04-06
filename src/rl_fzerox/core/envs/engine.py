@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 import numpy as np
-from gymnasium.spaces import Space
+from gymnasium import spaces
 
 from rl_fzerox.core.config.models import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
-from rl_fzerox.core.envs.contracts import ActionSpec, ObservationSpec, RewardFunction
-from rl_fzerox.core.envs.defaults import BackendReward, NoOpActionSpec, RawFrameObservationSpec
 
 
 class FZeroXEnvEngine:
@@ -16,34 +14,35 @@ class FZeroXEnvEngine:
         *,
         backend: EmulatorBackend,
         config: EnvConfig,
-        action_spec: ActionSpec | None = None,
-        observation_spec: ObservationSpec | None = None,
-        reward_function: RewardFunction | None = None,
     ) -> None:
         self.backend = backend
         self.config = config
-        self.action_spec = action_spec or NoOpActionSpec()
-        self.observation_spec = observation_spec or RawFrameObservationSpec()
-        self.reward_function = reward_function or BackendReward()
+        self._action_space = spaces.Discrete(1)
+        self._observation_space = spaces.Box(
+            low=0,
+            high=255,
+            shape=self.backend.frame_shape,
+            dtype=np.uint8,
+        )
 
     @property
-    def action_space(self) -> Space[np.int64]:
-        return self.action_spec.action_space
+    def action_space(self) -> spaces.Discrete:
+        return self._action_space
 
     @property
-    def observation_space(self) -> Space[np.ndarray]:
-        return self.observation_spec.observation_space(self.backend.frame_shape)
+    def observation_space(self) -> spaces.Box:
+        return self._observation_space
 
-    def reset(self, *, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
-        reset_state = self.backend.reset(seed=seed)
-        self.reward_function.reset()
-        return self.observation_spec.transform(reset_state.frame), dict(reset_state.info)
+    def reset(self) -> tuple[np.ndarray, dict[str, object]]:
+        reset_state = self.backend.reset()
+        return np.array(reset_state.frame, copy=True), dict(reset_state.info)
 
     def step(
         self,
         action: int | np.integer,
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
-        self.action_spec.validate(action)
+        if int(action) != 0:
+            raise ValueError(f"Only action 0 is supported right now, got {action!r}")
 
         latest_frame: np.ndarray | None = None
         total_reward = 0.0
@@ -54,7 +53,7 @@ class FZeroXEnvEngine:
         for repeat_index in range(self.config.action_repeat):
             frame_step = self.backend.step_frame()
             latest_frame = frame_step.frame
-            total_reward += self.reward_function.reward(frame_step)
+            total_reward += frame_step.reward
             terminated = frame_step.terminated
             truncated = frame_step.truncated
             info = dict(frame_step.info)
@@ -67,7 +66,7 @@ class FZeroXEnvEngine:
             raise RuntimeError("The emulator did not produce a frame during step()")
 
         return (
-            self.observation_spec.transform(latest_frame),
+            np.array(latest_frame, copy=True),
             total_reward,
             terminated,
             truncated,

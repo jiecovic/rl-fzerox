@@ -6,7 +6,6 @@ import numpy as np
 
 from rl_fzerox.core.config.models import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
-from rl_fzerox.core.envs.contracts import ActionSpec, ObservationSpec, RewardFunction
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
 
@@ -17,18 +16,11 @@ class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
         self,
         backend: EmulatorBackend,
         config: EnvConfig,
-        *,
-        action_spec: ActionSpec | None = None,
-        observation_spec: ObservationSpec | None = None,
-        reward_function: RewardFunction | None = None,
     ) -> None:
         super().__init__()
         self._engine = FZeroXEnvEngine(
             backend=backend,
             config=config,
-            action_spec=action_spec,
-            observation_spec=observation_spec,
-            reward_function=reward_function,
         )
         self.backend = self._engine.backend
         self.config = self._engine.config
@@ -38,7 +30,9 @@ class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
     def reset(self, *, seed: int | None = None, options: dict[str, object] | None = None):
         _ = options
         super().reset(seed=seed)
-        return self._engine.reset(seed=seed)
+        observation, info = self._engine.reset()
+        info["seed"] = seed
+        return observation, info
 
     def step(self, action: int | np.integer):
         return self._engine.step(action)
