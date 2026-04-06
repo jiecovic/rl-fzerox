@@ -1,0 +1,49 @@
+// rust/bindings/probe.rs
+use std::path::Path;
+
+use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError};
+use pyo3::prelude::*;
+
+use crate::core::error::CoreError;
+use crate::core::info::CoreInfo;
+use crate::core::probe::probe;
+
+#[pyclass(name = "CoreInfo", frozen, get_all, skip_from_py_object)]
+pub struct PyCoreInfo {
+    pub api_version: u32,
+    pub library_name: String,
+    pub library_version: String,
+    pub valid_extensions: Vec<String>,
+    pub requires_full_path: bool,
+    pub blocks_extract: bool,
+    pub supports_no_game: Option<bool>,
+}
+
+#[pyfunction]
+pub fn probe_core(core_path: &str) -> PyResult<PyCoreInfo> {
+    let core_info = probe(Path::new(core_path)).map_err(map_core_error)?;
+    Ok(PyCoreInfo::from(core_info))
+}
+
+impl From<CoreInfo> for PyCoreInfo {
+    fn from(value: CoreInfo) -> Self {
+        Self {
+            api_version: value.api_version,
+            library_name: value.library_name,
+            library_version: value.library_version,
+            valid_extensions: value.valid_extensions,
+            requires_full_path: value.requires_full_path,
+            blocks_extract: value.blocks_extract,
+            supports_no_game: value.supports_no_game,
+        }
+    }
+}
+
+fn map_core_error(error: CoreError) -> PyErr {
+    match error {
+        CoreError::MissingCore(_) | CoreError::MissingRom(_) => {
+            PyFileNotFoundError::new_err(error.to_string())
+        }
+        _ => PyRuntimeError::new_err(error.to_string()),
+    }
+}
