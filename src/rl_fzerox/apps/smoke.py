@@ -10,6 +10,8 @@ from rl_fzerox.core.emulator import Emulator
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for the headless smoke test."""
+
     parser = argparse.ArgumentParser(
         description="Load the ROM, reset the emulator, and advance frames headlessly.",
         allow_abbrev=False,
@@ -26,6 +28,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
+    """Run the headless ROM-load and frame-step smoke path."""
+
     args = parse_args(argv)
     if args.frames < 0:
         raise SystemExit("--frames must be >= 0")

@@ -10,6 +10,8 @@ from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
 
 class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
+    """Gymnasium wrapper around the current raw-frame emulator backend."""
+
     metadata = {"render_modes": ["rgb_array"]}
 
     def __init__(

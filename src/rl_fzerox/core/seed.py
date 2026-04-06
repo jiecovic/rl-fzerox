@@ -7,6 +7,8 @@ import numpy as np
 
 
 def seed_process(seed: int | None) -> None:
+    """Seed Python-side randomness for the current process."""
+
     # The current runtime is deterministic on the emulator side. The master seed
     # therefore owns Python-side randomness and future stochastic components.
     if seed is None:
@@ -17,6 +19,8 @@ def seed_process(seed: int | None) -> None:
 
 
 def episode_seed(master_seed: int | None, episode_index: int) -> int | None:
+    """Derive a stable per-episode seed from one master seed."""
+
     if master_seed is None:
         return None
     return master_seed + episode_index

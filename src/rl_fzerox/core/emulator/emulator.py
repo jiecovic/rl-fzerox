@@ -11,6 +11,8 @@ from rl_fzerox.core.emulator.video import display_size
 
 
 class Emulator:
+    """Python wrapper over the native Rust libretro host."""
+
     def __init__(self, *, core_path: Path, rom_path: Path) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
@@ -42,6 +44,8 @@ class Emulator:
         return int(self._native.frame_index)
 
     def reset(self) -> ResetState:
+        """Restore the deterministic episode baseline and return the first frame."""
+
         self._native.reset()
         return ResetState(
             frame=self.render(),
@@ -49,6 +53,8 @@ class Emulator:
         )
 
     def step_frame(self) -> FrameStep:
+        """Advance exactly one emulator frame."""
+
         self.step_frames(1)
         return FrameStep(
             frame=self.render(),
@@ -59,9 +65,13 @@ class Emulator:
         )
 
     def step_frames(self, count: int) -> None:
+        """Advance the emulator by a fixed number of frames."""
+
         self._native.step_frames(count)
 
     def render(self) -> np.ndarray:
+        """Return the latest raw RGB frame as a NumPy array."""
+
         frame_bytes = self._native.frame_rgb()
         frame_height, frame_width, channels = self.frame_shape
         frame = np.frombuffer(frame_bytes, dtype=np.uint8)
@@ -74,6 +84,8 @@ class Emulator:
         return frame.reshape((frame_height, frame_width, channels))
 
     def close(self) -> None:
+        """Release the native emulator host."""
+
         self._native.close()
 
     def _frame_info(self) -> dict[str, object]:

@@ -9,12 +9,16 @@ import numpy as np
 
 @dataclass(frozen=True)
 class ResetState:
+    """State returned immediately after an emulator reset."""
+
     frame: np.ndarray
     info: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class FrameStep:
+    """One emulator frame worth of output and metadata."""
+
     frame: np.ndarray
     reward: float
     terminated: bool
@@ -23,6 +27,8 @@ class FrameStep:
 
 
 class EmulatorBackend(Protocol):
+    """Minimal emulator contract consumed by the env and viewer."""
+
     @property
     def name(self) -> str: ...
 
