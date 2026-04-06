@@ -175,8 +175,8 @@ def run_viewer(config: WatchAppConfig) -> None:
         fonts = None
         paused = False
         target_seconds: float | None = None
-
-        for episode in range(config.watch.episodes):
+        episode = 0
+        while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             frame, info = env.reset(seed=reset_seed)
             reset_info = dict(info)
@@ -253,14 +253,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                     continue
 
                 if paused and viewer_input.step_once:
-                    # Pause-mode stepping should advance exactly one emulator
-                    # frame, independent of env action-repeat settings.
-                    frame_step = env.backend.step_frame()
-                    frame = frame_step.frame
-                    episode_reward += frame_step.reward
-                    terminated = frame_step.terminated
-                    truncated = frame_step.truncated
-                    info = dict(frame_step.info)
+                    frame, reward, terminated, truncated, info = env.step_frame()
+                    episode_reward += reward
                     telemetry = _read_live_telemetry(emulator)
                     _draw_frame(
                         pygame=pygame,
@@ -306,6 +300,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 delay = max(0.0, target_seconds - elapsed)
                 if delay:
                     time.sleep(delay)
+            episode += 1
     finally:
         env.close()
         pygame.quit()
@@ -473,7 +468,12 @@ def _build_panel_columns(
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
-                    _panel_line("Reward", f"{episode_reward:.2f}", PALETTE.text_primary),
+                    _panel_line(
+                        "Step",
+                        f"{_float_info(info, 'step_reward'):.2f}",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line("Return", f"{episode_reward:.2f}", PALETTE.text_primary),
                 ],
             ),
             PanelSection(
@@ -629,6 +629,7 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
                 PALETTE.text_primary,
             ),
             _panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
+            _panel_line("Boost", str(telemetry.player.boost_timer), PALETTE.text_primary),
             _panel_line(
                 "Energy",
                 f"{telemetry.player.energy:.1f} / {telemetry.player.max_energy:.1f}",
@@ -636,6 +637,26 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
             ),
             _panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
             _panel_line("Pos", str(telemetry.player.position), PALETTE.text_primary),
+            _panel_line(
+                "Progress",
+                _format_distance(telemetry.player.race_distance),
+                PALETTE.text_primary,
+            ),
+            _panel_line(
+                "Lap prog",
+                _format_distance(telemetry.player.lap_distance),
+                PALETTE.text_primary,
+            ),
+            _panel_line(
+                "Lap base",
+                _format_distance(telemetry.player.laps_completed_distance),
+                PALETTE.text_primary,
+            ),
+            _panel_line(
+                "Sort key",
+                _format_distance(telemetry.player.race_distance_position),
+                PALETTE.text_primary,
+            ),
             _panel_line(
                 "Flags",
                 _format_state_labels(telemetry.player.state_labels),
@@ -711,6 +732,10 @@ def _format_race_time_ms(race_time_ms: int) -> str:
     minutes, remainder = divmod(max(0, race_time_ms), 60_000)
     seconds, milliseconds = divmod(remainder, 1_000)
     return f"{minutes:02d}'{seconds:02d}\"{milliseconds:03d}"
+
+
+def _format_distance(distance: float) -> str:
+    return f"{distance:,.1f}"
 
 
 def _format_state_labels(state_labels: tuple[str, ...]) -> str:

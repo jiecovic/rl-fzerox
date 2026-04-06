@@ -11,5 +11,5 @@ env:
   reset_to_race: false
 
 watch:
-  episodes: 1
+  episodes: null
   fps: null

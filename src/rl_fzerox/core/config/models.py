@@ -38,7 +38,7 @@ class WatchConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    episodes: PositiveInt = 1
+    episodes: PositiveInt | None = None
     fps: PositiveFloat | None = None
 
 

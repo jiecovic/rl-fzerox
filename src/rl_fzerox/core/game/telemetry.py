@@ -13,30 +13,72 @@ RACER_SIZE = 0x3A8
 SPEED_TO_KPH = 21.6
 # Mupen64Plus-Next exposes the live RAM buffer in little-endian host order.
 MEMORY_ENDIANNESS = "little"
+# Keep game-specific decoding here while offsets and semantics are still being
+# validated. Once the field set is stable, move this decoding into the Rust
+# host so raw memory access and structured telemetry live at the same boundary.
 
 
 def _rdram_offset(vram_address: int) -> int:
     return vram_address - KSEG0_BASE
 
 
-# Derived from inspectredc/fzerox US rev0 symbol_addrs.txt.
-G_GAME_MODE = _rdram_offset(0x800DCE44)
-G_GAME_FRAME_COUNT = _rdram_offset(0x800CCFE0)
-G_COURSE_INDEX = _rdram_offset(0x800F8514)
-G_RACERS = _rdram_offset(0x802C4920)
+@dataclass(frozen=True)
+class GlobalOffsets:
+    """Global RDRAM addresses used by the current telemetry decoder."""
 
-# Derived from inspectredc/fzerox include/unk_structs.h for struct Racer.
-RACER_STATE_FLAGS = 0x004
-RACER_SPEED = 0x098
-RACER_BOOST_TIMER = 0x21C
-RACER_ENERGY = 0x228
-RACER_MAX_ENERGY = 0x22C
-RACER_RACE_TIME = 0x2A0
-RACER_LAP = 0x2A8
-RACER_LAPS_COMPLETED = 0x2AA
-RACER_POSITION = 0x2AC
-RACER_CHARACTER = 0x2C8
-RACER_MACHINE_INDEX = 0x2C9
+    game_mode: int
+    game_frame_count: int
+    course_index: int
+    racers: int
+
+
+@dataclass(frozen=True)
+class RacerOffsets:
+    """Byte offsets within `struct Racer` for the fields we decode."""
+
+    state_flags: int
+    speed: int
+    boost_timer: int
+    energy: int
+    max_energy: int
+    race_distance: int
+    laps_completed_distance: int
+    lap_distance: int
+    race_distance_position: int
+    race_time: int
+    lap: int
+    laps_completed: int
+    position: int
+    character: int
+    machine_index: int
+
+
+GLOBALS = GlobalOffsets(
+    # Derived from inspectredc/fzerox US rev0 symbol_addrs.txt.
+    game_mode=_rdram_offset(0x800DCE44),
+    game_frame_count=_rdram_offset(0x800CCFE0),
+    course_index=_rdram_offset(0x800F8514),
+    racers=_rdram_offset(0x802C4920),
+)
+
+RACER = RacerOffsets(
+    # Derived from inspectredc/fzerox include/unk_structs.h for struct Racer.
+    state_flags=0x004,
+    speed=0x098,
+    boost_timer=0x21C,
+    energy=0x228,
+    max_energy=0x22C,
+    race_distance=0x23C,
+    laps_completed_distance=0x240,
+    lap_distance=0x244,
+    race_distance_position=0x248,
+    race_time=0x2A0,
+    lap=0x2A8,
+    laps_completed=0x2AA,
+    position=0x2AC,
+    character=0x2C8,
+    machine_index=0x2C9,
+)
 
 
 class MemoryReadableEmulator(Protocol):
@@ -112,6 +154,10 @@ class PlayerTelemetry:
     energy: float
     max_energy: float
     boost_timer: int
+    race_distance: float
+    laps_completed_distance: float
+    lap_distance: float
+    race_distance_position: float
     race_time_ms: int
     lap: int
     laps_completed: int
@@ -147,13 +193,13 @@ def read_telemetry(emulator: MemoryReadableEmulator) -> FZeroXTelemetry:
             f"{emulator.system_ram_size} bytes"
         )
 
-    player_base = G_RACERS + (PLAYER_RACER_INDEX * RACER_SIZE)
-    header_start = G_GAME_FRAME_COUNT
-    header_end = G_COURSE_INDEX + 4
+    player_base = GLOBALS.racers + (PLAYER_RACER_INDEX * RACER_SIZE)
+    header_start = GLOBALS.game_frame_count
+    header_end = GLOBALS.course_index + 4
     header = emulator.read_system_ram(header_start, header_end - header_start)
-    player_window = emulator.read_system_ram(player_base, RACER_MACHINE_INDEX + 1)
+    player_window = emulator.read_system_ram(player_base, RACER.machine_index + 1)
 
-    game_mode_raw = _u32(header, G_GAME_MODE - header_start)
+    game_mode_raw = _u32(header, GLOBALS.game_mode - header_start)
     mode_id = game_mode_raw & 0x1F
     try:
         game_mode = GameMode(mode_id)
@@ -162,30 +208,34 @@ def read_telemetry(emulator: MemoryReadableEmulator) -> FZeroXTelemetry:
         game_mode = None
         game_mode_name = f"unknown_{mode_id:#x}"
 
-    player_state_flags = _u32(player_window, RACER_STATE_FLAGS)
-    player_speed_raw = _f32(player_window, RACER_SPEED)
+    player_state_flags = _u32(player_window, RACER.state_flags)
+    player_speed_raw = _f32(player_window, RACER.speed)
     player = PlayerTelemetry(
         state_flags=player_state_flags,
         state_labels=_decode_racer_flags(player_state_flags),
         speed_raw=player_speed_raw,
         speed_kph=player_speed_raw * SPEED_TO_KPH,
-        energy=_f32(player_window, RACER_ENERGY),
-        max_energy=_f32(player_window, RACER_MAX_ENERGY),
-        boost_timer=_s32(player_window, RACER_BOOST_TIMER),
-        race_time_ms=_s32(player_window, RACER_RACE_TIME),
-        lap=_s16(player_window, RACER_LAP),
-        laps_completed=_s16(player_window, RACER_LAPS_COMPLETED),
-        position=_s32(player_window, RACER_POSITION),
-        character=_u8(player_window, RACER_CHARACTER),
-        machine_index=_u8(player_window, RACER_MACHINE_INDEX),
+        energy=_f32(player_window, RACER.energy),
+        max_energy=_f32(player_window, RACER.max_energy),
+        boost_timer=_s32(player_window, RACER.boost_timer),
+        race_distance=_f32(player_window, RACER.race_distance),
+        laps_completed_distance=_f32(player_window, RACER.laps_completed_distance),
+        lap_distance=_f32(player_window, RACER.lap_distance),
+        race_distance_position=_f32(player_window, RACER.race_distance_position),
+        race_time_ms=_s32(player_window, RACER.race_time),
+        lap=_s16(player_window, RACER.lap),
+        laps_completed=_s16(player_window, RACER.laps_completed),
+        position=_s32(player_window, RACER.position),
+        character=_u8(player_window, RACER.character),
+        machine_index=_u8(player_window, RACER.machine_index),
     )
 
     return FZeroXTelemetry(
         system_ram_size=emulator.system_ram_size,
-        game_frame_count=_u32(header, G_GAME_FRAME_COUNT - header_start),
+        game_frame_count=_u32(header, GLOBALS.game_frame_count - header_start),
         game_mode_raw=game_mode_raw,
         game_mode_name=game_mode_name,
-        course_index=_u32(header, G_COURSE_INDEX - header_start),
+        course_index=_u32(header, GLOBALS.course_index - header_start),
         in_race_mode=game_mode in RACE_MODE_IDS,
         player=player,
     )

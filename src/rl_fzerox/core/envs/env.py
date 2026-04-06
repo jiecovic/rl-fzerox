@@ -37,6 +37,9 @@ class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
     def step(self, action: int | np.integer):
         return self._engine.step(action)
 
+    def step_frame(self):
+        return self._engine.step_frame()
+
     def render(self) -> np.ndarray:
         return self._engine.render()
 

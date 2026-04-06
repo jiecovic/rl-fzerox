@@ -3,17 +3,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import cast
 
 import numpy as np
 
 from rl_fzerox._native import JOYPAD_START, joypad_mask
 from rl_fzerox.core.emulator.base import EmulatorBackend
+from rl_fzerox.core.game.telemetry import GameMode, MemoryReadableEmulator, read_telemetry
 
 START_MASK = joypad_mask(JOYPAD_START)
 TITLE_WAIT_FRAMES = 240
 START_HOLD_FRAMES = 2
 SETTLE_FRAMES = 60
-RACE_GRID_WAIT_FRAMES = 360
+RACE_MODE_WAIT_FRAMES = 360
+PRE_RACE_SETTLE_FRAMES = 180
+NEXT_RACE_MAX_START_PRESSES = 12
+NEXT_RACE_SETTLE_FRAMES = 45
 
 
 class BootState(StrEnum):
@@ -26,8 +31,8 @@ class BootState(StrEnum):
     ENTER_MACHINE_SELECT = "enter_machine_select"
     CONFIRM_MACHINE = "confirm_machine"
     CONFIRM_MACHINE_PROFILE = "confirm_machine_profile"
-    WAIT_FOR_GRID = "wait_for_grid"
-    READY = "ready"
+    WAIT_FOR_GP_RACE = "wait_for_gp_race"
+    GP_RACE = "gp_race"
 
 
 @dataclass(frozen=True)
@@ -49,7 +54,6 @@ BOOT_SEQUENCE: tuple[BootPhase, ...] = (
     BootPhase(BootState.ENTER_MACHINE_SELECT, start_presses=2),
     BootPhase(BootState.CONFIRM_MACHINE, start_presses=2),
     BootPhase(BootState.CONFIRM_MACHINE_PROFILE, start_presses=4),
-    BootPhase(BootState.WAIT_FOR_GRID, start_presses=0, settle_frames=RACE_GRID_WAIT_FRAMES),
 )
 
 
@@ -61,7 +65,7 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
     against real menu/race state instead of relying on fixed frame counts.
     """
 
-    last_state = BootState.READY
+    last_state = BootState.GP_RACE
     try:
         for phase in BOOT_SEQUENCE:
             for _ in range(phase.start_presses):
@@ -70,11 +74,15 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
             if phase.start_presses == 0:
                 backend.step_frames(phase.settle_frames)
             last_state = phase.state
+        detected_gp_race = _wait_for_gp_race(backend)
+        last_state = BootState.WAIT_FOR_GP_RACE
+        if detected_gp_race:
+            backend.step_frames(PRE_RACE_SETTLE_FRAMES)
     finally:
         backend.set_joypad_mask(0)
 
     return backend.render(), {
-        "boot_state": BootState.READY.value,
+        "boot_state": BootState.GP_RACE.value,
         "boot_last_phase": last_state.value,
         "frame_index": backend.frame_index,
         "reset_mode": "boot_to_race",
@@ -85,3 +93,76 @@ def _press_start(backend: EmulatorBackend) -> None:
     backend.set_joypad_mask(START_MASK)
     backend.step_frames(START_HOLD_FRAMES)
     backend.set_joypad_mask(0)
+
+
+def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str, object]]:
+    """Advance the current session from a terminal state into the next race."""
+
+    try:
+        if _is_race_start_ready(backend):
+            backend.step_frames(PRE_RACE_SETTLE_FRAMES)
+            return _race_reset_result(backend, reset_mode="continue_to_next_race")
+
+        for _ in range(NEXT_RACE_MAX_START_PRESSES):
+            _press_start(backend)
+            for _ in range(NEXT_RACE_SETTLE_FRAMES):
+                if _is_race_start_ready(backend):
+                    backend.step_frames(PRE_RACE_SETTLE_FRAMES)
+                    return _race_reset_result(
+                        backend,
+                        reset_mode="continue_to_next_race",
+                    )
+                backend.step_frame()
+    finally:
+        backend.set_joypad_mask(0)
+
+    raise RuntimeError("Could not advance the current session into the next race")
+
+
+def _wait_for_gp_race(backend: EmulatorBackend) -> bool:
+    for _ in range(RACE_MODE_WAIT_FRAMES):
+        if _is_gp_race(backend):
+            return True
+        backend.step_frame()
+    return False
+
+
+def _is_gp_race(backend: EmulatorBackend) -> bool:
+    telemetry = _read_telemetry(backend)
+    if telemetry is None:
+        return False
+    return (telemetry.game_mode_raw & 0x1F) == int(GameMode.GP_RACE)
+
+
+def _is_race_start_ready(backend: EmulatorBackend) -> bool:
+    telemetry = _read_telemetry(backend)
+    if telemetry is None:
+        return False
+    return (
+        (telemetry.game_mode_raw & 0x1F) == int(GameMode.GP_RACE)
+        and telemetry.player.race_time_ms == 0
+        and "finished" not in telemetry.player.state_labels
+        and "crashed" not in telemetry.player.state_labels
+        and "retired" not in telemetry.player.state_labels
+    )
+
+
+def _read_telemetry(backend: EmulatorBackend):
+    if not hasattr(backend, "system_ram_size") or not hasattr(backend, "read_system_ram"):
+        return None
+    try:
+        return read_telemetry(cast(MemoryReadableEmulator, backend))
+    except (AttributeError, RuntimeError):
+        return None
+
+
+def _race_reset_result(
+    backend: EmulatorBackend,
+    *,
+    reset_mode: str,
+) -> tuple[np.ndarray, dict[str, object]]:
+    return backend.render(), {
+        "boot_state": BootState.GP_RACE.value,
+        "frame_index": backend.frame_index,
+        "reset_mode": reset_mode,
+    }
