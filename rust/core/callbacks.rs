@@ -2,7 +2,7 @@
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_void};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::ptr;
 
 use libretro_sys::{
@@ -51,13 +51,15 @@ pub struct CallbackGuard {
 }
 
 impl CallbackState {
-    pub fn new(core_path: &Path, rom_path: &Path) -> Result<Self, CoreError> {
-        let system_dir = rom_path
-            .parent()
-            .ok_or_else(|| CoreError::InvalidPath {
-                path: rom_path.to_path_buf(),
-            })?
-            .to_path_buf();
+    pub fn new(core_path: &Path, runtime_dir: Option<&Path>) -> Result<Self, CoreError> {
+        let system_dir = match runtime_dir {
+            Some(runtime_dir) => runtime_dir.to_path_buf(),
+            None => runtime_root_for_core(core_path)?,
+        };
+        std::fs::create_dir_all(&system_dir).map_err(|error| CoreError::CreateDirectory {
+            path: system_dir.clone(),
+            message: error.to_string(),
+        })?;
 
         Ok(Self {
             core_path: path_to_c_string(core_path)?,
@@ -314,4 +316,50 @@ fn write_ptr<T>(data: *mut c_void, value: T) -> bool {
         ptr::write(data.cast::<T>(), value);
     }
     true
+}
+
+fn runtime_root_for_core(core_path: &Path) -> Result<PathBuf, CoreError> {
+    let core_dir = core_path
+        .parent()
+        .ok_or_else(|| CoreError::InvalidPath {
+            path: core_path.to_path_buf(),
+        })?
+        .to_path_buf();
+
+    if core_dir
+        .file_name()
+        .and_then(|value| value.to_str())
+        .is_some_and(|value| value == "libretro")
+        && let Some(runtime_root) = core_dir.parent()
+    {
+        return Ok(runtime_root.to_path_buf());
+    }
+
+    Ok(core_dir)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::runtime_root_for_core;
+
+    #[test]
+    fn runtime_root_uses_repo_local_root_for_libretro_layout() {
+        let runtime_root = runtime_root_for_core(Path::new(
+            "/repo/local/libretro/mupen64plus_next_libretro.so",
+        ))
+        .expect("runtime root should resolve");
+
+        assert_eq!(runtime_root, PathBuf::from("/repo/local"));
+    }
+
+    #[test]
+    fn runtime_root_uses_core_directory_for_generic_layout() {
+        let runtime_root =
+            runtime_root_for_core(Path::new("/opt/cores/mupen64plus_next_libretro.so"))
+                .expect("runtime root should resolve");
+
+        assert_eq!(runtime_root, PathBuf::from("/opt/cores"));
+    }
 }

@@ -1,12 +1,13 @@
+defaults:
+  - /watch
+  - _self_
+
 seed: 123
 
 emulator:
-  core_path: /absolute/path/to/mupen64plus_next_libretro.so
-  rom_path: /absolute/path/to/F-Zero X (USA).n64
-
-env:
-  action_repeat: 2
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  runtime_dir: local/runtime
 
 watch:
-  episodes: 1
   fps: 30

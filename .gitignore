@@ -211,6 +211,7 @@ __marimo__/
 
 # Local emulator scratch space and ROM archives
 AGENTS.md
+/local/
 conf/local/*.yaml
 conf/local/*.yml
 !conf/local/*.example.yaml

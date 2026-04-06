@@ -1,6 +1,11 @@
 # src/rl_fzerox/_native.pyi
 class Emulator:
-    def __init__(self, core_path: str, rom_path: str) -> None: ...
+    def __init__(
+        self,
+        core_path: str,
+        rom_path: str,
+        runtime_dir: str | None = None,
+    ) -> None: ...
     @property
     def name(self) -> str: ...
     @property

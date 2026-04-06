@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/config/models.py
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveFloat, PositiveInt
 
 
@@ -13,12 +15,13 @@ class EnvConfig(BaseModel):
 
 
 class EmulatorConfig(BaseModel):
-    """Paths required to boot the libretro core and the ROM."""
+    """Paths used to boot the libretro core, the ROM, and optional runtime state."""
 
     model_config = ConfigDict(extra="forbid")
 
     core_path: FilePath
     rom_path: FilePath
+    runtime_dir: Path | None = None
 
 
 class WatchConfig(BaseModel):

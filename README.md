@@ -24,22 +24,32 @@ Official `Mupen64Plus-Next` links:
 curl https://sh.rustup.rs -sSf | sh
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .[dev,watch]
+python -m pip install -e .[dev,watch]
 ```
 
 ## Local config
 
+Keep local runtime artifacts such as the libretro core and ROM under `local/`. That directory is ignored by git.
+
 Put your local paths in `conf/local/watch.local.yaml`:
 
 ```yaml
+defaults:
+  - /watch
+  - _self_
+
 seed: 123
 
 emulator:
-  core_path: /abs/path/to/mupen64plus_next_libretro.so
-  rom_path: /abs/path/to/fzerox.n64
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  runtime_dir: local/runtime
+
+watch:
+  fps: 30
 ```
 
-The root `seed` is the master seed for Python/env randomness. Emulator resets restore a deterministic baseline savestate.
+Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. The root `seed` is the master seed for Python/env randomness. Emulator resets restore a deterministic baseline savestate.
 
 ## Commands
 
@@ -72,6 +82,7 @@ Watch controls:
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 cargo test
+cargo audit
 ruff check .
 pyright
 pytest

@@ -1,34 +1,60 @@
 # src/rl_fzerox/core/config/loader.py
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
-import yaml
+from hydra import compose, initialize_config_dir
+from hydra.errors import HydraException
+from omegaconf import OmegaConf
+from omegaconf.errors import OmegaConfBaseException
 from pydantic import ValidationError
 
 from rl_fzerox.core.config.models import WatchAppConfig
+from rl_fzerox.core.config.paths import config_root_dir, resolve_config_path_value
 
 
-def load_watch_app_config(config_path: Path) -> WatchAppConfig:
-    """Load and validate a watch configuration file."""
+def load_watch_app_config(
+    config_path: Path,
+    overrides: Sequence[str] | None = None,
+) -> WatchAppConfig:
+    """Compose a watch config with Hydra and validate it with Pydantic."""
 
     resolved_config_path = config_path.expanduser().resolve()
     try:
-        config_data = _load_yaml_mapping(resolved_config_path)
+        config_data = _compose_config_data(
+            config_path=resolved_config_path,
+            overrides=overrides,
+        )
+        _resolve_emulator_paths(config_data, config_dir=resolved_config_path.parent)
         return WatchAppConfig.model_validate(config_data)
-    except (OSError, TypeError, ValidationError, yaml.YAMLError) as exc:
+    except (HydraException, OmegaConfBaseException, OSError, TypeError, ValidationError) as exc:
         raise ValueError(
             f"Could not load watch config from {resolved_config_path}: {exc}"
         ) from exc
 
 
-def _load_yaml_mapping(config_path: Path) -> dict[str, object]:
-    if not config_path.is_file():
-        raise FileNotFoundError(f"Config file not found: {config_path}")
+def _compose_config_data(
+    *,
+    config_path: Path,
+    overrides: Sequence[str] | None,
+) -> dict[str, object]:
+    config_dir = config_path.parent
+    if not config_dir.is_dir():
+        raise FileNotFoundError(f"Config directory not found: {config_dir}")
 
-    with config_path.open("r", encoding="utf-8") as handle:
-        loaded = yaml.safe_load(handle)
+    hydra_overrides = list(overrides or [])
+    config_root = config_root_dir().resolve()
+    if config_dir.resolve() != config_root:
+        hydra_overrides = [
+            f"hydra.searchpath=[file://{config_root.as_posix()}]",
+            *hydra_overrides,
+        ]
 
+    with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+        composed = compose(config_name=config_path.stem, overrides=hydra_overrides)
+
+    loaded = OmegaConf.to_container(composed, resolve=True)
     if loaded is None:
         return {}
     if not isinstance(loaded, dict):
@@ -39,4 +65,20 @@ def _load_yaml_mapping(config_path: Path) -> dict[str, object]:
         if not isinstance(key, str):
             raise TypeError("Config keys must be strings")
         normalized[key] = value
+    normalized.pop("hydra", None)
     return normalized
+
+
+def _resolve_emulator_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
+    emulator = config_data.get("emulator")
+    if not isinstance(emulator, dict):
+        return
+
+    for field_name in ("core_path", "rom_path", "runtime_dir"):
+        raw_value = emulator.get(field_name)
+        if not isinstance(raw_value, str):
+            continue
+
+        emulator[field_name] = str(
+            resolve_config_path_value(raw_value, config_dir=config_dir)
+        )
