@@ -35,6 +35,7 @@ impl Host {
         core_path: &Path,
         rom_path: &Path,
         runtime_dir: Option<&Path>,
+        baseline_state_path: Option<&Path>,
     ) -> Result<Self, CoreError> {
         if !rom_path.is_file() {
             return Err(CoreError::MissingRom(rom_path.to_path_buf()));
@@ -70,7 +71,11 @@ impl Host {
         host.configure_callbacks();
         host.initialize();
         host.load_game()?;
-        host.capture_baseline()?;
+        match baseline_state_path {
+            Some(path) if path.is_file() => host.load_baseline_from_file(path)?,
+            None => host.capture_startup_baseline()?,
+            Some(_) => host.capture_startup_baseline()?,
+        }
         host.refresh_av_info();
         Ok(host)
     }
@@ -115,6 +120,39 @@ impl Host {
         if self.callbacks.frame().is_none() {
             return Err(CoreError::NoFrameAvailable);
         }
+        Ok(())
+    }
+
+    pub fn set_joypad_mask(&mut self, joypad_mask: u16) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.callbacks.set_joypad_mask(joypad_mask);
+        Ok(())
+    }
+
+    pub fn save_state(&mut self, path: &Path) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        let state = self.serialize_state()?;
+        self.write_state_bytes(path, &state)
+    }
+
+    pub fn capture_current_as_baseline(
+        &mut self,
+        save_path: Option<&Path>,
+    ) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        let state = self.serialize_state()?;
+        if let Some(path) = save_path {
+            self.write_state_bytes(path, &state)?;
+        }
+        self.baseline_state = state;
+        self.baseline_frame = Some(
+            self.callbacks
+                .frame()
+                .cloned()
+                .ok_or(CoreError::NoFrameAvailable)?,
+        );
+        self.refresh_av_info();
+        self.refresh_shape_from_frame();
         Ok(())
     }
 
@@ -214,18 +252,41 @@ impl Host {
         Err(CoreError::NoFrameAvailable)
     }
 
-    fn capture_baseline(&mut self) -> Result<(), CoreError> {
-        // Capture one canonical episode start state up front. Every reset then
+    fn capture_startup_baseline(&mut self) -> Result<(), CoreError> {
+        // Capture one canonical startup baseline up front. Every reset then
         // restores this snapshot instead of replaying startup frames again.
         let baseline_serial = self.callbacks.frame_serial();
         self.call_core(|core| unsafe {
             core.reset();
         });
         self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
+        self.capture_current_baseline()
+    }
+
+    fn load_baseline_from_file(&mut self, baseline_state_path: &Path) -> Result<(), CoreError> {
+        let baseline_state =
+            std::fs::read(baseline_state_path).map_err(|error| CoreError::ReadFile {
+                path: baseline_state_path.to_path_buf(),
+                message: error.to_string(),
+            })?;
+        let baseline_serial = self.callbacks.frame_serial();
+        self.restore_state_bytes(&baseline_state)?;
+        if self.callbacks.frame_serial() == baseline_serial {
+            self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
+        }
+        self.capture_current_baseline()
+    }
+
+    fn capture_current_baseline(&mut self) -> Result<(), CoreError> {
         self.refresh_av_info();
         self.refresh_shape_from_frame();
         self.baseline_state = self.serialize_state()?;
-        self.baseline_frame = self.callbacks.frame().cloned();
+        self.baseline_frame = Some(
+            self.callbacks
+                .frame()
+                .cloned()
+                .ok_or(CoreError::NoFrameAvailable)?,
+        );
         Ok(())
     }
 
@@ -234,16 +295,20 @@ impl Host {
             .baseline_frame
             .clone()
             .ok_or(CoreError::NoFrameAvailable)?;
-        let baseline_state_ptr = self.baseline_state.as_ptr();
-        let baseline_state_len = self.baseline_state.len();
-        let restored = self.call_core(|core| unsafe {
-            core.unserialize(baseline_state_ptr.cast(), baseline_state_len)
-        });
-        if !restored {
-            return Err(CoreError::UnserializeFailed);
-        }
+        let baseline_state = self.baseline_state.clone();
+        self.restore_state_bytes(&baseline_state)?;
         self.callbacks.set_frame(baseline_frame);
         Ok(())
+    }
+
+    fn restore_state_bytes(&mut self, state: &[u8]) -> Result<(), CoreError> {
+        let restored =
+            self.call_core(|core| unsafe { core.unserialize(state.as_ptr().cast(), state.len()) });
+        if restored {
+            Ok(())
+        } else {
+            Err(CoreError::UnserializeFailed)
+        }
     }
 
     fn serialize_state(&mut self) -> Result<Vec<u8>, CoreError> {
@@ -259,6 +324,22 @@ impl Host {
             return Err(CoreError::SerializeFailed);
         }
         Ok(state)
+    }
+
+    fn write_state_bytes(&self, path: &Path, state: &[u8]) -> Result<(), CoreError> {
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            std::fs::create_dir_all(parent).map_err(|error| CoreError::CreateDirectory {
+                path: parent.to_path_buf(),
+                message: error.to_string(),
+            })?;
+        }
+
+        std::fs::write(path, state).map_err(|error| CoreError::WriteFile {
+            path: path.to_path_buf(),
+            message: error.to_string(),
+        })
     }
 
     fn call_core<R>(&mut self, action: impl FnOnce(&LoadedCore) -> R) -> R {

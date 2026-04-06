@@ -39,6 +39,7 @@ pub struct CallbackState {
     system_dir: CString,
     save_dir: CString,
     variables: BTreeMap<String, CString>,
+    joypad_mask: u16,
     frame: Option<VideoFrame>,
     frame_serial: u64,
     pixel_format: PixelLayout,
@@ -66,6 +67,7 @@ impl CallbackState {
             system_dir: path_to_c_string(&system_dir)?,
             save_dir: path_to_c_string(&system_dir)?,
             variables: BTreeMap::new(),
+            joypad_mask: 0,
             frame: None,
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
@@ -90,6 +92,17 @@ impl CallbackState {
         self.geometry = Some((frame.width, frame.height));
         self.frame = Some(frame);
         self.frame_serial += 1;
+    }
+
+    pub fn set_joypad_mask(&mut self, joypad_mask: u16) {
+        self.joypad_mask = joypad_mask;
+    }
+
+    fn joypad_state(&self, button_id: u32) -> i16 {
+        if button_id >= u16::BITS {
+            return 0;
+        }
+        (((self.joypad_mask >> button_id) & 1) != 0) as i16
     }
 
     fn handle_environment(&mut self, cmd: u32, data: *mut c_void) -> bool {
@@ -264,7 +277,11 @@ pub extern "C" fn audio_sample_batch_callback(_data: *const i16, frames: usize) 
 pub extern "C" fn input_poll_callback() {}
 
 pub extern "C" fn input_state_callback(_port: u32, _device: u32, _index: u32, _id: u32) -> i16 {
-    0
+    if _port != 0 || _device != DEVICE_JOYPAD || _index != 0 {
+        return 0;
+    }
+
+    with_state_mut(|state| state.joypad_state(_id)).unwrap_or(0)
 }
 
 unsafe extern "C" fn log_callback(_level: LogLevel, _fmt: *const i8) {}

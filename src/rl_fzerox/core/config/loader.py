@@ -74,7 +74,12 @@ def _resolve_emulator_paths(config_data: dict[str, object], *, config_dir: Path)
     if not isinstance(emulator, dict):
         return
 
-    for field_name in ("core_path", "rom_path", "runtime_dir"):
+    for field_name in (
+        "core_path",
+        "rom_path",
+        "runtime_dir",
+        "baseline_state_path",
+    ):
         raw_value = emulator.get(field_name)
         if not isinstance(raw_value, str):
             continue

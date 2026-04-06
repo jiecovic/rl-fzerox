@@ -4,9 +4,11 @@ emulator:
   core_path: /absolute/path/to/mupen64plus_next_libretro.so
   rom_path: /absolute/path/to/fzerox.n64
   runtime_dir: null
+  baseline_state_path: null
 
 env:
   action_repeat: 2
+  reset_to_race: false
 
 watch:
   episodes: 1

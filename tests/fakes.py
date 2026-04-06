@@ -51,6 +51,7 @@ class SyntheticBackend:
             info={
                 "backend": self.name,
                 "native_fps": self.native_fps,
+                "frame_index": self._state.frame_index,
                 "progress": self._state.progress,
             },
         )
@@ -73,6 +74,13 @@ class SyntheticBackend:
 
     def render(self) -> np.ndarray:
         return self._last_frame.copy()
+
+    def step_frames(self, count: int) -> None:
+        for _ in range(count):
+            self.step_frame()
+
+    def set_joypad_mask(self, mask: int) -> None:
+        _ = mask
 
     def close(self) -> None:
         return None

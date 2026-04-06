@@ -14,7 +14,8 @@
 
 - `src/rl_fzerox/core/envs/`
   The Gymnasium-facing environment layer. Right now it is intentionally slim:
-  raw emulator frames, fixed frame stepping, no real action semantics yet.
+  raw emulator frames, fixed frame stepping, and an optional deterministic
+  boot-to-race reset path.
 
 - `src/rl_fzerox/core/emulator/`
   Python wrapper around the native emulator host. It exposes reset, frame
@@ -45,6 +46,9 @@
 - Working headless smoke path
 - Working real-time watch path
 - Deterministic reset via baseline savestate
+- Optional external baseline savestate file for fixed race-start resets
+- Optional scripted reset-to-race bootstrap from the boot baseline
+- Manual watch controls for creating a baseline savestate in-project
 
 Not implemented yet:
 

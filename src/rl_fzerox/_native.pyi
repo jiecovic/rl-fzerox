@@ -5,6 +5,7 @@ class Emulator:
         core_path: str,
         rom_path: str,
         runtime_dir: str | None = None,
+        baseline_state_path: str | None = None,
     ) -> None: ...
     @property
     def name(self) -> str: ...
@@ -18,6 +19,9 @@ class Emulator:
     def frame_index(self) -> int: ...
     def reset(self) -> None: ...
     def step_frames(self, count: int = 1) -> None: ...
+    def set_joypad_mask(self, mask: int) -> None: ...
+    def save_state(self, path: str) -> None: ...
+    def capture_current_as_baseline(self, path: str | None = None) -> None: ...
     def frame_rgb(self) -> bytes: ...
     def close(self) -> None: ...
 
@@ -30,3 +34,21 @@ class CoreInfo:
     blocks_extract: bool
 
 def probe_core(core_path: str) -> CoreInfo: ...
+def joypad_mask(*buttons: int) -> int: ...
+
+JOYPAD_B: int
+JOYPAD_Y: int
+JOYPAD_SELECT: int
+JOYPAD_START: int
+JOYPAD_UP: int
+JOYPAD_DOWN: int
+JOYPAD_LEFT: int
+JOYPAD_RIGHT: int
+JOYPAD_A: int
+JOYPAD_X: int
+JOYPAD_L: int
+JOYPAD_R: int
+JOYPAD_L2: int
+JOYPAD_R2: int
+JOYPAD_L3: int
+JOYPAD_R3: int
