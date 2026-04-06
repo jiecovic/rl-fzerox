@@ -23,6 +23,7 @@ from rl_fzerox.core.config.models import WatchAppConfig
 from rl_fzerox.core.emulator import Emulator
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.game import FZeroXTelemetry, read_telemetry
 from rl_fzerox.core.seed import seed_process
 
 Color = tuple[int, int, int]
@@ -51,8 +52,9 @@ class RenderFont(Protocol):
 class ViewerLayout:
     """Spacing and sizing used by the watch window layout."""
 
-    panel_width: int = 336
+    panel_width: int = 456
     panel_padding: int = 12
+    column_gap: int = 16
     title_gap: int = 2
     title_section_gap: int = 8
     section_gap: int = 8
@@ -89,6 +91,14 @@ class PanelSection:
 
     title: str
     lines: list[PanelLine]
+
+
+@dataclass(frozen=True)
+class PanelColumns:
+    """Left and right panel columns rendered next to the game view."""
+
+    left: list[PanelSection]
+    right: list[PanelSection]
 
 
 @dataclass(frozen=True)
@@ -171,6 +181,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             frame, info = env.reset(seed=reset_seed)
             reset_info = dict(info)
             current_joypad_mask = 0
+            telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
                 screen = _create_screen(pygame, emulator.display_size)
@@ -204,6 +215,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 episode_reward=0.0,
                 paused=paused,
                 joypad_mask=current_joypad_mask,
+                telemetry=telemetry,
             )
 
             terminated = False
@@ -235,6 +247,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         episode_reward=episode_reward,
                         paused=True,
                         joypad_mask=current_joypad_mask,
+                        telemetry=telemetry,
                     )
                     time.sleep(0.01)
                     continue
@@ -248,6 +261,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     terminated = frame_step.terminated
                     truncated = frame_step.truncated
                     info = dict(frame_step.info)
+                    telemetry = _read_live_telemetry(emulator)
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
@@ -259,12 +273,14 @@ def run_viewer(config: WatchAppConfig) -> None:
                         episode_reward=episode_reward,
                         paused=True,
                         joypad_mask=current_joypad_mask,
+                        telemetry=telemetry,
                     )
                     continue
 
                 frame_start = time.perf_counter()
                 frame, reward, terminated, truncated, info = env.step(0)
                 episode_reward += reward
+                telemetry = _read_live_telemetry(emulator)
 
                 screen = _ensure_screen(pygame, screen, emulator.display_size)
                 _draw_frame(
@@ -278,6 +294,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     episode_reward=episode_reward,
                     paused=paused,
                     joypad_mask=current_joypad_mask,
+                    telemetry=telemetry,
                 )
 
                 if paused:
@@ -327,6 +344,7 @@ def _draw_frame(
     episode_reward: float,
     paused: bool,
     joypad_mask: int,
+    telemetry: FZeroXTelemetry | None,
 ) -> None:
     frame_height, frame_width, _ = frame.shape
     surface = pygame.image.frombuffer(frame.tobytes(), (frame_width, frame_height), "RGB")
@@ -353,6 +371,7 @@ def _draw_frame(
         paused=paused,
         joypad_mask=joypad_mask,
         game_display_size=target_size,
+        telemetry=telemetry,
     )
     pygame.display.flip()
 
@@ -370,6 +389,7 @@ def _draw_side_panel(
     paused: bool,
     joypad_mask: int,
     game_display_size: tuple[int, int],
+    telemetry: FZeroXTelemetry | None,
 ) -> None:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
     pygame.draw.line(
@@ -383,7 +403,7 @@ def _draw_side_panel(
     x = panel_rect.x + LAYOUT.panel_padding
     y = panel_rect.y + LAYOUT.panel_padding
     panel_width = panel_rect.width - (2 * LAYOUT.panel_padding)
-    sections = _build_panel_sections(
+    columns = _build_panel_columns(
         episode=episode,
         info=info,
         reset_info=reset_info,
@@ -391,6 +411,7 @@ def _draw_side_panel(
         paused=paused,
         joypad_mask=joypad_mask,
         game_display_size=game_display_size,
+        telemetry=telemetry,
     )
 
     y = _draw_panel_title(
@@ -403,21 +424,33 @@ def _draw_side_panel(
     )
     y += LAYOUT.title_section_gap
 
-    for section_index, section in enumerate(sections):
-        y = _draw_section(
-            pygame=pygame,
-            screen=screen,
-            fonts=fonts,
-            x=x,
-            y=y,
-            width=panel_width,
-            section=section,
-        )
-        if section_index < len(sections) - 1:
-            y += LAYOUT.section_gap
+    content_width = panel_width
+    left_column_width = (content_width - LAYOUT.column_gap) // 2
+    right_column_width = content_width - LAYOUT.column_gap - left_column_width
+    left_x = x
+    right_x = x + left_column_width + LAYOUT.column_gap
+
+    _draw_column(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=left_x,
+        y=y,
+        width=left_column_width,
+        sections=columns.left,
+    )
+    _draw_column(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=right_x,
+        y=y,
+        width=right_column_width,
+        sections=columns.right,
+    )
 
 
-def _build_panel_sections(
+def _build_panel_columns(
     *,
     episode: int,
     info: dict[str, object],
@@ -426,78 +459,108 @@ def _build_panel_sections(
     paused: bool,
     joypad_mask: int,
     game_display_size: tuple[int, int],
-) -> list[PanelSection]:
-    return [
-        PanelSection(
-            title="Session",
-            lines=[
-                _panel_line(
-                    "State",
-                    "paused" if paused else "running",
-                    PALETTE.text_warning if paused else PALETTE.text_accent,
-                ),
-                _panel_line("Episode", str(episode), PALETTE.text_primary),
-                _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
-                _panel_line("Reward", f"{episode_reward:.2f}", PALETTE.text_primary),
-            ],
-        ),
-        PanelSection(
-            title="Reset",
-            lines=[
-                _panel_line(
-                    "Mode",
-                    str(reset_info.get("reset_mode", "baseline")),
-                    PALETTE.text_primary,
-                ),
-                _panel_line(
-                    "Baseline",
-                    str(reset_info.get("baseline_kind", "unknown")),
-                    PALETTE.text_primary,
-                ),
-                _panel_line(
-                    "Boot",
-                    str(reset_info.get("boot_state", "-")),
-                    PALETTE.text_primary,
-                ),
-            ],
-        ),
-        PanelSection(
-            title="Input",
-            lines=[
-                _panel_line(
-                    "Held",
-                    _pressed_button_labels(joypad_mask),
-                    PALETTE.text_primary,
-                ),
-            ],
-        ),
-        PanelSection(
-            title="Display",
-            lines=[
-                _panel_line(
-                    "Game",
-                    f"{game_display_size[0]}x{game_display_size[1]}",
-                    PALETTE.text_primary,
-                ),
-                _panel_line(
-                    "FPS",
-                    f"{_float_info(info, 'native_fps'):.1f}",
-                    PALETTE.text_primary,
-                ),
-            ],
-        ),
-        PanelSection(
-            title="Controls",
-            lines=[
-                _panel_line("Pad", "Arrows", PALETTE.text_muted),
-                _panel_line("A / B", "X / Z", PALETTE.text_muted),
-                _panel_line("Start", "Enter", PALETTE.text_muted),
-                _panel_line("Select", "Backspace", PALETTE.text_muted),
-                _panel_line("Playback", "P pause | N step", PALETTE.text_muted),
-                _panel_line("Baseline", "K save", PALETTE.text_muted),
-            ],
-        ),
-    ]
+    telemetry: FZeroXTelemetry | None,
+) -> PanelColumns:
+    return PanelColumns(
+        left=[
+            PanelSection(
+                title="Session",
+                lines=[
+                    _panel_line(
+                        "State",
+                        "paused" if paused else "running",
+                        PALETTE.text_warning if paused else PALETTE.text_accent,
+                    ),
+                    _panel_line("Episode", str(episode), PALETTE.text_primary),
+                    _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
+                    _panel_line("Reward", f"{episode_reward:.2f}", PALETTE.text_primary),
+                ],
+            ),
+            PanelSection(
+                title="Reset",
+                lines=[
+                    _panel_line(
+                        "Mode",
+                        str(reset_info.get("reset_mode", "baseline")),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Baseline",
+                        str(reset_info.get("baseline_kind", "unknown")),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Boot",
+                        str(reset_info.get("boot_state", "-")),
+                        PALETTE.text_primary,
+                    ),
+                ],
+            ),
+            PanelSection(
+                title="Input",
+                lines=[
+                    _panel_line(
+                        "Held",
+                        _pressed_button_labels(joypad_mask),
+                        PALETTE.text_primary,
+                    ),
+                ],
+            ),
+            PanelSection(
+                title="Controls",
+                lines=[
+                    _panel_line("Pad", "Arrows", PALETTE.text_muted),
+                    _panel_line("A / B", "X / Z", PALETTE.text_muted),
+                    _panel_line("Menu", "Enter / Backspace", PALETTE.text_muted),
+                    _panel_line("Playback", "P pause | N step", PALETTE.text_muted),
+                    _panel_line("Baseline", "K save", PALETTE.text_muted),
+                ],
+            ),
+        ],
+        right=[
+            _game_section(telemetry),
+            PanelSection(
+                title="Display",
+                lines=[
+                    _panel_line(
+                        "Game",
+                        f"{game_display_size[0]}x{game_display_size[1]}",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "FPS",
+                        f"{_float_info(info, 'native_fps'):.1f}",
+                        PALETTE.text_primary,
+                    ),
+                ],
+            ),
+        ],
+    )
+
+
+def _draw_column(
+    *,
+    pygame,
+    screen,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    sections: list[PanelSection],
+) -> None:
+    current_y = y
+    for section_index, section in enumerate(sections):
+        current_y = _draw_section(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=current_y,
+            width=width,
+            section=section,
+        )
+        if section_index < len(sections) - 1:
+            current_y += LAYOUT.section_gap
 
 
 def _draw_panel_title(*, screen, fonts, x: int, y: int, title: str, subtitle: str) -> int:
@@ -546,13 +609,56 @@ def _panel_line(label: str, value: str, color: Color) -> PanelLine:
     return PanelLine(label=label, value=value, color=color)
 
 
-def _panel_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> int:
+def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
+    if telemetry is None:
+        return PanelSection(
+            title="Game",
+            lines=[
+                _panel_line("Status", "unavailable", PALETTE.text_warning),
+            ],
+        )
+
+    return PanelSection(
+        title="Game",
+        lines=[
+            _panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
+            _panel_line("Course", str(telemetry.course_index), PALETTE.text_primary),
+            _panel_line(
+                "Time",
+                _format_race_time_ms(telemetry.player.race_time_ms),
+                PALETTE.text_primary,
+            ),
+            _panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
+            _panel_line(
+                "Energy",
+                f"{telemetry.player.energy:.1f} / {telemetry.player.max_energy:.1f}",
+                PALETTE.text_primary,
+            ),
+            _panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
+            _panel_line("Pos", str(telemetry.player.position), PALETTE.text_primary),
+            _panel_line(
+                "Flags",
+                _format_state_labels(telemetry.player.state_labels),
+                PALETTE.text_primary,
+            ),
+        ],
+    )
+
+
+def _panel_content_height(fonts: ViewerFonts, columns: PanelColumns) -> int:
     title_surface = fonts.title.render("F-Zero X Watch", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render("live emulator session", True, PALETTE.text_muted)
     y = LAYOUT.panel_padding
     y += title_surface.get_height() + LAYOUT.title_gap + subtitle_surface.get_height()
     y += LAYOUT.title_section_gap
 
+    left_height = _column_content_height(fonts, columns.left)
+    right_height = _column_content_height(fonts, columns.right)
+    return y + max(left_height, right_height) + LAYOUT.panel_padding
+
+
+def _column_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> int:
+    y = 0
     for section_index, section in enumerate(sections):
         section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
         y += section_title.get_height() + LAYOUT.section_title_gap
@@ -567,8 +673,7 @@ def _panel_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> i
                 y += value_surface.get_height() + LAYOUT.line_gap
         if section_index < len(sections) - 1:
             y += LAYOUT.section_gap
-
-    return y + LAYOUT.panel_padding
+    return y
 
 
 def _window_size(game_display_size: tuple[int, int]) -> tuple[int, int]:
@@ -596,6 +701,29 @@ def _float_info(info: dict[str, object], key: str) -> float:
     if isinstance(value, int | float):
         return float(value)
     return 0.0
+
+
+def _format_mode_name(mode_name: str) -> str:
+    return mode_name.replace("_", " ")
+
+
+def _format_race_time_ms(race_time_ms: int) -> str:
+    minutes, remainder = divmod(max(0, race_time_ms), 60_000)
+    seconds, milliseconds = divmod(remainder, 1_000)
+    return f"{minutes:02d}'{seconds:02d}\"{milliseconds:03d}"
+
+
+def _format_state_labels(state_labels: tuple[str, ...]) -> str:
+    if not state_labels:
+        return "none"
+    return " | ".join(state_labels)
+
+
+def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
+    try:
+        return read_telemetry(emulator)
+    except RuntimeError:
+        return None
 
 
 def _poll_viewer_input(pygame) -> ViewerInput:

@@ -1,8 +1,9 @@
 // rust/core/host.rs
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
+use std::slice;
 
-use libretro_sys::{DEVICE_JOYPAD, GameInfo};
+use libretro_sys::{DEVICE_JOYPAD, GameInfo, MEMORY_SYSTEM_RAM};
 
 use crate::core::api::LoadedCore;
 use crate::core::callbacks::{
@@ -108,6 +109,10 @@ impl Host {
         self.frame_index
     }
 
+    pub fn system_ram_size(&mut self) -> Result<usize, CoreError> {
+        self.memory_size(MEMORY_SYSTEM_RAM)
+    }
+
     pub fn baseline_kind(&self) -> &'static str {
         match self.baseline_kind {
             BaselineKind::Startup => "startup",
@@ -177,6 +182,10 @@ impl Host {
             .frame()
             .map(|frame| frame.rgb.as_slice())
             .ok_or(CoreError::NoFrameAvailable)
+    }
+
+    pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
+        self.read_memory(MEMORY_SYSTEM_RAM, offset, length)
     }
 
     pub fn close(&mut self) {
@@ -362,6 +371,49 @@ impl Host {
             path: path.to_path_buf(),
             message: error.to_string(),
         })
+    }
+
+    fn memory_size(&mut self, memory_id: u32) -> Result<usize, CoreError> {
+        self.ensure_open()?;
+        let size = self.call_core(|core| unsafe { core.memory_size(memory_id) });
+        if size == 0 {
+            return Err(CoreError::MemoryUnavailable { memory_id });
+        }
+        Ok(size)
+    }
+
+    fn read_memory(
+        &mut self,
+        memory_id: u32,
+        offset: usize,
+        length: usize,
+    ) -> Result<Vec<u8>, CoreError> {
+        self.ensure_open()?;
+        let available = self.memory_size(memory_id)?;
+        let end = offset
+            .checked_add(length)
+            .ok_or(CoreError::MemoryOutOfRange {
+                memory_id,
+                offset,
+                length,
+                available,
+            })?;
+        if end > available {
+            return Err(CoreError::MemoryOutOfRange {
+                memory_id,
+                offset,
+                length,
+                available,
+            });
+        }
+
+        let data = self.call_core(|core| unsafe { core.memory_data(memory_id) });
+        if data.is_null() {
+            return Err(CoreError::MemoryUnavailable { memory_id });
+        }
+
+        let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>().add(offset), length) };
+        Ok(bytes.to_vec())
     }
 
     fn call_core<R>(&mut self, action: impl FnOnce(&LoadedCore) -> R) -> R {

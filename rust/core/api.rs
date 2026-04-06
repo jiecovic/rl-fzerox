@@ -29,6 +29,8 @@ type RetroRunFn = unsafe extern "C" fn();
 type RetroSerializeSizeFn = unsafe extern "C" fn() -> usize;
 type RetroSerializeFn = unsafe extern "C" fn(data: *mut c_void, size: usize) -> bool;
 type RetroUnserializeFn = unsafe extern "C" fn(data: *const c_void, size: usize) -> bool;
+type RetroGetMemoryDataFn = unsafe extern "C" fn(id: u32) -> *mut c_void;
+type RetroGetMemorySizeFn = unsafe extern "C" fn(id: u32) -> usize;
 type RetroLoadGameFn = unsafe extern "C" fn(game: *const GameInfo) -> bool;
 type RetroUnloadGameFn = unsafe extern "C" fn();
 
@@ -55,6 +57,8 @@ struct Symbols {
     retro_serialize_size: RetroSerializeSizeFn,
     retro_serialize: RetroSerializeFn,
     retro_unserialize: RetroUnserializeFn,
+    retro_get_memory_data: RetroGetMemoryDataFn,
+    retro_get_memory_size: RetroGetMemorySizeFn,
     retro_load_game: RetroLoadGameFn,
     retro_unload_game: RetroUnloadGameFn,
 }
@@ -109,6 +113,8 @@ impl LoadedCore {
             retro_serialize_size: load_symbol(&library, b"retro_serialize_size\0")?,
             retro_serialize: load_symbol(&library, b"retro_serialize\0")?,
             retro_unserialize: load_symbol(&library, b"retro_unserialize\0")?,
+            retro_get_memory_data: load_symbol(&library, b"retro_get_memory_data\0")?,
+            retro_get_memory_size: load_symbol(&library, b"retro_get_memory_size\0")?,
             retro_load_game: load_symbol(&library, b"retro_load_game\0")?,
             retro_unload_game: load_symbol(&library, b"retro_unload_game\0")?,
         };
@@ -196,6 +202,14 @@ impl LoadedCore {
 
     pub unsafe fn unserialize(&self, data: *const c_void, size: usize) -> bool {
         unsafe { (self.symbols.retro_unserialize)(data, size) }
+    }
+
+    pub unsafe fn memory_data(&self, memory_id: u32) -> *mut c_void {
+        unsafe { (self.symbols.retro_get_memory_data)(memory_id) }
+    }
+
+    pub unsafe fn memory_size(&self, memory_id: u32) -> usize {
+        unsafe { (self.symbols.retro_get_memory_size)(memory_id) }
     }
 
     pub unsafe fn load_game(&self, game: &GameInfo) -> bool {

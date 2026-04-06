@@ -6,8 +6,9 @@ import pygame
 
 from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP
 from rl_fzerox.core.emulator.video import display_size
+from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
 from rl_fzerox.ui.viewer import (
-    _build_panel_sections,
+    _build_panel_columns,
     _create_fonts,
     _panel_content_height,
     _pressed_button_labels,
@@ -32,7 +33,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((640, 480)) == (976, 480)
+    assert _window_size((640, 480)) == (1096, 480)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -48,7 +49,7 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
 
     try:
         fonts = _create_fonts(pygame)
-        sections = _build_panel_sections(
+        columns = _build_panel_columns(
             episode=0,
             info={
                 "frame_index": 1592,
@@ -64,8 +65,35 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
             paused=False,
             joypad_mask=0,
             game_display_size=(640, 480),
+            telemetry=_sample_telemetry(),
         )
 
-        assert _panel_content_height(fonts, sections) <= 480
+        assert _panel_content_height(fonts, columns) <= 480
     finally:
         pygame.quit()
+
+
+def _sample_telemetry() -> FZeroXTelemetry:
+    return FZeroXTelemetry(
+        system_ram_size=0x00800000,
+        game_frame_count=1290,
+        game_mode_raw=1,
+        game_mode_name="gp_race",
+        course_index=0,
+        in_race_mode=True,
+        player=PlayerTelemetry(
+            state_flags=1 << 30,
+            state_labels=("active",),
+            speed_raw=0.0,
+            speed_kph=0.0,
+            energy=178.0,
+            max_energy=178.0,
+            boost_timer=0,
+            race_time_ms=116,
+            lap=1,
+            laps_completed=0,
+            position=30,
+            character=0,
+            machine_index=0,
+        ),
+    )
