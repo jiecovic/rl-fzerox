@@ -13,6 +13,14 @@ from pydantic import (
 )
 
 
+class ActionConfig(BaseModel):
+    """Policy action adapter settings for the current env."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    steer_buckets: int = Field(default=5, ge=3)
+
+
 class EnvConfig(BaseModel):
     """Environment-level rollout settings that affect frame stepping."""
 
@@ -20,6 +28,7 @@ class EnvConfig(BaseModel):
 
     action_repeat: PositiveInt = 2
     reset_to_race: bool = False
+    action: ActionConfig = Field(default_factory=ActionConfig)
 
 
 class EmulatorConfig(BaseModel):

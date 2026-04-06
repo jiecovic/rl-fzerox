@@ -20,7 +20,7 @@ from rl_fzerox._native import (
     joypad_mask,
 )
 from rl_fzerox.core.config.models import WatchAppConfig
-from rl_fzerox.core.emulator import Emulator
+from rl_fzerox.core.emulator import ControllerState, Emulator
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.game import FZeroXTelemetry, read_telemetry
@@ -145,7 +145,7 @@ class ViewerInput:
     toggle_pause: bool = False
     step_once: bool = False
     save_state: bool = False
-    joypad_mask: int = 0
+    control_state: ControllerState = ControllerState()
 
 
 def run_viewer(config: WatchAppConfig) -> None:
@@ -180,7 +180,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             reset_seed = config.seed if episode == 0 else None
             frame, info = env.reset(seed=reset_seed)
             reset_info = dict(info)
-            current_joypad_mask = 0
+            current_control_state = ControllerState()
             telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
@@ -194,8 +194,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 return
             if viewer_input.toggle_pause:
                 paused = not paused
-            current_joypad_mask = viewer_input.joypad_mask
-            emulator.set_joypad_mask(viewer_input.joypad_mask)
+            current_control_state = viewer_input.control_state
             if viewer_input.save_state:
                 _save_baseline_state(
                     emulator=emulator,
@@ -214,7 +213,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 reset_info=reset_info,
                 episode_reward=0.0,
                 paused=paused,
-                joypad_mask=current_joypad_mask,
+                control_state=current_control_state,
                 telemetry=telemetry,
             )
 
@@ -228,8 +227,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     return
                 if viewer_input.toggle_pause:
                     paused = not paused
-                current_joypad_mask = viewer_input.joypad_mask
-                emulator.set_joypad_mask(viewer_input.joypad_mask)
+                current_control_state = viewer_input.control_state
                 if viewer_input.save_state:
                     _save_baseline_state(
                         emulator=emulator,
@@ -246,14 +244,16 @@ def run_viewer(config: WatchAppConfig) -> None:
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
-                        joypad_mask=current_joypad_mask,
+                        control_state=current_control_state,
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
                     continue
 
                 if paused and viewer_input.step_once:
-                    frame, reward, terminated, truncated, info = env.step_frame()
+                    frame, reward, terminated, truncated, info = env.step_frame(
+                        current_control_state
+                    )
                     episode_reward += reward
                     telemetry = _read_live_telemetry(emulator)
                     _draw_frame(
@@ -266,13 +266,15 @@ def run_viewer(config: WatchAppConfig) -> None:
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
-                        joypad_mask=current_joypad_mask,
+                        control_state=current_control_state,
                         telemetry=telemetry,
                     )
                     continue
 
                 frame_start = time.perf_counter()
-                frame, reward, terminated, truncated, info = env.step(0)
+                frame, reward, terminated, truncated, info = env.step_control(
+                    current_control_state
+                )
                 episode_reward += reward
                 telemetry = _read_live_telemetry(emulator)
 
@@ -287,7 +289,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     reset_info=reset_info,
                     episode_reward=episode_reward,
                     paused=paused,
-                    joypad_mask=current_joypad_mask,
+                    control_state=current_control_state,
                     telemetry=telemetry,
                 )
 
@@ -338,7 +340,7 @@ def _draw_frame(
     reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
-    joypad_mask: int,
+    control_state: ControllerState,
     telemetry: FZeroXTelemetry | None,
 ) -> None:
     frame_height, frame_width, _ = frame.shape
@@ -364,7 +366,7 @@ def _draw_frame(
         reset_info=reset_info,
         episode_reward=episode_reward,
         paused=paused,
-        joypad_mask=joypad_mask,
+        control_state=control_state,
         game_display_size=target_size,
         telemetry=telemetry,
     )
@@ -382,7 +384,7 @@ def _draw_side_panel(
     reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
-    joypad_mask: int,
+    control_state: ControllerState,
     game_display_size: tuple[int, int],
     telemetry: FZeroXTelemetry | None,
 ) -> None:
@@ -404,7 +406,7 @@ def _draw_side_panel(
         reset_info=reset_info,
         episode_reward=episode_reward,
         paused=paused,
-        joypad_mask=joypad_mask,
+        control_state=control_state,
         game_display_size=game_display_size,
         telemetry=telemetry,
     )
@@ -452,7 +454,7 @@ def _build_panel_columns(
     reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
-    joypad_mask: int,
+    control_state: ControllerState,
     game_display_size: tuple[int, int],
     telemetry: FZeroXTelemetry | None,
 ) -> PanelColumns:
@@ -501,7 +503,12 @@ def _build_panel_columns(
                 lines=[
                     _panel_line(
                         "Held",
-                        _pressed_button_labels(joypad_mask),
+                        _pressed_button_labels(control_state.joypad_mask),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Steer",
+                        f"{control_state.left_stick_x:+.2f}",
                         PALETTE.text_primary,
                     ),
                 ],
@@ -509,7 +516,8 @@ def _build_panel_columns(
             PanelSection(
                 title="Controls",
                 lines=[
-                    _panel_line("Pad", "Arrows", PALETTE.text_muted),
+                    _panel_line("Steer", "Left / Right arrows", PALETTE.text_muted),
+                    _panel_line("D-pad", "Arrows", PALETTE.text_muted),
                     _panel_line("A / B", "X / Z", PALETTE.text_muted),
                     _panel_line("Menu", "Enter / Backspace", PALETTE.text_muted),
                     _panel_line("Playback", "P pause | N step", PALETTE.text_muted),
@@ -787,12 +795,21 @@ def _poll_viewer_input(pygame) -> ViewerInput:
     if keys[pygame.K_BACKSPACE]:
         pressed_buttons.append(JOYPAD_SELECT)
 
+    left_stick_x = 0.0
+    if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
+        left_stick_x = -1.0
+    elif keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
+        left_stick_x = 1.0
+
     return ViewerInput(
         quit_requested=quit_requested,
         toggle_pause=toggle_pause,
         step_once=step_once,
         save_state=save_state,
-        joypad_mask=joypad_mask(*pressed_buttons),
+        control_state=ControllerState(
+            joypad_mask=joypad_mask(*pressed_buttons),
+            left_stick_x=left_stick_x,
+        ),
     )
 
 

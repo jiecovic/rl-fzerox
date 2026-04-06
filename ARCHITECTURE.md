@@ -14,8 +14,13 @@
 
 - `src/rl_fzerox/core/envs/`
   The Gymnasium-facing environment layer. Right now it is intentionally slim:
-  raw emulator frames, fixed frame stepping, a first telemetry-based reward
-  function, and deterministic race reset helpers.
+  raw emulator frames, modular action adapters, fixed frame stepping, a first
+  telemetry-based reward function, and deterministic race reset helpers.
+
+- `src/rl_fzerox/core/actions/`
+  Policy-side action adapters that map Gymnasium action spaces to held emulator
+  controller state. The current adapter is a 5-bucket steering plus 2-mode
+  coast/throttle `MultiDiscrete` space.
 
 - `src/rl_fzerox/core/emulator/`
   Python wrapper around the native emulator host. It exposes reset, frame
@@ -59,10 +64,11 @@
 - Optional scripted reset-to-race bootstrap from the boot baseline
 - Soft continue-into-next-race reset after terminal episodes
 - Manual watch controls for creating a baseline savestate in-project
+- First modular controller/action mapping for policy actions
 - Live RDRAM telemetry for a first set of player/race values
 - First telemetry-based reward shaping from race progress and terminal events
 
 Not implemented yet:
 
-- Controller/action mapping
 - Training CLI and policy inference
+- Brake/boost action mapping and richer action spaces

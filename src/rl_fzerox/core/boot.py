@@ -9,9 +9,12 @@ import numpy as np
 
 from rl_fzerox._native import JOYPAD_START, joypad_mask
 from rl_fzerox.core.emulator.base import EmulatorBackend
+from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.game.telemetry import GameMode, MemoryReadableEmulator, read_telemetry
 
 START_MASK = joypad_mask(JOYPAD_START)
+START_CONTROL = ControllerState(joypad_mask=START_MASK)
+NEUTRAL_CONTROL = ControllerState()
 TITLE_WAIT_FRAMES = 240
 START_HOLD_FRAMES = 2
 SETTLE_FRAMES = 60
@@ -79,7 +82,7 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
         if detected_gp_race:
             backend.step_frames(PRE_RACE_SETTLE_FRAMES)
     finally:
-        backend.set_joypad_mask(0)
+        backend.set_controller_state(NEUTRAL_CONTROL)
 
     return backend.render(), {
         "boot_state": BootState.GP_RACE.value,
@@ -90,9 +93,9 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
 
 
 def _press_start(backend: EmulatorBackend) -> None:
-    backend.set_joypad_mask(START_MASK)
+    backend.set_controller_state(START_CONTROL)
     backend.step_frames(START_HOLD_FRAMES)
-    backend.set_joypad_mask(0)
+    backend.set_controller_state(NEUTRAL_CONTROL)
 
 
 def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str, object]]:
@@ -114,7 +117,7 @@ def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[st
                     )
                 backend.step_frame()
     finally:
-        backend.set_joypad_mask(0)
+        backend.set_controller_state(NEUTRAL_CONTROL)
 
     raise RuntimeError("Could not advance the current session into the next race")
 

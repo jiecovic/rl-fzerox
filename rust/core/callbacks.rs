@@ -6,17 +6,18 @@ use std::path::{Path, PathBuf};
 use std::ptr;
 
 use libretro_sys::{
-    DEVICE_JOYPAD, ENVIRONMENT_GET_CAN_DUPE, ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
-    ENVIRONMENT_GET_LIBRETRO_PATH, ENVIRONMENT_GET_LOG_INTERFACE, ENVIRONMENT_GET_OVERSCAN,
-    ENVIRONMENT_GET_SAVE_DIRECTORY, ENVIRONMENT_GET_SYSTEM_DIRECTORY, ENVIRONMENT_GET_VARIABLE,
-    ENVIRONMENT_GET_VARIABLE_UPDATE, ENVIRONMENT_SET_CONTROLLER_INFO, ENVIRONMENT_SET_GEOMETRY,
-    ENVIRONMENT_SET_HW_RENDER, ENVIRONMENT_SET_INPUT_DESCRIPTORS, ENVIRONMENT_SET_MEMORY_MAPS,
-    ENVIRONMENT_SET_PIXEL_FORMAT, ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK,
-    ENVIRONMENT_SET_SUBSYSTEM_INFO, ENVIRONMENT_SET_VARIABLES, GameGeometry, LogCallback, LogLevel,
-    PixelFormat, Variable,
+    DEVICE_ANALOG, DEVICE_JOYPAD, ENVIRONMENT_GET_CAN_DUPE,
+    ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, ENVIRONMENT_GET_LIBRETRO_PATH,
+    ENVIRONMENT_GET_LOG_INTERFACE, ENVIRONMENT_GET_OVERSCAN, ENVIRONMENT_GET_SAVE_DIRECTORY,
+    ENVIRONMENT_GET_SYSTEM_DIRECTORY, ENVIRONMENT_GET_VARIABLE, ENVIRONMENT_GET_VARIABLE_UPDATE,
+    ENVIRONMENT_SET_CONTROLLER_INFO, ENVIRONMENT_SET_GEOMETRY, ENVIRONMENT_SET_HW_RENDER,
+    ENVIRONMENT_SET_INPUT_DESCRIPTORS, ENVIRONMENT_SET_MEMORY_MAPS, ENVIRONMENT_SET_PIXEL_FORMAT,
+    ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK, ENVIRONMENT_SET_SUBSYSTEM_INFO,
+    ENVIRONMENT_SET_VARIABLES, GameGeometry, LogCallback, LogLevel, PixelFormat, Variable,
 };
 
 use crate::core::error::CoreError;
+use crate::core::input::ControllerState;
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{PixelLayout, VideoFrame, convert_frame};
 
@@ -39,7 +40,7 @@ pub struct CallbackState {
     system_dir: CString,
     save_dir: CString,
     variables: BTreeMap<String, CString>,
-    joypad_mask: u16,
+    controller_state: ControllerState,
     frame: Option<VideoFrame>,
     frame_serial: u64,
     pixel_format: PixelLayout,
@@ -67,7 +68,7 @@ impl CallbackState {
             system_dir: path_to_c_string(&system_dir)?,
             save_dir: path_to_c_string(&system_dir)?,
             variables: BTreeMap::new(),
-            joypad_mask: 0,
+            controller_state: ControllerState::default(),
             frame: None,
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
@@ -94,15 +95,16 @@ impl CallbackState {
         self.frame_serial += 1;
     }
 
-    pub fn set_joypad_mask(&mut self, joypad_mask: u16) {
-        self.joypad_mask = joypad_mask;
+    pub fn set_controller_state(&mut self, controller_state: ControllerState) {
+        self.controller_state = controller_state;
     }
 
     fn joypad_state(&self, button_id: u32) -> i16 {
-        if button_id >= u16::BITS {
-            return 0;
-        }
-        (((self.joypad_mask >> button_id) & 1) != 0) as i16
+        self.controller_state.joypad_state(button_id)
+    }
+
+    fn analog_state(&self, index: u32, id: u32) -> i16 {
+        self.controller_state.analog_state(index, id)
     }
 
     fn handle_environment(&mut self, cmd: u32, data: *mut c_void) -> bool {
@@ -277,11 +279,17 @@ pub extern "C" fn audio_sample_batch_callback(_data: *const i16, frames: usize) 
 pub extern "C" fn input_poll_callback() {}
 
 pub extern "C" fn input_state_callback(_port: u32, _device: u32, _index: u32, _id: u32) -> i16 {
-    if _port != 0 || _device != DEVICE_JOYPAD || _index != 0 {
+    if _port != 0 {
         return 0;
     }
 
-    with_state_mut(|state| state.joypad_state(_id)).unwrap_or(0)
+    match _device {
+        DEVICE_JOYPAD if _index == 0 => {
+            with_state_mut(|state| state.joypad_state(_id)).unwrap_or(0)
+        }
+        DEVICE_ANALOG => with_state_mut(|state| state.analog_state(_index, _id)).unwrap_or(0),
+        _ => 0,
+    }
 }
 
 unsafe extern "C" fn log_callback(_level: LogLevel, _fmt: *const i8) {}

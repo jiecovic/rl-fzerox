@@ -9,6 +9,8 @@ emulator:
 env:
   action_repeat: 2
   reset_to_race: false
+  action:
+    steer_buckets: 5
 
 watch:
   episodes: null
