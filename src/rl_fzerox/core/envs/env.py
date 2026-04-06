@@ -32,9 +32,7 @@ class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
     def reset(self, *, seed: int | None = None, options: dict[str, object] | None = None):
         _ = options
         super().reset(seed=seed)
-        observation, info = self._engine.reset()
-        info["seed"] = seed
-        return observation, info
+        return self._engine.reset(seed=seed)
 
     def step(self, action: int | np.integer):
         return self._engine.step(action)

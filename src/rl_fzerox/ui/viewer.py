@@ -10,7 +10,7 @@ from rl_fzerox.core.config.models import WatchAppConfig
 from rl_fzerox.core.emulator import Emulator
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.seed import episode_seed, seed_process
+from rl_fzerox.core.seed import seed_process
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,8 @@ def run_viewer(config: WatchAppConfig) -> None:
         target_seconds: float | None = None
 
         for episode in range(config.watch.episodes):
-            frame, info = env.reset(seed=episode_seed(config.seed, episode))
+            reset_seed = config.seed if episode == 0 else None
+            frame, info = env.reset(seed=reset_seed)
 
             if screen is None or font is None:
                 screen = _create_screen(pygame, emulator.display_size)

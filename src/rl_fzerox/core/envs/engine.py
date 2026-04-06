@@ -33,9 +33,11 @@ class FZeroXEnvEngine:
     def observation_space(self) -> spaces.Box:
         return self._observation_space
 
-    def reset(self) -> tuple[np.ndarray, dict[str, object]]:
+    def reset(self, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
         reset_state = self.backend.reset()
-        return np.array(reset_state.frame, copy=True), dict(reset_state.info)
+        info = dict(reset_state.info)
+        info["seed"] = seed
+        return np.array(reset_state.frame, copy=True), info
 
     def step(
         self,

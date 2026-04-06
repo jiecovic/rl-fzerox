@@ -1,11 +1,14 @@
 # tests/test_seed.py
-from rl_fzerox.core.seed import episode_seed
+from rl_fzerox.core.seed import derive_seed, splitmix64
 
 
-def test_episode_seed_is_stable_offset_from_master_seed() -> None:
-    assert episode_seed(11, 0) == 11
-    assert episode_seed(11, 3) == 14
+def test_splitmix64_is_stable_for_one_input() -> None:
+    assert splitmix64(11) == splitmix64(11)
 
 
-def test_episode_seed_propagates_none() -> None:
-    assert episode_seed(None, 5) is None
+def test_derive_seed_domain_separates_components() -> None:
+    assert derive_seed(11, 1) != derive_seed(11, 2)
+
+
+def test_derive_seed_propagates_none() -> None:
+    assert derive_seed(None, 5) is None
