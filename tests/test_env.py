@@ -16,6 +16,7 @@ def test_reset_returns_raw_frame_observation():
     assert obs.shape == backend.frame_shape
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
+    assert info["seed"] == 123
     assert isinstance(env.action_space, Discrete)
     assert env.action_space.n == 1
 

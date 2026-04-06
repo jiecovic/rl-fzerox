@@ -7,6 +7,7 @@ import numpy as np
 
 from rl_fzerox._native import Emulator as NativeEmulator
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
+from rl_fzerox.core.emulator.video import display_size
 
 
 class Emulator:
@@ -34,19 +35,13 @@ class Emulator:
 
     @property
     def display_size(self) -> tuple[int, int]:
-        frame_height, frame_width, _ = self.frame_shape
-        if self.display_aspect_ratio <= 0.0:
-            return frame_width, frame_height
-
-        display_height = max(1, round(frame_width / self.display_aspect_ratio))
-        return frame_width, int(display_height)
+        return display_size(self.frame_shape, self.display_aspect_ratio)
 
     @property
     def frame_index(self) -> int:
         return int(self._native.frame_index)
 
-    def reset(self, seed: int | None = None) -> ResetState:
-        _ = seed
+    def reset(self) -> ResetState:
         self._native.reset()
         return ResetState(
             frame=self.render(),
