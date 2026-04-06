@@ -5,7 +5,7 @@
 ## Layers
 
 - `src/rl_fzerox/apps/`
-  Thin CLI entrypoints such as `probe`, `smoke`, and `watch`.
+  Thin CLI entrypoints such as `probe`, `smoke`, `telemetry`, and `watch`.
 
 - `src/rl_fzerox/core/config/`
   Hydra composition plus Pydantic validation. Repo-owned configs resolve
@@ -19,7 +19,12 @@
 
 - `src/rl_fzerox/core/emulator/`
   Python wrapper around the native emulator host. It exposes reset, frame
-  stepping, rendering, and lightweight frame metadata.
+  stepping, rendering, lightweight frame metadata, and raw system RAM reads.
+
+- `src/rl_fzerox/core/game/`
+  F-Zero X-specific runtime decoding built on top of raw RAM reads. Right now
+  this is a small telemetry layer for race mode, timer, speed, energy, lap,
+  and player state flags.
 
 - `rust/`
   Native libretro host implemented in Rust and exposed to Python with `pyo3`.
@@ -49,6 +54,7 @@
 - Optional external baseline savestate file for fixed race-start resets
 - Optional scripted reset-to-race bootstrap from the boot baseline
 - Manual watch controls for creating a baseline savestate in-project
+- Live RDRAM telemetry for a first set of player/race values
 
 Not implemented yet:
 

@@ -2,7 +2,7 @@
 
 Experimental project to train a neural network to play F-Zero X with reinforcement learning.
 
-The emulator boundary is handled by a custom Rust libretro host exposed to Python with `pyo3`. Python owns the Gymnasium env, config, smoke tooling, and watch UI.
+The emulator boundary is handled by a custom Rust libretro host exposed to Python with `pyo3`. Python owns the Gymnasium env, config, telemetry tooling, and watch UI.
 
 ## Requirements
 
@@ -87,6 +87,12 @@ Watch the game:
 
 ```bash
 python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml
+```
+
+Read a live telemetry snapshot from emulated RAM:
+
+```bash
+python -m rl_fzerox.apps.telemetry --config conf/local/watch.local.yaml
 ```
 
 Watch controls:

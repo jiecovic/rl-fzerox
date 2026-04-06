@@ -62,6 +62,12 @@ impl PyEmulator {
     }
 
     #[getter]
+    fn system_ram_size(&mut self, py: Python<'_>) -> PyResult<usize> {
+        py.detach(|| self.host.system_ram_size())
+            .map_err(map_core_error)
+    }
+
+    #[getter]
     fn baseline_kind(&self) -> &'static str {
         self.host.baseline_kind()
     }
@@ -95,6 +101,18 @@ impl PyEmulator {
     fn frame_rgb<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
         let frame = self.host.frame_rgb().map_err(map_core_error)?;
         Ok(PyBytes::new(py, frame))
+    }
+
+    fn read_system_ram<'py>(
+        &mut self,
+        py: Python<'py>,
+        offset: usize,
+        length: usize,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let bytes = py
+            .detach(|| self.host.read_system_ram(offset, length))
+            .map_err(map_core_error)?;
+        Ok(PyBytes::new(py, &bytes))
     }
 
     fn close(&mut self) {

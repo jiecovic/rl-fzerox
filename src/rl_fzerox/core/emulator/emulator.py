@@ -66,6 +66,10 @@ class Emulator:
         return int(self._native.frame_index)
 
     @property
+    def system_ram_size(self) -> int:
+        return int(self._native.system_ram_size)
+
+    @property
     def baseline_kind(self) -> str:
         return str(self._native.baseline_kind)
 
@@ -104,6 +108,11 @@ class Emulator:
         """Serialize the current emulator state to a savestate file."""
 
         self._native.save_state(str(path.resolve()))
+
+    def read_system_ram(self, offset: int, length: int) -> bytes:
+        """Read a raw slice from the libretro system RAM buffer."""
+
+        return bytes(self._native.read_system_ram(offset, length))
 
     def capture_current_as_baseline(self, path: Path | None = None) -> None:
         """Promote the current state to the active reset baseline."""
