@@ -49,7 +49,7 @@ watch:
   fps: 30
 ```
 
-Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. The root `seed` is the master seed for Python/env randomness. Emulator resets restore a deterministic baseline savestate.
+Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. The root `seed` is the master seed for Python/env randomness. The emulator reset path itself is currently fixed-start deterministic via a baseline savestate.
 
 ## Commands
 

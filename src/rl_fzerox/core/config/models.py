@@ -3,7 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, FilePath, PositiveFloat, PositiveInt
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    FilePath,
+    PositiveFloat,
+    PositiveInt,
+)
 
 
 class EnvConfig(BaseModel):
