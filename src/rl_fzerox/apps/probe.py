@@ -6,7 +6,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from rl_fzerox.core.emulator.probe import probe_core
+from rl_fzerox.core.emulator import probe_core
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
