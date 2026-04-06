@@ -11,7 +11,6 @@ pub struct CoreInfo {
     pub valid_extensions: Vec<String>,
     pub requires_full_path: bool,
     pub blocks_extract: bool,
-    pub supports_no_game: Option<bool>,
 }
 
 impl CoreInfo {
@@ -23,7 +22,6 @@ impl CoreInfo {
             valid_extensions: split_extensions(system_info.valid_extensions),
             requires_full_path: system_info.need_fullpath,
             blocks_extract: system_info.block_extract,
-            supports_no_game: None,
         }
     }
 }

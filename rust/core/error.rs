@@ -7,6 +7,9 @@ pub enum CoreError {
     MissingCore(PathBuf),
     MissingRom(PathBuf),
     AlreadyClosed,
+    UnsupportedSaveState,
+    SerializeFailed,
+    UnserializeFailed,
     ReadFile { path: PathBuf, message: String },
     InvalidPath { path: PathBuf },
     LoadLibrary { path: PathBuf, message: String },
@@ -27,6 +30,24 @@ impl Display for CoreError {
             }
             Self::AlreadyClosed => {
                 write!(formatter, "The emulator host is already closed")
+            }
+            Self::UnsupportedSaveState => {
+                write!(
+                    formatter,
+                    "The libretro core does not expose save-state support"
+                )
+            }
+            Self::SerializeFailed => {
+                write!(
+                    formatter,
+                    "The libretro core failed to serialize its current state"
+                )
+            }
+            Self::UnserializeFailed => {
+                write!(
+                    formatter,
+                    "The libretro core failed to restore a saved state"
+                )
             }
             Self::ReadFile { path, message } => {
                 write!(formatter, "Could not read '{}': {message}", path.display())
