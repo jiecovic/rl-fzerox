@@ -1,20 +1,20 @@
 # tests/test_viewer.py
 import numpy as np
 
-from rl_fzerox.ui.viewer import _target_display_size
+from rl_fzerox.core.emulator.video import display_size
 
 
 def test_target_display_size_applies_aspect_correction() -> None:
-    frame = np.zeros((240, 640, 3), dtype=np.uint8)
+    frame_shape = np.zeros((240, 640, 3), dtype=np.uint8).shape
 
-    display_size = _target_display_size(frame, 4.0 / 3.0)
+    corrected_display_size = display_size(frame_shape, 4.0 / 3.0)
 
-    assert display_size == (640, 480)
+    assert corrected_display_size == (640, 480)
 
 
 def test_target_display_size_falls_back_to_raw_frame_size() -> None:
-    frame = np.zeros((240, 640, 3), dtype=np.uint8)
+    frame_shape = np.zeros((240, 640, 3), dtype=np.uint8).shape
 
-    display_size = _target_display_size(frame, 0.0)
+    corrected_display_size = display_size(frame_shape, 0.0)
 
-    assert display_size == (640, 240)
+    assert corrected_display_size == (640, 240)

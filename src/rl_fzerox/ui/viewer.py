@@ -8,7 +8,9 @@ import numpy as np
 
 from rl_fzerox.core.config.models import WatchAppConfig
 from rl_fzerox.core.emulator import Emulator
+from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.seed import episode_seed, seed_process
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,8 @@ def run_viewer(config: WatchAppConfig) -> None:
             "Install with `pip install -e .[watch]`."
         ) from exc
 
+    seed_process(config.seed)
+
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,
@@ -41,7 +45,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         target_seconds: float | None = None
 
         for episode in range(config.watch.episodes):
-            frame, info = env.reset(seed=config.watch.seed)
+            frame, info = env.reset(seed=episode_seed(config.seed, episode))
 
             if screen is None or font is None:
                 screen = _create_screen(pygame, emulator.display_size)
@@ -153,15 +157,6 @@ def _ensure_screen(pygame, screen, display_size: tuple[int, int]):
     return _create_screen(pygame, display_size)
 
 
-def _target_display_size(frame: np.ndarray, aspect_ratio: float) -> tuple[int, int]:
-    frame_height, frame_width, _ = frame.shape
-    if aspect_ratio <= 0.0:
-        return frame_width, frame_height
-
-    display_height = max(1, round(frame_width / aspect_ratio))
-    return frame_width, int(display_height)
-
-
 def _draw_frame(
     *,
     pygame,
@@ -175,12 +170,9 @@ def _draw_frame(
 ) -> None:
     frame_height, frame_width, _ = frame.shape
     surface = pygame.image.frombuffer(frame.tobytes(), (frame_width, frame_height), "RGB")
-    display_size = _target_display_size(
-        frame,
-        _display_aspect_ratio(info),
-    )
-    if surface.get_size() != display_size:
-        surface = pygame.transform.scale(surface, display_size)
+    target_size = display_size(frame.shape, _display_aspect_ratio(info))
+    if surface.get_size() != target_size:
+        surface = pygame.transform.scale(surface, target_size)
     screen.blit(surface, (0, 0))
 
     overlay = font.render(

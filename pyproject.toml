@@ -5,16 +5,16 @@ build-backend = "maturin"
 [project]
 name = "rl-fzerox"
 version = "0.1.0"
-description = "Gymnasium scaffold for F-Zero X emulator control and observation"
+description = "Experimental RL tooling for training an agent on F-Zero X"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Thomas" }]
 dependencies = [
   "gymnasium>=0.29,<1.1",
-  "hydra-core>=1.3,<2",
   "numpy>=1.26,<3",
   "pydantic>=2.8,<3",
+  "PyYAML>=6,<7",
 ]
 
 [project.optional-dependencies]
