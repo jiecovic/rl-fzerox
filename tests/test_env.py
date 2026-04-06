@@ -58,7 +58,7 @@ def test_reset_can_boot_into_the_first_race_path():
     assert obs.shape == backend.frame_shape
     assert info["seed"] == 5
     assert info["reset_mode"] == "boot_to_race"
-    assert info["boot_state"] == "ready"
+    assert info["boot_state"] == "gp_race"
     assert backend.frame_index == 1_592
 
 
@@ -81,3 +81,32 @@ def test_reset_skips_bootstrap_when_a_custom_baseline_is_active():
     assert info["seed"] == 11
     assert "boot_state" not in info
     assert backend.frame_index == 0
+
+
+def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=2, reset_to_race=True),
+    )
+
+    env.reset(seed=1)
+    env._engine._episode_done = True
+
+    def fake_continue_to_next_race(_backend):
+        return backend.render(), {
+            "reset_mode": "continue_to_next_race",
+            "boot_state": "gp_race",
+            "frame_index": 4242,
+        }
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine.continue_to_next_race",
+        fake_continue_to_next_race,
+    )
+
+    _, info = env.reset(seed=2)
+
+    assert info["seed"] == 2
+    assert info["reset_mode"] == "continue_to_next_race"
+    assert info["boot_state"] == "gp_race"
