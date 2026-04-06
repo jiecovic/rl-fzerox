@@ -17,6 +17,8 @@ use libretro_sys::{
 };
 
 use crate::core::error::CoreError;
+use crate::core::options::{default_option_value, override_option};
+use crate::core::video::{PixelLayout, VideoFrame, convert_frame};
 
 const ENVIRONMENT_GET_FASTFORWARDING: u32 = 49 | (1 << 31);
 const ENVIRONMENT_GET_TARGET_REFRESH_RATE: u32 = 50 | (1 << 31);
@@ -27,17 +29,9 @@ const ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY: u32 = 55 | (1 << 31);
 const ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK: u32 = 69;
 const AUDIO_VIDEO_ENABLE_VIDEO: u32 = 1 << 0;
 const AUDIO_VIDEO_ENABLE_AUDIO: u32 = 1 << 1;
-const HW_FRAME_BUFFER_VALID: usize = usize::MAX;
 
 thread_local! {
     static ACTIVE_STATE: Cell<*mut CallbackState> = const { Cell::new(ptr::null_mut()) };
-}
-
-#[derive(Clone, Debug)]
-pub struct VideoFrame {
-    pub width: usize,
-    pub height: usize,
-    pub rgb: Vec<u8>,
 }
 
 pub struct CallbackState {
@@ -54,13 +48,6 @@ pub struct CallbackState {
 
 pub struct CallbackGuard {
     previous: *mut CallbackState,
-}
-
-#[derive(Clone, Copy)]
-enum PixelLayout {
-    Argb1555,
-    Argb8888,
-    Rgb565,
 }
 
 impl CallbackState {
@@ -95,6 +82,12 @@ impl CallbackState {
 
     pub fn geometry(&self) -> Option<(usize, usize)> {
         self.geometry
+    }
+
+    pub fn set_frame(&mut self, frame: VideoFrame) {
+        self.geometry = Some((frame.width, frame.height));
+        self.frame = Some(frame);
+        self.frame_serial += 1;
     }
 
     fn handle_environment(&mut self, cmd: u32, data: *mut c_void) -> bool {
@@ -218,18 +211,9 @@ impl CallbackState {
         height: usize,
         pitch: usize,
     ) {
-        if data.is_null() || data as usize == HW_FRAME_BUFFER_VALID {
-            return;
+        if let Some(frame) = convert_frame(data, width, height, pitch, self.pixel_format) {
+            self.set_frame(frame);
         }
-
-        let rgb = match self.pixel_format {
-            PixelLayout::Argb1555 => convert_argb1555(data, width, height, pitch),
-            PixelLayout::Argb8888 => convert_argb8888(data, width, height, pitch),
-            PixelLayout::Rgb565 => convert_rgb565(data, width, height, pitch),
-        };
-        self.frame = Some(VideoFrame { width, height, rgb });
-        self.frame_serial += 1;
-        self.geometry = Some((width, height));
     }
 }
 
@@ -313,89 +297,6 @@ fn c_string(value: *const i8) -> String {
         .into_owned()
 }
 
-fn default_option_value(spec: &str) -> String {
-    let Some((_, values)) = spec.split_once("; ") else {
-        return spec.to_owned();
-    };
-    values.split('|').next().unwrap_or_default().to_owned()
-}
-
-fn override_option(key: &str, default_value: &str) -> String {
-    match key {
-        "mupen64plus-rdp-plugin" => "angrylion".to_owned(),
-        _ => default_value.to_owned(),
-    }
-}
-
-fn convert_argb8888(data: *const c_void, width: usize, height: usize, pitch: usize) -> Vec<u8> {
-    let mut rgb = vec![0_u8; width * height * 3];
-    for row in 0..height {
-        let src =
-            unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 4) };
-        let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 4;
-            let dst_index = column * 3;
-            dst[dst_index] = src[src_index + 2];
-            dst[dst_index + 1] = src[src_index + 1];
-            dst[dst_index + 2] = src[src_index];
-        }
-    }
-    rgb
-}
-
-fn convert_rgb565(data: *const c_void, width: usize, height: usize, pitch: usize) -> Vec<u8> {
-    let mut rgb = vec![0_u8; width * height * 3];
-    for row in 0..height {
-        let src =
-            unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
-        let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 2;
-            let pixel = u16::from_le_bytes([src[src_index], src[src_index + 1]]);
-            let red = ((pixel >> 11) & 0x1f) as u8;
-            let green = ((pixel >> 5) & 0x3f) as u8;
-            let blue = (pixel & 0x1f) as u8;
-
-            let dst_index = column * 3;
-            dst[dst_index] = expand_5_to_8(red);
-            dst[dst_index + 1] = expand_6_to_8(green);
-            dst[dst_index + 2] = expand_5_to_8(blue);
-        }
-    }
-    rgb
-}
-
-fn convert_argb1555(data: *const c_void, width: usize, height: usize, pitch: usize) -> Vec<u8> {
-    let mut rgb = vec![0_u8; width * height * 3];
-    for row in 0..height {
-        let src =
-            unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
-        let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 2;
-            let pixel = u16::from_le_bytes([src[src_index], src[src_index + 1]]);
-            let red = ((pixel >> 10) & 0x1f) as u8;
-            let green = ((pixel >> 5) & 0x1f) as u8;
-            let blue = (pixel & 0x1f) as u8;
-
-            let dst_index = column * 3;
-            dst[dst_index] = expand_5_to_8(red);
-            dst[dst_index + 1] = expand_5_to_8(green);
-            dst[dst_index + 2] = expand_5_to_8(blue);
-        }
-    }
-    rgb
-}
-
-fn expand_5_to_8(value: u8) -> u8 {
-    (value << 3) | (value >> 2)
-}
-
-fn expand_6_to_8(value: u8) -> u8 {
-    (value << 2) | (value >> 4)
-}
-
 fn read_u32(data: *mut c_void) -> Option<u32> {
     if data.is_null() {
         return None;
@@ -413,40 +314,4 @@ fn write_ptr<T>(data: *mut c_void, value: T) -> bool {
         ptr::write(data.cast::<T>(), value);
     }
     true
-}
-
-#[cfg(test)]
-mod tests {
-    use std::ffi::c_void;
-
-    use super::{convert_argb1555, convert_argb8888, convert_rgb565, default_option_value};
-
-    #[test]
-    fn default_option_value_returns_first_choice() {
-        assert_eq!(
-            default_option_value("Renderer; angrylion|gliden64"),
-            "angrylion"
-        );
-    }
-
-    #[test]
-    fn convert_argb8888_maps_bytes_to_rgb() {
-        let pixels = [3_u8, 2, 1, 0, 6, 5, 4, 0];
-        let rgb = convert_argb8888(pixels.as_ptr().cast::<c_void>(), 2, 1, 8);
-        assert_eq!(rgb, vec![1, 2, 3, 4, 5, 6]);
-    }
-
-    #[test]
-    fn convert_rgb565_maps_values_to_rgb() {
-        let pixel = 0xF800_u16.to_le_bytes();
-        let rgb = convert_rgb565(pixel.as_ptr().cast::<c_void>(), 1, 1, 2);
-        assert_eq!(rgb, vec![255, 0, 0]);
-    }
-
-    #[test]
-    fn convert_argb1555_maps_values_to_rgb() {
-        let pixel = 0x7C00_u16.to_le_bytes();
-        let rgb = convert_argb1555(pixel.as_ptr().cast::<c_void>(), 1, 1, 2);
-        assert_eq!(rgb, vec![255, 0, 0]);
-    }
 }

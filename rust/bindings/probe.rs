@@ -1,10 +1,9 @@
 // rust/bindings/probe.rs
 use std::path::Path;
 
-use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError};
 use pyo3::prelude::*;
 
-use crate::core::error::CoreError;
+use crate::bindings::error::map_core_error;
 use crate::core::info::CoreInfo;
 use crate::core::probe::probe;
 
@@ -16,7 +15,6 @@ pub struct PyCoreInfo {
     pub valid_extensions: Vec<String>,
     pub requires_full_path: bool,
     pub blocks_extract: bool,
-    pub supports_no_game: Option<bool>,
 }
 
 #[pyfunction]
@@ -34,16 +32,6 @@ impl From<CoreInfo> for PyCoreInfo {
             valid_extensions: value.valid_extensions,
             requires_full_path: value.requires_full_path,
             blocks_extract: value.blocks_extract,
-            supports_no_game: value.supports_no_game,
         }
-    }
-}
-
-fn map_core_error(error: CoreError) -> PyErr {
-    match error {
-        CoreError::MissingCore(_) | CoreError::MissingRom(_) => {
-            PyFileNotFoundError::new_err(error.to_string())
-        }
-        _ => PyRuntimeError::new_err(error.to_string()),
     }
 }

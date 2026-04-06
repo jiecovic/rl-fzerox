@@ -1,11 +1,10 @@
 // rust/bindings/emulator.rs
 use std::path::Path;
 
-use pyo3::exceptions::{PyFileNotFoundError, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-use crate::core::error::CoreError;
+use crate::bindings::error::map_core_error;
 use crate::core::host::Host;
 
 #[pyclass(name = "Emulator", unsendable)]
@@ -16,8 +15,10 @@ pub struct PyEmulator {
 #[pymethods]
 impl PyEmulator {
     #[new]
-    fn new(core_path: &str, rom_path: &str) -> PyResult<Self> {
-        let host = Host::open(Path::new(core_path), Path::new(rom_path)).map_err(map_core_error)?;
+    fn new(py: Python<'_>, core_path: &str, rom_path: &str) -> PyResult<Self> {
+        let host = py
+            .detach(|| Host::open(Path::new(core_path), Path::new(rom_path)))
+            .map_err(map_core_error)?;
         Ok(Self { host })
     }
 
@@ -46,30 +47,22 @@ impl PyEmulator {
         self.host.frame_index()
     }
 
-    fn reset(&mut self) -> PyResult<()> {
-        self.host.reset().map_err(map_core_error)
+    fn reset(&mut self, py: Python<'_>) -> PyResult<()> {
+        py.detach(|| self.host.reset()).map_err(map_core_error)
     }
 
     #[pyo3(signature = (count=1))]
-    fn step_frames(&mut self, count: usize) -> PyResult<()> {
-        self.host.step_frames(count).map_err(map_core_error)
+    fn step_frames(&mut self, py: Python<'_>, count: usize) -> PyResult<()> {
+        py.detach(|| self.host.step_frames(count))
+            .map_err(map_core_error)
     }
 
     fn frame_rgb<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
         let frame = self.host.frame_rgb().map_err(map_core_error)?;
-        Ok(PyBytes::new(py, &frame))
+        Ok(PyBytes::new(py, frame))
     }
 
     fn close(&mut self) {
         self.host.close();
-    }
-}
-
-fn map_core_error(error: CoreError) -> PyErr {
-    match error {
-        CoreError::MissingCore(_) | CoreError::MissingRom(_) => {
-            PyFileNotFoundError::new_err(error.to_string())
-        }
-        _ => PyRuntimeError::new_err(error.to_string()),
     }
 }

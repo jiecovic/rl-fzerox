@@ -6,13 +6,14 @@ use libretro_sys::{DEVICE_JOYPAD, GameInfo};
 
 use crate::core::api::LoadedCore;
 use crate::core::callbacks::{
-    CallbackGuard, CallbackState, VideoFrame, audio_sample_batch_callback, audio_sample_callback,
+    CallbackGuard, CallbackState, audio_sample_batch_callback, audio_sample_callback,
     environment_callback, input_device, input_poll_callback, input_state_callback,
     video_refresh_callback,
 };
 use crate::core::error::CoreError;
+use crate::core::video::VideoFrame;
 
-const RESET_WARMUP_FRAMES: usize = 120;
+const FRAME_WAIT_LIMIT: usize = 120;
 
 pub struct Host {
     core: LoadedCore,
@@ -20,6 +21,8 @@ pub struct Host {
     rom_path: PathBuf,
     rom_path_c_string: CString,
     rom_bytes: Vec<u8>,
+    baseline_state: Vec<u8>,
+    baseline_frame: Option<VideoFrame>,
     display_aspect_ratio: f64,
     native_fps: f64,
     frame_shape: (usize, usize, usize),
@@ -52,6 +55,8 @@ impl Host {
             rom_path: rom_path.to_path_buf(),
             rom_path_c_string,
             rom_bytes,
+            baseline_state: Vec::new(),
+            baseline_frame: None,
             display_aspect_ratio: 0.0,
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
@@ -61,6 +66,7 @@ impl Host {
         host.configure_callbacks();
         host.initialize();
         host.load_game()?;
+        host.capture_baseline()?;
         host.refresh_av_info();
         Ok(host)
     }
@@ -87,11 +93,7 @@ impl Host {
 
     pub fn reset(&mut self) -> Result<(), CoreError> {
         self.ensure_open()?;
-        let baseline = self.callbacks.frame_serial();
-        self.call_core(|core| unsafe {
-            core.reset();
-        });
-        self.run_until_frame(baseline, RESET_WARMUP_FRAMES)?;
+        self.restore_baseline()?;
         self.frame_index = 0;
         self.refresh_shape_from_frame();
         Ok(())
@@ -112,10 +114,10 @@ impl Host {
         Ok(())
     }
 
-    pub fn frame_rgb(&self) -> Result<Vec<u8>, CoreError> {
+    pub fn frame_rgb(&self) -> Result<&[u8], CoreError> {
         self.callbacks
             .frame()
-            .map(|frame| frame.rgb.clone())
+            .map(|frame| frame.rgb.as_slice())
             .ok_or(CoreError::NoFrameAvailable)
     }
 
@@ -206,6 +208,53 @@ impl Host {
             }
         }
         Err(CoreError::NoFrameAvailable)
+    }
+
+    fn capture_baseline(&mut self) -> Result<(), CoreError> {
+        // Capture one canonical episode start state up front. Every reset then
+        // restores this snapshot instead of replaying startup frames again.
+        let baseline_serial = self.callbacks.frame_serial();
+        self.call_core(|core| unsafe {
+            core.reset();
+        });
+        self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
+        self.refresh_av_info();
+        self.refresh_shape_from_frame();
+        self.baseline_state = self.serialize_state()?;
+        self.baseline_frame = self.callbacks.frame().cloned();
+        Ok(())
+    }
+
+    fn restore_baseline(&mut self) -> Result<(), CoreError> {
+        let baseline_frame = self
+            .baseline_frame
+            .clone()
+            .ok_or(CoreError::NoFrameAvailable)?;
+        let baseline_state_ptr = self.baseline_state.as_ptr();
+        let baseline_state_len = self.baseline_state.len();
+        let restored = self.call_core(|core| unsafe {
+            core.unserialize(baseline_state_ptr.cast(), baseline_state_len)
+        });
+        if !restored {
+            return Err(CoreError::UnserializeFailed);
+        }
+        self.callbacks.set_frame(baseline_frame);
+        Ok(())
+    }
+
+    fn serialize_state(&mut self) -> Result<Vec<u8>, CoreError> {
+        let size = self.call_core(|core| unsafe { core.serialize_size() });
+        if size == 0 {
+            return Err(CoreError::UnsupportedSaveState);
+        }
+
+        let mut state = vec![0_u8; size];
+        let serialized = self
+            .call_core(|core| unsafe { core.serialize(state.as_mut_ptr().cast(), state.len()) });
+        if !serialized {
+            return Err(CoreError::SerializeFailed);
+        }
+        Ok(state)
     }
 
     fn call_core<R>(&mut self, action: impl FnOnce(&LoadedCore) -> R) -> R {

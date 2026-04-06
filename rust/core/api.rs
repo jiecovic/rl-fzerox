@@ -1,4 +1,5 @@
 // rust/core/api.rs
+use std::ffi::c_void;
 use std::path::Path;
 use std::ptr;
 
@@ -25,6 +26,9 @@ type RetroGetSystemAvInfoFn = unsafe extern "C" fn(info: *mut SystemAvInfo);
 type RetroSetControllerPortDeviceFn = unsafe extern "C" fn(port: u32, device: u32);
 type RetroResetFn = unsafe extern "C" fn();
 type RetroRunFn = unsafe extern "C" fn();
+type RetroSerializeSizeFn = unsafe extern "C" fn() -> usize;
+type RetroSerializeFn = unsafe extern "C" fn(data: *mut c_void, size: usize) -> bool;
+type RetroUnserializeFn = unsafe extern "C" fn(data: *const c_void, size: usize) -> bool;
 type RetroLoadGameFn = unsafe extern "C" fn(game: *const GameInfo) -> bool;
 type RetroUnloadGameFn = unsafe extern "C" fn();
 
@@ -48,6 +52,9 @@ struct Symbols {
     retro_set_controller_port_device: RetroSetControllerPortDeviceFn,
     retro_reset: RetroResetFn,
     retro_run: RetroRunFn,
+    retro_serialize_size: RetroSerializeSizeFn,
+    retro_serialize: RetroSerializeFn,
+    retro_unserialize: RetroUnserializeFn,
     retro_load_game: RetroLoadGameFn,
     retro_unload_game: RetroUnloadGameFn,
 }
@@ -99,6 +106,9 @@ impl LoadedCore {
             )?,
             retro_reset: load_symbol(&library, b"retro_reset\0")?,
             retro_run: load_symbol(&library, b"retro_run\0")?,
+            retro_serialize_size: load_symbol(&library, b"retro_serialize_size\0")?,
+            retro_serialize: load_symbol(&library, b"retro_serialize\0")?,
+            retro_unserialize: load_symbol(&library, b"retro_unserialize\0")?,
             retro_load_game: load_symbol(&library, b"retro_load_game\0")?,
             retro_unload_game: load_symbol(&library, b"retro_unload_game\0")?,
         };
@@ -174,6 +184,18 @@ impl LoadedCore {
 
     pub unsafe fn run(&self) {
         unsafe { (self.symbols.retro_run)() };
+    }
+
+    pub unsafe fn serialize_size(&self) -> usize {
+        unsafe { (self.symbols.retro_serialize_size)() }
+    }
+
+    pub unsafe fn serialize(&self, data: *mut c_void, size: usize) -> bool {
+        unsafe { (self.symbols.retro_serialize)(data, size) }
+    }
+
+    pub unsafe fn unserialize(&self, data: *const c_void, size: usize) -> bool {
+        unsafe { (self.symbols.retro_unserialize)(data, size) }
     }
 
     pub unsafe fn load_game(&self, game: &GameInfo) -> bool {

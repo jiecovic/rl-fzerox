@@ -23,6 +23,5 @@ class CoreInfo:
     valid_extensions: list[str]
     requires_full_path: bool
     blocks_extract: bool
-    supports_no_game: bool | None
 
 def probe_core(core_path: str) -> CoreInfo: ...

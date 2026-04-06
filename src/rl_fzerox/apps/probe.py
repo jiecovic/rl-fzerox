@@ -30,7 +30,6 @@ def main(argv: Sequence[str] | None = None) -> None:
                 "valid_extensions": core_info.valid_extensions,
                 "requires_full_path": core_info.requires_full_path,
                 "blocks_extract": core_info.blocks_extract,
-                "supports_no_game": core_info.supports_no_game,
             },
             indent=2,
             sort_keys=True,
