@@ -15,9 +15,21 @@ pub struct PyEmulator {
 #[pymethods]
 impl PyEmulator {
     #[new]
-    fn new(py: Python<'_>, core_path: &str, rom_path: &str) -> PyResult<Self> {
+    #[pyo3(signature = (core_path, rom_path, runtime_dir=None))]
+    fn new(
+        py: Python<'_>,
+        core_path: &str,
+        rom_path: &str,
+        runtime_dir: Option<&str>,
+    ) -> PyResult<Self> {
         let host = py
-            .detach(|| Host::open(Path::new(core_path), Path::new(rom_path)))
+            .detach(|| {
+                Host::open(
+                    Path::new(core_path),
+                    Path::new(rom_path),
+                    runtime_dir.map(Path::new),
+                )
+            })
             .map_err(map_core_error)?;
         Ok(Self { host })
     }

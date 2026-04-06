@@ -10,6 +10,7 @@ pub enum CoreError {
     UnsupportedSaveState,
     SerializeFailed,
     UnserializeFailed,
+    CreateDirectory { path: PathBuf, message: String },
     ReadFile { path: PathBuf, message: String },
     InvalidPath { path: PathBuf },
     LoadLibrary { path: PathBuf, message: String },
@@ -47,6 +48,13 @@ impl Display for CoreError {
                 write!(
                     formatter,
                     "The libretro core failed to restore a saved state"
+                )
+            }
+            Self::CreateDirectory { path, message } => {
+                write!(
+                    formatter,
+                    "Could not create directory '{}': {message}",
+                    path.display()
                 )
             }
             Self::ReadFile { path, message } => {

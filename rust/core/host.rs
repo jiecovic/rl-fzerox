@@ -31,13 +31,17 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn open(core_path: &Path, rom_path: &Path) -> Result<Self, CoreError> {
+    pub fn open(
+        core_path: &Path,
+        rom_path: &Path,
+        runtime_dir: Option<&Path>,
+    ) -> Result<Self, CoreError> {
         if !rom_path.is_file() {
             return Err(CoreError::MissingRom(rom_path.to_path_buf()));
         }
 
         let core = LoadedCore::load(core_path)?;
-        let callbacks = Box::new(CallbackState::new(core_path, rom_path)?);
+        let callbacks = Box::new(CallbackState::new(core_path, runtime_dir)?);
         let rom_bytes = std::fs::read(rom_path).map_err(|error| CoreError::ReadFile {
             path: rom_path.to_path_buf(),
             message: error.to_string(),

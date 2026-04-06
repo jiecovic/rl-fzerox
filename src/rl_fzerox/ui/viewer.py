@@ -38,6 +38,7 @@ def run_viewer(config: WatchAppConfig) -> None:
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,
+        runtime_dir=config.emulator.runtime_dir,
     )
     env = FZeroXEnv(backend=emulator, config=config.env)
     pygame.init()

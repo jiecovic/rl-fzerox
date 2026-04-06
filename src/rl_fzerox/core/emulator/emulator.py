@@ -13,10 +13,21 @@ from rl_fzerox.core.emulator.video import display_size
 class Emulator:
     """Python wrapper over the native Rust libretro host."""
 
-    def __init__(self, *, core_path: Path, rom_path: Path) -> None:
+    def __init__(
+        self,
+        *,
+        core_path: Path,
+        rom_path: Path,
+        runtime_dir: Path | None = None,
+    ) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
-        self._native = NativeEmulator(str(self._core_path), str(self._rom_path))
+        self._runtime_dir = runtime_dir.resolve() if runtime_dir is not None else None
+        self._native = NativeEmulator(
+            str(self._core_path),
+            str(self._rom_path),
+            None if self._runtime_dir is None else str(self._runtime_dir),
+        )
 
     @property
     def name(self) -> str:
@@ -95,6 +106,7 @@ class Emulator:
             "frame_index": self.frame_index,
             "core_path": str(self._core_path),
             "rom_path": str(self._rom_path),
+            "runtime_dir": None if self._runtime_dir is None else str(self._runtime_dir),
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
