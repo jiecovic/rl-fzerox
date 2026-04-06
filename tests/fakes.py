@@ -52,6 +52,7 @@ class SyntheticBackend:
                 "backend": self.name,
                 "native_fps": self.native_fps,
                 "frame_index": self._state.frame_index,
+                "baseline_kind": "startup",
                 "progress": self._state.progress,
             },
         )

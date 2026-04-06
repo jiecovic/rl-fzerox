@@ -15,6 +15,12 @@ use crate::core::video::VideoFrame;
 
 const FRAME_WAIT_LIMIT: usize = 120;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BaselineKind {
+    Startup,
+    Custom,
+}
+
 pub struct Host {
     core: LoadedCore,
     callbacks: Box<CallbackState>,
@@ -23,6 +29,7 @@ pub struct Host {
     rom_bytes: Vec<u8>,
     baseline_state: Vec<u8>,
     baseline_frame: Option<VideoFrame>,
+    baseline_kind: BaselineKind,
     display_aspect_ratio: f64,
     native_fps: f64,
     frame_shape: (usize, usize, usize),
@@ -62,6 +69,7 @@ impl Host {
             rom_bytes,
             baseline_state: Vec::new(),
             baseline_frame: None,
+            baseline_kind: BaselineKind::Startup,
             display_aspect_ratio: 0.0,
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
@@ -98,6 +106,13 @@ impl Host {
 
     pub fn frame_index(&self) -> usize {
         self.frame_index
+    }
+
+    pub fn baseline_kind(&self) -> &'static str {
+        match self.baseline_kind {
+            BaselineKind::Startup => "startup",
+            BaselineKind::Custom => "custom",
+        }
     }
 
     pub fn reset(&mut self) -> Result<(), CoreError> {
@@ -151,6 +166,7 @@ impl Host {
                 .cloned()
                 .ok_or(CoreError::NoFrameAvailable)?,
         );
+        self.baseline_kind = BaselineKind::Custom;
         self.refresh_av_info();
         self.refresh_shape_from_frame();
         Ok(())
@@ -255,15 +271,12 @@ impl Host {
     fn capture_startup_baseline(&mut self) -> Result<(), CoreError> {
         // Capture one canonical startup baseline up front. Every reset then
         // restores this snapshot instead of replaying startup frames again.
-        let baseline_serial = self.callbacks.frame_serial();
-        self.call_core(|core| unsafe {
-            core.reset();
-        });
-        self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
-        self.capture_current_baseline()
+        self.initialize_running_state()?;
+        self.capture_current_baseline(BaselineKind::Startup)
     }
 
     fn load_baseline_from_file(&mut self, baseline_state_path: &Path) -> Result<(), CoreError> {
+        self.initialize_running_state()?;
         let baseline_state =
             std::fs::read(baseline_state_path).map_err(|error| CoreError::ReadFile {
                 path: baseline_state_path.to_path_buf(),
@@ -274,10 +287,18 @@ impl Host {
         if self.callbacks.frame_serial() == baseline_serial {
             self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
         }
-        self.capture_current_baseline()
+        self.capture_current_baseline(BaselineKind::Custom)
     }
 
-    fn capture_current_baseline(&mut self) -> Result<(), CoreError> {
+    fn initialize_running_state(&mut self) -> Result<(), CoreError> {
+        let baseline_serial = self.callbacks.frame_serial();
+        self.call_core(|core| unsafe {
+            core.reset();
+        });
+        self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)
+    }
+
+    fn capture_current_baseline(&mut self, baseline_kind: BaselineKind) -> Result<(), CoreError> {
         self.refresh_av_info();
         self.refresh_shape_from_frame();
         self.baseline_state = self.serialize_state()?;
@@ -287,6 +308,7 @@ impl Host {
                 .cloned()
                 .ok_or(CoreError::NoFrameAvailable)?,
         );
+        self.baseline_kind = baseline_kind;
         Ok(())
     }
 

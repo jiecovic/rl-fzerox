@@ -1,6 +1,4 @@
 # tests/test_env.py
-from pathlib import Path
-
 import numpy as np
 from gymnasium.spaces import Discrete
 
@@ -64,16 +62,13 @@ def test_reset_can_boot_into_the_first_race_path():
     assert backend.frame_index == 1_592
 
 
-def test_reset_skips_bootstrap_when_a_saved_baseline_exists(tmp_path: Path):
+def test_reset_skips_bootstrap_when_a_custom_baseline_is_active():
     class BaselineBackend(SyntheticBackend):
         def reset(self) -> ResetState:
             reset_state = super().reset()
             info = dict(reset_state.info)
-            info["baseline_state_path"] = str((tmp_path / "baseline.state").resolve())
+            info["baseline_kind"] = "custom"
             return ResetState(frame=reset_state.frame, info=info)
-
-    baseline_path = tmp_path / "baseline.state"
-    baseline_path.write_bytes(b"baseline")
 
     backend = BaselineBackend()
     env = FZeroXEnv(

@@ -1,8 +1,6 @@
 # src/rl_fzerox/core/envs/engine.py
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 from gymnasium import spaces
 
@@ -41,7 +39,7 @@ class FZeroXEnvEngine:
         info = dict(reset_state.info)
         frame = reset_state.frame
 
-        if self.config.reset_to_race and not _has_saved_baseline(info):
+        if self.config.reset_to_race and not _has_custom_baseline(info):
             frame, boot_info = boot_into_first_race(self.backend)
             info.update(boot_info)
 
@@ -91,8 +89,6 @@ class FZeroXEnvEngine:
         self.backend.close()
 
 
-def _has_saved_baseline(info: dict[str, object]) -> bool:
-    baseline_state_path = info.get("baseline_state_path")
-    if not isinstance(baseline_state_path, str):
-        return False
-    return Path(baseline_state_path).is_file()
+def _has_custom_baseline(info: dict[str, object]) -> bool:
+    baseline_kind = info.get("baseline_kind")
+    return baseline_kind == "custom"

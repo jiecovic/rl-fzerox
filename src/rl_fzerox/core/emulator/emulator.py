@@ -65,6 +65,10 @@ class Emulator:
     def frame_index(self) -> int:
         return int(self._native.frame_index)
 
+    @property
+    def baseline_kind(self) -> str:
+        return str(self._native.baseline_kind)
+
     def reset(self) -> ResetState:
         """Restore the deterministic episode baseline and return the first frame."""
 
@@ -139,6 +143,7 @@ class Emulator:
                 if self._baseline_state_path is None
                 else str(self._baseline_state_path)
             ),
+            "baseline_kind": self.baseline_kind,
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
