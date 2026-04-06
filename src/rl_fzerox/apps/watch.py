@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from rl_fzerox.core.config import load_watch_app_config
-from rl_fzerox.ui import run_viewer
+from rl_fzerox.ui.viewer import run_viewer
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
