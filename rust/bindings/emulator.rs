@@ -15,12 +15,13 @@ pub struct PyEmulator {
 #[pymethods]
 impl PyEmulator {
     #[new]
-    #[pyo3(signature = (core_path, rom_path, runtime_dir=None))]
+    #[pyo3(signature = (core_path, rom_path, runtime_dir=None, baseline_state_path=None))]
     fn new(
         py: Python<'_>,
         core_path: &str,
         rom_path: &str,
         runtime_dir: Option<&str>,
+        baseline_state_path: Option<&str>,
     ) -> PyResult<Self> {
         let host = py
             .detach(|| {
@@ -28,6 +29,7 @@ impl PyEmulator {
                     Path::new(core_path),
                     Path::new(rom_path),
                     runtime_dir.map(Path::new),
+                    baseline_state_path.map(Path::new),
                 )
             })
             .map_err(map_core_error)?;
@@ -66,6 +68,22 @@ impl PyEmulator {
     #[pyo3(signature = (count=1))]
     fn step_frames(&mut self, py: Python<'_>, count: usize) -> PyResult<()> {
         py.detach(|| self.host.step_frames(count))
+            .map_err(map_core_error)
+    }
+
+    fn set_joypad_mask(&mut self, py: Python<'_>, mask: u16) -> PyResult<()> {
+        py.detach(|| self.host.set_joypad_mask(mask))
+            .map_err(map_core_error)
+    }
+
+    fn save_state(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
+        py.detach(|| self.host.save_state(Path::new(path)))
+            .map_err(map_core_error)
+    }
+
+    #[pyo3(signature = (path=None))]
+    fn capture_current_as_baseline(&mut self, py: Python<'_>, path: Option<&str>) -> PyResult<()> {
+        py.detach(|| self.host.capture_current_as_baseline(path.map(Path::new)))
             .map_err(map_core_error)
     }
 

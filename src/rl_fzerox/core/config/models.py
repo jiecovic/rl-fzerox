@@ -19,16 +19,18 @@ class EnvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action_repeat: PositiveInt = 2
+    reset_to_race: bool = False
 
 
 class EmulatorConfig(BaseModel):
-    """Paths used to boot the libretro core, the ROM, and optional runtime state."""
+    """Paths used to boot the libretro core, content, and optional state."""
 
     model_config = ConfigDict(extra="forbid")
 
     core_path: FilePath
     rom_path: FilePath
     runtime_dir: Path | None = None
+    baseline_state_path: Path | None = None
 
 
 class WatchConfig(BaseModel):

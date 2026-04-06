@@ -12,6 +12,7 @@ pub enum CoreError {
     UnserializeFailed,
     CreateDirectory { path: PathBuf, message: String },
     ReadFile { path: PathBuf, message: String },
+    WriteFile { path: PathBuf, message: String },
     InvalidPath { path: PathBuf },
     LoadLibrary { path: PathBuf, message: String },
     MissingSymbol { symbol: String, message: String },
@@ -59,6 +60,9 @@ impl Display for CoreError {
             }
             Self::ReadFile { path, message } => {
                 write!(formatter, "Could not read '{}': {message}", path.display())
+            }
+            Self::WriteFile { path, message } => {
+                write!(formatter, "Could not write '{}': {message}", path.display())
             }
             Self::InvalidPath { path } => {
                 write!(

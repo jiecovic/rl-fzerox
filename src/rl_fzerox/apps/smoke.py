@@ -6,6 +6,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from rl_fzerox.core.boot import boot_into_first_race
 from rl_fzerox.core.emulator import Emulator
 
 
@@ -24,6 +25,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=60,
         help="Number of frames to advance after reset.",
     )
+    parser.add_argument(
+        "--baseline-state",
+        dest="baseline_state_path",
+        help="Optional path to a savestate used as the reset baseline.",
+    )
+    parser.add_argument(
+        "--reset-to-race",
+        action="store_true",
+        help="Run the deterministic first-race bootstrap after reset.",
+    )
     return parser.parse_args(argv)
 
 
@@ -37,9 +48,17 @@ def main(argv: Sequence[str] | None = None) -> None:
     emulator = Emulator(
         core_path=Path(args.core_path).expanduser().resolve(),
         rom_path=Path(args.rom_path).expanduser().resolve(),
+        baseline_state_path=(
+            None
+            if args.baseline_state_path is None
+            else Path(args.baseline_state_path).expanduser().resolve()
+        ),
     )
     try:
         reset_state = emulator.reset()
+        boot_info: dict[str, object] = {}
+        if args.reset_to_race:
+            _, boot_info = boot_into_first_race(emulator)
         emulator.step_frames(args.frames)
         frame = emulator.render()
         print(
@@ -51,6 +70,7 @@ def main(argv: Sequence[str] | None = None) -> None:
                     "native_fps": emulator.native_fps,
                     "frame_shape": list(emulator.frame_shape),
                     "frame_index": emulator.frame_index,
+                    "reset_mode": boot_info.get("reset_mode", "baseline"),
                     "reset_frame_shape": list(reset_state.frame.shape),
                     "final_frame_shape": list(frame.shape),
                 },

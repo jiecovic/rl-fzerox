@@ -19,14 +19,25 @@ class Emulator:
         core_path: Path,
         rom_path: Path,
         runtime_dir: Path | None = None,
+        baseline_state_path: Path | None = None,
     ) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
         self._runtime_dir = runtime_dir.resolve() if runtime_dir is not None else None
+        self._baseline_state_path = (
+            baseline_state_path.resolve()
+            if baseline_state_path is not None
+            else None
+        )
         self._native = NativeEmulator(
             str(self._core_path),
             str(self._rom_path),
             None if self._runtime_dir is None else str(self._runtime_dir),
+            (
+                None
+                if self._baseline_state_path is None
+                else str(self._baseline_state_path)
+            ),
         )
 
     @property
@@ -80,6 +91,22 @@ class Emulator:
 
         self._native.step_frames(count)
 
+    def set_joypad_mask(self, mask: int) -> None:
+        """Set the current libretro joypad bitmask for manual control."""
+
+        self._native.set_joypad_mask(mask)
+
+    def save_state(self, path: Path) -> None:
+        """Serialize the current emulator state to a savestate file."""
+
+        self._native.save_state(str(path.resolve()))
+
+    def capture_current_as_baseline(self, path: Path | None = None) -> None:
+        """Promote the current state to the active reset baseline."""
+
+        resolved_path = None if path is None else str(path.resolve())
+        self._native.capture_current_as_baseline(resolved_path)
+
     def render(self) -> np.ndarray:
         """Return the latest raw RGB frame as a NumPy array."""
 
@@ -107,6 +134,11 @@ class Emulator:
             "core_path": str(self._core_path),
             "rom_path": str(self._rom_path),
             "runtime_dir": None if self._runtime_dir is None else str(self._runtime_dir),
+            "baseline_state_path": (
+                None
+                if self._baseline_state_path is None
+                else str(self._baseline_state_path)
+            ),
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }

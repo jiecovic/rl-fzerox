@@ -1,9 +1,12 @@
 # src/rl_fzerox/core/envs/engine.py
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 from gymnasium import spaces
 
+from rl_fzerox.core.boot import boot_into_first_race
 from rl_fzerox.core.config.models import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
 
@@ -36,8 +39,14 @@ class FZeroXEnvEngine:
     def reset(self, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
         reset_state = self.backend.reset()
         info = dict(reset_state.info)
+        frame = reset_state.frame
+
+        if self.config.reset_to_race and not _has_saved_baseline(info):
+            frame, boot_info = boot_into_first_race(self.backend)
+            info.update(boot_info)
+
         info["seed"] = seed
-        return np.array(reset_state.frame, copy=True), info
+        return np.array(frame, copy=True), info
 
     def step(
         self,
@@ -80,3 +89,10 @@ class FZeroXEnvEngine:
 
     def close(self) -> None:
         self.backend.close()
+
+
+def _has_saved_baseline(info: dict[str, object]) -> bool:
+    baseline_state_path = info.get("baseline_state_path")
+    if not isinstance(baseline_state_path, str):
+        return False
+    return Path(baseline_state_path).is_file()
