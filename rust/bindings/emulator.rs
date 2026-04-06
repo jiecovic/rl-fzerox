@@ -6,6 +6,7 @@ use pyo3::types::PyBytes;
 
 use crate::bindings::error::map_core_error;
 use crate::core::host::Host;
+use crate::core::input::ControllerState;
 
 #[pyclass(name = "Emulator", unsendable)]
 pub struct PyEmulator {
@@ -82,8 +83,30 @@ impl PyEmulator {
             .map_err(map_core_error)
     }
 
-    fn set_joypad_mask(&mut self, py: Python<'_>, mask: u16) -> PyResult<()> {
-        py.detach(|| self.host.set_joypad_mask(mask))
+    #[pyo3(signature = (
+        joypad_mask=0,
+        left_stick_x=0.0,
+        left_stick_y=0.0,
+        right_stick_x=0.0,
+        right_stick_y=0.0,
+    ))]
+    fn set_controller_state(
+        &mut self,
+        py: Python<'_>,
+        joypad_mask: u16,
+        left_stick_x: f32,
+        left_stick_y: f32,
+        right_stick_x: f32,
+        right_stick_y: f32,
+    ) -> PyResult<()> {
+        let controller_state = ControllerState::from_normalized(
+            joypad_mask,
+            left_stick_x,
+            left_stick_y,
+            right_stick_x,
+            right_stick_y,
+        );
+        py.detach(|| self.host.set_controller_state(controller_state))
             .map_err(map_core_error)
     }
 

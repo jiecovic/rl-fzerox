@@ -7,6 +7,7 @@ import numpy as np
 
 from rl_fzerox._native import Emulator as NativeEmulator
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
+from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 
 
@@ -99,10 +100,17 @@ class Emulator:
 
         self._native.step_frames(count)
 
-    def set_joypad_mask(self, mask: int) -> None:
-        """Set the current libretro joypad bitmask for manual control."""
+    def set_controller_state(self, controller_state: ControllerState) -> None:
+        """Set the held controller state used for subsequent frame stepping."""
 
-        self._native.set_joypad_mask(mask)
+        state = controller_state.clamped()
+        self._native.set_controller_state(
+            joypad_mask=state.joypad_mask,
+            left_stick_x=state.left_stick_x,
+            left_stick_y=state.left_stick_y,
+            right_stick_x=state.right_stick_x,
+            right_stick_y=state.right_stick_y,
+        )
 
     def save_state(self, path: Path) -> None:
         """Serialize the current emulator state to a savestate file."""

@@ -12,6 +12,7 @@ use crate::core::callbacks::{
     video_refresh_callback,
 };
 use crate::core::error::CoreError;
+use crate::core::input::ControllerState;
 use crate::core::video::VideoFrame;
 
 const FRAME_WAIT_LIMIT: usize = 120;
@@ -123,6 +124,8 @@ impl Host {
     pub fn reset(&mut self) -> Result<(), CoreError> {
         self.ensure_open()?;
         self.restore_baseline()?;
+        self.callbacks
+            .set_controller_state(ControllerState::default());
         self.frame_index = 0;
         self.refresh_shape_from_frame();
         Ok(())
@@ -143,9 +146,12 @@ impl Host {
         Ok(())
     }
 
-    pub fn set_joypad_mask(&mut self, joypad_mask: u16) -> Result<(), CoreError> {
+    pub fn set_controller_state(
+        &mut self,
+        controller_state: ControllerState,
+    ) -> Result<(), CoreError> {
         self.ensure_open()?;
-        self.callbacks.set_joypad_mask(joypad_mask);
+        self.callbacks.set_controller_state(controller_state);
         Ok(())
     }
 

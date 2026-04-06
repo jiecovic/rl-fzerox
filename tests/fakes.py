@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
+from rl_fzerox.core.emulator.control import ControllerState
 
 
 @dataclass
@@ -26,6 +27,7 @@ class SyntheticBackend:
         self._max_frames = max_frames
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
+        self._last_controller_state = ControllerState()
 
     @property
     def name(self) -> str:
@@ -43,9 +45,14 @@ class SyntheticBackend:
     def frame_index(self) -> int:
         return self._state.frame_index
 
+    @property
+    def last_controller_state(self) -> ControllerState:
+        return self._last_controller_state
+
     def reset(self) -> ResetState:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
+        self._last_controller_state = ControllerState()
         return ResetState(
             frame=self._last_frame,
             info={
@@ -80,8 +87,8 @@ class SyntheticBackend:
         for _ in range(count):
             self.step_frame()
 
-    def set_joypad_mask(self, mask: int) -> None:
-        _ = mask
+    def set_controller_state(self, controller_state: ControllerState) -> None:
+        self._last_controller_state = controller_state
 
     def close(self) -> None:
         return None

@@ -59,6 +59,15 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 
 `watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it.
 
+The current policy action space is a `MultiDiscrete([5, 2])` adapter:
+
+- 5 steering buckets from hard-left to hard-right
+- 2 drive modes: `coast` and `throttle`
+
+Brake and boost are intentionally not part of the first policy surface yet.
+They need a cleaner verified mapping from libretro controls to F-Zero X inputs
+before they belong in training code.
+
 ## Commands
 
 Probe the core:
@@ -101,7 +110,8 @@ Watch controls:
 
 - `P`: pause / resume
 - `N`: advance one emulator frame while paused
-- `Arrow keys`: D-pad
+- `Left / Right`: steering and left/right D-pad
+- `Up / Down`: D-pad
 - `X`: A
 - `Z`: B
 - `Enter`: Start

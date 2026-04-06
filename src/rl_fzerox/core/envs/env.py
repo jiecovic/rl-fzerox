@@ -4,12 +4,14 @@ from __future__ import annotations
 import gymnasium as gym
 import numpy as np
 
+from rl_fzerox.core.actions.base import ActionValue
 from rl_fzerox.core.config.models import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
+from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
 
-class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
+class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
     """Gymnasium wrapper around the current raw-frame emulator backend."""
 
     metadata = {"render_modes": ["rgb_array"]}
@@ -34,11 +36,14 @@ class FZeroXEnv(gym.Env[np.ndarray, np.int64]):
         super().reset(seed=seed)
         return self._engine.reset(seed=seed)
 
-    def step(self, action: int | np.integer):
+    def step(self, action: ActionValue):
         return self._engine.step(action)
 
-    def step_frame(self):
-        return self._engine.step_frame()
+    def step_control(self, control_state: ControllerState):
+        return self._engine.step_control(control_state)
+
+    def step_frame(self, control_state: ControllerState | None = None):
+        return self._engine.step_frame(control_state)
 
     def render(self) -> np.ndarray:
         return self._engine.render()

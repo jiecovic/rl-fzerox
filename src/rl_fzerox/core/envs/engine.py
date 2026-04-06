@@ -6,9 +6,11 @@ from typing import cast
 import numpy as np
 from gymnasium import spaces
 
+from rl_fzerox.core.actions import ActionValue, SteerDriveActionAdapter
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.models import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
+from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.game import RewardTracker, read_telemetry
 from rl_fzerox.core.game.telemetry import FZeroXTelemetry, MemoryReadableEmulator
 
@@ -22,10 +24,11 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
+        self._action_adapter = SteerDriveActionAdapter(config.action)
         self._reward_tracker = RewardTracker()
         self._episode_done = False
         self._last_info: dict[str, object] = {}
-        self._action_space = spaces.Discrete(1)
+        self._action_space = self._action_adapter.action_space
         self._observation_space = spaces.Box(
             low=0,
             high=255,
@@ -34,7 +37,7 @@ class FZeroXEnvEngine:
         )
 
     @property
-    def action_space(self) -> spaces.Discrete:
+    def action_space(self) -> spaces.Space:
         return self._action_space
 
     @property
@@ -52,11 +55,15 @@ class FZeroXEnvEngine:
 
     def step(
         self,
-        action: int | np.integer,
+        action: ActionValue,
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
-        if int(action) != 0:
-            raise ValueError(f"Only action 0 is supported right now, got {action!r}")
+        return self.step_control(self._action_adapter.decode(action))
 
+    def step_control(
+        self,
+        control_state: ControllerState,
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+        self.backend.set_controller_state(control_state)
         latest_frame: np.ndarray | None = None
         total_reward = 0.0
         terminated = False
@@ -95,9 +102,14 @@ class FZeroXEnvEngine:
             info,
         )
 
-    def step_frame(self) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+    def step_frame(
+        self,
+        control_state: ControllerState | None = None,
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
+        if control_state is not None:
+            self.backend.set_controller_state(control_state)
         frame, reward, terminated, truncated, info, _ = self._advance_one_frame()
         self._episode_done = terminated or truncated
         self._last_info = dict(info)

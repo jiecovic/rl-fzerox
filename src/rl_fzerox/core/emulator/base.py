@@ -6,6 +6,8 @@ from typing import Protocol
 
 import numpy as np
 
+from rl_fzerox.core.emulator.control import ControllerState
+
 
 @dataclass(frozen=True)
 class ResetState:
@@ -47,7 +49,7 @@ class EmulatorBackend(Protocol):
 
     def step_frames(self, count: int) -> None: ...
 
-    def set_joypad_mask(self, mask: int) -> None: ...
+    def set_controller_state(self, controller_state: ControllerState) -> None: ...
 
     def render(self) -> np.ndarray: ...
 

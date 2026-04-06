@@ -5,6 +5,7 @@ import numpy as np
 import pygame
 
 from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP
+from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
 from rl_fzerox.ui.viewer import (
@@ -63,7 +64,7 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
             },
             episode_reward=0.0,
             paused=False,
-            joypad_mask=0,
+            control_state=ControllerState(),
             game_display_size=(640, 480),
             telemetry=_sample_telemetry(),
         )
