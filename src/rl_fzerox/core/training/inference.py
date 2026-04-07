@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/inference.py
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,12 +26,19 @@ class PolicyRunner:
         self._loaded_policy = loaded_policy
         self._policy = policy
         self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
+        self._last_reload_monotonic = time.monotonic()
 
     @property
     def label(self) -> str:
         """Return a short label for the currently loaded run."""
 
         return self._loaded_policy.run_dir.name
+
+    @property
+    def reload_age_seconds(self) -> float:
+        """Return how long ago the current policy artifact was loaded."""
+
+        return max(0.0, time.monotonic() - self._last_reload_monotonic)
 
     def predict(self, observation: np.ndarray) -> np.ndarray:
         """Predict one deterministic action for the current observation."""
@@ -67,6 +75,7 @@ class PolicyRunner:
         )
         self._policy = policy
         self._policy_mtime_ns = policy_mtime_ns
+        self._last_reload_monotonic = time.monotonic()
 
 
 def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:

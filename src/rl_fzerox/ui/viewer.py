@@ -240,6 +240,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 control_state=current_control_state,
                 policy_label=_policy_label(policy_runner),
                 policy_action=current_policy_action,
+                policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                 telemetry=telemetry,
             )
 
@@ -275,6 +276,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
                         policy_action=current_policy_action,
+                        policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
@@ -308,6 +310,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
                         policy_action=current_policy_action,
+                        policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         telemetry=telemetry,
                     )
                     continue
@@ -347,6 +350,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     control_state=current_control_state,
                     policy_label=_policy_label(policy_runner),
                     policy_action=current_policy_action,
+                    policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                     telemetry=telemetry,
                 )
 
@@ -410,6 +414,7 @@ def _draw_frame(
     control_state: ControllerState,
     policy_label: str | None,
     policy_action: np.ndarray | None,
+    policy_reload_age_seconds: float | None,
     telemetry: FZeroXTelemetry | None,
 ) -> None:
     game_surface = _rgb_surface(pygame, raw_frame)
@@ -462,6 +467,7 @@ def _draw_frame(
         control_state=control_state,
         policy_label=policy_label,
         policy_action=policy_action,
+        policy_reload_age_seconds=policy_reload_age_seconds,
         game_display_size=game_display_size,
         observation_shape=observation.shape,
         telemetry=telemetry,
@@ -483,6 +489,7 @@ def _draw_side_panel(
     control_state: ControllerState,
     policy_label: str | None,
     policy_action: np.ndarray | None,
+    policy_reload_age_seconds: float | None,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -508,6 +515,7 @@ def _draw_side_panel(
         control_state=control_state,
         policy_label=policy_label,
         policy_action=policy_action,
+        policy_reload_age_seconds=policy_reload_age_seconds,
         game_display_size=game_display_size,
         observation_shape=observation_shape,
         telemetry=telemetry,
@@ -559,6 +567,7 @@ def _build_panel_columns(
     control_state: ControllerState,
     policy_label: str | None,
     policy_action: np.ndarray | None,
+    policy_reload_age_seconds: float | None,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -581,6 +590,11 @@ def _build_panel_columns(
                     _panel_line(
                         "Action",
                         _format_policy_action(policy_action),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Reload",
+                        _format_reload_age(policy_reload_age_seconds),
                         PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
@@ -985,6 +999,22 @@ def _format_policy_action(policy_action: np.ndarray | None) -> str:
     return f"[{steer_bucket},{drive_mode}] {drive_label}"
 
 
+def _format_reload_age(reload_age_seconds: float | None) -> str:
+    if reload_age_seconds is None:
+        return "manual"
+
+    total_seconds = int(max(0.0, reload_age_seconds))
+    if total_seconds < 60:
+        return f"{total_seconds}s ago"
+
+    minutes, seconds = divmod(total_seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {seconds:02d}s"
+
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes:02d}m"
+
+
 def _display_aspect_ratio(info: dict[str, object]) -> float:
     value = info.get("display_aspect_ratio")
     if isinstance(value, int | float):
@@ -1042,6 +1072,12 @@ def _policy_label(policy_runner: PolicyRunner | None) -> str | None:
     if policy_runner is None:
         return None
     return policy_runner.label
+
+
+def _policy_reload_age_seconds(policy_runner: PolicyRunner | None) -> float | None:
+    if policy_runner is None:
+        return None
+    return policy_runner.reload_age_seconds
 
 
 def _poll_viewer_input(pygame) -> ViewerInput:
