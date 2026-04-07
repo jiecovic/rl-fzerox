@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/runner.py
 from __future__ import annotations
 
+import multiprocessing as mp
 import shutil
 
 import numpy as np
@@ -32,51 +33,73 @@ def run_training(config: TrainAppConfig) -> None:
     """Run one PPO training session from the composed train config."""
 
     seed_process(config.seed)
-    _validate_training_baseline_state(config)
-
     run_paths = build_run_paths(
         output_root=config.train.output_root,
         run_name=config.train.run_name,
     )
-    train_env = _build_training_env(config)
+    run_config = _resolve_train_run_config(config=config, run_paths=run_paths)
+    _validate_training_baseline_state(run_config)
+
+    ensure_run_dirs(run_paths)
+    train_env = None
+    model = None
 
     try:
+        train_env = _build_training_env(run_config, run_paths)
         model = _build_ppo_model(
             train_env=train_env,
-            train_config=config.train,
-            policy_config=config.policy,
+            train_config=run_config.train,
+            policy_config=run_config.policy,
             tensorboard_log=None,
         )
-        ensure_run_dirs(run_paths)
-        save_train_run_config(config=config, run_dir=run_paths.run_dir)
+        save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
         model.set_logger(_build_tensorboard_logger(run_paths))
         _print_training_startup(
             model=model,
             train_env=train_env,
-            config=config,
+            config=run_config,
             run_paths=run_paths,
         )
         _save_latest_artifacts(model, run_paths)
         callbacks = _build_callbacks(
-            train_config=config.train,
+            train_config=run_config.train,
             run_paths=run_paths,
         )
         try:
             model.learn(
-                total_timesteps=config.train.total_timesteps,
+                total_timesteps=run_config.train.total_timesteps,
                 callback=callbacks,
                 progress_bar=True,
             )
         except Exception:
             if model.num_timesteps > 0:
                 _save_latest_artifacts(model, run_paths)
-            _cleanup_failed_run(run_paths, model)
             raise
         model.save(str(run_paths.final_model_path))
         model.policy.save(str(run_paths.final_policy_path))
         _save_latest_artifacts(model, run_paths)
+    except Exception:
+        _cleanup_failed_run(run_paths, model)
+        raise
     finally:
-        train_env.close()
+        if train_env is not None:
+            train_env.close()
+
+
+def _resolve_train_run_config(
+    *,
+    config: TrainAppConfig,
+    run_paths: RunPaths,
+) -> TrainAppConfig:
+    """Resolve one train config snapshot with a run-local runtime root."""
+
+    return config.model_copy(
+        update={
+            "emulator": config.emulator.model_copy(
+                update={"runtime_dir": run_paths.runtime_root}
+            )
+        }
+    )
 
 
 def _validate_training_baseline_state(config: TrainAppConfig) -> None:
@@ -94,34 +117,47 @@ def _validate_training_baseline_state(config: TrainAppConfig) -> None:
     )
 
 
-def _build_training_env(config: TrainAppConfig):
+def _build_training_env(config: TrainAppConfig, run_paths: RunPaths):
     try:
         from stable_baselines3.common.monitor import Monitor
-        from stable_baselines3.common.vec_env import DummyVecEnv
+        from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
     except ImportError as exc:
         raise RuntimeError(
             "stable-baselines3 is required for training. "
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    return DummyVecEnv(
-        [
-            _make_env_factory(
-                config=config,
-                env_index=env_index,
-                monitor_cls=Monitor,
-            )
-            for env_index in range(config.train.num_envs)
-        ]
-    )
+    env_fns = [
+        _make_env_factory(
+            config=config,
+            env_index=env_index,
+            runtime_dir=run_paths.env_runtime_dir(env_index),
+            monitor_cls=Monitor,
+        )
+        for env_index in range(config.train.num_envs)
+    ]
+    if config.train.vec_env == "dummy":
+        return DummyVecEnv(env_fns)
+    if config.train.vec_env == "subproc":
+        return SubprocVecEnv(
+            env_fns,
+            start_method=_subproc_start_method(),
+        )
+    raise ValueError(f"Unsupported vec env kind: {config.train.vec_env!r}")
 
 
-def _make_env_factory(*, config: TrainAppConfig, env_index: int, monitor_cls):
+def _make_env_factory(
+    *,
+    config: TrainAppConfig,
+    env_index: int,
+    runtime_dir,
+    monitor_cls,
+):
     def _make_env():
         emulator = Emulator(
             core_path=config.emulator.core_path,
             rom_path=config.emulator.rom_path,
-            runtime_dir=config.emulator.runtime_dir,
+            runtime_dir=runtime_dir,
             baseline_state_path=config.emulator.baseline_state_path,
             renderer=config.emulator.renderer,
         )
@@ -137,6 +173,15 @@ def _make_env_factory(*, config: TrainAppConfig, env_index: int, monitor_cls):
         return wrapped
 
     return _make_env
+
+
+def _subproc_start_method() -> str:
+    """Prefer CUDA-safe multiprocessing start methods for emulator workers."""
+
+    available_methods = mp.get_all_start_methods()
+    if "forkserver" in available_methods:
+        return "forkserver"
+    return "spawn"
 
 
 def _build_ppo_model(
@@ -211,12 +256,15 @@ def _print_training_startup(
         from rich.table import Table
     except ImportError:
         print(f"run_dir: {run_paths.run_dir}")
+        print(f"runtime_root: {run_paths.runtime_root}")
         print(f"device: {model.device}")
         print(f"seed: {config.seed}")
         print(f"observation_space: {train_env.observation_space}")
         print(f"action_space: {train_env.action_space}")
         print(
             "ppo: "
+            f"vec_env={config.train.vec_env} "
+            f"num_envs={config.train.num_envs} "
             f"total_timesteps={config.train.total_timesteps} "
             f"n_steps={config.train.n_steps} "
             f"batch_size={config.train.batch_size} "
@@ -230,6 +278,7 @@ def _print_training_startup(
     summary.add_column(style="bold cyan")
     summary.add_column()
     summary.add_row("run_dir", str(run_paths.run_dir))
+    summary.add_row("runtime_root", str(run_paths.runtime_root))
     summary.add_row("device", str(model.device))
     summary.add_row("seed", str(config.seed))
     summary.add_row("observation", str(train_env.observation_space))
@@ -238,6 +287,8 @@ def _print_training_startup(
         "ppo",
         " ".join(
             [
+                f"vec_env={config.train.vec_env}",
+                f"num_envs={config.train.num_envs}",
                 f"total_timesteps={config.train.total_timesteps}",
                 f"n_steps={config.train.n_steps}",
                 f"batch_size={config.train.batch_size}",
@@ -345,11 +396,11 @@ def _numeric_values(infos: list[object], key: str) -> list[float]:
     return values
 
 
-def _cleanup_failed_run(run_paths: RunPaths, model: object) -> None:
+def _cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:
     if not run_paths.run_dir.exists():
         return
 
-    num_timesteps = getattr(model, "num_timesteps", None)
+    num_timesteps = getattr(model, "num_timesteps", None) if model is not None else None
     if num_timesteps not in (None, 0):
         return
 

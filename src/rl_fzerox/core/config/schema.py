@@ -44,7 +44,7 @@ class EnvConfig(BaseModel):
     stuck_grace_steps: PositiveInt = 300
     stuck_step_limit: PositiveInt = 900
     stuck_progress_epsilon: NonNegativeFloat = 5.0
-    wrong_way_step_limit: PositiveInt = 100
+    wrong_way_step_limit: PositiveInt = 300
     wrong_way_progress_epsilon: NonNegativeFloat = 2.0
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
@@ -106,6 +106,7 @@ class TrainConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
     n_steps: PositiveInt = 1_024

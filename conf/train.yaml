@@ -3,7 +3,6 @@ seed: 123
 emulator:
   core_path: local/libretro/mupen64plus_next_libretro.so
   rom_path: local/roms/F-Zero X (USA).n64
-  runtime_dir: local/runtime
   renderer: angrylion
 
 env:
@@ -22,6 +21,7 @@ env:
     rgb: true
 
 train:
+  vec_env: dummy
   num_envs: 1
   total_timesteps: 1000000
   n_steps: 1024
