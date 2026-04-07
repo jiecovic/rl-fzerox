@@ -7,7 +7,7 @@ emulator:
 
 env:
   action_repeat: 3
-  max_episode_steps: 8000
+  max_episode_steps: 12000
   stuck_grace_steps: 300
   stuck_step_limit: 900
   stuck_progress_epsilon: 5.0
@@ -23,19 +23,19 @@ env:
 train:
   vec_env: dummy
   num_envs: 1
-  total_timesteps: 1000000
-  n_steps: 1024
+  total_timesteps: 5_000_000
+  n_steps: 512
   batch_size: 256
   learning_rate: 0.0003
-  gamma: 0.99
+  gamma: 0.98
   gae_lambda: 0.95
   clip_range: 0.2
   ent_coef: 0.01
   vf_coef: 0.5
   max_grad_norm: 0.5
   verbose: 0
-  device: auto
-  save_freq: 1000
+  device: cuda
+  save_freq: 5000
   output_root: local/runs
   run_name: ppo_cnn
 

@@ -40,7 +40,7 @@ class EnvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action_repeat: PositiveInt = 3
-    max_episode_steps: PositiveInt = 8_000
+    max_episode_steps: PositiveInt = 12_000
     stuck_grace_steps: PositiveInt = 300
     stuck_step_limit: PositiveInt = 900
     stuck_progress_epsilon: NonNegativeFloat = 5.0
