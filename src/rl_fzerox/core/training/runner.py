@@ -42,6 +42,7 @@ def run_training(config: TrainAppConfig) -> None:
     """Run one PPO training session from the composed train config."""
 
     seed_process(config.seed)
+    _validate_training_baseline_state(config)
 
     run_paths = build_run_paths(
         output_root=config.train.output_root,
@@ -86,6 +87,21 @@ def run_training(config: TrainAppConfig) -> None:
         model.policy.save(str(run_paths.latest_policy_path))
     finally:
         train_env.close()
+
+
+def _validate_training_baseline_state(config: TrainAppConfig) -> None:
+    """Fail clearly when a configured local training baseline is missing."""
+
+    baseline_state_path = config.emulator.baseline_state_path
+    if baseline_state_path is None:
+        return
+    if baseline_state_path.exists():
+        return
+    raise RuntimeError(
+        "Configured training baseline state does not exist: "
+        f"{baseline_state_path}. Create it from watch with "
+        "`emulator.baseline_state_path` set and press `K` at race start."
+    )
 
 
 def _build_training_env(config: TrainAppConfig):
