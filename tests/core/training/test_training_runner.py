@@ -14,6 +14,7 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.training.runner import (
     _resolve_train_run_config,
+    _RolloutInfoAccumulator,
     _validate_training_baseline_state,
 )
 from rl_fzerox.core.training.runs import build_run_paths
@@ -88,3 +89,45 @@ def test_resolve_train_run_config_sets_run_local_runtime_root(tmp_path: Path) ->
     resolved_config = _resolve_train_run_config(config=config, run_paths=run_paths)
 
     assert resolved_config.emulator.runtime_dir == run_paths.runtime_root
+
+
+def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None:
+    accumulator = _RolloutInfoAccumulator()
+    infos = [
+        {
+            "race_distance": 10.0,
+            "speed_kph": 100.0,
+            "position": 5,
+            "lap": 1,
+            "laps_completed": 0,
+            "episode": {
+                "position": 2,
+                "laps_completed": 3,
+                "termination_reason": "finished",
+                "truncation_reason": None,
+            },
+        },
+        {
+            "race_distance": 14.0,
+            "speed_kph": 120.0,
+            "position": 7,
+            "lap": 1,
+            "laps_completed": 0,
+            "episode": {
+                "position": 8,
+                "laps_completed": 1,
+                "termination_reason": None,
+                "truncation_reason": "wrong_way",
+            },
+        },
+    ]
+
+    accumulator.add_infos(infos)
+
+    assert accumulator.state_metrics["race_distance"].mean() == 12.0
+    assert accumulator.state_metrics["speed_kph"].mean() == 110.0
+    assert accumulator.episode_metrics["position"].mean() == 5.0
+    assert accumulator.episode_metrics["laps_completed"].mean() == 2.0
+    assert accumulator.episode_count == 2
+    assert accumulator.termination_counts["finished"] == 1
+    assert accumulator.truncation_counts["wrong_way"] == 1
