@@ -10,6 +10,8 @@ emulator:
 
 env:
   reset_to_race: true
+  action:
+    name: steer_drive_boost_drift
 
 watch:
   fps: 30

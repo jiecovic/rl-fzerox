@@ -8,7 +8,7 @@ from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
 from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.envs.actions import ActionValue, SteerDriveActionAdapter
+from rl_fzerox.core.envs.actions import ActionValue, resolve_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.limits import EpisodeLimits
 from rl_fzerox.core.envs.observations import FrameStackBuffer
@@ -30,7 +30,7 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
-        self._action_adapter = SteerDriveActionAdapter(config.action)
+        self._action_adapter = resolve_action_adapter(config.action)
         self._observation_stack = FrameStackBuffer(
             frame_space=_observation_frame_space(config),
             frame_stack=config.observation.frame_stack,

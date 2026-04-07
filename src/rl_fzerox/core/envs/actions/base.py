@@ -28,3 +28,15 @@ class ActionAdapter(Protocol):
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one policy action into a held controller state."""
         ...
+
+
+def coerce_action_values(action: ActionValue) -> list[int]:
+    """Normalize one policy action into a flat integer list."""
+
+    if isinstance(action, np.ndarray):
+        return action.astype(np.int64, copy=False).reshape(-1).tolist()
+    if isinstance(action, np.integer):
+        return [int(action)]
+    if isinstance(action, Sequence) and not isinstance(action, str | bytes):
+        return [int(value) for value in action]
+    return [int(action)]

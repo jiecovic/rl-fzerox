@@ -8,6 +8,13 @@ emulator:
   baseline_state_path: local/states/first-race.state
   renderer: angrylion
 
+env:
+  action:
+    name: steer_drive_boost_drift
+
+policy:
+  activation: tanh
+
 train:
   vec_env: dummy
   output_root: local/runs

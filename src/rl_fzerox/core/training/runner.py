@@ -222,6 +222,12 @@ def _build_training_env(config: TrainAppConfig, run_paths: RunPaths):
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
+    if config.train.vec_env == "dummy" and config.train.num_envs > 1:
+        raise RuntimeError(
+            "DummyVecEnv with num_envs > 1 is not supported for the emulator training path. "
+            "Use `train.vec_env=subproc` or set `train.num_envs=1`."
+        )
+
     env_fns = [
         _make_env_factory(
             config=config,
@@ -307,6 +313,7 @@ def _build_ppo_model(
             "pi": [int(value) for value in policy_config.net_arch.pi],
             "vf": [int(value) for value in policy_config.net_arch.vf],
         },
+        "activation_fn": _resolve_policy_activation_fn(policy_config.activation),
     }
 
     return PPO(
@@ -314,6 +321,7 @@ def _build_ppo_model(
         env=train_env,
         learning_rate=train_config.learning_rate,
         n_steps=train_config.n_steps,
+        n_epochs=train_config.n_epochs,
         batch_size=train_config.batch_size,
         gamma=train_config.gamma,
         gae_lambda=train_config.gae_lambda,
@@ -326,6 +334,18 @@ def _build_ppo_model(
         verbose=train_config.verbose,
         device=train_config.device,
     )
+
+
+def _resolve_policy_activation_fn(name: str):
+    """Map the configured SB3 policy-head activation name to a torch module."""
+
+    from torch import nn
+
+    if name == "tanh":
+        return nn.Tanh
+    if name == "relu":
+        return nn.ReLU
+    raise ValueError(f"Unsupported policy activation: {name!r}")
 
 
 def _build_tensorboard_logger(run_paths: RunPaths):

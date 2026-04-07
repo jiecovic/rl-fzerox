@@ -2,7 +2,7 @@
 import numpy as np
 from gymnasium.spaces import MultiDiscrete
 
-from rl_fzerox.core.config.schema import EnvConfig, ObservationConfig
+from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
 from rl_fzerox.core.emulator.base import ResetState
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs import FZeroXEnv
@@ -34,7 +34,7 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [5, 2]
+    assert env.action_space.nvec.tolist() == [7, 2]
 
 
 def test_step_advances_backend_by_action_repeat():
@@ -53,7 +53,7 @@ def test_step_advances_backend_by_action_repeat():
     assert info["repeat_index"] == 2
     assert backend.last_controller_state == ControllerState(
         joypad_mask=THROTTLE_MASK,
-        left_stick_x=0.5,
+        left_stick_x=0.0,
     )
 
 
@@ -83,6 +83,16 @@ def test_step_control_applies_manual_controller_state() -> None:
     env.step_control(control_state)
 
     assert backend.last_controller_state == control_state
+
+
+def test_extended_action_env_exposes_four_head_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="steer_drive_boost_drift")),
+    )
+
+    assert isinstance(env.action_space, MultiDiscrete)
+    assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
 
 
 def test_reset_can_boot_into_the_first_race_path():

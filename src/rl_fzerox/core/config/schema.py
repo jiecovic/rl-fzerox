@@ -20,6 +20,7 @@ class ActionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    name: Literal["steer_drive", "steer_drive_boost_drift"] = "steer_drive"
     steer_buckets: int = Field(default=7, ge=3)
 
 
@@ -100,6 +101,7 @@ class PolicyConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
+    activation: Literal["tanh", "relu"] = "tanh"
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)
 
 
@@ -112,6 +114,7 @@ class TrainConfig(BaseModel):
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
     n_steps: PositiveInt = 1_024
+    n_epochs: PositiveInt = 10
     batch_size: PositiveInt = 256
     learning_rate: PositiveFloat = 3e-4
     gamma: float = Field(default=0.99, gt=0.0, le=1.0)

@@ -14,6 +14,7 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.training.runner import (
     _info_sequence,
+    _resolve_policy_activation_fn,
     _resolve_train_run_config,
     _RolloutInfoAccumulator,
     _validate_training_baseline_state,
@@ -140,3 +141,15 @@ def test_info_sequence_accepts_tuple_infos() -> None:
     assert _info_sequence(infos) == infos
     assert _info_sequence([{"race_distance": 10.0}]) == [{"race_distance": 10.0}]
     assert _info_sequence(None) is None
+
+
+def test_resolve_policy_activation_fn_supports_known_names() -> None:
+    from torch import nn
+
+    assert _resolve_policy_activation_fn("tanh") is nn.Tanh
+    assert _resolve_policy_activation_fn("relu") is nn.ReLU
+
+
+def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
+    with pytest.raises(ValueError, match="Unsupported policy activation"):
+        _resolve_policy_activation_fn("gelu")
