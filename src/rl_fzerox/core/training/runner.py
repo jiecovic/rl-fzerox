@@ -294,10 +294,12 @@ def _build_ppo_model(
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    from rl_fzerox.core.policy import FZeroXCnnExtractor
+    from rl_fzerox.core.policy import resolve_extractor_class
+
+    extractor_class = resolve_extractor_class(policy_config.extractor.name)
 
     policy_kwargs = {
-        "features_extractor_class": FZeroXCnnExtractor,
+        "features_extractor_class": extractor_class,
         "features_extractor_kwargs": {
             "features_dim": policy_config.extractor.features_dim,
         },

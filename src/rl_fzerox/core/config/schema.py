@@ -90,7 +90,7 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["fzerox_cnn"] = "fzerox_cnn"
+    name: Literal["fzerox_cnn", "fzerox_cnn_wide"] = "fzerox_cnn"
     features_dim: PositiveInt = 512
 
 
