@@ -58,6 +58,7 @@ class ViewerLayout:
     control_viz_gap: int = 3
     control_widget_gap: int = 12
     control_track_gap: int = 4
+    control_side_pill_gap: int = 8
     control_steer_width: int = 116
     control_steer_height: int = 10
     control_drive_width: int = 12
@@ -65,6 +66,7 @@ class ViewerLayout:
     control_drive_offset_x: int = 8
     control_marker_radius: int = 6
     control_caption_gap: int = 3
+    control_boost_gap: int = 4
     flag_token_gap: int = 4
     flag_token_pad_x: int = 6
     flag_token_pad_y: int = 2
@@ -108,6 +110,8 @@ class ControlViz:
 
     steer_x: float
     drive_level: int
+    boost_pressed: bool
+    drift_direction: int
 
 
 @dataclass(frozen=True)
