@@ -1,4 +1,4 @@
-# tests/test_training_artifacts.py
+# tests/core/training/test_training_artifacts.py
 from __future__ import annotations
 
 from pathlib import Path

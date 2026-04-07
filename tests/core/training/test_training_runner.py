@@ -1,4 +1,4 @@
-# tests/test_training_runner.py
+# tests/core/training/test_training_runner.py
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,4 +1,4 @@
-# tests/test_config_loader.py
+# tests/core/config/test_config_loader.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 import rl_fzerox.core.config.loader as config_loader_module
 import rl_fzerox.core.config.paths as config_paths_module
-from rl_fzerox.core.config import load_watch_app_config
+from rl_fzerox.core.config import load_train_app_config, load_watch_app_config
 
 
 def _write_yaml(path: Path, lines: list[str]) -> None:
@@ -50,6 +50,11 @@ def isolated_repo_layout(
 def test_load_watch_app_config_requires_existing_file() -> None:
     with pytest.raises(ValueError, match="Could not load watch config"):
         load_watch_app_config(Path("/does/not/exist.yaml"))
+
+
+def test_load_train_app_config_uses_train_error_label() -> None:
+    with pytest.raises(ValueError, match="Could not load train config"):
+        load_train_app_config(Path("/does/not/exist.yaml"))
 
 
 def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
@@ -266,6 +271,6 @@ def test_load_watch_app_config_applies_hydra_overrides(tmp_path: Path) -> None:
 
 
 def test_repo_watch_template_exists() -> None:
-    config_path = Path(__file__).resolve().parents[1] / "conf" / "watch.yaml"
+    config_path = config_paths_module.project_root_dir() / "conf" / "watch.yaml"
 
     assert config_path.is_file()

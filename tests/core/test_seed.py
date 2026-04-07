@@ -1,4 +1,4 @@
-# tests/test_seed.py
+# tests/core/test_seed.py
 from rl_fzerox.core.seed import derive_seed, splitmix64
 
 

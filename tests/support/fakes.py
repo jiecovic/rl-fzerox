@@ -1,12 +1,15 @@
-# tests/fakes.py
+# tests/support/fakes.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 
 import numpy as np
 
+from rl_fzerox.core.config.schema import ObservationConfig
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
 from rl_fzerox.core.emulator.control import ControllerState
+from rl_fzerox.core.envs.observations import ResizedObservationAdapter
+from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass
@@ -86,6 +89,18 @@ class SyntheticBackend:
 
     def render(self) -> np.ndarray:
         return self._last_frame.copy()
+
+    def render_observation(self, *, width: int, height: int, rgb: bool = True) -> np.ndarray:
+        adapter = ResizedObservationAdapter(
+            ObservationConfig(width=width, height=height, frame_stack=4, rgb=rgb)
+        )
+        return adapter.transform(
+            self._last_frame,
+            info={"display_aspect_ratio": self.display_aspect_ratio},
+        )
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        return None
 
     def step_frames(self, count: int) -> None:
         for _ in range(count):

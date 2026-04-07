@@ -1,4 +1,4 @@
-# tests/test_reward.py
+# tests/core/game/test_reward.py
 from rl_fzerox.core.game import (
     FZeroXTelemetry,
     PlayerTelemetry,
