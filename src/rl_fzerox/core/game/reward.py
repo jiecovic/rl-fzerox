@@ -13,6 +13,7 @@ from rl_fzerox.core.game.flags import (
     FLAG_FINISHED,
     FLAG_RETIRED,
     FLAG_SPINNING_OUT,
+    is_on_pit_strip,
 )
 from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
@@ -27,17 +28,21 @@ class RewardWeights:
     checkpoint_spacing: float = 3_000.0
     checkpoint_fast_time_ms: int = 3_000
     checkpoint_slow_time_ms: int = 8_000
-    checkpoint_fast_bonus: float = 1.0
-    checkpoint_slow_bonus: float = 0.25
+    checkpoint_fast_bonus: float = 1.25
+    checkpoint_slow_bonus: float = 0.4
     low_speed_threshold_kph: float = 100.0
     low_speed_penalty: float = -0.05
     energy_loss_epsilon: float = 0.1
-    energy_loss_penalty_scale: float = 0.05
+    energy_loss_penalty_scale: float = 0.1
+    low_energy_boost_threshold_ratio: float = 0.1
+    low_energy_boost_penalty: float = -4.0
+    refill_reward_energy_cap: float = 20.0
+    refill_reward_scale: float = 0.05
     stall_grace_steps: int = 60
     stall_penalty: float = -0.05
     stuck_truncation_penalty: float = -5.0
     wrong_way_truncation_penalty: float = -10.0
-    dash_pad_boost_reward: float = 0.5
+    dash_pad_boost_reward: float = 2.0
     dash_pad_min_progress: float = 500.0
     collision_recoil_penalty: float = -4.0
     spinning_out_penalty: float = -2.0
@@ -45,7 +50,7 @@ class RewardWeights:
     crashed_penalty: float = -20.0
     retired_penalty: float = -20.0
     finish_bonus: float = 100.0
-    finish_position_scale: float = 2.0
+    finish_position_scale: float = 4.0
     max_race_position: int = 30
 
 
@@ -66,11 +71,15 @@ class RewardTracker:
         self._best_race_distance = float("-inf")
         self._previous_race_distance = float("-inf")
         self._previous_energy = 0.0
+        self._previous_boost_timer = 0
         self._previous_state_flags = 0
         self._stall_steps = 0
         self._last_dash_pad_reward_distance = float("-inf")
         self._last_rewarded_checkpoint = -1
         self._last_checkpoint_race_time_ms = 0
+        self._pit_visit_rewarded_energy = 0.0
+        self._pit_visit_missing_energy_ratio = 0.0
+        self._previous_on_pit_strip = False
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Initialize reward state for a new episode."""
@@ -78,22 +87,28 @@ class RewardTracker:
         self._previous_state_flags = 0
         self._stall_steps = 0
         self._last_dash_pad_reward_distance = float("-inf")
+        self._pit_visit_rewarded_energy = 0.0
+        self._pit_visit_missing_energy_ratio = 0.0
+        self._previous_on_pit_strip = False
         if telemetry is None:
             self._best_race_distance = float("-inf")
             self._previous_race_distance = float("-inf")
             self._previous_energy = 0.0
+            self._previous_boost_timer = 0
             self._last_rewarded_checkpoint = -1
             self._last_checkpoint_race_time_ms = 0
             return
         self._best_race_distance = telemetry.player.race_distance
         self._previous_race_distance = telemetry.player.race_distance
         self._previous_energy = telemetry.player.energy
+        self._previous_boost_timer = telemetry.player.boost_timer
         self._previous_state_flags = telemetry.player.state_flags
         self._last_rewarded_checkpoint = _checkpoint_index(
             telemetry.player.race_distance,
             self._weights.checkpoint_spacing,
         )
         self._last_checkpoint_race_time_ms = telemetry.player.race_time_ms
+        self._previous_on_pit_strip = is_on_pit_strip(telemetry.player.state_flags)
 
     def step(self, telemetry: FZeroXTelemetry | None) -> RewardStep:
         """Compute one reward step from the current telemetry sample."""
@@ -119,8 +134,7 @@ class RewardTracker:
             reward += reverse_penalty
             if reverse_penalty:
                 breakdown["reverse_progress"] = reverse_penalty
-            self._stall_steps = 0
-        elif progress_gain <= self._weights.progress_epsilon:
+        if progress_gain <= self._weights.progress_epsilon:
             self._stall_steps += 1
             if self._stall_steps > self._weights.stall_grace_steps:
                 reward += self._weights.stall_penalty
@@ -140,6 +154,18 @@ class RewardTracker:
 
         current_flags = telemetry.player.state_flags
         entered_flags = current_flags & ~self._previous_state_flags
+        low_energy_boost_penalty = self._low_energy_boost_penalty(
+            telemetry=telemetry,
+            entered_flags=entered_flags,
+        )
+        if low_energy_boost_penalty:
+            reward += low_energy_boost_penalty
+            breakdown["low_energy_boost"] = low_energy_boost_penalty
+
+        refill_bonus = self._refill_bonus(telemetry)
+        if refill_bonus:
+            reward += refill_bonus
+            breakdown["refill"] = refill_bonus
 
         low_speed_penalty = self._low_speed_penalty(
             telemetry=telemetry,
@@ -203,7 +229,9 @@ class RewardTracker:
 
         self._previous_race_distance = telemetry.player.race_distance
         self._previous_energy = telemetry.player.energy
+        self._previous_boost_timer = telemetry.player.boost_timer
         self._previous_state_flags = current_flags
+        self._previous_on_pit_strip = is_on_pit_strip(current_flags)
 
         terminated = bool(
             current_flags
@@ -246,6 +274,32 @@ class RewardTracker:
         deficit_ratio = 1.0 - (speed_kph / threshold_kph)
         return self._weights.low_speed_penalty * deficit_ratio
 
+    def _low_energy_boost_penalty(
+        self,
+        *,
+        telemetry: FZeroXTelemetry,
+        entered_flags: int,
+    ) -> float:
+        if telemetry.player.max_energy <= 0.0:
+            return 0.0
+        if telemetry.player.boost_timer <= self._previous_boost_timer:
+            return 0.0
+        if entered_flags & FLAG_DASH_PAD_BOOST:
+            return 0.0
+
+        energy_ratio = self._previous_energy / telemetry.player.max_energy
+        if energy_ratio >= 1.0:
+            return 0.0
+        if energy_ratio <= self._weights.low_energy_boost_threshold_ratio:
+            return self._weights.low_energy_boost_penalty
+
+        threshold_ratio = self._weights.low_energy_boost_threshold_ratio
+        if threshold_ratio >= 1.0:
+            return self._weights.low_energy_boost_penalty
+
+        penalty_scale = (1.0 - energy_ratio) / (1.0 - threshold_ratio)
+        return self._weights.low_energy_boost_penalty * penalty_scale
+
     def _apply_dash_pad_reward(
         self,
         *,
@@ -264,6 +318,38 @@ class RewardTracker:
         breakdown["dash_pad_boost"] = self._weights.dash_pad_boost_reward
         return self._weights.dash_pad_boost_reward
 
+    def _refill_bonus(self, telemetry: FZeroXTelemetry) -> float:
+        current_on_pit_strip = is_on_pit_strip(telemetry.player.state_flags)
+        if current_on_pit_strip and not self._previous_on_pit_strip:
+            self._pit_visit_rewarded_energy = 0.0
+            self._pit_visit_missing_energy_ratio = max(
+                0.0,
+                1.0 - (telemetry.player.energy / telemetry.player.max_energy),
+            ) if telemetry.player.max_energy > 0.0 else 0.0
+
+        if not current_on_pit_strip:
+            return 0.0
+
+        progress_delta = telemetry.player.race_distance - self._previous_race_distance
+        if progress_delta <= self._weights.progress_epsilon:
+            return 0.0
+
+        energy_gain = telemetry.player.energy - self._previous_energy
+        if energy_gain <= self._weights.energy_loss_epsilon:
+            return 0.0
+
+        remaining_cap = self._weights.refill_reward_energy_cap - self._pit_visit_rewarded_energy
+        if remaining_cap <= self._weights.energy_loss_epsilon:
+            return 0.0
+
+        rewardable_energy_gain = min(max(0.0, energy_gain), remaining_cap)
+        self._pit_visit_rewarded_energy += rewardable_energy_gain
+        return (
+            rewardable_energy_gain
+            * self._weights.refill_reward_scale
+            * self._pit_visit_missing_energy_ratio
+        )
+
     def _checkpoint_bonus(self, telemetry: FZeroXTelemetry) -> float:
         current_checkpoint = _checkpoint_index(
             telemetry.player.race_distance,
@@ -272,7 +358,6 @@ class RewardTracker:
         if current_checkpoint <= self._last_rewarded_checkpoint:
             return 0.0
 
-        crossed_count = current_checkpoint - self._last_rewarded_checkpoint
         elapsed_ms = max(
             0,
             telemetry.player.race_time_ms - self._last_checkpoint_race_time_ms,
@@ -283,7 +368,7 @@ class RewardTracker:
         )
         self._last_rewarded_checkpoint = current_checkpoint
         self._last_checkpoint_race_time_ms = telemetry.player.race_time_ms
-        return crossed_count * per_checkpoint_bonus
+        return per_checkpoint_bonus
 
 
 def _apply_flag_penalty(

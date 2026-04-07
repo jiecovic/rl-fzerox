@@ -1,6 +1,13 @@
 # src/rl_fzerox/core/game/flags.py
 from __future__ import annotations
 
+COURSE_EFFECT_MASK = 0xF
+COURSE_EFFECT_NONE = 0
+COURSE_EFFECT_PIT = 1
+COURSE_EFFECT_DIRT = 2
+COURSE_EFFECT_DASH = 3
+COURSE_EFFECT_ICE = 4
+
 FLAG_COLLISION_RECOIL = 1 << 13
 FLAG_SPINNING_OUT = 1 << 14
 FLAG_RETIRED = 1 << 18
@@ -32,3 +39,15 @@ def decode_racer_flags(state_flags: int) -> tuple[str, ...]:
     """Return semantic labels for one raw racer state bitfield."""
 
     return tuple(label for bit, label in RACER_FLAG_LABELS if state_flags & bit)
+
+
+def course_effect(state_flags: int) -> int:
+    """Return the low-nibble course-effect code embedded in racer state flags."""
+
+    return state_flags & COURSE_EFFECT_MASK
+
+
+def is_on_pit_strip(state_flags: int) -> bool:
+    """Return whether the racer is currently inside the refill strip effect."""
+
+    return course_effect(state_flags) == COURSE_EFFECT_PIT
