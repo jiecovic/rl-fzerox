@@ -5,6 +5,7 @@ from rl_fzerox.core.game import (
     RewardTracker,
     RewardWeights,
 )
+from rl_fzerox.core.game.flags import FLAG_AIRBORNE
 
 
 def test_reward_tracker_rewards_new_best_progress_only() -> None:
@@ -114,6 +115,135 @@ def test_reward_tracker_requires_progress_before_rewarding_dash_pad_again() -> N
     assert allowed.breakdown == {"progress": 0.1, "dash_pad_boost": 0.75}
 
 
+def test_reward_tracker_rewards_each_checkpoint_only_once() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            checkpoint_spacing=3_000.0,
+            checkpoint_fast_time_ms=3_000,
+            checkpoint_slow_time_ms=8_000,
+            checkpoint_fast_bonus=1.0,
+            checkpoint_slow_bonus=0.25,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, race_time_ms=0))
+
+    first = tracker.step(_telemetry(race_distance=3_100.0, race_time_ms=2_000))
+    tracker.step(_telemetry(race_distance=2_800.0, race_time_ms=2_500))
+    repeated = tracker.step(_telemetry(race_distance=3_200.0, race_time_ms=3_000))
+
+    assert first.reward == 1.0
+    assert first.breakdown == {"checkpoint": 1.0}
+    assert repeated.reward == 0.0
+    assert repeated.breakdown == {}
+
+
+def test_reward_tracker_scales_checkpoint_bonus_with_race_time() -> None:
+    fast_tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            checkpoint_spacing=3_000.0,
+            checkpoint_fast_time_ms=1_000,
+            checkpoint_slow_time_ms=5_000,
+            checkpoint_fast_bonus=1.0,
+            checkpoint_slow_bonus=0.25,
+        )
+    )
+    slow_tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            checkpoint_spacing=3_000.0,
+            checkpoint_fast_time_ms=1_000,
+            checkpoint_slow_time_ms=5_000,
+            checkpoint_fast_bonus=1.0,
+            checkpoint_slow_bonus=0.25,
+        )
+    )
+    fast_tracker.reset(_telemetry(race_distance=0.0, race_time_ms=0))
+    slow_tracker.reset(_telemetry(race_distance=0.0, race_time_ms=0))
+
+    fast = fast_tracker.step(_telemetry(race_distance=3_100.0, race_time_ms=1_000))
+    slow = slow_tracker.step(_telemetry(race_distance=3_100.0, race_time_ms=5_000))
+
+    assert fast.reward == 1.0
+    assert fast.breakdown == {"checkpoint": 1.0}
+    assert slow.reward == 0.25
+    assert slow.breakdown == {"checkpoint": 0.25}
+
+
+def test_reward_tracker_scales_low_speed_penalty_by_speed_deficit() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            low_speed_threshold_kph=100.0,
+            low_speed_penalty=-0.2,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, speed_kph=50.0))
+
+    step = tracker.step(_telemetry(race_distance=100.0, speed_kph=50.0))
+
+    assert step.reward == -0.1
+    assert step.breakdown == {"low_speed": -0.1}
+
+
+def test_reward_tracker_applies_max_low_speed_penalty_at_standstill() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            low_speed_threshold_kph=100.0,
+            low_speed_penalty=-0.2,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, speed_kph=0.0))
+
+    step = tracker.step(_telemetry(race_distance=100.0, speed_kph=0.0))
+
+    assert step.reward == -0.2
+    assert step.breakdown == {"low_speed": -0.2}
+
+
+def test_reward_tracker_skips_low_speed_penalty_while_airborne() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            low_speed_threshold_kph=100.0,
+            low_speed_penalty=-0.2,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, speed_kph=20.0))
+
+    step = tracker.step(
+        _telemetry(
+            race_distance=100.0,
+            speed_kph=20.0,
+            state_flags=(1 << 30) | FLAG_AIRBORNE,
+        )
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_reward_tracker_skips_low_speed_penalty_at_or_above_threshold() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_scale=0.0,
+            low_speed_threshold_kph=100.0,
+            low_speed_penalty=-0.2,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, speed_kph=100.0))
+
+    threshold = tracker.step(_telemetry(race_distance=100.0, speed_kph=100.0))
+    above = tracker.step(_telemetry(race_distance=100.0, speed_kph=120.0))
+
+    assert threshold.reward == 0.0
+    assert threshold.breakdown == {}
+    assert above.reward == 0.0
+    assert above.breakdown == {}
+
+
 def test_reward_tracker_penalizes_stalling_after_grace_period() -> None:
     tracker = RewardTracker(
         RewardWeights(
@@ -203,6 +333,8 @@ def _telemetry(
     state_flags: int = 1 << 30,
     position: int = 30,
     energy: float = 178.0,
+    race_time_ms: int = 0,
+    speed_kph: float = 100.0,
 ) -> FZeroXTelemetry:
     return FZeroXTelemetry(
         system_ram_size=0x00800000,
@@ -215,7 +347,7 @@ def _telemetry(
             state_flags=state_flags,
             state_labels=(),
             speed_raw=0.0,
-            speed_kph=0.0,
+            speed_kph=speed_kph,
             energy=energy,
             max_energy=178.0,
             boost_timer=0,
@@ -223,7 +355,7 @@ def _telemetry(
             laps_completed_distance=0.0,
             lap_distance=race_distance,
             race_distance_position=race_distance,
-            race_time_ms=0,
+            race_time_ms=race_time_ms,
             lap=1,
             laps_completed=0,
             position=position,
