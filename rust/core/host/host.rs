@@ -134,8 +134,9 @@ impl Host {
         Ok(())
     }
 
-    pub fn step_frames(&mut self, count: usize) -> Result<(), CoreError> {
+    pub fn step_frames(&mut self, count: usize, capture_video: bool) -> Result<(), CoreError> {
         self.ensure_open()?;
+        self.callbacks.set_capture_video(capture_video);
         let run_frames = || {
             for _ in 0..count {
                 self.call_core(|core| unsafe {
@@ -144,9 +145,10 @@ impl Host {
             }
         };
         with_silenced_stdio(run_frames);
+        self.callbacks.set_capture_video(true);
         self.frame_index += count;
         self.refresh_shape_from_frame();
-        if self.callbacks.frame().is_none() {
+        if capture_video && !self.callbacks.has_frame() {
             return Err(CoreError::NoFrameAvailable);
         }
         Ok(())
@@ -189,7 +191,7 @@ impl Host {
         Ok(())
     }
 
-    pub fn frame_rgb(&self) -> Result<&[u8], CoreError> {
+    pub fn frame_rgb(&mut self) -> Result<&[u8], CoreError> {
         self.callbacks
             .frame()
             .map(|frame| frame.rgb.as_slice())
@@ -206,19 +208,14 @@ impl Host {
     }
 
     pub fn observation_frame(
-        &self,
+        &mut self,
         target_width: usize,
         target_height: usize,
         rgb: bool,
     ) -> Result<Vec<u8>, CoreError> {
-        let frame = self.callbacks.frame().ok_or(CoreError::NoFrameAvailable)?;
-        Ok(crate::core::video::observation_frame(
-            frame,
-            self.display_aspect_ratio,
-            target_width,
-            target_height,
-            rgb,
-        ))
+        self.callbacks
+            .observation_frame(self.display_aspect_ratio, target_width, target_height, rgb)
+            .ok_or(CoreError::NoFrameAvailable)
     }
 
     pub fn close(&mut self) {
@@ -292,11 +289,6 @@ impl Host {
     }
 
     fn refresh_shape_from_frame(&mut self) {
-        if let Some(VideoFrame { width, height, .. }) = self.callbacks.frame() {
-            self.frame_shape = (*height, *width, 3);
-            return;
-        }
-
         if let Some((width, height)) = self.callbacks.geometry() {
             self.frame_shape = (height, width, 3);
         }

@@ -1,5 +1,6 @@
 // rust/core/host/video.rs
 use std::ffi::c_void;
+use std::slice;
 
 const HW_FRAME_BUFFER_VALID: usize = usize::MAX;
 
@@ -10,7 +11,16 @@ pub struct VideoFrame {
     pub rgb: Vec<u8>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug)]
+pub struct RawVideoFrame {
+    pub width: usize,
+    pub height: usize,
+    pub pitch: usize,
+    pub pixel_layout: PixelLayout,
+    pub bytes: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug)]
 pub enum PixelLayout {
     Argb1555,
     Argb8888,
@@ -62,6 +72,111 @@ pub fn observation_frame(
     } else {
         to_grayscale(&resized, target_width, target_height)
     }
+}
+
+pub fn observation_frame_from_raw(
+    frame: &RawVideoFrame,
+    aspect_ratio: f64,
+    target_width: usize,
+    target_height: usize,
+    rgb: bool,
+) -> Option<Vec<u8>> {
+    let (display_width, display_height) = display_size(frame.width, frame.height, aspect_ratio);
+    let x_index = compose_axis_index_map(frame.width, display_width, target_width);
+    let y_index = compose_axis_index_map(frame.height, display_height, target_height);
+
+    if rgb {
+        let mut output = vec![0_u8; target_width * target_height * 3];
+        for (output_y, &input_y) in y_index.iter().enumerate() {
+            for (output_x, &input_x) in x_index.iter().enumerate() {
+                let rgb = sample_rgb(frame, input_x, input_y)?;
+                let dst_index = (output_y * target_width + output_x) * 3;
+                output[dst_index..dst_index + 3].copy_from_slice(&rgb);
+            }
+        }
+        Some(output)
+    } else {
+        let mut output = vec![0_u8; target_width * target_height];
+        for (output_y, &input_y) in y_index.iter().enumerate() {
+            for (output_x, &input_x) in x_index.iter().enumerate() {
+                let [red, green, blue] = sample_rgb(frame, input_x, input_y)?;
+                let gray = (0.299_f32 * red as f32)
+                    + (0.587_f32 * green as f32)
+                    + (0.114_f32 * blue as f32);
+                output[output_y * target_width + output_x] = gray.round() as u8;
+            }
+        }
+        Some(output)
+    }
+}
+
+pub fn capture_raw_frame(
+    data: *const c_void,
+    width: usize,
+    height: usize,
+    pitch: usize,
+    pixel_layout: PixelLayout,
+) -> Option<RawVideoFrame> {
+    if data.is_null() || data as usize == HW_FRAME_BUFFER_VALID {
+        return None;
+    }
+
+    let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>(), pitch.checked_mul(height)?) };
+    Some(RawVideoFrame {
+        width,
+        height,
+        pitch,
+        pixel_layout,
+        bytes: bytes.to_vec(),
+    })
+}
+
+pub fn decode_frame(frame: &RawVideoFrame) -> Option<VideoFrame> {
+    convert_frame(
+        frame.bytes.as_ptr().cast::<c_void>(),
+        frame.width,
+        frame.height,
+        frame.pitch,
+        frame.pixel_layout,
+    )
+}
+
+fn sample_rgb(frame: &RawVideoFrame, x: usize, y: usize) -> Option<[u8; 3]> {
+    match frame.pixel_layout {
+        PixelLayout::Argb8888 => {
+            let offset = y.checked_mul(frame.pitch)?.checked_add(x.checked_mul(4)?)?;
+            let bytes = frame.bytes.get(offset..offset + 4)?;
+            Some([bytes[2], bytes[1], bytes[0]])
+        }
+        PixelLayout::Rgb565 => {
+            let pixel = read_le_u16(frame, x, y)?;
+            let red = ((pixel >> 11) & 0x1f) as u8;
+            let green = ((pixel >> 5) & 0x3f) as u8;
+            let blue = (pixel & 0x1f) as u8;
+            Some([
+                expand_5_to_8(red),
+                expand_6_to_8(green),
+                expand_5_to_8(blue),
+            ])
+        }
+        PixelLayout::Argb1555 => {
+            let pixel = read_le_u16(frame, x, y)?;
+            let red = ((pixel >> 10) & 0x1f) as u8;
+            let green = ((pixel >> 5) & 0x1f) as u8;
+            let blue = (pixel & 0x1f) as u8;
+            Some([
+                expand_5_to_8(red),
+                expand_5_to_8(green),
+                expand_5_to_8(blue),
+            ])
+        }
+    }
+}
+
+fn read_le_u16(frame: &RawVideoFrame, x: usize, y: usize) -> Option<u16> {
+    let offset = y.checked_mul(frame.pitch)?.checked_add(x.checked_mul(2)?)?;
+    let bytes = frame.bytes.get(offset..offset + 2)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
 pub fn convert_frame(
@@ -184,6 +299,19 @@ fn axis_index_map(input_size: usize, output_size: usize) -> Vec<usize> {
     let scale = (input_size - 1) as f64 / (output_size - 1) as f64;
     (0..output_size)
         .map(|index| ((index as f64) * scale).round() as usize)
+        .collect()
+}
+
+fn compose_axis_index_map(
+    input_size: usize,
+    intermediate_size: usize,
+    output_size: usize,
+) -> Vec<usize> {
+    let intermediate_index = axis_index_map(input_size, intermediate_size);
+    let output_index = axis_index_map(intermediate_size, output_size);
+    output_index
+        .into_iter()
+        .map(|index| intermediate_index[index])
         .collect()
 }
 

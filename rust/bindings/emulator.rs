@@ -80,9 +80,9 @@ impl PyEmulator {
         py.detach(|| self.host.reset()).map_err(map_core_error)
     }
 
-    #[pyo3(signature = (count=1))]
-    fn step_frames(&mut self, py: Python<'_>, count: usize) -> PyResult<()> {
-        py.detach(|| self.host.step_frames(count))
+    #[pyo3(signature = (count=1, capture_video=true))]
+    fn step_frames(&mut self, py: Python<'_>, count: usize, capture_video: bool) -> PyResult<()> {
+        py.detach(|| self.host.step_frames(count, capture_video))
             .map_err(map_core_error)
     }
 
@@ -124,14 +124,14 @@ impl PyEmulator {
             .map_err(map_core_error)
     }
 
-    fn frame_rgb<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+    fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
         let frame = self.host.frame_rgb().map_err(map_core_error)?;
         Ok(PyBytes::new(py, frame))
     }
 
     #[pyo3(signature = (width, height, rgb=true))]
     fn frame_observation<'py>(
-        &self,
+        &mut self,
         py: Python<'py>,
         width: usize,
         height: usize,

@@ -20,7 +20,10 @@ use libretro_sys::{
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::options::{default_option_value, override_option};
-use crate::core::video::{PixelLayout, VideoFrame, convert_frame};
+use crate::core::video::{
+    PixelLayout, RawVideoFrame, VideoFrame, capture_raw_frame, decode_frame,
+    observation_frame_from_raw,
+};
 
 const ENVIRONMENT_EXPERIMENTAL: u32 = 1 << 31;
 
@@ -64,6 +67,8 @@ pub struct CallbackState {
     variables: BTreeMap<String, CString>,
     controller_state: ControllerState,
     frame: Option<VideoFrame>,
+    raw_frame: Option<RawVideoFrame>,
+    capture_video: bool,
     frame_serial: u64,
     pixel_format: PixelLayout,
     log_callback: LogCallback,
@@ -99,6 +104,8 @@ impl CallbackState {
             variables: BTreeMap::new(),
             controller_state: ControllerState::default(),
             frame: None,
+            raw_frame: None,
+            capture_video: true,
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
             log_callback: LogCallback { log: log_callback },
@@ -106,7 +113,10 @@ impl CallbackState {
         })
     }
 
-    pub fn frame(&self) -> Option<&VideoFrame> {
+    pub fn frame(&mut self) -> Option<&VideoFrame> {
+        if self.frame.is_none() {
+            self.frame = self.raw_frame.as_ref().and_then(decode_frame);
+        }
         self.frame.as_ref()
     }
 
@@ -118,10 +128,46 @@ impl CallbackState {
         self.geometry
     }
 
+    pub fn has_frame(&self) -> bool {
+        self.frame.is_some() || self.raw_frame.is_some()
+    }
+
     pub fn set_frame(&mut self, frame: VideoFrame) {
         self.geometry = Some((frame.width, frame.height));
+        self.raw_frame = None;
         self.frame = Some(frame);
         self.frame_serial += 1;
+    }
+
+    pub fn set_capture_video(&mut self, capture_video: bool) {
+        self.capture_video = capture_video;
+    }
+
+    pub fn observation_frame(
+        &mut self,
+        aspect_ratio: f64,
+        target_width: usize,
+        target_height: usize,
+        rgb: bool,
+    ) -> Option<Vec<u8>> {
+        if let Some(raw_frame) = self.raw_frame.as_ref() {
+            return observation_frame_from_raw(
+                raw_frame,
+                aspect_ratio,
+                target_width,
+                target_height,
+                rgb,
+            );
+        }
+
+        let frame = self.frame()?;
+        Some(crate::core::video::observation_frame(
+            frame,
+            aspect_ratio,
+            target_width,
+            target_height,
+            rgb,
+        ))
     }
 
     pub fn set_controller_state(&mut self, controller_state: ControllerState) {
@@ -251,8 +297,15 @@ impl CallbackState {
         height: usize,
         pitch: usize,
     ) {
-        if let Some(frame) = convert_frame(data, width, height, pitch, self.pixel_format) {
-            self.set_frame(frame);
+        self.geometry = Some((width, height));
+        if !self.capture_video {
+            return;
+        }
+
+        if let Some(raw_frame) = capture_raw_frame(data, width, height, pitch, self.pixel_format) {
+            self.raw_frame = Some(raw_frame);
+            self.frame = None;
+            self.frame_serial += 1;
         }
     }
 }

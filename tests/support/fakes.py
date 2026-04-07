@@ -31,6 +31,7 @@ class SyntheticBackend:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
+        self._capture_video_flags: list[bool] = []
 
     @property
     def name(self) -> str:
@@ -56,10 +57,15 @@ class SyntheticBackend:
     def last_controller_state(self) -> ControllerState:
         return self._last_controller_state
 
+    @property
+    def capture_video_flags(self) -> list[bool]:
+        return list(self._capture_video_flags)
+
     def reset(self) -> ResetState:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
+        self._capture_video_flags.clear()
         return ResetState(
             frame=self._last_frame,
             info={
@@ -102,7 +108,8 @@ class SyntheticBackend:
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         return None
 
-    def step_frames(self, count: int) -> None:
+    def step_frames(self, count: int, *, capture_video: bool = True) -> None:
+        self._capture_video_flags.extend([capture_video] * count)
         for _ in range(count):
             self.step_frame()
 
