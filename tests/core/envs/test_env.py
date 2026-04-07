@@ -300,6 +300,7 @@ def _telemetry(
     *,
     race_distance: float,
     state_labels: tuple[str, ...] = ("active",),
+    speed_kph: float = 100.0,
 ) -> FZeroXTelemetry:
     state_flags = 1 << 30
     if "collision_recoil" in state_labels:
@@ -326,7 +327,7 @@ def _telemetry(
             state_flags=state_flags,
             state_labels=state_labels,
             speed_raw=0.0,
-            speed_kph=0.0,
+            speed_kph=speed_kph,
             energy=178.0,
             max_energy=178.0,
             boost_timer=0,
