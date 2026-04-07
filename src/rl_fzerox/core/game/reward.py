@@ -3,14 +3,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rl_fzerox.core.game.flags import (
+    FLAG_COLLISION_RECOIL,
+    FLAG_CRASHED,
+    FLAG_FALLING_OFF_TRACK,
+    FLAG_FINISHED,
+    FLAG_RETIRED,
+    FLAG_SPINNING_OUT,
+)
 from rl_fzerox.core.game.telemetry import FZeroXTelemetry
-
-FLAG_COLLISION_RECOIL = 1 << 13
-FLAG_SPINNING_OUT = 1 << 14
-FLAG_RETIRED = 1 << 18
-FLAG_FALLING_OFF_TRACK = 1 << 19
-FLAG_FINISHED = 1 << 25
-FLAG_CRASHED = 1 << 27
 
 
 @dataclass(frozen=True)

@@ -6,6 +6,7 @@ seed: 123
 
 emulator:
   baseline_state_path: local/states/first-race.state
+  renderer: angrylion
 
 env:
   reset_to_race: true

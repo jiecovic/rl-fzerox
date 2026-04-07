@@ -1,8 +1,6 @@
 # src/rl_fzerox/core/envs/engine.py
 from __future__ import annotations
 
-from typing import cast
-
 import numpy as np
 from gymnasium import spaces
 
@@ -11,10 +9,10 @@ from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import ActionValue, SteerDriveActionAdapter
+from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.limits import EpisodeLimits
-from rl_fzerox.core.envs.observations import FrameStackBuffer, ResizedObservationAdapter
-from rl_fzerox.core.game import RewardTracker, read_telemetry
-from rl_fzerox.core.game.telemetry import FZeroXTelemetry, MemoryReadableEmulator
+from rl_fzerox.core.envs.observations import FrameStackBuffer
+from rl_fzerox.core.game import FZeroXTelemetry, RewardTracker
 
 
 class FZeroXEnvEngine:
@@ -27,9 +25,8 @@ class FZeroXEnvEngine:
         self.backend = backend
         self.config = config
         self._action_adapter = SteerDriveActionAdapter(config.action)
-        self._observation_adapter = ResizedObservationAdapter(config.observation)
         self._observation_stack = FrameStackBuffer(
-            frame_space=self._observation_adapter.observation_space,
+            frame_space=_observation_frame_space(config),
             frame_stack=config.observation.frame_stack,
         )
         self._episode_limits = EpisodeLimits(config)
@@ -49,14 +46,16 @@ class FZeroXEnvEngine:
         return self._observation_space
 
     def reset(self, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
-        frame, info = self._reset_race_state()
+        _, info = self._reset_race_state()
         telemetry = _read_live_telemetry(self.backend)
         self._reward_tracker.reset(telemetry)
         self._episode_limits.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
         info["seed"] = seed
-        observation = self._reset_observation(frame, info)
+        if telemetry is not None:
+            info["telemetry"] = telemetry
+        observation = self._reset_observation(info)
         self._last_info = dict(info)
         return observation, info
 
@@ -103,13 +102,13 @@ class FZeroXEnvEngine:
             raise RuntimeError("The emulator did not produce a frame during step()")
 
         if last_telemetry is not None:
-            info["telemetry"] = last_telemetry.to_dict()
+            info["telemetry"] = last_telemetry
         self._episode_return += total_reward
         info["episode_return"] = self._episode_return
-        _ensure_monitor_info_keys(info)
+        ensure_monitor_info_keys(info)
         self._episode_done = terminated or truncated
         self._last_info = dict(info)
-        observation = self._append_observation(latest_frame, info)
+        observation = self._append_observation(info)
 
         return (
             observation,
@@ -132,10 +131,10 @@ class FZeroXEnvEngine:
             raise RuntimeError("The emulator did not produce a frame during step_frame()")
         self._episode_return += reward
         info["episode_return"] = self._episode_return
-        _ensure_monitor_info_keys(info)
+        ensure_monitor_info_keys(info)
         self._episode_done = terminated or truncated
         self._last_info = dict(info)
-        observation = self._append_observation(frame, info)
+        observation = self._append_observation(info)
         return observation, reward, terminated, truncated, info
 
     def render(self) -> np.ndarray:
@@ -209,6 +208,7 @@ class FZeroXEnvEngine:
         if truncation_reason is not None:
             info["truncation_reason"] = truncation_reason
         if telemetry is not None:
+            info["telemetry"] = telemetry
             info.update(_telemetry_info(telemetry))
             termination_reason = _termination_reason(telemetry)
             if termination_reason is not None:
@@ -222,21 +222,28 @@ class FZeroXEnvEngine:
             telemetry,
         )
 
-    def _reset_observation(self, frame: np.ndarray, info: dict[str, object]) -> np.ndarray:
-        observation_frame = self._observation_adapter.transform(frame, info=info)
+    def _reset_observation(self, info: dict[str, object]) -> np.ndarray:
+        observation_frame = self._transform_observation()
         observation = self._observation_stack.reset(observation_frame)
         info["observation_shape"] = tuple(int(value) for value in observation.shape)
         info["observation_frame_shape"] = self._observation_stack.frame_shape
         info["observation_stack"] = self.config.observation.frame_stack
         return observation
 
-    def _append_observation(self, frame: np.ndarray, info: dict[str, object]) -> np.ndarray:
-        observation_frame = self._observation_adapter.transform(frame, info=info)
+    def _append_observation(self, info: dict[str, object]) -> np.ndarray:
+        observation_frame = self._transform_observation()
         observation = self._observation_stack.append(observation_frame)
         info["observation_shape"] = tuple(int(value) for value in observation.shape)
         info["observation_frame_shape"] = self._observation_stack.frame_shape
         info["observation_stack"] = self.config.observation.frame_stack
         return observation
+
+    def _transform_observation(self) -> np.ndarray:
+        return self.backend.render_observation(
+            width=self.config.observation.width,
+            height=self.config.observation.height,
+            rgb=self.config.observation.rgb,
+        )
 
 def _has_custom_baseline(info: dict[str, object]) -> bool:
     baseline_kind = info.get("baseline_kind")
@@ -244,12 +251,17 @@ def _has_custom_baseline(info: dict[str, object]) -> bool:
 
 
 def _read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
-    if not hasattr(backend, "system_ram_size") or not hasattr(backend, "read_system_ram"):
-        return None
-    try:
-        return read_telemetry(cast(MemoryReadableEmulator, backend))
-    except RuntimeError:
-        return None
+    return backend.try_read_telemetry()
+
+
+def _observation_frame_space(config: EnvConfig) -> spaces.Box:
+    channels = 3 if config.observation.rgb else 1
+    return spaces.Box(
+        low=0,
+        high=255,
+        shape=(config.observation.height, config.observation.width, channels),
+        dtype=np.uint8,
+    )
 
 
 def _reset_context_info(info: dict[str, object]) -> dict[str, object]:
@@ -300,15 +312,3 @@ def _termination_reason(telemetry: FZeroXTelemetry) -> str | None:
         if label in telemetry.player.state_labels:
             return label
     return None
-
-
-def _ensure_monitor_info_keys(info: dict[str, object]) -> None:
-    info.setdefault("episode_return", 0.0)
-    info.setdefault("episode_step", 0)
-    info.setdefault("termination_reason", None)
-    info.setdefault("truncation_reason", None)
-    info.setdefault("race_distance", None)
-    info.setdefault("speed_kph", None)
-    info.setdefault("position", None)
-    info.setdefault("lap", None)
-    info.setdefault("laps_completed", None)
