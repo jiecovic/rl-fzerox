@@ -9,5 +9,6 @@ emulator:
   renderer: angrylion
 
 train:
+  vec_env: dummy
   output_root: local/runs
   run_name: ppo_cnn

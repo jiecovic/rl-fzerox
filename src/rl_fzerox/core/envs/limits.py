@@ -75,6 +75,10 @@ class EpisodeLimits:
             self._stalled_steps = 0
         else:
             self._stalled_steps += 1
+        # Reverse driving is counted per internal telemetry sample, not per
+        # outer env step. With action_repeat > 1 this makes the limit a frame-
+        # scale timeout, which is what we want for consistent game-time
+        # behavior.
         if progress_delta < -self._wrong_way_progress_epsilon:
             self._reverse_steps += 1
         else:

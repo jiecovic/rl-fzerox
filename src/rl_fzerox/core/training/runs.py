@@ -16,6 +16,7 @@ class RunPaths:
     """Filesystem layout for one training run."""
 
     run_dir: Path
+    runtime_root: Path
     tensorboard_dir: Path
     latest_model_path: Path
     latest_policy_path: Path
@@ -23,6 +24,11 @@ class RunPaths:
     best_policy_path: Path
     final_model_path: Path
     final_policy_path: Path
+
+    def env_runtime_dir(self, env_index: int) -> Path:
+        """Return the writable runtime directory for one train env instance."""
+
+        return self.runtime_root / f"env_{env_index:03d}"
 
 
 def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
@@ -32,6 +38,7 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
     run_dir = _next_run_dir(resolved_output_root, run_name)
     return RunPaths(
         run_dir=run_dir,
+        runtime_root=run_dir / "runtime",
         tensorboard_dir=run_dir / "tensorboard",
         latest_model_path=run_dir / "latest_model.zip",
         latest_policy_path=run_dir / "latest_policy.zip",
@@ -46,6 +53,7 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     """Create the directories needed by the current run."""
 
     paths.run_dir.mkdir(parents=True, exist_ok=True)
+    paths.runtime_root.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -133,6 +141,16 @@ def apply_train_run_to_watch_config(
     """Inherit emulator/env settings from a training run for policy watch mode."""
 
     merged_emulator_config = train_config.emulator
+    if (
+        watch_config.emulator.runtime_dir is not None
+        and merged_emulator_config.runtime_dir != watch_config.emulator.runtime_dir
+    ):
+        merged_emulator_config = merged_emulator_config.model_copy(
+            update={
+                "runtime_dir": watch_config.emulator.runtime_dir,
+            }
+        )
+
     if (
         merged_emulator_config.baseline_state_path is None
         and watch_config.emulator.baseline_state_path is not None

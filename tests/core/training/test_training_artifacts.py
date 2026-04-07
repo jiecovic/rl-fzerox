@@ -28,17 +28,19 @@ from rl_fzerox.core.training.runs import (
 def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
-    runtime_dir = tmp_path / "runtime"
+    train_runtime_dir = tmp_path / "runtime"
+    watch_runtime_dir = tmp_path / "watch-runtime"
     core_path.touch()
     rom_path.touch()
-    runtime_dir.mkdir()
+    train_runtime_dir.mkdir()
+    watch_runtime_dir.mkdir()
 
     train_config = TrainAppConfig(
         seed=123,
         emulator=EmulatorConfig(
             core_path=core_path,
             rom_path=rom_path,
-            runtime_dir=runtime_dir,
+            runtime_dir=train_runtime_dir,
         ),
         env=EnvConfig(action_repeat=3),
         policy=PolicyConfig(),
@@ -55,7 +57,11 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
 
     watch_config = WatchAppConfig(
         seed=999,
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            runtime_dir=watch_runtime_dir,
+        ),
         env=EnvConfig(action_repeat=1),
         watch=WatchConfig(fps=30.0),
     )
@@ -67,7 +73,8 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
 
     assert loaded_train_config.train.output_root == train_config.train.output_root.resolve()
     assert merged_watch_config.seed == 123
-    assert merged_watch_config.emulator.runtime_dir == runtime_dir.resolve()
+    assert loaded_train_config.emulator.runtime_dir == train_runtime_dir.resolve()
+    assert merged_watch_config.emulator.runtime_dir == watch_runtime_dir.resolve()
     assert merged_watch_config.env.action_repeat == 3
     assert merged_watch_config.watch.policy_run_dir == run_paths.run_dir
     assert merged_watch_config.watch.fps == 30.0
@@ -182,3 +189,5 @@ def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> N
 
     assert first.run_dir.name == "ppo_cnn_0001"
     assert second.run_dir.name == "ppo_cnn_0002"
+    assert first.runtime_root == first.run_dir / "runtime"
+    assert first.env_runtime_dir(0) == first.run_dir / "runtime" / "env_000"
