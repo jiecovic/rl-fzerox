@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from rl_fzerox.core.game.flags import (
     FLAG_COLLISION_RECOIL,
     FLAG_CRASHED,
+    FLAG_DASH_PAD_BOOST,
     FLAG_FALLING_OFF_TRACK,
     FLAG_FINISHED,
     FLAG_RETIRED,
@@ -27,6 +28,8 @@ class RewardWeights:
     stall_penalty: float = -0.05
     stuck_truncation_penalty: float = -5.0
     wrong_way_truncation_penalty: float = -10.0
+    dash_pad_boost_reward: float = 0.5
+    dash_pad_min_progress: float = 500.0
     collision_recoil_penalty: float = -4.0
     spinning_out_penalty: float = -2.0
     falling_off_track_penalty: float = -10.0
@@ -56,12 +59,14 @@ class RewardTracker:
         self._previous_energy = 0.0
         self._previous_state_flags = 0
         self._stall_steps = 0
+        self._last_dash_pad_reward_distance = float("-inf")
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Initialize reward state for a new episode."""
 
         self._previous_state_flags = 0
         self._stall_steps = 0
+        self._last_dash_pad_reward_distance = float("-inf")
         if telemetry is None:
             self._best_race_distance = float("-inf")
             self._previous_race_distance = float("-inf")
@@ -145,6 +150,11 @@ class RewardTracker:
             "retired",
             breakdown,
         )
+        reward += self._apply_dash_pad_reward(
+            entered_flags=entered_flags,
+            race_distance=telemetry.player.race_distance,
+            breakdown=breakdown,
+        )
 
         if entered_flags & FLAG_FINISHED:
             reward += self._weights.finish_bonus
@@ -175,6 +185,24 @@ class RewardTracker:
         if truncation_reason == "wrong_way":
             return self._weights.wrong_way_truncation_penalty, "wrong_way_truncation"
         return 0.0, None
+
+    def _apply_dash_pad_reward(
+        self,
+        *,
+        entered_flags: int,
+        race_distance: float,
+        breakdown: dict[str, float],
+    ) -> float:
+        if not (entered_flags & FLAG_DASH_PAD_BOOST):
+            return 0.0
+        if (
+            race_distance - self._last_dash_pad_reward_distance
+            < self._weights.dash_pad_min_progress
+        ):
+            return 0.0
+        self._last_dash_pad_reward_distance = race_distance
+        breakdown["dash_pad_boost"] = self._weights.dash_pad_boost_reward
+        return self._weights.dash_pad_boost_reward
 
 
 def _apply_flag_penalty(
