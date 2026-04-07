@@ -191,6 +191,8 @@ class FZeroXEnvEngine:
         limit_step = self._episode_limits.step(telemetry)
         truncation_reason = limit_step.truncation_reason
         truncated = truncated or (truncation_reason is not None)
+        if frame is None and (terminated or truncated):
+            frame = self.backend.render()
         info["step_reward"] = reward_step.reward
         if reward_step.breakdown:
             info["reward_breakdown"] = dict(reward_step.breakdown)

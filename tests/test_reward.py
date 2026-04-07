@@ -1,5 +1,10 @@
 # tests/test_reward.py
-from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry, RewardTracker
+from rl_fzerox.core.game import (
+    FZeroXTelemetry,
+    PlayerTelemetry,
+    RewardTracker,
+    RewardWeights,
+)
 
 
 def test_reward_tracker_rewards_new_best_progress_only() -> None:
@@ -68,6 +73,46 @@ def test_reward_tracker_applies_stronger_collision_penalty_once() -> None:
     assert step.breakdown["collision_recoil"] == -1.0
     assert step.reward == -1.0
     assert repeated.reward == 0.0
+
+
+def test_reward_tracker_penalizes_stalling_after_grace_period() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_epsilon=0.5,
+            stall_grace_steps=2,
+            stall_penalty=-0.25,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    first = tracker.step(_telemetry(race_distance=100.0))
+    second = tracker.step(_telemetry(race_distance=100.0))
+    third = tracker.step(_telemetry(race_distance=100.0))
+
+    assert first.reward == 0.0
+    assert second.reward == 0.0
+    assert third.reward == -0.25
+    assert third.breakdown == {"stall": -0.25}
+
+
+def test_reward_tracker_resets_stall_counter_on_progress() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            progress_epsilon=0.5,
+            stall_grace_steps=1,
+            stall_penalty=-0.25,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    stalled = tracker.step(_telemetry(race_distance=100.0))
+    recovered = tracker.step(_telemetry(race_distance=110.0))
+    stalled_again = tracker.step(_telemetry(race_distance=110.0))
+
+    assert stalled.reward == 0.0
+    assert recovered.reward == 0.01
+    assert recovered.breakdown == {"progress": 0.01}
+    assert stalled_again.reward == 0.0
 
 
 def _telemetry(

@@ -193,6 +193,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             raw_frame = env.render()
             reset_info = dict(info)
             current_control_state = ControllerState()
+            current_policy_action: np.ndarray | None = None
             telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
@@ -238,6 +239,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 paused=paused,
                 control_state=current_control_state,
                 policy_label=_policy_label(policy_runner),
+                policy_action=current_policy_action,
                 telemetry=telemetry,
             )
 
@@ -272,6 +274,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         paused=True,
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
+                        policy_action=current_policy_action,
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
@@ -282,8 +285,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                         observation, reward, terminated, truncated, info = env.step_frame(
                             current_control_state
                         )
+                        current_policy_action = None
                     else:
                         action = policy_runner.predict(observation)
+                        current_policy_action = np.asarray(action, dtype=np.int64)
                         current_control_state = env.action_to_control_state(action)
                         observation, reward, terminated, truncated, info = env.step(action)
                     raw_frame = env.render()
@@ -302,6 +307,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         paused=True,
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
+                        policy_action=current_policy_action,
                         telemetry=telemetry,
                     )
                     continue
@@ -311,8 +317,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                     observation, reward, terminated, truncated, info = env.step_control(
                         current_control_state
                     )
+                    current_policy_action = None
                 else:
                     action = policy_runner.predict(observation)
+                    current_policy_action = np.asarray(action, dtype=np.int64)
                     current_control_state = env.action_to_control_state(action)
                     observation, reward, terminated, truncated, info = env.step(action)
                 raw_frame = env.render()
@@ -338,6 +346,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     paused=paused,
                     control_state=current_control_state,
                     policy_label=_policy_label(policy_runner),
+                    policy_action=current_policy_action,
                     telemetry=telemetry,
                 )
 
@@ -400,6 +409,7 @@ def _draw_frame(
     paused: bool,
     control_state: ControllerState,
     policy_label: str | None,
+    policy_action: np.ndarray | None,
     telemetry: FZeroXTelemetry | None,
 ) -> None:
     game_surface = _rgb_surface(pygame, raw_frame)
@@ -451,6 +461,7 @@ def _draw_frame(
         paused=paused,
         control_state=control_state,
         policy_label=policy_label,
+        policy_action=policy_action,
         game_display_size=game_display_size,
         observation_shape=observation.shape,
         telemetry=telemetry,
@@ -471,6 +482,7 @@ def _draw_side_panel(
     paused: bool,
     control_state: ControllerState,
     policy_label: str | None,
+    policy_action: np.ndarray | None,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -495,6 +507,7 @@ def _draw_side_panel(
         paused=paused,
         control_state=control_state,
         policy_label=policy_label,
+        policy_action=policy_action,
         game_display_size=game_display_size,
         observation_shape=observation_shape,
         telemetry=telemetry,
@@ -545,6 +558,7 @@ def _build_panel_columns(
     paused: bool,
     control_state: ControllerState,
     policy_label: str | None,
+    policy_action: np.ndarray | None,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -562,6 +576,11 @@ def _build_panel_columns(
                     _panel_line(
                         "Driver",
                         policy_label if policy_label is not None else "manual",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Action",
+                        _format_policy_action(policy_action),
                         PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
@@ -951,6 +970,19 @@ def _pressed_button_labels(joypad_mask_value: int) -> str:
         if joypad_mask_value & (1 << button_id)
     ]
     return " ".join(pressed) if pressed else "none"
+
+
+def _format_policy_action(policy_action: np.ndarray | None) -> str:
+    if policy_action is None:
+        return "manual"
+
+    values = np.asarray(policy_action, dtype=np.int64).reshape(-1)
+    if len(values) != 2:
+        return str(values.tolist())
+
+    steer_bucket, drive_mode = int(values[0]), int(values[1])
+    drive_label = "throttle" if drive_mode == 1 else "coast"
+    return f"[{steer_bucket},{drive_mode}] {drive_label}"
 
 
 def _display_aspect_ratio(info: dict[str, object]) -> float:

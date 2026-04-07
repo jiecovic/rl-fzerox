@@ -231,6 +231,27 @@ def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:
     assert isinstance(info["episode_return"], float)
 
 
+def test_step_returns_a_frame_when_done_before_final_repeat(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=3),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine._read_live_telemetry",
+        lambda _backend: _telemetry(race_distance=42.0, state_labels=("finished",)),
+    )
+
+    env.reset(seed=6)
+    obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert obs.shape == (120, 160, 12)
+    assert terminated
+    assert not truncated
+    assert info["repeat_index"] == 0
+    assert info["termination_reason"] == "finished"
+
+
 def _telemetry(
     *,
     race_distance: float,

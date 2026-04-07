@@ -24,6 +24,7 @@ class PolicyRunner:
     def __init__(self, loaded_policy: LoadedPolicy, policy) -> None:
         self._loaded_policy = loaded_policy
         self._policy = policy
+        self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
 
     @property
     def label(self) -> str:
@@ -34,8 +35,38 @@ class PolicyRunner:
     def predict(self, observation: np.ndarray) -> np.ndarray:
         """Predict one deterministic action for the current observation."""
 
+        self._maybe_reload()
         action, _ = self._policy.predict(observation, deterministic=True)
         return np.asarray(action, dtype=np.int64)
+
+    def _maybe_reload(self) -> None:
+        try:
+            policy_path = resolve_policy_artifact_path(
+                self._loaded_policy.run_dir,
+                artifact=self._loaded_policy.artifact,
+            )
+        except FileNotFoundError:
+            return
+
+        policy_mtime_ns = _policy_mtime_ns(policy_path)
+        if (
+            policy_path == self._loaded_policy.policy_path
+            and policy_mtime_ns == self._policy_mtime_ns
+        ):
+            return
+
+        try:
+            policy = _load_saved_policy(policy_path)
+        except Exception:
+            return
+
+        self._loaded_policy = LoadedPolicy(
+            run_dir=self._loaded_policy.run_dir,
+            policy_path=policy_path,
+            artifact=self._loaded_policy.artifact,
+        )
+        self._policy = policy
+        self._policy_mtime_ns = policy_mtime_ns
 
 
 def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:
@@ -66,3 +97,7 @@ def _load_saved_policy(policy_path: Path):
     from rl_fzerox.core.policy import FZeroXCnnExtractor as _  # noqa: F401
 
     return CnnPolicy.load(str(policy_path), device="auto")
+
+
+def _policy_mtime_ns(policy_path: Path) -> int:
+    return policy_path.stat().st_mtime_ns

@@ -20,6 +20,8 @@ class RewardWeights:
     progress_scale: float = 0.001
     reverse_progress_scale: float = 0.001
     progress_epsilon: float = 0.5
+    stall_grace_steps: int = 180
+    stall_penalty: float = -0.01
     collision_recoil_penalty: float = -1.0
     spinning_out_penalty: float = -2.0
     falling_off_track_penalty: float = -10.0
@@ -47,11 +49,13 @@ class RewardTracker:
         self._best_race_distance = float("-inf")
         self._previous_race_distance = float("-inf")
         self._previous_state_flags = 0
+        self._stall_steps = 0
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Initialize reward state for a new episode."""
 
         self._previous_state_flags = 0
+        self._stall_steps = 0
         if telemetry is None:
             self._best_race_distance = float("-inf")
             self._previous_race_distance = float("-inf")
@@ -76,11 +80,18 @@ class RewardTracker:
             reward += progress_reward
             breakdown["progress"] = progress_reward
             self._best_race_distance = telemetry.player.race_distance
+            self._stall_steps = 0
 
         if progress_delta < -self._weights.progress_epsilon:
             reverse_penalty = progress_delta * self._weights.reverse_progress_scale
             reward += reverse_penalty
             breakdown["reverse_progress"] = reverse_penalty
+            self._stall_steps = 0
+        elif progress_gain <= self._weights.progress_epsilon:
+            self._stall_steps += 1
+            if self._stall_steps > self._weights.stall_grace_steps:
+                reward += self._weights.stall_penalty
+                breakdown["stall"] = self._weights.stall_penalty
 
         current_flags = telemetry.player.state_flags
         entered_flags = current_flags & ~self._previous_state_flags
