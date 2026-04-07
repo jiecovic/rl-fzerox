@@ -4,6 +4,9 @@ defaults:
 
 seed: 123
 
+emulator:
+  baseline_state_path: local/states/first-race.state
+
 env:
   reset_to_race: true
 

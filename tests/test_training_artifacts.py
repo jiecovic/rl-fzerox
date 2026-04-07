@@ -73,6 +73,52 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.watch.fps == 30.0
 
 
+def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    baseline_state_path = tmp_path / "first-race.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_state_path.write_bytes(b"baseline")
+
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(action_repeat=3),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=train_config.train.output_root,
+        run_name=train_config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    watch_config = WatchAppConfig(
+        seed=999,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            baseline_state_path=baseline_state_path,
+        ),
+        env=EnvConfig(action_repeat=1),
+        watch=WatchConfig(fps=30.0),
+    )
+
+    merged_watch_config = apply_train_run_to_watch_config(
+        watch_config,
+        run_dir=run_paths.run_dir,
+        train_config=train_config,
+    )
+
+    assert merged_watch_config.emulator.baseline_state_path == baseline_state_path.resolve()
+
+
 def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)

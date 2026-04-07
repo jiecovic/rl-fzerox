@@ -50,6 +50,7 @@ emulator:
   core_path: local/libretro/mupen64plus_next_libretro.so
   rom_path: local/roms/F-Zero X (USA).n64
   runtime_dir: local/runtime
+  baseline_state_path: local/states/first-race.state
 
 env:
   reset_to_race: true
@@ -58,9 +59,9 @@ watch:
   fps: 30
 ```
 
-Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` is an optional savestate file used as the reset baseline if you create one later. The root `seed` is the master seed for Python/env randomness.
+Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` points to the saved race-start baseline used for fast deterministic resets once you create it. The root `seed` is the master seed for Python/env randomness.
 
-`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Once that path is stable for your setup, press `K` in `watch` to save a dedicated race-start baseline. When a custom baseline is active, that baseline takes precedence and the scripted bootstrap is skipped. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
+`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Press `K` in `watch` once to save `local/states/first-race.state`; after that, both `watch` and `train` reset from that dedicated race-start baseline instead of replaying the menu path. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
 
 `watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it.
 

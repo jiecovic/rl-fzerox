@@ -132,10 +132,21 @@ def apply_train_run_to_watch_config(
 ) -> WatchAppConfig:
     """Inherit emulator/env settings from a training run for policy watch mode."""
 
+    merged_emulator_config = train_config.emulator
+    if (
+        merged_emulator_config.baseline_state_path is None
+        and watch_config.emulator.baseline_state_path is not None
+    ):
+        merged_emulator_config = merged_emulator_config.model_copy(
+            update={
+                "baseline_state_path": watch_config.emulator.baseline_state_path,
+            }
+        )
+
     return watch_config.model_copy(
         update={
             "seed": train_config.seed,
-            "emulator": train_config.emulator,
+            "emulator": merged_emulator_config,
             "env": train_config.env,
             "watch": watch_config.watch.model_copy(
                 update={"policy_run_dir": run_dir.expanduser().resolve()}
