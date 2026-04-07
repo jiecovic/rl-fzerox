@@ -1,4 +1,4 @@
-// rust/core/host.rs
+// rust/core/host/host.rs
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 use std::slice;
@@ -14,6 +14,7 @@ use crate::core::callbacks::{
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::stdio::with_silenced_stdio;
+use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::video::VideoFrame;
 
 const FRAME_WAIT_LIMIT: usize = 120;
@@ -46,13 +47,14 @@ impl Host {
         rom_path: &Path,
         runtime_dir: Option<&Path>,
         baseline_state_path: Option<&Path>,
+        renderer: &str,
     ) -> Result<Self, CoreError> {
         if !rom_path.is_file() {
             return Err(CoreError::MissingRom(rom_path.to_path_buf()));
         }
 
         let core = LoadedCore::load(core_path)?;
-        let callbacks = Box::new(CallbackState::new(core_path, runtime_dir)?);
+        let callbacks = Box::new(CallbackState::new(core_path, runtime_dir, renderer)?);
         let rom_bytes = std::fs::read(rom_path).map_err(|error| CoreError::ReadFile {
             path: rom_path.to_path_buf(),
             message: error.to_string(),
@@ -196,6 +198,27 @@ impl Host {
 
     pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
         self.read_memory(MEMORY_SYSTEM_RAM, offset, length)
+    }
+
+    pub fn telemetry(&mut self) -> Result<TelemetrySnapshot, CoreError> {
+        let system_ram = self.system_ram_slice()?;
+        crate::core::telemetry::read_snapshot(system_ram)
+    }
+
+    pub fn observation_frame(
+        &self,
+        target_width: usize,
+        target_height: usize,
+        rgb: bool,
+    ) -> Result<Vec<u8>, CoreError> {
+        let frame = self.callbacks.frame().ok_or(CoreError::NoFrameAvailable)?;
+        Ok(crate::core::video::observation_frame(
+            frame,
+            self.display_aspect_ratio,
+            target_width,
+            target_height,
+            rgb,
+        ))
     }
 
     pub fn close(&mut self) {
@@ -396,6 +419,19 @@ impl Host {
         Ok(size)
     }
 
+    fn system_ram_slice(&mut self) -> Result<&[u8], CoreError> {
+        self.ensure_open()?;
+        let available = self.memory_size(MEMORY_SYSTEM_RAM)?;
+        let data = self.call_core(|core| unsafe { core.memory_data(MEMORY_SYSTEM_RAM) });
+        if data.is_null() {
+            return Err(CoreError::MemoryUnavailable {
+                memory_id: MEMORY_SYSTEM_RAM,
+            });
+        }
+        let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>(), available) };
+        Ok(bytes)
+    }
+
     fn read_memory(
         &mut self,
         memory_id: u32,
@@ -461,18 +497,5 @@ fn resolve_display_aspect_ratio(width: usize, height: usize, aspect_ratio: f64) 
 }
 
 #[cfg(test)]
-mod tests {
-    use super::resolve_display_aspect_ratio;
-
-    #[test]
-    fn resolve_display_aspect_ratio_prefers_reported_ratio() {
-        let ratio = resolve_display_aspect_ratio(640, 240, 4.0 / 3.0);
-        assert!((ratio - (4.0 / 3.0)).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn resolve_display_aspect_ratio_falls_back_to_geometry() {
-        let ratio = resolve_display_aspect_ratio(640, 480, 0.0);
-        assert!((ratio - (4.0 / 3.0)).abs() < f64::EPSILON);
-    }
-}
+#[path = "tests/host_tests.rs"]
+mod tests;

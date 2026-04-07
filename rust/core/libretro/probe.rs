@@ -1,4 +1,4 @@
-// rust/core/probe.rs
+// rust/core/libretro/probe.rs
 use std::path::Path;
 
 use crate::core::api::LoadedCore;

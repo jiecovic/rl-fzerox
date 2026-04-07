@@ -1,4 +1,4 @@
-// rust/core/video.rs
+// rust/core/host/video.rs
 use std::ffi::c_void;
 
 const HW_FRAME_BUFFER_VALID: usize = usize::MAX;
@@ -15,6 +15,53 @@ pub enum PixelLayout {
     Argb1555,
     Argb8888,
     Rgb565,
+}
+
+pub fn display_size(width: usize, height: usize, aspect_ratio: f64) -> (usize, usize) {
+    if aspect_ratio <= 0.0 {
+        return (width, height);
+    }
+
+    let display_height = ((width as f64) / aspect_ratio).round() as usize;
+    (width, display_height.max(1))
+}
+
+pub fn observation_frame(
+    frame: &VideoFrame,
+    aspect_ratio: f64,
+    target_width: usize,
+    target_height: usize,
+    rgb: bool,
+) -> Vec<u8> {
+    let (display_width, display_height) = display_size(frame.width, frame.height, aspect_ratio);
+    let aspect_corrected = if display_width != frame.width || display_height != frame.height {
+        resize_rgb(
+            &frame.rgb,
+            frame.width,
+            frame.height,
+            display_width,
+            display_height,
+        )
+    } else {
+        frame.rgb.clone()
+    };
+    let resized = if display_width != target_width || display_height != target_height {
+        resize_rgb(
+            &aspect_corrected,
+            display_width,
+            display_height,
+            target_width,
+            target_height,
+        )
+    } else {
+        aspect_corrected
+    };
+
+    if rgb {
+        resized
+    } else {
+        to_grayscale(&resized, target_width, target_height)
+    }
 }
 
 pub fn convert_frame(
@@ -105,30 +152,53 @@ fn expand_6_to_8(value: u8) -> u8 {
     (value << 2) | (value >> 4)
 }
 
-#[cfg(test)]
-mod tests {
-    use std::ffi::c_void;
-
-    use super::{convert_argb1555, convert_argb8888, convert_rgb565};
-
-    #[test]
-    fn convert_argb8888_maps_bytes_to_rgb() {
-        let pixels = [3_u8, 2, 1, 0, 6, 5, 4, 0];
-        let rgb = convert_argb8888(pixels.as_ptr().cast::<c_void>(), 2, 1, 8);
-        assert_eq!(rgb, vec![1, 2, 3, 4, 5, 6]);
+fn resize_rgb(
+    rgb: &[u8],
+    input_width: usize,
+    input_height: usize,
+    output_width: usize,
+    output_height: usize,
+) -> Vec<u8> {
+    if input_width == output_width && input_height == output_height {
+        return rgb.to_vec();
     }
 
-    #[test]
-    fn convert_rgb565_maps_values_to_rgb() {
-        let pixel = 0xF800_u16.to_le_bytes();
-        let rgb = convert_rgb565(pixel.as_ptr().cast::<c_void>(), 1, 1, 2);
-        assert_eq!(rgb, vec![255, 0, 0]);
+    let x_index = axis_index_map(input_width, output_width);
+    let y_index = axis_index_map(input_height, output_height);
+    let mut resized = vec![0_u8; output_width * output_height * 3];
+    for (output_y, &input_y) in y_index.iter().enumerate() {
+        for (output_x, &input_x) in x_index.iter().enumerate() {
+            let src_index = (input_y * input_width + input_x) * 3;
+            let dst_index = (output_y * output_width + output_x) * 3;
+            resized[dst_index..dst_index + 3].copy_from_slice(&rgb[src_index..src_index + 3]);
+        }
     }
-
-    #[test]
-    fn convert_argb1555_maps_values_to_rgb() {
-        let pixel = 0x7C00_u16.to_le_bytes();
-        let rgb = convert_argb1555(pixel.as_ptr().cast::<c_void>(), 1, 1, 2);
-        assert_eq!(rgb, vec![255, 0, 0]);
-    }
+    resized
 }
+
+fn axis_index_map(input_size: usize, output_size: usize) -> Vec<usize> {
+    if output_size <= 1 || input_size <= 1 {
+        return vec![0; output_size.max(1)];
+    }
+
+    let scale = (input_size - 1) as f64 / (output_size - 1) as f64;
+    (0..output_size)
+        .map(|index| ((index as f64) * scale).round() as usize)
+        .collect()
+}
+
+fn to_grayscale(rgb: &[u8], width: usize, height: usize) -> Vec<u8> {
+    let mut gray = vec![0_u8; width * height];
+    for index in 0..(width * height) {
+        let src = index * 3;
+        let value = (0.299_f32 * rgb[src] as f32)
+            + (0.587_f32 * rgb[src + 1] as f32)
+            + (0.114_f32 * rgb[src + 2] as f32);
+        gray[index] = value.round() as u8;
+    }
+    gray
+}
+
+#[cfg(test)]
+#[path = "tests/video_tests.rs"]
+mod tests;
