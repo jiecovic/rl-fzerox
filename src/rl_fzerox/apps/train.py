@@ -5,6 +5,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from rl_fzerox.apps._cli import normalize_hydra_overrides
 from rl_fzerox.core.config import load_train_app_config
 from rl_fzerox.core.training.runner import run_training
 
@@ -40,20 +41,12 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         config = load_train_app_config(
             args.config_path,
-            overrides=_normalize_overrides(args.overrides),
+            overrides=normalize_hydra_overrides(args.overrides),
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
 
     run_training(config)
-
-
-def _normalize_overrides(overrides: Sequence[str]) -> list[str]:
-    if not overrides:
-        return []
-    if overrides[0] == "--":
-        return list(overrides[1:])
-    return list(overrides)
 
 
 if __name__ == "__main__":
