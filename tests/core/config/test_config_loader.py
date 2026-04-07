@@ -270,6 +270,33 @@ def test_load_watch_app_config_applies_hydra_overrides(tmp_path: Path) -> None:
     assert config.watch.episodes == 3
 
 
+def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action_repeat: 2",
+            "policy:",
+            "  activation: relu",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.policy.activation == "relu"
+
+
 def test_repo_watch_template_exists() -> None:
     config_path = config_paths_module.project_root_dir() / "conf" / "watch.yaml"
 

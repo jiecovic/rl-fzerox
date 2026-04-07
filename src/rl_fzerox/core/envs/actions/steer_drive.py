@@ -1,7 +1,6 @@
 # src/rl_fzerox/core/envs/actions/steer_drive.py
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -10,10 +9,10 @@ from gymnasium import spaces
 from rl_fzerox._native import JOYPAD_B, joypad_mask
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.envs.actions.base import ActionValue
+from rl_fzerox.core.envs.actions.base import ActionValue, coerce_action_values
 
 # Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A button
-# on RetroPad B, which is the acceleration input F-Zero X uses during races.
+# on RetroPad B. In F-Zero X, N64 A is the acceleration input.
 THROTTLE_MASK = joypad_mask(JOYPAD_B)
 
 
@@ -78,14 +77,7 @@ def _parse_action_pair(
     *,
     steer_bucket_count: int,
 ) -> tuple[int, int]:
-    if isinstance(action, np.ndarray):
-        values = action.astype(np.int64, copy=False).reshape(-1).tolist()
-    elif isinstance(action, np.integer):
-        values = [int(action)]
-    elif isinstance(action, Sequence) and not isinstance(action, str | bytes):
-        values = [int(value) for value in action]
-    else:
-        values = [int(action)]
+    values = coerce_action_values(action)
 
     if len(values) != 2:
         raise ValueError(

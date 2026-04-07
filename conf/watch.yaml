@@ -10,6 +10,7 @@ env:
   action_repeat: 3
   reset_to_race: false
   action:
+    name: steer_drive_boost_drift
     steer_buckets: 7
   observation:
     width: 160
