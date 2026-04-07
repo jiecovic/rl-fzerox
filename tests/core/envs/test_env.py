@@ -1,6 +1,4 @@
-# tests/test_env.py
-from typing import cast
-
+# tests/core/envs/test_env.py
 import numpy as np
 from gymnasium.spaces import MultiDiscrete
 
@@ -10,7 +8,7 @@ from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
-from tests.fakes import SyntheticBackend
+from tests.support.fakes import SyntheticBackend
 
 
 def test_reset_returns_stacked_observation():
@@ -211,7 +209,8 @@ def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
     assert info["step_reward"] == -5.0
-    reward_breakdown = cast(dict[str, float], info["reward_breakdown"])
+    reward_breakdown = info["reward_breakdown"]
+    assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["stuck_truncation"] == -5.0
 
 
@@ -248,7 +247,8 @@ def test_step_truncates_when_driving_the_wrong_way(monkeypatch) -> None:
     assert reward == -10.0035
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_steps"] == 2
-    reward_breakdown = cast(dict[str, float], info["reward_breakdown"])
+    reward_breakdown = info["reward_breakdown"]
+    assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["wrong_way_truncation"] == -10.0
 
 

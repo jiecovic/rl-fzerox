@@ -1,4 +1,4 @@
-# tests/test_observations.py
+# tests/core/envs/test_observations.py
 import numpy as np
 
 from rl_fzerox.core.config.schema import ObservationConfig

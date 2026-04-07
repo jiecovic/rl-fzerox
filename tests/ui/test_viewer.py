@@ -1,4 +1,4 @@
-# tests/test_viewer.py
+# tests/ui/test_viewer.py
 import os
 
 import numpy as np
@@ -13,6 +13,7 @@ from rl_fzerox.ui.viewer import (
     _create_fonts,
     _format_policy_action,
     _format_reload_age,
+    _format_reload_error,
     _panel_content_height,
     _pressed_button_labels,
     _preview_frame,
@@ -72,6 +73,7 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
             policy_label=None,
             policy_action=None,
             policy_reload_age_seconds=None,
+            policy_reload_error=None,
             game_display_size=(640, 480),
             observation_shape=(120, 160, 12),
             telemetry=_sample_telemetry(),
@@ -104,6 +106,14 @@ def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(12.7) == "12s ago"
     assert _format_reload_age(125.0) == "2m 05s"
     assert _format_reload_age(3665.0) == "1h 01m"
+
+
+def test_format_reload_error_truncates_long_messages() -> None:
+    assert _format_reload_error(None) == "-"
+    assert _format_reload_error("bad checkpoint") == "bad checkpoint"
+    assert _format_reload_error("this is a much longer checkpoint parse failure message") == (
+        "this is a much longer che..."
+    )
 
 
 def _sample_telemetry() -> FZeroXTelemetry:

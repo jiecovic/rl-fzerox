@@ -1,4 +1,4 @@
-# tests/test_extractors.py
+# tests/core/policy/test_extractors.py
 from __future__ import annotations
 
 import numpy as np

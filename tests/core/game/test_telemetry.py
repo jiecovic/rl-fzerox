@@ -1,4 +1,4 @@
-# tests/test_telemetry.py
+# tests/core/game/test_telemetry.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -24,6 +24,14 @@ class FakeMemoryEmulator:
 
     def read_system_ram(self, offset: int, length: int) -> bytes:
         return self.system_ram[offset : offset + length]
+
+
+@dataclass
+class FakeStructuredTelemetryEmulator:
+    payload: dict[str, object]
+
+    def telemetry_data(self) -> dict[str, object]:
+        return self.payload
 
 
 def test_read_telemetry_decodes_player_one_race_values() -> None:
@@ -68,4 +76,44 @@ def test_read_telemetry_decodes_player_one_race_values() -> None:
     assert telemetry.player.position == 3
     assert telemetry.player.character == 0
     assert telemetry.player.machine_index == 7
+    assert telemetry.player.state_labels == ("can_boost", "active")
+
+
+def test_read_telemetry_accepts_native_structured_payloads() -> None:
+    telemetry = read_telemetry(
+        FakeStructuredTelemetryEmulator(
+            {
+                "system_ram_size": 0x00300000,
+                "game_frame_count": 321,
+                "game_mode_raw": 1,
+                "game_mode_name": "gp_race",
+                "course_index": 0,
+                "in_race_mode": True,
+                "player": {
+                    "state_flags": (1 << 20) | (1 << 30),
+                    "state_labels": ["can_boost", "active"],
+                    "speed_raw": 123.5,
+                    "speed_kph": 123.5 * 21.6,
+                    "energy": 92.25,
+                    "max_energy": 100.0,
+                    "boost_timer": 0,
+                    "race_distance": 12_345.5,
+                    "laps_completed_distance": 10_000.0,
+                    "lap_distance": 2_345.5,
+                    "race_distance_position": 12_340.0,
+                    "race_time_ms": 12_345,
+                    "lap": 2,
+                    "laps_completed": 1,
+                    "position": 3,
+                    "character": 0,
+                    "machine_index": 7,
+                },
+            }
+        )
+    )
+
+    assert telemetry.system_ram_size == 0x00300000
+    assert telemetry.game_frame_count == 321
+    assert telemetry.game_mode_name == "gp_race"
+    assert telemetry.player.speed_kph == pytest.approx(123.5 * 21.6)
     assert telemetry.player.state_labels == ("can_boost", "active")

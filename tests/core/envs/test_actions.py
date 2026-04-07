@@ -1,4 +1,4 @@
-# tests/test_actions.py
+# tests/core/envs/test_actions.py
 import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete

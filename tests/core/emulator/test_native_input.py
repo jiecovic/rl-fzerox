@@ -1,4 +1,4 @@
-# tests/test_native_input.py
+# tests/core/emulator/test_native_input.py
 from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP, joypad_mask
 
 
