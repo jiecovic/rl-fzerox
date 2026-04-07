@@ -1,17 +1,17 @@
 seed: 123
 
 emulator:
-  core_path: /absolute/path/to/mupen64plus_next_libretro.so
-  rom_path: /absolute/path/to/fzerox.n64
-  runtime_dir: null
-  baseline_state_path: null
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  runtime_dir: local/runtime
 
 env:
-  action_repeat: 2
+  action_repeat: 3
   reset_to_race: false
   action:
     steer_buckets: 5
-
-watch:
-  episodes: null
-  fps: null
+  observation:
+    width: 160
+    height: 120
+    frame_stack: 4
+    rgb: true

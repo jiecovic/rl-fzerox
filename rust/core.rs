@@ -7,4 +7,5 @@ pub mod info;
 pub mod input;
 pub mod options;
 pub mod probe;
+pub mod stdio;
 pub mod video;

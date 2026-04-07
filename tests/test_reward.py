@@ -12,8 +12,19 @@ def test_reward_tracker_rewards_new_best_progress_only() -> None:
     assert first.reward == 0.03
     assert first.terminated is False
     assert first.breakdown == {"progress": 0.03}
-    assert second.reward == 0.0
+    assert second.reward == -0.01
+    assert second.breakdown == {"reverse_progress": -0.01}
     assert second.terminated is False
+
+
+def test_reward_tracker_ignores_small_progress_noise() -> None:
+    tracker = RewardTracker()
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step(_telemetry(race_distance=100.2))
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
 
 
 def test_reward_tracker_applies_terminal_penalties_and_finish_bonus_once() -> None:
@@ -24,7 +35,13 @@ def test_reward_tracker_applies_terminal_penalties_and_finish_bonus_once() -> No
     repeated = tracker.step(_telemetry(race_distance=10.0, state_flags=(1 << 30) | (1 << 27)))
     finished = RewardTracker()
     finished.reset(_telemetry(race_distance=0.0, state_flags=1 << 30))
-    done = finished.step(_telemetry(race_distance=100.0, state_flags=(1 << 30) | (1 << 25)))
+    done = finished.step(
+        _telemetry(
+            race_distance=100.0,
+            state_flags=(1 << 30) | (1 << 25),
+            position=1,
+        )
+    )
 
     assert crashed.terminated is True
     assert crashed.breakdown["progress"] == 0.01
@@ -33,14 +50,31 @@ def test_reward_tracker_applies_terminal_penalties_and_finish_bonus_once() -> No
     assert repeated.reward == 0.0
     assert repeated.terminated is True
     assert done.terminated is True
-    assert done.breakdown["finished"] == 50.0
-    assert done.reward == 50.1
+    assert done.breakdown["finished"] == 100.0
+    assert done.breakdown["finish_position"] == 58.0
+    assert done.reward == 158.1
+
+
+def test_reward_tracker_applies_stronger_collision_penalty_once() -> None:
+    tracker = RewardTracker()
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step(_telemetry(race_distance=100.0, state_flags=(1 << 30) | (1 << 13)))
+    repeated = tracker.step(
+        _telemetry(race_distance=100.0, state_flags=(1 << 30) | (1 << 13))
+    )
+
+    assert step.terminated is False
+    assert step.breakdown["collision_recoil"] == -1.0
+    assert step.reward == -1.0
+    assert repeated.reward == 0.0
 
 
 def _telemetry(
     *,
     race_distance: float,
     state_flags: int = 1 << 30,
+    position: int = 30,
 ) -> FZeroXTelemetry:
     return FZeroXTelemetry(
         system_ram_size=0x00800000,
@@ -64,7 +98,7 @@ def _telemetry(
             race_time_ms=0,
             lap=1,
             laps_completed=0,
-            position=30,
+            position=position,
             character=0,
             machine_index=0,
         ),

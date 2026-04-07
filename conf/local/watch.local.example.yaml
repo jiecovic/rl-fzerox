@@ -4,12 +4,6 @@ defaults:
 
 seed: 123
 
-emulator:
-  core_path: local/libretro/mupen64plus_next_libretro.so
-  rom_path: local/roms/F-Zero X (USA).n64
-  runtime_dir: local/runtime
-  baseline_state_path: local/states/first-race.state
-
 env:
   reset_to_race: true
 

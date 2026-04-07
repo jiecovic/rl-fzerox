@@ -13,6 +13,7 @@ from rl_fzerox.ui.viewer import (
     _create_fonts,
     _panel_content_height,
     _pressed_button_labels,
+    _preview_frame,
     _window_size,
 )
 
@@ -34,7 +35,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((640, 480)) == (1096, 480)
+    assert _window_size((640, 480), (120, 160, 12)) == (1464, 480)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -56,6 +57,7 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
                 "frame_index": 1592,
                 "native_fps": 60.0,
                 "display_aspect_ratio": 4.0 / 3.0,
+                "observation_stack": 4,
             },
             reset_info={
                 "reset_mode": "boot",
@@ -65,13 +67,26 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
             episode_reward=0.0,
             paused=False,
             control_state=ControllerState(),
+            policy_label=None,
             game_display_size=(640, 480),
+            observation_shape=(120, 160, 12),
             telemetry=_sample_telemetry(),
         )
 
         assert _panel_content_height(fonts, columns) <= 480
     finally:
         pygame.quit()
+
+
+def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> None:
+    first = np.zeros((2, 3, 3), dtype=np.uint8)
+    second = np.full((2, 3, 3), 255, dtype=np.uint8)
+    stacked = np.concatenate((first, second), axis=2)
+
+    preview = _preview_frame(stacked)
+
+    assert preview.shape == (2, 3, 3)
+    assert np.array_equal(preview, second)
 
 
 def _sample_telemetry() -> FZeroXTelemetry:

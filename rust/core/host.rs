@@ -13,6 +13,7 @@ use crate::core::callbacks::{
 };
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
+use crate::core::stdio::with_silenced_stdio;
 use crate::core::video::VideoFrame;
 
 const FRAME_WAIT_LIMIT: usize = 120;
@@ -133,11 +134,14 @@ impl Host {
 
     pub fn step_frames(&mut self, count: usize) -> Result<(), CoreError> {
         self.ensure_open()?;
-        for _ in 0..count {
-            self.call_core(|core| unsafe {
-                core.run();
-            });
-        }
+        let run_frames = || {
+            for _ in 0..count {
+                self.call_core(|core| unsafe {
+                    core.run();
+                });
+            }
+        };
+        with_silenced_stdio(run_frames);
         self.frame_index += count;
         self.refresh_shape_from_frame();
         if self.callbacks.frame().is_none() {
@@ -218,8 +222,10 @@ impl Host {
     }
 
     fn initialize(&mut self) {
-        self.call_core(|core| unsafe {
-            core.init();
+        with_silenced_stdio(|| {
+            self.call_core(|core| unsafe {
+                core.init();
+            });
         });
     }
 
@@ -230,10 +236,12 @@ impl Host {
             size: self.rom_bytes.len(),
             meta: std::ptr::null(),
         };
-        let loaded = self.call_core(|core| unsafe {
-            core.set_controller_port_device(0, input_device());
-            core.set_controller_port_device(1, DEVICE_JOYPAD);
-            core.load_game(&game)
+        let loaded = with_silenced_stdio(|| {
+            self.call_core(|core| unsafe {
+                core.set_controller_port_device(0, input_device());
+                core.set_controller_port_device(1, DEVICE_JOYPAD);
+                core.load_game(&game)
+            })
         });
         if loaded {
             Ok(())

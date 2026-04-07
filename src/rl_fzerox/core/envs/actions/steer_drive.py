@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/actions/steer_drive.py
+# src/rl_fzerox/core/envs/actions/steer_drive.py
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -8,9 +8,9 @@ import numpy as np
 from gymnasium import spaces
 
 from rl_fzerox._native import JOYPAD_B, joypad_mask
-from rl_fzerox.core.actions.base import ActionValue
-from rl_fzerox.core.config.models import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.emulator.control import ControllerState
+from rl_fzerox.core.envs.actions.base import ActionValue
 
 # Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A button
 # on RetroPad B, which is the acceleration input F-Zero X uses during races.

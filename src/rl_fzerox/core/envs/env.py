@@ -4,10 +4,10 @@ from __future__ import annotations
 import gymnasium as gym
 import numpy as np
 
-from rl_fzerox.core.actions.base import ActionValue
-from rl_fzerox.core.config.models import EnvConfig
+from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend
 from rl_fzerox.core.emulator.control import ControllerState
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
 
@@ -38,6 +38,9 @@ class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
 
     def step(self, action: ActionValue):
         return self._engine.step(action)
+
+    def action_to_control_state(self, action: ActionValue) -> ControllerState:
+        return self._engine.action_to_control_state(action)
 
     def step_control(self, control_state: ControllerState):
         return self._engine.step_control(control_state)

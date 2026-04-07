@@ -3,9 +3,9 @@ import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
-from rl_fzerox.core.actions.steer_drive import THROTTLE_MASK, SteerDriveActionAdapter
-from rl_fzerox.core.config.models import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.emulator.control import ControllerState
+from rl_fzerox.core.envs.actions import THROTTLE_MASK, SteerDriveActionAdapter
 
 
 def test_steer_drive_adapter_uses_default_five_bucket_multidiscrete_space() -> None:

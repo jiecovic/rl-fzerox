@@ -1,0 +1,9 @@
+defaults:
+  - /train
+  - _self_
+
+seed: 123
+
+train:
+  output_root: local/runs
+  run_name: ppo_cnn
