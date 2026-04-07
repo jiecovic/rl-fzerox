@@ -16,6 +16,12 @@ from rl_fzerox.core.game import FZeroXTelemetry, RewardTracker
 
 
 class FZeroXEnvEngine:
+    """Environment step engine around one emulator backend.
+
+    Episode-limit counters are based on internal telemetry samples, which are
+    taken once per emulated frame, not once per outer env step.
+    """
+
     def __init__(
         self,
         *,
@@ -223,10 +229,6 @@ class FZeroXEnvEngine:
         info["observation_frame_shape"] = self._observation_stack.frame_shape
         info["observation_stack"] = self.config.observation.frame_stack
         return observation
-
-    def _append_observation(self, info: dict[str, object]) -> np.ndarray:
-        observation_frame = self._transform_observation()
-        return self._append_observation_frame(observation_frame, info)
 
     def _append_observation_frame(
         self,

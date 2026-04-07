@@ -40,6 +40,8 @@ class EnvConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action_repeat: PositiveInt = 3
+    # The step-like env limits below are counted per internal telemetry sample,
+    # i.e. once per emulated frame, not once per outer env.step().
     max_episode_steps: PositiveInt = 12_000
     stuck_grace_steps: PositiveInt = 300
     stuck_step_limit: PositiveInt = 900
