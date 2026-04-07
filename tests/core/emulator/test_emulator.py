@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.core.emulator import Emulator
+from rl_fzerox.core.game import TelemetryDecodeError, TelemetryUnavailableError
 
 
 def test_emulator_rejects_missing_core(tmp_path: Path) -> None:
@@ -32,3 +33,26 @@ def test_emulator_rejects_unsupported_renderer(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="gliden64"):
         Emulator(core_path=core_path, rom_path=rom_path, renderer="gliden64")
+
+
+def test_try_read_telemetry_returns_none_only_for_unavailable(monkeypatch) -> None:
+    emulator = object.__new__(Emulator)
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.emulator.emulator.read_telemetry",
+        lambda _: (_ for _ in ()).throw(TelemetryUnavailableError("missing")),
+    )
+
+    assert emulator.try_read_telemetry() is None
+
+
+def test_try_read_telemetry_propagates_decode_errors(monkeypatch) -> None:
+    emulator = object.__new__(Emulator)
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.emulator.emulator.read_telemetry",
+        lambda _: (_ for _ in ()).throw(TelemetryDecodeError("bad payload")),
+    )
+
+    with pytest.raises(TelemetryDecodeError, match="bad payload"):
+        emulator.try_read_telemetry()

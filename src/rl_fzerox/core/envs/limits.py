@@ -18,7 +18,7 @@ class LimitStep:
 
 
 class EpisodeLimits:
-    """Track timeout and no-progress truncation for one rollout."""
+    """Track timeout and no-progress truncation per internal frame sample."""
 
     def __init__(self, config: EnvConfig) -> None:
         self._max_episode_steps = config.max_episode_steps

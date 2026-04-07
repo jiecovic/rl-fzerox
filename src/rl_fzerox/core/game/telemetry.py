@@ -21,6 +21,18 @@ MEMORY_ENDIANNESS = "little"
 # host so raw memory access and structured telemetry live at the same boundary.
 
 
+class TelemetryError(RuntimeError):
+    """Base class for telemetry read and decode failures."""
+
+
+class TelemetryUnavailableError(TelemetryError):
+    """Raised when a backend does not expose telemetry at all."""
+
+
+class TelemetryDecodeError(TelemetryError):
+    """Raised when a backend exposes telemetry but the payload is invalid."""
+
+
 def _rdram_offset(vram_address: int) -> int:
     return vram_address - KSEG0_BASE
 
@@ -198,33 +210,31 @@ class FZeroXTelemetry:
         return asdict(self)
 
 
-def read_telemetry(emulator: TelemetryReadableEmulator) -> FZeroXTelemetry:
+def read_telemetry(emulator: object) -> FZeroXTelemetry:
     """Read the current F-Zero X telemetry from emulated system RAM."""
 
     if _is_structured_telemetry_readable(emulator):
         native_data = emulator.telemetry_data()
         if not isinstance(native_data, Mapping):
-            raise RuntimeError("Native telemetry payload must resolve to a mapping")
+            raise TelemetryDecodeError("Native telemetry payload must resolve to a mapping")
         return _telemetry_from_mapping(native_data)
 
     if not _is_memory_readable(emulator):
-        raise RuntimeError(
+        raise TelemetryUnavailableError(
             "Telemetry requires either a native telemetry_data() path or raw system RAM access"
         )
 
     if emulator.system_ram_size < SYSTEM_RAM_SIZE_MIN:
-        raise RuntimeError(
+        raise TelemetryUnavailableError(
             "System RAM is smaller than expected for F-Zero X telemetry: "
             f"{emulator.system_ram_size} bytes"
         )
 
     player_base = GLOBALS.racers + (PLAYER_RACER_INDEX * RACER_SIZE)
-    header_start = GLOBALS.game_frame_count
-    header_end = GLOBALS.course_index + 4
-    header = emulator.read_system_ram(header_start, header_end - header_start)
     player_window = emulator.read_system_ram(player_base, RACER.machine_index + 1)
-
-    game_mode_raw = _u32(header, GLOBALS.game_mode - header_start)
+    game_mode_raw = _read_u32_from_emulator(emulator, GLOBALS.game_mode)
+    game_frame_count = _read_u32_from_emulator(emulator, GLOBALS.game_frame_count)
+    course_index = _read_u32_from_emulator(emulator, GLOBALS.course_index)
     mode_id = game_mode_raw & 0x1F
     try:
         game_mode = GameMode(mode_id)
@@ -257,10 +267,10 @@ def read_telemetry(emulator: TelemetryReadableEmulator) -> FZeroXTelemetry:
 
     return FZeroXTelemetry(
         system_ram_size=emulator.system_ram_size,
-        game_frame_count=_u32(header, GLOBALS.game_frame_count - header_start),
+        game_frame_count=game_frame_count,
         game_mode_raw=game_mode_raw,
         game_mode_name=game_mode_name,
-        course_index=_u32(header, GLOBALS.course_index - header_start),
+        course_index=course_index,
         in_race_mode=game_mode in RACE_MODE_IDS,
         player=player,
     )
@@ -269,7 +279,7 @@ def read_telemetry(emulator: TelemetryReadableEmulator) -> FZeroXTelemetry:
 def _telemetry_from_mapping(data: Mapping[str, object]) -> FZeroXTelemetry:
     player_data = data.get("player")
     if not isinstance(player_data, Mapping):
-        raise RuntimeError("Native telemetry payload is missing a player mapping")
+        raise TelemetryDecodeError("Native telemetry payload is missing a player mapping")
 
     return FZeroXTelemetry(
         system_ram_size=_int_value(data, "system_ram_size"),
@@ -307,41 +317,47 @@ def _player_from_mapping(data: Mapping[str, object]) -> PlayerTelemetry:
 def _int_value(data: Mapping[str, object], key: str) -> int:
     value = data.get(key)
     if isinstance(value, bool) or not isinstance(value, int):
-        raise RuntimeError(f"Native telemetry field {key!r} must be an int")
+        raise TelemetryDecodeError(f"Native telemetry field {key!r} must be an int")
     return value
 
 
 def _float_value(data: Mapping[str, object], key: str) -> float:
     value = data.get(key)
     if isinstance(value, bool) or not isinstance(value, int | float):
-        raise RuntimeError(f"Native telemetry field {key!r} must be numeric")
+        raise TelemetryDecodeError(f"Native telemetry field {key!r} must be numeric")
     return float(value)
 
 
 def _bool_value(data: Mapping[str, object], key: str) -> bool:
     value = data.get(key)
     if not isinstance(value, bool):
-        raise RuntimeError(f"Native telemetry field {key!r} must be a bool")
+        raise TelemetryDecodeError(f"Native telemetry field {key!r} must be a bool")
     return value
 
 
 def _str_value(data: Mapping[str, object], key: str) -> str:
     value = data.get(key)
     if not isinstance(value, str):
-        raise RuntimeError(f"Native telemetry field {key!r} must be a str")
+        raise TelemetryDecodeError(f"Native telemetry field {key!r} must be a str")
     return value
 
 
 def _str_tuple(data: Mapping[str, object], key: str) -> tuple[str, ...]:
     value = data.get(key)
     if not isinstance(value, list | tuple):
-        raise RuntimeError(f"Native telemetry field {key!r} must be a list or tuple")
+        raise TelemetryDecodeError(f"Native telemetry field {key!r} must be a list or tuple")
     items: list[str] = []
     for item in value:
         if not isinstance(item, str):
-            raise RuntimeError(f"Native telemetry field {key!r} must contain only strings")
+            raise TelemetryDecodeError(
+                f"Native telemetry field {key!r} must contain only strings"
+            )
         items.append(item)
     return tuple(items)
+
+
+def _read_u32_from_emulator(emulator: MemoryReadableEmulator, offset: int) -> int:
+    return _u32(emulator.read_system_ram(offset, 4), 0)
 
 
 def _u8(memory: bytes, offset: int) -> int:

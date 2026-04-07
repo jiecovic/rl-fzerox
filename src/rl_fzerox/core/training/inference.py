@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 
 import numpy as np
@@ -112,10 +113,16 @@ def _load_saved_policy(policy_path: Path):
 
     from stable_baselines3.ppo import CnnPolicy
 
-    from rl_fzerox.core.policy import FZeroXCnnExtractor as _  # noqa: F401
+    _ensure_policy_dependencies_loaded()
 
     return CnnPolicy.load(str(policy_path), device="auto")
 
 
 def _policy_mtime_ns(policy_path: Path) -> int:
     return policy_path.stat().st_mtime_ns
+
+
+def _ensure_policy_dependencies_loaded() -> None:
+    """Import custom policy modules before SB3 deserializes saved artifacts."""
+
+    import_module("rl_fzerox.core.policy.extractors")

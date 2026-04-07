@@ -10,6 +10,8 @@ from rl_fzerox.core.game.telemetry import (
     GLOBALS,
     RACER,
     RACER_SIZE,
+    TelemetryDecodeError,
+    TelemetryUnavailableError,
     read_telemetry,
 )
 
@@ -32,6 +34,10 @@ class FakeStructuredTelemetryEmulator:
 
     def telemetry_data(self) -> dict[str, object]:
         return self.payload
+
+
+class FakeUnsupportedTelemetryEmulator:
+    pass
 
 
 def test_read_telemetry_decodes_player_one_race_values() -> None:
@@ -117,3 +123,25 @@ def test_read_telemetry_accepts_native_structured_payloads() -> None:
     assert telemetry.game_mode_name == "gp_race"
     assert telemetry.player.speed_kph == pytest.approx(123.5 * 21.6)
     assert telemetry.player.state_labels == ("can_boost", "active")
+
+
+def test_read_telemetry_raises_decode_error_for_bad_structured_payload() -> None:
+    with pytest.raises(TelemetryDecodeError, match="player mapping"):
+        read_telemetry(
+            FakeStructuredTelemetryEmulator(
+                {
+                    "system_ram_size": 0x00300000,
+                    "game_frame_count": 321,
+                    "game_mode_raw": 1,
+                    "game_mode_name": "gp_race",
+                    "course_index": 0,
+                    "in_race_mode": True,
+                    "player": "bad",
+                }
+            )
+        )
+
+
+def test_read_telemetry_raises_unavailable_for_unsupported_backend() -> None:
+    with pytest.raises(TelemetryUnavailableError):
+        read_telemetry(FakeUnsupportedTelemetryEmulator())

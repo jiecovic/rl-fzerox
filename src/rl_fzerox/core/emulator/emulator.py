@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 
@@ -10,7 +9,12 @@ from rl_fzerox._native import Emulator as NativeEmulator
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
-from rl_fzerox.core.game.telemetry import FZeroXTelemetry, read_telemetry
+from rl_fzerox.core.game.telemetry import (
+    FZeroXTelemetry,
+    TelemetryDecodeError,
+    TelemetryUnavailableError,
+    read_telemetry,
+)
 
 
 class Emulator:
@@ -173,12 +177,12 @@ class Emulator:
             )
         return frame.reshape((height, width, channels))
 
-    def telemetry_data(self) -> dict[str, Any]:
+    def telemetry_data(self) -> dict[str, object]:
         """Return the latest structured telemetry mapping from the native host."""
 
         data = self._native.telemetry()
         if not isinstance(data, dict):
-            raise RuntimeError("Native telemetry did not resolve to a mapping")
+            raise TelemetryDecodeError("Native telemetry did not resolve to a mapping")
         return data
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
@@ -186,7 +190,7 @@ class Emulator:
 
         try:
             return read_telemetry(self)
-        except RuntimeError:
+        except TelemetryUnavailableError:
             return None
 
     def close(self) -> None:
