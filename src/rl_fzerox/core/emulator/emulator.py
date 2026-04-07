@@ -97,7 +97,7 @@ class Emulator:
     def step_frame(self) -> FrameStep:
         """Advance exactly one emulator frame."""
 
-        self.step_frames(1)
+        self.step_frames(1, capture_video=True)
         return FrameStep(
             frame=self.render(),
             reward=0.0,
@@ -106,10 +106,10 @@ class Emulator:
             info=self._frame_info(),
         )
 
-    def step_frames(self, count: int) -> None:
+    def step_frames(self, count: int, *, capture_video: bool = True) -> None:
         """Advance the emulator by a fixed number of frames."""
 
-        self._native.step_frames(count)
+        self._native.step_frames(count, capture_video)
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
         """Set the held controller state used for subsequent frame stepping."""

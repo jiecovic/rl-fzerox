@@ -49,6 +49,7 @@ def test_step_advances_backend_by_action_repeat():
     assert not terminated
     assert not truncated
     assert backend.frame_index == 3
+    assert backend.capture_video_flags == [False, False, True]
     assert info["repeat_index"] == 2
     assert backend.last_controller_state == ControllerState(
         joypad_mask=THROTTLE_MASK,

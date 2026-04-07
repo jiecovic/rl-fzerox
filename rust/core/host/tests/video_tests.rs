@@ -1,6 +1,9 @@
 use std::ffi::c_void;
 
-use super::{VideoFrame, convert_argb1555, convert_argb8888, convert_rgb565, observation_frame};
+use super::{
+    PixelLayout, RawVideoFrame, VideoFrame, convert_argb1555, convert_argb8888, convert_rgb565,
+    decode_frame, observation_frame, observation_frame_from_raw,
+};
 
 #[test]
 fn convert_argb8888_maps_bytes_to_rgb() {
@@ -48,4 +51,32 @@ fn observation_frame_aspect_corrects_then_downscales() {
         .map(|(_, pixel)| pixel[0] as usize)
         .sum();
     assert!(left_red_total > 160 * 120 * 100);
+}
+
+#[test]
+fn observation_frame_from_raw_matches_decoded_path() {
+    let mut bytes = vec![0_u8; 4 * 2 * 4];
+    for row in 0..2 {
+        for column in 0..4 {
+            let offset = (row * 4 + column) * 4;
+            bytes[offset] = (10 * column) as u8;
+            bytes[offset + 1] = (20 * row) as u8;
+            bytes[offset + 2] = (30 + column + row) as u8;
+            bytes[offset + 3] = 0;
+        }
+    }
+    let raw = RawVideoFrame {
+        width: 4,
+        height: 2,
+        pitch: 16,
+        pixel_layout: PixelLayout::Argb8888,
+        bytes,
+    };
+    let decoded = decode_frame(&raw).expect("raw frame should decode");
+
+    let from_raw = observation_frame_from_raw(&raw, 4.0 / 3.0, 3, 2, true)
+        .expect("raw observation should render");
+    let from_decoded = observation_frame(&decoded, 4.0 / 3.0, 3, 2, true);
+
+    assert_eq!(from_raw, from_decoded);
 }
