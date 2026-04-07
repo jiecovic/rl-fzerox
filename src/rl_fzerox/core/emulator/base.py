@@ -38,6 +38,9 @@ class EmulatorBackend(Protocol):
     def native_fps(self) -> float: ...
 
     @property
+    def display_aspect_ratio(self) -> float: ...
+
+    @property
     def frame_shape(self) -> tuple[int, int, int]: ...
 
     @property

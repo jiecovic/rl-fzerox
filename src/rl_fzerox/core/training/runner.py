@@ -63,8 +63,8 @@ def run_training(config: TrainAppConfig) -> None:
             config=config,
             run_paths=run_paths,
         )
-        model.save(str(run_paths.final_model_path))
-        model.policy.save(str(run_paths.final_policy_path))
+        model.save(str(run_paths.latest_model_path))
+        model.policy.save(str(run_paths.latest_policy_path))
         callbacks = _build_callbacks(
             train_config=config.train,
             run_paths=run_paths,
@@ -80,6 +80,8 @@ def run_training(config: TrainAppConfig) -> None:
             raise
         model.save(str(run_paths.final_model_path))
         model.policy.save(str(run_paths.final_policy_path))
+        model.save(str(run_paths.latest_model_path))
+        model.policy.save(str(run_paths.latest_policy_path))
     finally:
         train_env.close()
 
@@ -240,11 +242,7 @@ def _print_training_startup(
 
 def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
     try:
-        from stable_baselines3.common.callbacks import (
-            BaseCallback,
-            CallbackList,
-            CheckpointCallback,
-        )
+        from stable_baselines3.common.callbacks import BaseCallback, CallbackList
     except ImportError as exc:
         raise RuntimeError(
             "stable-baselines3 is required for training. "
@@ -268,38 +266,54 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
                     self.logger.record(log_key, float(np.mean(values)))
             return True
 
-    class PolicyCheckpointCallback(BaseCallback):
-        """Save policy-only checkpoints alongside full PPO checkpoints."""
+    class RollingArtifactCallback(BaseCallback):
+        """Maintain rolling latest and best training artifacts."""
 
-        def __init__(self, *, save_freq: int, save_dir: str, name_prefix: str) -> None:
+        def __init__(self, *, save_freq: int, run_paths: RunPaths) -> None:
             super().__init__(verbose=0)
             self._save_freq = save_freq
-            self._save_dir = save_dir
-            self._name_prefix = name_prefix
+            self._run_paths = run_paths
+            self._best_episode_return: float | None = None
+
+        def _save_latest(self) -> None:
+            self.model.save(str(self._run_paths.latest_model_path))
+            self.model.policy.save(str(self._run_paths.latest_policy_path))
+
+        def _save_best(self, episode_return: float) -> None:
+            if (
+                self._best_episode_return is not None
+                and episode_return <= self._best_episode_return
+            ):
+                return
+            self._best_episode_return = episode_return
+            self.model.save(str(self._run_paths.best_model_path))
+            self.model.policy.save(str(self._run_paths.best_policy_path))
 
         def _on_step(self) -> bool:
-            if self.n_calls % self._save_freq != 0:
+            if self.n_calls % self._save_freq == 0:
+                self._save_latest()
+
+            infos = self.locals.get("infos")
+            if not isinstance(infos, list):
                 return True
-            policy_path = (
-                f"{self._save_dir}/{self._name_prefix}_{self.num_timesteps:012d}.zip"
-            )
-            self.model.policy.save(policy_path)
+
+            for info in infos:
+                if not isinstance(info, dict):
+                    continue
+                episode = info.get("episode")
+                if not isinstance(episode, dict):
+                    continue
+                episode_return = episode.get("r")
+                if isinstance(episode_return, int | float):
+                    self._save_best(float(episode_return))
             return True
 
-    adjusted_checkpoint_freq = max(1, train_config.checkpoint_freq // train_config.num_envs)
+    adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
     return CallbackList(
         [
-            CheckpointCallback(
-                save_freq=adjusted_checkpoint_freq,
-                save_path=str(run_paths.checkpoints_dir),
-                name_prefix="ppo",
-                save_replay_buffer=False,
-                save_vecnormalize=False,
-            ),
-            PolicyCheckpointCallback(
-                save_freq=adjusted_checkpoint_freq,
-                save_dir=str(run_paths.policy_checkpoints_dir),
-                name_prefix="ppo_policy",
+            RollingArtifactCallback(
+                save_freq=adjusted_save_freq,
+                run_paths=run_paths,
             ),
             InfoLoggingCallback(),
         ]

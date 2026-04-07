@@ -115,10 +115,16 @@ Train PPO:
 python -m rl_fzerox.apps.train --config conf/local/train.local.yaml
 ```
 
-Watch the latest checkpoint from one training run:
+Watch the latest saved policy artifact from one training run:
 
 ```bash
-python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir local/runs/ppo_cnn
+python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir local/runs/ppo_cnn_0001
+```
+
+Watch the current best saved policy instead:
+
+```bash
+python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir local/runs/ppo_cnn_0001 --artifact best
 ```
 
 Read a live telemetry snapshot from emulated RAM:

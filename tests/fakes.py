@@ -38,6 +38,10 @@ class SyntheticBackend:
         return 60.0
 
     @property
+    def display_aspect_ratio(self) -> float:
+        return 4.0 / 3.0
+
+    @property
     def frame_shape(self) -> tuple[int, int, int]:
         return (self._height, self._width, 3)
 
