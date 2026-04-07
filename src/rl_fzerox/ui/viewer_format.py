@@ -3,14 +3,19 @@ from __future__ import annotations
 
 import numpy as np
 
+from rl_fzerox._native import JOYPAD_B
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.game import FZeroXTelemetry
+from rl_fzerox.core.game.flags import RACER_FLAG_LABELS
 from rl_fzerox.ui.viewer_layout import (
     BUTTON_LABELS,
     FONT_SIZES,
     LAYOUT,
     PALETTE,
     Color,
+    ControlViz,
+    FlagToken,
+    FlagViz,
     PanelColumns,
     PanelLine,
     PanelSection,
@@ -45,7 +50,7 @@ def _build_panel_columns(
                         PALETTE.text_warning if paused else PALETTE.text_accent,
                     ),
                     _panel_line(
-                        "Driver",
+                        "Policy",
                         policy_label if policy_label is not None else "manual",
                         PALETTE.text_primary,
                     ),
@@ -98,28 +103,15 @@ def _build_panel_columns(
             ),
             PanelSection(
                 title="Input",
-                lines=[
-                    _panel_line(
-                        "Held",
-                        _pressed_button_labels(control_state.joypad_mask),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Steer",
-                        f"{control_state.left_stick_x:+.2f}",
-                        PALETTE.text_primary,
-                    ),
-                ],
+                lines=[],
+                control_viz=_control_viz(control_state),
             ),
             PanelSection(
                 title="Controls",
                 lines=[
-                    _panel_line("Steer", "Left / Right arrows", PALETTE.text_muted),
-                    _panel_line("D-pad", "Arrows", PALETTE.text_muted),
-                    _panel_line("A / B", "X / Z", PALETTE.text_muted),
-                    _panel_line("Menu", "Enter / Backspace", PALETTE.text_muted),
-                    _panel_line("Playback", "P pause | N step", PALETTE.text_muted),
-                    _panel_line("Baseline", "K save", PALETTE.text_muted),
+                    _panel_line("", "Left/Right steer | arrows D-pad", PALETTE.text_muted),
+                    _panel_line("", "Z throttle | X secondary", PALETTE.text_muted),
+                    _panel_line("", "P pause | N step | K save", PALETTE.text_muted),
                 ],
             ),
         ],
@@ -161,8 +153,11 @@ def _panel_content_height(fonts: ViewerFonts, columns: PanelColumns) -> int:
     y += title_surface.get_height() + LAYOUT.title_gap + subtitle_surface.get_height()
     y += LAYOUT.title_section_gap
 
-    left_height = _column_content_height(fonts, columns.left)
-    right_height = _column_content_height(fonts, columns.right)
+    content_width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
+    left_width = (content_width - LAYOUT.column_gap) // 2
+    right_width = content_width - LAYOUT.column_gap - left_width
+    left_height = _column_content_height(fonts, columns.left, width=left_width)
+    right_height = _column_content_height(fonts, columns.right, width=right_width)
     return y + max(left_height, right_height) + LAYOUT.panel_padding
 
 
@@ -282,13 +277,35 @@ def _preview_panel_size(observation_shape: tuple[int, ...]) -> tuple[int, int]:
     return panel_width, panel_height
 
 
-def _column_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> int:
+def _column_content_height(
+    fonts: ViewerFonts,
+    sections: list[PanelSection],
+    *,
+    width: int,
+) -> int:
     y = 0
     for section_index, section in enumerate(sections):
         section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
         y += section_title.get_height() + LAYOUT.section_title_gap
         y += LAYOUT.section_rule_gap
         for line in section.lines:
+            if line.label and line.wrap:
+                label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
+                y += label_surface.get_height() + LAYOUT.line_gap
+                wrapped_lines = _wrap_text(
+                    fonts.small,
+                    line.value,
+                    width - LAYOUT.wrapped_value_indent,
+                )
+                for wrapped_line in wrapped_lines:
+                    value_surface = fonts.small.render(wrapped_line, True, line.color)
+                    y += value_surface.get_height() + LAYOUT.line_gap
+                if len(wrapped_lines) < line.min_value_lines:
+                    blank_height = fonts.small.render("Ag", True, PALETTE.text_primary).get_height()
+                    y += (line.min_value_lines - len(wrapped_lines)) * (
+                        blank_height + LAYOUT.line_gap
+                    )
+                continue
             if line.label:
                 label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
                 value_surface = fonts.body.render(line.value, True, line.color)
@@ -296,13 +313,30 @@ def _column_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> 
             else:
                 value_surface = fonts.small.render(line.value, True, line.color)
                 y += value_surface.get_height() + LAYOUT.line_gap
+        if section.control_viz is not None:
+            y += LAYOUT.control_viz_gap + _control_viz_height(fonts)
+        if section.flag_viz is not None:
+            y += LAYOUT.control_viz_gap + _flag_viz_height(fonts, section.flag_viz)
         if section_index < len(sections) - 1:
             y += LAYOUT.section_gap
     return y
 
 
-def _panel_line(label: str, value: str, color: Color) -> PanelLine:
-    return PanelLine(label=label, value=value, color=color)
+def _panel_line(
+    label: str,
+    value: str,
+    color: Color,
+    *,
+    wrap: bool = False,
+    min_value_lines: int = 1,
+) -> PanelLine:
+    return PanelLine(
+        label=label,
+        value=value,
+        color=color,
+        wrap=wrap,
+        min_value_lines=min_value_lines,
+    )
 
 
 def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
@@ -353,12 +387,8 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
                 _format_distance(telemetry.player.race_distance_position),
                 PALETTE.text_primary,
             ),
-            _panel_line(
-                "Flags",
-                _format_state_labels(telemetry.player.state_labels),
-                PALETTE.text_primary,
-            ),
         ],
+        flag_viz=_flag_viz(telemetry.player.state_labels),
     )
 
 
@@ -403,7 +433,84 @@ def _format_distance(distance: float) -> str:
     return f"{distance:,.1f}"
 
 
-def _format_state_labels(state_labels: tuple[str, ...]) -> str:
-    if not state_labels:
-        return "none"
-    return " | ".join(state_labels)
+def _control_viz(control_state: ControllerState) -> ControlViz:
+    joypad_mask = control_state.joypad_mask
+    return ControlViz(
+        steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
+        drive_level=1 if joypad_mask & (1 << JOYPAD_B) else 0,
+    )
+
+
+def _control_viz_height(fonts: ViewerFonts) -> int:
+    small_height = fonts.small.render("Drive", True, PALETTE.text_primary).get_height()
+    return (
+        small_height
+        + LAYOUT.control_track_gap
+        + LAYOUT.control_drive_height
+        + LAYOUT.control_caption_gap
+        + small_height
+    )
+
+
+_FLAG_DISPLAY_LABELS = {
+    "can_boost": "boost ok",
+    "dash_pad_boost": "dash",
+    "airborne": "airborne",
+    "collision_recoil": "recoil",
+    "spinning_out": "spin",
+    "crashed": "crash",
+    "falling_off_track": "off-track",
+    "retired": "retired",
+    "finished": "finish",
+}
+
+_FLAG_ROWS = (
+    ("can_boost", "dash_pad_boost", "airborne"),
+    ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
+    ("retired", "finished"),
+)
+
+
+def _flag_viz(state_labels: tuple[str, ...]) -> FlagViz:
+    active_flags = set(state_labels)
+    known_flags = {label for _, label in RACER_FLAG_LABELS}
+    active_flags.intersection_update(known_flags)
+    return FlagViz(
+        rows=tuple(
+            tuple(
+                FlagToken(
+                    label=_FLAG_DISPLAY_LABELS.get(flag_label, flag_label.replace("_", " ")),
+                    active=flag_label in active_flags,
+                )
+                for flag_label in row
+            )
+            for row in _FLAG_ROWS
+        )
+    )
+
+
+def _flag_viz_height(fonts: ViewerFonts, flag_viz: FlagViz) -> int:
+    row_height = fonts.small.render("flags", True, PALETTE.text_primary).get_height()
+    pill_height = row_height + (2 * LAYOUT.flag_token_pad_y)
+    return row_height + LAYOUT.line_gap + (len(flag_viz.rows) * (pill_height + LAYOUT.line_gap))
+
+
+def _wrap_text(font, text: str, max_width: int) -> list[str]:
+    normalized = " ".join(text.split())
+    if not normalized:
+        return [""]
+    if font.render(normalized, True, PALETTE.text_primary).get_width() <= max_width:
+        return [normalized]
+
+    wrapped: list[str] = []
+    current = ""
+    for token in normalized.split(" "):
+        candidate = token if not current else f"{current} {token}"
+        if current and font.render(candidate, True, PALETTE.text_primary).get_width() > max_width:
+            wrapped.append(current)
+            current = token
+        else:
+            current = candidate
+    if current:
+        wrapped.append(current)
+    return wrapped
