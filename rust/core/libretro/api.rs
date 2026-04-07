@@ -1,4 +1,4 @@
-// rust/core/api.rs
+// rust/core/libretro/api.rs
 use std::ffi::c_void;
 use std::path::Path;
 use std::ptr;

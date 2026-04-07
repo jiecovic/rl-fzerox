@@ -1,10 +1,11 @@
-// rust/core/callbacks.rs
+// rust/core/host/callbacks.rs
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_void};
 use std::path::{Path, PathBuf};
 use std::ptr;
 
+use bitflags::bitflags;
 use libretro_sys::{
     DEVICE_ANALOG, DEVICE_JOYPAD, ENVIRONMENT_GET_CAN_DUPE,
     ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, ENVIRONMENT_GET_LIBRETRO_PATH,
@@ -21,15 +22,35 @@ use crate::core::input::ControllerState;
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{PixelLayout, VideoFrame, convert_frame};
 
-const ENVIRONMENT_GET_FASTFORWARDING: u32 = 49 | (1 << 31);
-const ENVIRONMENT_GET_TARGET_REFRESH_RATE: u32 = 50 | (1 << 31);
-const ENVIRONMENT_GET_INPUT_BITMASKS: u32 = 51 | (1 << 31);
-const ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE: u32 = 47 | (1 << 31);
-const ENVIRONMENT_GET_CORE_OPTIONS_VERSION: u32 = 52 | (1 << 31);
-const ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY: u32 = 55 | (1 << 31);
-const ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK: u32 = 69;
-const AUDIO_VIDEO_ENABLE_VIDEO: u32 = 1 << 0;
-const AUDIO_VIDEO_ENABLE_AUDIO: u32 = 1 << 1;
+const ENVIRONMENT_EXPERIMENTAL: u32 = 1 << 31;
+
+// These frontend environment command ids come from libretro.h. The
+// "experimental" ones are tagged by OR-ing bit 31, matching the libretro
+// header convention used by libretro-sys.
+#[repr(u32)]
+enum EnvironmentCmd {
+    GetAudioVideoEnable = 47 | ENVIRONMENT_EXPERIMENTAL,
+    GetFastForwarding = 49 | ENVIRONMENT_EXPERIMENTAL,
+    GetTargetRefreshRate = 50 | ENVIRONMENT_EXPERIMENTAL,
+    GetInputBitmasks = 51 | ENVIRONMENT_EXPERIMENTAL,
+    GetCoreOptionsVersion = 52 | ENVIRONMENT_EXPERIMENTAL,
+    SetCoreOptionsDisplay = 55 | ENVIRONMENT_EXPERIMENTAL,
+    SetCoreOptionsUpdateDisplayCallback = 69,
+}
+
+bitflags! {
+    // Flags returned for ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE from libretro.h.
+    struct AudioVideoEnable: u32 {
+        const VIDEO = 1 << 0;
+        const AUDIO = 1 << 1;
+    }
+}
+
+impl EnvironmentCmd {
+    const fn code(self) -> u32 {
+        self as u32
+    }
+}
 
 thread_local! {
     static ACTIVE_STATE: Cell<*mut CallbackState> = const { Cell::new(ptr::null_mut()) };
@@ -39,6 +60,7 @@ pub struct CallbackState {
     core_path: CString,
     system_dir: CString,
     save_dir: CString,
+    rdp_plugin: CString,
     variables: BTreeMap<String, CString>,
     controller_state: ControllerState,
     frame: Option<VideoFrame>,
@@ -53,7 +75,11 @@ pub struct CallbackGuard {
 }
 
 impl CallbackState {
-    pub fn new(core_path: &Path, runtime_dir: Option<&Path>) -> Result<Self, CoreError> {
+    pub fn new(
+        core_path: &Path,
+        runtime_dir: Option<&Path>,
+        renderer: &str,
+    ) -> Result<Self, CoreError> {
         let system_dir = match runtime_dir {
             Some(runtime_dir) => runtime_dir.to_path_buf(),
             None => runtime_root_for_core(core_path)?,
@@ -67,6 +93,9 @@ impl CallbackState {
             core_path: path_to_c_string(core_path)?,
             system_dir: path_to_c_string(&system_dir)?,
             save_dir: path_to_c_string(&system_dir)?,
+            rdp_plugin: CString::new(renderer).map_err(|_| CoreError::InvalidPath {
+                path: core_path.to_path_buf(),
+            })?,
             variables: BTreeMap::new(),
             controller_state: ControllerState::default(),
             frame: None,
@@ -119,20 +148,14 @@ impl CallbackState {
             ENVIRONMENT_SET_PIXEL_FORMAT => self.set_pixel_format(data),
             ENVIRONMENT_GET_OVERSCAN => write_ptr(data, false),
             ENVIRONMENT_GET_CAN_DUPE => write_ptr(data, true),
-            ENVIRONMENT_GET_INPUT_BITMASKS => write_ptr(data, true),
-            ENVIRONMENT_GET_FASTFORWARDING => write_ptr(data, false),
-            ENVIRONMENT_GET_TARGET_REFRESH_RATE => write_ptr(data, 60.0_f32),
-            ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE => {
-                write_ptr(data, AUDIO_VIDEO_ENABLE_VIDEO | AUDIO_VIDEO_ENABLE_AUDIO)
+            cmd if cmd == EnvironmentCmd::GetInputBitmasks.code() => write_ptr(data, true),
+            cmd if cmd == EnvironmentCmd::GetFastForwarding.code() => write_ptr(data, false),
+            cmd if cmd == EnvironmentCmd::GetTargetRefreshRate.code() => write_ptr(data, 60.0_f32),
+            cmd if cmd == EnvironmentCmd::GetAudioVideoEnable.code() => {
+                write_ptr(data, AudioVideoEnable::all().bits())
             }
-            ENVIRONMENT_GET_CORE_OPTIONS_VERSION => write_ptr(data, 0_u32),
-            ENVIRONMENT_SET_CORE_OPTIONS_DISPLAY
-            | ENVIRONMENT_SET_CORE_OPTIONS_UPDATE_DISPLAY_CALLBACK
-            | ENVIRONMENT_SET_INPUT_DESCRIPTORS
-            | ENVIRONMENT_SET_CONTROLLER_INFO
-            | ENVIRONMENT_SET_MEMORY_MAPS
-            | ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK
-            | ENVIRONMENT_SET_SUBSYSTEM_INFO => true,
+            cmd if cmd == EnvironmentCmd::GetCoreOptionsVersion.code() => write_ptr(data, 0_u32),
+            cmd if is_passthrough_environment_cmd(cmd) => true,
             ENVIRONMENT_SET_GEOMETRY => {
                 self.set_geometry(data);
                 true
@@ -159,7 +182,7 @@ impl CallbackState {
             let key = c_string(entry.key);
             let spec = c_string(entry.value);
             let default_value = default_option_value(&spec);
-            let value = override_option(&key, &default_value);
+            let value = override_option(&key, &default_value, self.rdp_plugin.as_c_str());
             let c_value = match CString::new(value) {
                 Ok(value) => value,
                 Err(_) => return false,
@@ -232,6 +255,18 @@ impl CallbackState {
             self.set_frame(frame);
         }
     }
+}
+
+fn is_passthrough_environment_cmd(cmd: u32) -> bool {
+    matches!(
+        cmd,
+        ENVIRONMENT_SET_INPUT_DESCRIPTORS
+            | ENVIRONMENT_SET_CONTROLLER_INFO
+            | ENVIRONMENT_SET_MEMORY_MAPS
+            | ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK
+            | ENVIRONMENT_SET_SUBSYSTEM_INFO
+    ) || cmd == EnvironmentCmd::SetCoreOptionsDisplay.code()
+        || cmd == EnvironmentCmd::SetCoreOptionsUpdateDisplayCallback.code()
 }
 
 impl CallbackGuard {
@@ -364,27 +399,5 @@ fn runtime_root_for_core(core_path: &Path) -> Result<PathBuf, CoreError> {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::path::{Path, PathBuf};
-
-    use super::runtime_root_for_core;
-
-    #[test]
-    fn runtime_root_uses_repo_local_root_for_libretro_layout() {
-        let runtime_root = runtime_root_for_core(Path::new(
-            "/repo/local/libretro/mupen64plus_next_libretro.so",
-        ))
-        .expect("runtime root should resolve");
-
-        assert_eq!(runtime_root, PathBuf::from("/repo/local"));
-    }
-
-    #[test]
-    fn runtime_root_uses_core_directory_for_generic_layout() {
-        let runtime_root =
-            runtime_root_for_core(Path::new("/opt/cores/mupen64plus_next_libretro.so"))
-                .expect("runtime root should resolve");
-
-        assert_eq!(runtime_root, PathBuf::from("/opt/cores"));
-    }
-}
+#[path = "tests/callbacks_tests.rs"]
+mod tests;

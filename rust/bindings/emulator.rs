@@ -2,11 +2,12 @@
 use std::path::Path;
 
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyDict, PyList};
 
 use crate::bindings::error::map_core_error;
 use crate::core::host::Host;
 use crate::core::input::ControllerState;
+use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
 
 #[pyclass(name = "Emulator", unsendable)]
 pub struct PyEmulator {
@@ -16,13 +17,14 @@ pub struct PyEmulator {
 #[pymethods]
 impl PyEmulator {
     #[new]
-    #[pyo3(signature = (core_path, rom_path, runtime_dir=None, baseline_state_path=None))]
+    #[pyo3(signature = (core_path, rom_path, runtime_dir=None, baseline_state_path=None, renderer="angrylion"))]
     fn new(
         py: Python<'_>,
         core_path: &str,
         rom_path: &str,
         runtime_dir: Option<&str>,
         baseline_state_path: Option<&str>,
+        renderer: &str,
     ) -> PyResult<Self> {
         let host = py
             .detach(|| {
@@ -31,6 +33,7 @@ impl PyEmulator {
                     Path::new(rom_path),
                     runtime_dir.map(Path::new),
                     baseline_state_path.map(Path::new),
+                    renderer,
                 )
             })
             .map_err(map_core_error)?;
@@ -126,6 +129,27 @@ impl PyEmulator {
         Ok(PyBytes::new(py, frame))
     }
 
+    #[pyo3(signature = (width, height, rgb=true))]
+    fn frame_observation<'py>(
+        &self,
+        py: Python<'py>,
+        width: usize,
+        height: usize,
+        rgb: bool,
+    ) -> PyResult<Bound<'py, PyBytes>> {
+        let frame = py
+            .detach(|| self.host.observation_frame(width, height, rgb))
+            .map_err(map_core_error)?;
+        Ok(PyBytes::new(py, &frame))
+    }
+
+    fn telemetry<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let telemetry = py
+            .detach(|| self.host.telemetry())
+            .map_err(map_core_error)?;
+        telemetry_to_pydict(py, &telemetry)
+    }
+
     fn read_system_ram<'py>(
         &mut self,
         py: Python<'py>,
@@ -141,4 +165,44 @@ impl PyEmulator {
     fn close(&mut self) {
         self.host.close();
     }
+}
+
+fn telemetry_to_pydict<'py>(
+    py: Python<'py>,
+    telemetry: &TelemetrySnapshot,
+) -> PyResult<Bound<'py, PyDict>> {
+    let dict = PyDict::new(py);
+    dict.set_item("system_ram_size", telemetry.system_ram_size)?;
+    dict.set_item("game_frame_count", telemetry.game_frame_count)?;
+    dict.set_item("game_mode_raw", telemetry.game_mode_raw)?;
+    dict.set_item("game_mode_name", &telemetry.game_mode_name)?;
+    dict.set_item("course_index", telemetry.course_index)?;
+    dict.set_item("in_race_mode", telemetry.in_race_mode)?;
+    dict.set_item("player", player_to_pydict(py, &telemetry.player)?)?;
+    Ok(dict)
+}
+
+fn player_to_pydict<'py>(
+    py: Python<'py>,
+    player: &PlayerTelemetry,
+) -> PyResult<Bound<'py, PyDict>> {
+    let dict = PyDict::new(py);
+    dict.set_item("state_flags", player.state_flags)?;
+    dict.set_item("state_labels", PyList::new(py, &player.state_labels)?)?;
+    dict.set_item("speed_raw", player.speed_raw)?;
+    dict.set_item("speed_kph", player.speed_kph)?;
+    dict.set_item("energy", player.energy)?;
+    dict.set_item("max_energy", player.max_energy)?;
+    dict.set_item("boost_timer", player.boost_timer)?;
+    dict.set_item("race_distance", player.race_distance)?;
+    dict.set_item("laps_completed_distance", player.laps_completed_distance)?;
+    dict.set_item("lap_distance", player.lap_distance)?;
+    dict.set_item("race_distance_position", player.race_distance_position)?;
+    dict.set_item("race_time_ms", player.race_time_ms)?;
+    dict.set_item("lap", player.lap)?;
+    dict.set_item("laps_completed", player.laps_completed)?;
+    dict.set_item("position", player.position)?;
+    dict.set_item("character", player.character)?;
+    dict.set_item("machine_index", player.machine_index)?;
+    Ok(dict)
 }

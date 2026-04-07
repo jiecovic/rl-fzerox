@@ -1,4 +1,4 @@
-// rust/core/stdio.rs
+// rust/core/host/stdio.rs
 use std::fs::OpenOptions;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_int;
