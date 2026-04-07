@@ -54,6 +54,20 @@ class ViewerLayout:
     section_title_gap: int = 4
     section_rule_gap: int = 4
     line_gap: int = 2
+    wrapped_value_indent: int = 10
+    control_viz_gap: int = 3
+    control_widget_gap: int = 12
+    control_track_gap: int = 4
+    control_steer_width: int = 116
+    control_steer_height: int = 10
+    control_drive_width: int = 12
+    control_drive_height: int = 42
+    control_drive_offset_x: int = 8
+    control_marker_radius: int = 6
+    control_caption_gap: int = 3
+    flag_token_gap: int = 4
+    flag_token_pad_x: int = 6
+    flag_token_pad_y: int = 2
 
 
 @dataclass(frozen=True)
@@ -67,6 +81,14 @@ class ViewerPalette:
     text_muted: Color = (155, 165, 178)
     text_accent: Color = (126, 214, 170)
     text_warning: Color = (241, 206, 108)
+    control_track: Color = (39, 46, 56)
+    control_knob: Color = (238, 241, 245)
+    control_knob_outline: Color = (20, 24, 30)
+    control_coast: Color = (86, 97, 112)
+    flag_active_background: Color = (36, 68, 56)
+    flag_active_border: Color = (126, 214, 170)
+    flag_inactive_background: Color = (27, 33, 41)
+    flag_inactive_border: Color = (46, 54, 66)
 
 
 @dataclass(frozen=True)
@@ -76,6 +98,31 @@ class PanelLine:
     label: str
     value: str
     color: Color
+    wrap: bool = False
+    min_value_lines: int = 1
+
+
+@dataclass(frozen=True)
+class ControlViz:
+    """Compact control-state visualization for the watch panel."""
+
+    steer_x: float
+    drive_level: int
+
+
+@dataclass(frozen=True)
+class FlagToken:
+    """One compact flag label rendered inside the watch panel."""
+
+    label: str
+    active: bool
+
+
+@dataclass(frozen=True)
+class FlagViz:
+    """Fixed multi-row racer flag visualization for the watch panel."""
+
+    rows: tuple[tuple[FlagToken, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -84,6 +131,8 @@ class PanelSection:
 
     title: str
     lines: list[PanelLine]
+    control_viz: ControlViz | None = None
+    flag_viz: FlagViz | None = None
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pygame
 
-from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP
+from rl_fzerox._native import JOYPAD_A, JOYPAD_B, JOYPAD_START, JOYPAD_UP
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
@@ -84,6 +84,63 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
         pygame.quit()
 
 
+def test_input_section_includes_visualized_control_state() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(
+            joypad_mask=(1 << JOYPAD_B),
+            left_stick_x=0.5,
+        ),
+        policy_label=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        game_display_size=(640, 480),
+        observation_shape=(120, 160, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_level == 1
+    assert input_section.control_viz.steer_x == 0.5
+
+
+def test_game_flags_are_rendered_in_fixed_rows() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        game_display_size=(640, 480),
+        observation_shape=(120, 160, 12),
+        telemetry=_sample_telemetry(
+            state_labels=("active", "dash_pad_boost", "collision_recoil", "wrong_way"),
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    assert len(game_section.flag_viz.rows) == 3
+    active_labels = {
+        token.label
+        for row in game_section.flag_viz.rows
+        for token in row
+        if token.active
+    }
+    assert {"dash", "recoil"}.issubset(active_labels)
+
+
 def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> None:
     first = np.zeros((2, 3, 3), dtype=np.uint8)
     second = np.full((2, 3, 3), 255, dtype=np.uint8)
@@ -116,7 +173,10 @@ def test_format_reload_error_truncates_long_messages() -> None:
     )
 
 
-def _sample_telemetry() -> FZeroXTelemetry:
+def _sample_telemetry(
+    *,
+    state_labels: tuple[str, ...] = ("active",),
+) -> FZeroXTelemetry:
     return FZeroXTelemetry(
         system_ram_size=0x00800000,
         game_frame_count=1290,
@@ -126,7 +186,7 @@ def _sample_telemetry() -> FZeroXTelemetry:
         in_race_mode=True,
         player=PlayerTelemetry(
             state_flags=1 << 30,
-            state_labels=("active",),
+            state_labels=state_labels,
             speed_raw=0.0,
             speed_kph=0.0,
             energy=178.0,
