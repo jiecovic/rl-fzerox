@@ -5,6 +5,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from rl_fzerox.apps._cli import normalize_hydra_overrides
 from rl_fzerox.core.config import load_watch_app_config
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
@@ -61,7 +62,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     try:
         config = load_watch_app_config(
             args.config_path,
-            overrides=_normalize_overrides(args.overrides),
+            overrides=normalize_hydra_overrides(args.overrides),
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
@@ -71,8 +72,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.policy_run_dir is not None
         else config.watch.policy_run_dir
     )
+    if args.policy_artifact is not None and policy_run_dir is None:
+        raise SystemExit(
+            "--artifact requires --run-dir or watch.policy_run_dir in the config"
+        )
     if policy_run_dir is not None:
-        train_config = load_train_run_config(policy_run_dir)
+        try:
+            train_config = load_train_run_config(policy_run_dir)
+        except (FileNotFoundError, ValueError) as exc:
+            raise SystemExit(str(exc)) from exc
         config = apply_train_run_to_watch_config(
             config,
             run_dir=policy_run_dir,
@@ -88,14 +96,6 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
 
     run_viewer(config)
-
-
-def _normalize_overrides(overrides: Sequence[str]) -> list[str]:
-    if not overrides:
-        return []
-    if overrides[0] == "--":
-        return list(overrides[1:])
-    return list(overrides)
 
 
 if __name__ == "__main__":
