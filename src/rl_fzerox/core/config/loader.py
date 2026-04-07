@@ -26,6 +26,7 @@ def load_watch_app_config(
     return _load_app_config(
         config_path=config_path,
         overrides=overrides,
+        config_kind="watch",
         model_type=WatchAppConfig,
         path_fields={
             "emulator": (
@@ -48,6 +49,7 @@ def load_train_app_config(
     return _load_app_config(
         config_path=config_path,
         overrides=overrides,
+        config_kind="train",
         model_type=TrainAppConfig,
         path_fields={
             "emulator": (
@@ -65,6 +67,7 @@ def _load_app_config(
     *,
     config_path: Path,
     overrides: Sequence[str] | None,
+    config_kind: str,
     model_type: type[ConfigModel],
     path_fields: dict[str, tuple[str, ...]],
 ) -> ConfigModel:
@@ -82,7 +85,7 @@ def _load_app_config(
         return model_type.model_validate(config_data)
     except (HydraException, OmegaConfBaseException, OSError, TypeError, ValidationError) as exc:
         raise ValueError(
-            f"Could not load watch config from {resolved_config_path}: {exc}"
+            f"Could not load {config_kind} config from {resolved_config_path}: {exc}"
         ) from exc
 
 

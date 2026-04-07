@@ -36,6 +36,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional runtime directory for emulator-generated state.",
     )
     parser.add_argument(
+        "--renderer",
+        choices=("angrylion",),
+        default="angrylion",
+        help="Retro plugin renderer to request from the core.",
+    )
+    parser.add_argument(
         "--reset-to-race",
         action="store_true",
         help="Run the deterministic first-race bootstrap after reset.",
@@ -63,6 +69,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             if args.baseline_state_path is None
             else Path(args.baseline_state_path).expanduser().resolve()
         ),
+        renderer=args.renderer,
     )
     try:
         reset_state = emulator.reset()

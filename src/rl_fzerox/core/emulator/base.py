@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
 from rl_fzerox.core.emulator.control import ControllerState
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass(frozen=True)
@@ -55,5 +58,9 @@ class EmulatorBackend(Protocol):
     def set_controller_state(self, controller_state: ControllerState) -> None: ...
 
     def render(self) -> np.ndarray: ...
+
+    def render_observation(self, *, width: int, height: int, rgb: bool = True) -> np.ndarray: ...
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
 
     def close(self) -> None: ...

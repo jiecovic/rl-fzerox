@@ -27,6 +27,7 @@ class PolicyRunner:
         self._policy = policy
         self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
         self._last_reload_monotonic = time.monotonic()
+        self._reload_error: str | None = None
 
     @property
     def label(self) -> str:
@@ -39,6 +40,12 @@ class PolicyRunner:
         """Return how long ago the current policy artifact was loaded."""
 
         return max(0.0, time.monotonic() - self._last_reload_monotonic)
+
+    @property
+    def reload_error(self) -> str | None:
+        """Return the latest hot-reload failure, if any."""
+
+        return self._reload_error
 
     def predict(self, observation: np.ndarray) -> np.ndarray:
         """Predict one deterministic action for the current observation."""
@@ -65,7 +72,8 @@ class PolicyRunner:
 
         try:
             policy = _load_saved_policy(policy_path)
-        except Exception:
+        except Exception as exc:
+            self._reload_error = str(exc)
             return
 
         self._loaded_policy = LoadedPolicy(
@@ -76,6 +84,7 @@ class PolicyRunner:
         self._policy = policy
         self._policy_mtime_ns = policy_mtime_ns
         self._last_reload_monotonic = time.monotonic()
+        self._reload_error = None
 
 
 def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:

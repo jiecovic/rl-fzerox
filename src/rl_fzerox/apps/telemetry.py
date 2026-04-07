@@ -9,7 +9,6 @@ from pathlib import Path
 from rl_fzerox.core.boot import boot_into_first_race
 from rl_fzerox.core.config.loader import load_watch_app_config
 from rl_fzerox.core.emulator import Emulator
-from rl_fzerox.core.game import read_telemetry
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -50,6 +49,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         rom_path=config.emulator.rom_path,
         runtime_dir=config.emulator.runtime_dir,
         baseline_state_path=config.emulator.baseline_state_path,
+        renderer=config.emulator.renderer,
     )
 
     try:
@@ -60,7 +60,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.frames:
             emulator.step_frames(args.frames)
 
-        telemetry = read_telemetry(emulator)
+        telemetry = emulator.try_read_telemetry()
+        if telemetry is None:
+            raise RuntimeError("Configured emulator backend does not expose telemetry")
         print(
             json.dumps(
                 {

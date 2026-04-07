@@ -8,6 +8,7 @@ import numpy as np
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
 from rl_fzerox.core.emulator import Emulator
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.seed import derive_seed, seed_process
 from rl_fzerox.core.training.runs import (
     RunPaths,
@@ -17,17 +18,6 @@ from rl_fzerox.core.training.runs import (
 )
 
 _DOMAIN_TRAIN_ENV = 0xA4C4F4B7A62D1131
-_MONITOR_INFO_KEYS = (
-    "episode_return",
-    "episode_step",
-    "termination_reason",
-    "truncation_reason",
-    "race_distance",
-    "speed_kph",
-    "position",
-    "lap",
-    "laps_completed",
-)
 _INFO_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("step_reward", "env/step_reward_mean"),
     ("race_distance", "env/race_distance_mean"),
@@ -66,8 +56,7 @@ def run_training(config: TrainAppConfig) -> None:
             config=config,
             run_paths=run_paths,
         )
-        model.save(str(run_paths.latest_model_path))
-        model.policy.save(str(run_paths.latest_policy_path))
+        _save_latest_artifacts(model, run_paths)
         callbacks = _build_callbacks(
             train_config=config.train,
             run_paths=run_paths,
@@ -79,12 +68,13 @@ def run_training(config: TrainAppConfig) -> None:
                 progress_bar=True,
             )
         except Exception:
+            if model.num_timesteps > 0:
+                _save_latest_artifacts(model, run_paths)
             _cleanup_failed_run(run_paths, model)
             raise
         model.save(str(run_paths.final_model_path))
         model.policy.save(str(run_paths.final_policy_path))
-        model.save(str(run_paths.latest_model_path))
-        model.policy.save(str(run_paths.latest_policy_path))
+        _save_latest_artifacts(model, run_paths)
     finally:
         train_env.close()
 
@@ -133,9 +123,10 @@ def _make_env_factory(*, config: TrainAppConfig, env_index: int, monitor_cls):
             rom_path=config.emulator.rom_path,
             runtime_dir=config.emulator.runtime_dir,
             baseline_state_path=config.emulator.baseline_state_path,
+            renderer=config.emulator.renderer,
         )
         env = FZeroXEnv(backend=emulator, config=config.env)
-        wrapped = monitor_cls(env, info_keywords=_MONITOR_INFO_KEYS)
+        wrapped = monitor_cls(env, info_keywords=MONITOR_INFO_KEYS)
         initial_seed = derive_seed(
             config.seed,
             _DOMAIN_TRAIN_ENV,
@@ -256,6 +247,11 @@ def _print_training_startup(
     )
     console.print(Panel(summary, title="Training", expand=False))
     console.print(Panel(str(model.policy), title="Policy", expand=False))
+
+
+def _save_latest_artifacts(model, run_paths: RunPaths) -> None:
+    model.save(str(run_paths.latest_model_path))
+    model.policy.save(str(run_paths.latest_policy_path))
 
 
 def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):

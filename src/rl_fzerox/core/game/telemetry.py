@@ -1,10 +1,13 @@
 # src/rl_fzerox/core/game/telemetry.py
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from enum import IntEnum
 from struct import unpack_from
-from typing import Protocol
+from typing import Protocol, TypeAlias, TypeGuard
+
+from rl_fzerox.core.game.flags import decode_racer_flags
 
 KSEG0_BASE = 0x80000000
 SYSTEM_RAM_SIZE_MIN = 0x00300000
@@ -90,6 +93,32 @@ class MemoryReadableEmulator(Protocol):
     def read_system_ram(self, offset: int, length: int) -> bytes: ...
 
 
+class StructuredTelemetryReadableEmulator(Protocol):
+    """Optional emulator contract for native structured telemetry reads."""
+
+    def telemetry_data(self) -> dict[str, object]: ...
+
+
+TelemetryReadableEmulator: TypeAlias = (
+    MemoryReadableEmulator | StructuredTelemetryReadableEmulator
+)
+
+
+def _is_structured_telemetry_readable(
+    emulator: object,
+) -> TypeGuard[StructuredTelemetryReadableEmulator]:
+    return callable(getattr(emulator, "telemetry_data", None))
+
+
+def _is_memory_readable(
+    emulator: object,
+) -> TypeGuard[MemoryReadableEmulator]:
+    return (
+        hasattr(emulator, "system_ram_size")
+        and hasattr(emulator, "read_system_ram")
+    )
+
+
 class GameMode(IntEnum):
     """Core F-Zero X game mode ids from inspectredc/fzerox include/fzx_game.h."""
 
@@ -127,21 +156,6 @@ RACE_MODE_IDS = {
     GameMode.TIME_ATTACK,
     GameMode.DEATH_RACE,
 }
-
-RACER_FLAG_LABELS: tuple[tuple[int, str], ...] = (
-    (1 << 13, "collision_recoil"),
-    (1 << 14, "spinning_out"),
-    (1 << 18, "retired"),
-    (1 << 19, "falling_off_track"),
-    (1 << 20, "can_boost"),
-    (1 << 23, "cpu_controlled"),
-    (1 << 24, "dash_pad_boost"),
-    (1 << 25, "finished"),
-    (1 << 26, "airborne"),
-    (1 << 27, "crashed"),
-    (1 << 30, "active"),
-)
-
 
 @dataclass(frozen=True)
 class PlayerTelemetry:
@@ -184,8 +198,19 @@ class FZeroXTelemetry:
         return asdict(self)
 
 
-def read_telemetry(emulator: MemoryReadableEmulator) -> FZeroXTelemetry:
+def read_telemetry(emulator: TelemetryReadableEmulator) -> FZeroXTelemetry:
     """Read the current F-Zero X telemetry from emulated system RAM."""
+
+    if _is_structured_telemetry_readable(emulator):
+        native_data = emulator.telemetry_data()
+        if not isinstance(native_data, Mapping):
+            raise RuntimeError("Native telemetry payload must resolve to a mapping")
+        return _telemetry_from_mapping(native_data)
+
+    if not _is_memory_readable(emulator):
+        raise RuntimeError(
+            "Telemetry requires either a native telemetry_data() path or raw system RAM access"
+        )
 
     if emulator.system_ram_size < SYSTEM_RAM_SIZE_MIN:
         raise RuntimeError(
@@ -212,7 +237,7 @@ def read_telemetry(emulator: MemoryReadableEmulator) -> FZeroXTelemetry:
     player_speed_raw = _f32(player_window, RACER.speed)
     player = PlayerTelemetry(
         state_flags=player_state_flags,
-        state_labels=_decode_racer_flags(player_state_flags),
+        state_labels=decode_racer_flags(player_state_flags),
         speed_raw=player_speed_raw,
         speed_kph=player_speed_raw * SPEED_TO_KPH,
         energy=_f32(player_window, RACER.energy),
@@ -241,8 +266,82 @@ def read_telemetry(emulator: MemoryReadableEmulator) -> FZeroXTelemetry:
     )
 
 
-def _decode_racer_flags(state_flags: int) -> tuple[str, ...]:
-    return tuple(label for bit, label in RACER_FLAG_LABELS if state_flags & bit)
+def _telemetry_from_mapping(data: Mapping[str, object]) -> FZeroXTelemetry:
+    player_data = data.get("player")
+    if not isinstance(player_data, Mapping):
+        raise RuntimeError("Native telemetry payload is missing a player mapping")
+
+    return FZeroXTelemetry(
+        system_ram_size=_int_value(data, "system_ram_size"),
+        game_frame_count=_int_value(data, "game_frame_count"),
+        game_mode_raw=_int_value(data, "game_mode_raw"),
+        game_mode_name=_str_value(data, "game_mode_name"),
+        course_index=_int_value(data, "course_index"),
+        in_race_mode=_bool_value(data, "in_race_mode"),
+        player=_player_from_mapping(player_data),
+    )
+
+
+def _player_from_mapping(data: Mapping[str, object]) -> PlayerTelemetry:
+    return PlayerTelemetry(
+        state_flags=_int_value(data, "state_flags"),
+        state_labels=_str_tuple(data, "state_labels"),
+        speed_raw=_float_value(data, "speed_raw"),
+        speed_kph=_float_value(data, "speed_kph"),
+        energy=_float_value(data, "energy"),
+        max_energy=_float_value(data, "max_energy"),
+        boost_timer=_int_value(data, "boost_timer"),
+        race_distance=_float_value(data, "race_distance"),
+        laps_completed_distance=_float_value(data, "laps_completed_distance"),
+        lap_distance=_float_value(data, "lap_distance"),
+        race_distance_position=_float_value(data, "race_distance_position"),
+        race_time_ms=_int_value(data, "race_time_ms"),
+        lap=_int_value(data, "lap"),
+        laps_completed=_int_value(data, "laps_completed"),
+        position=_int_value(data, "position"),
+        character=_int_value(data, "character"),
+        machine_index=_int_value(data, "machine_index"),
+    )
+
+
+def _int_value(data: Mapping[str, object], key: str) -> int:
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise RuntimeError(f"Native telemetry field {key!r} must be an int")
+    return value
+
+
+def _float_value(data: Mapping[str, object], key: str) -> float:
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise RuntimeError(f"Native telemetry field {key!r} must be numeric")
+    return float(value)
+
+
+def _bool_value(data: Mapping[str, object], key: str) -> bool:
+    value = data.get(key)
+    if not isinstance(value, bool):
+        raise RuntimeError(f"Native telemetry field {key!r} must be a bool")
+    return value
+
+
+def _str_value(data: Mapping[str, object], key: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str):
+        raise RuntimeError(f"Native telemetry field {key!r} must be a str")
+    return value
+
+
+def _str_tuple(data: Mapping[str, object], key: str) -> tuple[str, ...]:
+    value = data.get(key)
+    if not isinstance(value, list | tuple):
+        raise RuntimeError(f"Native telemetry field {key!r} must be a list or tuple")
+    items: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise RuntimeError(f"Native telemetry field {key!r} must contain only strings")
+        items.append(item)
+    return tuple(items)
 
 
 def _u8(memory: bytes, offset: int) -> int:

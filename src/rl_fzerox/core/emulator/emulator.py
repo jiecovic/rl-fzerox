@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -9,6 +10,7 @@ from rl_fzerox._native import Emulator as NativeEmulator
 from rl_fzerox.core.emulator.base import FrameStep, ResetState
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
+from rl_fzerox.core.game.telemetry import FZeroXTelemetry, read_telemetry
 
 
 class Emulator:
@@ -21,6 +23,7 @@ class Emulator:
         rom_path: Path,
         runtime_dir: Path | None = None,
         baseline_state_path: Path | None = None,
+        renderer: str = "angrylion",
     ) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
@@ -30,6 +33,13 @@ class Emulator:
             if baseline_state_path is not None
             else None
         )
+        self._renderer = renderer
+        if self._renderer != "angrylion":
+            raise RuntimeError(
+                f"Renderer {self._renderer!r} is not supported by the current host. "
+                "The libretro embedding still uses the software framebuffer path, "
+                "so hardware-render plugins like gliden64 are not wired up yet."
+            )
         self._native = NativeEmulator(
             str(self._core_path),
             str(self._rom_path),
@@ -39,6 +49,7 @@ class Emulator:
                 if self._baseline_state_path is None
                 else str(self._baseline_state_path)
             ),
+            self._renderer,
         )
 
     @property
@@ -142,6 +153,42 @@ class Emulator:
             )
         return frame.reshape((frame_height, frame_width, channels))
 
+    def render_observation(
+        self,
+        *,
+        width: int,
+        height: int,
+        rgb: bool = True,
+    ) -> np.ndarray:
+        """Return one native aspect-corrected observation frame."""
+
+        frame_bytes = self._native.frame_observation(width, height, rgb)
+        channels = 3 if rgb else 1
+        frame = np.frombuffer(frame_bytes, dtype=np.uint8)
+        expected_size = height * width * channels
+        if frame.size != expected_size:
+            raise RuntimeError(
+                "Unexpected observation size from native emulator: "
+                f"expected {expected_size} bytes, got {frame.size}"
+            )
+        return frame.reshape((height, width, channels))
+
+    def telemetry_data(self) -> dict[str, Any]:
+        """Return the latest structured telemetry mapping from the native host."""
+
+        data = self._native.telemetry()
+        if not isinstance(data, dict):
+            raise RuntimeError("Native telemetry did not resolve to a mapping")
+        return data
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        """Return the latest telemetry snapshot, if the host can decode it."""
+
+        try:
+            return read_telemetry(self)
+        except RuntimeError:
+            return None
+
     def close(self) -> None:
         """Release the native emulator host."""
 
@@ -160,6 +207,7 @@ class Emulator:
                 else str(self._baseline_state_path)
             ),
             "baseline_kind": self.baseline_kind,
+            "renderer": self._renderer,
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }

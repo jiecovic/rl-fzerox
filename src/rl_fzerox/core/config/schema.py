@@ -60,6 +60,7 @@ class EmulatorConfig(BaseModel):
     rom_path: FilePath
     runtime_dir: Path | None = None
     baseline_state_path: Path | None = None
+    renderer: Literal["angrylion"] = "angrylion"
 
 
 class WatchConfig(BaseModel):
