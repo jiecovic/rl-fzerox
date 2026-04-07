@@ -58,7 +58,7 @@ class ViewerLayout:
     panel_width: int = 456
     panel_padding: int = 12
     preview_gap: int = 12
-    preview_scale: int = 2
+    preview_scale: int = 1
     preview_padding: int = 12
     preview_title_gap: int = 6
     column_gap: int = 16
@@ -970,10 +970,11 @@ def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
 
 def _format_observation_summary(observation_shape: tuple[int, ...]) -> str:
     preview_shape = _preview_frame_shape(observation_shape)
+    stack_size = _observation_stack_size(observation_shape)
     return (
         f"{preview_shape[1]}x{preview_shape[0]} "
         f"{'rgb' if preview_shape[2] == 3 else 'gray'} "
-        f"x{_observation_stack_size(observation_shape)}"
+        f"x{stack_size}"
     )
 
 

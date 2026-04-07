@@ -205,6 +205,7 @@ class FZeroXEnvEngine:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = limit_step.step_count
         info["stalled_steps"] = limit_step.stalled_steps
+        info["reverse_steps"] = limit_step.reverse_steps
         if truncation_reason is not None:
             info["truncation_reason"] = truncation_reason
         if telemetry is not None:
@@ -274,6 +275,7 @@ def _telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "speed_kph": telemetry.player.speed_kph,
         "position": telemetry.player.position,
         "lap": telemetry.player.lap,
+        "laps_completed": telemetry.player.laps_completed,
         "energy": telemetry.player.energy,
     }
 
@@ -309,3 +311,4 @@ def _ensure_monitor_info_keys(info: dict[str, object]) -> None:
     info.setdefault("speed_kph", None)
     info.setdefault("position", None)
     info.setdefault("lap", None)
+    info.setdefault("laps_completed", None)

@@ -26,6 +26,7 @@ _MONITOR_INFO_KEYS = (
     "speed_kph",
     "position",
     "lap",
+    "laps_completed",
 )
 _INFO_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("step_reward", "env/step_reward_mean"),
@@ -33,6 +34,7 @@ _INFO_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("speed_kph", "env/speed_kph_mean"),
     ("position", "env/position_mean"),
     ("lap", "env/lap_mean"),
+    ("laps_completed", "env/laps_completed_mean"),
 )
 
 

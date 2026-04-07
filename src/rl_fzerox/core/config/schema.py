@@ -44,6 +44,8 @@ class EnvConfig(BaseModel):
     stuck_grace_steps: PositiveInt = 300
     stuck_step_limit: PositiveInt = 900
     stuck_progress_epsilon: NonNegativeFloat = 5.0
+    wrong_way_step_limit: PositiveInt = 45
+    wrong_way_progress_epsilon: NonNegativeFloat = 2.0
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)

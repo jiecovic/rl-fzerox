@@ -37,7 +37,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((640, 480), (120, 160, 12)) == (1464, 480)
+    assert _window_size((640, 480), (120, 160, 12)) == (1304, 480)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:

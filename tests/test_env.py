@@ -1,4 +1,6 @@
 # tests/test_env.py
+from typing import cast
+
 import numpy as np
 from gymnasium.spaces import MultiDiscrete
 
@@ -209,7 +211,45 @@ def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
     assert info["step_reward"] == -5.0
-    assert info["reward_breakdown"]["stuck_truncation"] == -5.0
+    reward_breakdown = cast(dict[str, float], info["reward_breakdown"])
+    assert reward_breakdown["stuck_truncation"] == -5.0
+
+
+def test_step_truncates_when_driving_the_wrong_way(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=100,
+            stuck_grace_steps=10,
+            stuck_step_limit=10,
+            wrong_way_step_limit=2,
+            wrong_way_progress_epsilon=2.0,
+        ),
+    )
+    distances = iter((0.0, -3.0, -6.5))
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine._read_live_telemetry",
+        lambda _backend: _telemetry(race_distance=next(distances)),
+    )
+
+    env.reset(seed=7)
+    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    assert not terminated
+    assert not truncated
+    assert reward == -0.003
+    assert info["reverse_steps"] == 1
+
+    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert not terminated
+    assert truncated
+    assert reward == -10.0035
+    assert info["truncation_reason"] == "wrong_way"
+    assert info["reverse_steps"] == 2
+    reward_breakdown = cast(dict[str, float], info["reward_breakdown"])
+    assert reward_breakdown["wrong_way_truncation"] == -10.0
 
 
 def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:

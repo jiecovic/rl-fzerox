@@ -13,6 +13,7 @@ class LimitStep:
 
     step_count: int
     stalled_steps: int
+    reverse_steps: int
     truncation_reason: str | None = None
 
 
@@ -24,19 +25,26 @@ class EpisodeLimits:
         self._stuck_grace_steps = config.stuck_grace_steps
         self._stuck_step_limit = config.stuck_step_limit
         self._stuck_progress_epsilon = float(config.stuck_progress_epsilon)
+        self._wrong_way_step_limit = config.wrong_way_step_limit
+        self._wrong_way_progress_epsilon = float(config.wrong_way_progress_epsilon)
         self._step_count = 0
         self._stalled_steps = 0
+        self._reverse_steps = 0
         self._best_race_distance = float("-inf")
+        self._previous_race_distance = float("-inf")
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Reset counters for a fresh episode."""
 
         self._step_count = 0
         self._stalled_steps = 0
+        self._reverse_steps = 0
         if telemetry is None:
             self._best_race_distance = float("-inf")
+            self._previous_race_distance = float("-inf")
             return
         self._best_race_distance = telemetry.player.race_distance
+        self._previous_race_distance = telemetry.player.race_distance
 
     def step(self, telemetry: FZeroXTelemetry | None) -> LimitStep:
         """Advance counters from the latest telemetry sample."""
@@ -47,27 +55,37 @@ class EpisodeLimits:
             return LimitStep(
                 step_count=self._step_count,
                 stalled_steps=self._stalled_steps,
+                reverse_steps=self._reverse_steps,
                 truncation_reason=truncation_reason,
             )
 
         if telemetry is None or not telemetry.in_race_mode:
             self._stalled_steps = 0
+            self._reverse_steps = 0
             return LimitStep(
                 step_count=self._step_count,
                 stalled_steps=self._stalled_steps,
+                reverse_steps=self._reverse_steps,
             )
 
+        progress_delta = telemetry.player.race_distance - self._previous_race_distance
         progress_gain = telemetry.player.race_distance - self._best_race_distance
         if progress_gain > self._stuck_progress_epsilon:
             self._best_race_distance = telemetry.player.race_distance
             self._stalled_steps = 0
         else:
             self._stalled_steps += 1
+        if progress_delta < -self._wrong_way_progress_epsilon:
+            self._reverse_steps += 1
+        else:
+            self._reverse_steps = 0
+        self._previous_race_distance = telemetry.player.race_distance
 
         return LimitStep(
             step_count=self._step_count,
             stalled_steps=self._stalled_steps,
-            truncation_reason=self._stuck_reason(),
+            reverse_steps=self._reverse_steps,
+            truncation_reason=self._truncation_reason(),
         )
 
     def _timeout_reason(self) -> str | None:
@@ -75,7 +93,9 @@ class EpisodeLimits:
             return "timeout"
         return None
 
-    def _stuck_reason(self) -> str | None:
+    def _truncation_reason(self) -> str | None:
+        if self._reverse_steps >= self._wrong_way_step_limit:
+            return "wrong_way"
         if self._step_count <= self._stuck_grace_steps:
             return None
         if self._stalled_steps >= self._stuck_step_limit:

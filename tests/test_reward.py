@@ -70,8 +70,8 @@ def test_reward_tracker_applies_stronger_collision_penalty_once() -> None:
     )
 
     assert step.terminated is False
-    assert step.breakdown["collision_recoil"] == -1.0
-    assert step.reward == -1.0
+    assert step.breakdown["collision_recoil"] == -4.0
+    assert step.reward == -4.0
     assert repeated.reward == 0.0
 
 
@@ -129,11 +129,41 @@ def test_reward_tracker_returns_stuck_truncation_penalty() -> None:
     assert none_label is None
 
 
+def test_reward_tracker_returns_wrong_way_truncation_penalty() -> None:
+    tracker = RewardTracker(
+        RewardWeights(wrong_way_truncation_penalty=-12.0)
+    )
+
+    penalty, label = tracker.truncation_penalty("wrong_way")
+
+    assert penalty == -12.0
+    assert label == "wrong_way_truncation"
+
+
+def test_reward_tracker_penalizes_energy_loss_but_not_energy_gain() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            energy_loss_epsilon=0.1,
+            energy_loss_penalty_scale=0.05,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, energy=178.0))
+
+    loss = tracker.step(_telemetry(race_distance=100.0, energy=174.0))
+    gain = tracker.step(_telemetry(race_distance=100.0, energy=176.0))
+
+    assert loss.reward == -0.2
+    assert loss.breakdown == {"energy_loss": -0.2}
+    assert gain.reward == 0.0
+    assert gain.breakdown == {}
+
+
 def _telemetry(
     *,
     race_distance: float,
     state_flags: int = 1 << 30,
     position: int = 30,
+    energy: float = 178.0,
 ) -> FZeroXTelemetry:
     return FZeroXTelemetry(
         system_ram_size=0x00800000,
@@ -147,7 +177,7 @@ def _telemetry(
             state_labels=(),
             speed_raw=0.0,
             speed_kph=0.0,
-            energy=178.0,
+            energy=energy,
             max_energy=178.0,
             boost_timer=0,
             race_distance=race_distance,
