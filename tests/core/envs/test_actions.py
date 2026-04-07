@@ -8,12 +8,12 @@ from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import THROTTLE_MASK, SteerDriveActionAdapter
 
 
-def test_steer_drive_adapter_uses_default_five_bucket_multidiscrete_space() -> None:
+def test_steer_drive_adapter_uses_default_seven_bucket_multidiscrete_space() -> None:
     adapter = SteerDriveActionAdapter(ActionConfig())
 
     assert isinstance(adapter.action_space, MultiDiscrete)
-    assert adapter.action_space.nvec.tolist() == [5, 2]
-    assert np.array_equal(adapter.idle_action, np.array([2, 0], dtype=np.int64))
+    assert adapter.action_space.nvec.tolist() == [7, 2]
+    assert np.array_equal(adapter.idle_action, np.array([3, 0], dtype=np.int64))
 
 
 def test_steer_drive_adapter_supports_custom_bucket_counts() -> None:
