@@ -20,10 +20,13 @@ class RewardWeights:
     progress_scale: float = 0.001
     reverse_progress_scale: float = 0.001
     progress_epsilon: float = 0.5
-    stall_grace_steps: int = 90
-    stall_penalty: float = -0.02
+    energy_loss_epsilon: float = 0.1
+    energy_loss_penalty_scale: float = 0.05
+    stall_grace_steps: int = 60
+    stall_penalty: float = -0.05
     stuck_truncation_penalty: float = -5.0
-    collision_recoil_penalty: float = -1.0
+    wrong_way_truncation_penalty: float = -10.0
+    collision_recoil_penalty: float = -4.0
     spinning_out_penalty: float = -2.0
     falling_off_track_penalty: float = -10.0
     crashed_penalty: float = -20.0
@@ -49,6 +52,7 @@ class RewardTracker:
         self._weights = weights or RewardWeights()
         self._best_race_distance = float("-inf")
         self._previous_race_distance = float("-inf")
+        self._previous_energy = 0.0
         self._previous_state_flags = 0
         self._stall_steps = 0
 
@@ -60,9 +64,11 @@ class RewardTracker:
         if telemetry is None:
             self._best_race_distance = float("-inf")
             self._previous_race_distance = float("-inf")
+            self._previous_energy = 0.0
             return
         self._best_race_distance = telemetry.player.race_distance
         self._previous_race_distance = telemetry.player.race_distance
+        self._previous_energy = telemetry.player.energy
         self._previous_state_flags = telemetry.player.state_flags
 
     def step(self, telemetry: FZeroXTelemetry | None) -> RewardStep:
@@ -93,6 +99,12 @@ class RewardTracker:
             if self._stall_steps > self._weights.stall_grace_steps:
                 reward += self._weights.stall_penalty
                 breakdown["stall"] = self._weights.stall_penalty
+
+        energy_delta = telemetry.player.energy - self._previous_energy
+        if energy_delta < -self._weights.energy_loss_epsilon:
+            energy_loss_penalty = energy_delta * self._weights.energy_loss_penalty_scale
+            reward += energy_loss_penalty
+            breakdown["energy_loss"] = energy_loss_penalty
 
         current_flags = telemetry.player.state_flags
         entered_flags = current_flags & ~self._previous_state_flags
@@ -145,6 +157,7 @@ class RewardTracker:
                 breakdown["finish_position"] = placement_bonus
 
         self._previous_race_distance = telemetry.player.race_distance
+        self._previous_energy = telemetry.player.energy
         self._previous_state_flags = current_flags
 
         terminated = bool(
@@ -158,6 +171,8 @@ class RewardTracker:
 
         if truncation_reason == "stuck":
             return self._weights.stuck_truncation_penalty, "stuck_truncation"
+        if truncation_reason == "wrong_way":
+            return self._weights.wrong_way_truncation_penalty, "wrong_way_truncation"
         return 0.0, None
 
 
