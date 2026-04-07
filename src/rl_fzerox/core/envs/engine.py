@@ -187,15 +187,22 @@ class FZeroXEnvEngine:
         telemetry = _read_live_telemetry(self.backend)
         reward_step = self._reward_tracker.step(telemetry)
         reward = frame_reward + reward_step.reward
+        reward_breakdown = dict(reward_step.breakdown)
         terminated = terminated or reward_step.terminated
         limit_step = self._episode_limits.step(telemetry)
         truncation_reason = limit_step.truncation_reason
         truncated = truncated or (truncation_reason is not None)
+        truncation_penalty, truncation_label = self._reward_tracker.truncation_penalty(
+            truncation_reason
+        )
+        reward += truncation_penalty
+        if truncation_label is not None:
+            reward_breakdown[truncation_label] = truncation_penalty
         if frame is None and (terminated or truncated):
             frame = self.backend.render()
-        info["step_reward"] = reward_step.reward
-        if reward_step.breakdown:
-            info["reward_breakdown"] = dict(reward_step.breakdown)
+        info["step_reward"] = reward
+        if reward_breakdown:
+            info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = limit_step.step_count
         info["stalled_steps"] = limit_step.stalled_steps
         if truncation_reason is not None:

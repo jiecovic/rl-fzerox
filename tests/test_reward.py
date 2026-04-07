@@ -115,6 +115,20 @@ def test_reward_tracker_resets_stall_counter_on_progress() -> None:
     assert stalled_again.reward == 0.0
 
 
+def test_reward_tracker_returns_stuck_truncation_penalty() -> None:
+    tracker = RewardTracker(
+        RewardWeights(stuck_truncation_penalty=-7.5)
+    )
+
+    penalty, label = tracker.truncation_penalty("stuck")
+    none_penalty, none_label = tracker.truncation_penalty("timeout")
+
+    assert penalty == -7.5
+    assert label == "stuck_truncation"
+    assert none_penalty == 0.0
+    assert none_label is None
+
+
 def _telemetry(
     *,
     race_distance: float,

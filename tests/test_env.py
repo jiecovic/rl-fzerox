@@ -201,12 +201,15 @@ def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
     assert not terminated
     assert not truncated
 
-    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
+    assert reward == -5.0
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
+    assert info["step_reward"] == -5.0
+    assert info["reward_breakdown"]["stuck_truncation"] == -5.0
 
 
 def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:

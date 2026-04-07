@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 
 import numpy as np
@@ -48,3 +49,20 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
 
     assert runner.predict(observation).tolist() == [4, 1]
+    assert runner.reload_age_seconds < 1.0
+
+
+def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> None:
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"v1")
+
+    loaded_policy = LoadedPolicy(
+        run_dir=tmp_path,
+        policy_path=policy_path,
+        artifact="latest",
+    )
+    runner = PolicyRunner(loaded_policy, _FakePolicy([2, 0]))
+
+    time.sleep(0.01)
+
+    assert runner.reload_age_seconds > 0.0

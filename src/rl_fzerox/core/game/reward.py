@@ -20,8 +20,9 @@ class RewardWeights:
     progress_scale: float = 0.001
     reverse_progress_scale: float = 0.001
     progress_epsilon: float = 0.5
-    stall_grace_steps: int = 180
-    stall_penalty: float = -0.01
+    stall_grace_steps: int = 90
+    stall_penalty: float = -0.02
+    stuck_truncation_penalty: float = -5.0
     collision_recoil_penalty: float = -1.0
     spinning_out_penalty: float = -2.0
     falling_off_track_penalty: float = -10.0
@@ -151,6 +152,13 @@ class RewardTracker:
             & (FLAG_FINISHED | FLAG_CRASHED | FLAG_RETIRED | FLAG_FALLING_OFF_TRACK)
         )
         return RewardStep(reward=reward, terminated=terminated, breakdown=breakdown)
+
+    def truncation_penalty(self, truncation_reason: str | None) -> tuple[float, str | None]:
+        """Return any extra reward penalty that should apply to a truncation."""
+
+        if truncation_reason == "stuck":
+            return self._weights.stuck_truncation_penalty, "stuck_truncation"
+        return 0.0, None
 
 
 def _apply_flag_penalty(
