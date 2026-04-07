@@ -68,6 +68,7 @@ class WatchConfig(BaseModel):
     episodes: PositiveInt | None = None
     fps: PositiveFloat | None = None
     policy_run_dir: Path | None = None
+    policy_artifact: Literal["latest", "best", "final"] = "latest"
 
 
 class NetArchConfig(BaseModel):
@@ -103,9 +104,9 @@ class TrainConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     num_envs: PositiveInt = 1
-    total_timesteps: PositiveInt = 200_000
-    n_steps: PositiveInt = 2048
-    batch_size: PositiveInt = 64
+    total_timesteps: PositiveInt = 1_000_000
+    n_steps: PositiveInt = 1_024
+    batch_size: PositiveInt = 256
     learning_rate: PositiveFloat = 3e-4
     gamma: float = Field(default=0.99, gt=0.0, le=1.0)
     gae_lambda: float = Field(default=0.95, gt=0.0, le=1.0)
@@ -115,7 +116,7 @@ class TrainConfig(BaseModel):
     max_grad_norm: PositiveFloat = 0.5
     verbose: int = Field(default=0, ge=0, le=2)
     device: str = "auto"
-    checkpoint_freq: PositiveInt = 10_000
+    save_freq: PositiveInt = 1_000
     output_root: Path = Path("local/runs")
     run_name: str = "ppo_cnn"
 

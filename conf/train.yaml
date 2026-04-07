@@ -34,7 +34,7 @@ train:
   max_grad_norm: 0.5
   verbose: 0
   device: auto
-  checkpoint_freq: 1000
+  save_freq: 1000
   output_root: local/runs
   run_name: ppo_cnn
 

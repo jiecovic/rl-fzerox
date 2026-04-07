@@ -178,7 +178,10 @@ def run_viewer(config: WatchAppConfig) -> None:
     pygame.init()
 
     try:
-        policy_runner = _load_policy_runner(config.watch.policy_run_dir)
+        policy_runner = _load_policy_runner(
+            config.watch.policy_run_dir,
+            artifact=config.watch.policy_artifact,
+        )
         screen = None
         fonts = None
         paused = False
@@ -991,12 +994,16 @@ def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
         return None
 
 
-def _load_policy_runner(policy_run_dir: Path | None) -> PolicyRunner | None:
+def _load_policy_runner(
+    policy_run_dir: Path | None,
+    *,
+    artifact: str,
+) -> PolicyRunner | None:
     if policy_run_dir is None:
         return None
     from rl_fzerox.core.training.inference import load_policy_runner
 
-    return load_policy_runner(policy_run_dir)
+    return load_policy_runner(policy_run_dir, artifact=artifact)
 
 
 def _policy_label(policy_runner: PolicyRunner | None) -> str | None:

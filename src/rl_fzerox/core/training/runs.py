@@ -16,9 +16,11 @@ class RunPaths:
     """Filesystem layout for one training run."""
 
     run_dir: Path
-    checkpoints_dir: Path
-    policy_checkpoints_dir: Path
     tensorboard_dir: Path
+    latest_model_path: Path
+    latest_policy_path: Path
+    best_model_path: Path
+    best_policy_path: Path
     final_model_path: Path
     final_policy_path: Path
 
@@ -30,9 +32,11 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
     run_dir = _next_run_dir(resolved_output_root, run_name)
     return RunPaths(
         run_dir=run_dir,
-        checkpoints_dir=run_dir / "checkpoints",
-        policy_checkpoints_dir=run_dir / "policy_checkpoints",
         tensorboard_dir=run_dir / "tensorboard",
+        latest_model_path=run_dir / "latest_model.zip",
+        latest_policy_path=run_dir / "latest_policy.zip",
+        best_model_path=run_dir / "best_model.zip",
+        best_policy_path=run_dir / "best_policy.zip",
         final_model_path=run_dir / "final_model.zip",
         final_policy_path=run_dir / "final_policy.zip",
     )
@@ -42,8 +46,6 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     """Create the directories needed by the current run."""
 
     paths.run_dir.mkdir(parents=True, exist_ok=True)
-    paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
-    paths.policy_checkpoints_dir.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -81,20 +83,44 @@ def resolve_train_run_config_path(run_dir: Path) -> Path:
 def resolve_latest_model_path(run_dir: Path) -> Path:
     """Resolve the newest full PPO artifact from a run directory."""
 
-    return _resolve_latest_path(
-        directory_name="checkpoints",
-        final_filename="final_model.zip",
-        run_dir=run_dir,
-    )
+    return resolve_model_artifact_path(run_dir, artifact="latest")
 
 
 def resolve_latest_policy_path(run_dir: Path) -> Path:
     """Resolve the newest policy-only artifact from a run directory."""
 
-    return _resolve_latest_path(
-        directory_name="policy_checkpoints",
-        final_filename="final_policy.zip",
+    return resolve_policy_artifact_path(run_dir, artifact="latest")
+
+
+def resolve_model_artifact_path(
+    run_dir: Path,
+    *,
+    artifact: str,
+) -> Path:
+    """Resolve one full-model artifact from a run directory."""
+
+    return _resolve_artifact_path(
         run_dir=run_dir,
+        artifact=artifact,
+        latest_filename="latest_model.zip",
+        best_filename="best_model.zip",
+        final_filename="final_model.zip",
+    )
+
+
+def resolve_policy_artifact_path(
+    run_dir: Path,
+    *,
+    artifact: str,
+) -> Path:
+    """Resolve one policy-only artifact from a run directory."""
+
+    return _resolve_artifact_path(
+        run_dir=run_dir,
+        artifact=artifact,
+        latest_filename="latest_policy.zip",
+        best_filename="best_policy.zip",
+        final_filename="final_policy.zip",
     )
 
 
@@ -118,16 +144,28 @@ def apply_train_run_to_watch_config(
     )
 
 
-def _resolve_latest_path(*, directory_name: str, final_filename: str, run_dir: Path) -> Path:
+def _resolve_artifact_path(
+    *,
+    run_dir: Path,
+    artifact: str,
+    latest_filename: str,
+    best_filename: str,
+    final_filename: str,
+) -> Path:
     resolved_run_dir = run_dir.expanduser().resolve()
-    artifact_dir = resolved_run_dir / directory_name
-    candidates = sorted(artifact_dir.glob("*.zip"), key=lambda path: path.name)
-    if candidates:
-        return candidates[-1]
+    if artifact == "latest":
+        preferred_filenames = (latest_filename, final_filename, best_filename)
+    elif artifact == "best":
+        preferred_filenames = (best_filename,)
+    elif artifact == "final":
+        preferred_filenames = (final_filename,)
+    else:
+        raise ValueError(f"Unsupported artifact kind: {artifact!r}")
 
-    final_path = resolved_run_dir / final_filename
-    if final_path.is_file():
-        return final_path
+    for filename in preferred_filenames:
+        resolved_path = resolved_run_dir / filename
+        if resolved_path.is_file():
+            return resolved_path
 
     raise FileNotFoundError(
         f"No artifact could be found under run directory {resolved_run_dir}"

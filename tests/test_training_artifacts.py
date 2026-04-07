@@ -19,6 +19,8 @@ from rl_fzerox.core.training.runs import (
     load_train_run_config,
     resolve_latest_model_path,
     resolve_latest_policy_path,
+    resolve_model_artifact_path,
+    resolve_policy_artifact_path,
     save_train_run_config,
 )
 
@@ -71,33 +73,58 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.watch.fps == 30.0
 
 
-def test_resolve_latest_model_path_prefers_checkpoint_over_final_model(tmp_path: Path) -> None:
+def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
-    final_model_path = run_paths.final_model_path
-    final_model_path.write_bytes(b"final")
-    older_checkpoint = run_paths.checkpoints_dir / "ppo_000100.zip"
-    newer_checkpoint = run_paths.checkpoints_dir / "ppo_000200.zip"
-    older_checkpoint.write_bytes(b"older")
-    newer_checkpoint.write_bytes(b"newer")
+    run_paths.final_model_path.write_bytes(b"final")
+    run_paths.best_model_path.write_bytes(b"best")
+    run_paths.latest_model_path.write_bytes(b"latest")
 
     resolved_model_path = resolve_latest_model_path(run_paths.run_dir)
 
-    assert resolved_model_path == newer_checkpoint
+    assert resolved_model_path == run_paths.latest_model_path
 
 
-def test_resolve_latest_policy_path_prefers_checkpoint_over_final_policy(tmp_path: Path) -> None:
+def test_resolve_latest_policy_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
     run_paths.final_policy_path.write_bytes(b"final-policy")
-    older_policy = run_paths.policy_checkpoints_dir / "ppo_policy_000000000100.zip"
-    newer_policy = run_paths.policy_checkpoints_dir / "ppo_policy_000000000200.zip"
-    older_policy.write_bytes(b"older-policy")
-    newer_policy.write_bytes(b"newer-policy")
+    run_paths.best_policy_path.write_bytes(b"best-policy")
+    run_paths.latest_policy_path.write_bytes(b"latest-policy")
 
     resolved_policy_path = resolve_latest_policy_path(run_paths.run_dir)
 
-    assert resolved_policy_path == newer_policy
+    assert resolved_policy_path == run_paths.latest_policy_path
+
+
+def test_resolve_best_policy_path_requires_best_artifact(tmp_path: Path) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    run_paths.final_policy_path.write_bytes(b"final-policy")
+    run_paths.best_policy_path.write_bytes(b"best-policy")
+    run_paths.latest_policy_path.write_bytes(b"latest-policy")
+
+    resolved_policy_path = resolve_policy_artifact_path(
+        run_paths.run_dir,
+        artifact="best",
+    )
+
+    assert resolved_policy_path == run_paths.best_policy_path
+
+
+def test_resolve_final_model_path_requires_final_artifact(tmp_path: Path) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    run_paths.final_model_path.write_bytes(b"final")
+    run_paths.best_model_path.write_bytes(b"best")
+    run_paths.latest_model_path.write_bytes(b"latest")
+
+    resolved_model_path = resolve_model_artifact_path(
+        run_paths.run_dir,
+        artifact="final",
+    )
+
+    assert resolved_model_path == run_paths.final_model_path
 
 
 def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> None:

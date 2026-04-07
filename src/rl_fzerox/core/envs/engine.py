@@ -84,6 +84,7 @@ class FZeroXEnvEngine:
         last_telemetry: FZeroXTelemetry | None = None
 
         for repeat_index in range(self.config.action_repeat):
+            is_last_repeat = repeat_index == (self.config.action_repeat - 1)
             (
                 latest_frame,
                 step_reward,
@@ -91,7 +92,7 @@ class FZeroXEnvEngine:
                 truncated,
                 info,
                 last_telemetry,
-            ) = self._advance_one_frame()
+            ) = self._advance_one_frame(render_frame=is_last_repeat)
             total_reward += step_reward
             info["repeat_index"] = repeat_index
 
@@ -127,6 +128,8 @@ class FZeroXEnvEngine:
         if control_state is not None:
             self.backend.set_controller_state(control_state)
         frame, reward, terminated, truncated, info, _ = self._advance_one_frame()
+        if frame is None:
+            raise RuntimeError("The emulator did not produce a frame during step_frame()")
         self._episode_return += reward
         info["episode_return"] = self._episode_return
         _ensure_monitor_info_keys(info)
@@ -164,16 +167,30 @@ class FZeroXEnvEngine:
 
     def _advance_one_frame(
         self,
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object], FZeroXTelemetry | None]:
-        frame_step = self.backend.step_frame()
-        info = dict(frame_step.info)
+        *,
+        render_frame: bool = True,
+    ) -> tuple[np.ndarray | None, float, bool, bool, dict[str, object], FZeroXTelemetry | None]:
+        if render_frame:
+            frame_step = self.backend.step_frame()
+            frame = frame_step.frame
+            frame_reward = frame_step.reward
+            terminated = frame_step.terminated
+            truncated = frame_step.truncated
+            info = dict(frame_step.info)
+        else:
+            self.backend.step_frames(1)
+            frame = None
+            frame_reward = 0.0
+            terminated = False
+            truncated = False
+            info = _backend_step_info(self.backend)
         telemetry = _read_live_telemetry(self.backend)
         reward_step = self._reward_tracker.step(telemetry)
-        reward = frame_step.reward + reward_step.reward
-        terminated = frame_step.terminated or reward_step.terminated
+        reward = frame_reward + reward_step.reward
+        terminated = terminated or reward_step.terminated
         limit_step = self._episode_limits.step(telemetry)
         truncation_reason = limit_step.truncation_reason
-        truncated = frame_step.truncated or (truncation_reason is not None)
+        truncated = truncated or (truncation_reason is not None)
         info["step_reward"] = reward_step.reward
         if reward_step.breakdown:
             info["reward_breakdown"] = dict(reward_step.breakdown)
@@ -187,7 +204,7 @@ class FZeroXEnvEngine:
             if termination_reason is not None:
                 info["termination_reason"] = termination_reason
         return (
-            frame_step.frame,
+            frame,
             reward,
             terminated,
             truncated,
@@ -249,6 +266,15 @@ def _telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "position": telemetry.player.position,
         "lap": telemetry.player.lap,
         "energy": telemetry.player.energy,
+    }
+
+
+def _backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
+    return {
+        "backend": backend.name,
+        "frame_index": backend.frame_index,
+        "display_aspect_ratio": backend.display_aspect_ratio,
+        "native_fps": backend.native_fps,
     }
 
 

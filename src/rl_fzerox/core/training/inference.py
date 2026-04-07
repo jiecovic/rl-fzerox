@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from rl_fzerox.core.training.runs import resolve_latest_policy_path
+from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 
 @dataclass(frozen=True)
@@ -15,6 +15,7 @@ class LoadedPolicy:
 
     run_dir: Path
     policy_path: Path
+    artifact: str
 
 
 class PolicyRunner:
@@ -37,16 +38,17 @@ class PolicyRunner:
         return np.asarray(action, dtype=np.int64)
 
 
-def load_policy_runner(run_dir: Path) -> PolicyRunner:
-    """Load the newest saved policy artifact from one run directory."""
+def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:
+    """Load one saved policy artifact from one run directory."""
 
     resolved_run_dir = run_dir.expanduser().resolve()
-    policy_path = resolve_latest_policy_path(resolved_run_dir)
+    policy_path = resolve_policy_artifact_path(resolved_run_dir, artifact=artifact)
     policy = _load_saved_policy(policy_path)
     return PolicyRunner(
         LoadedPolicy(
             run_dir=resolved_run_dir,
             policy_path=policy_path,
+            artifact=artifact,
         ),
         policy=policy,
     )

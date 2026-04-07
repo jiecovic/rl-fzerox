@@ -39,7 +39,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         dest="policy_run_dir",
         type=Path,
         default=None,
-        help="Optional training run directory. The watch app loads its latest checkpoint.",
+        help=(
+            "Optional training run directory. "
+            "The watch app loads its latest saved policy artifact."
+        ),
+    )
+    parser.add_argument(
+        "--artifact",
+        dest="policy_artifact",
+        choices=("latest", "best", "final"),
+        default=None,
+        help="Which saved policy artifact to load from the run directory.",
     )
     return parser.parse_args(argv)
 
@@ -68,6 +78,14 @@ def main(argv: Sequence[str] | None = None) -> None:
             run_dir=policy_run_dir,
             train_config=train_config,
         )
+        if args.policy_artifact is not None:
+            config = config.model_copy(
+                update={
+                    "watch": config.watch.model_copy(
+                        update={"policy_artifact": args.policy_artifact}
+                    )
+                }
+            )
 
     run_viewer(config)
 
