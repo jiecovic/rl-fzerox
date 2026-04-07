@@ -75,6 +75,45 @@ def test_reward_tracker_applies_stronger_collision_penalty_once() -> None:
     assert repeated.reward == 0.0
 
 
+def test_reward_tracker_rewards_dash_pad_boost_entry_once() -> None:
+    tracker = RewardTracker()
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step(_telemetry(race_distance=100.0, state_flags=(1 << 30) | (1 << 24)))
+    repeated = tracker.step(
+        _telemetry(race_distance=100.0, state_flags=(1 << 30) | (1 << 24))
+    )
+
+    assert step.terminated is False
+    assert step.breakdown == {"dash_pad_boost": 0.5}
+    assert step.reward == 0.5
+    assert repeated.reward == 0.0
+    assert repeated.breakdown == {}
+
+
+def test_reward_tracker_requires_progress_before_rewarding_dash_pad_again() -> None:
+    tracker = RewardTracker(
+        RewardWeights(
+            dash_pad_boost_reward=0.75,
+            dash_pad_min_progress=500.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    first = tracker.step(_telemetry(race_distance=120.0, state_flags=(1 << 30) | (1 << 24)))
+    tracker.step(_telemetry(race_distance=120.0, state_flags=1 << 30))
+    blocked = tracker.step(_telemetry(race_distance=540.0, state_flags=(1 << 30) | (1 << 24)))
+    tracker.step(_telemetry(race_distance=540.0, state_flags=1 << 30))
+    allowed = tracker.step(_telemetry(race_distance=640.0, state_flags=(1 << 30) | (1 << 24)))
+
+    assert first.reward == 0.77
+    assert first.breakdown == {"progress": 0.02, "dash_pad_boost": 0.75}
+    assert blocked.reward == 0.42
+    assert blocked.breakdown == {"progress": 0.42}
+    assert allowed.reward == 0.85
+    assert allowed.breakdown == {"progress": 0.1, "dash_pad_boost": 0.75}
+
+
 def test_reward_tracker_penalizes_stalling_after_grace_period() -> None:
     tracker = RewardTracker(
         RewardWeights(
