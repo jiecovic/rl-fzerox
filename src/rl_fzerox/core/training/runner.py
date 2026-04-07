@@ -422,8 +422,8 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             self._rollout_info = _RolloutInfoAccumulator()
 
         def _on_step(self) -> bool:
-            infos = self.locals.get("infos")
-            if not isinstance(infos, list):
+            infos = _info_sequence(self.locals.get("infos"))
+            if infos is None:
                 return True
 
             self._rollout_info.add_infos(infos)
@@ -459,8 +459,8 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             if self.n_calls % self._save_freq == 0:
                 self._save_latest()
 
-            infos = self.locals.get("infos")
-            if not isinstance(infos, list):
+            infos = _info_sequence(self.locals.get("infos"))
+            if infos is None:
                 return True
 
             for info in infos:
@@ -495,6 +495,12 @@ def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
         if isinstance(value, int | float):
             values.append(float(value))
     return values
+
+
+def _info_sequence(infos: object) -> Sequence[object] | None:
+    if isinstance(infos, list | tuple):
+        return infos
+    return None
 
 
 def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:

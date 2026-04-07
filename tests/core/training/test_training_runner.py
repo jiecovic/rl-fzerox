@@ -13,6 +13,7 @@ from rl_fzerox.core.config.schema import (
     TrainConfig,
 )
 from rl_fzerox.core.training.runner import (
+    _info_sequence,
     _resolve_train_run_config,
     _RolloutInfoAccumulator,
     _validate_training_baseline_state,
@@ -131,3 +132,11 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.episode_count == 2
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["wrong_way"] == 1
+
+
+def test_info_sequence_accepts_tuple_infos() -> None:
+    infos = ({"race_distance": 10.0}, {"race_distance": 12.0})
+
+    assert _info_sequence(infos) == infos
+    assert _info_sequence([{"race_distance": 10.0}]) == [{"race_distance": 10.0}]
+    assert _info_sequence(None) is None
