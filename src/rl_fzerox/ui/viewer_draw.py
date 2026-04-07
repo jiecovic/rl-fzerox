@@ -351,8 +351,27 @@ def _draw_control_viz(
         - LAYOUT.control_drive_offset_x
         - LAYOUT.control_widget_gap,
     )
-    steer_width = min(LAYOUT.control_steer_width, left_widget_width)
-    steer_x = x + max(0, (left_widget_width - steer_width) // 2)
+    left_drift_width = _pill_width(fonts.small, "drift")
+    right_drift_width = _pill_width(fonts.small, "drift")
+    max_steer_width = max(
+        48,
+        left_widget_width
+        - left_drift_width
+        - right_drift_width
+        - (2 * LAYOUT.control_side_pill_gap),
+    )
+    steer_width = min(LAYOUT.control_steer_width, max_steer_width)
+    steer_group_width = (
+        left_drift_width
+        + LAYOUT.control_side_pill_gap
+        + steer_width
+        + LAYOUT.control_side_pill_gap
+        + right_drift_width
+    )
+    steer_group_x = x + max(0, (left_widget_width - steer_group_width) // 2)
+    left_drift_x = steer_group_x
+    steer_x = left_drift_x + left_drift_width + LAYOUT.control_side_pill_gap
+    right_drift_x = steer_x + steer_width + LAYOUT.control_side_pill_gap
 
     screen.blit(steer_label, (x, y))
     screen.blit(drive_label, (drive_x - 12, y))
@@ -362,6 +381,32 @@ def _draw_control_viz(
     steer_y = drive_y + (LAYOUT.control_drive_height - LAYOUT.control_steer_height) // 2
     steer_mid_y = steer_y + LAYOUT.control_steer_height // 2
     steer_mid_x = steer_x + steer_width // 2
+    drift_pill_y = steer_mid_y - (_pill_height(fonts.small) // 2)
+
+    _draw_pill(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=left_drift_x,
+        y=drift_pill_y,
+        label="drift",
+        active=control_viz.drift_direction < 0,
+        active_text_color=PALETTE.text_primary,
+        active_fill_color=PALETTE.flag_active_background,
+        active_border_color=PALETTE.flag_active_border,
+    )
+    _draw_pill(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=right_drift_x,
+        y=drift_pill_y,
+        label="drift",
+        active=control_viz.drift_direction > 0,
+        active_text_color=PALETTE.text_primary,
+        active_fill_color=PALETTE.flag_active_background,
+        active_border_color=PALETTE.flag_active_border,
+    )
 
     steer_track = pygame.Rect(
         steer_x,
@@ -458,7 +503,21 @@ def _draw_control_viz(
     mode_surface = fonts.small.render(mode, True, mode_color)
     mode_x = drive_center_x - (mode_surface.get_width() // 2)
     screen.blit(mode_surface, (mode_x, y))
-    return y + mode_surface.get_height()
+    y += mode_surface.get_height() + LAYOUT.control_boost_gap
+    boost_x = drive_center_x - (_pill_width(fonts.small, "boost") // 2)
+    _draw_pill(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=boost_x,
+        y=y,
+        label="boost",
+        active=control_viz.boost_pressed,
+        active_text_color=PALETTE.text_primary,
+        active_fill_color=(88, 66, 28),
+        active_border_color=PALETTE.text_warning,
+    )
+    return y + _pill_height(fonts.small)
 
 
 def _draw_round_marker(
@@ -496,52 +555,85 @@ def _draw_flag_viz(
     screen.blit(label_surface, (x, y))
     y += label_surface.get_height() + LAYOUT.line_gap
 
-    pill_radius = 8
     pill_height = 0
     for row in flag_viz.rows:
         row_x = x
         for token in row:
-            text_color = PALETTE.text_primary if token.active else PALETTE.text_muted
-            fill_color = (
-                PALETTE.flag_active_background
-                if token.active
-                else PALETTE.flag_inactive_background
-            )
-            border_color = (
-                PALETTE.flag_active_border if token.active else PALETTE.flag_inactive_border
-            )
-            token_surface = fonts.small.render(token.label, True, text_color)
-            pill_rect = pygame.Rect(
-                row_x,
-                y,
-                token_surface.get_width() + (2 * LAYOUT.flag_token_pad_x),
-                token_surface.get_height() + (2 * LAYOUT.flag_token_pad_y),
+            pill_rect = _draw_pill(
+                pygame=pygame,
+                screen=screen,
+                font=fonts.small,
+                x=row_x,
+                y=y,
+                label=token.label,
+                active=token.active,
+                active_text_color=PALETTE.text_primary,
+                active_fill_color=PALETTE.flag_active_background,
+                active_border_color=PALETTE.flag_active_border,
             )
             pill_height = pill_rect.height
-            pygame.draw.rect(
-                screen,
-                fill_color,
-                pill_rect,
-                border_radius=pill_radius,
-            )
-            pygame.draw.rect(
-                screen,
-                border_color,
-                pill_rect,
-                width=1,
-                border_radius=pill_radius,
-            )
-            screen.blit(
-                token_surface,
-                (
-                    pill_rect.x + LAYOUT.flag_token_pad_x,
-                    pill_rect.y + LAYOUT.flag_token_pad_y,
-                ),
-            )
             row_x += pill_rect.width + LAYOUT.flag_token_gap
         y += pill_height + LAYOUT.line_gap
 
     return y
+
+
+def _pill_width(font, label: str) -> int:
+    return font.render(label, True, PALETTE.text_primary).get_width() + (
+        2 * LAYOUT.flag_token_pad_x
+    )
+
+
+def _pill_height(font) -> int:
+    return font.render("pill", True, PALETTE.text_primary).get_height() + (
+        2 * LAYOUT.flag_token_pad_y
+    )
+
+
+def _draw_pill(
+    *,
+    pygame,
+    screen,
+    font,
+    x: int,
+    y: int,
+    label: str,
+    active: bool,
+    active_text_color,
+    active_fill_color,
+    active_border_color,
+):
+    text_color = active_text_color if active else PALETTE.text_muted
+    fill_color = active_fill_color if active else PALETTE.flag_inactive_background
+    border_color = active_border_color if active else PALETTE.flag_inactive_border
+    token_surface = font.render(label, True, text_color)
+    pill_rect = pygame.Rect(
+        x,
+        y,
+        token_surface.get_width() + (2 * LAYOUT.flag_token_pad_x),
+        token_surface.get_height() + (2 * LAYOUT.flag_token_pad_y),
+    )
+    pygame.draw.rect(
+        screen,
+        fill_color,
+        pill_rect,
+        border_radius=8,
+    )
+    pygame.draw.rect(
+        screen,
+        border_color,
+        pill_rect,
+        width=1,
+        border_radius=8,
+    )
+    screen.blit(
+        token_surface,
+        (
+            pill_rect.x + LAYOUT.flag_token_pad_x,
+            pill_rect.y + LAYOUT.flag_token_pad_y,
+        ),
+    )
+    return pill_rect
 
 
 def _rgb_surface(pygame, frame: np.ndarray):

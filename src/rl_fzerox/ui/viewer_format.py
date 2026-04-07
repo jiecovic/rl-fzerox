@@ -3,10 +3,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from rl_fzerox._native import JOYPAD_B
 from rl_fzerox.core.emulator.control import ControllerState
+from rl_fzerox.core.envs.actions import (
+    BOOST_MASK,
+    DRIFT_LEFT_MASK,
+    DRIFT_RIGHT_MASK,
+    THROTTLE_MASK,
+)
 from rl_fzerox.core.game import FZeroXTelemetry
 from rl_fzerox.core.game.flags import RACER_FLAG_LABELS
+from rl_fzerox.core.game.reward import RewardWeights
 from rl_fzerox.ui.viewer_layout import (
     BUTTON_LABELS,
     FONT_SIZES,
@@ -206,12 +212,7 @@ def _format_policy_action(policy_action: np.ndarray | None) -> str:
         return "manual"
 
     values = np.asarray(policy_action, dtype=np.int64).reshape(-1)
-    if len(values) != 2:
-        return str(values.tolist())
-
-    steer_bucket, drive_mode = int(values[0]), int(values[1])
-    drive_label = "throttle" if drive_mode == 1 else "coast"
-    return f"[{steer_bucket},{drive_mode}] {drive_label}"
+    return str(values.tolist()).replace(" ", "")
 
 
 def _format_reload_age(reload_age_seconds: float | None) -> str:
@@ -373,18 +374,13 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
                 PALETTE.text_primary,
             ),
             _panel_line(
+                "Checkpoint",
+                _format_checkpoint_counter(telemetry.player.race_distance),
+                PALETTE.text_primary,
+            ),
+            _panel_line(
                 "Lap prog",
                 _format_distance(telemetry.player.lap_distance),
-                PALETTE.text_primary,
-            ),
-            _panel_line(
-                "Lap base",
-                _format_distance(telemetry.player.laps_completed_distance),
-                PALETTE.text_primary,
-            ),
-            _panel_line(
-                "Sort key",
-                _format_distance(telemetry.player.race_distance_position),
                 PALETTE.text_primary,
             ),
         ],
@@ -433,11 +429,26 @@ def _format_distance(distance: float) -> str:
     return f"{distance:,.1f}"
 
 
+def _format_checkpoint_counter(race_distance: float) -> str:
+    spacing = RewardWeights().checkpoint_spacing
+    checkpoint_index = max(0, int(max(race_distance, 0.0) // spacing))
+    next_checkpoint_distance = (checkpoint_index + 1) * spacing
+    return f"{checkpoint_index} -> {next_checkpoint_distance:,.0f}"
+
+
 def _control_viz(control_state: ControllerState) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
-        drive_level=1 if joypad_mask & (1 << JOYPAD_B) else 0,
+        drive_level=1 if joypad_mask & THROTTLE_MASK else 0,
+        boost_pressed=bool(joypad_mask & BOOST_MASK),
+        drift_direction=(
+            -1
+            if joypad_mask & DRIFT_LEFT_MASK
+            else 1
+            if joypad_mask & DRIFT_RIGHT_MASK
+            else 0
+        ),
     )
 
 
@@ -449,11 +460,14 @@ def _control_viz_height(fonts: ViewerFonts) -> int:
         + LAYOUT.control_drive_height
         + LAYOUT.control_caption_gap
         + small_height
+        + LAYOUT.control_boost_gap
+        + small_height
+        + (2 * LAYOUT.flag_token_pad_y)
     )
 
 
 _FLAG_DISPLAY_LABELS = {
-    "can_boost": "boost ok",
+    "can_boost": "can boost",
     "dash_pad_boost": "dash",
     "airborne": "airborne",
     "collision_recoil": "recoil",

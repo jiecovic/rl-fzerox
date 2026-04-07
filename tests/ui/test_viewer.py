@@ -4,9 +4,10 @@ import os
 import numpy as np
 import pygame
 
-from rl_fzerox._native import JOYPAD_A, JOYPAD_B, JOYPAD_START, JOYPAD_UP
+from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
+from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
 from rl_fzerox.ui.viewer import (
     _build_panel_columns,
@@ -92,7 +93,7 @@ def test_input_section_includes_visualized_control_state() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(
-            joypad_mask=(1 << JOYPAD_B),
+            joypad_mask=THROTTLE_MASK | BOOST_MASK | DRIFT_LEFT_MASK,
             left_stick_x=0.5,
         ),
         policy_label=None,
@@ -108,6 +109,8 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_level == 1
     assert input_section.control_viz.steer_x == 0.5
+    assert input_section.control_viz.boost_pressed
+    assert input_section.control_viz.drift_direction == -1
 
 
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
@@ -141,6 +144,29 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
     assert {"dash", "recoil"}.issubset(active_labels)
 
 
+def test_game_section_includes_checkpoint_counter() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        game_display_size=(640, 480),
+        observation_shape=(120, 160, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    game_section = columns.right[0]
+    checkpoint_line = next(line for line in game_section.lines if line.label == "Checkpoint")
+
+    assert checkpoint_line.value == "0 -> 3,000"
+
+
 def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> None:
     first = np.zeros((2, 3, 3), dtype=np.uint8)
     second = np.full((2, 3, 3), 255, dtype=np.uint8)
@@ -154,8 +180,9 @@ def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> N
 
 def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(None) == "manual"
-    assert _format_policy_action(np.array([2, 0], dtype=np.int64)) == "[2,0] coast"
-    assert _format_policy_action(np.array([4, 1], dtype=np.int64)) == "[4,1] throttle"
+    assert _format_policy_action(np.array([2, 0], dtype=np.int64)) == "[2,0]"
+    assert _format_policy_action(np.array([4, 1], dtype=np.int64)) == "[4,1]"
+    assert _format_policy_action(np.array([4, 1, 1, 2], dtype=np.int64)) == "[4,1,1,2]"
 
 
 def test_format_reload_age_is_human_readable() -> None:
