@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/actions/base.py
+# src/rl_fzerox/core/envs/actions/base.py
 from __future__ import annotations
 
 from collections.abc import Sequence

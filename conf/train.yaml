@@ -1,0 +1,47 @@
+seed: 123
+
+emulator:
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  runtime_dir: local/runtime
+
+env:
+  action_repeat: 3
+  max_episode_steps: 8000
+  stuck_grace_steps: 300
+  stuck_step_limit: 900
+  stuck_progress_epsilon: 5.0
+  reset_to_race: true
+  action:
+    steer_buckets: 5
+  observation:
+    width: 160
+    height: 120
+    frame_stack: 4
+    rgb: true
+
+train:
+  num_envs: 1
+  total_timesteps: 1000000
+  n_steps: 1024
+  batch_size: 256
+  learning_rate: 0.0003
+  gamma: 0.99
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.01
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  verbose: 0
+  device: auto
+  checkpoint_freq: 1000
+  output_root: local/runs
+  run_name: ppo_cnn
+
+policy:
+  extractor:
+    name: fzerox_cnn
+    features_dim: 512
+  net_arch:
+    pi: [256, 256]
+    vf: [256, 256]

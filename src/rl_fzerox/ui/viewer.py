@@ -4,7 +4,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
@@ -19,12 +19,15 @@ from rl_fzerox._native import (
     JOYPAD_UP,
     joypad_mask,
 )
-from rl_fzerox.core.config.models import WatchAppConfig
+from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.emulator import ControllerState, Emulator
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.game import FZeroXTelemetry, read_telemetry
 from rl_fzerox.core.seed import seed_process
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.training.inference import PolicyRunner
 
 Color = tuple[int, int, int]
 
@@ -54,6 +57,10 @@ class ViewerLayout:
 
     panel_width: int = 456
     panel_padding: int = 12
+    preview_gap: int = 12
+    preview_scale: int = 2
+    preview_padding: int = 12
+    preview_title_gap: int = 6
     column_gap: int = 16
     title_gap: int = 2
     title_section_gap: int = 8
@@ -171,6 +178,7 @@ def run_viewer(config: WatchAppConfig) -> None:
     pygame.init()
 
     try:
+        policy_runner = _load_policy_runner(config.watch.policy_run_dir)
         screen = None
         fonts = None
         paused = False
@@ -178,13 +186,18 @@ def run_viewer(config: WatchAppConfig) -> None:
         episode = 0
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
-            frame, info = env.reset(seed=reset_seed)
+            observation, info = env.reset(seed=reset_seed)
+            raw_frame = env.render()
             reset_info = dict(info)
             current_control_state = ControllerState()
             telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
-                screen = _create_screen(pygame, emulator.display_size)
+                screen = _create_screen(
+                    pygame,
+                    emulator.display_size,
+                    observation.shape,
+                )
                 fonts = _create_fonts(pygame)
                 target_fps = config.watch.fps or (env.backend.native_fps / config.env.action_repeat)
                 target_seconds = 1.0 / target_fps
@@ -194,26 +207,34 @@ def run_viewer(config: WatchAppConfig) -> None:
                 return
             if viewer_input.toggle_pause:
                 paused = not paused
-            current_control_state = viewer_input.control_state
+            if policy_runner is None:
+                current_control_state = viewer_input.control_state
             if viewer_input.save_state:
                 _save_baseline_state(
                     emulator=emulator,
                     baseline_state_path=config.emulator.baseline_state_path,
                 )
 
-            screen = _ensure_screen(pygame, screen, emulator.display_size)
+            screen = _ensure_screen(
+                pygame,
+                screen,
+                emulator.display_size,
+                observation.shape,
+            )
 
             _draw_frame(
                 pygame=pygame,
                 screen=screen,
                 fonts=fonts,
-                frame=frame,
+                raw_frame=raw_frame,
+                observation=observation,
                 episode=episode,
                 info=info,
                 reset_info=reset_info,
                 episode_reward=0.0,
                 paused=paused,
                 control_state=current_control_state,
+                policy_label=_policy_label(policy_runner),
                 telemetry=telemetry,
             )
 
@@ -227,7 +248,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                     return
                 if viewer_input.toggle_pause:
                     paused = not paused
-                current_control_state = viewer_input.control_state
+                if policy_runner is None:
+                    current_control_state = viewer_input.control_state
                 if viewer_input.save_state:
                     _save_baseline_state(
                         emulator=emulator,
@@ -238,58 +260,81 @@ def run_viewer(config: WatchAppConfig) -> None:
                         pygame=pygame,
                         screen=screen,
                         fonts=fonts,
-                        frame=frame,
+                        raw_frame=raw_frame,
+                        observation=observation,
                         episode=episode,
                         info=info,
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
                         control_state=current_control_state,
+                        policy_label=_policy_label(policy_runner),
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
                     continue
 
                 if paused and viewer_input.step_once:
-                    frame, reward, terminated, truncated, info = env.step_frame(
-                        current_control_state
-                    )
+                    if policy_runner is None:
+                        observation, reward, terminated, truncated, info = env.step_frame(
+                            current_control_state
+                        )
+                    else:
+                        action = policy_runner.predict(observation)
+                        current_control_state = env.action_to_control_state(action)
+                        observation, reward, terminated, truncated, info = env.step(action)
+                    raw_frame = env.render()
                     episode_reward += reward
                     telemetry = _read_live_telemetry(emulator)
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
                         fonts=fonts,
-                        frame=frame,
+                        raw_frame=raw_frame,
+                        observation=observation,
                         episode=episode,
                         info=info,
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
                         control_state=current_control_state,
+                        policy_label=_policy_label(policy_runner),
                         telemetry=telemetry,
                     )
                     continue
 
                 frame_start = time.perf_counter()
-                frame, reward, terminated, truncated, info = env.step_control(
-                    current_control_state
-                )
+                if policy_runner is None:
+                    observation, reward, terminated, truncated, info = env.step_control(
+                        current_control_state
+                    )
+                else:
+                    action = policy_runner.predict(observation)
+                    current_control_state = env.action_to_control_state(action)
+                    observation, reward, terminated, truncated, info = env.step(action)
+                raw_frame = env.render()
                 episode_reward += reward
                 telemetry = _read_live_telemetry(emulator)
 
-                screen = _ensure_screen(pygame, screen, emulator.display_size)
+                screen = _ensure_screen(
+                    pygame,
+                    screen,
+                    emulator.display_size,
+                    observation.shape,
+                )
                 _draw_frame(
                     pygame=pygame,
                     screen=screen,
                     fonts=fonts,
-                    frame=frame,
+                    raw_frame=raw_frame,
+                    observation=observation,
                     episode=episode,
                     info=info,
                     reset_info=reset_info,
                     episode_reward=episode_reward,
                     paused=paused,
                     control_state=current_control_state,
+                    policy_label=_policy_label(policy_runner),
                     telemetry=telemetry,
                 )
 
@@ -308,16 +353,25 @@ def run_viewer(config: WatchAppConfig) -> None:
         pygame.quit()
 
 
-def _create_screen(pygame, game_display_size: tuple[int, int]):
-    screen = pygame.display.set_mode(_window_size(game_display_size))
+def _create_screen(
+    pygame,
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+):
+    screen = pygame.display.set_mode(_window_size(game_display_size, observation_shape))
     pygame.display.set_caption("F-Zero X Watch")
     return screen
 
 
-def _ensure_screen(pygame, screen, game_display_size: tuple[int, int]):
-    if screen.get_size() == _window_size(game_display_size):
+def _ensure_screen(
+    pygame,
+    screen,
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+):
+    if screen.get_size() == _window_size(game_display_size, observation_shape):
         return screen
-    return _create_screen(pygame, game_display_size)
+    return _create_screen(pygame, game_display_size, observation_shape)
 
 
 def _create_fonts(pygame) -> ViewerFonts:
@@ -334,27 +388,53 @@ def _draw_frame(
     pygame,
     screen,
     fonts,
-    frame: np.ndarray,
+    raw_frame: np.ndarray,
+    observation: np.ndarray,
     episode: int,
     info: dict[str, object],
     reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
     control_state: ControllerState,
+    policy_label: str | None,
     telemetry: FZeroXTelemetry | None,
 ) -> None:
-    frame_height, frame_width, _ = frame.shape
-    surface = pygame.image.frombuffer(frame.tobytes(), (frame_width, frame_height), "RGB")
-    target_size = display_size(frame.shape, _display_aspect_ratio(info))
-    if surface.get_size() != target_size:
-        surface = pygame.transform.scale(surface, target_size)
+    game_surface = _rgb_surface(pygame, raw_frame)
+    game_display_size = display_size(raw_frame.shape, _display_aspect_ratio(info))
+    if game_surface.get_size() != game_display_size:
+        game_surface = pygame.transform.scale(game_surface, game_display_size)
+    preview_frame = _preview_frame(observation)
+    observation_display_size = _observation_preview_size(observation.shape)
+    observation_surface = _rgb_surface(pygame, preview_frame)
+    if observation_surface.get_size() != observation_display_size:
+        observation_surface = pygame.transform.scale(
+            observation_surface,
+            observation_display_size,
+        )
+    preview_panel_size = _preview_panel_size(observation.shape)
+
     screen.fill(PALETTE.app_background)
-    screen.blit(surface, (0, 0))
+    screen.blit(game_surface, (0, 0))
+    preview_panel_origin = (
+        game_display_size[0] + LAYOUT.preview_gap,
+        0,
+    )
+    _draw_observation_preview(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        panel_origin=preview_panel_origin,
+        observation_shape=observation.shape,
+    )
     panel_rect = pygame.Rect(
-        target_size[0],
+        game_display_size[0]
+        + LAYOUT.preview_gap
+        + preview_panel_size[0]
+        + LAYOUT.preview_gap,
         0,
         LAYOUT.panel_width,
-        _window_size(target_size)[1],
+        _window_size(game_display_size, observation.shape)[1],
     )
     _draw_side_panel(
         pygame=pygame,
@@ -367,7 +447,9 @@ def _draw_frame(
         episode_reward=episode_reward,
         paused=paused,
         control_state=control_state,
-        game_display_size=target_size,
+        policy_label=policy_label,
+        game_display_size=game_display_size,
+        observation_shape=observation.shape,
         telemetry=telemetry,
     )
     pygame.display.flip()
@@ -385,7 +467,9 @@ def _draw_side_panel(
     episode_reward: float,
     paused: bool,
     control_state: ControllerState,
+    policy_label: str | None,
     game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
 ) -> None:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
@@ -407,7 +491,9 @@ def _draw_side_panel(
         episode_reward=episode_reward,
         paused=paused,
         control_state=control_state,
+        policy_label=policy_label,
         game_display_size=game_display_size,
+        observation_shape=observation_shape,
         telemetry=telemetry,
     )
 
@@ -455,7 +541,9 @@ def _build_panel_columns(
     episode_reward: float,
     paused: bool,
     control_state: ControllerState,
+    policy_label: str | None,
     game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
 ) -> PanelColumns:
     return PanelColumns(
@@ -467,6 +555,11 @@ def _build_panel_columns(
                         "State",
                         "paused" if paused else "running",
                         PALETTE.text_warning if paused else PALETTE.text_accent,
+                    ),
+                    _panel_line(
+                        "Driver",
+                        policy_label if policy_label is not None else "manual",
+                        PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
@@ -533,6 +626,16 @@ def _build_panel_columns(
                     _panel_line(
                         "Game",
                         f"{game_display_size[0]}x{game_display_size[1]}",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Obs",
+                        _format_observation_shape(observation_shape),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Stack",
+                        str(_observation_stack_size(observation_shape)),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
@@ -705,8 +808,137 @@ def _column_content_height(fonts: ViewerFonts, sections: list[PanelSection]) -> 
     return y
 
 
-def _window_size(game_display_size: tuple[int, int]) -> tuple[int, int]:
-    return game_display_size[0] + LAYOUT.panel_width, game_display_size[1]
+def _window_size(
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+) -> tuple[int, int]:
+    preview_panel_size = _preview_panel_size(observation_shape)
+    return (
+        game_display_size[0]
+        + LAYOUT.preview_gap
+        + preview_panel_size[0]
+        + LAYOUT.preview_gap
+        + LAYOUT.panel_width,
+        max(game_display_size[1], preview_panel_size[1]),
+    )
+
+
+def _rgb_surface(pygame, frame: np.ndarray):
+    rgb_frame = np.ascontiguousarray(frame)
+    height, width, channels = rgb_frame.shape
+    if channels != 3:
+        raise ValueError(f"Expected an RGB frame for display, got shape {frame.shape!r}")
+    return pygame.image.frombuffer(rgb_frame.tobytes(), (width, height), "RGB")
+
+
+def _preview_frame(observation: np.ndarray) -> np.ndarray:
+    if observation.ndim != 3:
+        raise ValueError(f"Expected an HxWxC observation, got {observation.shape!r}")
+
+    channels = observation.shape[2]
+    if channels == 3:
+        return np.ascontiguousarray(observation)
+    if channels == 1:
+        return np.repeat(observation, 3, axis=2)
+    if channels % 3 == 0:
+        return np.ascontiguousarray(observation[:, :, -3:])
+
+    latest_channel = observation[:, :, -1:]
+    return np.repeat(latest_channel, 3, axis=2)
+
+
+def _draw_observation_preview(
+    *,
+    pygame,
+    screen,
+    fonts: ViewerFonts,
+    surface,
+    panel_origin: tuple[int, int],
+    observation_shape: tuple[int, ...],
+) -> None:
+    preview_width, preview_height = _observation_preview_size(observation_shape)
+    panel_width, panel_height = _preview_panel_size(observation_shape)
+    panel_rect = pygame.Rect(
+        panel_origin[0],
+        panel_origin[1],
+        panel_width,
+        panel_height,
+    )
+    pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
+    pygame.draw.line(
+        screen,
+        PALETTE.panel_border,
+        panel_rect.topleft,
+        panel_rect.bottomleft,
+        width=2,
+    )
+
+    x = panel_rect.x + LAYOUT.preview_padding
+    y = panel_rect.y + LAYOUT.preview_padding
+    title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
+    subtitle_surface = fonts.small.render(
+        _format_observation_summary(observation_shape),
+        True,
+        PALETTE.text_muted,
+    )
+    screen.blit(title_surface, (x, y))
+    y += title_surface.get_height() + LAYOUT.preview_title_gap
+    screen.blit(subtitle_surface, (x, y))
+    y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
+
+    preview_rect = pygame.Rect(x, y, preview_width, preview_height)
+    pygame.draw.rect(screen, PALETTE.app_background, preview_rect)
+    screen.blit(surface, preview_rect.topleft)
+
+
+def _preview_panel_size(observation_shape: tuple[int, ...]) -> tuple[int, int]:
+    preview_width, preview_height = _observation_preview_size(observation_shape)
+    title_height = FONT_SIZES.section + LAYOUT.preview_title_gap + FONT_SIZES.small
+    panel_height = (
+        (2 * LAYOUT.preview_padding)
+        + title_height
+        + LAYOUT.section_rule_gap
+        + preview_height
+    )
+    panel_width = preview_width + (2 * LAYOUT.preview_padding)
+    return panel_width, panel_height
+
+
+def _observation_preview_size(observation_shape: tuple[int, ...]) -> tuple[int, int]:
+    preview_shape = _preview_frame_shape(observation_shape)
+    return (
+        preview_shape[1] * LAYOUT.preview_scale,
+        preview_shape[0] * LAYOUT.preview_scale,
+    )
+
+
+def _preview_frame_shape(observation_shape: tuple[int, ...]) -> tuple[int, int, int]:
+    if len(observation_shape) != 3:
+        raise ValueError(f"Expected an HxWxC observation shape, got {observation_shape!r}")
+    height, width, channels = observation_shape
+    preview_channels = 3 if channels % 3 == 0 else 1
+    return height, width, preview_channels
+
+
+def _observation_stack_size(observation_shape: tuple[int, ...]) -> int:
+    channels = observation_shape[2]
+    if channels % 3 == 0:
+        return channels // 3
+    return channels
+
+
+def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
+    height, width, channels = observation_shape
+    return f"{width}x{height}x{channels}"
+
+
+def _format_observation_summary(observation_shape: tuple[int, ...]) -> str:
+    preview_shape = _preview_frame_shape(observation_shape)
+    return (
+        f"{preview_shape[1]}x{preview_shape[0]} "
+        f"{'rgb' if preview_shape[2] == 3 else 'gray'} "
+        f"x{_observation_stack_size(observation_shape)}"
+    )
 
 
 def _pressed_button_labels(joypad_mask_value: int) -> str:
@@ -757,6 +989,20 @@ def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
         return read_telemetry(emulator)
     except RuntimeError:
         return None
+
+
+def _load_policy_runner(policy_run_dir: Path | None) -> PolicyRunner | None:
+    if policy_run_dir is None:
+        return None
+    from rl_fzerox.core.training.inference import load_policy_runner
+
+    return load_policy_runner(policy_run_dir)
+
+
+def _policy_label(policy_runner: PolicyRunner | None) -> str | None:
+    if policy_runner is None:
+        return None
+    return policy_runner.label
 
 
 def _poll_viewer_input(pygame) -> ViewerInput:

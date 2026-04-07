@@ -18,12 +18,16 @@ class RewardWeights:
     """Weights for the first telemetry-based reward function."""
 
     progress_scale: float = 0.001
-    collision_recoil_penalty: float = -0.05
-    spinning_out_penalty: float = -0.1
+    reverse_progress_scale: float = 0.001
+    progress_epsilon: float = 0.5
+    collision_recoil_penalty: float = -1.0
+    spinning_out_penalty: float = -2.0
     falling_off_track_penalty: float = -10.0
     crashed_penalty: float = -20.0
     retired_penalty: float = -20.0
-    finish_bonus: float = 50.0
+    finish_bonus: float = 100.0
+    finish_position_scale: float = 2.0
+    max_race_position: int = 30
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,7 @@ class RewardTracker:
     def __init__(self, weights: RewardWeights | None = None) -> None:
         self._weights = weights or RewardWeights()
         self._best_race_distance = float("-inf")
+        self._previous_race_distance = float("-inf")
         self._previous_state_flags = 0
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
@@ -49,8 +54,10 @@ class RewardTracker:
         self._previous_state_flags = 0
         if telemetry is None:
             self._best_race_distance = float("-inf")
+            self._previous_race_distance = float("-inf")
             return
         self._best_race_distance = telemetry.player.race_distance
+        self._previous_race_distance = telemetry.player.race_distance
         self._previous_state_flags = telemetry.player.state_flags
 
     def step(self, telemetry: FZeroXTelemetry | None) -> RewardStep:
@@ -61,13 +68,19 @@ class RewardTracker:
 
         reward = 0.0
         breakdown: dict[str, float] = {}
+        progress_delta = telemetry.player.race_distance - self._previous_race_distance
 
         progress_gain = telemetry.player.race_distance - self._best_race_distance
-        if progress_gain > 0.0:
+        if progress_gain > self._weights.progress_epsilon:
             progress_reward = progress_gain * self._weights.progress_scale
             reward += progress_reward
             breakdown["progress"] = progress_reward
             self._best_race_distance = telemetry.player.race_distance
+
+        if progress_delta < -self._weights.progress_epsilon:
+            reverse_penalty = progress_delta * self._weights.reverse_progress_scale
+            reward += reverse_penalty
+            breakdown["reverse_progress"] = reverse_penalty
 
         current_flags = telemetry.player.state_flags
         entered_flags = current_flags & ~self._previous_state_flags
@@ -111,7 +124,15 @@ class RewardTracker:
         if entered_flags & FLAG_FINISHED:
             reward += self._weights.finish_bonus
             breakdown["finished"] = self._weights.finish_bonus
+            placement_bonus = _finish_placement_bonus(
+                position=telemetry.player.position,
+                weights=self._weights,
+            )
+            if placement_bonus:
+                reward += placement_bonus
+                breakdown["finish_position"] = placement_bonus
 
+        self._previous_race_distance = telemetry.player.race_distance
         self._previous_state_flags = current_flags
 
         terminated = bool(
@@ -132,3 +153,9 @@ def _apply_flag_penalty(
         return 0.0
     breakdown[label] = penalty
     return penalty
+
+
+def _finish_placement_bonus(*, position: int, weights: RewardWeights) -> float:
+    clamped_position = min(max(position, 1), weights.max_race_position)
+    better_than_last = weights.max_race_position - clamped_position
+    return better_than_last * weights.finish_position_scale

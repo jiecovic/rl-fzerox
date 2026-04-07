@@ -2,24 +2,37 @@
 import numpy as np
 from gymnasium.spaces import MultiDiscrete
 
-from rl_fzerox.core.actions.steer_drive import THROTTLE_MASK
-from rl_fzerox.core.config.models import EnvConfig
+from rl_fzerox.core.config.schema import EnvConfig, ObservationConfig
 from rl_fzerox.core.emulator.base import ResetState
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.actions import THROTTLE_MASK
+from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
 from tests.fakes import SyntheticBackend
 
 
-def test_reset_returns_raw_frame_observation():
+def test_reset_returns_stacked_observation():
     backend = SyntheticBackend()
-    env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=2))
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=2,
+            observation=ObservationConfig(width=160, height=120, frame_stack=4),
+        ),
+    )
 
     obs, info = env.reset(seed=123)
 
-    assert obs.shape == backend.frame_shape
+    assert obs.shape == (120, 160, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
+    assert info["observation_shape"] == (120, 160, 12)
+    assert info["observation_frame_shape"] == (120, 160, 3)
+    assert info["observation_stack"] == 4
+    assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
+    assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
+    assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [5, 2]
 
@@ -31,7 +44,7 @@ def test_step_advances_backend_by_action_repeat():
     env.reset(seed=7)
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
 
-    assert obs.shape == backend.frame_shape
+    assert obs.shape == (120, 160, 12)
     assert isinstance(reward, float)
     assert not terminated
     assert not truncated
@@ -43,13 +56,21 @@ def test_step_advances_backend_by_action_repeat():
     )
 
 
-def test_step_updates_raw_observation_during_headless_smoke_rollout():
-    env = FZeroXEnv(backend=SyntheticBackend(), config=EnvConfig(action_repeat=1))
+def test_step_shifts_the_frame_stack_forward():
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            observation=ObservationConfig(width=160, height=120, frame_stack=4),
+        ),
+    )
 
     obs_before, _ = env.reset(seed=9)
-    obs_after, _, _, _, _ = env.step(np.array([3, 0], dtype=np.int64))
+    obs_after, _, _, _, _ = env.step(np.array([2, 0], dtype=np.int64))
+    obs_later, _, _, _, _ = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not np.array_equal(obs_before, obs_after)
+    assert np.array_equal(obs_later[:, :, 0:9], obs_after[:, :, 3:12])
 
 
 def test_step_control_applies_manual_controller_state() -> None:
@@ -72,7 +93,7 @@ def test_reset_can_boot_into_the_first_race_path():
 
     obs, info = env.reset(seed=5)
 
-    assert obs.shape == backend.frame_shape
+    assert obs.shape == (120, 160, 12)
     assert info["seed"] == 5
     assert info["reset_mode"] == "boot_to_race"
     assert info["boot_state"] == "gp_race"
@@ -127,3 +148,132 @@ def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> 
     assert info["seed"] == 2
     assert info["reset_mode"] == "continue_to_next_race"
     assert info["boot_state"] == "gp_race"
+
+
+def test_step_truncates_on_timeout(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=2,
+            stuck_grace_steps=10,
+            stuck_step_limit=10,
+        ),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine._read_live_telemetry",
+        lambda _backend: _telemetry(race_distance=float(backend.frame_index * 10)),
+    )
+
+    env.reset(seed=3)
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    assert not terminated
+    assert not truncated
+
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert not terminated
+    assert truncated
+    assert info["truncation_reason"] == "timeout"
+    assert info["episode_step"] == 2
+
+
+def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=100,
+            stuck_grace_steps=1,
+            stuck_step_limit=2,
+            stuck_progress_epsilon=5.0,
+        ),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine._read_live_telemetry",
+        lambda _backend: _telemetry(race_distance=0.0),
+    )
+
+    env.reset(seed=4)
+    _, _, terminated, truncated, _ = env.step(np.array([2, 0], dtype=np.int64))
+    assert not terminated
+    assert not truncated
+
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert not terminated
+    assert truncated
+    assert info["truncation_reason"] == "stuck"
+    assert info["stalled_steps"] == 2
+
+
+def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine._read_live_telemetry",
+        lambda _backend: _telemetry(race_distance=42.0, state_labels=("finished",)),
+    )
+
+    env.reset(seed=5)
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert terminated
+    assert not truncated
+    assert info["termination_reason"] == "finished"
+    assert "truncation_reason" in info
+    assert info["truncation_reason"] is None
+    assert isinstance(info["episode_return"], float)
+
+
+def _telemetry(
+    *,
+    race_distance: float,
+    state_labels: tuple[str, ...] = ("active",),
+) -> FZeroXTelemetry:
+    state_flags = 1 << 30
+    if "collision_recoil" in state_labels:
+        state_flags |= 1 << 13
+    if "spinning_out" in state_labels:
+        state_flags |= 1 << 14
+    if "retired" in state_labels:
+        state_flags |= 1 << 18
+    if "falling_off_track" in state_labels:
+        state_flags |= 1 << 19
+    if "finished" in state_labels:
+        state_flags |= 1 << 25
+    if "crashed" in state_labels:
+        state_flags |= 1 << 27
+
+    return FZeroXTelemetry(
+        system_ram_size=0x00800000,
+        game_frame_count=100,
+        game_mode_raw=1,
+        game_mode_name="gp_race",
+        course_index=0,
+        in_race_mode=True,
+        player=PlayerTelemetry(
+            state_flags=state_flags,
+            state_labels=state_labels,
+            speed_raw=0.0,
+            speed_kph=0.0,
+            energy=178.0,
+            max_energy=178.0,
+            boost_timer=0,
+            race_distance=race_distance,
+            laps_completed_distance=0.0,
+            lap_distance=race_distance,
+            race_distance_position=race_distance,
+            race_time_ms=0,
+            lap=1,
+            laps_completed=0,
+            position=30,
+            character=0,
+            machine_index=0,
+        ),
+    )

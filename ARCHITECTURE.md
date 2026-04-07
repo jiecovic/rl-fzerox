@@ -14,13 +14,18 @@
 
 - `src/rl_fzerox/core/envs/`
   The Gymnasium-facing environment layer. Right now it is intentionally slim:
-  raw emulator frames, modular action adapters, fixed frame stepping, a first
-  telemetry-based reward function, and deterministic race reset helpers.
+  modular action adapters, fixed frame stepping, a first telemetry-based reward
+  function, deterministic race reset helpers, action adapters, episode limits,
+  and a stacked observation pipeline.
 
-- `src/rl_fzerox/core/actions/`
-  Policy-side action adapters that map Gymnasium action spaces to held emulator
-  controller state. The current adapter is a 5-bucket steering plus 2-mode
+  The current policy-side action adapter is a 5-bucket steering plus 2-mode
   coast/throttle `MultiDiscrete` space.
+
+  The current observation pipeline aspect-corrects the raw framebuffer,
+  downsamples it to `160x120 RGB`, and stacks 4 returned observations. The
+  stateless image transforms are candidates to move into Rust once the
+  observation format is stable; the stack itself should stay tied to env
+  reset/step semantics.
 
 - `src/rl_fzerox/core/emulator/`
   Python wrapper around the native emulator host. It exposes reset, frame
@@ -34,6 +39,16 @@
   active. Once that field set is stable, the decoding should move into the Rust
   host so the native boundary owns both memory access and structured game-state
   reads.
+
+- `src/rl_fzerox/core/policy.py`
+  SB3-facing policy surface shared by training and inference. Right now it
+  contains the first custom PPO CNN extractor, PPO model construction, and the
+  small inference wrapper used by `watch --run-dir`.
+
+- `src/rl_fzerox/core/training/`
+  Training-session orchestration and run artifacts only. This layer owns run
+  directories, saved train-config snapshots, and the PPO runner wiring around
+  the env and policy modules.
 
 - `rust/`
   Native libretro host implemented in Rust and exposed to Python with `pyo3`.
@@ -65,10 +80,11 @@
 - Soft continue-into-next-race reset after terminal episodes
 - Manual watch controls for creating a baseline savestate in-project
 - First modular controller/action mapping for policy actions
+- First modular observation pipeline for policy input
 - Live RDRAM telemetry for a first set of player/race values
 - First telemetry-based reward shaping from race progress and terminal events
+- First PPO training/inference wiring with saved run-config snapshots
 
 Not implemented yet:
 
-- Training CLI and policy inference
 - Brake/boost action mapping and richer action spaces

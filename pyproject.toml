@@ -27,10 +27,17 @@ dev = [
 watch = [
   "pygame>=2.5,<3",
 ]
+train = [
+  "rich>=13,<15",
+  "stable-baselines3>=2.6,<3",
+  "tensorboard>=2.18,<3",
+  "tqdm>=4.66,<5",
+]
 
 [project.scripts]
 fzerox-probe = "rl_fzerox.apps.probe:main"
 fzerox-smoke = "rl_fzerox.apps.smoke:main"
+fzerox-train = "rl_fzerox.apps.train:main"
 fzerox-watch = "rl_fzerox.apps.watch:main"
 
 [tool.pytest.ini_options]

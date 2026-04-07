@@ -131,6 +131,7 @@ dependencies = [
 name = "rl-fzerox-native"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "libloading",
  "libretro-sys",
  "pyo3",

@@ -6,6 +6,10 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from rl_fzerox.core.config import load_watch_app_config
+from rl_fzerox.core.training.runs import (
+    apply_train_run_to_watch_config,
+    load_train_run_config,
+)
 from rl_fzerox.ui.viewer import run_viewer
 
 
@@ -30,6 +34,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         nargs=argparse.REMAINDER,
         help="Hydra overrides. Use `-- key=value` to separate them from CLI flags.",
     )
+    parser.add_argument(
+        "--run-dir",
+        dest="policy_run_dir",
+        type=Path,
+        default=None,
+        help="Optional training run directory. The watch app loads its latest checkpoint.",
+    )
     return parser.parse_args(argv)
 
 
@@ -44,6 +55,19 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+
+    policy_run_dir = (
+        args.policy_run_dir.expanduser().resolve()
+        if args.policy_run_dir is not None
+        else config.watch.policy_run_dir
+    )
+    if policy_run_dir is not None:
+        train_config = load_train_run_config(policy_run_dir)
+        config = apply_train_run_to_watch_config(
+            config,
+            run_dir=policy_run_dir,
+            train_config=train_config,
+        )
 
     run_viewer(config)
 
