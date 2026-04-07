@@ -13,7 +13,7 @@ env:
   stuck_progress_epsilon: 5.0
   reset_to_race: true
   action:
-    steer_buckets: 5
+    steer_buckets: 7
   observation:
     width: 160
     height: 120

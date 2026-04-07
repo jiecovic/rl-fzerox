@@ -10,7 +10,7 @@ env:
   action_repeat: 3
   reset_to_race: false
   action:
-    steer_buckets: 5
+    steer_buckets: 7
   observation:
     width: 160
     height: 120

@@ -20,7 +20,7 @@ class ActionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    steer_buckets: int = Field(default=5, ge=3)
+    steer_buckets: int = Field(default=7, ge=3)
 
 
 class ObservationConfig(BaseModel):
