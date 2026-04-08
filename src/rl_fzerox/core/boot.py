@@ -15,9 +15,7 @@ class BootConfig:
 
     title_mode_name: str = "title"
     race_mode_name: str = "gp_race"
-    start_control: ControllerState = ControllerState(
-        joypad_mask=joypad_mask(JOYPAD_START)
-    )
+    start_control: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_START))
     neutral_control: ControllerState = ControllerState()
     title_wait_frames: int = 240
     start_hold_frames: int = 2

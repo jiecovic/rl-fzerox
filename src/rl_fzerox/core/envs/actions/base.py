@@ -82,8 +82,7 @@ def parse_discrete_action(
     if len(values) != expected_size:
         labels = ", ".join(dimension.label for dimension in dimensions)
         raise ValueError(
-            f"{action_label} actions must contain exactly {expected_size} values: "
-            f"[{labels}]"
+            f"{action_label} actions must contain exactly {expected_size} values: [{labels}]"
         )
 
     for value, dimension in zip(values, dimensions, strict=True):

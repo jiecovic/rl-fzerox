@@ -50,9 +50,10 @@ def test_window_size_adds_sidebar_width() -> None:
 
 def test_pressed_button_labels_are_human_readable() -> None:
     assert _pressed_button_labels(0) == "none"
-    assert _pressed_button_labels(
-        (1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START)
-    ) == "Up A Start"
+    assert (
+        _pressed_button_labels((1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START))
+        == "Up A Start"
+    )
 
 
 def test_side_panel_fits_default_watch_window_height() -> None:
@@ -88,11 +89,14 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             telemetry=_sample_telemetry(),
         )
 
-        assert _panel_content_height(
-            fonts,
-            columns,
-            observation_shape=(78, 222, 12),
-        ) <= _window_size((592, 444), (78, 222, 12))[1]
+        assert (
+            _panel_content_height(
+                fonts,
+                columns,
+                observation_shape=(78, 222, 12),
+            )
+            <= _window_size((592, 444), (78, 222, 12))[1]
+        )
     finally:
         pygame.quit()
 
@@ -152,10 +156,7 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
     assert game_section.flag_viz is not None
     assert len(game_section.flag_viz.rows) == 3
     active_labels = {
-        token.label
-        for row in game_section.flag_viz.rows
-        for token in row
-        if token.active
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
     assert {"dash", "recoil"}.issubset(active_labels)
 

@@ -199,9 +199,7 @@ def _window_size(
     observation_shape: tuple[int, ...],
 ) -> tuple[int, int]:
     return (
-        game_display_size[0]
-        + LAYOUT.preview_gap
-        + LAYOUT.panel_width,
+        game_display_size[0] + LAYOUT.preview_gap + LAYOUT.panel_width,
         max(game_display_size[1], LAYOUT.panel_min_height),
     )
 
@@ -234,10 +232,7 @@ def _preview_panel_size(observation_shape: tuple[int, ...]) -> tuple[int, int]:
     preview_width, preview_height = _observation_preview_size(observation_shape)
     title_height = FONT_SIZES.section + LAYOUT.preview_title_gap + FONT_SIZES.small
     panel_height = (
-        (2 * LAYOUT.preview_padding)
-        + title_height
-        + LAYOUT.section_rule_gap
-        + preview_height
+        (2 * LAYOUT.preview_padding) + title_height + LAYOUT.section_rule_gap + preview_height
     )
     panel_width = preview_width + (2 * LAYOUT.preview_padding)
     return panel_width, panel_height
@@ -375,11 +370,7 @@ def _control_viz(control_state: ControllerState) -> ControlViz:
         drive_level=1 if joypad_mask & THROTTLE_MASK else 0,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         drift_direction=(
-            -1
-            if joypad_mask & DRIFT_LEFT_MASK
-            else 1
-            if joypad_mask & DRIFT_RIGHT_MASK
-            else 0
+            -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
         ),
     )
 

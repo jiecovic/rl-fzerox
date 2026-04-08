@@ -54,11 +54,7 @@ def _persist_reload_error(
     runtime_dir: Path | None,
     last_logged_reload_error: str | None,
 ) -> str | None:
-    if (
-        reload_error is None
-        or runtime_dir is None
-        or reload_error == last_logged_reload_error
-    ):
+    if reload_error is None or runtime_dir is None or reload_error == last_logged_reload_error:
         return last_logged_reload_error
 
     log_path = runtime_dir.parent / "reload_error.log"
@@ -83,8 +79,10 @@ def _with_viewer_fps(
     else:
         dt = now - last_draw_time
         instant_fps = 0.0 if dt <= 0.0 else 1.0 / dt
-        viewer_fps = instant_fps if current_viewer_fps <= 0.0 else (
-            (0.8 * current_viewer_fps) + (0.2 * instant_fps)
+        viewer_fps = (
+            instant_fps
+            if current_viewer_fps <= 0.0
+            else ((0.8 * current_viewer_fps) + (0.2 * instant_fps))
         )
     draw_info = dict(info)
     draw_info["viewer_fps"] = viewer_fps

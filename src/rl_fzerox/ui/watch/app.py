@@ -82,9 +82,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     observation.shape,
                 )
                 fonts = _create_fonts(pygame)
-                target_fps = config.watch.fps or (
-                    env.backend.native_fps / config.env.action_repeat
-                )
+                target_fps = config.watch.fps or (env.backend.native_fps / config.env.action_repeat)
                 target_seconds = 1.0 / target_fps
 
             viewer_input = _poll_viewer_input(pygame)

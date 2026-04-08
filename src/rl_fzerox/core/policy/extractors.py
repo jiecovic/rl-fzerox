@@ -90,9 +90,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         """Convert either NHWC or NCHW observations into shared PPO features."""
 
         if observations.ndim != 4:
-            raise ValueError(
-                f"Expected a 4D observation tensor, got {tuple(observations.shape)!r}"
-            )
+            raise ValueError(f"Expected a 4D observation tensor, got {tuple(observations.shape)!r}")
 
         if observations.shape[1:] == (self._channels, self._height, self._width):
             channels_first = observations
