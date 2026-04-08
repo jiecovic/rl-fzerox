@@ -1,10 +1,14 @@
 // rust/core/host/input.rs
+//! Conversion between Python-friendly normalized controls and libretro's
+//! integer input representation.
+
 use libretro_sys::{
     DEVICE_ID_ANALOG_X, DEVICE_ID_ANALOG_Y, DEVICE_INDEX_ANALOG_LEFT, DEVICE_INDEX_ANALOG_RIGHT,
 };
 
 const LIBRETRO_ANALOG_MAX: f32 = i16::MAX as f32;
 
+/// Packed controller state for a single libretro polling step.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ControllerState {
     joypad_mask: u16,
@@ -15,6 +19,8 @@ pub struct ControllerState {
 }
 
 impl ControllerState {
+    /// Build one controller state from normalized `[-1, 1]` stick inputs and a
+    /// bitmask of pressed joypad buttons.
     pub fn from_normalized(
         joypad_mask: u16,
         left_stick_x: f32,

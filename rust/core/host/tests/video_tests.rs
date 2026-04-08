@@ -1,8 +1,9 @@
+// Covers pixel conversion plus crop/aspect/resize behavior in the video path.
 use std::ffi::c_void;
 
 use super::{
-    PixelLayout, RawVideoFrame, VideoFrame, convert_argb1555, convert_argb8888, convert_rgb565,
-    decode_frame, observation_frame, observation_frame_from_raw,
+    PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, convert_argb1555, convert_argb8888,
+    convert_rgb565, decode_frame, processed_frame, processed_frame_from_raw,
 };
 
 #[test]
@@ -41,7 +42,8 @@ fn observation_frame_aspect_corrects_then_downscales() {
         rgb,
     };
 
-    let observation = observation_frame(&frame, 4.0 / 3.0, 160, 120, true);
+    let observation = processed_frame(&frame, 4.0 / 3.0, 160, 120, true, VideoCrop::default())
+        .expect("observation should render");
 
     assert_eq!(observation.len(), 160 * 120 * 3);
     let left_red_total: usize = observation
@@ -74,9 +76,44 @@ fn observation_frame_from_raw_matches_decoded_path() {
     };
     let decoded = decode_frame(&raw).expect("raw frame should decode");
 
-    let from_raw = observation_frame_from_raw(&raw, 4.0 / 3.0, 3, 2, true)
+    let from_raw = processed_frame_from_raw(&raw, 4.0 / 3.0, 3, 2, true, VideoCrop::default())
         .expect("raw observation should render");
-    let from_decoded = observation_frame(&decoded, 4.0 / 3.0, 3, 2, true);
+    let from_decoded = processed_frame(&decoded, 4.0 / 3.0, 3, 2, true, VideoCrop::default())
+        .expect("decoded observation");
 
     assert_eq!(from_raw, from_decoded);
+}
+
+#[test]
+fn processed_frame_crops_before_resize() {
+    let mut rgb = vec![0_u8; 10 * 6 * 3];
+    for row in 1..5 {
+        for column in 2..8 {
+            let index = (row * 10 + column) * 3;
+            rgb[index + 1] = 255;
+        }
+    }
+    let frame = VideoFrame {
+        width: 10,
+        height: 6,
+        rgb,
+    };
+
+    let observation = processed_frame(
+        &frame,
+        0.0,
+        6,
+        4,
+        true,
+        VideoCrop {
+            top: 1,
+            bottom: 1,
+            left: 2,
+            right: 2,
+        },
+    )
+    .expect("cropped observation should render");
+
+    assert_eq!(observation.len(), 6 * 4 * 3);
+    assert!(observation.chunks_exact(3).all(|pixel| pixel[1] == 255));
 }

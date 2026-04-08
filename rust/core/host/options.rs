@@ -1,4 +1,10 @@
 // rust/core/host/options.rs
+//! Small helpers for libretro core-option parsing and overrides.
+
+use std::ffi::CStr;
+
+/// Extract the default value from a libretro option spec like
+/// `"Renderer; angrylion|gliden64"`.
 pub fn default_option_value(spec: &str) -> String {
     let Some((_, values)) = spec.split_once("; ") else {
         return spec.to_owned();
@@ -6,8 +12,7 @@ pub fn default_option_value(spec: &str) -> String {
     values.split('|').next().unwrap_or_default().to_owned()
 }
 
-use std::ffi::CStr;
-
+/// Override core options that the host wants to pin explicitly.
 pub fn override_option(key: &str, default_value: &str, renderer: &CStr) -> String {
     match key {
         "mupen64plus-rdp-plugin" => renderer.to_string_lossy().into_owned(),

@@ -1,14 +1,19 @@
 // rust/bindings/emulator.rs
+//! Python binding for the native libretro host runtime.
+
 use std::path::Path;
 
+use numpy::{PyArray1, PyArrayMethods};
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyList};
+use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
 
 use crate::bindings::error::map_core_error;
 use crate::core::host::Host;
 use crate::core::input::ControllerState;
+use crate::core::observation::ObservationPreset;
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
 
+/// Python-facing wrapper around one native `Host` instance.
 #[pyclass(name = "Emulator", unsendable)]
 pub struct PyEmulator {
     host: Host,
@@ -129,18 +134,57 @@ impl PyEmulator {
         Ok(PyBytes::new(py, frame))
     }
 
-    #[pyo3(signature = (width, height, rgb=true))]
+    fn observation_spec<'py>(
+        &mut self,
+        py: Python<'py>,
+        preset: &str,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let spec = py
+            .detach(|| self.host.observation_spec(preset))
+            .map_err(map_core_error)?;
+        let dict = PyDict::new(py);
+        dict.set_item("preset", spec.preset_name)?;
+        dict.set_item("width", spec.frame_width)?;
+        dict.set_item("height", spec.frame_height)?;
+        dict.set_item("channels", spec.channels)?;
+        dict.set_item("display_width", spec.display_width)?;
+        dict.set_item("display_height", spec.display_height)?;
+        Ok(dict)
+    }
+
+    #[pyo3(signature = (preset))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
-        width: usize,
-        height: usize,
-        rgb: bool,
-    ) -> PyResult<Bound<'py, PyBytes>> {
-        let frame = py
-            .detach(|| self.host.observation_frame(width, height, rgb))
+        preset: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let spec = py
+            .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
-        Ok(PyBytes::new(py, &frame))
+        let frame = py
+            .detach(|| self.host.observation_frame(preset))
+            .map_err(map_core_error)?;
+        frame_to_pyarray(
+            py,
+            frame,
+            spec.frame_height,
+            spec.frame_width,
+            spec.channels,
+        )
+    }
+
+    #[pyo3(signature = (preset))]
+    fn frame_display<'py>(&mut self, py: Python<'py>, preset: &str) -> PyResult<Bound<'py, PyAny>> {
+        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let spec = py
+            .detach(|| self.host.observation_spec(preset))
+            .map_err(map_core_error)?;
+        let frame = py
+            .detach(|| self.host.display_frame(preset))
+            .map_err(map_core_error)?;
+        frame_to_pyarray(py, frame, spec.display_height, spec.display_width, 3)
     }
 
     fn telemetry<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
@@ -148,6 +192,13 @@ impl PyEmulator {
             .detach(|| self.host.telemetry())
             .map_err(map_core_error)?;
         telemetry_to_pydict(py, &telemetry)
+    }
+
+    fn telemetry_flat<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
+        let telemetry = py
+            .detach(|| self.host.telemetry())
+            .map_err(map_core_error)?;
+        telemetry_to_pytuple(py, &telemetry)
     }
 
     fn read_system_ram<'py>(
@@ -167,6 +218,8 @@ impl PyEmulator {
     }
 }
 
+/// Convert the rich native telemetry snapshot into a Python dictionary for
+/// introspection/debugging use.
 fn telemetry_to_pydict<'py>(
     py: Python<'py>,
     telemetry: &TelemetrySnapshot,
@@ -182,6 +235,7 @@ fn telemetry_to_pydict<'py>(
     Ok(dict)
 }
 
+/// Convert the player telemetry sub-struct into a Python dictionary.
 fn player_to_pydict<'py>(
     py: Python<'py>,
     player: &PlayerTelemetry,
@@ -205,4 +259,79 @@ fn player_to_pydict<'py>(
     dict.set_item("character", player.character)?;
     dict.set_item("machine_index", player.machine_index)?;
     Ok(dict)
+}
+
+/// Convert the hot-path telemetry shape into tuples so Python can rebuild typed
+/// telemetry objects with less object churn than nested dict/list creation.
+fn telemetry_to_pytuple<'py>(
+    py: Python<'py>,
+    telemetry: &TelemetrySnapshot,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let player = player_to_pytuple(py, &telemetry.player)?;
+    PyTuple::new(
+        py,
+        [
+            telemetry.system_ram_size.into_pyobject(py)?.into_any(),
+            telemetry.game_frame_count.into_pyobject(py)?.into_any(),
+            telemetry.game_mode_raw.into_pyobject(py)?.into_any(),
+            telemetry
+                .game_mode_name
+                .as_str()
+                .into_pyobject(py)?
+                .into_any(),
+            telemetry.course_index.into_pyobject(py)?.into_any(),
+            telemetry
+                .in_race_mode
+                .into_pyobject(py)?
+                .to_owned()
+                .into_any(),
+            player.into_any(),
+        ],
+    )
+}
+
+/// Convert the player telemetry sub-struct into the tuple layout expected by
+/// the Python-side fast path.
+fn player_to_pytuple<'py>(
+    py: Python<'py>,
+    player: &PlayerTelemetry,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let state_labels = PyTuple::new(py, player.state_labels.iter().copied())?;
+    PyTuple::new(
+        py,
+        [
+            player.state_flags.into_pyobject(py)?.into_any(),
+            state_labels.into_any(),
+            player.speed_raw.into_pyobject(py)?.into_any(),
+            player.speed_kph.into_pyobject(py)?.into_any(),
+            player.energy.into_pyobject(py)?.into_any(),
+            player.max_energy.into_pyobject(py)?.into_any(),
+            player.boost_timer.into_pyobject(py)?.into_any(),
+            player.race_distance.into_pyobject(py)?.into_any(),
+            player.laps_completed_distance.into_pyobject(py)?.into_any(),
+            player.lap_distance.into_pyobject(py)?.into_any(),
+            player.race_distance_position.into_pyobject(py)?.into_any(),
+            player.race_time_ms.into_pyobject(py)?.into_any(),
+            player.lap.into_pyobject(py)?.into_any(),
+            player.laps_completed.into_pyobject(py)?.into_any(),
+            player.position.into_pyobject(py)?.into_any(),
+            player.character.into_pyobject(py)?.into_any(),
+            player.machine_index.into_pyobject(py)?.into_any(),
+        ],
+    )
+}
+
+/// Materialize a Python-owned NumPy array view of a frame buffer.
+///
+/// This still performs one copy into Python-owned memory; it just avoids the
+/// extra `PyBytes` hop that the older path used.
+fn frame_to_pyarray<'py>(
+    py: Python<'py>,
+    frame: &[u8],
+    height: usize,
+    width: usize,
+    channels: usize,
+) -> PyResult<Bound<'py, PyAny>> {
+    let array = PyArray1::<u8>::from_vec(py, frame.to_vec());
+    Ok(array.reshape([height, width, channels])?.into_any())
 }

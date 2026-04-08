@@ -1,4 +1,6 @@
 // rust/bindings/probe.rs
+//! Python binding for lightweight libretro core metadata probing.
+
 use std::path::Path;
 
 use pyo3::prelude::*;
@@ -7,6 +9,7 @@ use crate::bindings::error::map_core_error;
 use crate::core::info::CoreInfo;
 use crate::core::probe::probe;
 
+/// Python-facing owned view of libretro core metadata.
 #[pyclass(name = "CoreInfo", frozen, get_all, skip_from_py_object)]
 pub struct PyCoreInfo {
     pub api_version: u32,
@@ -23,6 +26,7 @@ pub fn probe_core(core_path: &str) -> PyResult<PyCoreInfo> {
     Ok(PyCoreInfo::from(core_info))
 }
 
+/// Convert the native metadata struct into the Python-facing equivalent.
 impl From<CoreInfo> for PyCoreInfo {
     fn from(value: CoreInfo) -> Self {
         Self {

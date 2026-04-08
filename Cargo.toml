@@ -15,4 +15,10 @@ bitflags = "2.6"
 libc = "0.2"
 libloading = "0.9.0"
 libretro-sys = "0.1.1"
+numpy = "0.28"
 pyo3 = { version = "0.28.3", features = ["extension-module"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

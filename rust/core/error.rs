@@ -1,7 +1,11 @@
 // rust/core/error.rs
+//! Error types shared across the native libretro host, video pipeline, and
+//! telemetry readers.
+
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 
+/// Domain-specific failures raised by the native host and exposed to Python.
 #[derive(Debug)]
 pub enum CoreError {
     MissingCore(PathBuf),
@@ -48,6 +52,17 @@ pub enum CoreError {
     },
     LoadGameFailed {
         path: PathBuf,
+    },
+    InvalidObservationPreset {
+        name: String,
+    },
+    InvalidVideoCrop {
+        frame_width: usize,
+        frame_height: usize,
+        top: usize,
+        bottom: usize,
+        left: usize,
+        right: usize,
     },
     NoFrameAvailable,
 }
@@ -140,6 +155,22 @@ impl Display for CoreError {
                     formatter,
                     "Libretro core could not load ROM '{}'",
                     path.display()
+                )
+            }
+            Self::InvalidObservationPreset { name } => {
+                write!(formatter, "Unknown observation preset '{name}'")
+            }
+            Self::InvalidVideoCrop {
+                frame_width,
+                frame_height,
+                top,
+                bottom,
+                left,
+                right,
+            } => {
+                write!(
+                    formatter,
+                    "Invalid video crop for frame {frame_width}x{frame_height}: top={top}, bottom={bottom}, left={left}, right={right}"
                 )
             }
             Self::NoFrameAvailable => {

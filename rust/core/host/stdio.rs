@@ -1,4 +1,7 @@
 // rust/core/host/stdio.rs
+//! Helpers for temporarily silencing noisy core stdout/stderr during libretro
+//! init/load paths.
+
 use std::fs::OpenOptions;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_int;
@@ -6,6 +9,7 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 static STDIO_SILENCE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
+/// Run one operation while temporarily redirecting stdout/stderr to `/dev/null`.
 pub fn with_silenced_stdio<T>(operation: impl FnOnce() -> T) -> T {
     let _guard = StdioSilencer::acquire();
     operation()

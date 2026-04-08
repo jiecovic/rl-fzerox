@@ -1,8 +1,11 @@
 // rust/core/libretro/info.rs
+//! Helpers for turning raw libretro `SystemInfo` data into owned Rust types.
+
 use std::ffi::CStr;
 
 use libretro_sys::SystemInfo;
 
+/// Owned metadata describing a loaded libretro core.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CoreInfo {
     pub api_version: u32,
@@ -14,6 +17,8 @@ pub struct CoreInfo {
 }
 
 impl CoreInfo {
+    /// Copy libretro-reported metadata into an owned struct that outlives the
+    /// original callback frame.
     pub fn from_system_info(api_version: u32, system_info: &SystemInfo) -> Self {
         Self {
             api_version,
@@ -26,7 +31,7 @@ impl CoreInfo {
     }
 }
 
-pub fn c_string_field(value: *const i8) -> String {
+fn c_string_field(value: *const i8) -> String {
     if value.is_null() {
         return String::new();
     }
@@ -39,7 +44,8 @@ pub fn c_string_field(value: *const i8) -> String {
         .into_owned()
 }
 
-pub fn split_extensions(value: *const i8) -> Vec<String> {
+/// Parse a `foo|bar|baz` extension string into owned extension entries.
+fn split_extensions(value: *const i8) -> Vec<String> {
     c_string_field(value)
         .split('|')
         .filter(|entry| !entry.is_empty())

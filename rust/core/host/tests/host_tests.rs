@@ -1,3 +1,4 @@
+// Covers host bootstrap helpers that resolve the effective display aspect ratio.
 use super::resolve_display_aspect_ratio;
 
 #[test]
