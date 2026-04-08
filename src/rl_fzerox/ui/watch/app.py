@@ -1,46 +1,33 @@
-# src/rl_fzerox/ui/viewer.py
+# src/rl_fzerox/ui/watch/app.py
 from __future__ import annotations
 
-import os
 import time
-from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.emulator import ControllerState, Emulator
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.game import FZeroXTelemetry
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.ui.viewer_draw import _create_fonts, _draw_frame
-from rl_fzerox.ui.viewer_format import (
-    _build_panel_columns,
-    _format_policy_action,
-    _format_reload_age,
-    _format_reload_error,
-    _panel_content_height,
-    _pressed_button_labels,
-    _preview_frame,
-    _window_size,
+from rl_fzerox.ui.watch.input import _poll_viewer_input
+from rl_fzerox.ui.watch.render.frame import (
+    _create_fonts,
+    _create_screen,
+    _draw_frame,
+    _ensure_screen,
 )
-from rl_fzerox.ui.viewer_input import _poll_viewer_input
+from rl_fzerox.ui.watch.session import (
+    _load_policy_runner,
+    _persist_reload_error,
+    _policy_label,
+    _policy_reload_age_seconds,
+    _policy_reload_error,
+    _save_baseline_state,
+    _telemetry_from_info,
+    _with_viewer_fps,
+)
 
-if TYPE_CHECKING:
-    from rl_fzerox.core.training.inference import PolicyRunner
-
-__all__ = [
-    "run_viewer",
-    "_build_panel_columns",
-    "_create_fonts",
-    "_format_policy_action",
-    "_format_reload_age",
-    "_format_reload_error",
-    "_panel_content_height",
-    "_pressed_button_labels",
-    "_preview_frame",
-    "_window_size",
-]
+__all__ = ["run_viewer"]
 
 
 def run_viewer(config: WatchAppConfig) -> None:
@@ -317,109 +304,3 @@ def run_viewer(config: WatchAppConfig) -> None:
     finally:
         env.close()
         pygame.quit()
-
-
-def _create_screen(
-    pygame,
-    game_display_size: tuple[int, int],
-    observation_shape: tuple[int, ...],
-):
-    _apply_window_position_hint()
-    screen = pygame.display.set_mode(_window_size(game_display_size, observation_shape))
-    pygame.display.set_caption("F-Zero X Watch")
-    return screen
-
-
-def _ensure_screen(
-    pygame,
-    screen,
-    game_display_size: tuple[int, int],
-    observation_shape: tuple[int, ...],
-):
-    if screen.get_size() == _window_size(game_display_size, observation_shape):
-        return screen
-    return _create_screen(pygame, game_display_size, observation_shape)
-
-
-def _telemetry_from_info(info: dict[str, object]) -> FZeroXTelemetry | None:
-    telemetry = info.get("telemetry")
-    if isinstance(telemetry, FZeroXTelemetry):
-        return telemetry
-    return None
-
-
-def _load_policy_runner(
-    policy_run_dir: Path | None,
-    *,
-    artifact: str,
-) -> PolicyRunner | None:
-    if policy_run_dir is None:
-        return None
-    from rl_fzerox.core.training.inference import load_policy_runner
-
-    return load_policy_runner(policy_run_dir, artifact=artifact)
-
-
-def _policy_label(policy_runner: PolicyRunner | None) -> str | None:
-    if policy_runner is None:
-        return None
-    return policy_runner.label
-
-
-def _policy_reload_age_seconds(policy_runner: PolicyRunner | None) -> float | None:
-    if policy_runner is None:
-        return None
-    return policy_runner.reload_age_seconds
-
-
-def _policy_reload_error(policy_runner: PolicyRunner | None) -> str | None:
-    if policy_runner is None:
-        return None
-    return policy_runner.last_reload_error
-
-
-def _apply_window_position_hint() -> None:
-    os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
-
-
-def _persist_reload_error(
-    *,
-    reload_error: str | None,
-    runtime_dir: Path | None,
-    last_logged_reload_error: str | None,
-) -> str | None:
-    if (
-        reload_error is None
-        or runtime_dir is None
-        or reload_error == last_logged_reload_error
-    ):
-        return last_logged_reload_error
-
-    log_path = runtime_dir.parent / "reload_error.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_text(reload_error + "\n", encoding="utf-8")
-    return reload_error
-
-
-def _save_baseline_state(*, emulator: Emulator, baseline_state_path: Path | None) -> None:
-    emulator.capture_current_as_baseline(baseline_state_path)
-
-
-def _with_viewer_fps(
-    info: dict[str, object],
-    *,
-    last_draw_time: float | None,
-    current_viewer_fps: float,
-) -> tuple[dict[str, object], float, float]:
-    now = time.perf_counter()
-    if last_draw_time is None:
-        viewer_fps = current_viewer_fps
-    else:
-        dt = now - last_draw_time
-        instant_fps = 0.0 if dt <= 0.0 else 1.0 / dt
-        viewer_fps = instant_fps if current_viewer_fps <= 0.0 else (
-            (0.8 * current_viewer_fps) + (0.2 * instant_fps)
-        )
-    draw_info = dict(info)
-    draw_info["viewer_fps"] = viewer_fps
-    return draw_info, now, viewer_fps

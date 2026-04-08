@@ -14,7 +14,7 @@ from rl_fzerox.core.training.runs import (
     load_train_run_config,
     materialize_watch_session_config,
 )
-from rl_fzerox.ui.viewer import run_viewer
+from rl_fzerox.ui.watch import run_viewer
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

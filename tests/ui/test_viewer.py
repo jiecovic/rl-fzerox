@@ -9,7 +9,7 @@ from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
-from rl_fzerox.ui.viewer import (
+from rl_fzerox.ui.watch import (
     _build_panel_columns,
     _create_fonts,
     _format_policy_action,
