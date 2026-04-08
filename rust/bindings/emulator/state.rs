@@ -81,17 +81,6 @@ pub(super) fn state_flag_labels(state_flags: u32) -> Vec<&'static str> {
         .collect()
 }
 
-pub(super) fn terminal_reason(state_flags: u32) -> Option<&'static str> {
-    [
-        ("finished", FLAG_FINISHED),
-        ("crashed", FLAG_CRASHED),
-        ("retired", FLAG_RETIRED),
-        ("falling_off_track", FLAG_FALLING_OFF_TRACK),
-    ]
-    .into_iter()
-    .find_map(|(label, mask)| has_state_flag(state_flags, mask).then_some(label))
-}
-
 #[pyfunction]
 pub fn encode_state_flags(labels: Vec<String>) -> PyResult<u32> {
     let mut state_flags = 0u32;

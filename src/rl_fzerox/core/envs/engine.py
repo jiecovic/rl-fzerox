@@ -4,12 +4,16 @@ from __future__ import annotations
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry, ObservationSpec
+from fzerox_emulator import (
+    ControllerState,
+    EmulatorBackend,
+    FZeroXTelemetry,
+    ObservationSpec,
+)
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
-from rl_fzerox.core.envs.limits import EpisodeLimits
 from rl_fzerox.core.envs.rewards import build_reward_tracker
 
 
@@ -17,8 +21,8 @@ class FZeroXEnvEngine:
     """Environment step engine around one emulator backend.
 
     Rust owns the repeated inner-frame loop for one outer env step. Python
-    consumes the returned step summary to apply reward shaping, truncation
-    limits, and Gym-facing info assembly.
+    consumes the returned step summary and stop state to apply reward shaping
+    and Gym-facing info assembly.
     """
 
     def __init__(
@@ -31,7 +35,6 @@ class FZeroXEnvEngine:
         self.config = config
         self._action_adapter = build_action_adapter(config.action)
         self._observation_spec = backend.observation_spec(config.observation.preset)
-        self._episode_limits = EpisodeLimits(config)
         self._reward_tracker = build_reward_tracker()
         self._reward_summary_config = self._reward_tracker.summary_config()
         self._episode_done = False
@@ -63,7 +66,6 @@ class FZeroXEnvEngine:
         _, info = self._reset_race_state()
         telemetry = _read_live_telemetry(self.backend)
         self._reward_tracker.reset(telemetry)
-        self._episode_limits.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
@@ -160,16 +162,18 @@ class FZeroXEnvEngine:
             reverse_progress_epsilon=self._reward_summary_config.reverse_progress_epsilon,
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
             wrong_way_progress_epsilon=float(self.config.wrong_way_progress_epsilon),
+            max_episode_steps=self.config.max_episode_steps,
+            stuck_step_limit=self.config.stuck_step_limit,
+            wrong_way_step_limit=self.config.wrong_way_step_limit,
         )
         info = _backend_step_info(self.backend)
         telemetry = step_result.telemetry
         reward_step = self._reward_tracker.step_summary(step_result.summary, telemetry)
         reward = reward_step.reward
         reward_breakdown = dict(reward_step.breakdown)
-        terminated = reward_step.terminated
-        limit_step = self._episode_limits.step_summary(step_result.summary, telemetry)
-        truncation_reason = limit_step.truncation_reason
-        truncated = truncation_reason is not None
+        terminated = step_result.status.terminated
+        truncation_reason = step_result.status.truncation_reason
+        truncated = step_result.status.truncated
         truncation_penalty, truncation_label = self._reward_tracker.truncation_penalty(
             truncation_reason
         )
@@ -180,17 +184,14 @@ class FZeroXEnvEngine:
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
-        info["episode_step"] = limit_step.step_count
-        info["stalled_steps"] = limit_step.stalled_steps
-        info["reverse_steps"] = limit_step.reverse_steps
-        if truncation_reason is not None:
-            info["truncation_reason"] = truncation_reason
+        info["episode_step"] = step_result.status.step_count
+        info["stalled_steps"] = step_result.status.stalled_steps
+        info["reverse_steps"] = step_result.status.reverse_steps
+        info["termination_reason"] = step_result.status.termination_reason
+        info["truncation_reason"] = step_result.status.truncation_reason
         if telemetry is not None:
             info["telemetry"] = telemetry
             info.update(_telemetry_info(telemetry))
-            termination_reason = _termination_reason(telemetry)
-            if termination_reason is not None:
-                info["termination_reason"] = termination_reason
         observation = step_result.observation
         self._episode_return += reward
         info["episode_return"] = self._episode_return
@@ -285,7 +286,3 @@ def _backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
         "display_aspect_ratio": backend.display_aspect_ratio,
         "native_fps": backend.native_fps,
     }
-
-
-def _termination_reason(telemetry: FZeroXTelemetry) -> str | None:
-    return telemetry.player.terminal_reason

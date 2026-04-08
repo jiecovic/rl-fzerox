@@ -18,8 +18,8 @@ mod telemetry;
 
 use frame::frame_to_pyarray;
 pub use state::encode_state_flags;
-pub use step::PyStepSummary;
-use step::step_summary_to_py;
+pub use step::{PyStepStatus, PyStepSummary};
+use step::{step_status_to_py, step_summary_to_py};
 use telemetry::telemetry_to_py;
 pub use telemetry::{PyPlayerTelemetry, PyTelemetry};
 
@@ -109,6 +109,9 @@ impl PyEmulator {
         reverse_progress_epsilon,
         energy_loss_epsilon,
         wrong_way_progress_epsilon,
+        max_episode_steps,
+        stuck_step_limit,
+        wrong_way_step_limit,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -126,6 +129,9 @@ impl PyEmulator {
         reverse_progress_epsilon: f32,
         energy_loss_epsilon: f32,
         wrong_way_progress_epsilon: f32,
+        max_episode_steps: usize,
+        stuck_step_limit: usize,
+        wrong_way_step_limit: usize,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -154,6 +160,9 @@ impl PyEmulator {
                     reverse_progress_epsilon,
                     energy_loss_epsilon,
                     wrong_way_progress_epsilon,
+                    max_episode_steps,
+                    stuck_step_limit,
+                    wrong_way_step_limit,
                 })
             })
             .map_err(map_core_error)?;
@@ -165,12 +174,14 @@ impl PyEmulator {
             spec.channels * frame_stack,
         )?;
         let summary = step_summary_to_py(py, &result.summary)?;
+        let status = step_status_to_py(py, &result.status)?;
         let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
         PyTuple::new(
             py,
             [
                 observation,
                 summary.into_bound(py).into_any(),
+                status.into_bound(py).into_any(),
                 telemetry.into_bound(py).into_any(),
             ],
         )

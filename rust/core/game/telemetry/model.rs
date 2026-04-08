@@ -1,6 +1,35 @@
 // rust/core/game/telemetry/model.rs
 //! Public telemetry data structures.
 
+const FLAG_RETIRED: u32 = 1 << 18;
+const FLAG_FALLING_OFF_TRACK: u32 = 1 << 19;
+const FLAG_FINISHED: u32 = 1 << 25;
+const FLAG_CRASHED: u32 = 1 << 27;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct StepTelemetrySample {
+    pub state_flags: u32,
+    pub speed_kph: f32,
+    pub energy: f32,
+    pub race_distance: f32,
+}
+
+pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'static str> {
+    if (state_flags & FLAG_FINISHED) != 0 {
+        return Some("finished");
+    }
+    if (state_flags & FLAG_CRASHED) != 0 {
+        return Some("crashed");
+    }
+    if (state_flags & FLAG_RETIRED) != 0 {
+        return Some("retired");
+    }
+    if (state_flags & FLAG_FALLING_OFF_TRACK) != 0 {
+        return Some("falling_off_track");
+    }
+    None
+}
+
 #[derive(Clone, Debug)]
 pub struct PlayerTelemetry {
     pub state_flags: u32,
@@ -14,6 +43,12 @@ pub struct PlayerTelemetry {
     pub lap: i16,
     pub laps_completed: i16,
     pub position: i32,
+}
+
+impl PlayerTelemetry {
+    pub fn terminal_reason(&self) -> Option<&'static str> {
+        terminal_reason_from_state_flags(self.state_flags)
+    }
 }
 
 /// Telemetry snapshot for the current frame, focused on player-one race state.

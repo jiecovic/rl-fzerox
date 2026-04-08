@@ -6,7 +6,7 @@ from typing import Protocol
 
 import numpy as np
 
-from fzerox_emulator._native import FZeroXTelemetry, StepSummary
+from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 from fzerox_emulator.control import ControllerState
 
 
@@ -47,6 +47,7 @@ class BackendStepResult:
 
     observation: np.ndarray
     summary: StepSummary
+    status: StepStatus
     telemetry: FZeroXTelemetry | None
 
 
@@ -85,6 +86,9 @@ class EmulatorBackend(Protocol):
         reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
         wrong_way_progress_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_step_limit: int,
     ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

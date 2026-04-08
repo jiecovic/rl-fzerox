@@ -7,7 +7,7 @@ use pyo3::types::{PyDict, PyTuple};
 use crate::bindings::emulator::state::{
     FLAG_ACTIVE, FLAG_AIRBORNE, FLAG_CAN_BOOST, FLAG_COLLISION_RECOIL, FLAG_CPU_CONTROLLED,
     FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK, FLAG_FINISHED, FLAG_RETIRED,
-    FLAG_SPINNING_OUT, has_state_flag, state_flag_labels, terminal_reason,
+    FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
 };
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
 
@@ -186,7 +186,7 @@ impl PyPlayerTelemetry {
 
     #[getter]
     fn terminal_reason(&self) -> Option<&'static str> {
-        terminal_reason(self.inner.state_flags)
+        self.inner.terminal_reason()
     }
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

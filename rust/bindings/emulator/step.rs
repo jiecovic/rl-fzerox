@@ -1,5 +1,5 @@
 // rust/bindings/emulator/step.rs
-//! PyO3 step-summary object exposed directly to Python.
+//! PyO3 step objects exposed directly to Python.
 
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
@@ -8,7 +8,7 @@ use crate::bindings::emulator::state::{
     FLAG_COLLISION_RECOIL, FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK,
     FLAG_FINISHED, FLAG_RETIRED, FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
 };
-use crate::core::host::StepSummary;
+use crate::core::host::{StepStatus, StepSummary};
 
 #[pyclass(
     name = "StepSummary",
@@ -170,4 +170,118 @@ pub(super) fn step_summary_to_py(
             inner: summary.clone(),
         },
     )
+}
+
+#[pyclass(
+    name = "StepStatus",
+    module = "fzerox_emulator._native",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Debug)]
+pub struct PyStepStatus {
+    inner: StepStatus,
+}
+
+#[pymethods]
+impl PyStepStatus {
+    #[new]
+    #[pyo3(signature = (
+        step_count,
+        stalled_steps,
+        reverse_steps,
+        termination_reason=None,
+        truncation_reason=None,
+    ))]
+    fn new(
+        step_count: usize,
+        stalled_steps: usize,
+        reverse_steps: usize,
+        termination_reason: Option<String>,
+        truncation_reason: Option<String>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: StepStatus {
+                counters: crate::core::host::StepCounters {
+                    step_count,
+                    stalled_steps,
+                    reverse_steps,
+                },
+                termination_reason: parse_reason(termination_reason)?,
+                truncation_reason: parse_reason(truncation_reason)?,
+            },
+        })
+    }
+
+    #[getter]
+    fn step_count(&self) -> usize {
+        self.inner.counters.step_count
+    }
+
+    #[getter]
+    fn stalled_steps(&self) -> usize {
+        self.inner.counters.stalled_steps
+    }
+
+    #[getter]
+    fn reverse_steps(&self) -> usize {
+        self.inner.counters.reverse_steps
+    }
+
+    #[getter]
+    fn terminated(&self) -> bool {
+        self.inner.terminated()
+    }
+
+    #[getter]
+    fn truncated(&self) -> bool {
+        self.inner.truncated()
+    }
+
+    #[getter]
+    fn termination_reason(&self) -> Option<&'static str> {
+        self.inner.termination_reason
+    }
+
+    #[getter]
+    fn truncation_reason(&self) -> Option<&'static str> {
+        self.inner.truncation_reason
+    }
+
+    fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let dict = PyDict::new(py);
+        dict.set_item("step_count", self.step_count())?;
+        dict.set_item("stalled_steps", self.stalled_steps())?;
+        dict.set_item("reverse_steps", self.reverse_steps())?;
+        dict.set_item("terminated", self.terminated())?;
+        dict.set_item("truncated", self.truncated())?;
+        dict.set_item("termination_reason", self.termination_reason())?;
+        dict.set_item("truncation_reason", self.truncation_reason())?;
+        Ok(dict)
+    }
+}
+
+pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult<Py<PyStepStatus>> {
+    Py::new(
+        py,
+        PyStepStatus {
+            inner: status.clone(),
+        },
+    )
+}
+
+fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
+    match reason.as_deref() {
+        None => Ok(None),
+        Some("finished") => Ok(Some("finished")),
+        Some("crashed") => Ok(Some("crashed")),
+        Some("retired") => Ok(Some("retired")),
+        Some("falling_off_track") => Ok(Some("falling_off_track")),
+        Some("stuck") => Ok(Some("stuck")),
+        Some("wrong_way") => Ok(Some("wrong_way")),
+        Some("timeout") => Ok(Some("timeout")),
+        Some(other) => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "Unknown step reason: {other}"
+        ))),
+    }
 }
