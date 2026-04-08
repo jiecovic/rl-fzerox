@@ -24,9 +24,9 @@ env:
     frame_stack: 4
 train:
   vec_env: subproc
-  num_envs: 8
+  num_envs: 4
   total_timesteps: 5_000_000
-  n_steps: 512
+  n_steps: 1024
   n_epochs: 6
   batch_size: 512
   learning_rate: 1.0e-4
@@ -38,14 +38,14 @@ train:
   max_grad_norm: 0.5
   verbose: 0
   device: cuda
-  save_freq: 5000
+  save_freq: 10_000
   output_root: local/runs
   run_name: ppo_cnn
 
 policy:
   activation: tanh
   extractor:
-    features_dim: auto
+    features_dim: 512
   net_arch:
-    pi: [512, 256]
-    vf: [512, 256]
+    pi: [512]
+    vf: [512]
