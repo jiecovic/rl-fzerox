@@ -15,8 +15,12 @@ from rl_fzerox.core.config.schema import (
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
     build_run_paths,
+    build_watch_session_paths,
     ensure_run_dirs,
+    ensure_watch_session_dirs,
     load_train_run_config,
+    materialize_train_run_config,
+    materialize_watch_session_config,
     resolve_latest_model_path,
     resolve_latest_policy_path,
     resolve_model_artifact_path,
@@ -191,3 +195,105 @@ def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> N
     assert second.run_dir.name == "ppo_cnn_0002"
     assert first.runtime_root == first.run_dir / "runtime"
     assert first.env_runtime_dir(0) == first.run_dir / "runtime" / "env_000"
+    assert first.baseline_state_path == first.run_dir / "baseline.state"
+
+
+def test_materialize_train_run_config_copies_baseline_into_run_dir(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    source_baseline_path = tmp_path / "shared.state"
+    core_path.touch()
+    rom_path.touch()
+    source_baseline_path.write_bytes(b"baseline")
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            baseline_state_path=source_baseline_path,
+        ),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+
+    ensure_run_dirs(run_paths)
+    materialized = materialize_train_run_config(config, run_paths=run_paths)
+
+    assert materialized.emulator.runtime_dir == run_paths.runtime_root
+    assert materialized.emulator.baseline_state_path == run_paths.baseline_state_path
+    assert run_paths.baseline_state_path.read_bytes() == b"baseline"
+
+
+def test_build_watch_session_paths_uses_run_local_watch_root(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    baseline_state_path = tmp_path / "baseline.state"
+
+    session_paths = build_watch_session_paths(
+        run_dir=run_dir,
+        runtime_dir=tmp_path / "runtime",
+        baseline_state_path=baseline_state_path,
+        session_name="session-001",
+    )
+
+    assert session_paths.session_dir == run_dir / "watch" / "session-001"
+    assert session_paths.runtime_dir == run_dir / "watch" / "session-001" / "runtime"
+    assert session_paths.baseline_state_path == (
+        run_dir / "watch" / "session-001" / "baseline.state"
+    )
+
+
+def test_materialize_watch_session_config_isolates_runtime_and_baseline(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    baseline_state_path = tmp_path / "shared.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_state_path.write_bytes(b"baseline")
+
+    watch_config = WatchAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            runtime_dir=tmp_path / "runtime",
+            baseline_state_path=baseline_state_path,
+        ),
+        watch=WatchConfig(),
+    )
+
+    materialized = materialize_watch_session_config(
+        watch_config,
+        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
+        session_name="session-001",
+    )
+
+    assert materialized.emulator.runtime_dir == (
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "runtime"
+    )
+    assert materialized.emulator.baseline_state_path == (
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
+    )
+    assert materialized.emulator.baseline_state_path is not None
+    assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
+
+
+def test_ensure_watch_session_dirs_creates_runtime_root(tmp_path: Path) -> None:
+    paths = build_watch_session_paths(
+        run_dir=None,
+        runtime_dir=tmp_path / "runtime",
+        baseline_state_path=None,
+        session_name="session-001",
+    )
+
+    ensure_watch_session_dirs(paths)
+
+    assert paths.session_dir.is_dir()
+    assert paths.runtime_dir.is_dir()

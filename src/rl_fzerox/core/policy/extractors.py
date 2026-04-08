@@ -1,22 +1,24 @@
 # src/rl_fzerox/core/policy/extractors.py
 from __future__ import annotations
 
+from typing import Literal
+
 import torch
 from gymnasium import spaces
 from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
+ConvSpec = tuple[tuple[int, tuple[int, int], tuple[int, int]], ...]
 
-class _BaseFZeroXCnnExtractor(BaseFeaturesExtractor):
-    """Shared CNN extractor base for stacked `160x120` F-Zero X RGB observations."""
+
+class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
+    """CNN extractor for stacked `222x78` native-crop F-Zero X RGB observations."""
 
     def __init__(
         self,
         observation_space: spaces.Box,
-        *,
-        conv_spec: tuple[tuple[int, int, int], ...],
-        features_dim: int = 512,
+        features_dim: int | Literal["auto"] = 512,
     ) -> None:
         if len(observation_space.shape) != 3:
             raise ValueError(
@@ -29,27 +31,48 @@ class _BaseFZeroXCnnExtractor(BaseFeaturesExtractor):
         else:
             height, width, channels = observation_space.shape
 
-        super().__init__(observation_space, features_dim)
         self._height = int(height)
         self._width = int(width)
         self._channels = int(channels)
-        self._cnn = nn.Sequential(*self._build_conv_layers(conv_spec), nn.Flatten())
+        self._conv_spec: ConvSpec = (
+            (64, (8, 4), (4, 2)),
+            (64, (4, 4), (2, 2)),
+            (128, (3, 3), (2, 2)),
+            (128, (3, 3), (1, 1)),
+        )
+
+        cnn = nn.Sequential(
+            *self._build_conv_layers(
+                input_channels=self._channels,
+                conv_spec=self._conv_spec,
+            ),
+            nn.Flatten(),
+        )
 
         with torch.no_grad():
             sample = torch.zeros(1, self._channels, self._height, self._width)
-            n_flatten = int(self._cnn(sample).shape[1])
+            n_flatten = int(cnn(sample).shape[1])
 
-        self._linear = nn.Sequential(
-            nn.Linear(n_flatten, features_dim),
-            nn.ReLU(),
-        )
+        resolved_features_dim = n_flatten if features_dim == "auto" else int(features_dim)
+        super().__init__(observation_space, resolved_features_dim)
+        self._flatten_dim = n_flatten
+        self._cnn = cnn
+        if features_dim == "auto":
+            self._linear: nn.Module = nn.Identity()
+        else:
+            self._linear = nn.Sequential(
+                nn.Linear(n_flatten, resolved_features_dim),
+                nn.ReLU(),
+            )
 
     def _build_conv_layers(
         self,
-        conv_spec: tuple[tuple[int, int, int], ...],
+        *,
+        input_channels: int,
+        conv_spec: ConvSpec,
     ) -> list[nn.Module]:
         layers: list[nn.Module] = []
-        in_channels = self._channels
+        in_channels = input_channels
         for out_channels, kernel_size, stride in conv_spec:
             layers.append(
                 nn.Conv2d(
@@ -82,35 +105,3 @@ class _BaseFZeroXCnnExtractor(BaseFeaturesExtractor):
             )
 
         return self._linear(self._cnn(channels_first))
-
-
-class FZeroXCnnExtractor(_BaseFZeroXCnnExtractor):
-    """Original CNN kept stable for existing checkpoints."""
-
-    def __init__(self, observation_space: spaces.Box, features_dim: int = 512) -> None:
-        super().__init__(
-            observation_space,
-            conv_spec=(
-                (32, 8, 4),
-                (64, 4, 2),
-                (64, 3, 2),
-                (128, 3, 1),
-            ),
-            features_dim=features_dim,
-        )
-
-
-class FZeroXCnnWideExtractor(_BaseFZeroXCnnExtractor):
-    """Wider CNN variant for stacked RGB frames with higher early capacity."""
-
-    def __init__(self, observation_space: spaces.Box, features_dim: int = 512) -> None:
-        super().__init__(
-            observation_space,
-            conv_spec=(
-                (64, 8, 4),
-                (64, 4, 2),
-                (128, 3, 2),
-                (128, 3, 1),
-            ),
-            features_dim=features_dim,
-        )

@@ -13,6 +13,7 @@ from rl_fzerox.core.config.schema import (
     TrainConfig,
 )
 from rl_fzerox.core.training.runner import (
+    _atomic_save_artifact,
     _info_sequence,
     _resolve_policy_activation_fn,
     _resolve_train_run_config,
@@ -153,3 +154,15 @@ def test_resolve_policy_activation_fn_supports_known_names() -> None:
 def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unsupported policy activation"):
         _resolve_policy_activation_fn("gelu")
+
+
+def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path) -> None:
+    target_path = tmp_path / "latest_policy.zip"
+
+    def _fake_save(path: str) -> None:
+        Path(path).write_bytes(b"new-policy")
+
+    _atomic_save_artifact(_fake_save, target_path)
+
+    assert target_path.read_bytes() == b"new-policy"
+    assert list(tmp_path.glob("*.tmp.zip")) == []
