@@ -3,8 +3,8 @@ import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
+from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import (
     ACTION_ADAPTER_REGISTRY,
     BOOST_MASK,

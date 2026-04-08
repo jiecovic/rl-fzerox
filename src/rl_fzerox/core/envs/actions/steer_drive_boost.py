@@ -4,8 +4,8 @@ from __future__ import annotations
 import numpy as np
 from gymnasium import spaces
 
+from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,

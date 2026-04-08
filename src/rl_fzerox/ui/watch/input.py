@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox._native import (
+from fzerox_emulator import (
     JOYPAD_A,
     JOYPAD_B,
     JOYPAD_DOWN,
@@ -12,9 +12,9 @@ from rl_fzerox._native import (
     JOYPAD_SELECT,
     JOYPAD_START,
     JOYPAD_UP,
+    ControllerState,
     joypad_mask,
 )
-from rl_fzerox.core.emulator.control import ControllerState
 
 
 @dataclass(frozen=True)

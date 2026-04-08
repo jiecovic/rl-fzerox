@@ -5,8 +5,8 @@ import time
 
 import numpy as np
 
+from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.config.schema import WatchAppConfig
-from rl_fzerox.core.emulator import ControllerState, Emulator
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.input import _poll_viewer_input

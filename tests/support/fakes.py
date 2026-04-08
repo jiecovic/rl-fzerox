@@ -5,16 +5,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from rl_fzerox.core.emulator.base import (
+from fzerox_emulator import (
     BackendStepResult,
+    ControllerState,
     FrameStep,
+    FZeroXTelemetry,
     ObservationSpec,
     ResetState,
     StepSummary,
+    display_size,
 )
-from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.emulator.video import display_size
-from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass

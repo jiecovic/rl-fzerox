@@ -5,8 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from rl_fzerox.core.emulator.base import StepSummary
-    from rl_fzerox.core.game.telemetry import FZeroXTelemetry
+    from fzerox_emulator import FZeroXTelemetry, StepSummary
 
 
 @dataclass(frozen=True)
@@ -50,14 +49,13 @@ class RewardTracker(Protocol):
         ...
 
 
-def apply_flag_penalty(
-    entered_flags: int,
-    flag: int,
+def apply_event_penalty(
+    entered: bool,
     penalty: float,
     label: str,
     breakdown: dict[str, float],
 ) -> float:
-    if not (entered_flags & flag):
+    if not entered:
         return 0.0
     breakdown[label] = penalty
     return penalty

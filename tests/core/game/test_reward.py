@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from rl_fzerox.core.emulator import StepSummary
+from fzerox_emulator import FZeroXTelemetry, StepSummary
 from rl_fzerox.core.envs.rewards import (
     DEFAULT_REWARD_NAME,
     REWARD_TRACKER_REGISTRY,
@@ -12,13 +12,7 @@ from rl_fzerox.core.envs.rewards import (
     build_reward_tracker,
     reward_tracker_names,
 )
-from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
-from rl_fzerox.core.game.flags import (
-    FLAG_ACTIVE,
-    FLAG_COLLISION_RECOIL,
-    FLAG_DASH_PAD_BOOST,
-    FLAG_FINISHED,
-)
+from tests.support.native_objects import make_step_summary, make_telemetry
 
 
 def test_race_v2_rewards_new_frontier_progress_once() -> None:
@@ -101,12 +95,21 @@ def test_race_v2_applies_event_penalties_once_per_entry() -> None:
     tracker.reset(_telemetry(race_distance=100.0))
 
     first = tracker.step_summary(
-        _summary(max_race_distance=100.0, entered_state_flags=FLAG_COLLISION_RECOIL),
-        _telemetry(race_distance=100.0, state_flags=FLAG_ACTIVE | FLAG_COLLISION_RECOIL),
+        _summary(
+            max_race_distance=100.0,
+            entered_state_labels=("collision_recoil",),
+        ),
+        _telemetry(
+            race_distance=100.0,
+            state_labels=("active", "collision_recoil"),
+        ),
     )
     repeated = tracker.step_summary(
         _summary(max_race_distance=100.0),
-        _telemetry(race_distance=100.0, state_flags=FLAG_ACTIVE | FLAG_COLLISION_RECOIL),
+        _telemetry(
+            race_distance=100.0,
+            state_labels=("active", "collision_recoil"),
+        ),
     )
 
     assert first.reward == -2.0
@@ -124,13 +127,13 @@ def test_race_v2_applies_finish_bonus_and_position_bonus() -> None:
             finish_position_scale=4.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0, state_flags=FLAG_ACTIVE))
+    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active",)))
 
     step = tracker.step_summary(
-        _summary(max_race_distance=100.0, entered_state_flags=FLAG_FINISHED),
+        _summary(max_race_distance=100.0, entered_state_labels=("finished",)),
         _telemetry(
             race_distance=100.0,
-            state_flags=FLAG_ACTIVE | FLAG_FINISHED,
+            state_labels=("active", "finished"),
             position=1,
         )
     )
@@ -155,11 +158,14 @@ def test_race_v2_keeps_low_speed_and_dash_pad_out_of_reward() -> None:
     tracker.reset(_telemetry(race_distance=100.0, speed_kph=30.0))
 
     step = tracker.step_summary(
-        _summary(max_race_distance=100.0, entered_state_flags=FLAG_DASH_PAD_BOOST),
+        _summary(
+            max_race_distance=100.0,
+            entered_state_labels=("dash_pad_boost",),
+        ),
         _telemetry(
             race_distance=100.0,
             speed_kph=30.0,
-            state_flags=FLAG_ACTIVE | FLAG_DASH_PAD_BOOST,
+            state_labels=("active", "dash_pad_boost"),
         )
     )
 
@@ -209,39 +215,21 @@ def test_race_v2_multiplies_time_penalty_by_frames_run() -> None:
 def _telemetry(
     *,
     race_distance: float,
-    state_flags: int = FLAG_ACTIVE,
+    state_labels: tuple[str, ...] = ("active",),
     position: int = 30,
     energy: float = 178.0,
     boost_timer: int = 0,
     race_time_ms: int = 0,
     speed_kph: float = 100.0,
-    ) -> FZeroXTelemetry:
-    return FZeroXTelemetry(
-        system_ram_size=0x00800000,
-        game_frame_count=100,
-        game_mode_raw=1,
-        game_mode_name="gp_race",
-        course_index=0,
-        in_race_mode=True,
-        player=PlayerTelemetry(
-            state_flags=state_flags,
-            state_labels=(),
-            speed_raw=0.0,
-            speed_kph=speed_kph,
-            energy=energy,
-            max_energy=178.0,
-            boost_timer=boost_timer,
-            race_distance=race_distance,
-            laps_completed_distance=0.0,
-            lap_distance=race_distance,
-            race_distance_position=race_distance,
-            race_time_ms=race_time_ms,
-            lap=1,
-            laps_completed=0,
-            position=position,
-            character=0,
-            machine_index=0,
-        ),
+) -> FZeroXTelemetry:
+    return make_telemetry(
+        race_distance=race_distance,
+        state_labels=state_labels,
+        speed_kph=speed_kph,
+        energy=energy,
+        boost_timer=boost_timer,
+        race_time_ms=race_time_ms,
+        position=position,
     )
 
 
@@ -251,15 +239,13 @@ def _summary(
     frames_run: int = 1,
     reverse_progress_total: float = 0.0,
     energy_loss_total: float = 0.0,
-    entered_state_flags: int = 0,
+    entered_state_labels: tuple[str, ...] = (),
 ) -> StepSummary:
-    return StepSummary(
+    return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
         reverse_progress_total=reverse_progress_total,
-        consecutive_reverse_frames=0,
         energy_loss_total=energy_loss_total,
-        consecutive_low_speed_frames=0,
-        entered_state_flags=entered_state_flags,
+        entered_state_labels=entered_state_labels,
         final_frame_index=frames_run,
     )
