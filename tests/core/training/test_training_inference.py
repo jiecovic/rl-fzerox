@@ -32,7 +32,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
     runner = PolicyRunner(loaded_policy, _FakePolicy([2, 0]))
 
-    observation = np.zeros((120, 160, 12), dtype=np.uint8)
+    observation = np.zeros((78, 222, 12), dtype=np.uint8)
     assert runner.predict(observation).tolist() == [2, 0]
 
     policy_path.write_bytes(b"v2")
@@ -97,9 +97,10 @@ def test_policy_runner_exposes_reload_error_until_success(
         lambda path: (_ for _ in ()).throw(RuntimeError("bad checkpoint")),
     )
 
-    observation = np.zeros((120, 160, 12), dtype=np.uint8)
+    observation = np.zeros((78, 222, 12), dtype=np.uint8)
     assert runner.predict(observation).tolist() == [2, 0]
     assert runner.reload_error == "bad checkpoint"
+    assert runner.last_reload_error == "bad checkpoint"
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
@@ -108,3 +109,4 @@ def test_policy_runner_exposes_reload_error_until_success(
 
     assert runner.predict(observation).tolist() == [4, 1]
     assert runner.reload_error is None
+    assert runner.last_reload_error == "bad checkpoint"

@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/viewer.py
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -74,6 +75,9 @@ def run_viewer(config: WatchAppConfig) -> None:
         fonts = None
         paused = False
         target_seconds: float | None = None
+        last_draw_time: float | None = None
+        viewer_fps = 0.0
+        last_logged_reload_error: str | None = None
         episode = 0
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
@@ -87,7 +91,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             if screen is None or fonts is None:
                 screen = _create_screen(
                     pygame,
-                    emulator.display_size,
+                    (raw_frame.shape[1], raw_frame.shape[0]),
                     observation.shape,
                 )
                 fonts = _create_fonts(pygame)
@@ -108,6 +112,12 @@ def run_viewer(config: WatchAppConfig) -> None:
                     emulator=emulator,
                     baseline_state_path=config.emulator.baseline_state_path,
                 )
+            policy_reload_error = _policy_reload_error(policy_runner)
+            last_logged_reload_error = _persist_reload_error(
+                reload_error=policy_reload_error,
+                runtime_dir=config.emulator.runtime_dir,
+                last_logged_reload_error=last_logged_reload_error,
+            )
 
             screen = _ensure_screen(
                 pygame,
@@ -116,6 +126,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                 observation.shape,
             )
 
+            draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
+                info,
+                last_draw_time=last_draw_time,
+                current_viewer_fps=viewer_fps,
+            )
             _draw_frame(
                 pygame=pygame,
                 screen=screen,
@@ -123,7 +138,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 raw_frame=raw_frame,
                 observation=observation,
                 episode=episode,
-                info=info,
+                info=draw_info,
                 reset_info=reset_info,
                 episode_reward=0.0,
                 paused=paused,
@@ -131,7 +146,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_label=_policy_label(policy_runner),
                 policy_action=current_policy_action,
                 policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
-                policy_reload_error=_policy_reload_error(policy_runner),
+                policy_reload_error=policy_reload_error,
+                action_repeat=config.env.action_repeat,
+                stuck_step_limit=config.env.stuck_step_limit,
                 telemetry=telemetry,
             )
 
@@ -152,7 +169,18 @@ def run_viewer(config: WatchAppConfig) -> None:
                         emulator=emulator,
                         baseline_state_path=config.emulator.baseline_state_path,
                     )
+                policy_reload_error = _policy_reload_error(policy_runner)
+                last_logged_reload_error = _persist_reload_error(
+                    reload_error=policy_reload_error,
+                    runtime_dir=config.emulator.runtime_dir,
+                    last_logged_reload_error=last_logged_reload_error,
+                )
                 if paused and not viewer_input.step_once:
+                    draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
+                        info,
+                        last_draw_time=last_draw_time,
+                        current_viewer_fps=viewer_fps,
+                    )
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
@@ -160,7 +188,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         raw_frame=raw_frame,
                         observation=observation,
                         episode=episode,
-                        info=info,
+                        info=draw_info,
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
@@ -168,7 +196,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_label=_policy_label(policy_runner),
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
-                        policy_reload_error=_policy_reload_error(policy_runner),
+                        policy_reload_error=policy_reload_error,
+                        action_repeat=config.env.action_repeat,
+                        stuck_step_limit=config.env.stuck_step_limit,
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
@@ -188,6 +218,17 @@ def run_viewer(config: WatchAppConfig) -> None:
                     raw_frame = env.render()
                     episode_reward += reward
                     telemetry = _telemetry_from_info(info)
+                    policy_reload_error = _policy_reload_error(policy_runner)
+                    last_logged_reload_error = _persist_reload_error(
+                        reload_error=policy_reload_error,
+                        runtime_dir=config.emulator.runtime_dir,
+                        last_logged_reload_error=last_logged_reload_error,
+                    )
+                    draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
+                        info,
+                        last_draw_time=last_draw_time,
+                        current_viewer_fps=viewer_fps,
+                    )
                     _draw_frame(
                         pygame=pygame,
                         screen=screen,
@@ -195,7 +236,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         raw_frame=raw_frame,
                         observation=observation,
                         episode=episode,
-                        info=info,
+                        info=draw_info,
                         reset_info=reset_info,
                         episode_reward=episode_reward,
                         paused=True,
@@ -203,7 +244,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_label=_policy_label(policy_runner),
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
-                        policy_reload_error=_policy_reload_error(policy_runner),
+                        policy_reload_error=policy_reload_error,
+                        action_repeat=config.env.action_repeat,
+                        stuck_step_limit=config.env.stuck_step_limit,
                         telemetry=telemetry,
                     )
                     continue
@@ -222,12 +265,23 @@ def run_viewer(config: WatchAppConfig) -> None:
                 raw_frame = env.render()
                 episode_reward += reward
                 telemetry = _telemetry_from_info(info)
+                policy_reload_error = _policy_reload_error(policy_runner)
+                last_logged_reload_error = _persist_reload_error(
+                    reload_error=policy_reload_error,
+                    runtime_dir=config.emulator.runtime_dir,
+                    last_logged_reload_error=last_logged_reload_error,
+                )
 
                 screen = _ensure_screen(
                     pygame,
                     screen,
                     emulator.display_size,
                     observation.shape,
+                )
+                draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
+                    info,
+                    last_draw_time=last_draw_time,
+                    current_viewer_fps=viewer_fps,
                 )
                 _draw_frame(
                     pygame=pygame,
@@ -236,7 +290,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     raw_frame=raw_frame,
                     observation=observation,
                     episode=episode,
-                    info=info,
+                    info=draw_info,
                     reset_info=reset_info,
                     episode_reward=episode_reward,
                     paused=paused,
@@ -244,7 +298,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_label=_policy_label(policy_runner),
                     policy_action=current_policy_action,
                     policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
-                    policy_reload_error=_policy_reload_error(policy_runner),
+                    policy_reload_error=policy_reload_error,
+                    action_repeat=config.env.action_repeat,
+                    stuck_step_limit=config.env.stuck_step_limit,
                     telemetry=telemetry,
                 )
 
@@ -268,6 +324,7 @@ def _create_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
 ):
+    _apply_window_position_hint()
     screen = pygame.display.set_mode(_window_size(game_display_size, observation_shape))
     pygame.display.set_caption("F-Zero X Watch")
     return screen
@@ -318,8 +375,51 @@ def _policy_reload_age_seconds(policy_runner: PolicyRunner | None) -> float | No
 def _policy_reload_error(policy_runner: PolicyRunner | None) -> str | None:
     if policy_runner is None:
         return None
-    return policy_runner.reload_error
+    return policy_runner.last_reload_error
+
+
+def _apply_window_position_hint() -> None:
+    os.environ["SDL_VIDEO_WINDOW_POS"] = "100,100"
+
+
+def _persist_reload_error(
+    *,
+    reload_error: str | None,
+    runtime_dir: Path | None,
+    last_logged_reload_error: str | None,
+) -> str | None:
+    if (
+        reload_error is None
+        or runtime_dir is None
+        or reload_error == last_logged_reload_error
+    ):
+        return last_logged_reload_error
+
+    log_path = runtime_dir.parent / "reload_error.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(reload_error + "\n", encoding="utf-8")
+    return reload_error
 
 
 def _save_baseline_state(*, emulator: Emulator, baseline_state_path: Path | None) -> None:
     emulator.capture_current_as_baseline(baseline_state_path)
+
+
+def _with_viewer_fps(
+    info: dict[str, object],
+    *,
+    last_draw_time: float | None,
+    current_viewer_fps: float,
+) -> tuple[dict[str, object], float, float]:
+    now = time.perf_counter()
+    if last_draw_time is None:
+        viewer_fps = current_viewer_fps
+    else:
+        dt = now - last_draw_time
+        instant_fps = 0.0 if dt <= 0.0 else 1.0 / dt
+        viewer_fps = instant_fps if current_viewer_fps <= 0.0 else (
+            (0.8 * current_viewer_fps) + (0.2 * instant_fps)
+        )
+    draw_info = dict(info)
+    draw_info["viewer_fps"] = viewer_fps
+    return draw_info, now, viewer_fps

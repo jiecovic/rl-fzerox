@@ -12,7 +12,6 @@ from rl_fzerox.core.envs.actions import (
 )
 from rl_fzerox.core.game import FZeroXTelemetry
 from rl_fzerox.core.game.flags import RACER_FLAG_LABELS
-from rl_fzerox.core.game.reward import RewardWeights
 from rl_fzerox.ui.viewer_layout import (
     BUTTON_LABELS,
     FONT_SIZES,
@@ -28,6 +27,8 @@ from rl_fzerox.ui.viewer_layout import (
     ViewerFonts,
 )
 
+_RELOAD_ERROR_MAX_CHARS = 36
+
 
 def _build_panel_columns(
     *,
@@ -41,6 +42,8 @@ def _build_panel_columns(
     policy_action: np.ndarray | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    action_repeat: int,
+    stuck_step_limit: int,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -71,14 +74,23 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                     _panel_line(
-                        "Reload err",
+                        "Last reload err",
                         _format_reload_error(policy_reload_error),
                         PALETTE.text_warning
                         if policy_reload_error is not None
                         else PALETTE.text_muted,
+                        wrap=True,
+                        min_value_lines=2,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
+                    _panel_line(
+                        "Stuck",
+                        _format_stuck_counter(info, stuck_step_limit=stuck_step_limit),
+                        PALETTE.text_warning
+                        if _int_info(info, "stalled_steps") > 0
+                        else PALETTE.text_muted,
+                    ),
                     _panel_line(
                         "Step",
                         f"{_float_info(info, 'step_reward'):.2f}",
@@ -115,9 +127,7 @@ def _build_panel_columns(
             PanelSection(
                 title="Controls",
                 lines=[
-                    _panel_line("", "Left/Right steer | arrows D-pad", PALETTE.text_muted),
-                    _panel_line("", "Z throttle | X secondary", PALETTE.text_muted),
-                    _panel_line("", "P pause | N step | K save", PALETTE.text_muted),
+                    _panel_line("", "Arrows steer | Z/X | P/N/K", PALETTE.text_muted),
                 ],
             ),
         ],
@@ -137,13 +147,13 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                     _panel_line(
-                        "Stack",
-                        str(_observation_stack_size(observation_shape)),
+                        "Frame skip",
+                        str(action_repeat),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
                         "FPS",
-                        f"{_float_info(info, 'native_fps'):.1f}",
+                        _format_fps(info),
                         PALETTE.text_primary,
                     ),
                 ],
@@ -152,7 +162,12 @@ def _build_panel_columns(
     )
 
 
-def _panel_content_height(fonts: ViewerFonts, columns: PanelColumns) -> int:
+def _panel_content_height(
+    fonts: ViewerFonts,
+    columns: PanelColumns,
+    *,
+    observation_shape: tuple[int, ...],
+) -> int:
     title_surface = fonts.title.render("F-Zero X Watch", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render("live emulator session", True, PALETTE.text_muted)
     y = LAYOUT.panel_padding
@@ -164,21 +179,20 @@ def _panel_content_height(fonts: ViewerFonts, columns: PanelColumns) -> int:
     right_width = content_width - LAYOUT.column_gap - left_width
     left_height = _column_content_height(fonts, columns.left, width=left_width)
     right_height = _column_content_height(fonts, columns.right, width=right_width)
-    return y + max(left_height, right_height) + LAYOUT.panel_padding
+    preview_height = _preview_block_height(observation_shape, fonts)
+    right_total_height = right_height + LAYOUT.section_gap + preview_height
+    return y + max(left_height, right_total_height) + LAYOUT.panel_padding
 
 
 def _window_size(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
 ) -> tuple[int, int]:
-    preview_panel_size = _preview_panel_size(observation_shape)
     return (
         game_display_size[0]
         + LAYOUT.preview_gap
-        + preview_panel_size[0]
-        + LAYOUT.preview_gap
         + LAYOUT.panel_width,
-        max(game_display_size[1], preview_panel_size[1]),
+        max(game_display_size[1], LAYOUT.panel_min_height),
     )
 
 
@@ -235,9 +249,9 @@ def _format_reload_error(reload_error: str | None) -> str:
     if reload_error is None:
         return "-"
     normalized = " ".join(reload_error.split())
-    if len(normalized) <= 28:
+    if len(normalized) <= _RELOAD_ERROR_MAX_CHARS:
         return normalized
-    return f"{normalized[:25]}..."
+    return normalized[: _RELOAD_ERROR_MAX_CHARS - 1] + "…"
 
 
 def _display_aspect_ratio(info: dict[str, object]) -> float:
@@ -276,6 +290,26 @@ def _preview_panel_size(observation_shape: tuple[int, ...]) -> tuple[int, int]:
     )
     panel_width = preview_width + (2 * LAYOUT.preview_padding)
     return panel_width, panel_height
+
+
+def _preview_block_height(
+    observation_shape: tuple[int, ...],
+    fonts: ViewerFonts,
+) -> int:
+    preview_height = _observation_preview_size(observation_shape)[1]
+    title_height = fonts.section.render("Policy Obs", True, PALETTE.text_primary).get_height()
+    subtitle_height = fonts.small.render(
+        _format_observation_summary(observation_shape),
+        True,
+        PALETTE.text_muted,
+    ).get_height()
+    return (
+        title_height
+        + LAYOUT.preview_title_gap
+        + subtitle_height
+        + LAYOUT.section_rule_gap
+        + preview_height
+    )
 
 
 def _column_content_height(
@@ -374,11 +408,6 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
                 PALETTE.text_primary,
             ),
             _panel_line(
-                "Checkpoint",
-                _format_checkpoint_counter(telemetry.player.race_distance),
-                PALETTE.text_primary,
-            ),
-            _panel_line(
                 "Lap prog",
                 _format_distance(telemetry.player.lap_distance),
                 PALETTE.text_primary,
@@ -408,11 +437,30 @@ def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
     return f"{width}x{height}x{channels}"
 
 
+def _format_stuck_counter(
+    info: dict[str, object],
+    *,
+    stuck_step_limit: int,
+) -> str:
+    return f"{_int_info(info, 'stalled_steps')} / {stuck_step_limit}"
+
+
+def _format_fps(info: dict[str, object]) -> str:
+    return f"{_float_info(info, 'viewer_fps'):.1f} / {_float_info(info, 'native_fps'):.1f}"
+
+
 def _float_info(info: dict[str, object], key: str) -> float:
     value = info.get(key)
     if isinstance(value, int | float):
         return float(value)
     return 0.0
+
+
+def _int_info(info: dict[str, object], key: str) -> int:
+    value = info.get(key)
+    if isinstance(value, int | float):
+        return int(value)
+    return 0
 
 
 def _format_mode_name(mode_name: str) -> str:
@@ -427,13 +475,6 @@ def _format_race_time_ms(race_time_ms: int) -> str:
 
 def _format_distance(distance: float) -> str:
     return f"{distance:,.1f}"
-
-
-def _format_checkpoint_counter(race_distance: float) -> str:
-    spacing = RewardWeights().checkpoint_spacing
-    checkpoint_index = max(0, int(max(race_distance, 0.0) // spacing))
-    next_checkpoint_distance = (checkpoint_index + 1) * spacing
-    return f"{checkpoint_index} -> {next_checkpoint_distance:,.0f}"
 
 
 def _control_viz(control_state: ControllerState) -> ControlViz:

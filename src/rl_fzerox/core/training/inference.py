@@ -29,6 +29,7 @@ class PolicyRunner:
         self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
         self._last_reload_monotonic = time.monotonic()
         self._reload_error: str | None = None
+        self._last_reload_error: str | None = None
 
     @property
     def label(self) -> str:
@@ -47,6 +48,12 @@ class PolicyRunner:
         """Return the latest hot-reload failure, if any."""
 
         return self._reload_error
+
+    @property
+    def last_reload_error(self) -> str | None:
+        """Return the last hot-reload failure, even if a later reload succeeded."""
+
+        return self._last_reload_error
 
     def predict(self, observation: np.ndarray) -> np.ndarray:
         """Predict one deterministic action for the current observation."""
@@ -75,6 +82,7 @@ class PolicyRunner:
             policy = _load_saved_policy(policy_path)
         except Exception as exc:
             self._reload_error = str(exc)
+            self._last_reload_error = self._reload_error
             return
 
         self._loaded_policy = LoadedPolicy(

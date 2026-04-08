@@ -16,6 +16,7 @@ from rl_fzerox.ui.viewer import (
     _format_reload_age,
     _format_reload_error,
     _panel_content_height,
+    _persist_reload_error,
     _pressed_button_labels,
     _preview_frame,
     _window_size,
@@ -39,7 +40,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((640, 480), (120, 160, 12)) == (1304, 480)
+    assert _window_size((592, 444), (78, 222, 12)) == (1060, 720)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -49,7 +50,7 @@ def test_pressed_button_labels_are_human_readable() -> None:
     ) == "Up A Start"
 
 
-def test_side_panel_fits_default_480p_watch_window() -> None:
+def test_side_panel_fits_default_watch_window_height() -> None:
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     pygame.init()
 
@@ -75,12 +76,18 @@ def test_side_panel_fits_default_480p_watch_window() -> None:
             policy_action=None,
             policy_reload_age_seconds=None,
             policy_reload_error=None,
-            game_display_size=(640, 480),
-            observation_shape=(120, 160, 12),
+            action_repeat=3,
+            stuck_step_limit=240,
+            game_display_size=(592, 444),
+            observation_shape=(78, 222, 12),
             telemetry=_sample_telemetry(),
         )
 
-        assert _panel_content_height(fonts, columns) <= 480
+        assert _panel_content_height(
+            fonts,
+            columns,
+            observation_shape=(78, 222, 12),
+        ) <= _window_size((592, 444), (78, 222, 12))[1]
     finally:
         pygame.quit()
 
@@ -100,8 +107,10 @@ def test_input_section_includes_visualized_control_state() -> None:
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        game_display_size=(640, 480),
-        observation_shape=(120, 160, 12),
+        action_repeat=3,
+        stuck_step_limit=240,
+        game_display_size=(592, 444),
+        observation_shape=(78, 222, 12),
         telemetry=_sample_telemetry(),
     )
 
@@ -125,8 +134,10 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        game_display_size=(640, 480),
-        observation_shape=(120, 160, 12),
+        action_repeat=3,
+        stuck_step_limit=240,
+        game_display_size=(592, 444),
+        observation_shape=(78, 222, 12),
         telemetry=_sample_telemetry(
             state_labels=("active", "dash_pad_boost", "collision_recoil", "wrong_way"),
         ),
@@ -142,29 +153,6 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         if token.active
     }
     assert {"dash", "recoil"}.issubset(active_labels)
-
-
-def test_game_section_includes_checkpoint_counter() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_label=None,
-        policy_action=None,
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        game_display_size=(640, 480),
-        observation_shape=(120, 160, 12),
-        telemetry=_sample_telemetry(),
-    )
-
-    game_section = columns.right[0]
-    checkpoint_line = next(line for line in game_section.lines if line.label == "Checkpoint")
-
-    assert checkpoint_line.value == "0 -> 3,000"
 
 
 def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> None:
@@ -185,6 +173,56 @@ def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(np.array([4, 1, 1, 2], dtype=np.int64)) == "[4,1,1,2]"
 
 
+def test_display_section_includes_action_repeat() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0013",
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=2,
+        stuck_step_limit=240,
+        game_display_size=(592, 444),
+        observation_shape=(78, 222, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    display_section = next(section for section in columns.right if section.title == "Display")
+    repeat_line = next(line for line in display_section.lines if line.label == "Frame skip")
+
+    assert repeat_line.value == "2"
+
+
+def test_session_section_includes_stuck_counter() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0, "stalled_steps": 17},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        game_display_size=(592, 444),
+        observation_shape=(78, 222, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    stuck_line = next(line for line in session_section.lines if line.label == "Stuck")
+
+    assert stuck_line.value == "17 / 240"
+
+
 def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(None) == "manual"
     assert _format_reload_age(12.7) == "12s ago"
@@ -196,7 +234,23 @@ def test_format_reload_error_truncates_long_messages() -> None:
     assert _format_reload_error(None) == "-"
     assert _format_reload_error("bad checkpoint") == "bad checkpoint"
     assert _format_reload_error("this is a much longer checkpoint parse failure message") == (
-        "this is a much longer che..."
+        "this is a much longer checkpoint pa…"
+    )
+
+
+def test_persist_reload_error_writes_full_message_once(tmp_path) -> None:
+    runtime_dir = tmp_path / "watch" / "runtime"
+    runtime_dir.mkdir(parents=True)
+
+    logged_error = _persist_reload_error(
+        reload_error="PyTorchStreamReader failed reading file data/0",
+        runtime_dir=runtime_dir,
+        last_logged_reload_error=None,
+    )
+
+    assert logged_error == "PyTorchStreamReader failed reading file data/0"
+    assert (tmp_path / "watch" / "reload_error.log").read_text(encoding="utf-8") == (
+        "PyTorchStreamReader failed reading file data/0\n"
     )
 
 

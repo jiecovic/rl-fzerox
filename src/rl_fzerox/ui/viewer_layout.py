@@ -42,6 +42,7 @@ class ViewerLayout:
     """Spacing and sizing used by the watch window layout."""
 
     panel_width: int = 456
+    panel_min_height: int = 720
     panel_padding: int = 12
     preview_gap: int = 12
     preview_scale: int = 1
