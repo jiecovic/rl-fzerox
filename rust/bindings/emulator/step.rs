@@ -30,6 +30,7 @@ impl PyStepSummary {
         reverse_progress_total=0.0,
         consecutive_reverse_frames=0,
         energy_loss_total=0.0,
+        energy_gain_total=0.0,
         consecutive_low_speed_frames=0,
         entered_state_flags=0,
         final_frame_index=0,
@@ -41,6 +42,7 @@ impl PyStepSummary {
         reverse_progress_total: f32,
         consecutive_reverse_frames: usize,
         energy_loss_total: f32,
+        energy_gain_total: f32,
         consecutive_low_speed_frames: usize,
         entered_state_flags: u32,
         final_frame_index: usize,
@@ -52,6 +54,7 @@ impl PyStepSummary {
                 reverse_progress_total,
                 consecutive_reverse_frames,
                 energy_loss_total,
+                energy_gain_total,
                 consecutive_low_speed_frames,
                 entered_state_flags,
                 final_frame_index,
@@ -82,6 +85,11 @@ impl PyStepSummary {
     #[getter]
     fn energy_loss_total(&self) -> f32 {
         self.inner.energy_loss_total
+    }
+
+    #[getter]
+    fn energy_gain_total(&self) -> f32 {
+        self.inner.energy_gain_total
     }
 
     #[getter]
@@ -149,6 +157,7 @@ impl PyStepSummary {
             self.consecutive_reverse_frames(),
         )?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
+        dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item(
             "consecutive_low_speed_frames",
             self.consecutive_low_speed_frames(),

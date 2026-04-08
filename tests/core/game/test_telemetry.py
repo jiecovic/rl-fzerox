@@ -32,9 +32,11 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
 
 def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     telemetry = FZeroXTelemetry(
+        total_lap_count=3,
         game_mode_raw=1,
         game_mode_name="gp_race",
         in_race_mode=True,
+        total_racers=30,
         course_index=0,
         player=PlayerTelemetry(
             state_flags=(1 << 20) | (1 << 30),
@@ -53,7 +55,9 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
 
     payload = telemetry.to_dict()
 
+    assert payload["total_lap_count"] == 3
     assert payload["game_mode_name"] == "gp_race"
+    assert payload["total_racers"] == 30
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
     assert player_payload["state_labels"] == ("can_boost", "active")
@@ -66,6 +70,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         reverse_progress_total=3.5,
         consecutive_reverse_frames=1,
         energy_loss_total=4.0,
+        energy_gain_total=2.5,
         consecutive_low_speed_frames=2,
         entered_state_flags=(1 << 13) | (1 << 25),
         final_frame_index=12,
@@ -74,6 +79,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.entered_collision_recoil is True
     assert summary.entered_finished is True
     assert summary.entered_crashed is False
+    assert summary.energy_gain_total == 2.5
     assert summary.entered_state_labels == ("collision_recoil", "finished")
 
 

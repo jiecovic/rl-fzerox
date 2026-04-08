@@ -19,7 +19,9 @@ pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
 
 #[derive(Clone, Copy)]
 pub(super) struct GlobalOffsets {
+    pub total_lap_count: usize,
     pub game_mode: usize,
+    pub total_racers: usize,
     pub course_index: usize,
     pub racers: usize,
 }
@@ -44,7 +46,9 @@ pub(super) struct RacerOffsets {
 // We keep them grouped here so the reverse-engineered memory layout is easy to
 // audit and update as field semantics are validated.
 pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
+    total_lap_count: rdram_offset(0x800C_D00C),
     game_mode: rdram_offset(0x800DCE44),
+    total_racers: rdram_offset(0x800E5EC0),
     course_index: rdram_offset(0x800F8514),
     racers: rdram_offset(0x802C4920),
 };

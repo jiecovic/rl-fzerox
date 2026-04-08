@@ -6,7 +6,10 @@ use super::read_snapshot;
 fn read_snapshot_decodes_player_one_race_values() {
     let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
     let player_base = GLOBALS.racers;
+    memory[GLOBALS.total_lap_count..GLOBALS.total_lap_count + 4]
+        .copy_from_slice(&3_i32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
+    memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
     memory[GLOBALS.course_index..GLOBALS.course_index + 4].copy_from_slice(&0_u32.to_le_bytes());
     memory[player_base + RACER.state_flags..player_base + RACER.state_flags + 4]
         .copy_from_slice(&((1_u32 << 20) | (1_u32 << 30)).to_le_bytes());
@@ -30,6 +33,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     let telemetry = read_snapshot(&memory).expect("telemetry should decode");
 
     assert_eq!(telemetry.game_mode_raw, 1);
+    assert_eq!(telemetry.total_lap_count, 3);
+    assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.course_index, 0);
     assert!(
         (telemetry.player.speed_kph - (123.5 * TELEMETRY_CONFIG.speed_to_kph)).abs() < f32::EPSILON

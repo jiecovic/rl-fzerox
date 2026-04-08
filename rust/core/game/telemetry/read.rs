@@ -31,9 +31,11 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
     };
 
     Ok(TelemetrySnapshot {
+        total_lap_count: read_i32(system_ram, GLOBALS.total_lap_count)?,
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
+        total_racers: read_i32(system_ram, GLOBALS.total_racers)?,
         course_index: read_u32(system_ram, GLOBALS.course_index)?,
         player,
     })

@@ -83,6 +83,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
                 max_race_distance=42.0,
                 reverse_progress_total=3.5,
                 energy_loss_total=4.0,
+                energy_gain_total=1.5,
                 consecutive_low_speed_frames=2,
                 final_frame_index=12,
             )
@@ -111,6 +112,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     assert result.summary.max_race_distance == 42.0
     assert result.summary.reverse_progress_total == 3.5
     assert result.summary.energy_loss_total == 4.0
+    assert result.summary.energy_gain_total == 1.5
     assert result.summary.final_frame_index == 12
     assert result.status.step_count == 12
     assert result.status.stalled_steps == 2
