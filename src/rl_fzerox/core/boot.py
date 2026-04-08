@@ -6,21 +6,29 @@ from enum import StrEnum
 
 import numpy as np
 
-from rl_fzerox._native import JOYPAD_START, joypad_mask
-from rl_fzerox.core.emulator.base import EmulatorBackend
-from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.game.telemetry import GameMode
+from fzerox_emulator import JOYPAD_START, ControllerState, EmulatorBackend, joypad_mask
 
-START_MASK = joypad_mask(JOYPAD_START)
-START_CONTROL = ControllerState(joypad_mask=START_MASK)
-NEUTRAL_CONTROL = ControllerState()
-TITLE_WAIT_FRAMES = 240
-START_HOLD_FRAMES = 2
-SETTLE_FRAMES = 60
-RACE_MODE_WAIT_FRAMES = 360
-PRE_RACE_SETTLE_FRAMES = 180
-NEXT_RACE_MAX_START_PRESSES = 12
-NEXT_RACE_SETTLE_FRAMES = 45
+
+@dataclass(frozen=True)
+class BootConfig:
+    """Deterministic timing and control settings for the boot script."""
+
+    title_mode_name: str = "title"
+    race_mode_name: str = "gp_race"
+    start_control: ControllerState = ControllerState(
+        joypad_mask=joypad_mask(JOYPAD_START)
+    )
+    neutral_control: ControllerState = ControllerState()
+    title_wait_frames: int = 240
+    start_hold_frames: int = 2
+    settle_frames: int = 60
+    race_mode_wait_frames: int = 360
+    pre_race_settle_frames: int = 180
+    next_race_max_start_presses: int = 12
+    next_race_settle_frames: int = 45
+
+
+BOOT_CONFIG = BootConfig()
 
 
 class BootState(StrEnum):
@@ -43,18 +51,38 @@ class BootPhase:
 
     state: BootState
     start_presses: int
-    settle_frames: int = SETTLE_FRAMES
+    settle_frames: int
 
 
 # This sequence was measured against the current USA ROM boot path with the
 # default GP Race / Novice / Jack Cup / Blue Falcon selections.
 BOOT_SEQUENCE: tuple[BootPhase, ...] = (
-    BootPhase(BootState.OPEN_MODE_MENU, start_presses=4),
-    BootPhase(BootState.CONFIRM_DIFFICULTY, start_presses=2),
-    BootPhase(BootState.CONFIRM_COURSE, start_presses=2),
-    BootPhase(BootState.ENTER_MACHINE_SELECT, start_presses=2),
-    BootPhase(BootState.CONFIRM_MACHINE, start_presses=2),
-    BootPhase(BootState.CONFIRM_MACHINE_PROFILE, start_presses=4),
+    BootPhase(BootState.OPEN_MODE_MENU, start_presses=4, settle_frames=BOOT_CONFIG.settle_frames),
+    BootPhase(
+        BootState.CONFIRM_DIFFICULTY,
+        start_presses=2,
+        settle_frames=BOOT_CONFIG.settle_frames,
+    ),
+    BootPhase(
+        BootState.CONFIRM_COURSE,
+        start_presses=2,
+        settle_frames=BOOT_CONFIG.settle_frames,
+    ),
+    BootPhase(
+        BootState.ENTER_MACHINE_SELECT,
+        start_presses=2,
+        settle_frames=BOOT_CONFIG.settle_frames,
+    ),
+    BootPhase(
+        BootState.CONFIRM_MACHINE,
+        start_presses=2,
+        settle_frames=BOOT_CONFIG.settle_frames,
+    ),
+    BootPhase(
+        BootState.CONFIRM_MACHINE_PROFILE,
+        start_presses=4,
+        settle_frames=BOOT_CONFIG.settle_frames,
+    ),
 )
 
 
@@ -68,7 +96,7 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
 
     last_state = BootState.GP_RACE
     try:
-        _wait_for_mode(backend, GameMode.TITLE, TITLE_WAIT_FRAMES)
+        _wait_for_mode(backend, BOOT_CONFIG.title_mode_name, BOOT_CONFIG.title_wait_frames)
         last_state = BootState.WAIT_FOR_TITLE
         for phase in BOOT_SEQUENCE:
             for _ in range(phase.start_presses):
@@ -78,9 +106,9 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
         detected_gp_race = _wait_for_gp_race(backend)
         last_state = BootState.WAIT_FOR_GP_RACE
         if detected_gp_race:
-            backend.step_frames(PRE_RACE_SETTLE_FRAMES)
+            backend.step_frames(BOOT_CONFIG.pre_race_settle_frames)
     finally:
-        backend.set_controller_state(NEUTRAL_CONTROL)
+        backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
     return backend.render(), {
         "boot_state": BootState.GP_RACE.value,
@@ -91,9 +119,9 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
 
 
 def _press_start(backend: EmulatorBackend) -> None:
-    backend.set_controller_state(START_CONTROL)
-    backend.step_frames(START_HOLD_FRAMES)
-    backend.set_controller_state(NEUTRAL_CONTROL)
+    backend.set_controller_state(BOOT_CONFIG.start_control)
+    backend.step_frames(BOOT_CONFIG.start_hold_frames)
+    backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
 
 def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str, object]]:
@@ -101,43 +129,43 @@ def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[st
 
     try:
         if _is_race_start_ready(backend):
-            backend.step_frames(PRE_RACE_SETTLE_FRAMES)
+            backend.step_frames(BOOT_CONFIG.pre_race_settle_frames)
             return _race_reset_result(backend, reset_mode="continue_to_next_race")
 
-        for _ in range(NEXT_RACE_MAX_START_PRESSES):
+        for _ in range(BOOT_CONFIG.next_race_max_start_presses):
             _press_start(backend)
-            for _ in range(NEXT_RACE_SETTLE_FRAMES):
+            for _ in range(BOOT_CONFIG.next_race_settle_frames):
                 if _is_race_start_ready(backend):
-                    backend.step_frames(PRE_RACE_SETTLE_FRAMES)
+                    backend.step_frames(BOOT_CONFIG.pre_race_settle_frames)
                     return _race_reset_result(
                         backend,
                         reset_mode="continue_to_next_race",
                     )
                 backend.step_frame()
     finally:
-        backend.set_controller_state(NEUTRAL_CONTROL)
+        backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
     raise RuntimeError("Could not advance the current session into the next race")
 
 
 def _wait_for_gp_race(backend: EmulatorBackend) -> bool:
-    return _wait_for_mode(backend, GameMode.GP_RACE, RACE_MODE_WAIT_FRAMES)
+    return _wait_for_mode(
+        backend,
+        BOOT_CONFIG.race_mode_name,
+        BOOT_CONFIG.race_mode_wait_frames,
+    )
 
 
 def _wait_for_mode(
     backend: EmulatorBackend,
-    mode: GameMode,
+    mode_name: str,
     max_frames: int,
 ) -> bool:
     for _ in range(max_frames):
-        if _current_game_mode(backend) == mode:
+        if _current_game_mode_name(backend) == mode_name:
             return True
         backend.step_frame()
-    return _current_game_mode(backend) == mode
-
-
-def _is_gp_race(backend: EmulatorBackend) -> bool:
-    return _current_game_mode(backend) == GameMode.GP_RACE
+    return _current_game_mode_name(backend) == mode_name
 
 
 def _is_race_start_ready(backend: EmulatorBackend) -> bool:
@@ -145,11 +173,11 @@ def _is_race_start_ready(backend: EmulatorBackend) -> bool:
     if telemetry is None:
         return False
     return (
-        (telemetry.game_mode_raw & 0x1F) == int(GameMode.GP_RACE)
+        telemetry.game_mode_name == BOOT_CONFIG.race_mode_name
         and telemetry.player.race_time_ms == 0
-        and "finished" not in telemetry.player.state_labels
-        and "crashed" not in telemetry.player.state_labels
-        and "retired" not in telemetry.player.state_labels
+        and not telemetry.player.finished
+        and not telemetry.player.crashed
+        and not telemetry.player.retired
     )
 
 
@@ -157,26 +185,22 @@ def _read_telemetry(backend: EmulatorBackend):
     return backend.try_read_telemetry()
 
 
-def _current_game_mode(backend: EmulatorBackend) -> GameMode | None:
+def _current_game_mode_name(backend: EmulatorBackend) -> str | None:
     telemetry = _read_telemetry(backend)
     if telemetry is None:
         return None
-    mode_id = telemetry.game_mode_raw & 0x1F
-    try:
-        return GameMode(mode_id)
-    except ValueError:
-        return None
+    return telemetry.game_mode_name
 
 
 def _settle_after_input(backend: EmulatorBackend, max_frames: int) -> None:
-    starting_mode = _current_game_mode(backend)
-    if starting_mode is None:
+    starting_mode_name = _current_game_mode_name(backend)
+    if starting_mode_name is None:
         backend.step_frames(max_frames)
         return
 
     for _ in range(max_frames):
-        current_mode = _current_game_mode(backend)
-        if current_mode is not None and current_mode != starting_mode:
+        current_mode_name = _current_game_mode_name(backend)
+        if current_mode_name is not None and current_mode_name != starting_mode_name:
             return
         backend.step_frame()
 

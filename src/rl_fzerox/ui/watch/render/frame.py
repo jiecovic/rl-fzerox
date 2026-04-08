@@ -5,7 +5,7 @@ import os
 
 import numpy as np
 
-from rl_fzerox.core.emulator.video import display_size
+from fzerox_emulator import display_size
 from rl_fzerox.ui.watch.hud.draw import _draw_side_panel
 from rl_fzerox.ui.watch.hud.format import _display_aspect_ratio
 from rl_fzerox.ui.watch.hud.model import (

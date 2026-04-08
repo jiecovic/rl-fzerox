@@ -5,8 +5,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rl_fzerox.core.emulator import Emulator
-from rl_fzerox.core.game import FZeroXTelemetry
+from fzerox_emulator import Emulator, FZeroXTelemetry
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner

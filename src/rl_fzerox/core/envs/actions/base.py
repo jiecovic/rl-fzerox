@@ -8,7 +8,7 @@ from typing import Protocol, TypeAlias
 import numpy as np
 from gymnasium import spaces
 
-from rl_fzerox.core.emulator.control import ControllerState
+from fzerox_emulator import ControllerState
 
 ActionValue: TypeAlias = int | np.integer | Sequence[int] | np.ndarray
 

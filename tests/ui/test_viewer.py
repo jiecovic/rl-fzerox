@@ -4,11 +4,15 @@ import os
 import numpy as np
 import pygame
 
-from rl_fzerox._native import JOYPAD_A, JOYPAD_START, JOYPAD_UP
-from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.emulator.video import display_size
+from fzerox_emulator import (
+    JOYPAD_A,
+    JOYPAD_START,
+    JOYPAD_UP,
+    ControllerState,
+    FZeroXTelemetry,
+    display_size,
+)
 from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
-from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
 from rl_fzerox.ui.watch import (
     _build_panel_columns,
     _create_fonts,
@@ -21,6 +25,7 @@ from rl_fzerox.ui.watch import (
     _preview_frame,
     _window_size,
 )
+from tests.support.native_objects import make_telemetry
 
 
 def test_target_display_size_applies_aspect_correction() -> None:
@@ -258,30 +263,10 @@ def _sample_telemetry(
     *,
     state_labels: tuple[str, ...] = ("active",),
 ) -> FZeroXTelemetry:
-    return FZeroXTelemetry(
-        system_ram_size=0x00800000,
-        game_frame_count=1290,
-        game_mode_raw=1,
-        game_mode_name="gp_race",
-        course_index=0,
-        in_race_mode=True,
-        player=PlayerTelemetry(
-            state_flags=1 << 30,
-            state_labels=state_labels,
-            speed_raw=0.0,
-            speed_kph=0.0,
-            energy=178.0,
-            max_energy=178.0,
-            boost_timer=0,
-            race_distance=-3040.8,
-            laps_completed_distance=-79028.0,
-            lap_distance=75987.2,
-            race_distance_position=-3040.8,
-            race_time_ms=116,
-            lap=1,
-            laps_completed=0,
-            position=30,
-            character=0,
-            machine_index=0,
-        ),
+    return make_telemetry(
+        state_labels=state_labels,
+        speed_kph=0.0,
+        race_distance=-3040.8,
+        lap_distance=75987.2,
+        race_time_ms=116,
     )

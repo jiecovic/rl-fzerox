@@ -48,9 +48,6 @@ class EnvConfig(BaseModel):
     max_episode_steps: PositiveInt = 12_000
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
-    # Deprecated compatibility field kept so older saved run configs still load.
-    # The current stuck detector is speed-based and does not read this value.
-    stuck_progress_epsilon: NonNegativeFloat = 5.0
     wrong_way_step_limit: PositiveInt = 300
     wrong_way_progress_epsilon: NonNegativeFloat = 2.0
     reset_to_race: bool = False

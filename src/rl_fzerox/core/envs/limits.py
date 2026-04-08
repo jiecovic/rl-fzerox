@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fzerox_emulator import FZeroXTelemetry, StepSummary
 from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.emulator.base import StepSummary
-from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass(frozen=True)

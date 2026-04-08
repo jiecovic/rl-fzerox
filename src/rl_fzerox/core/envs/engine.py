@@ -4,15 +4,13 @@ from __future__ import annotations
 import numpy as np
 from gymnasium import spaces
 
+from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.emulator.base import EmulatorBackend, ObservationSpec
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.limits import EpisodeLimits
 from rl_fzerox.core.envs.rewards import build_reward_tracker
-from rl_fzerox.core.game import FZeroXTelemetry
 
 
 class FZeroXEnvEngine:
@@ -55,6 +53,13 @@ class FZeroXEnvEngine:
         return self._observation_space
 
     def reset(self, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
+        """Reset one episode.
+
+        The `seed` is kept for Gym compatibility and future Python-side reset
+        randomization. The emulator baseline reset path itself is deterministic
+        today, so different seeds currently do not diversify emulator state.
+        """
+
         _, info = self._reset_race_state()
         telemetry = _read_live_telemetry(self.backend)
         self._reward_tracker.reset(telemetry)
@@ -202,6 +207,7 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
         )
 
+
 def _has_custom_baseline(info: dict[str, object]) -> bool:
     baseline_kind = info.get("baseline_kind")
     return baseline_kind == "custom"
@@ -278,13 +284,4 @@ def _backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
 
 
 def _termination_reason(telemetry: FZeroXTelemetry) -> str | None:
-    terminal_labels = (
-        "finished",
-        "crashed",
-        "retired",
-        "falling_off_track",
-    )
-    for label in terminal_labels:
-        if label in telemetry.player.state_labels:
-            return label
-    return None
+    return telemetry.player.terminal_reason

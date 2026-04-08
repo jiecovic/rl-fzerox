@@ -3,14 +3,18 @@ import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
+from fzerox_emulator import (
+    BackendStepResult,
+    ControllerState,
+    FZeroXTelemetry,
+    ResetState,
+    StepSummary,
+)
 from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
-from rl_fzerox.core.emulator.base import BackendStepResult, ResetState, StepSummary
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
-from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
-from rl_fzerox.core.game.flags import FLAG_ACTIVE, FLAG_FINISHED
 from tests.support.fakes import SyntheticBackend
+from tests.support.native_objects import make_step_summary, make_telemetry
 
 
 class ScriptedStepBackend(SyntheticBackend):
@@ -391,7 +395,7 @@ def test_terminal_step_exposes_monitor_info_keys() -> None:
                 telemetry=_telemetry(race_distance=42.0, state_labels=("finished",)),
                 summary=_step_summary(
                     max_race_distance=42.0,
-                    entered_state_flags=FLAG_FINISHED,
+                    entered_state_labels=("finished",),
                     final_frame_index=1,
                 ),
             )
@@ -422,7 +426,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
                 summary=_step_summary(
                     frames_run=3,
                     max_race_distance=42.0,
-                    entered_state_flags=FLAG_FINISHED,
+                    entered_state_labels=("finished",),
                     final_frame_index=3,
                 ),
             )
@@ -450,46 +454,10 @@ def _telemetry(
     state_labels: tuple[str, ...] = ("active",),
     speed_kph: float = 100.0,
 ) -> FZeroXTelemetry:
-    state_flags = FLAG_ACTIVE
-    if "collision_recoil" in state_labels:
-        state_flags |= 1 << 13
-    if "spinning_out" in state_labels:
-        state_flags |= 1 << 14
-    if "retired" in state_labels:
-        state_flags |= 1 << 18
-    if "falling_off_track" in state_labels:
-        state_flags |= 1 << 19
-    if "finished" in state_labels:
-        state_flags |= FLAG_FINISHED
-    if "crashed" in state_labels:
-        state_flags |= 1 << 27
-
-    return FZeroXTelemetry(
-        system_ram_size=0x00800000,
-        game_frame_count=100,
-        game_mode_raw=1,
-        game_mode_name="gp_race",
-        course_index=0,
-        in_race_mode=True,
-        player=PlayerTelemetry(
-            state_flags=state_flags,
-            state_labels=state_labels,
-            speed_raw=0.0,
-            speed_kph=speed_kph,
-            energy=178.0,
-            max_energy=178.0,
-            boost_timer=0,
-            race_distance=race_distance,
-            laps_completed_distance=0.0,
-            lap_distance=race_distance,
-            race_distance_position=race_distance,
-            race_time_ms=0,
-            lap=1,
-            laps_completed=0,
-            position=30,
-            character=0,
-            machine_index=0,
-        ),
+    return make_telemetry(
+        race_distance=race_distance,
+        state_labels=state_labels,
+        speed_kph=speed_kph,
     )
 
 
@@ -500,17 +468,17 @@ def _step_summary(
     reverse_progress_total: float = 0.0,
     consecutive_reverse_frames: int = 0,
     consecutive_low_speed_frames: int = 0,
-    entered_state_flags: int = 0,
+    entered_state_labels: tuple[str, ...] = (),
     final_frame_index: int = 1,
 ) -> StepSummary:
-    return StepSummary(
+    return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
         reverse_progress_total=reverse_progress_total,
         consecutive_reverse_frames=consecutive_reverse_frames,
         energy_loss_total=0.0,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
-        entered_state_flags=entered_state_flags,
+        entered_state_labels=entered_state_labels,
         final_frame_index=final_frame_index,
     )
 

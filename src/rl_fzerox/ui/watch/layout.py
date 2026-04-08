@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from rl_fzerox._native import (
+from fzerox_emulator import (
     JOYPAD_A,
     JOYPAD_B,
     JOYPAD_DOWN,

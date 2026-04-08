@@ -3,22 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.core.emulator.base import StepSummary
+from fzerox_emulator import FZeroXTelemetry, StepSummary
 from rl_fzerox.core.envs.rewards.common import (
     RewardStep,
     RewardSummaryConfig,
-    apply_flag_penalty,
+    apply_event_penalty,
     finish_placement_bonus,
 )
-from rl_fzerox.core.game.flags import (
-    FLAG_COLLISION_RECOIL,
-    FLAG_CRASHED,
-    FLAG_FALLING_OFF_TRACK,
-    FLAG_FINISHED,
-    FLAG_RETIRED,
-    FLAG_SPINNING_OUT,
-)
-from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass(frozen=True)
@@ -111,44 +102,38 @@ class RaceV2RewardTracker:
             if energy_loss_penalty:
                 breakdown["energy_loss"] = energy_loss_penalty
 
-        entered_flags = summary.entered_state_flags
-        reward += apply_flag_penalty(
-            entered_flags,
-            FLAG_COLLISION_RECOIL,
+        reward += apply_event_penalty(
+            summary.entered_collision_recoil,
             self._weights.collision_recoil_penalty,
             "collision_recoil",
             breakdown,
         )
-        reward += apply_flag_penalty(
-            entered_flags,
-            FLAG_SPINNING_OUT,
+        reward += apply_event_penalty(
+            summary.entered_spinning_out,
             self._weights.spinning_out_penalty,
             "spinning_out",
             breakdown,
         )
-        reward += apply_flag_penalty(
-            entered_flags,
-            FLAG_FALLING_OFF_TRACK,
+        reward += apply_event_penalty(
+            summary.entered_falling_off_track,
             self._weights.falling_off_track_penalty,
             "falling_off_track",
             breakdown,
         )
-        reward += apply_flag_penalty(
-            entered_flags,
-            FLAG_CRASHED,
+        reward += apply_event_penalty(
+            summary.entered_crashed,
             self._weights.crashed_penalty,
             "crashed",
             breakdown,
         )
-        reward += apply_flag_penalty(
-            entered_flags,
-            FLAG_RETIRED,
+        reward += apply_event_penalty(
+            summary.entered_retired,
             self._weights.retired_penalty,
             "retired",
             breakdown,
         )
 
-        if entered_flags & FLAG_FINISHED:
+        if summary.entered_finished:
             reward += self._weights.finish_bonus
             breakdown["finished"] = self._weights.finish_bonus
             placement_bonus = finish_placement_bonus(
@@ -161,8 +146,10 @@ class RaceV2RewardTracker:
                 breakdown["finish_position"] = placement_bonus
 
         terminated = bool(
-            telemetry.player.state_flags
-            & (FLAG_FINISHED | FLAG_CRASHED | FLAG_RETIRED | FLAG_FALLING_OFF_TRACK)
+            telemetry.player.finished
+            or telemetry.player.crashed
+            or telemetry.player.retired
+            or telemetry.player.falling_off_track
         )
         return RewardStep(reward=reward, terminated=terminated, breakdown=breakdown)
 

@@ -6,9 +6,8 @@ from dataclasses import dataclass
 import numpy as np
 from gymnasium import spaces
 
-from rl_fzerox._native import JOYPAD_B, joypad_mask
+from fzerox_emulator import JOYPAD_B, ControllerState, joypad_mask
 from rl_fzerox.core.config.schema import ActionConfig
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,

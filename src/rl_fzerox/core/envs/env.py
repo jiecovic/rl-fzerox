@@ -4,15 +4,14 @@ from __future__ import annotations
 import gymnasium as gym
 import numpy as np
 
+from fzerox_emulator import ControllerState, EmulatorBackend
 from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.emulator.base import EmulatorBackend
-from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
 
 class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
-    """Gymnasium wrapper around the current raw-frame emulator backend."""
+    """Gymnasium wrapper around the emulator-backed F-Zero X environment."""
 
     metadata = {"render_modes": ["rgb_array"]}
 
@@ -32,6 +31,13 @@ class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
         self.observation_space = self._engine.observation_space
 
     def reset(self, *, seed: int | None = None, options: dict[str, object] | None = None):
+        """Reset the env and return the first stacked observation.
+
+        The `seed` is accepted to match the Gym API and to seed any future
+        Python-side reset randomization. The emulator reset path itself remains
+        deterministic today.
+        """
+
         _ = options
         super().reset(seed=seed)
         return self._engine.reset(seed=seed)

@@ -3,15 +3,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from rl_fzerox.core.emulator.control import ControllerState
+from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
     THROTTLE_MASK,
 )
-from rl_fzerox.core.game import FZeroXTelemetry
-from rl_fzerox.core.game.flags import RACER_FLAG_LABELS
 from rl_fzerox.ui.watch.hud.format import (
     _float_info,
     _format_distance,
@@ -421,7 +419,7 @@ _FLAG_ROWS = (
 
 def _flag_viz(state_labels: tuple[str, ...]) -> FlagViz:
     active_flags = set(state_labels)
-    known_flags = {label for _, label in RACER_FLAG_LABELS}
+    known_flags = {flag_label for row in _FLAG_ROWS for flag_label in row}
     active_flags.intersection_update(known_flags)
     return FlagViz(
         rows=tuple(
