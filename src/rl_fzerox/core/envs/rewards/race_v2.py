@@ -65,7 +65,7 @@ class RaceV2RewardTracker:
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Initialize reward state for a new episode."""
 
-        if telemetry is None:
+        if telemetry is None or not telemetry.in_race_mode:
             self._next_milestone_index = 1
             self._awarded_laps_completed = 0
             self._bootstrap_progress_frontier = 0.0
@@ -212,6 +212,8 @@ class RaceV2RewardTracker:
         }
         if telemetry is None:
             return info
+        if not telemetry.in_race_mode:
+            return info
         self._ensure_progress_origin(telemetry)
         current_relative_progress = self._relative_progress(telemetry.player.race_distance)
         next_milestone_distance = self._next_milestone_index * self._weights.milestone_distance
@@ -238,7 +240,7 @@ class RaceV2RewardTracker:
         self._has_progress_origin = True
 
     def _ensure_progress_origin(self, telemetry: FZeroXTelemetry) -> None:
-        if self._has_progress_origin:
+        if self._has_progress_origin or not telemetry.in_race_mode:
             return
         self._set_progress_origin(telemetry.player.race_distance)
 

@@ -40,10 +40,10 @@ by the human watch display, then downscale to:
 - `native_crop_v2`: `124 x 92 x 3`
 - `native_crop_v3`: `164 x 116 x 3`
 
-Both give the policy an approximately `4:3` view instead of the earlier
+All three give the policy an approximately `4:3` view instead of the earlier
 native-width-squashed observation. `native_crop_v1` and `native_crop_v2` use
-an exact NatureCNN-style conv stack; `native_crop_v3` is the larger default
-and pairs with the older 4-layer `32,64,64,128` extractor shape.
+an exact NatureCNN-style conv stack; `native_crop_v3` is the current larger
+default and pairs with the older 4-layer `32,64,64,128` extractor shape.
 
 With `frame_stack: 4`, the env observation space becomes:
 
