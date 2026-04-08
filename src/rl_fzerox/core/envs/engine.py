@@ -8,7 +8,7 @@ from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.emulator.base import EmulatorBackend, ObservationSpec
 from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.envs.actions import ActionValue, resolve_action_adapter
+from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.limits import EpisodeLimits
 from rl_fzerox.core.envs.rewards import build_reward_tracker
@@ -18,8 +18,9 @@ from rl_fzerox.core.game import FZeroXTelemetry
 class FZeroXEnvEngine:
     """Environment step engine around one emulator backend.
 
-    Episode-limit counters are based on internal telemetry samples, which are
-    taken once per emulated frame, not once per outer env step.
+    Rust owns the repeated inner-frame loop for one outer env step. Python
+    consumes the returned step summary to apply reward shaping, truncation
+    limits, and Gym-facing info assembly.
     """
 
     def __init__(
@@ -30,12 +31,14 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
-        self._action_adapter = resolve_action_adapter(config.action)
+        self._action_adapter = build_action_adapter(config.action)
         self._observation_spec = backend.observation_spec(config.observation.preset)
         self._episode_limits = EpisodeLimits(config)
-        self._reward_tracker = build_reward_tracker(config.reward.name)
+        self._reward_tracker = build_reward_tracker()
+        self._reward_summary_config = self._reward_tracker.summary_config()
         self._episode_done = False
         self._episode_return = 0.0
+        self._held_controller_state = ControllerState()
         self._last_info: dict[str, object] = {}
         self._action_space = self._action_adapter.action_space
         self._observation_space = _observation_space(
@@ -58,6 +61,7 @@ class FZeroXEnvEngine:
         self._episode_limits.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
+        self._held_controller_state = ControllerState()
         info["seed"] = seed
         if telemetry is not None:
             info["telemetry"] = telemetry
@@ -86,54 +90,10 @@ class FZeroXEnvEngine:
         self,
         control_state: ControllerState,
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
-        self.backend.set_controller_state(control_state)
-        latest_observation: np.ndarray | None = None
-        total_reward = 0.0
-        terminated = False
-        truncated = False
-        info: dict[str, object] = {}
-        last_telemetry: FZeroXTelemetry | None = None
-
-        for repeat_index in range(self.config.action_repeat):
-            is_last_repeat = repeat_index == (self.config.action_repeat - 1)
-            (
-                latest_observation,
-                step_reward,
-                terminated,
-                truncated,
-                info,
-                last_telemetry,
-            ) = self._advance_one_frame(render_observation=is_last_repeat)
-            total_reward += step_reward
-            info["repeat_index"] = repeat_index
-
-            if terminated or truncated:
-                break
-
-        if latest_observation is None:
-            raise RuntimeError("The emulator did not produce an observation during step()")
-
-        if last_telemetry is not None:
-            info["telemetry"] = last_telemetry
-        self._episode_return += total_reward
-        info["episode_return"] = self._episode_return
-        ensure_monitor_info_keys(info)
-        self._episode_done = terminated or truncated
-        self._last_info = dict(info)
-        observation = latest_observation
-        _set_observation_info(
-            info,
-            observation_shape=tuple(int(value) for value in observation.shape),
-            observation_spec=self._observation_spec,
-            frame_stack=self.config.observation.frame_stack,
-        )
-
-        return (
-            observation,
-            total_reward,
-            terminated,
-            truncated,
-            info,
+        self._held_controller_state = control_state
+        return self._run_env_step(
+            control_state,
+            action_repeat=self.config.action_repeat,
         )
 
     def step_frame(
@@ -143,24 +103,11 @@ class FZeroXEnvEngine:
         """Advance one frame through the same reward path used by step()."""
 
         if control_state is not None:
-            self.backend.set_controller_state(control_state)
-        observation, reward, terminated, truncated, info, _ = self._advance_one_frame(
-            render_observation=True
+            self._held_controller_state = control_state
+        return self._run_env_step(
+            self._held_controller_state,
+            action_repeat=1,
         )
-        if observation is None:
-            raise RuntimeError("The emulator did not produce an observation during step_frame()")
-        self._episode_return += reward
-        info["episode_return"] = self._episode_return
-        ensure_monitor_info_keys(info)
-        self._episode_done = terminated or truncated
-        self._last_info = dict(info)
-        _set_observation_info(
-            info,
-            observation_shape=tuple(int(value) for value in observation.shape),
-            observation_spec=self._observation_spec,
-            frame_stack=self.config.observation.frame_stack,
-        )
-        return observation, reward, terminated, truncated, info
 
     def render(self) -> np.ndarray:
         return self.backend.render_display(preset=self.config.observation.preset)
@@ -189,34 +136,39 @@ class FZeroXEnvEngine:
 
         return frame, info
 
-    def _advance_one_frame(
+    def _run_env_step(
         self,
+        control_state: ControllerState,
         *,
-        render_observation: bool = True,
-    ) -> tuple[np.ndarray | None, float, bool, bool, dict[str, object], FZeroXTelemetry | None]:
-        self.backend.step_frames(1, capture_video=render_observation)
-        observation_frame = None
-        frame_reward = 0.0
-        terminated = False
-        truncated = False
+        action_repeat: int,
+    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+        step_result = self.backend.step_repeat_raw(
+            control_state,
+            action_repeat=action_repeat,
+            preset=self.config.observation.preset,
+            frame_stack=self.config.observation.frame_stack,
+            stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
+            reverse_progress_epsilon=self._reward_summary_config.reverse_progress_epsilon,
+            energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
+            wrong_way_progress_epsilon=float(self.config.wrong_way_progress_epsilon),
+        )
         info = _backend_step_info(self.backend)
-        telemetry = _read_live_telemetry(self.backend)
-        reward_step = self._reward_tracker.step(telemetry)
-        reward = frame_reward + reward_step.reward
+        telemetry = step_result.telemetry
+        reward_step = self._reward_tracker.step_summary(step_result.summary, telemetry)
+        reward = reward_step.reward
         reward_breakdown = dict(reward_step.breakdown)
-        terminated = terminated or reward_step.terminated
-        limit_step = self._episode_limits.step(telemetry)
+        terminated = reward_step.terminated
+        limit_step = self._episode_limits.step_summary(step_result.summary, telemetry)
         truncation_reason = limit_step.truncation_reason
-        truncated = truncated or (truncation_reason is not None)
+        truncated = truncation_reason is not None
         truncation_penalty, truncation_label = self._reward_tracker.truncation_penalty(
             truncation_reason
         )
         reward += truncation_penalty
         if truncation_label is not None:
             reward_breakdown[truncation_label] = truncation_penalty
-        if render_observation or terminated or truncated:
-            observation_frame = self._transform_observation()
         info["step_reward"] = reward
+        info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = limit_step.step_count
@@ -230,14 +182,19 @@ class FZeroXEnvEngine:
             termination_reason = _termination_reason(telemetry)
             if termination_reason is not None:
                 info["termination_reason"] = termination_reason
-        return (
-            observation_frame,
-            reward,
-            terminated,
-            truncated,
+        observation = step_result.observation
+        self._episode_return += reward
+        info["episode_return"] = self._episode_return
+        ensure_monitor_info_keys(info)
+        self._episode_done = terminated or truncated
+        self._last_info = dict(info)
+        _set_observation_info(
             info,
-            telemetry,
+            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_spec=self._observation_spec,
+            frame_stack=self.config.observation.frame_stack,
         )
+        return observation, reward, terminated, truncated, info
 
     def _transform_observation(self) -> np.ndarray:
         return self.backend.render_observation(

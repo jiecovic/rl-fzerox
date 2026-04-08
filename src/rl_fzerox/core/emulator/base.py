@@ -43,6 +43,29 @@ class ObservationSpec:
     display_height: int
 
 
+@dataclass(frozen=True, slots=True)
+class StepSummary:
+    """Step-level aggregates returned after one repeated env step."""
+
+    frames_run: int
+    max_race_distance: float
+    reverse_progress_total: float
+    consecutive_reverse_frames: int
+    energy_loss_total: float
+    consecutive_low_speed_frames: int
+    entered_state_flags: int
+    final_frame_index: int
+
+
+@dataclass(frozen=True)
+class BackendStepResult:
+    """Native repeated-step payload consumed by the env engine."""
+
+    observation: np.ndarray
+    summary: StepSummary
+    telemetry: FZeroXTelemetry | None
+
+
 class EmulatorBackend(Protocol):
     """Emulator contract consumed by the F-Zero X env and watch tools."""
 
@@ -66,6 +89,19 @@ class EmulatorBackend(Protocol):
     def step_frame(self) -> FrameStep: ...
 
     def step_frames(self, count: int, *, capture_video: bool = True) -> None: ...
+
+    def step_repeat_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        reverse_progress_epsilon: float,
+        energy_loss_epsilon: float,
+        wrong_way_progress_epsilon: float,
+    ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...
 

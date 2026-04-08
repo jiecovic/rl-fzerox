@@ -11,4 +11,4 @@ pub mod runtime;
 pub mod stdio;
 pub mod video;
 
-pub use runtime::Host;
+pub use runtime::{Host, RepeatedStepConfig, StepSummary};

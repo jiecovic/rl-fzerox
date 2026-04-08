@@ -5,7 +5,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from rl_fzerox.core.emulator.base import FrameStep, ObservationSpec, ResetState
+from rl_fzerox.core.emulator.base import (
+    BackendStepResult,
+    FrameStep,
+    ObservationSpec,
+    ResetState,
+    StepSummary,
+)
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.game.telemetry import FZeroXTelemetry
@@ -147,6 +153,48 @@ class SyntheticBackend:
         self._capture_video_flags.extend([capture_video] * count)
         for _ in range(count):
             self.step_frame()
+
+    def step_repeat_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        reverse_progress_epsilon: float,
+        energy_loss_epsilon: float,
+        wrong_way_progress_epsilon: float,
+    ) -> BackendStepResult:
+        _ = (
+            stuck_min_speed_kph,
+            reverse_progress_epsilon,
+            energy_loss_epsilon,
+            wrong_way_progress_epsilon,
+        )
+        self.set_controller_state(controller_state)
+        if action_repeat <= 0:
+            raise ValueError("action_repeat must be positive")
+
+        self._capture_video_flags.extend([False] * max(action_repeat - 1, 0))
+        self._capture_video_flags.append(True)
+        for _ in range(action_repeat):
+            self.step_frame()
+        observation = self.render_observation(preset=preset, frame_stack=frame_stack)
+        return BackendStepResult(
+            observation=observation,
+            summary=StepSummary(
+                frames_run=action_repeat,
+                max_race_distance=self._state.progress,
+                reverse_progress_total=0.0,
+                consecutive_reverse_frames=0,
+                energy_loss_total=0.0,
+                consecutive_low_speed_frames=0,
+                entered_state_flags=0,
+                final_frame_index=self._state.frame_index,
+            ),
+            telemetry=None,
+        )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
         self._last_controller_state = controller_state

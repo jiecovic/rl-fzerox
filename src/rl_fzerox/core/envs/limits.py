@@ -4,12 +4,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rl_fzerox.core.config.schema import EnvConfig
+from rl_fzerox.core.emulator.base import StepSummary
 from rl_fzerox.core.game.telemetry import FZeroXTelemetry
 
 
 @dataclass(frozen=True)
 class LimitStep:
-    """Episode-limit state after one environment step."""
+    """Episode-limit state after one environment step.
+
+    `stalled_steps` is kept as the public field name for compatibility, but it
+    now counts consecutive low-speed internal frames rather than no-progress
+    frontier frames.
+    """
 
     step_count: int
     stalled_steps: int
@@ -18,76 +24,66 @@ class LimitStep:
 
 
 class EpisodeLimits:
-    """Track timeout and no-progress truncation per internal frame sample."""
+    """Track timeout, low-speed stuck, and wrong-way truncation per env step.
+
+    The counters still operate in internal-frame units. Rust aggregates the
+    repeated inner frames into a `StepSummary`, and this tracker advances the
+    carried streaks from that summary once per outer env step.
+    """
 
     def __init__(self, config: EnvConfig) -> None:
         self._max_episode_steps = config.max_episode_steps
-        self._stuck_grace_steps = config.stuck_grace_steps
         self._stuck_step_limit = config.stuck_step_limit
-        self._stuck_progress_epsilon = float(config.stuck_progress_epsilon)
         self._wrong_way_step_limit = config.wrong_way_step_limit
-        self._wrong_way_progress_epsilon = float(config.wrong_way_progress_epsilon)
         self._step_count = 0
-        self._stalled_steps = 0
+        self._low_speed_steps = 0
         self._reverse_steps = 0
-        self._best_race_distance = float("-inf")
-        self._previous_race_distance = float("-inf")
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
         """Reset counters for a fresh episode."""
 
         self._step_count = 0
-        self._stalled_steps = 0
+        self._low_speed_steps = 0
         self._reverse_steps = 0
-        if telemetry is None:
-            self._best_race_distance = float("-inf")
-            self._previous_race_distance = float("-inf")
-            return
-        self._best_race_distance = telemetry.player.race_distance
-        self._previous_race_distance = telemetry.player.race_distance
 
-    def step(self, telemetry: FZeroXTelemetry | None) -> LimitStep:
-        """Advance counters from the latest telemetry sample."""
+    def step_summary(
+        self,
+        summary: StepSummary,
+        telemetry: FZeroXTelemetry | None,
+    ) -> LimitStep:
+        """Advance counters from one repeated-step summary."""
 
-        self._step_count += 1
+        self._step_count += summary.frames_run
         truncation_reason = self._timeout_reason()
         if truncation_reason is not None:
             return LimitStep(
                 step_count=self._step_count,
-                stalled_steps=self._stalled_steps,
+                stalled_steps=self._low_speed_steps,
                 reverse_steps=self._reverse_steps,
                 truncation_reason=truncation_reason,
             )
 
         if telemetry is None or not telemetry.in_race_mode:
-            self._stalled_steps = 0
+            self._low_speed_steps = 0
             self._reverse_steps = 0
             return LimitStep(
                 step_count=self._step_count,
-                stalled_steps=self._stalled_steps,
+                stalled_steps=self._low_speed_steps,
                 reverse_steps=self._reverse_steps,
             )
 
-        progress_delta = telemetry.player.race_distance - self._previous_race_distance
-        progress_gain = telemetry.player.race_distance - self._best_race_distance
-        if progress_gain > self._stuck_progress_epsilon:
-            self._best_race_distance = telemetry.player.race_distance
-            self._stalled_steps = 0
+        if summary.consecutive_low_speed_frames == summary.frames_run:
+            self._low_speed_steps += summary.frames_run
         else:
-            self._stalled_steps += 1
-        # Reverse driving is counted per internal telemetry sample, not per
-        # outer env step. With action_repeat > 1 this makes the limit a frame-
-        # scale timeout, which is what we want for consistent game-time
-        # behavior.
-        if progress_delta < -self._wrong_way_progress_epsilon:
-            self._reverse_steps += 1
+            self._low_speed_steps = summary.consecutive_low_speed_frames
+        if summary.consecutive_reverse_frames == summary.frames_run:
+            self._reverse_steps += summary.frames_run
         else:
-            self._reverse_steps = 0
-        self._previous_race_distance = telemetry.player.race_distance
+            self._reverse_steps = summary.consecutive_reverse_frames
 
         return LimitStep(
             step_count=self._step_count,
-            stalled_steps=self._stalled_steps,
+            stalled_steps=self._low_speed_steps,
             reverse_steps=self._reverse_steps,
             truncation_reason=self._truncation_reason(),
         )
@@ -100,8 +96,6 @@ class EpisodeLimits:
     def _truncation_reason(self) -> str | None:
         if self._reverse_steps >= self._wrong_way_step_limit:
             return "wrong_way"
-        if self._step_count <= self._stuck_grace_steps:
-            return None
-        if self._stalled_steps >= self._stuck_step_limit:
+        if self._low_speed_steps >= self._stuck_step_limit:
             return "stuck"
         return None
