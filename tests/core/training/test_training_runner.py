@@ -12,15 +12,17 @@ from rl_fzerox.core.config.schema import (
     TrainAppConfig,
     TrainConfig,
 )
-from rl_fzerox.core.training.runner import (
+from rl_fzerox.core.training.runs import build_run_paths
+from rl_fzerox.core.training.session.artifacts import (
     _atomic_save_artifact,
-    _info_sequence,
-    _resolve_policy_activation_fn,
     _resolve_train_run_config,
-    _RolloutInfoAccumulator,
     _validate_training_baseline_state,
 )
-from rl_fzerox.core.training.runs import build_run_paths
+from rl_fzerox.core.training.session.callbacks import (
+    _info_sequence,
+    _RolloutInfoAccumulator,
+)
+from rl_fzerox.core.training.session.model import _resolve_policy_activation_fn
 
 
 def test_validate_training_baseline_state_requires_existing_file(
