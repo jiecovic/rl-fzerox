@@ -33,6 +33,90 @@ pub struct StepSummary {
     pub final_frame_index: usize,
 }
 
+/// Carried limit counters that persist across outer env steps.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StepCounters {
+    /// Total internal frames executed in the current episode.
+    pub step_count: usize,
+    /// Consecutive low-speed internal frames at the current episode frontier.
+    pub stalled_steps: usize,
+    /// Consecutive reverse-progress internal frames at the current frontier.
+    pub reverse_steps: usize,
+}
+
+/// Native stop/counter state after one repeated env step completes.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct StepStatus {
+    /// Updated carried counters after the repeated env step.
+    pub counters: StepCounters,
+    /// Terminal reason detected on the final executed internal frame, if any.
+    pub termination_reason: Option<&'static str>,
+    /// Truncation reason detected while advancing the repeated env step, if any.
+    pub truncation_reason: Option<&'static str>,
+}
+
+impl StepStatus {
+    pub fn from_step(
+        previous: StepCounters,
+        summary: &StepSummary,
+        final_telemetry: &TelemetrySnapshot,
+        config: RepeatedStepConfig,
+    ) -> Self {
+        let counters = StepCounters {
+            step_count: previous.step_count + summary.frames_run,
+            stalled_steps: carried_streak(
+                previous.stalled_steps,
+                summary.consecutive_low_speed_frames,
+                summary.frames_run,
+                final_telemetry.in_race_mode,
+            ),
+            reverse_steps: carried_streak(
+                previous.reverse_steps,
+                summary.consecutive_reverse_frames,
+                summary.frames_run,
+                final_telemetry.in_race_mode,
+            ),
+        };
+        let truncation_reason = if counters.step_count >= config.max_episode_steps {
+            Some("timeout")
+        } else if counters.reverse_steps >= config.wrong_way_step_limit {
+            Some("wrong_way")
+        } else if counters.stalled_steps >= config.stuck_step_limit {
+            Some("stuck")
+        } else {
+            None
+        };
+        Self {
+            counters,
+            termination_reason: final_telemetry.player.terminal_reason(),
+            truncation_reason,
+        }
+    }
+
+    pub fn terminated(&self) -> bool {
+        self.termination_reason.is_some()
+    }
+
+    pub fn truncated(&self) -> bool {
+        self.truncation_reason.is_some()
+    }
+}
+
+fn carried_streak(
+    previous: usize,
+    trailing_in_step: usize,
+    frames_run: usize,
+    in_race_mode: bool,
+) -> usize {
+    if !in_race_mode || trailing_in_step == 0 {
+        return 0;
+    }
+    if trailing_in_step == frames_run {
+        return previous + trailing_in_step;
+    }
+    trailing_in_step
+}
+
 /// Native env-step payload returned after executing a repeated step.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -41,6 +125,8 @@ pub struct NativeStepResult<'a> {
     pub observation: &'a [u8],
     /// Aggregated step features spanning the internal repeated frames.
     pub summary: StepSummary,
+    /// Native counter/stop state after the repeated env step completed.
+    pub status: StepStatus,
     /// Final telemetry snapshot after the repeated step completed.
     pub final_telemetry: TelemetrySnapshot,
 }
@@ -64,4 +150,10 @@ pub struct RepeatedStepConfig {
     pub energy_loss_epsilon: f32,
     /// Epsilon used for wrong-way streak counting.
     pub wrong_way_progress_epsilon: f32,
+    /// Maximum number of internal frames allowed in one episode.
+    pub max_episode_steps: usize,
+    /// Low-speed frame limit that triggers a stuck truncation.
+    pub stuck_step_limit: usize,
+    /// Reverse-progress frame limit that triggers wrong-way truncation.
+    pub wrong_way_step_limit: usize,
 }

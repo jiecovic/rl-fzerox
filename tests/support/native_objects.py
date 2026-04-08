@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from fzerox_emulator import (
     FZeroXTelemetry,
     PlayerTelemetry,
+    StepStatus,
     StepSummary,
 )
 from fzerox_emulator import (
@@ -32,9 +33,7 @@ def make_player_telemetry(
     laps_completed: int = 0,
     position: int = 30,
 ) -> PlayerTelemetry:
-    resolved_state_flags = (
-        encode_state_flags(state_labels) if state_flags is None else state_flags
-    )
+    resolved_state_flags = encode_state_flags(state_labels) if state_flags is None else state_flags
     return PlayerTelemetry(
         state_flags=resolved_state_flags,
         speed_kph=speed_kph,
@@ -120,3 +119,21 @@ def make_step_summary(
         entered_state_flags=resolved_entered_state_flags,
         final_frame_index=final_frame_index,
     )
+
+
+def make_step_status(
+    *,
+    step_count: int,
+    stalled_steps: int = 0,
+    reverse_steps: int = 0,
+    termination_reason: str | None = None,
+    truncation_reason: str | None = None,
+) -> StepStatus:
+    return StepStatus(
+        step_count=step_count,
+        stalled_steps=stalled_steps,
+        reverse_steps=reverse_steps,
+        termination_reason=termination_reason,
+        truncation_reason=truncation_reason,
+    )
+

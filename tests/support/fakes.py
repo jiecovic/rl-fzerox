@@ -12,6 +12,7 @@ from fzerox_emulator import (
     FZeroXTelemetry,
     ObservationSpec,
     ResetState,
+    StepStatus,
     StepSummary,
     display_size,
 )
@@ -22,6 +23,9 @@ from tests.support.native_objects import make_telemetry
 class SyntheticState:
     frame_index: int = 0
     progress: float = 0.0
+    step_count: int = 0
+    stalled_steps: int = 0
+    reverse_steps: int = 0
 
 
 class SyntheticBackend:
@@ -183,6 +187,9 @@ class SyntheticBackend:
         reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
         wrong_way_progress_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_step_limit: int,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -198,7 +205,11 @@ class SyntheticBackend:
         self._capture_video_flags.append(True)
         for _ in range(action_repeat):
             self.step_frame()
+        self._state.step_count += action_repeat
         observation = self.render_observation(preset=preset, frame_stack=frame_stack)
+        truncation_reason = None
+        if self._state.step_count >= max_episode_steps:
+            truncation_reason = "timeout"
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
@@ -210,6 +221,12 @@ class SyntheticBackend:
                 consecutive_low_speed_frames=0,
                 entered_state_flags=0,
                 final_frame_index=self._state.frame_index,
+            ),
+            status=StepStatus(
+                step_count=self._state.step_count,
+                stalled_steps=self._state.stalled_steps,
+                reverse_steps=self._state.reverse_steps,
+                truncation_reason=truncation_reason,
             ),
             telemetry=None,
         )

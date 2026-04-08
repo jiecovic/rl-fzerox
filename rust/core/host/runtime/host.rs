@@ -12,10 +12,10 @@ use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::observation::{ObservationPreset, ObservationSpec};
 use crate::core::stdio::with_silenced_stdio;
-use crate::core::telemetry::TelemetrySnapshot;
+use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
 use crate::core::video::VideoFrame;
 
-use super::step::{NativeStepResult, RepeatedStepConfig};
+use super::step::{NativeStepResult, RepeatedStepConfig, StepCounters, StepStatus};
 use super::step_accumulator::StepAccumulator;
 
 // Maximum number of `core.run()` calls we allow while waiting for a reset/load
@@ -41,6 +41,7 @@ pub struct Host {
     pub(super) native_fps: f64,
     pub(super) frame_shape: (usize, usize, usize),
     pub(super) frame_index: usize,
+    pub(super) step_counters: StepCounters,
     pub(super) closed: bool,
 }
 
@@ -84,6 +85,7 @@ impl Host {
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
             frame_index: 0,
+            step_counters: StepCounters::default(),
             closed: false,
         };
         host.configure_callbacks();
@@ -135,6 +137,7 @@ impl Host {
         self.callbacks
             .set_controller_state(ControllerState::default());
         self.frame_index = 0;
+        self.step_counters = StepCounters::default();
         self.refresh_shape_from_frame();
         Ok(())
     }
@@ -161,9 +164,15 @@ impl Host {
 
     /// Execute one outer env step fully inside the host runtime.
     ///
-    /// The chosen controller state is held for `action_repeat` internal frames.
-    /// The host aggregates step-level telemetry features across those frames
-    /// and returns the final stacked observation once at the end.
+    /// The chosen controller state is held for exactly `action_repeat`
+    /// internal frames. The host aggregates step-level telemetry features and
+    /// stop-state counters across those frames, then returns the final stacked
+    /// observation once at the end.
+    ///
+    /// We intentionally capture video only on the last repeated frame. That
+    /// keeps the common path fast at the cost of not returning the exact first
+    /// terminal/truncation frame image when a stop condition occurs earlier in
+    /// the repeated step.
     #[allow(dead_code)]
     pub fn step_repeat_raw(
         &mut self,
@@ -176,18 +185,10 @@ impl Host {
             });
         }
 
-        let initial_telemetry = self.telemetry()?;
+        let initial_sample = self.telemetry_sample()?;
         self.callbacks.set_controller_state(config.controller_state);
         let step_result = with_silenced_stdio(|| {
-            let mut accumulator = StepAccumulator::new(
-                &initial_telemetry,
-                config.stuck_min_speed_kph,
-                config.reverse_progress_epsilon,
-                config.energy_loss_epsilon,
-                config.wrong_way_progress_epsilon,
-                self.frame_index,
-            );
-            let mut final_telemetry = initial_telemetry;
+            let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
 
             for repeat_index in 0..config.action_repeat {
                 let capture_video = repeat_index + 1 == config.action_repeat;
@@ -197,25 +198,28 @@ impl Host {
                 });
                 self.frame_index += 1;
 
-                let telemetry = self.telemetry()?;
+                let telemetry = self.telemetry_sample()?;
                 accumulator.observe(&telemetry, self.frame_index);
-                final_telemetry = telemetry;
             }
 
-            Ok((accumulator.finish(), final_telemetry))
+            Ok(accumulator.finish())
         });
         self.callbacks.set_capture_video(true);
         self.refresh_shape_from_frame();
 
-        let (summary, final_telemetry) = step_result?;
+        let summary = step_result?;
         if !self.callbacks.has_frame() {
             return Err(CoreError::NoFrameAvailable);
         }
 
+        let final_telemetry = self.telemetry()?;
+        let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
+        self.step_counters = status.counters;
         let observation = self.observation_frame(config.preset, config.frame_stack)?;
         Ok(NativeStepResult {
             observation,
             summary,
+            status,
             final_telemetry,
         })
     }
@@ -256,6 +260,11 @@ impl Host {
     pub fn telemetry(&mut self) -> Result<TelemetrySnapshot, CoreError> {
         let system_ram = self.system_ram_slice()?;
         crate::core::telemetry::read_snapshot(system_ram)
+    }
+
+    fn telemetry_sample(&mut self) -> Result<StepTelemetrySample, CoreError> {
+        let system_ram = self.system_ram_slice()?;
+        crate::core::telemetry::read_step_sample(system_ram)
     }
 
     pub fn observation_spec(

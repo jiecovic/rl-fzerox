@@ -33,9 +33,7 @@ class Emulator:
         self._rom_path = rom_path.resolve()
         self._runtime_dir = runtime_dir.resolve() if runtime_dir is not None else None
         self._baseline_state_path = (
-            baseline_state_path.resolve()
-            if baseline_state_path is not None
-            else None
+            baseline_state_path.resolve() if baseline_state_path is not None else None
         )
         self._renderer = renderer
         if self._renderer != "angrylion":
@@ -48,11 +46,7 @@ class Emulator:
             str(self._core_path),
             str(self._rom_path),
             None if self._runtime_dir is None else str(self._runtime_dir),
-            (
-                None
-                if self._baseline_state_path is None
-                else str(self._baseline_state_path)
-            ),
+            (None if self._baseline_state_path is None else str(self._baseline_state_path)),
             self._renderer,
         )
         self._observation_specs: dict[str, ObservationSpec] = {}
@@ -123,11 +117,14 @@ class Emulator:
         reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
         wrong_way_progress_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_step_limit: int,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
         state = controller_state.clamped()
-        observation, summary, telemetry = self._native.step_repeat_raw(
+        observation, summary, status, telemetry = self._native.step_repeat_raw(
             action_repeat=action_repeat,
             preset=preset,
             frame_stack=frame_stack,
@@ -135,6 +132,9 @@ class Emulator:
             reverse_progress_epsilon=reverse_progress_epsilon,
             energy_loss_epsilon=energy_loss_epsilon,
             wrong_way_progress_epsilon=wrong_way_progress_epsilon,
+            max_episode_steps=max_episode_steps,
+            stuck_step_limit=stuck_step_limit,
+            wrong_way_step_limit=wrong_way_step_limit,
             joypad_mask=state.joypad_mask,
             left_stick_x=state.left_stick_x,
             left_stick_y=state.left_stick_y,
@@ -153,6 +153,7 @@ class Emulator:
         return BackendStepResult(
             observation=np.ascontiguousarray(frame),
             summary=summary,
+            status=status,
             telemetry=telemetry,
         )
 
@@ -271,9 +272,7 @@ class Emulator:
             "rom_path": str(self._rom_path),
             "runtime_dir": None if self._runtime_dir is None else str(self._runtime_dir),
             "baseline_state_path": (
-                None
-                if self._baseline_state_path is None
-                else str(self._baseline_state_path)
+                None if self._baseline_state_path is None else str(self._baseline_state_path)
             ),
             "baseline_kind": self.baseline_kind,
             "renderer": self._renderer,

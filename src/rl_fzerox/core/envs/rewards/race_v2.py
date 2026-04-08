@@ -54,7 +54,7 @@ class RaceV2RewardTracker:
             self._best_race_distance = float("-inf")
             return
         self._best_race_distance = telemetry.player.race_distance
-    
+
     def summary_config(self) -> RewardSummaryConfig:
         """Describe the native aggregation thresholds needed by `race_v2`."""
 
@@ -71,7 +71,7 @@ class RaceV2RewardTracker:
         """Compute one reward step from one repeated env-step summary."""
 
         if telemetry is None or not telemetry.in_race_mode:
-            return RewardStep(reward=0.0, terminated=False)
+            return RewardStep(reward=0.0)
 
         reward = summary.frames_run * self._weights.time_penalty_per_frame
         breakdown: dict[str, float] = {}
@@ -87,9 +87,7 @@ class RaceV2RewardTracker:
             self._best_race_distance = summary.max_race_distance
 
         if summary.reverse_progress_total > 0.0:
-            reverse_penalty = (
-                -summary.reverse_progress_total * self._weights.reverse_progress_scale
-            )
+            reverse_penalty = -summary.reverse_progress_total * self._weights.reverse_progress_scale
             reward += reverse_penalty
             if reverse_penalty:
                 breakdown["reverse_progress"] = reverse_penalty
@@ -145,13 +143,7 @@ class RaceV2RewardTracker:
                 reward += placement_bonus
                 breakdown["finish_position"] = placement_bonus
 
-        terminated = bool(
-            telemetry.player.finished
-            or telemetry.player.crashed
-            or telemetry.player.retired
-            or telemetry.player.falling_off_track
-        )
-        return RewardStep(reward=reward, terminated=terminated, breakdown=breakdown)
+        return RewardStep(reward=reward, breakdown=breakdown)
 
     def truncation_penalty(self, truncation_reason: str | None) -> tuple[float, str | None]:
         """Return any extra reward penalty that should apply to a truncation."""

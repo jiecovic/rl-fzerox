@@ -8,13 +8,18 @@ from fzerox_emulator import (
     ControllerState,
     FZeroXTelemetry,
     ResetState,
+    StepStatus,
     StepSummary,
 )
 from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
 from tests.support.fakes import SyntheticBackend
-from tests.support.native_objects import make_step_summary, make_telemetry
+from tests.support.native_objects import (
+    make_step_status,
+    make_step_summary,
+    make_telemetry,
+)
 
 
 class ScriptedStepBackend(SyntheticBackend):
@@ -39,17 +44,24 @@ class ScriptedStepBackend(SyntheticBackend):
         reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
         wrong_way_progress_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_step_limit: int,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
             reverse_progress_epsilon,
             energy_loss_epsilon,
             wrong_way_progress_epsilon,
+            max_episode_steps,
+            stuck_step_limit,
+            wrong_way_step_limit,
         )
         self.set_controller_state(controller_state)
-        self._capture_video_flags.extend([False] * max(action_repeat - 1, 0))
-        self._capture_video_flags.append(True)
         result = self._results.pop(0)
+        frames_run = result.summary.frames_run
+        self._capture_video_flags.extend([False] * max(frames_run - 1, 0))
+        self._capture_video_flags.append(True)
         self._state.frame_index = result.summary.final_frame_index
         self._state.progress = result.summary.max_race_distance
         self._last_frame = self._build_frame()
@@ -316,6 +328,7 @@ def test_step_truncates_when_speed_is_stuck() -> None:
                     consecutive_low_speed_frames=1,
                     final_frame_index=1,
                 ),
+                status=make_step_status(step_count=1, stalled_steps=1),
             ),
             _backend_step_result(
                 telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
@@ -323,6 +336,11 @@ def test_step_truncates_when_speed_is_stuck() -> None:
                     max_race_distance=0.0,
                     consecutive_low_speed_frames=1,
                     final_frame_index=2,
+                ),
+                status=make_step_status(
+                    step_count=2,
+                    stalled_steps=2,
+                    truncation_reason="stuck",
                 ),
             ),
         ],
@@ -368,6 +386,7 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
                     consecutive_reverse_frames=1,
                     final_frame_index=1,
                 ),
+                status=make_step_status(step_count=1, reverse_steps=1),
             ),
             _backend_step_result(
                 telemetry=_telemetry(race_distance=-6.5),
@@ -376,6 +395,11 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
                     reverse_progress_total=3.5,
                     consecutive_reverse_frames=1,
                     final_frame_index=2,
+                ),
+                status=make_step_status(
+                    step_count=2,
+                    reverse_steps=2,
+                    truncation_reason="wrong_way",
                 ),
             ),
         ],
@@ -447,10 +471,14 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
             _backend_step_result(
                 telemetry=_telemetry(race_distance=42.0, state_labels=("finished",)),
                 summary=_step_summary(
-                    frames_run=3,
+                    frames_run=1,
                     max_race_distance=42.0,
                     entered_state_labels=("finished",),
-                    final_frame_index=3,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(
+                    step_count=1,
+                    termination_reason="finished",
                 ),
             )
         ],
@@ -467,7 +495,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     assert obs.shape == (78, 222, 12)
     assert terminated
     assert not truncated
-    assert info["repeat_index"] == 2
+    assert info["repeat_index"] == 0
     assert info["termination_reason"] == "finished"
 
 
@@ -510,11 +538,20 @@ def _backend_step_result(
     *,
     telemetry: FZeroXTelemetry,
     summary: StepSummary,
+    status: StepStatus | None = None,
 ) -> BackendStepResult:
     value = np.uint8(summary.final_frame_index % 255)
     observation = np.full((78, 222, 12), value, dtype=np.uint8)
     return BackendStepResult(
         observation=observation,
         summary=summary,
+        status=(
+            status
+            if status is not None
+            else make_step_status(
+                step_count=summary.final_frame_index,
+                termination_reason=telemetry.player.terminal_reason,
+            )
+        ),
         telemetry=telemetry,
     )

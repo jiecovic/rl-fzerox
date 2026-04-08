@@ -135,10 +135,9 @@ def test_race_v2_applies_finish_bonus_and_position_bonus() -> None:
             race_distance=100.0,
             state_labels=("active", "finished"),
             position=1,
-        )
+        ),
     )
 
-    assert step.terminated is True
     assert step.reward == pytest.approx(266.09)
     assert step.breakdown == {
         "time": -0.01,
@@ -166,7 +165,7 @@ def test_race_v2_keeps_low_speed_and_dash_pad_out_of_reward() -> None:
             race_distance=100.0,
             speed_kph=30.0,
             state_labels=("active", "dash_pad_boost"),
-        )
+        ),
     )
 
     assert step.reward == -0.01
@@ -231,7 +230,6 @@ def _telemetry(
         race_time_ms=race_time_ms,
         position=position,
     )
-
 
 def _summary(
     *,

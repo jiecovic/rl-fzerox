@@ -7,32 +7,14 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
 use crate::core::telemetry::layout::{GLOBALS, GameMode, RACER, TELEMETRY_CONFIG};
-use crate::core::telemetry::model::{PlayerTelemetry, TelemetrySnapshot};
+use crate::core::telemetry::model::{PlayerTelemetry, StepTelemetrySample, TelemetrySnapshot};
 
 /// Decode a typed telemetry snapshot from a full system RAM view.
 pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> {
-    if system_ram.len() < TELEMETRY_CONFIG.system_ram_size_min {
-        return Err(CoreError::MemoryOutOfRange {
-            memory_id: MEMORY_SYSTEM_RAM,
-            offset: 0,
-            length: TELEMETRY_CONFIG.system_ram_size_min,
-            available: system_ram.len(),
-        });
-    }
-
-    let player_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
-    let player_end = player_base + RACER.position + size_of::<i32>();
-    if player_end > system_ram.len() {
-        return Err(CoreError::MemoryOutOfRange {
-            memory_id: MEMORY_SYSTEM_RAM,
-            offset: player_base,
-            length: player_end - player_base,
-            available: system_ram.len(),
-        });
-    }
+    let player_base = validate_snapshot_memory(system_ram)?;
 
     let game_mode_raw = read_u32(system_ram, GLOBALS.game_mode)?;
-    let game_mode = GameMode::try_from(game_mode_raw & 0x1F).ok();
+    let game_mode = resolve_game_mode(game_mode_raw);
     let player_state_flags = read_u32(system_ram, player_base + RACER.state_flags)?;
     let player = PlayerTelemetry {
         state_flags: player_state_flags,
@@ -55,6 +37,43 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         course_index: read_u32(system_ram, GLOBALS.course_index)?,
         player,
     })
+}
+
+pub(crate) fn read_step_sample(system_ram: &[u8]) -> Result<StepTelemetrySample, CoreError> {
+    let player_base = validate_snapshot_memory(system_ram)?;
+    Ok(StepTelemetrySample {
+        state_flags: read_u32(system_ram, player_base + RACER.state_flags)?,
+        speed_kph: read_f32(system_ram, player_base + RACER.speed)? * TELEMETRY_CONFIG.speed_to_kph,
+        energy: read_f32(system_ram, player_base + RACER.energy)?,
+        race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
+    })
+}
+
+fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
+    if system_ram.len() < TELEMETRY_CONFIG.system_ram_size_min {
+        return Err(CoreError::MemoryOutOfRange {
+            memory_id: MEMORY_SYSTEM_RAM,
+            offset: 0,
+            length: TELEMETRY_CONFIG.system_ram_size_min,
+            available: system_ram.len(),
+        });
+    }
+
+    let player_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
+    let player_end = player_base + RACER.position + size_of::<i32>();
+    if player_end > system_ram.len() {
+        return Err(CoreError::MemoryOutOfRange {
+            memory_id: MEMORY_SYSTEM_RAM,
+            offset: player_base,
+            length: player_end - player_base,
+            available: system_ram.len(),
+        });
+    }
+    Ok(player_base)
+}
+
+fn resolve_game_mode(game_mode_raw: u32) -> Option<GameMode> {
+    GameMode::try_from(game_mode_raw & 0x1F).ok()
 }
 
 fn read_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {

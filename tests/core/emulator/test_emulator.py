@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
-from tests.support.native_objects import make_step_summary, make_telemetry
+from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry
 
 
 def test_emulator_rejects_missing_core(tmp_path: Path) -> None:
@@ -86,8 +86,9 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
                 consecutive_low_speed_frames=2,
                 final_frame_index=12,
             )
+            status = make_step_status(step_count=12, stalled_steps=2, reverse_steps=1)
             telemetry = make_telemetry(race_distance=42.0, race_time_ms=5000, position=10)
-            return observation, summary, telemetry
+            return observation, summary, status, telemetry
 
     emulator.__dict__["_native"] = NativeStub()
 
@@ -100,6 +101,9 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         reverse_progress_epsilon=0.5,
         energy_loss_epsilon=0.1,
         wrong_way_progress_epsilon=2.0,
+        max_episode_steps=1_000,
+        stuck_step_limit=240,
+        wrong_way_step_limit=180,
     )
 
     assert result.observation.shape == (78, 222, 6)
@@ -108,5 +112,8 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     assert result.summary.reverse_progress_total == 3.5
     assert result.summary.energy_loss_total == 4.0
     assert result.summary.final_frame_index == 12
+    assert result.status.step_count == 12
+    assert result.status.stalled_steps == 2
+    assert result.status.reverse_steps == 1
     assert isinstance(result.telemetry, FZeroXTelemetry)
     assert result.telemetry.player.race_distance == 42.0
