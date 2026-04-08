@@ -9,7 +9,7 @@ from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import RunPaths, materialize_train_run_config
 
 
-def _resolve_train_run_config(
+def resolve_train_run_config(
     *,
     config: TrainAppConfig,
     run_paths: RunPaths,
@@ -19,7 +19,7 @@ def _resolve_train_run_config(
     return materialize_train_run_config(config, run_paths=run_paths)
 
 
-def _validate_training_baseline_state(config: TrainAppConfig) -> None:
+def validate_training_baseline_state(config: TrainAppConfig) -> None:
     """Fail clearly when a configured local training baseline is missing."""
 
     baseline_state_path = config.emulator.baseline_state_path
@@ -34,20 +34,20 @@ def _validate_training_baseline_state(config: TrainAppConfig) -> None:
     )
 
 
-def _save_latest_artifacts(model, run_paths: RunPaths) -> None:
-    _save_artifacts_atomically(
+def save_latest_artifacts(model, run_paths: RunPaths) -> None:
+    save_artifacts_atomically(
         model=model,
         model_path=run_paths.latest_model_path,
         policy_path=run_paths.latest_policy_path,
     )
 
 
-def _save_artifacts_atomically(*, model, model_path: Path, policy_path: Path) -> None:
-    _atomic_save_artifact(model.save, model_path)
-    _atomic_save_artifact(model.policy.save, policy_path)
+def save_artifacts_atomically(*, model, model_path: Path, policy_path: Path) -> None:
+    atomic_save_artifact(model.save, model_path)
+    atomic_save_artifact(model.policy.save, policy_path)
 
 
-def _atomic_save_artifact(save_fn, target_path: Path) -> None:
+def atomic_save_artifact(save_fn, target_path: Path) -> None:
     tmp_path = target_path.with_name(f".{target_path.stem}.tmp{target_path.suffix}")
     tmp_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -58,7 +58,7 @@ def _atomic_save_artifact(save_fn, target_path: Path) -> None:
             tmp_path.unlink()
 
 
-def _cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:
+def cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:
     if not run_paths.run_dir.exists():
         return
 

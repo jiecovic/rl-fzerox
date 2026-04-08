@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from rl_fzerox.core.config.schema import TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
-from rl_fzerox.core.training.session.artifacts import _save_artifacts_atomically
+from rl_fzerox.core.training.session.artifacts import save_artifacts_atomically
 
 _STATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("race_distance", "state/race_distance_mean"),
@@ -48,7 +48,7 @@ class _MeanAccumulator:
 
 
 @dataclass
-class _RolloutInfoAccumulator:
+class RolloutInfoAccumulator:
     state_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {key: _MeanAccumulator() for key, _ in _STATE_LOG_KEYS}
     )
@@ -113,7 +113,7 @@ class _RolloutInfoAccumulator:
             )
 
 
-def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
+def build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
     """Construct the SB3 callback list used during PPO training."""
 
     try:
@@ -131,13 +131,13 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
 
         def __init__(self) -> None:
             super().__init__(verbose=0)
-            self._rollout_info = _RolloutInfoAccumulator()
+            self._rollout_info = RolloutInfoAccumulator()
 
         def _on_rollout_start(self) -> None:
-            self._rollout_info = _RolloutInfoAccumulator()
+            self._rollout_info = RolloutInfoAccumulator()
 
         def _on_step(self) -> bool:
-            infos = _info_sequence(self.locals.get("infos"))
+            infos = info_sequence(self.locals.get("infos"))
             if infos is None:
                 return True
 
@@ -157,7 +157,7 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             self._best_episode_return: float | None = None
 
         def _save_latest(self) -> None:
-            _save_artifacts_atomically(
+            save_artifacts_atomically(
                 model=self.model,
                 model_path=self._run_paths.latest_model_path,
                 policy_path=self._run_paths.latest_policy_path,
@@ -170,7 +170,7 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             ):
                 return
             self._best_episode_return = episode_return
-            _save_artifacts_atomically(
+            save_artifacts_atomically(
                 model=self.model,
                 model_path=self._run_paths.best_model_path,
                 policy_path=self._run_paths.best_policy_path,
@@ -180,7 +180,7 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             if self.n_calls % self._save_freq == 0:
                 self._save_latest()
 
-            infos = _info_sequence(self.locals.get("infos"))
+            infos = info_sequence(self.locals.get("infos"))
             if infos is None:
                 return True
 
@@ -218,7 +218,7 @@ def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
     return values
 
 
-def _info_sequence(infos: object) -> Sequence[object] | None:
+def info_sequence(infos: object) -> Sequence[object] | None:
     if isinstance(infos, list | tuple):
         return infos
     return None

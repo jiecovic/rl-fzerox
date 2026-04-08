@@ -14,15 +14,12 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.training.runs import build_run_paths
 from rl_fzerox.core.training.session.artifacts import (
-    _atomic_save_artifact,
-    _resolve_train_run_config,
-    _validate_training_baseline_state,
+    atomic_save_artifact,
+    resolve_train_run_config,
+    validate_training_baseline_state,
 )
-from rl_fzerox.core.training.session.callbacks import (
-    _info_sequence,
-    _RolloutInfoAccumulator,
-)
-from rl_fzerox.core.training.session.model import _resolve_policy_activation_fn
+from rl_fzerox.core.training.session.callbacks import RolloutInfoAccumulator, info_sequence
+from rl_fzerox.core.training.session.model import resolve_policy_activation_fn
 
 
 def test_validate_training_baseline_state_requires_existing_file(
@@ -47,7 +44,7 @@ def test_validate_training_baseline_state_requires_existing_file(
     )
 
     with pytest.raises(RuntimeError, match="Configured training baseline state"):
-        _validate_training_baseline_state(config)
+        validate_training_baseline_state(config)
 
 
 def test_validate_training_baseline_state_accepts_existing_file(tmp_path: Path) -> None:
@@ -70,7 +67,7 @@ def test_validate_training_baseline_state_accepts_existing_file(tmp_path: Path) 
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
 
-    _validate_training_baseline_state(config)
+    validate_training_baseline_state(config)
 
 
 def test_resolve_train_run_config_sets_run_local_runtime_root(tmp_path: Path) -> None:
@@ -91,13 +88,13 @@ def test_resolve_train_run_config_sets_run_local_runtime_root(tmp_path: Path) ->
         run_name=config.train.run_name,
     )
 
-    resolved_config = _resolve_train_run_config(config=config, run_paths=run_paths)
+    resolved_config = resolve_train_run_config(config=config, run_paths=run_paths)
 
     assert resolved_config.emulator.runtime_dir == run_paths.runtime_root
 
 
 def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None:
-    accumulator = _RolloutInfoAccumulator()
+    accumulator = RolloutInfoAccumulator()
     infos = [
         {
             "race_distance": 10.0,
@@ -141,21 +138,21 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
 def test_info_sequence_accepts_tuple_infos() -> None:
     infos = ({"race_distance": 10.0}, {"race_distance": 12.0})
 
-    assert _info_sequence(infos) == infos
-    assert _info_sequence([{"race_distance": 10.0}]) == [{"race_distance": 10.0}]
-    assert _info_sequence(None) is None
+    assert info_sequence(infos) == infos
+    assert info_sequence([{"race_distance": 10.0}]) == [{"race_distance": 10.0}]
+    assert info_sequence(None) is None
 
 
 def test_resolve_policy_activation_fn_supports_known_names() -> None:
     from torch import nn
 
-    assert _resolve_policy_activation_fn("tanh") is nn.Tanh
-    assert _resolve_policy_activation_fn("relu") is nn.ReLU
+    assert resolve_policy_activation_fn("tanh") is nn.Tanh
+    assert resolve_policy_activation_fn("relu") is nn.ReLU
 
 
 def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unsupported policy activation"):
-        _resolve_policy_activation_fn("gelu")
+        resolve_policy_activation_fn("gelu")
 
 
 def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path) -> None:
@@ -164,7 +161,7 @@ def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path
     def _fake_save(path: str) -> None:
         Path(path).write_bytes(b"new-policy")
 
-    _atomic_save_artifact(_fake_save, target_path)
+    atomic_save_artifact(_fake_save, target_path)
 
     assert target_path.read_bytes() == b"new-policy"
     assert list(tmp_path.glob("*.tmp.zip")) == []

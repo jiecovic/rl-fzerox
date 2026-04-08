@@ -5,7 +5,7 @@ from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig, TrainConf
 from rl_fzerox.core.training.runs import RunPaths
 
 
-def _build_ppo_model(
+def build_ppo_model(
     *,
     train_env,
     train_config: TrainConfig,
@@ -33,7 +33,7 @@ def _build_ppo_model(
             "pi": [int(value) for value in policy_config.net_arch.pi],
             "vf": [int(value) for value in policy_config.net_arch.vf],
         },
-        "activation_fn": _resolve_policy_activation_fn(policy_config.activation),
+        "activation_fn": resolve_policy_activation_fn(policy_config.activation),
     }
 
     return PPO(
@@ -56,7 +56,7 @@ def _build_ppo_model(
     )
 
 
-def _resolve_policy_activation_fn(name: str):
+def resolve_policy_activation_fn(name: str):
     """Map the configured SB3 policy-head activation name to a torch module."""
 
     from torch import nn
@@ -68,7 +68,7 @@ def _resolve_policy_activation_fn(name: str):
     raise ValueError(f"Unsupported policy activation: {name!r}")
 
 
-def _build_tensorboard_logger(run_paths: RunPaths):
+def build_tensorboard_logger(run_paths: RunPaths):
     """Create the SB3 TensorBoard logger for one training run."""
 
     try:
@@ -82,7 +82,7 @@ def _build_tensorboard_logger(run_paths: RunPaths):
     return sb3_logger.configure(str(run_paths.tensorboard_dir), ["tensorboard"])
 
 
-def _print_training_startup(
+def print_training_startup(
     *,
     model,
     train_env,
