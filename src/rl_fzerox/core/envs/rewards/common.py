@@ -20,7 +20,6 @@ class RewardStep:
 class RewardSummaryConfig:
     """Native step-summary thresholds required by one reward tracker."""
 
-    reverse_progress_epsilon: float
     energy_loss_epsilon: float
 
 

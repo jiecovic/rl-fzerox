@@ -163,12 +163,10 @@ class FZeroXEnvEngine:
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
-            reverse_progress_epsilon=self._reward_summary_config.reverse_progress_epsilon,
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
-            wrong_way_progress_epsilon=float(self.config.wrong_way_progress_epsilon),
             max_episode_steps=self.config.max_episode_steps,
             stuck_step_limit=self.config.stuck_step_limit,
-            wrong_way_step_limit=self.config.wrong_way_step_limit,
+            wrong_way_timer_limit=self.config.wrong_way_timer_limit,
         )
         info = _backend_step_info(self.backend)
         telemetry = step_result.telemetry
@@ -187,7 +185,7 @@ class FZeroXEnvEngine:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count
         info["stalled_steps"] = step_result.status.stalled_steps
-        info["reverse_steps"] = step_result.status.reverse_steps
+        info["reverse_timer"] = step_result.status.reverse_timer
         info["termination_reason"] = step_result.status.termination_reason
         info["truncation_reason"] = step_result.status.truncation_reason
         if telemetry is not None:

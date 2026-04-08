@@ -114,12 +114,10 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stuck_min_speed_kph: float,
-        reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
-        wrong_way_progress_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_step_limit: int,
+        wrong_way_timer_limit: int,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
@@ -129,12 +127,10 @@ class Emulator:
             preset=preset,
             frame_stack=frame_stack,
             stuck_min_speed_kph=stuck_min_speed_kph,
-            reverse_progress_epsilon=reverse_progress_epsilon,
             energy_loss_epsilon=energy_loss_epsilon,
-            wrong_way_progress_epsilon=wrong_way_progress_epsilon,
             max_episode_steps=max_episode_steps,
             stuck_step_limit=stuck_step_limit,
-            wrong_way_step_limit=wrong_way_step_limit,
+            wrong_way_timer_limit=wrong_way_timer_limit,
             joypad_mask=state.joypad_mask,
             left_stick_x=state.left_stick_x,
             left_stick_y=state.left_stick_y,

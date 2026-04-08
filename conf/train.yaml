@@ -12,8 +12,9 @@ emulator:
 env:
   action_repeat: 2
   max_episode_steps: 44000
-  stuck_step_limit: 240
-  stuck_min_speed_kph: 50.0
+  stuck_step_limit: 360
+  stuck_min_speed_kph: 60.0
+  wrong_way_timer_limit: 360
   reset_to_race: true
   action:
     name: steer_drive_boost
@@ -29,7 +30,7 @@ train:
   n_epochs: 8
   batch_size: 512
   learning_rate: 1.0e-4
-  gamma: 0.995
+  gamma: 0.993
   gae_lambda: 0.95
   clip_range: 0.2
   ent_coef: 0.01

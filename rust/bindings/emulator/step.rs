@@ -27,8 +27,7 @@ impl PyStepSummary {
     #[pyo3(signature = (
         frames_run,
         max_race_distance,
-        reverse_progress_total=0.0,
-        consecutive_reverse_frames=0,
+        reverse_warning_frames=0,
         energy_loss_total=0.0,
         energy_gain_total=0.0,
         consecutive_low_speed_frames=0,
@@ -39,8 +38,7 @@ impl PyStepSummary {
     fn new(
         frames_run: usize,
         max_race_distance: f32,
-        reverse_progress_total: f32,
-        consecutive_reverse_frames: usize,
+        reverse_warning_frames: usize,
         energy_loss_total: f32,
         energy_gain_total: f32,
         consecutive_low_speed_frames: usize,
@@ -51,8 +49,7 @@ impl PyStepSummary {
             inner: StepSummary {
                 frames_run,
                 max_race_distance,
-                reverse_progress_total,
-                consecutive_reverse_frames,
+                reverse_warning_frames,
                 energy_loss_total,
                 energy_gain_total,
                 consecutive_low_speed_frames,
@@ -73,13 +70,8 @@ impl PyStepSummary {
     }
 
     #[getter]
-    fn reverse_progress_total(&self) -> f32 {
-        self.inner.reverse_progress_total
-    }
-
-    #[getter]
-    fn consecutive_reverse_frames(&self) -> usize {
-        self.inner.consecutive_reverse_frames
+    fn reverse_warning_frames(&self) -> usize {
+        self.inner.reverse_warning_frames
     }
 
     #[getter]
@@ -151,11 +143,7 @@ impl PyStepSummary {
         let dict = PyDict::new(py);
         dict.set_item("frames_run", self.frames_run())?;
         dict.set_item("max_race_distance", self.max_race_distance())?;
-        dict.set_item("reverse_progress_total", self.reverse_progress_total())?;
-        dict.set_item(
-            "consecutive_reverse_frames",
-            self.consecutive_reverse_frames(),
-        )?;
+        dict.set_item("reverse_warning_frames", self.reverse_warning_frames())?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item(
@@ -198,14 +186,14 @@ impl PyStepStatus {
     #[pyo3(signature = (
         step_count,
         stalled_steps,
-        reverse_steps,
+        reverse_timer=0,
         termination_reason=None,
         truncation_reason=None,
     ))]
     fn new(
         step_count: usize,
         stalled_steps: usize,
-        reverse_steps: usize,
+        reverse_timer: usize,
         termination_reason: Option<String>,
         truncation_reason: Option<String>,
     ) -> PyResult<Self> {
@@ -214,8 +202,8 @@ impl PyStepStatus {
                 counters: crate::core::host::StepCounters {
                     step_count,
                     stalled_steps,
-                    reverse_steps,
                 },
+                reverse_timer,
                 termination_reason: parse_reason(termination_reason)?,
                 truncation_reason: parse_reason(truncation_reason)?,
             },
@@ -233,8 +221,8 @@ impl PyStepStatus {
     }
 
     #[getter]
-    fn reverse_steps(&self) -> usize {
-        self.inner.counters.reverse_steps
+    fn reverse_timer(&self) -> usize {
+        self.inner.reverse_timer
     }
 
     #[getter]
@@ -261,7 +249,7 @@ impl PyStepStatus {
         let dict = PyDict::new(py);
         dict.set_item("step_count", self.step_count())?;
         dict.set_item("stalled_steps", self.stalled_steps())?;
-        dict.set_item("reverse_steps", self.reverse_steps())?;
+        dict.set_item("reverse_timer", self.reverse_timer())?;
         dict.set_item("terminated", self.terminated())?;
         dict.set_item("truncated", self.truncated())?;
         dict.set_item("termination_reason", self.termination_reason())?;

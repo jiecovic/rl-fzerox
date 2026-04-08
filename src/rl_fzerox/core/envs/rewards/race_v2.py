@@ -17,6 +17,7 @@ class RaceV2RewardWeights:
     """Weights for the race-first reward profile (`race_v2`)."""
 
     time_penalty_per_frame: float = -0.005
+    reverse_time_penalty_scale: float = 2.0
     milestone_distance: float = 3_000.0
     milestone_bonus: float = 2.0
     lap_1_completion_bonus: float = 20.0
@@ -40,8 +41,8 @@ class RaceV2RewardTracker:
     """Track episode reward state for the simplified `race_v2` profile.
 
     The tracker keeps only cross-step frontier state; per-step deltas like
-    reverse progress, energy loss, and entered flags are now pre-aggregated by
-    the native repeated-step path.
+    reverse-warning frames, energy loss, and entered flags are now
+    pre-aggregated by the native repeated-step path.
     """
 
     def __init__(
@@ -69,7 +70,6 @@ class RaceV2RewardTracker:
         """Describe the native aggregation thresholds needed by `race_v2`."""
 
         return RewardSummaryConfig(
-            reverse_progress_epsilon=0.0,
             energy_loss_epsilon=self._weights.energy_loss_epsilon,
         )
 
@@ -88,6 +88,10 @@ class RaceV2RewardTracker:
         breakdown: dict[str, float] = {}
         if reward:
             breakdown["time"] = reward
+        reverse_time_penalty = self._reverse_time_penalty(summary)
+        if reverse_time_penalty:
+            reward += reverse_time_penalty
+            breakdown["reverse_time"] = reverse_time_penalty
 
         milestone_bonus = self._milestone_bonus(summary.max_race_distance)
         if milestone_bonus:
@@ -212,6 +216,16 @@ class RaceV2RewardTracker:
     def _remaining_step_penalty(self, status: StepStatus) -> float:
         remaining_steps = max(self._max_episode_steps - status.step_count, 0)
         return remaining_steps * abs(self._weights.time_penalty_per_frame)
+
+    def _reverse_time_penalty(self, summary: StepSummary) -> float:
+        extra_scale = self._weights.reverse_time_penalty_scale - 1.0
+        if summary.reverse_warning_frames <= 0 or extra_scale == 0.0:
+            return 0.0
+        return (
+            summary.reverse_warning_frames
+            * self._weights.time_penalty_per_frame
+            * extra_scale
+        )
 
     def _remaining_lap_count(self, telemetry: FZeroXTelemetry) -> int:
         return max(

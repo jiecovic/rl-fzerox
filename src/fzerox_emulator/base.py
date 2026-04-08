@@ -83,12 +83,10 @@ class EmulatorBackend(Protocol):
         preset: str,
         frame_stack: int,
         stuck_min_speed_kph: float,
-        reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
-        wrong_way_progress_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_step_limit: int,
+        wrong_way_timer_limit: int,
     ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

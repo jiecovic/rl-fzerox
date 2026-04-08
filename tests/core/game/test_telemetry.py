@@ -16,6 +16,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
         energy=92.25,
         max_energy=100.0,
         boost_timer=0,
+        reverse_timer=12,
         race_distance=12_345.5,
         lap_distance=2_345.5,
         race_time_ms=12_345,
@@ -44,6 +45,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             energy=92.25,
             max_energy=100.0,
             boost_timer=0,
+            reverse_timer=12,
             race_distance=12_345.5,
             lap_distance=2_345.5,
             race_time_ms=12_345,
@@ -67,8 +69,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     summary = StepSummary(
         frames_run=2,
         max_race_distance=42.0,
-        reverse_progress_total=3.5,
-        consecutive_reverse_frames=1,
+        reverse_warning_frames=1,
         energy_loss_total=4.0,
         energy_gain_total=2.5,
         consecutive_low_speed_frames=2,
@@ -80,6 +81,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.entered_finished is True
     assert summary.entered_crashed is False
     assert summary.energy_gain_total == 2.5
+    assert summary.reverse_warning_frames == 1
     assert summary.entered_state_labels == ("collision_recoil", "finished")
 
 

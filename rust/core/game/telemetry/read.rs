@@ -12,6 +12,7 @@ use crate::core::telemetry::model::{PlayerTelemetry, StepTelemetrySample, Teleme
 /// Decode a typed telemetry snapshot from a full system RAM view.
 pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> {
     let player_base = validate_snapshot_memory(system_ram)?;
+    let reverse_timer_offset = player_reverse_timer_offset();
 
     let game_mode_raw = read_u32(system_ram, GLOBALS.game_mode)?;
     let game_mode = resolve_game_mode(game_mode_raw);
@@ -22,6 +23,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         max_energy: read_f32(system_ram, player_base + RACER.max_energy)?,
         boost_timer: read_i32(system_ram, player_base + RACER.boost_timer)?,
+        reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
         lap_distance: read_f32(system_ram, player_base + RACER.lap_distance)?,
         race_time_ms: read_i32(system_ram, player_base + RACER.race_time)?,
@@ -43,11 +45,13 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
 
 pub(crate) fn read_step_sample(system_ram: &[u8]) -> Result<StepTelemetrySample, CoreError> {
     let player_base = validate_snapshot_memory(system_ram)?;
+    let reverse_timer_offset = player_reverse_timer_offset();
     Ok(StepTelemetrySample {
         state_flags: read_u32(system_ram, player_base + RACER.state_flags)?,
         speed_kph: read_f32(system_ram, player_base + RACER.speed)? * TELEMETRY_CONFIG.speed_to_kph,
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
+        reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
     })
 }
 
@@ -63,15 +67,21 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
 
     let player_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
     let player_end = player_base + RACER.position + size_of::<i32>();
-    if player_end > system_ram.len() {
+    let reverse_timer_end = player_reverse_timer_offset() + size_of::<i32>();
+    let required_end = player_end.max(reverse_timer_end);
+    if required_end > system_ram.len() {
         return Err(CoreError::MemoryOutOfRange {
             memory_id: MEMORY_SYSTEM_RAM,
             offset: player_base,
-            length: player_end - player_base,
+            length: required_end - player_base,
             available: system_ram.len(),
         });
     }
     Ok(player_base)
+}
+
+fn player_reverse_timer_offset() -> usize {
+    GLOBALS.reverse_timers + (TELEMETRY_CONFIG.player_racer_index * size_of::<i32>())
 }
 
 fn resolve_game_mode(game_mode_raw: u32) -> Option<GameMode> {
