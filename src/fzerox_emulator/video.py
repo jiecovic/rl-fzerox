@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/emulator/video.py
+# src/fzerox_emulator/video.py
 from __future__ import annotations
 
 

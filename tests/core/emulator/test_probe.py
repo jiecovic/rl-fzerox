@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.emulator import probe_core
+from fzerox_emulator import probe_core
 
 
 def test_probe_core_rejects_missing_library(tmp_path: Path) -> None:

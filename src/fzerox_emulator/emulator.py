@@ -1,27 +1,20 @@
-# src/rl_fzerox/core/emulator/emulator.py
+# src/fzerox_emulator/emulator.py
 from __future__ import annotations
 
 from pathlib import Path
 
 import numpy as np
 
-from rl_fzerox._native import Emulator as NativeEmulator
-from rl_fzerox.core.emulator.base import (
+from fzerox_emulator._native import Emulator as NativeEmulator
+from fzerox_emulator._native import FZeroXTelemetry
+from fzerox_emulator.base import (
     BackendStepResult,
     FrameStep,
     ObservationSpec,
     ResetState,
-    StepSummary,
 )
-from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.emulator.video import display_size
-from rl_fzerox.core.game.telemetry import (
-    FZeroXTelemetry,
-    PlayerTelemetry,
-    TelemetryDecodeError,
-    TelemetryUnavailableError,
-    read_telemetry,
-)
+from fzerox_emulator.control import ControllerState
+from fzerox_emulator.video import display_size
 
 
 class Emulator:
@@ -90,10 +83,6 @@ class Emulator:
         return int(self._native.frame_index)
 
     @property
-    def system_ram_size(self) -> int:
-        return int(self._native.system_ram_size)
-
-    @property
     def baseline_kind(self) -> str:
         return str(self._native.baseline_kind)
 
@@ -138,7 +127,7 @@ class Emulator:
         """Execute one repeated env step natively and return the final payload."""
 
         state = controller_state.clamped()
-        observation, summary_data, telemetry_data = self._native.step_repeat_raw(
+        observation, summary, telemetry = self._native.step_repeat_raw(
             action_repeat=action_repeat,
             preset=preset,
             frame_stack=frame_stack,
@@ -163,8 +152,8 @@ class Emulator:
             )
         return BackendStepResult(
             observation=np.ascontiguousarray(frame),
-            summary=_step_summary_from_flat_tuple(summary_data),
-            telemetry=_telemetry_from_flat_tuple(telemetry_data),
+            summary=summary,
+            telemetry=telemetry,
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
@@ -183,11 +172,6 @@ class Emulator:
         """Serialize the current emulator state to a savestate file."""
 
         self._native.save_state(str(path.resolve()))
-
-    def read_system_ram(self, offset: int, length: int) -> bytes:
-        """Read a raw slice from the libretro system RAM buffer."""
-
-        return bytes(self._native.read_system_ram(offset, length))
 
     def capture_current_as_baseline(self, path: Path | None = None) -> None:
         """Promote the current state to the active reset baseline."""
@@ -270,24 +254,9 @@ class Emulator:
             )
         return np.ascontiguousarray(frame)
 
-    def telemetry_data(self) -> dict[str, object]:
-        """Return the latest structured telemetry mapping from the native host."""
-
-        data = self._native.telemetry()
-        if not isinstance(data, dict):
-            raise TelemetryDecodeError("Native telemetry did not resolve to a mapping")
-        return data
-
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
-        """Return the latest telemetry snapshot, if the host can decode it."""
-
-        try:
-            native = getattr(self, "_native", None)
-            if native is not None:
-                return _telemetry_from_flat_tuple(native.telemetry_flat())
-            return read_telemetry(self)
-        except TelemetryUnavailableError:
-            return None
+        """Return the latest telemetry snapshot from the native host, if available."""
+        return self._native.telemetry()
 
     def close(self) -> None:
         """Release the native emulator host."""
@@ -311,136 +280,3 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
-
-
-def _telemetry_from_flat_tuple(data: object) -> FZeroXTelemetry:
-    if not isinstance(data, tuple) or len(data) != 7:
-        raise TelemetryDecodeError("Native telemetry payload must be a 7-item tuple")
-
-    (
-        system_ram_size,
-        game_frame_count,
-        game_mode_raw,
-        game_mode_name,
-        course_index,
-        in_race_mode,
-        player_data,
-    ) = data
-    if not isinstance(player_data, tuple) or len(player_data) != 17:
-        raise TelemetryDecodeError("Native player telemetry payload must be a 17-item tuple")
-
-    (
-        state_flags,
-        state_labels,
-        speed_raw,
-        speed_kph,
-        energy,
-        max_energy,
-        boost_timer,
-        race_distance,
-        laps_completed_distance,
-        lap_distance,
-        race_distance_position,
-        race_time_ms,
-        lap,
-        laps_completed,
-        position,
-        character,
-        machine_index,
-    ) = player_data
-
-    if not isinstance(state_labels, tuple) or not all(
-        isinstance(label, str) for label in state_labels
-    ):
-        raise TelemetryDecodeError("Native player telemetry labels must be a tuple[str, ...]")
-
-    return FZeroXTelemetry(
-        system_ram_size=_int_field(system_ram_size, "system_ram_size"),
-        game_frame_count=_int_field(game_frame_count, "game_frame_count"),
-        game_mode_raw=_int_field(game_mode_raw, "game_mode_raw"),
-        game_mode_name=_str_field(game_mode_name, "game_mode_name"),
-        course_index=_int_field(course_index, "course_index"),
-        in_race_mode=_bool_field(in_race_mode, "in_race_mode"),
-        player=PlayerTelemetry(
-            state_flags=_int_field(state_flags, "player.state_flags"),
-            state_labels=tuple(state_labels),
-            speed_raw=_float_field(speed_raw, "player.speed_raw"),
-            speed_kph=_float_field(speed_kph, "player.speed_kph"),
-            energy=_float_field(energy, "player.energy"),
-            max_energy=_float_field(max_energy, "player.max_energy"),
-            boost_timer=_int_field(boost_timer, "player.boost_timer"),
-            race_distance=_float_field(race_distance, "player.race_distance"),
-            laps_completed_distance=_float_field(
-                laps_completed_distance, "player.laps_completed_distance"
-            ),
-            lap_distance=_float_field(lap_distance, "player.lap_distance"),
-            race_distance_position=_float_field(
-                race_distance_position, "player.race_distance_position"
-            ),
-            race_time_ms=_int_field(race_time_ms, "player.race_time_ms"),
-            lap=_int_field(lap, "player.lap"),
-            laps_completed=_int_field(laps_completed, "player.laps_completed"),
-            position=_int_field(position, "player.position"),
-            character=_int_field(character, "player.character"),
-            machine_index=_int_field(machine_index, "player.machine_index"),
-        ),
-    )
-
-
-def _step_summary_from_flat_tuple(data: object) -> StepSummary:
-    if not isinstance(data, tuple) or len(data) != 8:
-        raise TelemetryDecodeError("Native step summary payload must be an 8-item tuple")
-
-    (
-        frames_run,
-        max_race_distance,
-        reverse_progress_total,
-        consecutive_reverse_frames,
-        energy_loss_total,
-        consecutive_low_speed_frames,
-        entered_state_flags,
-        final_frame_index,
-    ) = data
-    return StepSummary(
-        frames_run=_int_field(frames_run, "step.frames_run"),
-        max_race_distance=_float_field(max_race_distance, "step.max_race_distance"),
-        reverse_progress_total=_float_field(
-            reverse_progress_total,
-            "step.reverse_progress_total",
-        ),
-        consecutive_reverse_frames=_int_field(
-            consecutive_reverse_frames,
-            "step.consecutive_reverse_frames",
-        ),
-        energy_loss_total=_float_field(energy_loss_total, "step.energy_loss_total"),
-        consecutive_low_speed_frames=_int_field(
-            consecutive_low_speed_frames,
-            "step.consecutive_low_speed_frames",
-        ),
-        entered_state_flags=_int_field(entered_state_flags, "step.entered_state_flags"),
-        final_frame_index=_int_field(final_frame_index, "step.final_frame_index"),
-    )
-
-
-def _int_field(value: object, field_name: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be an int")
-    return value
-
-
-def _float_field(value: object, field_name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be numeric")
-    return float(value)
-
-
-def _bool_field(value: object, field_name: str) -> bool:
-    if not isinstance(value, bool):
-        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be a bool")
-    return value
-
-
-def _str_field(value: object, field_name: str) -> str:
-    if not isinstance(value, str):
-        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be a str")
-    return value

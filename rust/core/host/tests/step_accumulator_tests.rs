@@ -67,30 +67,22 @@ fn telemetry(
     state_flags: u32,
 ) -> TelemetrySnapshot {
     TelemetrySnapshot {
-        system_ram_size: 0x00800000,
-        game_frame_count: 100,
         game_mode_raw: 1,
-        game_mode_name: String::from("gp_race"),
-        course_index: 0,
+        game_mode_name: "gp_race",
         in_race_mode: true,
+        course_index: 0,
         player: PlayerTelemetry {
             state_flags,
-            state_labels: Vec::new(),
-            speed_raw: 0.0,
             speed_kph,
             energy,
             max_energy: 178.0,
             boost_timer: 0,
             race_distance,
-            laps_completed_distance: 0.0,
             lap_distance: race_distance,
-            race_distance_position: race_distance,
             race_time_ms: 0,
             lap: 1,
             laps_completed: 0,
             position: 30,
-            character: 0,
-            machine_index: 0,
         },
     }
 }

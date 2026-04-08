@@ -1,0 +1,129 @@
+# tests/support/native_objects.py
+from __future__ import annotations
+
+from collections.abc import Iterable
+
+from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry, StepSummary
+
+_STATE_FLAG_MASKS: dict[str, int] = {
+    "collision_recoil": 1 << 13,
+    "spinning_out": 1 << 14,
+    "retired": 1 << 18,
+    "falling_off_track": 1 << 19,
+    "can_boost": 1 << 20,
+    "cpu_controlled": 1 << 23,
+    "dash_pad_boost": 1 << 24,
+    "finished": 1 << 25,
+    "airborne": 1 << 26,
+    "crashed": 1 << 27,
+    "active": 1 << 30,
+}
+
+
+def encode_state_flags(state_labels: Iterable[str]) -> int:
+    return sum(_STATE_FLAG_MASKS.get(label, 0) for label in state_labels)
+
+
+def make_player_telemetry(
+    *,
+    state_labels: tuple[str, ...] = ("active",),
+    state_flags: int | None = None,
+    speed_kph: float = 100.0,
+    energy: float = 178.0,
+    max_energy: float = 178.0,
+    boost_timer: int = 0,
+    race_distance: float = 0.0,
+    lap_distance: float | None = None,
+    race_time_ms: int = 0,
+    lap: int = 1,
+    laps_completed: int = 0,
+    position: int = 30,
+) -> PlayerTelemetry:
+    resolved_state_flags = (
+        encode_state_flags(state_labels) if state_flags is None else state_flags
+    )
+    return PlayerTelemetry(
+        state_flags=resolved_state_flags,
+        speed_kph=speed_kph,
+        energy=energy,
+        max_energy=max_energy,
+        boost_timer=boost_timer,
+        race_distance=race_distance,
+        lap_distance=race_distance if lap_distance is None else lap_distance,
+        race_time_ms=race_time_ms,
+        lap=lap,
+        laps_completed=laps_completed,
+        position=position,
+    )
+
+
+def make_telemetry(
+    *,
+    game_mode_raw: int = 1,
+    game_mode_name: str = "gp_race",
+    in_race_mode: bool = True,
+    course_index: int = 0,
+    player: PlayerTelemetry | None = None,
+    state_labels: tuple[str, ...] = ("active",),
+    state_flags: int | None = None,
+    speed_kph: float = 100.0,
+    energy: float = 178.0,
+    max_energy: float = 178.0,
+    boost_timer: int = 0,
+    race_distance: float = 0.0,
+    lap_distance: float | None = None,
+    race_time_ms: int = 0,
+    lap: int = 1,
+    laps_completed: int = 0,
+    position: int = 30,
+) -> FZeroXTelemetry:
+    resolved_player = player or make_player_telemetry(
+        state_labels=state_labels,
+        state_flags=state_flags,
+        speed_kph=speed_kph,
+        energy=energy,
+        max_energy=max_energy,
+        boost_timer=boost_timer,
+        race_distance=race_distance,
+        lap_distance=lap_distance,
+        race_time_ms=race_time_ms,
+        lap=lap,
+        laps_completed=laps_completed,
+        position=position,
+    )
+    return FZeroXTelemetry(
+        game_mode_raw=game_mode_raw,
+        game_mode_name=game_mode_name,
+        in_race_mode=in_race_mode,
+        course_index=course_index,
+        player=resolved_player,
+    )
+
+
+def make_step_summary(
+    *,
+    frames_run: int = 1,
+    max_race_distance: float,
+    reverse_progress_total: float = 0.0,
+    consecutive_reverse_frames: int = 0,
+    energy_loss_total: float = 0.0,
+    consecutive_low_speed_frames: int = 0,
+    entered_state_labels: tuple[str, ...] = (),
+    entered_state_flags: int | None = None,
+    final_frame_index: int = 1,
+) -> StepSummary:
+    resolved_entered_state_flags = (
+        encode_state_flags(entered_state_labels)
+        if entered_state_flags is None
+        else entered_state_flags
+    )
+    return StepSummary(
+        frames_run=frames_run,
+        max_race_distance=max_race_distance,
+        reverse_progress_total=reverse_progress_total,
+        consecutive_reverse_frames=consecutive_reverse_frames,
+        energy_loss_total=energy_loss_total,
+        consecutive_low_speed_frames=consecutive_low_speed_frames,
+        entered_state_flags=resolved_entered_state_flags,
+        final_frame_index=final_frame_index,
+    )

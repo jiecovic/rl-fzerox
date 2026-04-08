@@ -6,9 +6,9 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from fzerox_emulator import Emulator
 from rl_fzerox.core.boot import boot_into_first_race
 from rl_fzerox.core.config.loader import load_watch_app_config
-from rl_fzerox.core.emulator import Emulator
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

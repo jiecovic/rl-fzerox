@@ -12,12 +12,15 @@ use crate::core::input::ControllerState;
 use crate::core::observation::ObservationPreset;
 
 mod frame;
+mod state;
 mod step;
 mod telemetry;
 
 use frame::frame_to_pyarray;
-use step::step_summary_to_pytuple;
-use telemetry::{telemetry_to_pydict, telemetry_to_pytuple};
+pub use step::PyStepSummary;
+use step::step_summary_to_py;
+use telemetry::telemetry_to_py;
+pub use telemetry::{PyPlayerTelemetry, PyTelemetry};
 
 /// Python-facing wrapper around one native `Host` instance.
 #[pyclass(name = "Emulator", unsendable)]
@@ -160,9 +163,16 @@ impl PyEmulator {
             spec.frame_width,
             spec.channels * frame_stack,
         )?;
-        let summary = step_summary_to_pytuple(py, &result.summary)?;
-        let telemetry = telemetry_to_pytuple(py, &result.final_telemetry)?;
-        PyTuple::new(py, [observation, summary.into_any(), telemetry.into_any()])
+        let summary = step_summary_to_py(py, &result.summary)?;
+        let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
+        PyTuple::new(
+            py,
+            [
+                observation,
+                summary.into_bound(py).into_any(),
+                telemetry.into_bound(py).into_any(),
+            ],
+        )
     }
 
     #[pyo3(signature = (
@@ -262,18 +272,11 @@ impl PyEmulator {
         frame_to_pyarray(py, frame, spec.display_height, spec.display_width, 3)
     }
 
-    fn telemetry<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+    fn telemetry(&mut self, py: Python<'_>) -> PyResult<Py<PyTelemetry>> {
         let telemetry = py
             .detach(|| self.host.telemetry())
             .map_err(map_core_error)?;
-        telemetry_to_pydict(py, &telemetry)
-    }
-
-    fn telemetry_flat<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
-        let telemetry = py
-            .detach(|| self.host.telemetry())
-            .map_err(map_core_error)?;
-        telemetry_to_pytuple(py, &telemetry)
+        telemetry_to_py(py, &telemetry)
     }
 
     fn read_system_ram<'py>(

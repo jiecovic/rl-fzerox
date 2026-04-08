@@ -1,15 +1,13 @@
-# src/rl_fzerox/core/emulator/base.py
+# src/fzerox_emulator/base.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 import numpy as np
 
-from rl_fzerox.core.emulator.control import ControllerState
-
-if TYPE_CHECKING:
-    from rl_fzerox.core.game.telemetry import FZeroXTelemetry
+from fzerox_emulator._native import FZeroXTelemetry, StepSummary
+from fzerox_emulator.control import ControllerState
 
 
 @dataclass(frozen=True)
@@ -41,20 +39,6 @@ class ObservationSpec:
     channels: int
     display_width: int
     display_height: int
-
-
-@dataclass(frozen=True, slots=True)
-class StepSummary:
-    """Step-level aggregates returned after one repeated env step."""
-
-    frames_run: int
-    max_race_distance: float
-    reverse_progress_total: float
-    consecutive_reverse_frames: int
-    energy_loss_total: float
-    consecutive_low_speed_frames: int
-    entered_state_flags: int
-    final_frame_index: int
 
 
 @dataclass(frozen=True)

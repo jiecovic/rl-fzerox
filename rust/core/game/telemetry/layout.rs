@@ -8,7 +8,6 @@ pub(super) struct TelemetryConfig {
     pub system_ram_size_min: usize,
     pub player_racer_index: usize,
     pub speed_to_kph: f32,
-    pub game_mode_mask: u32,
 }
 
 pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
@@ -16,13 +15,11 @@ pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
     system_ram_size_min: 0x0030_0000,
     player_racer_index: 0,
     speed_to_kph: 21.6,
-    game_mode_mask: 0x1F,
 };
 
 #[derive(Clone, Copy)]
 pub(super) struct GlobalOffsets {
     pub game_mode: usize,
-    pub game_frame_count: usize,
     pub course_index: usize,
     pub racers: usize,
 }
@@ -36,15 +33,11 @@ pub(super) struct RacerOffsets {
     pub energy: usize,
     pub max_energy: usize,
     pub race_distance: usize,
-    pub laps_completed_distance: usize,
     pub lap_distance: usize,
-    pub race_distance_position: usize,
     pub race_time: usize,
     pub lap: usize,
     pub laps_completed: usize,
     pub position: usize,
-    pub character: usize,
-    pub machine_index: usize,
 }
 
 // Global RDRAM addresses derived from the F-Zero X USA decomp / symbol dumps.
@@ -52,7 +45,6 @@ pub(super) struct RacerOffsets {
 // audit and update as field semantics are validated.
 pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     game_mode: rdram_offset(0x800DCE44),
-    game_frame_count: rdram_offset(0x800CCFE0),
     course_index: rdram_offset(0x800F8514),
     racers: rdram_offset(0x802C4920),
 };
@@ -67,15 +59,11 @@ pub(super) const RACER: RacerOffsets = RacerOffsets {
     energy: 0x228,
     max_energy: 0x22C,
     race_distance: 0x23C,
-    laps_completed_distance: 0x240,
     lap_distance: 0x244,
-    race_distance_position: 0x248,
     race_time: 0x2A0,
     lap: 0x2A8,
     laps_completed: 0x2AA,
     position: 0x2AC,
-    character: 0x2C8,
-    machine_index: 0x2C9,
 };
 
 // F-Zero X game-mode ids derived from the decomp's `include/fzx_game.h`.
@@ -108,7 +96,7 @@ pub(super) enum GameMode {
 }
 
 impl GameMode {
-    pub(super) const fn name(self) -> &'static str {
+    pub(super) const fn wire_name(self) -> &'static str {
         match self {
             Self::Title => "title",
             Self::GpRace => "gp_race",
@@ -181,24 +169,6 @@ impl TryFrom<u32> for GameMode {
             _ => Err(()),
         }
     }
-}
-
-// Racer state bits derived from the decomp's racer state flags and validated
-// against live telemetry/HUD behavior in-game.
-#[repr(u32)]
-#[derive(Clone, Copy)]
-pub(super) enum RacerStateFlag {
-    CollisionRecoil = 1 << 13,
-    SpinningOut = 1 << 14,
-    Retired = 1 << 18,
-    FallingOffTrack = 1 << 19,
-    CanBoost = 1 << 20,
-    CpuControlled = 1 << 23,
-    DashPadBoost = 1 << 24,
-    Finished = 1 << 25,
-    Airborne = 1 << 26,
-    Crashed = 1 << 27,
-    Active = 1 << 30,
 }
 
 pub(super) const fn rdram_offset(vram_address: usize) -> usize {
