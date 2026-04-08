@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 
 from fzerox_emulator import ControllerState, EmulatorBackend
-from rl_fzerox.core.config.schema import EnvConfig
+from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 
@@ -19,11 +19,13 @@ class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
         self,
         backend: EmulatorBackend,
         config: EnvConfig,
+        reward_config: RewardConfig | None = None,
     ) -> None:
         super().__init__()
         self._engine = FZeroXEnvEngine(
             backend=backend,
             config=config,
+            reward_config=reward_config,
         )
         self.backend = self._engine.backend
         self.config = self._engine.config

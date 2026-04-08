@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from fzerox_emulator import FZeroXTelemetry, StepSummary
+    from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 
 
 @dataclass(frozen=True)
@@ -38,13 +38,10 @@ class RewardTracker(Protocol):
     def step_summary(
         self,
         summary: StepSummary,
+        status: StepStatus,
         telemetry: FZeroXTelemetry | None,
     ) -> RewardStep:
         """Compute one env-step reward from the repeated-step summary."""
-        ...
-
-    def truncation_penalty(self, truncation_reason: str | None) -> tuple[float, str | None]:
-        """Return any extra reward penalty that should apply to a truncation."""
         ...
 
 
@@ -60,7 +57,8 @@ def apply_event_penalty(
     return penalty
 
 
-def finish_placement_bonus(*, position: int, max_race_position: int, scale: float) -> float:
-    clamped_position = min(max(position, 1), max_race_position)
-    better_than_last = max_race_position - clamped_position
+def finish_placement_bonus(*, position: int, total_racers: int, scale: float) -> float:
+    clamped_total_racers = max(total_racers, 1)
+    clamped_position = min(max(position, 1), clamped_total_racers)
+    better_than_last = clamped_total_racers - clamped_position
     return better_than_last * scale

@@ -1,3 +1,7 @@
+defaults:
+  - reward: race_v2
+  - _self_
+
 seed: 123
 
 emulator:
@@ -17,7 +21,6 @@ env:
   observation:
     preset: native_crop_v1
     frame_stack: 4
-
 train:
   vec_env: subproc
   num_envs: 6

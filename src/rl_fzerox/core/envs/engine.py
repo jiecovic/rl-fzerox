@@ -11,7 +11,7 @@ from fzerox_emulator import (
     ObservationSpec,
 )
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
-from rl_fzerox.core.config.schema import EnvConfig
+from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import build_reward_tracker
@@ -30,12 +30,16 @@ class FZeroXEnvEngine:
         *,
         backend: EmulatorBackend,
         config: EnvConfig,
+        reward_config: RewardConfig | None = None,
     ) -> None:
         self.backend = backend
         self.config = config
         self._action_adapter = build_action_adapter(config.action)
         self._observation_spec = backend.observation_spec(config.observation.preset)
-        self._reward_tracker = build_reward_tracker()
+        self._reward_tracker = build_reward_tracker(
+            config=reward_config,
+            max_episode_steps=config.max_episode_steps,
+        )
         self._reward_summary_config = self._reward_tracker.summary_config()
         self._episode_done = False
         self._episode_return = 0.0
@@ -168,18 +172,15 @@ class FZeroXEnvEngine:
         )
         info = _backend_step_info(self.backend)
         telemetry = step_result.telemetry
-        reward_step = self._reward_tracker.step_summary(step_result.summary, telemetry)
+        reward_step = self._reward_tracker.step_summary(
+            step_result.summary,
+            step_result.status,
+            telemetry,
+        )
         reward = reward_step.reward
         reward_breakdown = dict(reward_step.breakdown)
         terminated = step_result.status.terminated
-        truncation_reason = step_result.status.truncation_reason
         truncated = step_result.status.truncated
-        truncation_penalty, truncation_label = self._reward_tracker.truncation_penalty(
-            truncation_reason
-        )
-        reward += truncation_penalty
-        if truncation_label is not None:
-            reward_breakdown[truncation_label] = truncation_penalty
         info["step_reward"] = reward
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         if reward_breakdown:
