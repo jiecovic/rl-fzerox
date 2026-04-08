@@ -7,29 +7,26 @@ emulator:
 
 env:
   action_repeat: 2
-  max_episode_steps: 14000
-  stuck_grace_steps: 300
-  stuck_step_limit: 900
-  stuck_progress_epsilon: 5.0
+  max_episode_steps: 44000
+  stuck_step_limit: 240
+  stuck_min_speed_kph: 50.0
   reset_to_race: true
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost
     steer_buckets: 7
   observation:
-    width: 160
-    height: 120
+    preset: native_crop_v1
     frame_stack: 4
-    rgb: true
 
 train:
   vec_env: subproc
-  num_envs: 4
+  num_envs: 6
   total_timesteps: 5_000_000
   n_steps: 1024
   n_epochs: 8
   batch_size: 512
   learning_rate: 1.0e-4
-  gamma: 0.98
+  gamma: 0.995
   gae_lambda: 0.95
   clip_range: 0.2
   ent_coef: 0.01
@@ -42,10 +39,9 @@ train:
   run_name: ppo_cnn
 
 policy:
-  activation: relu
+  activation: tanh
   extractor:
-    name: fzerox_cnn_wide
-    features_dim: 1024
+    features_dim: auto
   net_arch:
-    pi: [256, 256]
-    vf: [256, 256]
+    pi: [512, 256]
+    vf: [512, 256]

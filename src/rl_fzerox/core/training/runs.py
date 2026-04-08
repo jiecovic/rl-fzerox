@@ -1,7 +1,10 @@
 # src/rl_fzerox/core/training/runs.py
 from __future__ import annotations
 
+import os
+import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -9,6 +12,9 @@ from omegaconf import OmegaConf
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
 
 RUN_CONFIG_FILENAME = "train_config.yaml"
+RUN_BASELINE_FILENAME = "baseline.state"
+WATCH_RUNTIME_ROOTNAME = "watch"
+WATCH_SESSION_BASELINE_FILENAME = "baseline.state"
 
 
 @dataclass(frozen=True)
@@ -24,11 +30,21 @@ class RunPaths:
     best_policy_path: Path
     final_model_path: Path
     final_policy_path: Path
+    baseline_state_path: Path
 
     def env_runtime_dir(self, env_index: int) -> Path:
         """Return the writable runtime directory for one train env instance."""
 
         return self.runtime_root / f"env_{env_index:03d}"
+
+
+@dataclass(frozen=True)
+class WatchSessionPaths:
+    """Filesystem layout for one interactive watch session."""
+
+    session_dir: Path
+    runtime_dir: Path
+    baseline_state_path: Path | None
 
 
 def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
@@ -46,6 +62,7 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
         best_policy_path=run_dir / "best_policy.zip",
         final_model_path=run_dir / "final_model.zip",
         final_policy_path=run_dir / "final_policy.zip",
+        baseline_state_path=run_dir / RUN_BASELINE_FILENAME,
     )
 
 
@@ -55,6 +72,95 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     paths.run_dir.mkdir(parents=True, exist_ok=True)
     paths.runtime_root.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
+
+
+def build_watch_session_paths(
+    *,
+    run_dir: Path | None,
+    runtime_dir: Path | None,
+    baseline_state_path: Path | None,
+    session_name: str | None = None,
+) -> WatchSessionPaths:
+    """Build one isolated runtime/baseline layout for a watch session."""
+
+    session_root = _watch_session_root(run_dir=run_dir, runtime_dir=runtime_dir)
+    session_dir = session_root / (session_name or _watch_session_name())
+    return WatchSessionPaths(
+        session_dir=session_dir,
+        runtime_dir=session_dir / "runtime",
+        baseline_state_path=(
+            None
+            if baseline_state_path is None
+            else session_dir / WATCH_SESSION_BASELINE_FILENAME
+        ),
+    )
+
+
+def ensure_watch_session_dirs(paths: WatchSessionPaths) -> None:
+    """Create the directories needed by the current watch session."""
+
+    paths.session_dir.mkdir(parents=True, exist_ok=True)
+    paths.runtime_dir.mkdir(parents=True, exist_ok=True)
+
+
+def materialize_watch_session_config(
+    watch_config: WatchAppConfig,
+    *,
+    run_dir: Path | None,
+    session_name: str | None = None,
+) -> WatchAppConfig:
+    """Rewrite one watch config to use isolated per-session scratch paths."""
+
+    paths = build_watch_session_paths(
+        run_dir=run_dir,
+        runtime_dir=watch_config.emulator.runtime_dir,
+        baseline_state_path=watch_config.emulator.baseline_state_path,
+        session_name=session_name,
+    )
+    ensure_watch_session_dirs(paths)
+    _copy_state_file(
+        source=watch_config.emulator.baseline_state_path,
+        destination=paths.baseline_state_path,
+    )
+    return watch_config.model_copy(
+        update={
+            "emulator": watch_config.emulator.model_copy(
+                update={
+                    "runtime_dir": paths.runtime_dir,
+                    "baseline_state_path": paths.baseline_state_path,
+                }
+            )
+        }
+    )
+
+
+def materialize_train_run_config(
+    config: TrainAppConfig,
+    *,
+    run_paths: RunPaths,
+) -> TrainAppConfig:
+    """Rewrite one train config to use run-local runtime and baseline files."""
+
+    baseline_state_path = config.emulator.baseline_state_path
+    if baseline_state_path is not None:
+        _copy_state_file(
+            source=baseline_state_path,
+            destination=run_paths.baseline_state_path,
+        )
+    return config.model_copy(
+        update={
+            "emulator": config.emulator.model_copy(
+                update={
+                    "runtime_dir": run_paths.runtime_root,
+                    "baseline_state_path": (
+                        None
+                        if baseline_state_path is None
+                        else run_paths.baseline_state_path
+                    ),
+                }
+            )
+        }
+    )
 
 
 def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
@@ -171,6 +277,32 @@ def apply_train_run_to_watch_config(
             ),
         }
     )
+
+
+def _copy_state_file(*, source: Path | None, destination: Path | None) -> None:
+    if source is None or destination is None:
+        return
+    resolved_source = source.expanduser().resolve()
+    resolved_destination = destination.expanduser().resolve()
+    if resolved_source == resolved_destination:
+        return
+    if not resolved_source.is_file():
+        return
+    resolved_destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(resolved_source, resolved_destination)
+
+
+def _watch_session_root(*, run_dir: Path | None, runtime_dir: Path | None) -> Path:
+    if run_dir is not None:
+        return run_dir.expanduser().resolve() / WATCH_RUNTIME_ROOTNAME
+    if runtime_dir is not None:
+        return runtime_dir.expanduser().resolve().parent / WATCH_RUNTIME_ROOTNAME
+    return Path("local/watch").expanduser().resolve()
+
+
+def _watch_session_name() -> str:
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{timestamp}-{os.getpid()}"
 
 
 def _resolve_artifact_path(

@@ -20,7 +20,11 @@ class ActionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["steer_drive", "steer_drive_boost_drift"] = "steer_drive"
+    name: Literal[
+        "steer_drive",
+        "steer_drive_boost",
+        "steer_drive_boost_drift",
+    ] = "steer_drive"
     steer_buckets: int = Field(default=7, ge=3)
 
 
@@ -29,10 +33,8 @@ class ObservationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    width: PositiveInt = 160
-    height: PositiveInt = 120
+    preset: Literal["native_crop_v1"] = "native_crop_v1"
     frame_stack: PositiveInt = 4
-    rgb: bool = True
 
 
 class EnvConfig(BaseModel):
@@ -44,8 +46,10 @@ class EnvConfig(BaseModel):
     # The step-like env limits below are counted per internal telemetry sample,
     # i.e. once per emulated frame, not once per outer env.step().
     max_episode_steps: PositiveInt = 12_000
-    stuck_grace_steps: PositiveInt = 300
-    stuck_step_limit: PositiveInt = 900
+    stuck_step_limit: PositiveInt = 240
+    stuck_min_speed_kph: NonNegativeFloat = 50.0
+    # Deprecated compatibility field kept so older saved run configs still load.
+    # The current stuck detector is speed-based and does not read this value.
     stuck_progress_epsilon: NonNegativeFloat = 5.0
     wrong_way_step_limit: PositiveInt = 300
     wrong_way_progress_epsilon: NonNegativeFloat = 2.0
@@ -91,8 +95,7 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["fzerox_cnn", "fzerox_cnn_wide"] = "fzerox_cnn"
-    features_dim: PositiveInt = 512
+    features_dim: PositiveInt | Literal["auto"] = 512
 
 
 class PolicyConfig(BaseModel):

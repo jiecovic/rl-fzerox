@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+import os
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
 from rl_fzerox.core.emulator import Emulator
@@ -15,6 +17,7 @@ from rl_fzerox.core.training.runs import (
     RunPaths,
     build_run_paths,
     ensure_run_dirs,
+    materialize_train_run_config,
     save_train_run_config,
 )
 
@@ -132,10 +135,10 @@ def run_training(config: TrainAppConfig) -> None:
         output_root=config.train.output_root,
         run_name=config.train.run_name,
     )
-    run_config = _resolve_train_run_config(config=config, run_paths=run_paths)
-    _validate_training_baseline_state(run_config)
+    _validate_training_baseline_state(config)
 
     ensure_run_dirs(run_paths)
+    run_config = _resolve_train_run_config(config=config, run_paths=run_paths)
     train_env = None
     model = None
 
@@ -170,8 +173,11 @@ def run_training(config: TrainAppConfig) -> None:
             if model.num_timesteps > 0:
                 _save_latest_artifacts(model, run_paths)
             raise
-        model.save(str(run_paths.final_model_path))
-        model.policy.save(str(run_paths.final_policy_path))
+        _save_artifacts_atomically(
+            model=model,
+            model_path=run_paths.final_model_path,
+            policy_path=run_paths.final_policy_path,
+        )
         _save_latest_artifacts(model, run_paths)
     except Exception:
         _cleanup_failed_run(run_paths, model)
@@ -188,13 +194,7 @@ def _resolve_train_run_config(
 ) -> TrainAppConfig:
     """Resolve one train config snapshot with a run-local runtime root."""
 
-    return config.model_copy(
-        update={
-            "emulator": config.emulator.model_copy(
-                update={"runtime_dir": run_paths.runtime_root}
-            )
-        }
-    )
+    return materialize_train_run_config(config, run_paths=run_paths)
 
 
 def _validate_training_baseline_state(config: TrainAppConfig) -> None:
@@ -300,12 +300,10 @@ def _build_ppo_model(
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    from rl_fzerox.core.policy import resolve_extractor_class
-
-    extractor_class = resolve_extractor_class(policy_config.extractor.name)
+    from rl_fzerox.core.policy import FZeroXObservationCnnExtractor
 
     policy_kwargs = {
-        "features_extractor_class": extractor_class,
+        "features_extractor_class": FZeroXObservationCnnExtractor,
         "features_extractor_kwargs": {
             "features_dim": policy_config.extractor.features_dim,
         },
@@ -418,8 +416,27 @@ def _print_training_startup(
 
 
 def _save_latest_artifacts(model, run_paths: RunPaths) -> None:
-    model.save(str(run_paths.latest_model_path))
-    model.policy.save(str(run_paths.latest_policy_path))
+    _save_artifacts_atomically(
+        model=model,
+        model_path=run_paths.latest_model_path,
+        policy_path=run_paths.latest_policy_path,
+    )
+
+
+def _save_artifacts_atomically(*, model, model_path: Path, policy_path: Path) -> None:
+    _atomic_save_artifact(model.save, model_path)
+    _atomic_save_artifact(model.policy.save, policy_path)
+
+
+def _atomic_save_artifact(save_fn, target_path: Path) -> None:
+    tmp_path = target_path.with_name(f".{target_path.stem}.tmp{target_path.suffix}")
+    tmp_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        save_fn(str(tmp_path))
+        os.replace(tmp_path, target_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
 
 
 def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
@@ -462,8 +479,11 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             self._best_episode_return: float | None = None
 
         def _save_latest(self) -> None:
-            self.model.save(str(self._run_paths.latest_model_path))
-            self.model.policy.save(str(self._run_paths.latest_policy_path))
+            _save_artifacts_atomically(
+                model=self.model,
+                model_path=self._run_paths.latest_model_path,
+                policy_path=self._run_paths.latest_policy_path,
+            )
 
         def _save_best(self, episode_return: float) -> None:
             if (
@@ -472,8 +492,11 @@ def _build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
             ):
                 return
             self._best_episode_return = episode_return
-            self.model.save(str(self._run_paths.best_model_path))
-            self.model.policy.save(str(self._run_paths.best_policy_path))
+            _save_artifacts_atomically(
+                model=self.model,
+                model_path=self._run_paths.best_model_path,
+                policy_path=self._run_paths.best_policy_path,
+            )
 
         def _on_step(self) -> bool:
             if self.n_calls % self._save_freq == 0:

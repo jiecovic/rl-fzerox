@@ -3,7 +3,6 @@ seed: 123
 emulator:
   core_path: local/libretro/mupen64plus_next_libretro.so
   rom_path: local/roms/F-Zero X (USA).n64
-  runtime_dir: local/runtime
   renderer: angrylion
 
 env:
@@ -13,7 +12,5 @@ env:
     name: steer_drive_boost_drift
     steer_buckets: 7
   observation:
-    width: 160
-    height: 120
+    preset: native_crop_v1
     frame_stack: 4
-    rgb: true
