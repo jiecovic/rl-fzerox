@@ -72,7 +72,11 @@ struct StackedObservationKey {
 
 struct StackedObservationBuffer {
     frame_len: usize,
+    channels_per_pixel: usize,
+    frame_stack: usize,
+    frames: Vec<u8>,
     bytes: Vec<u8>,
+    next_slot: usize,
     last_frame_serial: Option<u64>,
 }
 
@@ -236,7 +240,11 @@ impl CallbackState {
             .stacked_observation_buffers
             .entry(stack_key)
             .or_insert_with(|| {
-                StackedObservationBuffer::new(observation_buffer.len(), frame_stack)
+                StackedObservationBuffer::new(
+                    observation_buffer.len(),
+                    frame_stack,
+                    if request.rgb { 3 } else { 1 },
+                )
             });
         stack_buffer.update(observation_buffer, frame_serial)?;
         Ok(stack_buffer.as_slice())
@@ -492,11 +500,17 @@ impl RenderRequest {
 }
 
 impl StackedObservationBuffer {
-    fn new(frame_len: usize, frame_stack: usize) -> Self {
+    fn new(frame_len: usize, frame_stack: usize, channels_per_pixel: usize) -> Self {
         debug_assert!(frame_stack > 0);
+        debug_assert!(channels_per_pixel > 0);
+        debug_assert_eq!(frame_len % channels_per_pixel, 0);
         Self {
             frame_len,
+            channels_per_pixel,
+            frame_stack,
+            frames: vec![0_u8; frame_len * frame_stack],
             bytes: vec![0_u8; frame_len * frame_stack],
+            next_slot: 0,
             last_frame_serial: None,
         }
     }
@@ -510,24 +524,55 @@ impl StackedObservationBuffer {
         }
 
         if self.last_frame_serial.is_none() {
-            for chunk in self.bytes.chunks_exact_mut(self.frame_len) {
-                chunk.copy_from_slice(frame);
+            for slot_frame in self.frames.chunks_exact_mut(self.frame_len) {
+                slot_frame.copy_from_slice(frame);
             }
         } else {
-            self.bytes.copy_within(self.frame_len.., 0);
-            let tail_start = self.bytes.len() - self.frame_len;
-            self.bytes[tail_start..].copy_from_slice(frame);
+            let slot_start = self.next_slot * self.frame_len;
+            self.frames[slot_start..slot_start + self.frame_len].copy_from_slice(frame);
+            self.next_slot = (self.next_slot + 1) % self.frame_stack;
         }
 
+        self.materialize();
         self.last_frame_serial = Some(frame_serial);
         Ok(())
     }
 
     fn clear(&mut self) {
+        self.next_slot = 0;
         self.last_frame_serial = None;
     }
 
     fn as_slice(&self) -> &[u8] {
         self.bytes.as_slice()
+    }
+
+    fn materialize(&mut self) {
+        let pixel_count = self.frame_len / self.channels_per_pixel;
+
+        if self.channels_per_pixel == 3 {
+            for pixel_index in 0..pixel_count {
+                let pixel_src = pixel_index * 3;
+                let pixel_dst = pixel_index * 3 * self.frame_stack;
+                for stack_index in 0..self.frame_stack {
+                    let slot = (self.next_slot + stack_index) % self.frame_stack;
+                    let src = (slot * self.frame_len) + pixel_src;
+                    let dst = pixel_dst + (stack_index * 3);
+                    self.bytes[dst] = self.frames[src];
+                    self.bytes[dst + 1] = self.frames[src + 1];
+                    self.bytes[dst + 2] = self.frames[src + 2];
+                }
+            }
+            return;
+        }
+
+        for pixel_index in 0..pixel_count {
+            let pixel_dst = pixel_index * self.frame_stack;
+            for stack_index in 0..self.frame_stack {
+                let slot = (self.next_slot + stack_index) % self.frame_stack;
+                let src = (slot * self.frame_len) + pixel_index;
+                self.bytes[pixel_dst + stack_index] = self.frames[src];
+            }
+        }
     }
 }

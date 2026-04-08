@@ -83,6 +83,28 @@ fn set_frame_clears_existing_stacked_observations_for_the_next_episode() {
     );
 }
 
+#[test]
+fn stacked_observation_interleaves_frames_per_pixel_for_multi_pixel_images() {
+    let mut state = callback_state();
+    state.set_frame(rgb_row_frame([[1, 2, 3], [4, 5, 6]]));
+
+    let stacked = state
+        .stacked_observation_frame(0.0, 2, 1, true, VideoCrop::default(), 2)
+        .expect("stacked observation should render")
+        .to_vec();
+
+    assert_eq!(stacked, vec![1, 2, 3, 1, 2, 3, 4, 5, 6, 4, 5, 6,]);
+
+    state.set_frame_for_test_without_reset(rgb_row_frame([[10, 11, 12], [13, 14, 15]]));
+
+    let stacked = state
+        .stacked_observation_frame(0.0, 2, 1, true, VideoCrop::default(), 2)
+        .expect("stacked observation should render")
+        .to_vec();
+
+    assert_eq!(stacked, vec![1, 2, 3, 10, 11, 12, 4, 5, 6, 13, 14, 15,]);
+}
+
 fn callback_state() -> CallbackState {
     let runtime_dir = std::env::temp_dir().join(format!(
         "rl_fzerox_callbacks_tests_{}_{}",
@@ -103,6 +125,14 @@ fn rgb_frame(rgb: [u8; 3]) -> VideoFrame {
         width: 1,
         height: 1,
         rgb: rgb.to_vec(),
+    }
+}
+
+fn rgb_row_frame(pixels: [[u8; 3]; 2]) -> VideoFrame {
+    VideoFrame {
+        width: 2,
+        height: 1,
+        rgb: pixels.into_iter().flatten().collect(),
     }
 }
 
