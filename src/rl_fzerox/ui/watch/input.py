@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/viewer_input.py
+# src/rl_fzerox/ui/watch/input.py
 from __future__ import annotations
 
 from dataclasses import dataclass

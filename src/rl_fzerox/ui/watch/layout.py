@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/viewer_layout.py
+# src/rl_fzerox/ui/watch/layout.py
 from __future__ import annotations
 
 from dataclasses import dataclass
