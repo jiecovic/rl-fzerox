@@ -89,9 +89,7 @@ def build_watch_session_paths(
         session_dir=session_dir,
         runtime_dir=session_dir / "runtime",
         baseline_state_path=(
-            None
-            if baseline_state_path is None
-            else session_dir / WATCH_SESSION_BASELINE_FILENAME
+            None if baseline_state_path is None else session_dir / WATCH_SESSION_BASELINE_FILENAME
         ),
     )
 
@@ -153,9 +151,7 @@ def materialize_train_run_config(
                 update={
                     "runtime_dir": run_paths.runtime_root,
                     "baseline_state_path": (
-                        None
-                        if baseline_state_path is None
-                        else run_paths.baseline_state_path
+                        None if baseline_state_path is None else run_paths.baseline_state_path
                     ),
                 }
             )
@@ -328,9 +324,7 @@ def _resolve_artifact_path(
         if resolved_path.is_file():
             return resolved_path
 
-    raise FileNotFoundError(
-        f"No artifact could be found under run directory {resolved_run_dir}"
-    )
+    raise FileNotFoundError(f"No artifact could be found under run directory {resolved_run_dir}")
 
 
 def _next_run_dir(output_root: Path, run_name: str) -> Path:

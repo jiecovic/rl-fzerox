@@ -69,9 +69,7 @@ def test_extended_adapter_uses_four_head_multidiscrete_space() -> None:
 
 
 def test_boost_adapter_uses_three_head_multidiscrete_space() -> None:
-    adapter = SteerDriveBoostActionAdapter(
-        ActionConfig(name="steer_drive_boost", steer_buckets=7)
-    )
+    adapter = SteerDriveBoostActionAdapter(ActionConfig(name="steer_drive_boost", steer_buckets=7))
 
     assert isinstance(adapter.action_space, MultiDiscrete)
     assert adapter.action_space.nvec.tolist() == [7, 2, 2]
@@ -79,9 +77,7 @@ def test_boost_adapter_uses_three_head_multidiscrete_space() -> None:
 
 
 def test_boost_adapter_decodes_throttle_and_boost() -> None:
-    adapter = SteerDriveBoostActionAdapter(
-        ActionConfig(name="steer_drive_boost", steer_buckets=7)
-    )
+    adapter = SteerDriveBoostActionAdapter(ActionConfig(name="steer_drive_boost", steer_buckets=7))
 
     control_state = adapter.decode(np.array([4, 1, 1], dtype=np.int64))
 
@@ -90,9 +86,7 @@ def test_boost_adapter_decodes_throttle_and_boost() -> None:
 
 
 def test_boost_adapter_rejects_wrong_action_shape() -> None:
-    adapter = SteerDriveBoostActionAdapter(
-        ActionConfig(name="steer_drive_boost", steer_buckets=7)
-    )
+    adapter = SteerDriveBoostActionAdapter(ActionConfig(name="steer_drive_boost", steer_buckets=7))
 
     with pytest.raises(ValueError):
         adapter.decode(np.array([3, 1], dtype=np.int64))

@@ -27,12 +27,14 @@ BOOST_MASK = joypad_mask(JOYPAD_Y)
 DRIFT_LEFT_MASK = joypad_mask(JOYPAD_L2)
 DRIFT_RIGHT_MASK = joypad_mask(JOYPAD_R)
 
+
 @dataclass(frozen=True, slots=True)
 class DriftMode:
     """One held drift-side mapping for the current controller profile."""
 
     label: str
     joypad_mask: int
+
 
 DRIFT_MODES: tuple[DriftMode, ...] = (
     DriftMode(label="none", joypad_mask=0),

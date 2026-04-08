@@ -9,11 +9,7 @@ _RELOAD_ERROR_MAX_CHARS = 36
 
 
 def _pressed_button_labels(joypad_mask_value: int) -> str:
-    pressed = [
-        label
-        for button_id, label in BUTTON_LABELS
-        if joypad_mask_value & (1 << button_id)
-    ]
+    pressed = [label for button_id, label in BUTTON_LABELS if joypad_mask_value & (1 << button_id)]
     return " ".join(pressed) if pressed else "none"
 
 

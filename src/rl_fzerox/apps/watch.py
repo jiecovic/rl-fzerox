@@ -44,8 +44,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=None,
         help=(
-            "Optional training run directory. "
-            "The watch app loads its latest saved policy artifact."
+            "Optional training run directory. The watch app loads its latest saved policy artifact."
         ),
     )
     parser.add_argument(
@@ -64,9 +63,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     normalized_overrides = normalize_hydra_overrides(args.overrides)
     cli_run_dir = (
-        args.policy_run_dir.expanduser().resolve()
-        if args.policy_run_dir is not None
-        else None
+        args.policy_run_dir.expanduser().resolve() if args.policy_run_dir is not None else None
     )
     if args.config_path is None:
         if cli_run_dir is None:
@@ -91,13 +88,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
 
-    policy_run_dir = (
-        cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
-    )
+    policy_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
     if args.policy_artifact is not None and policy_run_dir is None:
-        raise SystemExit(
-            "--artifact requires --run-dir or watch.policy_run_dir in the config"
-        )
+        raise SystemExit("--artifact requires --run-dir or watch.policy_run_dir in the config")
     if policy_run_dir is not None:
         try:
             train_config = load_train_run_config(policy_run_dir)

@@ -140,6 +140,4 @@ def _resolve_config_paths(
             if not isinstance(raw_value, str):
                 continue
 
-            section[field_name] = str(
-                resolve_config_path_value(raw_value, config_dir=config_dir)
-            )
+            section[field_name] = str(resolve_config_path_value(raw_value, config_dir=config_dir))

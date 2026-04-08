@@ -60,9 +60,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         core_path=Path(args.core_path).expanduser().resolve(),
         rom_path=Path(args.rom_path).expanduser().resolve(),
         runtime_dir=(
-            None
-            if args.runtime_dir is None
-            else Path(args.runtime_dir).expanduser().resolve()
+            None if args.runtime_dir is None else Path(args.runtime_dir).expanduser().resolve()
         ),
         baseline_state_path=(
             None
