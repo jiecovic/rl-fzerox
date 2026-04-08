@@ -24,10 +24,10 @@ env:
     frame_stack: 4
 train:
   vec_env: subproc
-  num_envs: 6
+  num_envs: 8
   total_timesteps: 5_000_000
-  n_steps: 1024
-  n_epochs: 8
+  n_steps: 512
+  n_epochs: 6
   batch_size: 512
   learning_rate: 1.0e-4
   gamma: 0.993
