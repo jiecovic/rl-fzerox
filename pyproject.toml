@@ -52,6 +52,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = [
+  "ANN401",
   "B",
   "E",
   "F",
