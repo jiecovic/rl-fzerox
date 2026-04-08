@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class RewardStep:
-    """Reward, terminal state, and debug breakdown for one telemetry sample."""
+    """Reward, terminal state, and debug breakdown for one env step."""
 
     reward: float
     terminated: bool

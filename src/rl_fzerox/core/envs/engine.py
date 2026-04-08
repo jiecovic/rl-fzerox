@@ -121,6 +121,7 @@ class FZeroXEnvEngine:
         self.backend.close()
 
     def _reset_race_state(self) -> tuple[np.ndarray, dict[str, object]]:
+        continue_error: str | None = None
         if self.config.reset_to_race and not _has_custom_baseline(self._last_info):
             if self._episode_done:
                 try:
@@ -128,12 +129,15 @@ class FZeroXEnvEngine:
                     info = _reset_context_info(self._last_info)
                     info.update(reset_info)
                     return frame, info
-                except RuntimeError:
-                    pass
+                except RuntimeError as exc:
+                    continue_error = str(exc)
 
         reset_state = self.backend.reset()
         info = dict(reset_state.info)
         frame = reset_state.frame
+        if continue_error is not None:
+            info["reset_fallback"] = "continue_to_next_race_failed"
+            info["continue_to_next_race_error"] = continue_error
 
         if self.config.reset_to_race and not _has_custom_baseline(info):
             frame, boot_info = boot_into_first_race(self.backend)

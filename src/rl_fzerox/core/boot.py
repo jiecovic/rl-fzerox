@@ -96,17 +96,26 @@ def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str
 
     last_state = BootState.GP_RACE
     try:
-        _wait_for_mode(backend, BOOT_CONFIG.title_mode_name, BOOT_CONFIG.title_wait_frames)
+        if not _wait_for_mode(
+            backend,
+            BOOT_CONFIG.title_mode_name,
+            BOOT_CONFIG.title_wait_frames,
+        ):
+            raise RuntimeError(
+                f"Timed out waiting for {BOOT_CONFIG.title_mode_name!r} mode during boot"
+            )
         last_state = BootState.WAIT_FOR_TITLE
         for phase in BOOT_SEQUENCE:
             for _ in range(phase.start_presses):
                 _press_start(backend)
                 _settle_after_input(backend, phase.settle_frames)
             last_state = phase.state
-        detected_gp_race = _wait_for_gp_race(backend)
         last_state = BootState.WAIT_FOR_GP_RACE
-        if detected_gp_race:
-            backend.step_frames(BOOT_CONFIG.pre_race_settle_frames)
+        if not _wait_for_gp_race(backend):
+            raise RuntimeError(
+                f"Timed out waiting for {BOOT_CONFIG.race_mode_name!r} mode during boot"
+            )
+        backend.step_frames(BOOT_CONFIG.pre_race_settle_frames)
     finally:
         backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
@@ -141,7 +150,7 @@ def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[st
                         backend,
                         reset_mode="continue_to_next_race",
                     )
-                backend.step_frame()
+                _advance_poll_frame(backend)
     finally:
         backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
@@ -164,7 +173,7 @@ def _wait_for_mode(
     for _ in range(max_frames):
         if _current_game_mode_name(backend) == mode_name:
             return True
-        backend.step_frame()
+        _advance_poll_frame(backend)
     return _current_game_mode_name(backend) == mode_name
 
 
@@ -202,7 +211,13 @@ def _settle_after_input(backend: EmulatorBackend, max_frames: int) -> None:
         current_mode_name = _current_game_mode_name(backend)
         if current_mode_name is not None and current_mode_name != starting_mode_name:
             return
-        backend.step_frame()
+        _advance_poll_frame(backend)
+
+
+def _advance_poll_frame(backend: EmulatorBackend) -> None:
+    """Advance one telemetry-poll frame without materializing a Python frame object."""
+
+    backend.step_frames(1, capture_video=True)
 
 
 def _race_reset_result(

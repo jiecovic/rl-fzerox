@@ -259,6 +259,29 @@ def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> 
     assert info["boot_state"] == "gp_race"
 
 
+def test_reset_surfaces_continue_to_next_race_fallback(monkeypatch) -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=2, reset_to_race=True),
+    )
+
+    env.reset(seed=1)
+    env._engine._episode_done = True
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.envs.engine.continue_to_next_race",
+        lambda _backend: (_ for _ in ()).throw(RuntimeError("continue failed")),
+    )
+
+    _, info = env.reset(seed=2)
+
+    assert info["seed"] == 2
+    assert info["reset_mode"] == "boot_to_race"
+    assert info["reset_fallback"] == "continue_to_next_race_failed"
+    assert info["continue_to_next_race_error"] == "continue failed"
+
+
 def test_step_truncates_on_timeout() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
