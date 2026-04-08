@@ -6,7 +6,13 @@ from pathlib import Path
 import numpy as np
 
 from rl_fzerox._native import Emulator as NativeEmulator
-from rl_fzerox.core.emulator.base import FrameStep, ObservationSpec, ResetState
+from rl_fzerox.core.emulator.base import (
+    BackendStepResult,
+    FrameStep,
+    ObservationSpec,
+    ResetState,
+    StepSummary,
+)
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.game.telemetry import (
@@ -116,6 +122,50 @@ class Emulator:
         """Advance the emulator by a fixed number of frames."""
 
         self._native.step_frames(count, capture_video)
+
+    def step_repeat_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        reverse_progress_epsilon: float,
+        energy_loss_epsilon: float,
+        wrong_way_progress_epsilon: float,
+    ) -> BackendStepResult:
+        """Execute one repeated env step natively and return the final payload."""
+
+        state = controller_state.clamped()
+        observation, summary_data, telemetry_data = self._native.step_repeat_raw(
+            action_repeat=action_repeat,
+            preset=preset,
+            frame_stack=frame_stack,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            reverse_progress_epsilon=reverse_progress_epsilon,
+            energy_loss_epsilon=energy_loss_epsilon,
+            wrong_way_progress_epsilon=wrong_way_progress_epsilon,
+            joypad_mask=state.joypad_mask,
+            left_stick_x=state.left_stick_x,
+            left_stick_y=state.left_stick_y,
+            right_stick_x=state.right_stick_x,
+            right_stick_y=state.right_stick_y,
+        )
+        frame = np.asarray(observation, dtype=np.uint8)
+        spec = self.observation_spec(preset)
+        stacked_channels = spec.channels * frame_stack
+        expected_shape = (spec.height, spec.width, stacked_channels)
+        if tuple(int(value) for value in frame.shape) != expected_shape:
+            raise RuntimeError(
+                "Unexpected repeated-step observation shape from native emulator: "
+                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
+            )
+        return BackendStepResult(
+            observation=np.ascontiguousarray(frame),
+            summary=_step_summary_from_flat_tuple(summary_data),
+            telemetry=_telemetry_from_flat_tuple(telemetry_data),
+        )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
         """Set the held controller state used for subsequent frame stepping."""
@@ -334,6 +384,41 @@ def _telemetry_from_flat_tuple(data: object) -> FZeroXTelemetry:
             character=_int_field(character, "player.character"),
             machine_index=_int_field(machine_index, "player.machine_index"),
         ),
+    )
+
+
+def _step_summary_from_flat_tuple(data: object) -> StepSummary:
+    if not isinstance(data, tuple) or len(data) != 8:
+        raise TelemetryDecodeError("Native step summary payload must be an 8-item tuple")
+
+    (
+        frames_run,
+        max_race_distance,
+        reverse_progress_total,
+        consecutive_reverse_frames,
+        energy_loss_total,
+        consecutive_low_speed_frames,
+        entered_state_flags,
+        final_frame_index,
+    ) = data
+    return StepSummary(
+        frames_run=_int_field(frames_run, "step.frames_run"),
+        max_race_distance=_float_field(max_race_distance, "step.max_race_distance"),
+        reverse_progress_total=_float_field(
+            reverse_progress_total,
+            "step.reverse_progress_total",
+        ),
+        consecutive_reverse_frames=_int_field(
+            consecutive_reverse_frames,
+            "step.consecutive_reverse_frames",
+        ),
+        energy_loss_total=_float_field(energy_loss_total, "step.energy_loss_total"),
+        consecutive_low_speed_frames=_int_field(
+            consecutive_low_speed_frames,
+            "step.consecutive_low_speed_frames",
+        ),
+        entered_state_flags=_int_field(entered_state_flags, "step.entered_state_flags"),
+        final_frame_index=_int_field(final_frame_index, "step.final_frame_index"),
     )
 
 

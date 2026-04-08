@@ -15,6 +15,9 @@ use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::video::VideoFrame;
 
+use super::step::{NativeStepResult, RepeatedStepConfig};
+use super::step_accumulator::StepAccumulator;
+
 // Maximum number of `core.run()` calls we allow while waiting for a reset/load
 // path to produce a fresh frame before treating it as a core failure.
 pub(super) const FRAME_WAIT_LIMIT: usize = 120;
@@ -154,6 +157,67 @@ impl Host {
             return Err(CoreError::NoFrameAvailable);
         }
         Ok(())
+    }
+
+    /// Execute one outer env step fully inside the host runtime.
+    ///
+    /// The chosen controller state is held for `action_repeat` internal frames.
+    /// The host aggregates step-level telemetry features across those frames
+    /// and returns the final stacked observation once at the end.
+    #[allow(dead_code)]
+    pub fn step_repeat_raw(
+        &mut self,
+        config: RepeatedStepConfig,
+    ) -> Result<NativeStepResult<'_>, CoreError> {
+        self.ensure_open()?;
+        if config.action_repeat == 0 {
+            return Err(CoreError::InvalidStepRepeatCount {
+                count: config.action_repeat,
+            });
+        }
+
+        let initial_telemetry = self.telemetry()?;
+        self.callbacks.set_controller_state(config.controller_state);
+        let step_result = with_silenced_stdio(|| {
+            let mut accumulator = StepAccumulator::new(
+                &initial_telemetry,
+                config.stuck_min_speed_kph,
+                config.reverse_progress_epsilon,
+                config.energy_loss_epsilon,
+                config.wrong_way_progress_epsilon,
+                self.frame_index,
+            );
+            let mut final_telemetry = initial_telemetry;
+
+            for repeat_index in 0..config.action_repeat {
+                let capture_video = repeat_index + 1 == config.action_repeat;
+                self.callbacks.set_capture_video(capture_video);
+                self.call_core(|core| unsafe {
+                    core.run();
+                });
+                self.frame_index += 1;
+
+                let telemetry = self.telemetry()?;
+                accumulator.observe(&telemetry, self.frame_index);
+                final_telemetry = telemetry;
+            }
+
+            Ok((accumulator.finish(), final_telemetry))
+        });
+        self.callbacks.set_capture_video(true);
+        self.refresh_shape_from_frame();
+
+        let (summary, final_telemetry) = step_result?;
+        if !self.callbacks.has_frame() {
+            return Err(CoreError::NoFrameAvailable);
+        }
+
+        let observation = self.observation_frame(config.preset, config.frame_stack)?;
+        Ok(NativeStepResult {
+            observation,
+            summary,
+            final_telemetry,
+        })
     }
 
     pub fn set_controller_state(

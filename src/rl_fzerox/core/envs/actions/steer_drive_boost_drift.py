@@ -9,8 +9,15 @@ from gymnasium import spaces
 from rl_fzerox._native import JOYPAD_L2, JOYPAD_R, JOYPAD_Y, joypad_mask
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.envs.actions.base import ActionValue, coerce_action_values
-from rl_fzerox.core.envs.actions.steer_drive import THROTTLE_MASK
+from rl_fzerox.core.envs.actions.base import (
+    ActionValue,
+    DiscreteActionDimension,
+    idle_action,
+    multidiscrete_space,
+    parse_discrete_action,
+    steer_values,
+)
+from rl_fzerox.core.envs.actions.steer_drive import DRIVE_MODES
 
 # Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 B/Z/R
 # controls as RetroPad Y/L2/R respectively. In F-Zero X that means:
@@ -21,27 +28,12 @@ BOOST_MASK = joypad_mask(JOYPAD_Y)
 DRIFT_LEFT_MASK = joypad_mask(JOYPAD_L2)
 DRIFT_RIGHT_MASK = joypad_mask(JOYPAD_R)
 
-
-@dataclass(frozen=True, slots=True)
-class DriveMode:
-    """One held drive-mode mapping for the current controller profile."""
-
-    label: str
-    joypad_mask: int
-
-
 @dataclass(frozen=True, slots=True)
 class DriftMode:
     """One held drift-side mapping for the current controller profile."""
 
     label: str
     joypad_mask: int
-
-
-DRIVE_MODES: tuple[DriveMode, ...] = (
-    DriveMode(label="coast", joypad_mask=0),
-    DriveMode(label="throttle", joypad_mask=THROTTLE_MASK),
-)
 
 DRIFT_MODES: tuple[DriftMode, ...] = (
     DriftMode(label="none", joypad_mask=0),
@@ -54,24 +46,14 @@ class SteerDriveBoostDriftActionAdapter:
     """Map steering, throttle, boost, and drift-side actions to controls."""
 
     def __init__(self, config: ActionConfig) -> None:
-        self._steer_values = np.linspace(
-            -1.0,
-            1.0,
-            num=config.steer_buckets,
-            dtype=np.float32,
+        self._steer_values = steer_values(config.steer_buckets)
+        self._action_space = multidiscrete_space(
+            config.steer_buckets,
+            len(DRIVE_MODES),
+            2,
+            len(DRIFT_MODES),
         )
-        self._action_space = spaces.MultiDiscrete(
-            np.array(
-                [
-                    config.steer_buckets,
-                    len(DRIVE_MODES),
-                    2,
-                    len(DRIFT_MODES),
-                ],
-                dtype=np.int64,
-            )
-        )
-        self._idle_action = np.array([config.steer_buckets // 2, 0, 0, 0], dtype=np.int64)
+        self._idle_action = idle_action(config.steer_buckets // 2, 0, 0, 0)
 
     @property
     def action_space(self) -> spaces.MultiDiscrete:
@@ -109,20 +91,14 @@ def _parse_action_quad(
     *,
     steer_bucket_count: int,
 ) -> tuple[int, int, int, int]:
-    values = coerce_action_values(action)
-    if len(values) != 4:
-        raise ValueError(
-            "Steer-drive-boost-drift actions must contain exactly 4 values: "
-            "[steer_bucket, drive_mode, boost, drift_mode]"
-        )
-
-    steer_index, drive_mode_index, boost_index, drift_mode_index = values
-    if not 0 <= steer_index < steer_bucket_count:
-        raise ValueError(f"Invalid steer bucket index {steer_index}")
-    if not 0 <= drive_mode_index < len(DRIVE_MODES):
-        raise ValueError(f"Invalid drive mode index {drive_mode_index}")
-    if boost_index not in (0, 1):
-        raise ValueError(f"Invalid boost index {boost_index}")
-    if not 0 <= drift_mode_index < len(DRIFT_MODES):
-        raise ValueError(f"Invalid drift mode index {drift_mode_index}")
+    steer_index, drive_mode_index, boost_index, drift_mode_index = parse_discrete_action(
+        action,
+        action_label="Steer-drive-boost-drift",
+        dimensions=(
+            DiscreteActionDimension("steer_bucket", steer_bucket_count),
+            DiscreteActionDimension("drive_mode", len(DRIVE_MODES)),
+            DiscreteActionDimension("boost", 2),
+            DiscreteActionDimension("drift_mode", len(DRIFT_MODES)),
+        ),
+    )
     return steer_index, drive_mode_index, boost_index, drift_mode_index

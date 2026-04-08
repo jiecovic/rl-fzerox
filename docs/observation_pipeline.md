@@ -75,3 +75,20 @@ Python now owns:
 
 This keeps one source of truth for frame geometry and avoids the older split
 where Python and native code could disagree about crop and resize behavior.
+
+## Env-Step Ownership
+
+The hot training step loop is now split like this:
+
+- Rust owns:
+  - repeated internal frame execution for one outer env step
+  - native observation rendering and native frame stacking
+  - step-local summary aggregation across repeated frames
+- Python owns:
+  - action decoding into one held controller state
+  - reward shaping from the returned step summary
+  - timeout / stuck / wrong-way limits from the returned step summary
+  - Gym info assembly
+
+So `env.step()` now crosses the Rust boundary once per outer RL step, rather
+than manually looping repeated inner frames in Python.

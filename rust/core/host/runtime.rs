@@ -9,8 +9,11 @@ mod baseline;
 mod bootstrap;
 mod host;
 mod memory;
+mod step;
+mod step_accumulator;
 
 pub use host::Host;
+pub use step::{RepeatedStepConfig, StepSummary};
 
 #[cfg(test)]
 use bootstrap::resolve_display_aspect_ratio;
@@ -18,3 +21,7 @@ use bootstrap::resolve_display_aspect_ratio;
 #[cfg(test)]
 #[path = "tests/host_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "tests/step_accumulator_tests.rs"]
+mod step_accumulator_tests;

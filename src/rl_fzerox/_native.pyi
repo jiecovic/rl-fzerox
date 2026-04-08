@@ -37,6 +37,17 @@ TelemetryFlat: TypeAlias = tuple[
     bool,
     PlayerTelemetryFlat,
 ]
+StepSummaryFlat: TypeAlias = tuple[
+    int,
+    float,
+    float,
+    int,
+    float,
+    int,
+    int,
+    int,
+]
+StepRepeatRawFlat: TypeAlias = tuple[Any, StepSummaryFlat, TelemetryFlat]
 
 
 class Emulator:
@@ -64,6 +75,21 @@ class Emulator:
     def baseline_kind(self) -> str: ...
     def reset(self) -> None: ...
     def step_frames(self, count: int = 1, capture_video: bool = True) -> None: ...
+    def step_repeat_raw(
+        self,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        reverse_progress_epsilon: float,
+        energy_loss_epsilon: float,
+        wrong_way_progress_epsilon: float,
+        joypad_mask: int = 0,
+        left_stick_x: float = 0.0,
+        left_stick_y: float = 0.0,
+        right_stick_x: float = 0.0,
+        right_stick_y: float = 0.0,
+    ) -> StepRepeatRawFlat: ...
     def set_controller_state(
         self,
         joypad_mask: int = 0,

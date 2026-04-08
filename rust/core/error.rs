@@ -50,6 +50,10 @@ pub enum CoreError {
         actual: u32,
         expected: u32,
     },
+    #[allow(dead_code)]
+    InvalidStepRepeatCount {
+        count: usize,
+    },
     LoadGameFailed {
         path: PathBuf,
     },
@@ -149,6 +153,9 @@ impl Display for CoreError {
                     formatter,
                     "Unsupported libretro API version {actual} (expected {expected})"
                 )
+            }
+            Self::InvalidStepRepeatCount { count } => {
+                write!(formatter, "Invalid repeated env-step frame count {count}")
             }
             Self::LoadGameFailed { path } => {
                 write!(

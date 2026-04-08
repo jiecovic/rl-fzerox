@@ -1,14 +1,62 @@
 # tests/core/envs/test_env.py
 import numpy as np
+import pytest
 from gymnasium.spaces import MultiDiscrete
 
 from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
-from rl_fzerox.core.emulator.base import ResetState
+from rl_fzerox.core.emulator.base import BackendStepResult, ResetState, StepSummary
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
 from rl_fzerox.core.game import FZeroXTelemetry, PlayerTelemetry
+from rl_fzerox.core.game.flags import FLAG_ACTIVE, FLAG_FINISHED
 from tests.support.fakes import SyntheticBackend
+
+
+class ScriptedStepBackend(SyntheticBackend):
+    def __init__(
+        self,
+        results: list[BackendStepResult],
+        *,
+        reset_telemetry: FZeroXTelemetry | None = None,
+    ) -> None:
+        super().__init__()
+        self._results = list(results)
+        self._reset_telemetry = reset_telemetry
+
+    def step_repeat_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        reverse_progress_epsilon: float,
+        energy_loss_epsilon: float,
+        wrong_way_progress_epsilon: float,
+    ) -> BackendStepResult:
+        _ = (
+            stuck_min_speed_kph,
+            reverse_progress_epsilon,
+            energy_loss_epsilon,
+            wrong_way_progress_epsilon,
+        )
+        self.set_controller_state(controller_state)
+        self._capture_video_flags.extend([False] * max(action_repeat - 1, 0))
+        self._capture_video_flags.append(True)
+        result = self._results.pop(0)
+        self._state.frame_index = result.summary.final_frame_index
+        self._state.progress = result.summary.max_race_distance
+        self._last_frame = self._build_frame()
+        if result.observation.shape[2] != frame_stack * 3:
+            raise AssertionError("Scripted observation stack does not match frame_stack")
+        if preset != "native_crop_v1":
+            raise AssertionError(f"Unexpected preset {preset!r}")
+        return result
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        return self._reset_telemetry
 
 
 def test_reset_returns_stacked_observation():
@@ -207,7 +255,7 @@ def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> 
     assert info["boot_state"] == "gp_race"
 
 
-def test_step_truncates_on_timeout(monkeypatch) -> None:
+def test_step_truncates_on_timeout() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
@@ -216,10 +264,6 @@ def test_step_truncates_on_timeout(monkeypatch) -> None:
             max_episode_steps=2,
             stuck_step_limit=10,
         ),
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=float(backend.frame_index * 10)),
     )
 
     env.reset(seed=3)
@@ -235,8 +279,28 @@ def test_step_truncates_on_timeout(monkeypatch) -> None:
     assert info["episode_step"] == 2
 
 
-def test_step_truncates_when_speed_is_stuck(monkeypatch) -> None:
-    backend = SyntheticBackend()
+def test_step_truncates_when_speed_is_stuck() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    consecutive_low_speed_frames=1,
+                    final_frame_index=1,
+                ),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    consecutive_low_speed_frames=1,
+                    final_frame_index=2,
+                ),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
@@ -245,10 +309,6 @@ def test_step_truncates_when_speed_is_stuck(monkeypatch) -> None:
             stuck_step_limit=2,
             stuck_min_speed_kph=50.0,
         ),
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=0.0, speed_kph=40.0),
     )
 
     env.reset(seed=4)
@@ -260,18 +320,40 @@ def test_step_truncates_when_speed_is_stuck(monkeypatch) -> None:
 
     assert not terminated
     assert truncated
-    assert reward == -5.03
+    assert reward == -100.01
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
-    assert info["step_reward"] == -5.03
+    assert info["step_reward"] == -100.01
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
-    assert reward_breakdown["low_speed"] == -0.03
-    assert reward_breakdown["stuck_truncation"] == -5.0
+    assert reward_breakdown["time"] == -0.01
+    assert reward_breakdown["stuck_truncation"] == -100.0
 
 
-def test_step_truncates_when_driving_the_wrong_way(monkeypatch) -> None:
-    backend = SyntheticBackend()
+def test_step_truncates_when_driving_the_wrong_way() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=-3.0),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    reverse_progress_total=3.0,
+                    consecutive_reverse_frames=1,
+                    final_frame_index=1,
+                ),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=-6.5),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    reverse_progress_total=3.5,
+                    consecutive_reverse_frames=1,
+                    final_frame_index=2,
+                ),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
@@ -282,40 +364,43 @@ def test_step_truncates_when_driving_the_wrong_way(monkeypatch) -> None:
             wrong_way_progress_epsilon=2.0,
         ),
     )
-    distances = iter((0.0, -3.0, -6.5))
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=next(distances)),
-    )
 
     env.reset(seed=7)
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     assert not terminated
     assert not truncated
-    assert reward == -0.003
+    assert reward == pytest.approx(-0.013)
     assert info["reverse_steps"] == 1
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == -10.0035
+    assert reward == pytest.approx(-120.0135)
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_steps"] == 2
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
-    assert reward_breakdown["wrong_way_truncation"] == -10.0
+    assert reward_breakdown["wrong_way_truncation"] == -120.0
 
 
-def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:
-    backend = SyntheticBackend()
+def test_terminal_step_exposes_monitor_info_keys() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=42.0, state_labels=("finished",)),
+                summary=_step_summary(
+                    max_race_distance=42.0,
+                    entered_state_flags=FLAG_FINISHED,
+                    final_frame_index=1,
+                ),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(action_repeat=1),
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=42.0, state_labels=("finished",)),
     )
 
     env.reset(seed=5)
@@ -329,15 +414,24 @@ def test_terminal_step_exposes_monitor_info_keys(monkeypatch) -> None:
     assert isinstance(info["episode_return"], float)
 
 
-def test_step_returns_a_frame_when_done_before_final_repeat(monkeypatch) -> None:
-    backend = SyntheticBackend()
+def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=42.0, state_labels=("finished",)),
+                summary=_step_summary(
+                    frames_run=3,
+                    max_race_distance=42.0,
+                    entered_state_flags=FLAG_FINISHED,
+                    final_frame_index=3,
+                ),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(action_repeat=3),
-    )
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=42.0, state_labels=("finished",)),
     )
 
     env.reset(seed=6)
@@ -346,7 +440,7 @@ def test_step_returns_a_frame_when_done_before_final_repeat(monkeypatch) -> None
     assert obs.shape == (78, 222, 12)
     assert terminated
     assert not truncated
-    assert info["repeat_index"] == 0
+    assert info["repeat_index"] == 2
     assert info["termination_reason"] == "finished"
 
 
@@ -356,7 +450,7 @@ def _telemetry(
     state_labels: tuple[str, ...] = ("active",),
     speed_kph: float = 100.0,
 ) -> FZeroXTelemetry:
-    state_flags = 1 << 30
+    state_flags = FLAG_ACTIVE
     if "collision_recoil" in state_labels:
         state_flags |= 1 << 13
     if "spinning_out" in state_labels:
@@ -366,7 +460,7 @@ def _telemetry(
     if "falling_off_track" in state_labels:
         state_flags |= 1 << 19
     if "finished" in state_labels:
-        state_flags |= 1 << 25
+        state_flags |= FLAG_FINISHED
     if "crashed" in state_labels:
         state_flags |= 1 << 27
 
@@ -396,4 +490,40 @@ def _telemetry(
             character=0,
             machine_index=0,
         ),
+    )
+
+
+def _step_summary(
+    *,
+    max_race_distance: float,
+    frames_run: int = 1,
+    reverse_progress_total: float = 0.0,
+    consecutive_reverse_frames: int = 0,
+    consecutive_low_speed_frames: int = 0,
+    entered_state_flags: int = 0,
+    final_frame_index: int = 1,
+) -> StepSummary:
+    return StepSummary(
+        frames_run=frames_run,
+        max_race_distance=max_race_distance,
+        reverse_progress_total=reverse_progress_total,
+        consecutive_reverse_frames=consecutive_reverse_frames,
+        energy_loss_total=0.0,
+        consecutive_low_speed_frames=consecutive_low_speed_frames,
+        entered_state_flags=entered_state_flags,
+        final_frame_index=final_frame_index,
+    )
+
+
+def _backend_step_result(
+    *,
+    telemetry: FZeroXTelemetry,
+    summary: StepSummary,
+) -> BackendStepResult:
+    value = np.uint8(summary.final_frame_index % 255)
+    observation = np.full((78, 222, 12), value, dtype=np.uint8)
+    return BackendStepResult(
+        observation=observation,
+        summary=summary,
+        telemetry=telemetry,
     )
