@@ -12,6 +12,7 @@ pub(crate) struct StepTelemetrySample {
     pub speed_kph: f32,
     pub energy: f32,
     pub race_distance: f32,
+    pub reverse_timer: i32,
 }
 
 pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'static str> {
@@ -37,6 +38,7 @@ pub struct PlayerTelemetry {
     pub energy: f32,
     pub max_energy: f32,
     pub boost_timer: i32,
+    pub reverse_timer: i32,
     pub race_distance: f32,
     pub lap_distance: f32,
     pub race_time_ms: i32,

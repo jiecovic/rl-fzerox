@@ -68,6 +68,29 @@ def test_race_v2_rewards_completed_laps() -> None:
     }
 
 
+def test_race_v2_scales_time_penalty_while_reverse_warning_is_active() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=-0.01,
+            reverse_time_penalty_scale=2.0,
+            milestone_bonus=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3, reverse_warning_frames=2),
+        _status(step_count=3, reverse_timer=120),
+        _telemetry(race_distance=0.0, reverse_timer=120),
+    )
+
+    assert step.reward == pytest.approx(-0.05)
+    assert step.breakdown == {
+        "time": -0.03,
+        "reverse_time": -0.02,
+    }
+
+
 def test_race_v2_penalizes_energy_loss_more_than_refill_reward() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
@@ -210,12 +233,12 @@ def test_race_v2_scales_truncation_penalty_by_remaining_steps_and_laps() -> None
 
     early = tracker.step_summary(
         _summary(max_race_distance=0.0),
-        _status(step_count=10, reverse_steps=10, truncation_reason="wrong_way"),
+        _status(step_count=10, reverse_timer=100, truncation_reason="wrong_way"),
         _telemetry(race_distance=0.0, laps_completed=0),
     )
     late = tracker.step_summary(
         _summary(max_race_distance=140_000.0),
-        _status(step_count=90, reverse_steps=10, truncation_reason="wrong_way"),
+        _status(step_count=90, reverse_timer=100, truncation_reason="wrong_way"),
         _telemetry(race_distance=140_000.0, laps_completed=2),
     )
 
@@ -318,6 +341,7 @@ def _telemetry(
     race_time_ms: int = 0,
     speed_kph: float = 100.0,
     laps_completed: int = 0,
+    reverse_timer: int = 0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         race_distance=race_distance,
@@ -328,6 +352,7 @@ def _telemetry(
         race_time_ms=race_time_ms,
         position=position,
         laps_completed=laps_completed,
+        reverse_timer=reverse_timer,
     )
 
 
@@ -335,6 +360,7 @@ def _summary(
     *,
     max_race_distance: float,
     frames_run: int = 1,
+    reverse_warning_frames: int = 0,
     energy_loss_total: float = 0.0,
     energy_gain_total: float = 0.0,
     entered_state_labels: tuple[str, ...] = (),
@@ -342,6 +368,7 @@ def _summary(
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
+        reverse_warning_frames=reverse_warning_frames,
         energy_loss_total=energy_loss_total,
         energy_gain_total=energy_gain_total,
         entered_state_labels=entered_state_labels,
@@ -353,14 +380,14 @@ def _status(
     *,
     step_count: int,
     stalled_steps: int = 0,
-    reverse_steps: int = 0,
+    reverse_timer: int = 0,
     termination_reason: str | None = None,
     truncation_reason: str | None = None,
 ) -> StepStatus:
     return StepStatus(
         step_count=step_count,
         stalled_steps=stalled_steps,
-        reverse_steps=reverse_steps,
+        reverse_timer=reverse_timer,
         termination_reason=termination_reason,
         truncation_reason=truncation_reason,
     )

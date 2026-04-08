@@ -10,10 +10,14 @@ emulator:
   renderer: angrylion
 
 env:
-  action_repeat: 3
-  reset_to_race: false
+  action_repeat: 2
+  max_episode_steps: 12000
+  stuck_step_limit: 240
+  stuck_min_speed_kph: 50.0
+  wrong_way_timer_limit: 300
+  reset_to_race: true
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost
     steer_buckets: 7
   observation:
     preset: native_crop_v1

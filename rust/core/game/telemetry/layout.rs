@@ -23,6 +23,7 @@ pub(super) struct GlobalOffsets {
     pub game_mode: usize,
     pub total_racers: usize,
     pub course_index: usize,
+    pub reverse_timers: usize,
     pub racers: usize,
 }
 
@@ -50,6 +51,7 @@ pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     game_mode: rdram_offset(0x800DCE44),
     total_racers: rdram_offset(0x800E5EC0),
     course_index: rdram_offset(0x800F8514),
+    reverse_timers: rdram_offset(0x800F_80A8),
     racers: rdram_offset(0x802C4920),
 };
 

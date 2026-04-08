@@ -20,6 +20,7 @@ class PlayerTelemetry:
         energy: float,
         max_energy: float,
         boost_timer: int,
+        reverse_timer: int,
         race_distance: float,
         lap_distance: float,
         race_time_ms: int,
@@ -39,6 +40,8 @@ class PlayerTelemetry:
     def max_energy(self) -> float: ...
     @property
     def boost_timer(self) -> int: ...
+    @property
+    def reverse_timer(self) -> int: ...
     @property
     def race_distance(self) -> float: ...
     @property
@@ -109,8 +112,7 @@ class StepSummary:
         self,
         frames_run: int,
         max_race_distance: float,
-        reverse_progress_total: float = 0.0,
-        consecutive_reverse_frames: int = 0,
+        reverse_warning_frames: int = 0,
         energy_loss_total: float = 0.0,
         energy_gain_total: float = 0.0,
         consecutive_low_speed_frames: int = 0,
@@ -122,9 +124,7 @@ class StepSummary:
     @property
     def max_race_distance(self) -> float: ...
     @property
-    def reverse_progress_total(self) -> float: ...
-    @property
-    def consecutive_reverse_frames(self) -> int: ...
+    def reverse_warning_frames(self) -> int: ...
     @property
     def energy_loss_total(self) -> float: ...
     @property
@@ -158,7 +158,7 @@ class StepStatus:
         self,
         step_count: int,
         stalled_steps: int,
-        reverse_steps: int,
+        reverse_timer: int = 0,
         termination_reason: str | None = None,
         truncation_reason: str | None = None,
     ) -> None: ...
@@ -167,7 +167,7 @@ class StepStatus:
     @property
     def stalled_steps(self) -> int: ...
     @property
-    def reverse_steps(self) -> int: ...
+    def reverse_timer(self) -> int: ...
     @property
     def terminated(self) -> bool: ...
     @property
@@ -209,12 +209,10 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stuck_min_speed_kph: float,
-        reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
-        wrong_way_progress_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_step_limit: int,
+        wrong_way_timer_limit: int,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,

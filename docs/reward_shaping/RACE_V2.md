@@ -12,6 +12,8 @@ short-horizon driving tricks.
 - Reward better placement at lap boundaries and more strongly on final finish.
 - Penalize time on every internal emulator frame so earlier completion stays
   better than slower completion.
+- Penalize reverse-driving frames more strongly by scaling the normal per-frame
+  time penalty while the game reverse-warning timer is active.
 - Keep energy loss negative and energy refill positive, but smaller than the
   loss penalty.
 - Make death and truncation penalties dynamic:
@@ -25,6 +27,9 @@ short-horizon driving tricks.
 - Total laps and total racers are read from live emulator RAM through the native
   telemetry path.
 - The reverse-engineered RAM layout currently targets the US ROM build.
+- Reverse-driving punishment starts at the game's HUD warning threshold
+  (`100`), but wrong-way truncation remains a separate env limit based on the
+  live reverse timer.
 
 ## Terms
 
@@ -34,6 +39,8 @@ short-horizon driving tricks.
   - Absolute `race_distance` spacing for one-time milestone rewards.
 - `milestone_bonus`
   - One-time reward paid for each newly crossed milestone bucket.
+- `reverse_time_penalty_scale`
+  - Multiplier applied to the normal time penalty on reverse-warning frames.
 - `lap_1_completion_bonus`
   - Reward for first completed lap.
 - `lap_2_completion_bonus`
@@ -59,6 +66,7 @@ Ordinary step:
 - one-time milestone reward
 - lap completion reward if a new lap was crossed
 - lap placement reward if a new lap was crossed
+- extra reverse-driving time penalty while the game warning timer is active
 - energy loss penalty
 - smaller energy refill reward
 - collision / spin entry penalties

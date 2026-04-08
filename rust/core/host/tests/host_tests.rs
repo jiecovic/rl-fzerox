@@ -24,7 +24,7 @@ fn step_summary_defaults_to_empty_step_accumulators() {
     let summary = StepSummary::default();
 
     assert_eq!(summary.frames_run, 0);
-    assert_eq!(summary.consecutive_reverse_frames, 0);
+    assert_eq!(summary.reverse_warning_frames, 0);
     assert_eq!(summary.consecutive_low_speed_frames, 0);
     assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.entered_state_flags, 0);
@@ -37,21 +37,19 @@ fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
         StepCounters {
             step_count: 9,
             stalled_steps: 2,
-            reverse_steps: 2,
         },
         &StepSummary {
             frames_run: 2,
             consecutive_low_speed_frames: 2,
-            consecutive_reverse_frames: 2,
             ..StepSummary::default()
         },
-        &telemetry(true, 1 << 25),
-        repeated_step_config(10, 4, 4),
+        &telemetry(true, 1 << 25, 100),
+        repeated_step_config(10, 4, 180),
     );
 
     assert_eq!(status.counters.step_count, 11);
     assert_eq!(status.counters.stalled_steps, 4);
-    assert_eq!(status.counters.reverse_steps, 4);
+    assert_eq!(status.reverse_timer, 100);
     assert_eq!(status.termination_reason, Some("finished"));
     assert_eq!(status.truncation_reason, Some("timeout"));
 }
@@ -62,29 +60,59 @@ fn step_status_resets_non_race_trailing_counters() {
         StepCounters {
             step_count: 3,
             stalled_steps: 5,
-            reverse_steps: 6,
         },
         &StepSummary {
             frames_run: 1,
             consecutive_low_speed_frames: 1,
-            consecutive_reverse_frames: 1,
             ..StepSummary::default()
         },
-        &telemetry(false, 0),
-        repeated_step_config(100, 5, 5),
+        &telemetry(false, 0, 0),
+        repeated_step_config(100, 5, 180),
     );
 
     assert_eq!(status.counters.step_count, 4);
     assert_eq!(status.counters.stalled_steps, 0);
-    assert_eq!(status.counters.reverse_steps, 0);
+    assert_eq!(status.reverse_timer, 0);
     assert!(status.termination_reason.is_none());
     assert!(status.truncation_reason.is_none());
+}
+
+#[test]
+fn step_status_uses_game_reverse_warning_timer_limit_for_wrong_way() {
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry(true, 0, 180),
+        repeated_step_config(100, 5, 180),
+    );
+
+    assert_eq!(status.reverse_timer, 180);
+    assert_eq!(status.truncation_reason, Some("wrong_way"));
+}
+
+#[test]
+fn step_status_does_not_truncate_at_warning_threshold_when_limit_is_higher() {
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry(true, 0, 100),
+        repeated_step_config(100, 5, 180),
+    );
+
+    assert_eq!(status.reverse_timer, 100);
+    assert_eq!(status.truncation_reason, None);
 }
 
 fn repeated_step_config(
     max_episode_steps: usize,
     stuck_step_limit: usize,
-    wrong_way_step_limit: usize,
+    wrong_way_timer_limit: usize,
 ) -> RepeatedStepConfig {
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
@@ -92,16 +120,14 @@ fn repeated_step_config(
         preset: ObservationPreset::NativeCropV1,
         frame_stack: 4,
         stuck_min_speed_kph: 50.0,
-        reverse_progress_epsilon: 0.5,
         energy_loss_epsilon: 0.1,
-        wrong_way_progress_epsilon: 0.5,
         max_episode_steps,
         stuck_step_limit,
-        wrong_way_step_limit,
+        wrong_way_timer_limit,
     }
 }
 
-fn telemetry(in_race_mode: bool, state_flags: u32) -> TelemetrySnapshot {
+fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> TelemetrySnapshot {
     TelemetrySnapshot {
         total_lap_count: 3,
         game_mode_raw: 1,
@@ -115,6 +141,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32) -> TelemetrySnapshot {
             energy: 100.0,
             max_energy: 178.0,
             boost_timer: 0,
+            reverse_timer,
             race_distance: 100.0,
             lap_distance: 100.0,
             race_time_ms: 0,

@@ -8,6 +8,8 @@
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{input::ControllerState, observation::ObservationPreset};
 
+pub const WRONG_WAY_WARNING_TIMER_THRESHOLD: usize = 100;
+
 /// Aggregated per-step features collected across repeated internal frames.
 ///
 /// This is the native summary Python reward trackers and limit trackers will
@@ -19,10 +21,8 @@ pub struct StepSummary {
     pub frames_run: usize,
     /// Highest race distance reached during this repeated step.
     pub max_race_distance: f32,
-    /// Total reverse progress magnitude accumulated during this repeated step.
-    pub reverse_progress_total: f32,
-    /// Reverse-progress streak length at the end of the repeated step.
-    pub consecutive_reverse_frames: usize,
+    /// Number of internal frames spent with the reverse warning visible.
+    pub reverse_warning_frames: usize,
     /// Total energy lost during the repeated step.
     pub energy_loss_total: f32,
     /// Total energy regained during the repeated step.
@@ -42,8 +42,6 @@ pub struct StepCounters {
     pub step_count: usize,
     /// Consecutive low-speed internal frames at the current episode frontier.
     pub stalled_steps: usize,
-    /// Consecutive reverse-progress internal frames at the current frontier.
-    pub reverse_steps: usize,
 }
 
 /// Native stop/counter state after one repeated env step completes.
@@ -51,6 +49,8 @@ pub struct StepCounters {
 pub struct StepStatus {
     /// Updated carried counters after the repeated env step.
     pub counters: StepCounters,
+    /// Current game reverse-warning timer after the repeated env step.
+    pub reverse_timer: usize,
     /// Terminal reason detected on the final executed internal frame, if any.
     pub termination_reason: Option<&'static str>,
     /// Truncation reason detected while advancing the repeated env step, if any.
@@ -72,16 +72,11 @@ impl StepStatus {
                 summary.frames_run,
                 final_telemetry.in_race_mode,
             ),
-            reverse_steps: carried_streak(
-                previous.reverse_steps,
-                summary.consecutive_reverse_frames,
-                summary.frames_run,
-                final_telemetry.in_race_mode,
-            ),
         };
+        let reverse_timer = final_telemetry.player.reverse_timer.max(0) as usize;
         let truncation_reason = if counters.step_count >= config.max_episode_steps {
             Some("timeout")
-        } else if counters.reverse_steps >= config.wrong_way_step_limit {
+        } else if reverse_timer >= config.wrong_way_timer_limit {
             Some("wrong_way")
         } else if counters.stalled_steps >= config.stuck_step_limit {
             Some("stuck")
@@ -90,6 +85,7 @@ impl StepStatus {
         };
         Self {
             counters,
+            reverse_timer,
             termination_reason: final_telemetry.player.terminal_reason(),
             truncation_reason,
         }
@@ -146,16 +142,12 @@ pub struct RepeatedStepConfig {
     pub frame_stack: usize,
     /// Speed threshold used by the stuck limit tracker.
     pub stuck_min_speed_kph: f32,
-    /// Epsilon used for reward-side reverse-progress aggregation.
-    pub reverse_progress_epsilon: f32,
     /// Epsilon used for reward-side energy-loss aggregation.
     pub energy_loss_epsilon: f32,
-    /// Epsilon used for wrong-way streak counting.
-    pub wrong_way_progress_epsilon: f32,
     /// Maximum number of internal frames allowed in one episode.
     pub max_episode_steps: usize,
     /// Low-speed frame limit that triggers a stuck truncation.
     pub stuck_step_limit: usize,
-    /// Reverse-progress frame limit that triggers wrong-way truncation.
-    pub wrong_way_step_limit: usize,
+    /// Reverse timer limit that triggers wrong-way truncation.
+    pub wrong_way_timer_limit: usize,
 }

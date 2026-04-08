@@ -41,21 +41,17 @@ class ScriptedStepBackend(SyntheticBackend):
         preset: str,
         frame_stack: int,
         stuck_min_speed_kph: float,
-        reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
-        wrong_way_progress_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_step_limit: int,
+        wrong_way_timer_limit: int,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
-            reverse_progress_epsilon,
             energy_loss_epsilon,
-            wrong_way_progress_epsilon,
             max_episode_steps,
             stuck_step_limit,
-            wrong_way_step_limit,
+            wrong_way_timer_limit,
         )
         self.set_controller_state(controller_state)
         result = self._results.pop(0)
@@ -379,26 +375,24 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
-                telemetry=_telemetry(race_distance=-3.0),
+                telemetry=_telemetry(race_distance=-3.0, reverse_timer=80),
                 summary=_step_summary(
                     max_race_distance=0.0,
-                    reverse_progress_total=3.0,
-                    consecutive_reverse_frames=1,
+                    reverse_warning_frames=0,
                     final_frame_index=1,
                 ),
-                status=make_step_status(step_count=1, reverse_steps=1),
+                status=make_step_status(step_count=1, reverse_timer=80),
             ),
             _backend_step_result(
-                telemetry=_telemetry(race_distance=-6.5),
+                telemetry=_telemetry(race_distance=-6.5, reverse_timer=100),
                 summary=_step_summary(
                     max_race_distance=0.0,
-                    reverse_progress_total=3.5,
-                    consecutive_reverse_frames=1,
+                    reverse_warning_frames=1,
                     final_frame_index=2,
                 ),
                 status=make_step_status(
                     step_count=2,
-                    reverse_steps=2,
+                    reverse_timer=100,
                     truncation_reason="wrong_way",
                 ),
             ),
@@ -411,8 +405,7 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
             action_repeat=1,
             max_episode_steps=100,
             stuck_step_limit=10,
-            wrong_way_step_limit=2,
-            wrong_way_progress_epsilon=2.0,
+            wrong_way_timer_limit=100,
         ),
     )
 
@@ -421,17 +414,18 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     assert not terminated
     assert not truncated
     assert reward == pytest.approx(-0.005)
-    assert info["reverse_steps"] == 1
+    assert info["reverse_timer"] == 80
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-320.495)
+    assert reward == pytest.approx(-320.5)
     assert info["truncation_reason"] == "wrong_way"
-    assert info["reverse_steps"] == 2
+    assert info["reverse_timer"] == 100
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["reverse_time"] == -0.005
     assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.49)
 
 
@@ -504,11 +498,13 @@ def _telemetry(
     race_distance: float,
     state_labels: tuple[str, ...] = ("active",),
     speed_kph: float = 100.0,
+    reverse_timer: int = 0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         race_distance=race_distance,
         state_labels=state_labels,
         speed_kph=speed_kph,
+        reverse_timer=reverse_timer,
     )
 
 
@@ -516,8 +512,7 @@ def _step_summary(
     *,
     max_race_distance: float,
     frames_run: int = 1,
-    reverse_progress_total: float = 0.0,
-    consecutive_reverse_frames: int = 0,
+    reverse_warning_frames: int = 0,
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     final_frame_index: int = 1,
@@ -525,8 +520,7 @@ def _step_summary(
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
-        reverse_progress_total=reverse_progress_total,
-        consecutive_reverse_frames=consecutive_reverse_frames,
+        reverse_warning_frames=reverse_warning_frames,
         energy_loss_total=0.0,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_labels=entered_state_labels,

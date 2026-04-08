@@ -25,7 +25,7 @@ class SyntheticState:
     progress: float = 0.0
     step_count: int = 0
     stalled_steps: int = 0
-    reverse_steps: int = 0
+    reverse_timer: int = 0
 
 
 class SyntheticBackend:
@@ -184,18 +184,15 @@ class SyntheticBackend:
         preset: str,
         frame_stack: int,
         stuck_min_speed_kph: float,
-        reverse_progress_epsilon: float,
         energy_loss_epsilon: float,
-        wrong_way_progress_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_step_limit: int,
+        wrong_way_timer_limit: int,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
-            reverse_progress_epsilon,
             energy_loss_epsilon,
-            wrong_way_progress_epsilon,
+            wrong_way_timer_limit,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:
@@ -215,8 +212,7 @@ class SyntheticBackend:
             summary=StepSummary(
                 frames_run=action_repeat,
                 max_race_distance=self._state.progress,
-                reverse_progress_total=0.0,
-                consecutive_reverse_frames=0,
+                reverse_warning_frames=0,
                 energy_loss_total=0.0,
                 energy_gain_total=0.0,
                 consecutive_low_speed_frames=0,
@@ -226,7 +222,7 @@ class SyntheticBackend:
             status=StepStatus(
                 step_count=self._state.step_count,
                 stalled_steps=self._state.stalled_steps,
-                reverse_steps=self._state.reverse_steps,
+                reverse_timer=self._state.reverse_timer,
                 truncation_reason=truncation_reason,
             ),
             telemetry=None,

@@ -48,8 +48,7 @@ class EnvConfig(BaseModel):
     max_episode_steps: PositiveInt = 12_000
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
-    wrong_way_step_limit: PositiveInt = 300
-    wrong_way_progress_epsilon: NonNegativeFloat = 2.0
+    wrong_way_timer_limit: int = Field(default=300, ge=100)
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
@@ -62,6 +61,7 @@ class RewardConfig(BaseModel):
 
     name: Literal["race_v2"] = "race_v2"
     time_penalty_per_frame: float = -0.005
+    reverse_time_penalty_scale: NonNegativeFloat = 2.0
     milestone_distance: PositiveFloat = 3_000.0
     milestone_bonus: NonNegativeFloat = 2.0
     lap_1_completion_bonus: NonNegativeFloat = 20.0

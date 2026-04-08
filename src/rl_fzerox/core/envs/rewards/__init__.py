@@ -29,6 +29,7 @@ def build_reward_tracker(
         raise ValueError(f"Unsupported reward profile: {resolved_config.name!r}")
     weights = RaceV2RewardWeights(
         time_penalty_per_frame=resolved_config.time_penalty_per_frame,
+        reverse_time_penalty_scale=resolved_config.reverse_time_penalty_scale,
         milestone_distance=resolved_config.milestone_distance,
         milestone_bonus=resolved_config.milestone_bonus,
         lap_1_completion_bonus=resolved_config.lap_1_completion_bonus,
