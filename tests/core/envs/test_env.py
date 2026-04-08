@@ -17,18 +17,18 @@ def test_reset_returns_stacked_observation():
         backend=backend,
         config=EnvConfig(
             action_repeat=2,
-            observation=ObservationConfig(width=160, height=120, frame_stack=4),
+            observation=ObservationConfig(frame_stack=4),
         ),
     )
 
     obs, info = env.reset(seed=123)
 
-    assert obs.shape == (120, 160, 12)
+    assert obs.shape == (78, 222, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
-    assert info["observation_shape"] == (120, 160, 12)
-    assert info["observation_frame_shape"] == (120, 160, 3)
+    assert info["observation_shape"] == (78, 222, 12)
+    assert info["observation_frame_shape"] == (78, 222, 3)
     assert info["observation_stack"] == 4
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
@@ -44,7 +44,7 @@ def test_step_advances_backend_by_action_repeat():
     env.reset(seed=7)
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
 
-    assert obs.shape == (120, 160, 12)
+    assert obs.shape == (78, 222, 12)
     assert isinstance(reward, float)
     assert not terminated
     assert not truncated
@@ -58,12 +58,14 @@ def test_step_advances_backend_by_action_repeat():
 
 
 def test_step_shifts_the_frame_stack_forward():
+    class DistinctFrameBackend(SyntheticBackend):
+        def _build_frame(self) -> np.ndarray:
+            value = np.uint8((self.frame_index * 40) % 255)
+            return np.full((240, 640, 3), value, dtype=np.uint8)
+
     env = FZeroXEnv(
-        backend=SyntheticBackend(),
-        config=EnvConfig(
-            action_repeat=1,
-            observation=ObservationConfig(width=160, height=120, frame_stack=4),
-        ),
+        backend=DistinctFrameBackend(),
+        config=EnvConfig(action_repeat=1, observation=ObservationConfig(frame_stack=4)),
     )
 
     obs_before, _ = env.reset(seed=9)
@@ -72,6 +74,40 @@ def test_step_shifts_the_frame_stack_forward():
 
     assert not np.array_equal(obs_before, obs_after)
     assert np.array_equal(obs_later[:, :, 0:9], obs_after[:, :, 3:12])
+
+
+def test_env_reset_passes_preset_to_render_observation() -> None:
+    class ObservationPresetBackend(SyntheticBackend):
+        def __init__(self, *args, **kwargs) -> None:
+            super().__init__(*args, **kwargs)
+            self.render_observation_calls: list[tuple[str, int]] = []
+
+        def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
+            self.render_observation_calls.append((preset, frame_stack))
+            return super().render_observation(preset=preset, frame_stack=frame_stack)
+
+    backend = ObservationPresetBackend()
+
+    env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=1))
+
+    obs, info = env.reset(seed=13)
+
+    assert obs.shape == (78, 222, 12)
+    assert info["observation_frame_shape"] == (78, 222, 3)
+    assert backend.render_observation_calls == [("native_crop_v1", 4)]
+
+
+def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:
+    backend = SyntheticBackend(width=640, height=240)
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(observation=ObservationConfig(frame_stack=4)),
+    )
+
+    env.reset(seed=1)
+    frame = env.render()
+
+    assert frame.shape == (444, 592, 3)
 
 
 def test_step_control_applies_manual_controller_state() -> None:
@@ -95,6 +131,16 @@ def test_extended_action_env_exposes_four_head_action_space() -> None:
     assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
 
 
+def test_boost_action_env_exposes_three_head_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="steer_drive_boost")),
+    )
+
+    assert isinstance(env.action_space, MultiDiscrete)
+    assert env.action_space.nvec.tolist() == [7, 2, 2]
+
+
 def test_reset_can_boot_into_the_first_race_path():
     backend = SyntheticBackend()
     env = FZeroXEnv(
@@ -104,7 +150,7 @@ def test_reset_can_boot_into_the_first_race_path():
 
     obs, info = env.reset(seed=5)
 
-    assert obs.shape == (120, 160, 12)
+    assert obs.shape == (78, 222, 12)
     assert info["seed"] == 5
     assert info["reset_mode"] == "boot_to_race"
     assert info["boot_state"] == "gp_race"
@@ -168,7 +214,6 @@ def test_step_truncates_on_timeout(monkeypatch) -> None:
         config=EnvConfig(
             action_repeat=1,
             max_episode_steps=2,
-            stuck_grace_steps=10,
             stuck_step_limit=10,
         ),
     )
@@ -190,21 +235,20 @@ def test_step_truncates_on_timeout(monkeypatch) -> None:
     assert info["episode_step"] == 2
 
 
-def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
+def test_step_truncates_when_speed_is_stuck(monkeypatch) -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
             max_episode_steps=100,
-            stuck_grace_steps=1,
             stuck_step_limit=2,
-            stuck_progress_epsilon=5.0,
+            stuck_min_speed_kph=50.0,
         ),
     )
     monkeypatch.setattr(
         "rl_fzerox.core.envs.engine._read_live_telemetry",
-        lambda _backend: _telemetry(race_distance=0.0),
+        lambda _backend: _telemetry(race_distance=0.0, speed_kph=40.0),
     )
 
     env.reset(seed=4)
@@ -216,12 +260,13 @@ def test_step_truncates_when_progress_is_stuck(monkeypatch) -> None:
 
     assert not terminated
     assert truncated
-    assert reward == -5.0
+    assert reward == -5.03
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
-    assert info["step_reward"] == -5.0
+    assert info["step_reward"] == -5.03
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["low_speed"] == -0.03
     assert reward_breakdown["stuck_truncation"] == -5.0
 
 
@@ -232,7 +277,6 @@ def test_step_truncates_when_driving_the_wrong_way(monkeypatch) -> None:
         config=EnvConfig(
             action_repeat=1,
             max_episode_steps=100,
-            stuck_grace_steps=10,
             stuck_step_limit=10,
             wrong_way_step_limit=2,
             wrong_way_progress_epsilon=2.0,
@@ -299,7 +343,7 @@ def test_step_returns_a_frame_when_done_before_final_repeat(monkeypatch) -> None
     env.reset(seed=6)
     obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
-    assert obs.shape == (120, 160, 12)
+    assert obs.shape == (78, 222, 12)
     assert terminated
     assert not truncated
     assert info["repeat_index"] == 0

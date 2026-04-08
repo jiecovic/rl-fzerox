@@ -5,7 +5,7 @@ use std::ptr;
 
 use libretro_sys::{DEVICE_JOYPAD, GameInfo};
 
-use super::Host;
+use super::host::Host;
 use crate::core::callbacks::{
     audio_sample_batch_callback, audio_sample_callback, environment_callback, input_device,
     input_poll_callback, input_state_callback, video_refresh_callback,

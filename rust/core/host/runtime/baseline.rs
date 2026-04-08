@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use super::{BaselineKind, FRAME_WAIT_LIMIT, Host};
+use super::host::{BaselineKind, FRAME_WAIT_LIMIT, Host};
 use crate::core::error::CoreError;
 
 impl Host {

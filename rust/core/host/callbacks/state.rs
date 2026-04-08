@@ -44,6 +44,7 @@ pub struct CallbackState {
     raw_frame: Option<RawVideoFrame>,
     observation_buffer: Vec<u8>,
     display_buffer: Vec<u8>,
+    stacked_observation_buffers: BTreeMap<StackedObservationKey, StackedObservationBuffer>,
     render_plans: BTreeMap<ProcessedFramePlanKey, ProcessedFramePlan>,
     capture_video: bool,
     frame_serial: u64,
@@ -61,6 +62,18 @@ struct RenderRequest {
     target_height: usize,
     rgb: bool,
     crop: VideoCrop,
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct StackedObservationKey {
+    render_plan: ProcessedFramePlanKey,
+    frame_stack: usize,
+}
+
+struct StackedObservationBuffer {
+    frame_len: usize,
+    bytes: Vec<u8>,
+    last_frame_serial: Option<u64>,
 }
 
 impl CallbackState {
@@ -91,6 +104,7 @@ impl CallbackState {
             raw_frame: None,
             observation_buffer: Vec::new(),
             display_buffer: Vec::new(),
+            stacked_observation_buffers: BTreeMap::new(),
             render_plans: BTreeMap::new(),
             capture_video: true,
             frame_serial: 0,
@@ -124,6 +138,7 @@ impl CallbackState {
         self.raw_frame = None;
         self.frame = Some(frame);
         self.frame_serial += 1;
+        self.clear_stacked_observation_buffers();
     }
 
     pub fn set_capture_video(&mut self, capture_video: bool) {
@@ -179,6 +194,52 @@ impl CallbackState {
         target_buffer.clear();
         target_buffer.extend_from_slice(&rendered);
         Ok(target_buffer.as_slice())
+    }
+
+    pub fn stacked_observation_frame(
+        &mut self,
+        aspect_ratio: f64,
+        target_width: usize,
+        target_height: usize,
+        rgb: bool,
+        crop: VideoCrop,
+        frame_stack: usize,
+    ) -> Result<&[u8], CoreError> {
+        let request = RenderRequest {
+            source_width: self
+                .raw_frame
+                .as_ref()
+                .map(|raw_frame| raw_frame.width)
+                .or_else(|| self.frame.as_ref().map(|frame| frame.width))
+                .ok_or(CoreError::NoFrameAvailable)?,
+            source_height: self
+                .raw_frame
+                .as_ref()
+                .map(|raw_frame| raw_frame.height)
+                .or_else(|| self.frame.as_ref().map(|frame| frame.height))
+                .ok_or(CoreError::NoFrameAvailable)?,
+            aspect_ratio,
+            target_width,
+            target_height,
+            rgb,
+            crop,
+        };
+        let frame_serial = self.frame_serial;
+        let stack_key = StackedObservationKey {
+            render_plan: request.plan_key(),
+            frame_stack,
+        };
+        self.render_observation_into_buffer(request)?;
+
+        let observation_buffer = self.observation_buffer.as_slice();
+        let stack_buffer = self
+            .stacked_observation_buffers
+            .entry(stack_key)
+            .or_insert_with(|| {
+                StackedObservationBuffer::new(observation_buffer.len(), frame_stack)
+            });
+        stack_buffer.update(observation_buffer, frame_serial)?;
+        Ok(stack_buffer.as_slice())
     }
 
     pub fn set_controller_state(&mut self, controller_state: ControllerState) {
@@ -362,6 +423,47 @@ impl CallbackState {
             .ok_or(CoreError::NoFrameAvailable)
     }
 
+    fn render_observation_into_buffer(&mut self, request: RenderRequest) -> Result<(), CoreError> {
+        if self
+            .raw_frame
+            .as_ref()
+            .map(|raw_frame| (raw_frame.width, raw_frame.height))
+            .is_some()
+        {
+            let plan = self.render_plan(request)?.clone();
+            let raw_frame = self.raw_frame.as_ref().ok_or(CoreError::NoFrameAvailable)?;
+            processed_frame_from_raw_into(raw_frame, &plan, &mut self.observation_buffer)?;
+            return Ok(());
+        }
+
+        let frame = self.frame().ok_or(CoreError::NoFrameAvailable)?;
+        let rendered = processed_frame(
+            frame,
+            request.aspect_ratio,
+            request.target_width,
+            request.target_height,
+            request.rgb,
+            request.crop,
+        )?;
+        self.observation_buffer.clear();
+        self.observation_buffer.extend_from_slice(&rendered);
+        Ok(())
+    }
+
+    fn clear_stacked_observation_buffers(&mut self) {
+        for stack in self.stacked_observation_buffers.values_mut() {
+            stack.clear();
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn set_frame_for_test_without_reset(&mut self, frame: VideoFrame) {
+        self.geometry = Some((frame.width, frame.height));
+        self.raw_frame = None;
+        self.frame = Some(frame);
+        self.frame_serial += 1;
+    }
+
     fn use_display_buffer(&self, target_width: usize, target_height: usize) -> bool {
         if let Some((frame_width, frame_height)) = self.geometry {
             if target_width == frame_width {
@@ -372,5 +474,60 @@ impl CallbackState {
             }
         }
         target_width >= target_height
+    }
+}
+
+impl RenderRequest {
+    fn plan_key(self) -> ProcessedFramePlanKey {
+        ProcessedFramePlanKey {
+            source_width: self.source_width,
+            source_height: self.source_height,
+            crop: self.crop,
+            aspect_ratio_bits: self.aspect_ratio.to_bits(),
+            target_width: self.target_width,
+            target_height: self.target_height,
+            rgb: self.rgb,
+        }
+    }
+}
+
+impl StackedObservationBuffer {
+    fn new(frame_len: usize, frame_stack: usize) -> Self {
+        debug_assert!(frame_stack > 0);
+        Self {
+            frame_len,
+            bytes: vec![0_u8; frame_len * frame_stack],
+            last_frame_serial: None,
+        }
+    }
+
+    fn update(&mut self, frame: &[u8], frame_serial: u64) -> Result<(), CoreError> {
+        if frame.len() != self.frame_len {
+            return Err(CoreError::NoFrameAvailable);
+        }
+        if self.last_frame_serial == Some(frame_serial) {
+            return Ok(());
+        }
+
+        if self.last_frame_serial.is_none() {
+            for chunk in self.bytes.chunks_exact_mut(self.frame_len) {
+                chunk.copy_from_slice(frame);
+            }
+        } else {
+            self.bytes.copy_within(self.frame_len.., 0);
+            let tail_start = self.bytes.len() - self.frame_len;
+            self.bytes[tail_start..].copy_from_slice(frame);
+        }
+
+        self.last_frame_serial = Some(frame_serial);
+        Ok(())
+    }
+
+    fn clear(&mut self) {
+        self.last_frame_serial = None;
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        self.bytes.as_slice()
     }
 }

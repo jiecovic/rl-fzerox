@@ -31,6 +31,18 @@ class FrameStep:
     info: dict[str, object] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ObservationSpec:
+    """Resolved native observation geometry for one preset."""
+
+    preset: str
+    width: int
+    height: int
+    channels: int
+    display_width: int
+    display_height: int
+
+
 class EmulatorBackend(Protocol):
     """Emulator contract consumed by the F-Zero X env and watch tools."""
 
@@ -59,7 +71,11 @@ class EmulatorBackend(Protocol):
 
     def render(self) -> np.ndarray: ...
 
-    def render_observation(self, *, width: int, height: int, rgb: bool = True) -> np.ndarray: ...
+    def observation_spec(self, preset: str) -> ObservationSpec: ...
+
+    def render_display(self, *, preset: str) -> np.ndarray: ...
+
+    def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray: ...
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
 

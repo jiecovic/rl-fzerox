@@ -6,13 +6,13 @@ from gymnasium import spaces
 
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.emulator.base import EmulatorBackend
+from rl_fzerox.core.emulator.base import EmulatorBackend, ObservationSpec
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.envs.actions import ActionValue, resolve_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.limits import EpisodeLimits
-from rl_fzerox.core.envs.observations import FrameStackBuffer
-from rl_fzerox.core.game import FZeroXTelemetry, RewardTracker
+from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.game import FZeroXTelemetry
 
 
 class FZeroXEnvEngine:
@@ -31,17 +31,17 @@ class FZeroXEnvEngine:
         self.backend = backend
         self.config = config
         self._action_adapter = resolve_action_adapter(config.action)
-        self._observation_stack = FrameStackBuffer(
-            frame_space=_observation_frame_space(config),
-            frame_stack=config.observation.frame_stack,
-        )
+        self._observation_spec = backend.observation_spec(config.observation.preset)
         self._episode_limits = EpisodeLimits(config)
-        self._reward_tracker = RewardTracker()
+        self._reward_tracker = build_reward_tracker(config.reward.name)
         self._episode_done = False
         self._episode_return = 0.0
         self._last_info: dict[str, object] = {}
         self._action_space = self._action_adapter.action_space
-        self._observation_space = self._observation_stack.observation_space
+        self._observation_space = _observation_space(
+            self._observation_spec,
+            frame_stack=config.observation.frame_stack,
+        )
 
     @property
     def action_space(self) -> spaces.Space:
@@ -61,7 +61,13 @@ class FZeroXEnvEngine:
         info["seed"] = seed
         if telemetry is not None:
             info["telemetry"] = telemetry
-        observation = self._reset_observation(info)
+        observation = self._transform_observation()
+        _set_observation_info(
+            info,
+            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_spec=self._observation_spec,
+            frame_stack=self.config.observation.frame_stack,
+        )
         self._last_info = dict(info)
         return observation, info
 
@@ -81,7 +87,7 @@ class FZeroXEnvEngine:
         control_state: ControllerState,
     ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
         self.backend.set_controller_state(control_state)
-        latest_observation_frame: np.ndarray | None = None
+        latest_observation: np.ndarray | None = None
         total_reward = 0.0
         terminated = False
         truncated = False
@@ -91,7 +97,7 @@ class FZeroXEnvEngine:
         for repeat_index in range(self.config.action_repeat):
             is_last_repeat = repeat_index == (self.config.action_repeat - 1)
             (
-                latest_observation_frame,
+                latest_observation,
                 step_reward,
                 terminated,
                 truncated,
@@ -104,7 +110,7 @@ class FZeroXEnvEngine:
             if terminated or truncated:
                 break
 
-        if latest_observation_frame is None:
+        if latest_observation is None:
             raise RuntimeError("The emulator did not produce an observation during step()")
 
         if last_telemetry is not None:
@@ -114,7 +120,13 @@ class FZeroXEnvEngine:
         ensure_monitor_info_keys(info)
         self._episode_done = terminated or truncated
         self._last_info = dict(info)
-        observation = self._append_observation_frame(latest_observation_frame, info)
+        observation = latest_observation
+        _set_observation_info(
+            info,
+            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_spec=self._observation_spec,
+            frame_stack=self.config.observation.frame_stack,
+        )
 
         return (
             observation,
@@ -132,21 +144,26 @@ class FZeroXEnvEngine:
 
         if control_state is not None:
             self.backend.set_controller_state(control_state)
-        observation_frame, reward, terminated, truncated, info, _ = self._advance_one_frame(
+        observation, reward, terminated, truncated, info, _ = self._advance_one_frame(
             render_observation=True
         )
-        if observation_frame is None:
+        if observation is None:
             raise RuntimeError("The emulator did not produce an observation during step_frame()")
         self._episode_return += reward
         info["episode_return"] = self._episode_return
         ensure_monitor_info_keys(info)
         self._episode_done = terminated or truncated
         self._last_info = dict(info)
-        observation = self._append_observation_frame(observation_frame, info)
+        _set_observation_info(
+            info,
+            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_spec=self._observation_spec,
+            frame_stack=self.config.observation.frame_stack,
+        )
         return observation, reward, terminated, truncated, info
 
     def render(self) -> np.ndarray:
-        return self.backend.render()
+        return self.backend.render_display(preset=self.config.observation.preset)
 
     def close(self) -> None:
         self.backend.close()
@@ -222,30 +239,10 @@ class FZeroXEnvEngine:
             telemetry,
         )
 
-    def _reset_observation(self, info: dict[str, object]) -> np.ndarray:
-        observation_frame = self._transform_observation()
-        observation = self._observation_stack.reset(observation_frame)
-        info["observation_shape"] = tuple(int(value) for value in observation.shape)
-        info["observation_frame_shape"] = self._observation_stack.frame_shape
-        info["observation_stack"] = self.config.observation.frame_stack
-        return observation
-
-    def _append_observation_frame(
-        self,
-        observation_frame: np.ndarray,
-        info: dict[str, object],
-    ) -> np.ndarray:
-        observation = self._observation_stack.append(observation_frame)
-        info["observation_shape"] = tuple(int(value) for value in observation.shape)
-        info["observation_frame_shape"] = self._observation_stack.frame_shape
-        info["observation_stack"] = self.config.observation.frame_stack
-        return observation
-
     def _transform_observation(self) -> np.ndarray:
         return self.backend.render_observation(
-            width=self.config.observation.width,
-            height=self.config.observation.height,
-            rgb=self.config.observation.rgb,
+            preset=self.config.observation.preset,
+            frame_stack=self.config.observation.frame_stack,
         )
 
 def _has_custom_baseline(info: dict[str, object]) -> bool:
@@ -257,14 +254,33 @@ def _read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
     return backend.try_read_telemetry()
 
 
-def _observation_frame_space(config: EnvConfig) -> spaces.Box:
-    channels = 3 if config.observation.rgb else 1
+def _observation_space(observation_spec: ObservationSpec, *, frame_stack: int) -> spaces.Box:
     return spaces.Box(
         low=0,
         high=255,
-        shape=(config.observation.height, config.observation.width, channels),
+        shape=(
+            observation_spec.height,
+            observation_spec.width,
+            observation_spec.channels * frame_stack,
+        ),
         dtype=np.uint8,
     )
+
+
+def _set_observation_info(
+    info: dict[str, object],
+    *,
+    observation_shape: tuple[int, ...],
+    observation_spec: ObservationSpec,
+    frame_stack: int,
+) -> None:
+    info["observation_shape"] = observation_shape
+    info["observation_frame_shape"] = (
+        observation_spec.height,
+        observation_spec.width,
+        observation_spec.channels,
+    )
+    info["observation_stack"] = frame_stack
 
 
 def _reset_context_info(info: dict[str, object]) -> dict[str, object]:
