@@ -112,7 +112,8 @@ class StepSummary:
         self,
         frames_run: int,
         max_race_distance: float,
-        reverse_warning_frames: int = 0,
+        reverse_active_frames: int = 0,
+        low_speed_frames: int = 0,
         energy_loss_total: float = 0.0,
         energy_gain_total: float = 0.0,
         consecutive_low_speed_frames: int = 0,
@@ -124,7 +125,9 @@ class StepSummary:
     @property
     def max_race_distance(self) -> float: ...
     @property
-    def reverse_warning_frames(self) -> int: ...
+    def reverse_active_frames(self) -> int: ...
+    @property
+    def low_speed_frames(self) -> int: ...
     @property
     def energy_loss_total(self) -> float: ...
     @property

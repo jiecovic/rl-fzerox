@@ -5,20 +5,23 @@ short-horizon driving tricks.
 
 ## Plan
 
-- Remove dense per-step frontier shaping.
-- Use coarse one-time milestones instead of trusting `race_distance` as a
-  precise local line-quality signal.
+- Keep dense frontier shaping only as a bootstrap signal until milestone 1.
+- Use coarse one-time milestones after that instead of trusting `race_distance`
+  as a precise local line-quality signal for the whole episode.
 - Reward lap completion with increasing bonuses.
 - Reward better placement at lap boundaries and more strongly on final finish.
 - Penalize time on every internal emulator frame so earlier completion stays
   better than slower completion.
 - Penalize reverse-driving frames more strongly by scaling the normal per-frame
   time penalty while the game reverse-warning timer is active.
+- Penalize low-speed frames more strongly by scaling the normal per-frame time
+  penalty whenever speed drops below the env stuck-speed threshold.
 - Keep energy loss negative and energy refill positive, but smaller than the
   loss penalty.
 - Make death and truncation penalties dynamic:
   - base penalty
-  - plus remaining-step pressure derived from `time_penalty_per_frame`
+  - plus explicit remaining-step pressure from
+    `remaining_step_penalty_per_frame`
   - plus remaining-lap penalty based on live game telemetry
 
 ## Runtime assumptions
@@ -27,9 +30,10 @@ short-horizon driving tricks.
 - Total laps and total racers are read from live emulator RAM through the native
   telemetry path.
 - The reverse-engineered RAM layout currently targets the US ROM build.
-- Reverse-driving punishment starts at the game's HUD warning threshold
-  (`100`), but wrong-way truncation remains a separate env limit based on the
-  live reverse timer.
+- Reverse-driving punishment starts as soon as the game's live reverse timer is
+  non-zero. The on-screen HUD warning still appears later at the game's hard
+  threshold (`100`), and wrong-way truncation remains a separate env limit
+  based on that same reverse timer.
 
 ## Terms
 
@@ -39,8 +43,15 @@ short-horizon driving tricks.
   - Absolute `race_distance` spacing for one-time milestone rewards.
 - `milestone_bonus`
   - One-time reward paid for each newly crossed milestone bucket.
+- `bootstrap_progress_scale`
+  - Dense new-best frontier reward used only before the first milestone is
+    reached.
 - `reverse_time_penalty_scale`
-  - Multiplier applied to the normal time penalty on reverse-warning frames.
+  - Multiplier applied to the normal time penalty on frames where the live game
+    reverse timer is active.
+- `low_speed_time_penalty_scale`
+  - Multiplier applied to the normal time penalty on frames below the env's
+    configured stuck-speed threshold.
 - `lap_1_completion_bonus`
   - Reward for first completed lap.
 - `lap_2_completion_bonus`
@@ -53,6 +64,8 @@ short-horizon driving tricks.
   - Larger placement bonus scale applied on actual race finish.
 - `remaining_lap_penalty`
   - Extra penalty per unfinished lap on death or truncation.
+- `remaining_step_penalty_per_frame`
+  - Extra penalty per remaining internal frame on death or truncation.
 - `energy_loss_penalty_scale`
   - Penalty scale applied to `energy_loss_total`.
 - `energy_gain_reward_scale`
@@ -63,10 +76,12 @@ short-horizon driving tricks.
 Ordinary step:
 
 - negative time reward
+- bootstrap frontier reward on new best progress before milestone 1 only
 - one-time milestone reward
 - lap completion reward if a new lap was crossed
 - lap placement reward if a new lap was crossed
-- extra reverse-driving time penalty while the game warning timer is active
+- extra reverse-driving time penalty while the live reverse timer is active
+- extra low-speed time penalty while speed is below the stuck-speed threshold
 - energy loss penalty
 - smaller energy refill reward
 - collision / spin entry penalties
@@ -79,5 +94,5 @@ Finish:
 Crash / retire / off-track / truncation:
 
 - base failure penalty
-- plus remaining-step penalty from skipped future time cost
+- plus remaining-step penalty from `remaining_step_penalty_per_frame`
 - plus remaining-lap penalty from unfinished race progress

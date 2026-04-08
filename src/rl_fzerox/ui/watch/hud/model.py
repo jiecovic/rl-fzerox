@@ -12,8 +12,8 @@ from rl_fzerox.core.envs.actions import (
 )
 from rl_fzerox.ui.watch.hud.format import (
     _float_info,
+    _format_control_game_rate,
     _format_distance,
-    _format_fps,
     _format_mode_name,
     _format_observation_shape,
     _format_observation_summary,
@@ -162,8 +162,18 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                     _panel_line(
-                        "FPS",
-                        _format_fps(info),
+                        "Control/Game",
+                        _format_control_game_rate(info),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Milestones",
+                        _format_milestone_status(info),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Next milestone",
+                        _format_next_milestone(info),
                         PALETTE.text_primary,
                     ),
                 ],
@@ -256,6 +266,22 @@ def _preview_block_height(
         + LAYOUT.section_rule_gap
         + preview_height
     )
+
+
+def _format_milestone_status(info: dict[str, object]) -> str:
+    completed = _int_info(info, "milestones_completed")
+    next_index = _int_info(info, "next_milestone_index")
+    if info.get("bootstrap_progress_active"):
+        return f"{completed} done / next {next_index} / bootstrap"
+    return f"{completed} done / next {next_index}"
+
+
+def _format_next_milestone(info: dict[str, object]) -> str:
+    remaining = info.get("distance_to_next_milestone")
+    next_distance = info.get("next_milestone_distance")
+    if isinstance(remaining, int | float) and isinstance(next_distance, int | float):
+        return f"{remaining:,.1f} to {next_distance:,.0f}"
+    return "-"
 
 
 def _column_content_height(

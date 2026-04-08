@@ -43,6 +43,10 @@ class RewardTracker(Protocol):
         """Compute one env-step reward from the repeated-step summary."""
         ...
 
+    def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
+        """Expose lightweight reward-state info for logging and watch UI."""
+        ...
+
 
 def apply_event_penalty(
     entered: bool,

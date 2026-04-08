@@ -21,6 +21,7 @@ def test_race_v2_rewards_each_progress_milestone_once() -> None:
             time_penalty_per_frame=0.0,
             milestone_distance=25.0,
             milestone_bonus=3.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -51,6 +52,7 @@ def test_race_v2_rewards_completed_laps() -> None:
             lap_2_completion_bonus=35.0,
             final_lap_completion_bonus=60.0,
             lap_position_scale=1.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, laps_completed=0))
@@ -68,26 +70,51 @@ def test_race_v2_rewards_completed_laps() -> None:
     }
 
 
-def test_race_v2_scales_time_penalty_while_reverse_warning_is_active() -> None:
+def test_race_v2_scales_time_penalty_while_reverse_timer_is_active() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=-0.01,
             reverse_time_penalty_scale=2.0,
             milestone_bonus=0.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
 
     step = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3, reverse_warning_frames=2),
-        _status(step_count=3, reverse_timer=120),
-        _telemetry(race_distance=0.0, reverse_timer=120),
+        _summary(max_race_distance=0.0, frames_run=3, reverse_active_frames=2),
+        _status(step_count=3, reverse_timer=20),
+        _telemetry(race_distance=0.0, reverse_timer=20),
     )
 
     assert step.reward == pytest.approx(-0.05)
     assert step.breakdown == {
         "time": -0.03,
         "reverse_time": -0.02,
+    }
+
+
+def test_race_v2_scales_time_penalty_while_below_stuck_speed_threshold() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=-0.01,
+            low_speed_time_penalty_scale=2.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, speed_kph=30.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3, low_speed_frames=2),
+        _status(step_count=3, stalled_steps=2),
+        _telemetry(race_distance=0.0, speed_kph=30.0),
+    )
+
+    assert step.reward == pytest.approx(-0.05)
+    assert step.breakdown == {
+        "time": -0.03,
+        "low_speed_time": -0.02,
     }
 
 
@@ -98,6 +125,7 @@ def test_race_v2_penalizes_energy_loss_more_than_refill_reward() -> None:
             energy_loss_epsilon=0.1,
             energy_loss_penalty_scale=0.05,
             energy_gain_reward_scale=0.02,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0, energy=178.0))
@@ -125,6 +153,7 @@ def test_race_v2_energy_gain_stays_net_negative_against_equal_loss() -> None:
             time_penalty_per_frame=0.0,
             energy_loss_penalty_scale=0.05,
             energy_gain_reward_scale=0.02,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0, energy=178.0))
@@ -151,6 +180,7 @@ def test_race_v2_applies_event_penalties_once_per_entry() -> None:
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             collision_recoil_penalty=-2.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0))
@@ -190,8 +220,10 @@ def test_race_v2_scales_terminal_failure_penalty_by_remaining_steps_and_laps() -
             lap_2_completion_bonus=0.0,
             final_lap_completion_bonus=0.0,
             lap_position_scale=0.0,
+            remaining_step_penalty_per_frame=0.01,
             remaining_lap_penalty=50.0,
             terminal_failure_base_penalty=-120.0,
+            bootstrap_progress_scale=0.0,
         ),
         max_episode_steps=100,
     )
@@ -224,8 +256,10 @@ def test_race_v2_scales_truncation_penalty_by_remaining_steps_and_laps() -> None
             lap_2_completion_bonus=0.0,
             final_lap_completion_bonus=0.0,
             lap_position_scale=0.0,
+            remaining_step_penalty_per_frame=0.01,
             remaining_lap_penalty=50.0,
             wrong_way_truncation_base_penalty=-170.0,
+            bootstrap_progress_scale=0.0,
         ),
         max_episode_steps=100,
     )
@@ -259,6 +293,7 @@ def test_race_v2_applies_final_lap_reward_and_finish_position_bonus() -> None:
             final_lap_completion_bonus=60.0,
             lap_position_scale=0.0,
             finish_position_scale=4.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, state_labels=("active",), laps_completed=2))
@@ -282,10 +317,12 @@ def test_race_v2_applies_final_lap_reward_and_finish_position_bonus() -> None:
     }
 
 
-def test_race_v2_keeps_low_speed_and_dash_pad_out_of_reward() -> None:
+def test_race_v2_applies_low_speed_time_penalty_but_not_dash_pad_bonus() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=-0.01,
+            low_speed_time_penalty_scale=2.0,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0, speed_kph=30.0))
@@ -293,6 +330,7 @@ def test_race_v2_keeps_low_speed_and_dash_pad_out_of_reward() -> None:
     step = tracker.step_summary(
         _summary(
             max_race_distance=100.0,
+            low_speed_frames=1,
             entered_state_labels=("dash_pad_boost",),
         ),
         _status(step_count=1),
@@ -303,8 +341,11 @@ def test_race_v2_keeps_low_speed_and_dash_pad_out_of_reward() -> None:
         ),
     )
 
-    assert step.reward == -0.01
-    assert step.breakdown == {"time": -0.01}
+    assert step.reward == -0.02
+    assert step.breakdown == {
+        "time": -0.01,
+        "low_speed_time": -0.01,
+    }
 
 
 def test_reward_tracker_registry_exposes_registered_names() -> None:
@@ -317,6 +358,7 @@ def test_race_v2_multiplies_time_penalty_by_frames_run() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=-0.01,
+            bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0))
@@ -329,6 +371,41 @@ def test_race_v2_multiplies_time_penalty_by_frames_run() -> None:
 
     assert step.reward == pytest.approx(-0.03)
     assert step.breakdown == {"time": -0.03}
+
+
+def test_race_v2_bootstrap_progress_only_applies_before_first_milestone() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=25.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=10.0),
+    )
+    crossing = tracker.step_summary(
+        _summary(max_race_distance=30.0),
+        _status(step_count=2),
+        _telemetry(race_distance=30.0),
+    )
+    after = tracker.step_summary(
+        _summary(max_race_distance=40.0),
+        _status(step_count=3),
+        _telemetry(race_distance=40.0),
+    )
+
+    assert first.reward == pytest.approx(1.0)
+    assert first.breakdown == {"bootstrap_progress": 1.0}
+    assert crossing.reward == pytest.approx(1.5)
+    assert crossing.breakdown == {"bootstrap_progress": 1.5}
+    assert after.reward == 0.0
+    assert after.breakdown == {}
 
 
 def _telemetry(
@@ -360,7 +437,8 @@ def _summary(
     *,
     max_race_distance: float,
     frames_run: int = 1,
-    reverse_warning_frames: int = 0,
+    reverse_active_frames: int = 0,
+    low_speed_frames: int = 0,
     energy_loss_total: float = 0.0,
     energy_gain_total: float = 0.0,
     entered_state_labels: tuple[str, ...] = (),
@@ -368,7 +446,8 @@ def _summary(
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
-        reverse_warning_frames=reverse_warning_frames,
+        reverse_active_frames=reverse_active_frames,
+        low_speed_frames=low_speed_frames,
         energy_loss_total=energy_loss_total,
         energy_gain_total=energy_gain_total,
         entered_state_labels=entered_state_labels,

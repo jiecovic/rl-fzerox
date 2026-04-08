@@ -62,12 +62,15 @@ class RewardConfig(BaseModel):
     name: Literal["race_v2"] = "race_v2"
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
+    low_speed_time_penalty_scale: NonNegativeFloat = 2.0
     milestone_distance: PositiveFloat = 3_000.0
     milestone_bonus: NonNegativeFloat = 2.0
+    bootstrap_progress_scale: NonNegativeFloat = 0.001
     lap_1_completion_bonus: NonNegativeFloat = 20.0
     lap_2_completion_bonus: NonNegativeFloat = 35.0
     final_lap_completion_bonus: NonNegativeFloat = 60.0
     lap_position_scale: NonNegativeFloat = 1.0
+    remaining_step_penalty_per_frame: NonNegativeFloat = 0.01
     remaining_lap_penalty: NonNegativeFloat = 50.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_loss_penalty_scale: NonNegativeFloat = 0.05
@@ -99,7 +102,7 @@ class WatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     episodes: PositiveInt | None = None
-    fps: PositiveFloat | None = None
+    fps: PositiveFloat | Literal["auto"] | None = "auto"
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
 

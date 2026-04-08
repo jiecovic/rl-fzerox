@@ -18,12 +18,15 @@ class RaceV2RewardWeights:
 
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: float = 2.0
+    low_speed_time_penalty_scale: float = 2.0
     milestone_distance: float = 3_000.0
     milestone_bonus: float = 2.0
+    bootstrap_progress_scale: float = 0.001
     lap_1_completion_bonus: float = 20.0
     lap_2_completion_bonus: float = 35.0
     final_lap_completion_bonus: float = 60.0
     lap_position_scale: float = 1.0
+    remaining_step_penalty_per_frame: float = 0.01
     remaining_lap_penalty: float = 50.0
     energy_loss_epsilon: float = 0.01
     energy_loss_penalty_scale: float = 0.05
@@ -41,7 +44,7 @@ class RaceV2RewardTracker:
     """Track episode reward state for the simplified `race_v2` profile.
 
     The tracker keeps only cross-step frontier state; per-step deltas like
-    reverse-warning frames, energy loss, and entered flags are now
+    reverse-active frames, energy loss, and entered flags are now
     pre-aggregated by the native repeated-step path.
     """
 
@@ -54,6 +57,7 @@ class RaceV2RewardTracker:
         self._weights = weights or RaceV2RewardWeights()
         self._next_milestone_index = 1
         self._awarded_laps_completed = 0
+        self._bootstrap_progress_frontier = 0.0
         self._max_episode_steps = max_episode_steps
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
@@ -62,9 +66,14 @@ class RaceV2RewardTracker:
         if telemetry is None:
             self._next_milestone_index = 1
             self._awarded_laps_completed = 0
+            self._bootstrap_progress_frontier = 0.0
             return
         self._next_milestone_index = self._milestone_index(telemetry.player.race_distance) + 1
         self._awarded_laps_completed = telemetry.player.laps_completed
+        self._bootstrap_progress_frontier = min(
+            max(telemetry.player.race_distance, 0.0),
+            self._weights.milestone_distance,
+        )
 
     def summary_config(self) -> RewardSummaryConfig:
         """Describe the native aggregation thresholds needed by `race_v2`."""
@@ -92,6 +101,15 @@ class RaceV2RewardTracker:
         if reverse_time_penalty:
             reward += reverse_time_penalty
             breakdown["reverse_time"] = reverse_time_penalty
+        low_speed_time_penalty = self._low_speed_time_penalty(summary)
+        if low_speed_time_penalty:
+            reward += low_speed_time_penalty
+            breakdown["low_speed_time"] = low_speed_time_penalty
+
+        bootstrap_progress_reward = self._bootstrap_progress_reward(summary.max_race_distance)
+        if bootstrap_progress_reward:
+            reward += bootstrap_progress_reward
+            breakdown["bootstrap_progress"] = bootstrap_progress_reward
 
         milestone_bonus = self._milestone_bonus(summary.max_race_distance)
         if milestone_bonus:
@@ -179,6 +197,30 @@ class RaceV2RewardTracker:
 
         return RewardStep(reward=reward, breakdown=breakdown)
 
+    def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
+        completed_milestones = max(self._next_milestone_index - 1, 0)
+        info: dict[str, object] = {
+            "milestones_completed": completed_milestones,
+            "next_milestone_index": self._next_milestone_index,
+            "milestone_distance": self._weights.milestone_distance,
+            "bootstrap_progress_active": self._bootstrap_progress_active(),
+            "rewarded_laps_completed": self._awarded_laps_completed,
+        }
+        if telemetry is None:
+            return info
+        next_milestone_distance = self._next_milestone_index * self._weights.milestone_distance
+        info["next_milestone_distance"] = next_milestone_distance
+        info["distance_to_next_milestone"] = max(
+            next_milestone_distance - telemetry.player.race_distance,
+            0.0,
+        )
+        if self._bootstrap_progress_active():
+            info["bootstrap_progress_remaining"] = max(
+                self._weights.milestone_distance - self._bootstrap_progress_frontier,
+                0.0,
+            )
+        return info
+
     def _milestone_index(self, race_distance: float) -> int:
         if race_distance <= 0.0:
             return 0
@@ -191,6 +233,19 @@ class RaceV2RewardTracker:
             return 0.0
         self._next_milestone_index += crossed_count
         return crossed_count * self._weights.milestone_bonus
+
+    def _bootstrap_progress_active(self) -> bool:
+        return self._weights.bootstrap_progress_scale > 0.0 and self._next_milestone_index <= 1
+
+    def _bootstrap_progress_reward(self, max_race_distance: float) -> float:
+        if not self._bootstrap_progress_active():
+            return 0.0
+        capped_progress = min(max(max_race_distance, 0.0), self._weights.milestone_distance)
+        frontier_gain = capped_progress - self._bootstrap_progress_frontier
+        if frontier_gain <= 0.0 or self._weights.bootstrap_progress_scale <= 0.0:
+            return 0.0
+        self._bootstrap_progress_frontier = capped_progress
+        return frontier_gain * self._weights.bootstrap_progress_scale
 
     def _lap_completion_bonus(self, lap_number: int, total_lap_count: int) -> float:
         if lap_number <= 1:
@@ -215,14 +270,24 @@ class RaceV2RewardTracker:
 
     def _remaining_step_penalty(self, status: StepStatus) -> float:
         remaining_steps = max(self._max_episode_steps - status.step_count, 0)
-        return remaining_steps * abs(self._weights.time_penalty_per_frame)
+        return remaining_steps * self._weights.remaining_step_penalty_per_frame
 
     def _reverse_time_penalty(self, summary: StepSummary) -> float:
         extra_scale = self._weights.reverse_time_penalty_scale - 1.0
-        if summary.reverse_warning_frames <= 0 or extra_scale == 0.0:
+        if summary.reverse_active_frames <= 0 or extra_scale == 0.0:
             return 0.0
         return (
-            summary.reverse_warning_frames
+            summary.reverse_active_frames
+            * self._weights.time_penalty_per_frame
+            * extra_scale
+        )
+
+    def _low_speed_time_penalty(self, summary: StepSummary) -> float:
+        extra_scale = self._weights.low_speed_time_penalty_scale - 1.0
+        if summary.low_speed_frames <= 0 or extra_scale == 0.0:
+            return 0.0
+        return (
+            summary.low_speed_frames
             * self._weights.time_penalty_per_frame
             * extra_scale
         )

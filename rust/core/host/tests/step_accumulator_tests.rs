@@ -17,7 +17,8 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
 
     assert_eq!(summary.frames_run, 2);
     assert_eq!(summary.max_race_distance, 140.0);
-    assert_eq!(summary.reverse_warning_frames, 0);
+    assert_eq!(summary.reverse_active_frames, 1);
+    assert_eq!(summary.low_speed_frames, 1);
     assert_eq!(summary.energy_loss_total, 12.0);
     assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
@@ -26,7 +27,7 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
 }
 
 #[test]
-fn step_accumulator_counts_reverse_warning_frames_when_warning_timer_runs() {
+fn step_accumulator_counts_reverse_active_frames_when_reverse_timer_runs() {
     let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 5);
 
@@ -38,7 +39,8 @@ fn step_accumulator_counts_reverse_warning_frames_when_warning_timer_runs() {
 
     assert_eq!(summary.frames_run, 3);
     assert_eq!(summary.max_race_distance, 100.0);
-    assert_eq!(summary.reverse_warning_frames, 1);
+    assert_eq!(summary.reverse_active_frames, 2);
+    assert_eq!(summary.low_speed_frames, 2);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
     assert_eq!(summary.final_frame_index, 8);
 }
@@ -57,7 +59,8 @@ fn step_accumulator_tracks_low_speed_streak_and_energy_changes() {
     assert_eq!(summary.max_race_distance, 100.0);
     assert_eq!(summary.energy_loss_total, 2.0);
     assert_eq!(summary.energy_gain_total, 10.0);
-    assert_eq!(summary.reverse_warning_frames, 0);
+    assert_eq!(summary.reverse_active_frames, 2);
+    assert_eq!(summary.low_speed_frames, 2);
     assert_eq!(summary.consecutive_low_speed_frames, 2);
     assert_eq!(summary.final_frame_index, 13);
 }
@@ -86,8 +89,9 @@ fn step_accumulator_tracks_summary_needed_for_stop_state_derivation() {
     let summary = accumulator.finish();
 
     assert_eq!(summary.frames_run, 1);
+    assert_eq!(summary.low_speed_frames, 1);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
-    assert_eq!(summary.reverse_warning_frames, 1);
+    assert_eq!(summary.reverse_active_frames, 1);
     assert_eq!(summary.entered_state_flags, 1 << 25);
 }
 

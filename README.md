@@ -59,7 +59,7 @@ env:
   reset_to_race: true
 
 watch:
-  fps: 30
+  fps: auto
 ```
 
 Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` points to the saved race-start baseline used for fast deterministic resets once you create it. The root `seed` is the master seed for Python/env randomness.
@@ -68,7 +68,7 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 
 `env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Press `K` in `watch` once to save `local/states/first-race.state`; after that, both `watch` and `train` reset from that dedicated race-start baseline instead of replaying the menu path. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
 
-`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it.
+`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`, and any explicit numeric `watch.fps` is capped to that same maximum.
 
 The current policy action space is a `MultiDiscrete([5, 2])` adapter:
 

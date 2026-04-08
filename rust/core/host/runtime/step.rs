@@ -8,8 +8,6 @@
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{input::ControllerState, observation::ObservationPreset};
 
-pub const WRONG_WAY_WARNING_TIMER_THRESHOLD: usize = 100;
-
 /// Aggregated per-step features collected across repeated internal frames.
 ///
 /// This is the native summary Python reward trackers and limit trackers will
@@ -21,8 +19,10 @@ pub struct StepSummary {
     pub frames_run: usize,
     /// Highest race distance reached during this repeated step.
     pub max_race_distance: f32,
-    /// Number of internal frames spent with the reverse warning visible.
-    pub reverse_warning_frames: usize,
+    /// Number of internal frames spent with the game reverse timer active.
+    pub reverse_active_frames: usize,
+    /// Number of internal frames spent below the configured stuck-speed threshold.
+    pub low_speed_frames: usize,
     /// Total energy lost during the repeated step.
     pub energy_loss_total: f32,
     /// Total energy regained during the repeated step.

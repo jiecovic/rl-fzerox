@@ -6,7 +6,7 @@
 
 use crate::core::telemetry::StepTelemetrySample;
 
-use super::step::{RepeatedStepConfig, StepSummary, WRONG_WAY_WARNING_TIMER_THRESHOLD};
+use super::step::{RepeatedStepConfig, StepSummary};
 
 /// Collect step-level aggregates across repeated internal emulator frames.
 #[cfg_attr(not(test), allow(dead_code))]
@@ -48,8 +48,8 @@ impl StepAccumulator {
         self.summary.final_frame_index = frame_index;
         self.summary.max_race_distance =
             self.summary.max_race_distance.max(telemetry.race_distance);
-        if telemetry.reverse_timer >= WRONG_WAY_WARNING_TIMER_THRESHOLD as i32 {
-            self.summary.reverse_warning_frames += 1;
+        if telemetry.reverse_timer > 0 {
+            self.summary.reverse_active_frames += 1;
         }
 
         let energy_delta = telemetry.energy - self.previous_energy;
@@ -60,6 +60,7 @@ impl StepAccumulator {
         }
 
         if telemetry.speed_kph < self.stuck_min_speed_kph {
+            self.summary.low_speed_frames += 1;
             self.summary.consecutive_low_speed_frames += 1;
         } else {
             self.summary.consecutive_low_speed_frames = 0;

@@ -24,7 +24,8 @@ fn step_summary_defaults_to_empty_step_accumulators() {
     let summary = StepSummary::default();
 
     assert_eq!(summary.frames_run, 0);
-    assert_eq!(summary.reverse_warning_frames, 0);
+    assert_eq!(summary.reverse_active_frames, 0);
+    assert_eq!(summary.low_speed_frames, 0);
     assert_eq!(summary.consecutive_low_speed_frames, 0);
     assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.entered_state_flags, 0);

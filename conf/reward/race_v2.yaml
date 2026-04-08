@@ -3,14 +3,19 @@ name: race_v2
 
 # Time pressure: small negative reward per internal emulator frame.
 time_penalty_per_frame: -0.005
-# Time pressure: multiplier applied to the per-frame time penalty once the
-# game's reverse-warning HUD threshold (`reverse_timer >= 100`) is active.
+# Time pressure: multiplier applied to the per-frame time penalty whenever the
+# game's live reverse timer is active (`reverse_timer > 0`).
 reverse_time_penalty_scale: 2.0
+# Time pressure: multiplier applied to the per-frame time penalty on frames
+# below the env's configured stuck-speed threshold.
+low_speed_time_penalty_scale: 2.0
 
 # Milestones: absolute race-distance interval between one-time milestone rewards.
 milestone_distance: 3000.0
 # Milestones: one-time bonus for crossing a new race-distance milestone.
 milestone_bonus: 2.0
+# Milestones: dense new-frontier reward used only before milestone 1 is reached.
+bootstrap_progress_scale: 0.001
 
 # Lap rewards: one-time bonus for completing lap 1.
 lap_1_completion_bonus: 20.0
@@ -22,6 +27,9 @@ final_lap_completion_bonus: 60.0
 # `(total_racers - position) * lap_position_scale`.
 lap_position_scale: 1.0
 
+# Failure shaping: extra penalty per remaining internal emulator frame on
+# death or truncation.
+remaining_step_penalty_per_frame: 0.01
 # Failure shaping: extra penalty per unfinished lap on death or truncation.
 remaining_lap_penalty: 50.0
 

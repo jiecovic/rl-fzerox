@@ -212,7 +212,8 @@ class SyntheticBackend:
             summary=StepSummary(
                 frames_run=action_repeat,
                 max_race_distance=self._state.progress,
-                reverse_warning_frames=0,
+                reverse_active_frames=0,
+                low_speed_frames=0,
                 energy_loss_total=0.0,
                 energy_gain_total=0.0,
                 consecutive_low_speed_frames=0,
