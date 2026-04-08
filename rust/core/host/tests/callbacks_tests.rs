@@ -1,3 +1,4 @@
+// Covers callback utility helpers for runtime-directory resolution.
 use std::path::{Path, PathBuf};
 
 use super::runtime_root_for_core;

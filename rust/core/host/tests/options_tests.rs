@@ -1,3 +1,4 @@
+// Covers small libretro option parsing and renderer override helpers.
 use std::ffi::CString;
 
 use super::{default_option_value, override_option};

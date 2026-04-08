@@ -1,4 +1,6 @@
 // rust/bindings/input.rs
+//! Small Python helpers and constants for libretro input encoding.
+
 use libretro_sys::{
     DEVICE_ID_JOYPAD_A, DEVICE_ID_JOYPAD_B, DEVICE_ID_JOYPAD_DOWN, DEVICE_ID_JOYPAD_L,
     DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_L3, DEVICE_ID_JOYPAD_LEFT, DEVICE_ID_JOYPAD_R,
@@ -30,6 +32,8 @@ pub fn joypad_mask(buttons: &Bound<'_, PyTuple>) -> PyResult<u16> {
     Ok(mask)
 }
 
+/// Register joypad constants and helper functions onto the Python extension
+/// module.
 pub fn register_input_api(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("JOYPAD_B", DEVICE_ID_JOYPAD_B)?;
     module.add("JOYPAD_Y", DEVICE_ID_JOYPAD_Y)?;

@@ -1,4 +1,6 @@
 // rust/core/libretro/api.rs
+//! Dynamic loading and typed function-pointer access for libretro cores.
+
 use std::ffi::c_void;
 use std::path::Path;
 use std::ptr;
@@ -12,6 +14,9 @@ use libretro_sys::{
 use crate::core::error::CoreError;
 use crate::core::info::CoreInfo;
 
+// Typed aliases for the libretro entry points we resolve from the shared
+// library. Keeping them named here makes the symbol table below readable and
+// narrows the later unsafe call sites.
 type RetroSetEnvironmentFn = unsafe extern "C" fn(callback: EnvironmentFn);
 type RetroSetVideoRefreshFn = unsafe extern "C" fn(callback: VideoRefreshFn);
 type RetroSetAudioSampleFn = unsafe extern "C" fn(callback: AudioSampleFn);
@@ -34,12 +39,17 @@ type RetroGetMemorySizeFn = unsafe extern "C" fn(id: u32) -> usize;
 type RetroLoadGameFn = unsafe extern "C" fn(game: *const GameInfo) -> bool;
 type RetroUnloadGameFn = unsafe extern "C" fn();
 
+/// Loaded libretro core plus the subset of resolved symbols used by this host.
+///
+/// The library handle is intentionally kept alive for the full lifetime of this
+/// struct so the copied function pointers remain valid.
 pub struct LoadedCore {
-    _library: Library,
+    _library_handle: Library,
     symbols: Symbols,
     info: CoreInfo,
 }
 
+/// Private table of resolved libretro entry points used by the host runtime.
 #[derive(Clone, Copy)]
 struct Symbols {
     retro_set_environment: RetroSetEnvironmentFn,
@@ -64,6 +74,8 @@ struct Symbols {
 }
 
 impl LoadedCore {
+    /// Load a libretro shared library, validate its API version, and resolve
+    /// the symbol set required by the rest of the native host.
     pub fn load(core_path: &Path) -> Result<Self, CoreError> {
         if !core_path.is_file() {
             return Err(CoreError::MissingCore(core_path.to_path_buf()));
@@ -81,46 +93,13 @@ impl LoadedCore {
 
         let retro_get_system_info: RetroGetSystemInfoFn =
             load_symbol(&library, b"retro_get_system_info\0")?;
-        let system_info = unsafe {
-            let mut info = SystemInfo {
-                library_name: ptr::null(),
-                library_version: ptr::null(),
-                valid_extensions: ptr::null(),
-                need_fullpath: false,
-                block_extract: false,
-            };
-            retro_get_system_info(&mut info as *mut SystemInfo);
-            info
-        };
+        let system_info = read_system_info(retro_get_system_info);
 
         let info = CoreInfo::from_system_info(api_version, &system_info);
-        let symbols = Symbols {
-            retro_set_environment: load_symbol(&library, b"retro_set_environment\0")?,
-            retro_set_video_refresh: load_symbol(&library, b"retro_set_video_refresh\0")?,
-            retro_set_audio_sample: load_symbol(&library, b"retro_set_audio_sample\0")?,
-            retro_set_audio_sample_batch: load_symbol(&library, b"retro_set_audio_sample_batch\0")?,
-            retro_set_input_poll: load_symbol(&library, b"retro_set_input_poll\0")?,
-            retro_set_input_state: load_symbol(&library, b"retro_set_input_state\0")?,
-            retro_init: load_symbol(&library, b"retro_init\0")?,
-            retro_deinit: load_symbol(&library, b"retro_deinit\0")?,
-            retro_get_system_av_info: load_symbol(&library, b"retro_get_system_av_info\0")?,
-            retro_set_controller_port_device: load_symbol(
-                &library,
-                b"retro_set_controller_port_device\0",
-            )?,
-            retro_reset: load_symbol(&library, b"retro_reset\0")?,
-            retro_run: load_symbol(&library, b"retro_run\0")?,
-            retro_serialize_size: load_symbol(&library, b"retro_serialize_size\0")?,
-            retro_serialize: load_symbol(&library, b"retro_serialize\0")?,
-            retro_unserialize: load_symbol(&library, b"retro_unserialize\0")?,
-            retro_get_memory_data: load_symbol(&library, b"retro_get_memory_data\0")?,
-            retro_get_memory_size: load_symbol(&library, b"retro_get_memory_size\0")?,
-            retro_load_game: load_symbol(&library, b"retro_load_game\0")?,
-            retro_unload_game: load_symbol(&library, b"retro_unload_game\0")?,
-        };
+        let symbols = Symbols::load(&library)?;
 
         Ok(Self {
-            _library: library,
+            _library_handle: library,
             symbols,
             info,
         })
@@ -163,19 +142,7 @@ impl LoadedCore {
     }
 
     pub unsafe fn system_av_info(&self) -> SystemAvInfo {
-        let mut info = SystemAvInfo {
-            geometry: libretro_sys::GameGeometry {
-                base_width: 0,
-                base_height: 0,
-                max_width: 0,
-                max_height: 0,
-                aspect_ratio: 0.0,
-            },
-            timing: libretro_sys::SystemTiming {
-                fps: 0.0,
-                sample_rate: 0.0,
-            },
-        };
+        let mut info = empty_system_av_info();
         unsafe { (self.symbols.retro_get_system_av_info)(&mut info as *mut SystemAvInfo) };
         info
     }
@@ -221,6 +188,43 @@ impl LoadedCore {
     }
 }
 
+impl Symbols {
+    fn load(library: &Library) -> Result<Self, CoreError> {
+        Ok(Self {
+            retro_set_environment: load_symbol(library, b"retro_set_environment\0")?,
+            retro_set_video_refresh: load_symbol(library, b"retro_set_video_refresh\0")?,
+            retro_set_audio_sample: load_symbol(library, b"retro_set_audio_sample\0")?,
+            retro_set_audio_sample_batch: load_symbol(library, b"retro_set_audio_sample_batch\0")?,
+            retro_set_input_poll: load_symbol(library, b"retro_set_input_poll\0")?,
+            retro_set_input_state: load_symbol(library, b"retro_set_input_state\0")?,
+            retro_init: load_symbol(library, b"retro_init\0")?,
+            retro_deinit: load_symbol(library, b"retro_deinit\0")?,
+            retro_get_system_av_info: load_symbol(library, b"retro_get_system_av_info\0")?,
+            retro_set_controller_port_device: load_symbol(
+                library,
+                b"retro_set_controller_port_device\0",
+            )?,
+            retro_reset: load_symbol(library, b"retro_reset\0")?,
+            retro_run: load_symbol(library, b"retro_run\0")?,
+            retro_serialize_size: load_symbol(library, b"retro_serialize_size\0")?,
+            retro_serialize: load_symbol(library, b"retro_serialize\0")?,
+            retro_unserialize: load_symbol(library, b"retro_unserialize\0")?,
+            retro_get_memory_data: load_symbol(library, b"retro_get_memory_data\0")?,
+            retro_get_memory_size: load_symbol(library, b"retro_get_memory_size\0")?,
+            retro_load_game: load_symbol(library, b"retro_load_game\0")?,
+            retro_unload_game: load_symbol(library, b"retro_unload_game\0")?,
+        })
+    }
+}
+
+fn read_system_info(get_system_info: RetroGetSystemInfoFn) -> SystemInfo {
+    unsafe {
+        let mut info = empty_system_info();
+        get_system_info(&mut info as *mut SystemInfo);
+        info
+    }
+}
+
 fn load_library(core_path: &Path) -> Result<Library, CoreError> {
     unsafe { Library::new(core_path) }.map_err(|error| CoreError::LoadLibrary {
         path: core_path.to_path_buf(),
@@ -237,6 +241,32 @@ fn load_symbol<T: Copy>(library: &Library, symbol_name: &[u8]) -> Result<T, Core
     Ok(*symbol)
 }
 
+fn empty_system_info() -> SystemInfo {
+    SystemInfo {
+        library_name: ptr::null(),
+        library_version: ptr::null(),
+        valid_extensions: ptr::null(),
+        need_fullpath: false,
+        block_extract: false,
+    }
+}
+
+fn empty_system_av_info() -> SystemAvInfo {
+    SystemAvInfo {
+        geometry: libretro_sys::GameGeometry {
+            base_width: 0,
+            base_height: 0,
+            max_width: 0,
+            max_height: 0,
+            aspect_ratio: 0.0,
+        },
+        timing: libretro_sys::SystemTiming {
+            fps: 0.0,
+            sample_rate: 0.0,
+        },
+    }
+}
+
 fn printable_symbol(symbol_name: &[u8]) -> String {
     symbol_name
         .strip_suffix(b"\0")
@@ -246,3 +276,7 @@ fn printable_symbol(symbol_name: &[u8]) -> String {
         .map(char::from)
         .collect()
 }
+
+#[cfg(test)]
+#[path = "tests/api_tests.rs"]
+mod tests;

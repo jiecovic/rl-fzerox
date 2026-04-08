@@ -1,9 +1,11 @@
-use super::{GLOBALS, RACER, RacerStateFlag, read_snapshot};
+// Covers decoding a representative player-one race telemetry snapshot.
+use super::layout::{GLOBALS, RACER, RacerStateFlag, TELEMETRY_CONFIG};
+use super::read_snapshot;
 
 #[test]
 fn read_snapshot_decodes_player_one_race_values() {
-    let mut memory = vec![0_u8; 0x0030_0000];
-    let player_base = GLOBALS.racers + (RACER.size * 0);
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let player_base = GLOBALS.racers;
     memory[GLOBALS.game_frame_count..GLOBALS.game_frame_count + 4]
         .copy_from_slice(&321_u32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
@@ -40,7 +42,9 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!(telemetry.in_race_mode);
     assert_eq!(telemetry.course_index, 0);
     assert!((telemetry.player.speed_raw - 123.5).abs() < f32::EPSILON);
-    assert!((telemetry.player.speed_kph - (123.5 * 21.6)).abs() < f32::EPSILON);
+    assert!(
+        (telemetry.player.speed_kph - (123.5 * TELEMETRY_CONFIG.speed_to_kph)).abs() < f32::EPSILON
+    );
     assert!((telemetry.player.energy - 92.25).abs() < f32::EPSILON);
     assert!((telemetry.player.max_energy - 100.0).abs() < f32::EPSILON);
     assert!((telemetry.player.race_distance - 12_345.5).abs() < f32::EPSILON);
