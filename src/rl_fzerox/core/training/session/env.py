@@ -14,7 +14,7 @@ from rl_fzerox.core.training.runs import RunPaths
 _DOMAIN_TRAIN_ENV = 0xA4C4F4B7A62D1131
 
 
-def _build_training_env(config: TrainAppConfig, run_paths: RunPaths):
+def build_training_env(config: TrainAppConfig, run_paths: RunPaths):
     """Construct the configured SB3 vector env around emulator workers."""
 
     try:
