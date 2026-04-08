@@ -19,6 +19,7 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
     assert_eq!(summary.max_race_distance, 140.0);
     assert_eq!(summary.reverse_progress_total, 0.0);
     assert_eq!(summary.energy_loss_total, 12.0);
+    assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
     assert_eq!(summary.consecutive_reverse_frames, 0);
     assert_eq!(summary.entered_state_flags, 0b110);
@@ -58,9 +59,24 @@ fn step_accumulator_keeps_trailing_streaks_when_every_frame_matches() {
     assert_eq!(summary.max_race_distance, 100.0);
     assert_eq!(summary.reverse_progress_total, 2.0);
     assert_eq!(summary.energy_loss_total, 2.0);
+    assert_eq!(summary.energy_gain_total, 10.0);
     assert_eq!(summary.consecutive_reverse_frames, 2);
     assert_eq!(summary.consecutive_low_speed_frames, 2);
     assert_eq!(summary.final_frame_index, 13);
+}
+
+#[test]
+fn step_accumulator_tracks_energy_gain_separately_from_loss() {
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5, 5), 20);
+
+    accumulator.observe(&telemetry(102.0, 96.0, 120.0, 0b001), 21);
+    accumulator.observe(&telemetry(104.0, 101.5, 120.0, 0b001), 22);
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.energy_loss_total, 4.0);
+    assert_eq!(summary.energy_gain_total, 5.5);
 }
 
 #[test]

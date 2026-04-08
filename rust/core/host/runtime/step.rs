@@ -25,6 +25,8 @@ pub struct StepSummary {
     pub consecutive_reverse_frames: usize,
     /// Total energy lost during the repeated step.
     pub energy_loss_total: f32,
+    /// Total energy regained during the repeated step.
+    pub energy_gain_total: f32,
     /// Low-speed streak length at the end of the repeated step.
     pub consecutive_low_speed_frames: usize,
     /// OR of state flags newly entered at least once during this env step.

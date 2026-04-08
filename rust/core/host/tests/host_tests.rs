@@ -26,6 +26,7 @@ fn step_summary_defaults_to_empty_step_accumulators() {
     assert_eq!(summary.frames_run, 0);
     assert_eq!(summary.consecutive_reverse_frames, 0);
     assert_eq!(summary.consecutive_low_speed_frames, 0);
+    assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.entered_state_flags, 0);
     assert_eq!(summary.final_frame_index, 0);
 }
@@ -102,9 +103,11 @@ fn repeated_step_config(
 
 fn telemetry(in_race_mode: bool, state_flags: u32) -> TelemetrySnapshot {
     TelemetrySnapshot {
+        total_lap_count: 3,
         game_mode_raw: 1,
         game_mode_name: if in_race_mode { "gp_race" } else { "title" },
         in_race_mode,
+        total_racers: 30,
         course_index: 0,
         player: PlayerTelemetry {
             state_flags,

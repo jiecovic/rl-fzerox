@@ -51,9 +51,11 @@ def make_player_telemetry(
 
 def make_telemetry(
     *,
+    total_lap_count: int = 3,
     game_mode_raw: int = 1,
     game_mode_name: str = "gp_race",
     in_race_mode: bool = True,
+    total_racers: int = 30,
     course_index: int = 0,
     player: PlayerTelemetry | None = None,
     state_labels: tuple[str, ...] = ("active",),
@@ -84,9 +86,11 @@ def make_telemetry(
         position=position,
     )
     return FZeroXTelemetry(
+        total_lap_count=total_lap_count,
         game_mode_raw=game_mode_raw,
         game_mode_name=game_mode_name,
         in_race_mode=in_race_mode,
+        total_racers=total_racers,
         course_index=course_index,
         player=resolved_player,
     )
@@ -99,6 +103,7 @@ def make_step_summary(
     reverse_progress_total: float = 0.0,
     consecutive_reverse_frames: int = 0,
     energy_loss_total: float = 0.0,
+    energy_gain_total: float = 0.0,
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     entered_state_flags: int | None = None,
@@ -115,6 +120,7 @@ def make_step_summary(
         reverse_progress_total=reverse_progress_total,
         consecutive_reverse_frames=consecutive_reverse_frames,
         energy_loss_total=energy_loss_total,
+        energy_gain_total=energy_gain_total,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_flags=resolved_entered_state_flags,
         final_frame_index=final_frame_index,
@@ -136,4 +142,3 @@ def make_step_status(
         termination_reason=termination_reason,
         truncation_reason=truncation_reason,
     )
-

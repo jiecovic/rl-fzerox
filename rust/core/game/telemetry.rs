@@ -10,8 +10,8 @@ mod layout;
 mod model;
 mod read;
 
-pub use model::{PlayerTelemetry, TelemetrySnapshot};
 pub(crate) use model::StepTelemetrySample;
+pub use model::{PlayerTelemetry, TelemetrySnapshot};
 pub use read::read_snapshot;
 pub(crate) use read::read_step_sample;
 

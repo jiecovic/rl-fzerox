@@ -62,6 +62,8 @@ impl StepAccumulator {
         let energy_delta = telemetry.energy - self.previous_energy;
         if energy_delta < -self.config.energy_loss_epsilon {
             self.summary.energy_loss_total += -energy_delta;
+        } else if energy_delta > self.config.energy_loss_epsilon {
+            self.summary.energy_gain_total += energy_delta;
         }
 
         if telemetry.speed_kph < self.config.stuck_min_speed_kph {

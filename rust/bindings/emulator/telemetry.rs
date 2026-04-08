@@ -222,9 +222,11 @@ impl PyPlayerTelemetry {
     skip_from_py_object
 )]
 pub struct PyTelemetry {
+    total_lap_count: i32,
     game_mode_raw: u32,
     game_mode_name: String,
     in_race_mode: bool,
+    total_racers: i32,
     course_index: u32,
     player: Py<PyPlayerTelemetry>,
 }
@@ -233,26 +235,37 @@ pub struct PyTelemetry {
 impl PyTelemetry {
     #[new]
     #[pyo3(signature = (
+        total_lap_count,
         game_mode_raw,
         game_mode_name,
         in_race_mode,
+        total_racers,
         course_index,
         player,
     ))]
     fn new(
+        total_lap_count: i32,
         game_mode_raw: u32,
         game_mode_name: String,
         in_race_mode: bool,
+        total_racers: i32,
         course_index: u32,
         player: Py<PyPlayerTelemetry>,
     ) -> Self {
         Self {
+            total_lap_count,
             game_mode_raw,
             game_mode_name,
             in_race_mode,
+            total_racers,
             course_index,
             player,
         }
+    }
+
+    #[getter]
+    fn total_lap_count(&self) -> i32 {
+        self.total_lap_count
     }
 
     #[getter]
@@ -271,6 +284,11 @@ impl PyTelemetry {
     }
 
     #[getter]
+    fn total_racers(&self) -> i32 {
+        self.total_racers
+    }
+
+    #[getter]
     fn course_index(&self) -> u32 {
         self.course_index
     }
@@ -282,9 +300,11 @@ impl PyTelemetry {
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
+        dict.set_item("total_lap_count", self.total_lap_count())?;
         dict.set_item("game_mode_raw", self.game_mode_raw())?;
         dict.set_item("game_mode_name", self.game_mode_name())?;
         dict.set_item("in_race_mode", self.in_race_mode())?;
+        dict.set_item("total_racers", self.total_racers())?;
         dict.set_item("course_index", self.course_index())?;
         let player_handle = self.player(py);
         let player = player_handle.bind(py);
@@ -301,9 +321,11 @@ pub(super) fn telemetry_to_py(
     Py::new(
         py,
         PyTelemetry {
+            total_lap_count: telemetry.total_lap_count,
             game_mode_raw: telemetry.game_mode_raw,
             game_mode_name: telemetry.game_mode_name.to_owned(),
             in_race_mode: telemetry.in_race_mode,
+            total_racers: telemetry.total_racers,
             course_index: telemetry.course_index,
             player,
         },

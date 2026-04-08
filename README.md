@@ -9,9 +9,12 @@ The emulator boundary is handled by a custom Rust libretro host exposed to Pytho
 - Python `3.11+`
 - Rust toolchain via `rustup` / `cargo`
 - `Mupen64Plus-Next` libretro core shared library (`.so`)
-- An extracted F-Zero X ROM that you obtained yourself
+- An extracted F-Zero X US ROM that you obtained yourself
 
 The repo does not include the emulator core or ROM files. You need to download or build those yourself. ROMs are not committed for copyright reasons.
+
+The reverse-engineered telemetry/RAM layout currently targets the US ROM build.
+Other regional revisions are not supported by the current memory offsets.
 
 Official `Mupen64Plus-Next` links:
 

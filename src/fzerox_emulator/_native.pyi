@@ -80,18 +80,24 @@ class PlayerTelemetry:
 class FZeroXTelemetry:
     def __init__(
         self,
+        total_lap_count: int,
         game_mode_raw: int,
         game_mode_name: str,
         in_race_mode: bool,
+        total_racers: int,
         course_index: int,
         player: PlayerTelemetry,
     ) -> None: ...
+    @property
+    def total_lap_count(self) -> int: ...
     @property
     def game_mode_raw(self) -> int: ...
     @property
     def game_mode_name(self) -> str: ...
     @property
     def in_race_mode(self) -> bool: ...
+    @property
+    def total_racers(self) -> int: ...
     @property
     def course_index(self) -> int: ...
     @property
@@ -106,6 +112,7 @@ class StepSummary:
         reverse_progress_total: float = 0.0,
         consecutive_reverse_frames: int = 0,
         energy_loss_total: float = 0.0,
+        energy_gain_total: float = 0.0,
         consecutive_low_speed_frames: int = 0,
         entered_state_flags: int = 0,
         final_frame_index: int = 0,
@@ -120,6 +127,8 @@ class StepSummary:
     def consecutive_reverse_frames(self) -> int: ...
     @property
     def energy_loss_total(self) -> float: ...
+    @property
+    def energy_gain_total(self) -> float: ...
     @property
     def consecutive_low_speed_frames(self) -> int: ...
     @property

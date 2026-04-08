@@ -54,9 +54,11 @@ impl PlayerTelemetry {
 /// Telemetry snapshot for the current frame, focused on player-one race state.
 #[derive(Clone, Debug)]
 pub struct TelemetrySnapshot {
+    pub total_lap_count: i32,
     pub game_mode_raw: u32,
     pub game_mode_name: &'static str,
     pub in_race_mode: bool,
+    pub total_racers: i32,
     pub course_index: u32,
     pub player: PlayerTelemetry,
 }
