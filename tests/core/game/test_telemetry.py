@@ -1,7 +1,12 @@
 # tests/core/game/test_telemetry.py
 from __future__ import annotations
 
-from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry, StepSummary
+from fzerox_emulator import (
+    FZeroXTelemetry,
+    PlayerTelemetry,
+    StepSummary,
+    encode_state_flags,
+)
 
 
 def test_native_player_telemetry_exposes_state_helpers() -> None:
@@ -70,3 +75,9 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.entered_finished is True
     assert summary.entered_crashed is False
     assert summary.entered_state_labels == ("collision_recoil", "finished")
+
+
+def test_encode_state_flags_builds_bitmask_from_labels() -> None:
+    encoded = encode_state_flags(["collision_recoil", "finished"])
+
+    assert encoded == (1 << 13) | (1 << 25)

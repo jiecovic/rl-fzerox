@@ -144,7 +144,7 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         game_display_size=(592, 444),
         observation_shape=(78, 222, 12),
         telemetry=_sample_telemetry(
-            state_labels=("active", "dash_pad_boost", "collision_recoil", "wrong_way"),
+            state_labels=("active", "dash_pad_boost", "collision_recoil"),
         ),
     )
 

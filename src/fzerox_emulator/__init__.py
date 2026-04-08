@@ -15,6 +15,7 @@ from fzerox_emulator._native import (
     FZeroXTelemetry,
     PlayerTelemetry,
     StepSummary,
+    encode_state_flags,
     joypad_mask,
     probe_core,
 )
@@ -35,6 +36,7 @@ __all__ = [
     "Emulator",
     "BackendStepResult",
     "EmulatorBackend",
+    "encode_state_flags",
     "FZeroXTelemetry",
     "FrameStep",
     "JOYPAD_A",
