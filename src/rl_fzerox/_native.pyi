@@ -1,4 +1,44 @@
 # src/rl_fzerox/_native.pyi
+from typing import Any, TypeAlias, TypedDict
+
+class ObservationSpecDict(TypedDict):
+    preset: str
+    width: int
+    height: int
+    channels: int
+    display_width: int
+    display_height: int
+
+PlayerTelemetryFlat: TypeAlias = tuple[
+    int,
+    tuple[str, ...],
+    float,
+    float,
+    float,
+    float,
+    int,
+    float,
+    float,
+    float,
+    float,
+    int,
+    int,
+    int,
+    int,
+    int,
+    int,
+]
+TelemetryFlat: TypeAlias = tuple[
+    int,
+    int,
+    int,
+    str,
+    int,
+    bool,
+    PlayerTelemetryFlat,
+]
+
+
 class Emulator:
     def __init__(
         self,
@@ -35,8 +75,11 @@ class Emulator:
     def save_state(self, path: str) -> None: ...
     def capture_current_as_baseline(self, path: str | None = None) -> None: ...
     def frame_rgb(self) -> bytes: ...
-    def frame_observation(self, width: int, height: int, rgb: bool = True) -> bytes: ...
+    def observation_spec(self, preset: str) -> ObservationSpecDict: ...
+    def frame_observation(self, preset: str, frame_stack: int) -> Any: ...
+    def frame_display(self, preset: str) -> Any: ...
     def telemetry(self) -> dict[str, object]: ...
+    def telemetry_flat(self) -> TelemetryFlat: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...
     def close(self) -> None: ...
 

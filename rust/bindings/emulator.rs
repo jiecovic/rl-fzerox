@@ -153,25 +153,26 @@ impl PyEmulator {
         Ok(dict)
     }
 
-    #[pyo3(signature = (preset))]
+    #[pyo3(signature = (preset, frame_stack))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
+        frame_stack: usize,
     ) -> PyResult<Bound<'py, PyAny>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
         let frame = py
-            .detach(|| self.host.observation_frame(preset))
+            .detach(|| self.host.observation_frame(preset, frame_stack))
             .map_err(map_core_error)?;
         frame_to_pyarray(
             py,
             frame,
             spec.frame_height,
             spec.frame_width,
-            spec.channels,
+            spec.channels * frame_stack,
         )
     }
 

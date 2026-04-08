@@ -4,7 +4,7 @@
 
 use std::slice;
 
-use super::Host;
+use super::host::Host;
 use crate::core::error::CoreError;
 
 impl Host {

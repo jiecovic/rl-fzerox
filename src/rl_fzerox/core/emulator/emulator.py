@@ -6,11 +6,12 @@ from pathlib import Path
 import numpy as np
 
 from rl_fzerox._native import Emulator as NativeEmulator
-from rl_fzerox.core.emulator.base import FrameStep, ResetState
+from rl_fzerox.core.emulator.base import FrameStep, ObservationSpec, ResetState
 from rl_fzerox.core.emulator.control import ControllerState
 from rl_fzerox.core.emulator.video import display_size
 from rl_fzerox.core.game.telemetry import (
     FZeroXTelemetry,
+    PlayerTelemetry,
     TelemetryDecodeError,
     TelemetryUnavailableError,
     read_telemetry,
@@ -55,6 +56,7 @@ class Emulator:
             ),
             self._renderer,
         )
+        self._observation_specs: dict[str, ObservationSpec] = {}
 
     @property
     def name(self) -> str:
@@ -157,25 +159,66 @@ class Emulator:
             )
         return frame.reshape((frame_height, frame_width, channels))
 
-    def render_observation(
+    def render_display(
         self,
         *,
-        width: int,
-        height: int,
-        rgb: bool = True,
+        preset: str,
     ) -> np.ndarray:
-        """Return one native aspect-corrected observation frame."""
+        """Return one native display frame for the requested observation preset."""
 
-        frame_bytes = self._native.frame_observation(width, height, rgb)
-        channels = 3 if rgb else 1
-        frame = np.frombuffer(frame_bytes, dtype=np.uint8)
-        expected_size = height * width * channels
+        spec = self.observation_spec(preset)
+        frame = np.asarray(self._native.frame_display(preset), dtype=np.uint8)
+        expected_size = spec.display_height * spec.display_width * 3
+        if frame.size != expected_size:
+            raise RuntimeError(
+                "Unexpected display frame size from native emulator: "
+                f"expected {expected_size} bytes, got {frame.size}"
+            )
+        expected_shape = (spec.display_height, spec.display_width, 3)
+        if tuple(int(value) for value in frame.shape) != expected_shape:
+            raise RuntimeError(
+                "Unexpected display frame shape from native emulator: "
+                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
+            )
+        return np.ascontiguousarray(frame)
+
+    def observation_spec(self, preset: str) -> ObservationSpec:
+        """Return the resolved native observation spec for one preset."""
+
+        cached = self._observation_specs.get(preset)
+        if cached is not None:
+            return cached
+        spec_data = self._native.observation_spec(preset)
+        spec = ObservationSpec(
+            preset=str(spec_data["preset"]),
+            width=int(spec_data["width"]),
+            height=int(spec_data["height"]),
+            channels=int(spec_data["channels"]),
+            display_width=int(spec_data["display_width"]),
+            display_height=int(spec_data["display_height"]),
+        )
+        self._observation_specs[preset] = spec
+        return spec
+
+    def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
+        """Return one native stacked observation tensor for the requested preset."""
+
+        spec = self.observation_spec(preset)
+        frame = np.asarray(self._native.frame_observation(preset, frame_stack), dtype=np.uint8)
+        stacked_channels = spec.channels * frame_stack
+        expected_size = spec.height * spec.width * stacked_channels
         if frame.size != expected_size:
             raise RuntimeError(
                 "Unexpected observation size from native emulator: "
                 f"expected {expected_size} bytes, got {frame.size}"
             )
-        return frame.reshape((height, width, channels))
+        expected_shape = (spec.height, spec.width, stacked_channels)
+        if tuple(int(value) for value in frame.shape) != expected_shape:
+            raise RuntimeError(
+                "Unexpected observation frame shape from native emulator: "
+                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
+            )
+        return np.ascontiguousarray(frame)
 
     def telemetry_data(self) -> dict[str, object]:
         """Return the latest structured telemetry mapping from the native host."""
@@ -189,6 +232,9 @@ class Emulator:
         """Return the latest telemetry snapshot, if the host can decode it."""
 
         try:
+            native = getattr(self, "_native", None)
+            if native is not None:
+                return _telemetry_from_flat_tuple(native.telemetry_flat())
             return read_telemetry(self)
         except TelemetryUnavailableError:
             return None
@@ -215,3 +261,101 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
+
+
+def _telemetry_from_flat_tuple(data: object) -> FZeroXTelemetry:
+    if not isinstance(data, tuple) or len(data) != 7:
+        raise TelemetryDecodeError("Native telemetry payload must be a 7-item tuple")
+
+    (
+        system_ram_size,
+        game_frame_count,
+        game_mode_raw,
+        game_mode_name,
+        course_index,
+        in_race_mode,
+        player_data,
+    ) = data
+    if not isinstance(player_data, tuple) or len(player_data) != 17:
+        raise TelemetryDecodeError("Native player telemetry payload must be a 17-item tuple")
+
+    (
+        state_flags,
+        state_labels,
+        speed_raw,
+        speed_kph,
+        energy,
+        max_energy,
+        boost_timer,
+        race_distance,
+        laps_completed_distance,
+        lap_distance,
+        race_distance_position,
+        race_time_ms,
+        lap,
+        laps_completed,
+        position,
+        character,
+        machine_index,
+    ) = player_data
+
+    if not isinstance(state_labels, tuple) or not all(
+        isinstance(label, str) for label in state_labels
+    ):
+        raise TelemetryDecodeError("Native player telemetry labels must be a tuple[str, ...]")
+
+    return FZeroXTelemetry(
+        system_ram_size=_int_field(system_ram_size, "system_ram_size"),
+        game_frame_count=_int_field(game_frame_count, "game_frame_count"),
+        game_mode_raw=_int_field(game_mode_raw, "game_mode_raw"),
+        game_mode_name=_str_field(game_mode_name, "game_mode_name"),
+        course_index=_int_field(course_index, "course_index"),
+        in_race_mode=_bool_field(in_race_mode, "in_race_mode"),
+        player=PlayerTelemetry(
+            state_flags=_int_field(state_flags, "player.state_flags"),
+            state_labels=tuple(state_labels),
+            speed_raw=_float_field(speed_raw, "player.speed_raw"),
+            speed_kph=_float_field(speed_kph, "player.speed_kph"),
+            energy=_float_field(energy, "player.energy"),
+            max_energy=_float_field(max_energy, "player.max_energy"),
+            boost_timer=_int_field(boost_timer, "player.boost_timer"),
+            race_distance=_float_field(race_distance, "player.race_distance"),
+            laps_completed_distance=_float_field(
+                laps_completed_distance, "player.laps_completed_distance"
+            ),
+            lap_distance=_float_field(lap_distance, "player.lap_distance"),
+            race_distance_position=_float_field(
+                race_distance_position, "player.race_distance_position"
+            ),
+            race_time_ms=_int_field(race_time_ms, "player.race_time_ms"),
+            lap=_int_field(lap, "player.lap"),
+            laps_completed=_int_field(laps_completed, "player.laps_completed"),
+            position=_int_field(position, "player.position"),
+            character=_int_field(character, "player.character"),
+            machine_index=_int_field(machine_index, "player.machine_index"),
+        ),
+    )
+
+
+def _int_field(value: object, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be an int")
+    return value
+
+
+def _float_field(value: object, field_name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be numeric")
+    return float(value)
+
+
+def _bool_field(value: object, field_name: str) -> bool:
+    if not isinstance(value, bool):
+        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be a bool")
+    return value
+
+
+def _str_field(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise TelemetryDecodeError(f"Native telemetry field {field_name!r} must be a str")
+    return value
