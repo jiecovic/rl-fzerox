@@ -76,8 +76,8 @@ def _format_stuck_counter(
     return f"{_int_info(info, 'stalled_steps')} / {stuck_step_limit}"
 
 
-def _format_fps(info: dict[str, object]) -> str:
-    return f"{_float_info(info, 'viewer_fps'):.1f} / {_float_info(info, 'native_fps'):.1f}"
+def _format_control_game_rate(info: dict[str, object]) -> str:
+    return f"{_float_info(info, 'control_fps'):.1f} / {_float_info(info, 'game_fps'):.1f}"
 
 
 def _float_info(info: dict[str, object], key: str) -> float:

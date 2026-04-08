@@ -22,8 +22,8 @@ from rl_fzerox.ui.watch.session import (
     _policy_label,
     _policy_reload_age_seconds,
     _policy_reload_error,
+    _read_live_telemetry,
     _save_baseline_state,
-    _telemetry_from_info,
     _with_viewer_fps,
 )
 
@@ -77,7 +77,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             reset_info = dict(info)
             current_control_state = ControllerState()
             current_policy_action: np.ndarray | None = None
-            telemetry = _telemetry_from_info(info)
+            telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
                 screen = _create_screen(
@@ -86,8 +86,13 @@ def run_viewer(config: WatchAppConfig) -> None:
                     observation.shape,
                 )
                 fonts = _create_fonts(pygame)
-                target_fps = config.watch.fps or (env.backend.native_fps / config.env.action_repeat)
-                target_seconds = 1.0 / target_fps
+                max_control_fps = env.backend.native_fps / config.env.action_repeat
+                configured_control_fps = config.watch.fps
+                if configured_control_fps in (None, "auto"):
+                    target_control_fps = max_control_fps
+                else:
+                    target_control_fps = min(configured_control_fps, max_control_fps)
+                target_seconds = 1.0 / target_control_fps
 
             viewer_input = _poll_viewer_input(pygame)
             if viewer_input.quit_requested:
@@ -119,6 +124,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 info,
                 last_draw_time=last_draw_time,
                 current_viewer_fps=viewer_fps,
+                action_repeat=config.env.action_repeat,
             )
             _draw_frame(
                 pygame=pygame,
@@ -169,6 +175,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         info,
                         last_draw_time=last_draw_time,
                         current_viewer_fps=viewer_fps,
+                        action_repeat=config.env.action_repeat,
                     )
                     _draw_frame(
                         pygame=pygame,
@@ -206,7 +213,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         observation, reward, terminated, truncated, info = env.step(action)
                     raw_frame = env.render()
                     episode_reward += reward
-                    telemetry = _telemetry_from_info(info)
+                    telemetry = _read_live_telemetry(emulator)
                     policy_reload_error = _policy_reload_error(policy_runner)
                     last_logged_reload_error = _persist_reload_error(
                         reload_error=policy_reload_error,
@@ -217,6 +224,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         info,
                         last_draw_time=last_draw_time,
                         current_viewer_fps=viewer_fps,
+                        action_repeat=config.env.action_repeat,
                     )
                     _draw_frame(
                         pygame=pygame,
@@ -253,7 +261,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     observation, reward, terminated, truncated, info = env.step(action)
                 raw_frame = env.render()
                 episode_reward += reward
-                telemetry = _telemetry_from_info(info)
+                telemetry = _read_live_telemetry(emulator)
                 policy_reload_error = _policy_reload_error(policy_runner)
                 last_logged_reload_error = _persist_reload_error(
                     reload_error=policy_reload_error,
@@ -271,6 +279,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     info,
                     last_draw_time=last_draw_time,
                     current_viewer_fps=viewer_fps,
+                    action_repeat=config.env.action_repeat,
                 )
                 _draw_frame(
                     pygame=pygame,

@@ -81,7 +81,8 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
             summary = make_step_summary(
                 frames_run=2,
                 max_race_distance=42.0,
-                reverse_warning_frames=1,
+                reverse_active_frames=1,
+                low_speed_frames=1,
                 energy_loss_total=4.0,
                 energy_gain_total=1.5,
                 consecutive_low_speed_frames=2,
@@ -113,7 +114,8 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     assert result.observation.shape == (78, 222, 6)
     assert result.summary.frames_run == 2
     assert result.summary.max_race_distance == 42.0
-    assert result.summary.reverse_warning_frames == 1
+    assert result.summary.reverse_active_frames == 1
+    assert result.summary.low_speed_frames == 1
     assert result.summary.energy_loss_total == 4.0
     assert result.summary.energy_gain_total == 1.5
     assert result.summary.final_frame_index == 12

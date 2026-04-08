@@ -75,7 +75,8 @@ class FZeroXEnvEngine:
         self._held_controller_state = ControllerState()
         info["seed"] = seed
         if telemetry is not None:
-            info["telemetry"] = telemetry
+            info.update(_telemetry_info(telemetry))
+        info.update(self._reward_tracker.info(telemetry))
         observation = self._transform_observation()
         _set_observation_info(
             info,
@@ -189,8 +190,9 @@ class FZeroXEnvEngine:
         info["termination_reason"] = step_result.status.termination_reason
         info["truncation_reason"] = step_result.status.truncation_reason
         if telemetry is not None:
-            info["telemetry"] = telemetry
+            # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(_telemetry_info(telemetry))
+        info.update(self._reward_tracker.info(telemetry))
         observation = step_result.observation
         self._episode_return += reward
         info["episode_return"] = self._episode_return

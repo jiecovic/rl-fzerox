@@ -182,7 +182,16 @@ def test_format_policy_action_is_human_readable() -> None:
 def test_display_section_includes_action_repeat() -> None:
     columns = _build_panel_columns(
         episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "control_fps": 30.0,
+            "game_fps": 60.0,
+            "milestones_completed": 1,
+            "next_milestone_index": 2,
+            "distance_to_next_milestone": 750.0,
+            "next_milestone_distance": 6000.0,
+        },
         reset_info={},
         episode_reward=0.0,
         paused=False,
@@ -200,8 +209,16 @@ def test_display_section_includes_action_repeat() -> None:
 
     display_section = next(section for section in columns.right if section.title == "Display")
     repeat_line = next(line for line in display_section.lines if line.label == "Frame skip")
+    control_rate_line = next(line for line in display_section.lines if line.label == "Control/Game")
+    milestone_line = next(line for line in display_section.lines if line.label == "Milestones")
+    next_milestone_line = next(
+        line for line in display_section.lines if line.label == "Next milestone"
+    )
 
     assert repeat_line.value == "2"
+    assert control_rate_line.value == "30.0 / 60.0"
+    assert milestone_line.value == "1 done / next 2"
+    assert next_milestone_line.value == "750.0 to 6,000"
 
 
 def test_session_section_includes_stuck_counter() -> None:

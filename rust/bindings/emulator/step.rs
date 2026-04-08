@@ -27,7 +27,8 @@ impl PyStepSummary {
     #[pyo3(signature = (
         frames_run,
         max_race_distance,
-        reverse_warning_frames=0,
+        reverse_active_frames=0,
+        low_speed_frames=0,
         energy_loss_total=0.0,
         energy_gain_total=0.0,
         consecutive_low_speed_frames=0,
@@ -38,7 +39,8 @@ impl PyStepSummary {
     fn new(
         frames_run: usize,
         max_race_distance: f32,
-        reverse_warning_frames: usize,
+        reverse_active_frames: usize,
+        low_speed_frames: usize,
         energy_loss_total: f32,
         energy_gain_total: f32,
         consecutive_low_speed_frames: usize,
@@ -49,7 +51,8 @@ impl PyStepSummary {
             inner: StepSummary {
                 frames_run,
                 max_race_distance,
-                reverse_warning_frames,
+                reverse_active_frames,
+                low_speed_frames,
                 energy_loss_total,
                 energy_gain_total,
                 consecutive_low_speed_frames,
@@ -70,8 +73,13 @@ impl PyStepSummary {
     }
 
     #[getter]
-    fn reverse_warning_frames(&self) -> usize {
-        self.inner.reverse_warning_frames
+    fn reverse_active_frames(&self) -> usize {
+        self.inner.reverse_active_frames
+    }
+
+    #[getter]
+    fn low_speed_frames(&self) -> usize {
+        self.inner.low_speed_frames
     }
 
     #[getter]
@@ -143,7 +151,8 @@ impl PyStepSummary {
         let dict = PyDict::new(py);
         dict.set_item("frames_run", self.frames_run())?;
         dict.set_item("max_race_distance", self.max_race_distance())?;
-        dict.set_item("reverse_warning_frames", self.reverse_warning_frames())?;
+        dict.set_item("reverse_active_frames", self.reverse_active_frames())?;
+        dict.set_item("low_speed_frames", self.low_speed_frames())?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item(

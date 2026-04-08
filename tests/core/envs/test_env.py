@@ -1,4 +1,6 @@
 # tests/core/envs/test_env.py
+import pickle
+
 import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
@@ -95,6 +97,19 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [7, 2]
+
+
+def test_reset_info_is_pickle_safe_with_live_telemetry() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1),
+    )
+
+    _, info = env.reset(seed=123)
+
+    assert "telemetry" not in info
+    pickle.dumps(info)
 
 
 def test_step_advances_backend_by_action_repeat():
@@ -321,6 +336,7 @@ def test_step_truncates_when_speed_is_stuck() -> None:
                 telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
                 summary=_step_summary(
                     max_race_distance=0.0,
+                    low_speed_frames=1,
                     consecutive_low_speed_frames=1,
                     final_frame_index=1,
                 ),
@@ -330,6 +346,7 @@ def test_step_truncates_when_speed_is_stuck() -> None:
                 telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
                 summary=_step_summary(
                     max_race_distance=0.0,
+                    low_speed_frames=1,
                     consecutive_low_speed_frames=1,
                     final_frame_index=2,
                 ),
@@ -361,14 +378,15 @@ def test_step_truncates_when_speed_is_stuck() -> None:
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-300.495)
+    assert reward == pytest.approx(-300.99)
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
-    assert info["step_reward"] == pytest.approx(-300.495)
+    assert info["step_reward"] == pytest.approx(-300.99)
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["time"] == -0.005
-    assert reward_breakdown["stuck_truncation"] == pytest.approx(-300.49)
+    assert reward_breakdown["low_speed_time"] == -0.005
+    assert reward_breakdown["stuck_truncation"] == pytest.approx(-300.98)
 
 
 def test_step_truncates_when_driving_the_wrong_way() -> None:
@@ -378,7 +396,7 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
                 telemetry=_telemetry(race_distance=-3.0, reverse_timer=80),
                 summary=_step_summary(
                     max_race_distance=0.0,
-                    reverse_warning_frames=0,
+                    reverse_active_frames=1,
                     final_frame_index=1,
                 ),
                 status=make_step_status(step_count=1, reverse_timer=80),
@@ -387,7 +405,7 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
                 telemetry=_telemetry(race_distance=-6.5, reverse_timer=100),
                 summary=_step_summary(
                     max_race_distance=0.0,
-                    reverse_warning_frames=1,
+                    reverse_active_frames=1,
                     final_frame_index=2,
                 ),
                 status=make_step_status(
@@ -413,20 +431,20 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     assert not terminated
     assert not truncated
-    assert reward == pytest.approx(-0.005)
+    assert reward == pytest.approx(-0.01)
     assert info["reverse_timer"] == 80
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-320.5)
+    assert reward == pytest.approx(-320.99)
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_timer"] == 100
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["reverse_time"] == -0.005
-    assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.49)
+    assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.98)
 
 
 def test_terminal_step_exposes_monitor_info_keys() -> None:
@@ -493,6 +511,33 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     assert info["termination_reason"] == "finished"
 
 
+def test_step_info_is_pickle_safe_with_native_telemetry() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=42.0),
+                summary=_step_summary(
+                    max_race_distance=42.0,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1),
+    )
+
+    env.reset(seed=8)
+    _, _, _, _, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert "telemetry" not in info
+    assert info["race_distance"] == pytest.approx(42.0)
+    pickle.dumps(info)
+
+
 def _telemetry(
     *,
     race_distance: float,
@@ -512,7 +557,8 @@ def _step_summary(
     *,
     max_race_distance: float,
     frames_run: int = 1,
-    reverse_warning_frames: int = 0,
+    reverse_active_frames: int = 0,
+    low_speed_frames: int = 0,
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     final_frame_index: int = 1,
@@ -520,7 +566,8 @@ def _step_summary(
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
-        reverse_warning_frames=reverse_warning_frames,
+        reverse_active_frames=reverse_active_frames,
+        low_speed_frames=low_speed_frames,
         energy_loss_total=0.0,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_labels=entered_state_labels,

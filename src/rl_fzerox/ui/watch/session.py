@@ -11,11 +11,8 @@ if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner
 
 
-def _telemetry_from_info(info: dict[str, object]) -> FZeroXTelemetry | None:
-    telemetry = info.get("telemetry")
-    if isinstance(telemetry, FZeroXTelemetry):
-        return telemetry
-    return None
+def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
+    return emulator.try_read_telemetry()
 
 
 def _load_policy_runner(
@@ -72,6 +69,7 @@ def _with_viewer_fps(
     *,
     last_draw_time: float | None,
     current_viewer_fps: float,
+    action_repeat: int,
 ) -> tuple[dict[str, object], float, float]:
     now = time.perf_counter()
     if last_draw_time is None:
@@ -86,4 +84,6 @@ def _with_viewer_fps(
         )
     draw_info = dict(info)
     draw_info["viewer_fps"] = viewer_fps
+    draw_info["control_fps"] = viewer_fps
+    draw_info["game_fps"] = viewer_fps * float(action_repeat)
     return draw_info, now, viewer_fps
