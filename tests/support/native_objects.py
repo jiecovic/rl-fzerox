@@ -3,25 +3,18 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry, StepSummary
-
-_STATE_FLAG_MASKS: dict[str, int] = {
-    "collision_recoil": 1 << 13,
-    "spinning_out": 1 << 14,
-    "retired": 1 << 18,
-    "falling_off_track": 1 << 19,
-    "can_boost": 1 << 20,
-    "cpu_controlled": 1 << 23,
-    "dash_pad_boost": 1 << 24,
-    "finished": 1 << 25,
-    "airborne": 1 << 26,
-    "crashed": 1 << 27,
-    "active": 1 << 30,
-}
+from fzerox_emulator import (
+    FZeroXTelemetry,
+    PlayerTelemetry,
+    StepSummary,
+)
+from fzerox_emulator import (
+    encode_state_flags as _encode_state_flags,
+)
 
 
 def encode_state_flags(state_labels: Iterable[str]) -> int:
-    return sum(_STATE_FLAG_MASKS.get(label, 0) for label in state_labels)
+    return int(_encode_state_flags(list(state_labels)))
 
 
 def make_player_telemetry(

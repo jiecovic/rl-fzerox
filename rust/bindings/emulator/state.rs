@@ -1,6 +1,9 @@
 // rust/bindings/emulator/state.rs
 //! Shared racer-state flag helpers for Python-facing telemetry and step objects.
 
+use pyo3::exceptions::PyValueError;
+use pyo3::prelude::*;
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct RacerStateFlagSpec {
     pub mask: u32,
@@ -87,4 +90,22 @@ pub(super) fn terminal_reason(state_flags: u32) -> Option<&'static str> {
     ]
     .into_iter()
     .find_map(|(label, mask)| has_state_flag(state_flags, mask).then_some(label))
+}
+
+#[pyfunction]
+pub fn encode_state_flags(labels: Vec<String>) -> PyResult<u32> {
+    let mut state_flags = 0u32;
+    for label in labels {
+        let Some(mask) = RACER_STATE_FLAG_SPECS
+            .iter()
+            .find(|spec| spec.label == label)
+            .map(|spec| spec.mask)
+        else {
+            return Err(PyValueError::new_err(format!(
+                "Unknown racer state label: {label}"
+            )));
+        };
+        state_flags |= mask;
+    }
+    Ok(state_flags)
 }

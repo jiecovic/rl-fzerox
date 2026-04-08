@@ -17,6 +17,7 @@ mod step;
 mod telemetry;
 
 use frame::frame_to_pyarray;
+pub use state::encode_state_flags;
 pub use step::PyStepSummary;
 use step::step_summary_to_py;
 use telemetry::telemetry_to_py;
