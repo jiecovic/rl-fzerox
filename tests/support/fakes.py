@@ -15,6 +15,7 @@ from fzerox_emulator import (
     StepSummary,
     display_size,
 )
+from tests.support.native_objects import make_telemetry
 
 
 @dataclass
@@ -147,7 +148,24 @@ class SyntheticBackend:
         return np.array(self._observation_stacks[stack_key][0], copy=True)
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
-        return None
+        if self.frame_index < 240:
+            return None
+        if self.frame_index < 1_412:
+            return make_telemetry(
+                game_mode_raw=0,
+                game_mode_name="title",
+                in_race_mode=False,
+                race_distance=self._state.progress,
+                state_labels=("active",),
+            )
+        return make_telemetry(
+            game_mode_raw=1,
+            game_mode_name="gp_race",
+            in_race_mode=True,
+            race_distance=self._state.progress,
+            race_time_ms=0,
+            state_labels=("active",),
+        )
 
     def step_frames(self, count: int, *, capture_video: bool = True) -> None:
         self._capture_video_flags.extend([capture_video] * count)
