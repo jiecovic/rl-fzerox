@@ -123,6 +123,31 @@ def test_load_watch_app_config_accepts_larger_observation_preset(tmp_path: Path)
     assert config.env.observation.preset == "native_crop_v2"
 
 
+def test_load_watch_app_config_accepts_default_v3_observation_preset(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "watch.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: native_crop_v3",
+            "watch:",
+            "  fps: auto",
+        ],
+    )
+
+    config = load_watch_app_config(config_path)
+
+    assert config.env.observation.preset == "native_crop_v3"
+
+
 def test_load_watch_app_config_accepts_auto_watch_fps(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
