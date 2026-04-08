@@ -6,6 +6,6 @@ pub mod error;
 pub mod input;
 pub mod probe;
 
-pub use emulator::PyEmulator;
+pub use emulator::{PyEmulator, PyPlayerTelemetry, PyStepSummary, PyTelemetry};
 pub use input::register_input_api;
 pub use probe::{PyCoreInfo, probe_core};

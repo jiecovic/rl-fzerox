@@ -66,5 +66,5 @@ line-ending = "lf"
 
 [tool.maturin]
 bindings = "pyo3"
-module-name = "rl_fzerox._native"
+module-name = "fzerox_emulator._native"
 python-source = "src"

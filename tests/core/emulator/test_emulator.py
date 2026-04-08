@@ -4,9 +4,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from rl_fzerox.core.emulator import Emulator
-from rl_fzerox.core.emulator.control import ControllerState
-from rl_fzerox.core.game import TelemetryDecodeError, TelemetryUnavailableError
+from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
+from tests.support.native_objects import make_step_summary, make_telemetry
 
 
 def test_emulator_rejects_missing_core(tmp_path: Path) -> None:
@@ -37,30 +36,30 @@ def test_emulator_rejects_unsupported_renderer(tmp_path: Path) -> None:
         Emulator(core_path=core_path, rom_path=rom_path, renderer="gliden64")
 
 
-def test_try_read_telemetry_returns_none_only_for_unavailable(monkeypatch) -> None:
+def test_try_read_telemetry_returns_none_when_native_binding_reports_no_snapshot() -> None:
     emulator = object.__new__(Emulator)
-
-    monkeypatch.setattr(
-        "rl_fzerox.core.emulator.emulator.read_telemetry",
-        lambda _: (_ for _ in ()).throw(TelemetryUnavailableError("missing")),
-    )
+    emulator.__dict__["_native"] = type(
+        "NativeStub",
+        (),
+        {"telemetry": staticmethod(lambda: None)},
+    )()
 
     assert emulator.try_read_telemetry() is None
 
 
-def test_try_read_telemetry_propagates_decode_errors(monkeypatch) -> None:
+def test_try_read_telemetry_returns_native_snapshot_object() -> None:
+    telemetry = make_telemetry(race_distance=42.0)
     emulator = object.__new__(Emulator)
+    emulator.__dict__["_native"] = type(
+        "NativeStub",
+        (),
+        {"telemetry": staticmethod(lambda: telemetry)},
+    )()
 
-    monkeypatch.setattr(
-        "rl_fzerox.core.emulator.emulator.read_telemetry",
-        lambda _: (_ for _ in ()).throw(TelemetryDecodeError("bad payload")),
-    )
-
-    with pytest.raises(TelemetryDecodeError, match="bad payload"):
-        emulator.try_read_telemetry()
+    assert emulator.try_read_telemetry() is telemetry
 
 
-def test_step_repeat_raw_decodes_native_summary_and_observation() -> None:
+def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     emulator = object.__new__(Emulator)
     emulator._observation_specs = {}
 
@@ -79,34 +78,15 @@ def test_step_repeat_raw_decodes_native_summary_and_observation() -> None:
         def step_repeat_raw(self, **kwargs):
             assert kwargs["action_repeat"] == 2
             observation = np.zeros((78, 222, 6), dtype=np.uint8)
-            summary = (2, 42.0, 3.5, 1, 4.0, 2, 0, 12)
-            telemetry = (
-                0x00800000,
-                120,
-                1,
-                "gp_race",
-                0,
-                True,
-                (
-                    1 << 30,
-                    ("active",),
-                    0.0,
-                    100.0,
-                    178.0,
-                    178.0,
-                    0,
-                    42.0,
-                    0.0,
-                    42.0,
-                    42.0,
-                    5000,
-                    1,
-                    0,
-                    10,
-                    0,
-                    0,
-                ),
+            summary = make_step_summary(
+                frames_run=2,
+                max_race_distance=42.0,
+                reverse_progress_total=3.5,
+                energy_loss_total=4.0,
+                consecutive_low_speed_frames=2,
+                final_frame_index=12,
             )
+            telemetry = make_telemetry(race_distance=42.0, race_time_ms=5000, position=10)
             return observation, summary, telemetry
 
     emulator.__dict__["_native"] = NativeStub()
@@ -128,5 +108,5 @@ def test_step_repeat_raw_decodes_native_summary_and_observation() -> None:
     assert result.summary.reverse_progress_total == 3.5
     assert result.summary.energy_loss_total == 4.0
     assert result.summary.final_frame_index == 12
-    assert result.telemetry is not None
+    assert isinstance(result.telemetry, FZeroXTelemetry)
     assert result.telemetry.player.race_distance == 42.0

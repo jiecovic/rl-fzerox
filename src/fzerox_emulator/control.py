@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/emulator/control.py
+# src/fzerox_emulator/control.py
 from __future__ import annotations
 
 from dataclasses import dataclass

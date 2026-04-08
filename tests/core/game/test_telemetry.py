@@ -1,147 +1,72 @@
 # tests/core/game/test_telemetry.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-from struct import pack_into
-
-import pytest
-
-from rl_fzerox.core.game.telemetry import (
-    GLOBALS,
-    RACER,
-    RACER_SIZE,
-    TelemetryDecodeError,
-    TelemetryUnavailableError,
-    read_telemetry,
-)
+from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry, StepSummary
 
 
-@dataclass
-class FakeMemoryEmulator:
-    system_ram: bytes
-
-    @property
-    def system_ram_size(self) -> int:
-        return len(self.system_ram)
-
-    def read_system_ram(self, offset: int, length: int) -> bytes:
-        return self.system_ram[offset : offset + length]
-
-
-@dataclass
-class FakeStructuredTelemetryEmulator:
-    payload: dict[str, object]
-
-    def telemetry_data(self) -> dict[str, object]:
-        return self.payload
-
-
-class FakeUnsupportedTelemetryEmulator:
-    pass
-
-
-def test_read_telemetry_decodes_player_one_race_values() -> None:
-    memory = bytearray(0x00300000)
-    player_base = GLOBALS.racers + RACER_SIZE * 0
-
-    pack_into("<I", memory, GLOBALS.game_frame_count, 321)
-    pack_into("<I", memory, GLOBALS.game_mode, 0x00000001)
-    pack_into("<I", memory, GLOBALS.course_index, 0)
-    pack_into("<I", memory, player_base + RACER.state_flags, (1 << 20) | (1 << 30))
-    pack_into("<f", memory, player_base + RACER.speed, 123.5)
-    pack_into("<f", memory, player_base + RACER.energy, 92.25)
-    pack_into("<f", memory, player_base + RACER.max_energy, 100.0)
-    pack_into("<f", memory, player_base + RACER.race_distance, 12_345.5)
-    pack_into("<f", memory, player_base + RACER.laps_completed_distance, 10_000.0)
-    pack_into("<f", memory, player_base + RACER.lap_distance, 2_345.5)
-    pack_into("<f", memory, player_base + RACER.race_distance_position, 12_340.0)
-    pack_into("<i", memory, player_base + RACER.race_time, 12_345)
-    pack_into("<h", memory, player_base + RACER.lap, 2)
-    pack_into("<i", memory, player_base + RACER.position, 3)
-    memory[player_base + RACER.character] = 0
-    memory[player_base + RACER.machine_index] = 7
-
-    telemetry = read_telemetry(FakeMemoryEmulator(bytes(memory)))
-
-    assert telemetry.system_ram_size == len(memory)
-    assert telemetry.game_frame_count == 321
-    assert telemetry.game_mode_raw == 1
-    assert telemetry.game_mode_name == "gp_race"
-    assert telemetry.in_race_mode is True
-    assert telemetry.course_index == 0
-    assert telemetry.player.speed_raw == pytest.approx(123.5)
-    assert telemetry.player.speed_kph == pytest.approx(123.5 * 21.6)
-    assert telemetry.player.energy == pytest.approx(92.25)
-    assert telemetry.player.max_energy == pytest.approx(100.0)
-    assert telemetry.player.race_distance == pytest.approx(12_345.5)
-    assert telemetry.player.laps_completed_distance == pytest.approx(10_000.0)
-    assert telemetry.player.lap_distance == pytest.approx(2_345.5)
-    assert telemetry.player.race_distance_position == pytest.approx(12_340.0)
-    assert telemetry.player.race_time_ms == 12_345
-    assert telemetry.player.lap == 2
-    assert telemetry.player.position == 3
-    assert telemetry.player.character == 0
-    assert telemetry.player.machine_index == 7
-    assert telemetry.player.state_labels == ("can_boost", "active")
-
-
-def test_read_telemetry_accepts_native_structured_payloads() -> None:
-    telemetry = read_telemetry(
-        FakeStructuredTelemetryEmulator(
-            {
-                "system_ram_size": 0x00300000,
-                "game_frame_count": 321,
-                "game_mode_raw": 1,
-                "game_mode_name": "gp_race",
-                "course_index": 0,
-                "in_race_mode": True,
-                "player": {
-                    "state_flags": (1 << 20) | (1 << 30),
-                    "state_labels": ["can_boost", "active"],
-                    "speed_raw": 123.5,
-                    "speed_kph": 123.5 * 21.6,
-                    "energy": 92.25,
-                    "max_energy": 100.0,
-                    "boost_timer": 0,
-                    "race_distance": 12_345.5,
-                    "laps_completed_distance": 10_000.0,
-                    "lap_distance": 2_345.5,
-                    "race_distance_position": 12_340.0,
-                    "race_time_ms": 12_345,
-                    "lap": 2,
-                    "laps_completed": 1,
-                    "position": 3,
-                    "character": 0,
-                    "machine_index": 7,
-                },
-            }
-        )
+def test_native_player_telemetry_exposes_state_helpers() -> None:
+    player = PlayerTelemetry(
+        state_flags=(1 << 20) | (1 << 30),
+        speed_kph=123.5,
+        energy=92.25,
+        max_energy=100.0,
+        boost_timer=0,
+        race_distance=12_345.5,
+        lap_distance=2_345.5,
+        race_time_ms=12_345,
+        lap=2,
+        laps_completed=1,
+        position=3,
     )
 
-    assert telemetry.system_ram_size == 0x00300000
-    assert telemetry.game_frame_count == 321
-    assert telemetry.game_mode_name == "gp_race"
-    assert telemetry.player.speed_kph == pytest.approx(123.5 * 21.6)
-    assert telemetry.player.state_labels == ("can_boost", "active")
+    assert player.can_boost is True
+    assert player.active is True
+    assert player.finished is False
+    assert player.state_labels == ("can_boost", "active")
 
 
-def test_read_telemetry_raises_decode_error_for_bad_structured_payload() -> None:
-    with pytest.raises(TelemetryDecodeError, match="player mapping"):
-        read_telemetry(
-            FakeStructuredTelemetryEmulator(
-                {
-                    "system_ram_size": 0x00300000,
-                    "game_frame_count": 321,
-                    "game_mode_raw": 1,
-                    "game_mode_name": "gp_race",
-                    "course_index": 0,
-                    "in_race_mode": True,
-                    "player": "bad",
-                }
-            )
-        )
+def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
+    telemetry = FZeroXTelemetry(
+        game_mode_raw=1,
+        game_mode_name="gp_race",
+        in_race_mode=True,
+        course_index=0,
+        player=PlayerTelemetry(
+            state_flags=(1 << 20) | (1 << 30),
+            speed_kph=123.5,
+            energy=92.25,
+            max_energy=100.0,
+            boost_timer=0,
+            race_distance=12_345.5,
+            lap_distance=2_345.5,
+            race_time_ms=12_345,
+            lap=2,
+            laps_completed=1,
+            position=3,
+        ),
+    )
+
+    payload = telemetry.to_dict()
+
+    assert payload["game_mode_name"] == "gp_race"
+    player_payload = payload["player"]
+    assert isinstance(player_payload, dict)
+    assert player_payload["state_labels"] == ("can_boost", "active")
 
 
-def test_read_telemetry_raises_unavailable_for_unsupported_backend() -> None:
-    with pytest.raises(TelemetryUnavailableError):
-        read_telemetry(FakeUnsupportedTelemetryEmulator())
+def test_native_step_summary_exposes_entered_state_helpers() -> None:
+    summary = StepSummary(
+        frames_run=2,
+        max_race_distance=42.0,
+        reverse_progress_total=3.5,
+        consecutive_reverse_frames=1,
+        energy_loss_total=4.0,
+        consecutive_low_speed_frames=2,
+        entered_state_flags=(1 << 13) | (1 << 25),
+        final_frame_index=12,
+    )
+
+    assert summary.entered_collision_recoil is True
+    assert summary.entered_finished is True
+    assert summary.entered_crashed is False
+    assert summary.entered_state_labels == ("collision_recoil", "finished")
