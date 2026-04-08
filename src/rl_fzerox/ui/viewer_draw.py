@@ -10,7 +10,6 @@ from rl_fzerox.ui.viewer_format import (
     _format_observation_summary,
     _observation_preview_size,
     _preview_frame,
-    _preview_panel_size,
     _window_size,
     _wrap_text,
 )
@@ -51,40 +50,36 @@ def _draw_frame(
     policy_action: np.ndarray | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    action_repeat: int,
+    stuck_step_limit: int,
     telemetry,
 ) -> None:
     game_surface = _rgb_surface(pygame, raw_frame)
     game_display_size = display_size(raw_frame.shape, _display_aspect_ratio(info))
     if game_surface.get_size() != game_display_size:
-        game_surface = pygame.transform.scale(game_surface, game_display_size)
+        raise RuntimeError(
+            "Native display frame size did not match the expected watch size: "
+            f"frame={game_surface.get_size()}, expected={game_display_size}"
+        )
     preview_frame = _preview_frame(observation)
     observation_display_size = _observation_preview_size(observation.shape)
     observation_surface = _rgb_surface(pygame, preview_frame)
     if observation_surface.get_size() != observation_display_size:
-        observation_surface = pygame.transform.scale(
-            observation_surface,
-            observation_display_size,
+        raise RuntimeError(
+            "Native observation preview size did not match the expected preview size: "
+            f"frame={observation_surface.get_size()}, expected={observation_display_size}"
         )
-    preview_panel_size = _preview_panel_size(observation.shape)
-
     screen.fill(PALETTE.app_background)
     screen.blit(game_surface, (0, 0))
-    preview_panel_origin = (
-        game_display_size[0] + LAYOUT.preview_gap,
-        0,
-    )
-    _draw_observation_preview(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        surface=observation_surface,
-        panel_origin=preview_panel_origin,
-        observation_shape=observation.shape,
+    pygame.draw.rect(
+        screen,
+        PALETTE.text_warning,
+        pygame.Rect(0, 0, game_display_size[0], game_display_size[1]),
+        width=2,
+        border_radius=4,
     )
     panel_rect = pygame.Rect(
         game_display_size[0]
-        + LAYOUT.preview_gap
-        + preview_panel_size[0]
         + LAYOUT.preview_gap,
         0,
         LAYOUT.panel_width,
@@ -105,8 +100,11 @@ def _draw_frame(
         policy_action=policy_action,
         policy_reload_age_seconds=policy_reload_age_seconds,
         policy_reload_error=policy_reload_error,
+        action_repeat=action_repeat,
+        stuck_step_limit=stuck_step_limit,
         game_display_size=game_display_size,
         observation_shape=observation.shape,
+        observation_surface=observation_surface,
         telemetry=telemetry,
     )
     pygame.display.flip()
@@ -128,8 +126,11 @@ def _draw_side_panel(
     policy_action: np.ndarray | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    action_repeat: int,
+    stuck_step_limit: int,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
+    observation_surface,
     telemetry,
 ) -> None:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
@@ -155,6 +156,8 @@ def _draw_side_panel(
         policy_action=policy_action,
         policy_reload_age_seconds=policy_reload_age_seconds,
         policy_reload_error=policy_reload_error,
+        action_repeat=action_repeat,
+        stuck_step_limit=stuck_step_limit,
         game_display_size=game_display_size,
         observation_shape=observation_shape,
         telemetry=telemetry,
@@ -185,7 +188,7 @@ def _draw_side_panel(
         width=left_column_width,
         sections=columns.left,
     )
-    _draw_column(
+    right_column_bottom = _draw_column(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -193,6 +196,16 @@ def _draw_side_panel(
         y=y,
         width=right_column_width,
         sections=columns.right,
+    )
+    _draw_observation_preview(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        x=right_x,
+        y=right_column_bottom + LAYOUT.section_gap,
+        width=right_column_width,
+        observation_shape=observation_shape,
     )
 
 
@@ -205,7 +218,7 @@ def _draw_column(
     y: int,
     width: int,
     sections: list[PanelSection],
-) -> None:
+) -> int:
     current_y = y
     for section_index, section in enumerate(sections):
         current_y = _draw_section(
@@ -219,6 +232,7 @@ def _draw_column(
         )
         if section_index < len(sections) - 1:
             current_y += LAYOUT.section_gap
+    return current_y
 
 
 def _draw_panel_title(*, screen, fonts, x: int, y: int, title: str, subtitle: str) -> int:
@@ -650,28 +664,12 @@ def _draw_observation_preview(
     screen,
     fonts: ViewerFonts,
     surface,
-    panel_origin: tuple[int, int],
+    x: int,
+    y: int,
+    width: int,
     observation_shape: tuple[int, ...],
 ) -> None:
     preview_width, preview_height = _observation_preview_size(observation_shape)
-    panel_width, panel_height = _preview_panel_size(observation_shape)
-    panel_rect = pygame.Rect(
-        panel_origin[0],
-        panel_origin[1],
-        panel_width,
-        panel_height,
-    )
-    pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
-    pygame.draw.line(
-        screen,
-        PALETTE.panel_border,
-        panel_rect.topleft,
-        panel_rect.bottomleft,
-        width=2,
-    )
-
-    x = panel_rect.x + LAYOUT.preview_padding
-    y = panel_rect.y + LAYOUT.preview_padding
     title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render(
         _format_observation_summary(observation_shape),
@@ -683,6 +681,14 @@ def _draw_observation_preview(
     screen.blit(subtitle_surface, (x, y))
     y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
 
-    preview_rect = pygame.Rect(x, y, preview_width, preview_height)
+    preview_x = x + max(0, (width - preview_width) // 2)
+    preview_rect = pygame.Rect(preview_x, y, preview_width, preview_height)
     pygame.draw.rect(screen, PALETTE.app_background, preview_rect)
     screen.blit(surface, preview_rect.topleft)
+    pygame.draw.rect(
+        screen,
+        PALETTE.text_warning,
+        preview_rect,
+        width=2,
+        border_radius=4,
+    )
