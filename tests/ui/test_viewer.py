@@ -45,7 +45,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (78, 222, 12)) == (1060, 720)
+    assert _window_size((592, 444), (84, 116, 12)) == (1060, 720)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -84,8 +84,9 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             policy_reload_error=None,
             action_repeat=3,
             stuck_step_limit=240,
+            stuck_min_speed_kph=50.0,
             game_display_size=(592, 444),
-            observation_shape=(78, 222, 12),
+            observation_shape=(84, 116, 12),
             telemetry=_sample_telemetry(),
         )
 
@@ -93,9 +94,9 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             _panel_content_height(
                 fonts,
                 columns,
-                observation_shape=(78, 222, 12),
+                observation_shape=(84, 116, 12),
             )
-            <= _window_size((592, 444), (78, 222, 12))[1]
+            <= _window_size((592, 444), (84, 116, 12))[1]
         )
     finally:
         pygame.quit()
@@ -118,8 +119,9 @@ def test_input_section_includes_visualized_control_state() -> None:
         policy_reload_error=None,
         action_repeat=3,
         stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(78, 222, 12),
+        observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
     )
 
@@ -145,20 +147,22 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         policy_reload_error=None,
         action_repeat=3,
         stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(78, 222, 12),
+        observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(
             state_labels=("active", "dash_pad_boost", "collision_recoil"),
+            reverse_timer=40,
         ),
     )
 
     game_section = columns.right[0]
     assert game_section.flag_viz is not None
-    assert len(game_section.flag_viz.rows) == 3
+    assert len(game_section.flag_viz.rows) == 4
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
-    assert {"dash", "recoil"}.issubset(active_labels)
+    assert {"dash", "recoil", "reverse", "slow"}.issubset(active_labels)
 
 
 def test_preview_frame_uses_latest_rgb_slice_for_stacked_rgb_observations() -> None:
@@ -202,8 +206,9 @@ def test_display_section_includes_action_repeat() -> None:
         policy_reload_error=None,
         action_repeat=2,
         stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(78, 222, 12),
+        observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
     )
 
@@ -235,8 +240,9 @@ def test_session_section_includes_stuck_counter() -> None:
         policy_reload_error=None,
         action_repeat=1,
         stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(78, 222, 12),
+        observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
     )
 
@@ -280,10 +286,12 @@ def test_persist_reload_error_writes_full_message_once(tmp_path) -> None:
 def _sample_telemetry(
     *,
     state_labels: tuple[str, ...] = ("active",),
+    reverse_timer: int = 0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         state_labels=state_labels,
         speed_kph=0.0,
+        reverse_timer=reverse_timer,
         race_distance=-3040.8,
         lap_distance=75987.2,
         race_time_ms=116,

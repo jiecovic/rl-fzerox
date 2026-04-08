@@ -109,14 +109,20 @@ class SyntheticBackend:
         return self._last_frame.copy()
 
     def observation_spec(self, preset: str) -> ObservationSpec:
-        if preset != "native_crop_v1":
+        if preset not in {"native_crop_v1", "native_crop_v2", "native_crop_v3"}:
             raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
         cropped = _crop_native_crop_v1(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
+        if preset == "native_crop_v1":
+            width, height = (116, 84)
+        elif preset == "native_crop_v2":
+            width, height = (124, 92)
+        else:
+            width, height = (164, 116)
         return ObservationSpec(
             preset=preset,
-            width=222,
-            height=78,
+            width=width,
+            height=height,
             channels=3,
             display_width=display_width,
             display_height=display_height,
@@ -135,7 +141,12 @@ class SyntheticBackend:
     def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
         spec = self.observation_spec(preset)
         cropped = _crop_native_crop_v1(self._last_frame)
-        frame = _resize_frame(cropped, width=spec.width, height=spec.height)
+        aspect_corrected = _resize_frame(
+            cropped,
+            width=spec.display_width,
+            height=spec.display_height,
+        )
+        frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
         stack_key = (preset, frame_stack)
         stacked_entry = self._observation_stacks.get(stack_key)
         if stacked_entry is None or stacked_entry[1] is None:

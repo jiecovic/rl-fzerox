@@ -144,6 +144,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_reload_error=policy_reload_error,
                 action_repeat=config.env.action_repeat,
                 stuck_step_limit=config.env.stuck_step_limit,
+                stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                 telemetry=telemetry,
             )
 
@@ -195,6 +196,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_error=policy_reload_error,
                         action_repeat=config.env.action_repeat,
                         stuck_step_limit=config.env.stuck_step_limit,
+                        stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                         telemetry=telemetry,
                     )
                     time.sleep(0.01)
@@ -244,6 +246,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_error=policy_reload_error,
                         action_repeat=config.env.action_repeat,
                         stuck_step_limit=config.env.stuck_step_limit,
+                        stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                         telemetry=telemetry,
                     )
                     continue
@@ -299,6 +302,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_reload_error=policy_reload_error,
                     action_repeat=config.env.action_repeat,
                     stuck_step_limit=config.env.stuck_step_limit,
+                    stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                     telemetry=telemetry,
                 )
 

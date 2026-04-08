@@ -58,6 +58,8 @@ class RaceV2RewardTracker:
         self._next_milestone_index = 1
         self._awarded_laps_completed = 0
         self._bootstrap_progress_frontier = 0.0
+        self._progress_origin = 0.0
+        self._has_progress_origin = False
         self._max_episode_steps = max_episode_steps
 
     def reset(self, telemetry: FZeroXTelemetry | None) -> None:
@@ -67,13 +69,13 @@ class RaceV2RewardTracker:
             self._next_milestone_index = 1
             self._awarded_laps_completed = 0
             self._bootstrap_progress_frontier = 0.0
+            self._progress_origin = 0.0
+            self._has_progress_origin = False
             return
-        self._next_milestone_index = self._milestone_index(telemetry.player.race_distance) + 1
+        self._next_milestone_index = 1
         self._awarded_laps_completed = telemetry.player.laps_completed
-        self._bootstrap_progress_frontier = min(
-            max(telemetry.player.race_distance, 0.0),
-            self._weights.milestone_distance,
-        )
+        self._bootstrap_progress_frontier = 0.0
+        self._set_progress_origin(telemetry.player.race_distance)
 
     def summary_config(self) -> RewardSummaryConfig:
         """Describe the native aggregation thresholds needed by `race_v2`."""
@@ -93,6 +95,8 @@ class RaceV2RewardTracker:
         if telemetry is None or not telemetry.in_race_mode:
             return RewardStep(reward=0.0)
 
+        self._ensure_progress_origin(telemetry)
+        max_relative_progress = self._relative_progress(summary.max_race_distance)
         reward = summary.frames_run * self._weights.time_penalty_per_frame
         breakdown: dict[str, float] = {}
         if reward:
@@ -106,12 +110,12 @@ class RaceV2RewardTracker:
             reward += low_speed_time_penalty
             breakdown["low_speed_time"] = low_speed_time_penalty
 
-        bootstrap_progress_reward = self._bootstrap_progress_reward(summary.max_race_distance)
+        bootstrap_progress_reward = self._bootstrap_progress_reward(max_relative_progress)
         if bootstrap_progress_reward:
             reward += bootstrap_progress_reward
             breakdown["bootstrap_progress"] = bootstrap_progress_reward
 
-        milestone_bonus = self._milestone_bonus(summary.max_race_distance)
+        milestone_bonus = self._milestone_bonus(max_relative_progress)
         if milestone_bonus:
             reward += milestone_bonus
             breakdown["milestone"] = milestone_bonus
@@ -208,12 +212,15 @@ class RaceV2RewardTracker:
         }
         if telemetry is None:
             return info
+        self._ensure_progress_origin(telemetry)
+        current_relative_progress = self._relative_progress(telemetry.player.race_distance)
         next_milestone_distance = self._next_milestone_index * self._weights.milestone_distance
         info["next_milestone_distance"] = next_milestone_distance
         info["distance_to_next_milestone"] = max(
-            next_milestone_distance - telemetry.player.race_distance,
+            next_milestone_distance - current_relative_progress,
             0.0,
         )
+        info["relative_progress"] = current_relative_progress
         if self._bootstrap_progress_active():
             info["bootstrap_progress_remaining"] = max(
                 self._weights.milestone_distance - self._bootstrap_progress_frontier,
@@ -221,13 +228,27 @@ class RaceV2RewardTracker:
             )
         return info
 
-    def _milestone_index(self, race_distance: float) -> int:
-        if race_distance <= 0.0:
-            return 0
-        return int(race_distance // self._weights.milestone_distance)
+    def _relative_progress(self, race_distance: float) -> float:
+        if not self._has_progress_origin:
+            return 0.0
+        return max(race_distance - self._progress_origin, 0.0)
 
-    def _milestone_bonus(self, max_race_distance: float) -> float:
-        last_crossed_index = self._milestone_index(max_race_distance)
+    def _set_progress_origin(self, race_distance: float) -> None:
+        self._progress_origin = race_distance
+        self._has_progress_origin = True
+
+    def _ensure_progress_origin(self, telemetry: FZeroXTelemetry) -> None:
+        if self._has_progress_origin:
+            return
+        self._set_progress_origin(telemetry.player.race_distance)
+
+    def _milestone_index(self, relative_progress: float) -> int:
+        if relative_progress <= 0.0:
+            return 0
+        return int(relative_progress // self._weights.milestone_distance)
+
+    def _milestone_bonus(self, max_relative_progress: float) -> float:
+        last_crossed_index = self._milestone_index(max_relative_progress)
         crossed_count = max(0, last_crossed_index - self._next_milestone_index + 1)
         if crossed_count <= 0:
             return 0.0
@@ -237,10 +258,10 @@ class RaceV2RewardTracker:
     def _bootstrap_progress_active(self) -> bool:
         return self._weights.bootstrap_progress_scale > 0.0 and self._next_milestone_index <= 1
 
-    def _bootstrap_progress_reward(self, max_race_distance: float) -> float:
+    def _bootstrap_progress_reward(self, max_relative_progress: float) -> float:
         if not self._bootstrap_progress_active():
             return 0.0
-        capped_progress = min(max(max_race_distance, 0.0), self._weights.milestone_distance)
+        capped_progress = min(max_relative_progress, self._weights.milestone_distance)
         frontier_gain = capped_progress - self._bootstrap_progress_frontier
         if frontier_gain <= 0.0 or self._weights.bootstrap_progress_scale <= 0.0:
             return 0.0

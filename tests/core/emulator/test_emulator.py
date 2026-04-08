@@ -68,8 +68,8 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
             assert preset == "native_crop_v1"
             return {
                 "preset": preset,
-                "width": 222,
-                "height": 78,
+                "width": 116,
+                "height": 84,
                 "channels": 3,
                 "display_width": 592,
                 "display_height": 444,
@@ -77,7 +77,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
 
         def step_repeat_raw(self, **kwargs):
             assert kwargs["action_repeat"] == 2
-            observation = np.zeros((78, 222, 6), dtype=np.uint8)
+            observation = np.zeros((84, 116, 6), dtype=np.uint8)
             summary = make_step_summary(
                 frames_run=2,
                 max_race_distance=42.0,
@@ -111,7 +111,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         wrong_way_timer_limit=180,
     )
 
-    assert result.observation.shape == (78, 222, 6)
+    assert result.observation.shape == (84, 116, 6)
     assert result.summary.frames_run == 2
     assert result.summary.max_race_distance == 42.0
     assert result.summary.reverse_active_frames == 1

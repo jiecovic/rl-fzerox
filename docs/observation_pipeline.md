@@ -1,8 +1,10 @@
 # Observation Pipeline
 
-The repo now uses one native observation preset for policy inputs:
+The repo now uses native observation presets for policy inputs:
 
 - `native_crop_v1`
+- `native_crop_v2`
+- `native_crop_v3`
 
 Python no longer configures observation width, height, crop margins, or color
 mode directly. Rust owns the per-frame geometry so the env, watch UI, and any
@@ -31,17 +33,23 @@ That yields a cropped native frame of:
 
 ## Policy Observation
 
-For the policy path, `native_crop_v1` keeps the cropped native aspect ratio and
-downscales directly to:
+For the policy path, all three presets first apply the same aspect correction used
+by the human watch display, then downscale to:
 
-- `222 x 78 x 3`
+- `native_crop_v1`: `116 x 84 x 3`
+- `native_crop_v2`: `124 x 92 x 3`
+- `native_crop_v3`: `164 x 116 x 3`
 
-This is an exact `3/8` downscale of the cropped native frame, so the policy
-sees a geometry-preserving, non-aspect-corrected observation.
+Both give the policy an approximately `4:3` view instead of the earlier
+native-width-squashed observation. `native_crop_v1` and `native_crop_v2` use
+an exact NatureCNN-style conv stack; `native_crop_v3` is the larger default
+and pairs with the older 4-layer `32,64,64,128` extractor shape.
 
 With `frame_stack: 4`, the env observation space becomes:
 
-- `78 x 222 x 12`
+- `native_crop_v1`: `84 x 116 x 12`
+- `native_crop_v2`: `92 x 124 x 12`
+- `native_crop_v3`: `116 x 164 x 12`
 
 ## Human Watch Display
 

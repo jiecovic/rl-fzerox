@@ -67,8 +67,7 @@ class FZeroXEnvEngine:
         today, so different seeds currently do not diversify emulator state.
         """
 
-        _, info = self._reset_race_state()
-        telemetry = _read_live_telemetry(self.backend)
+        _, info, telemetry = self._reset_race_state()
         self._reward_tracker.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
@@ -127,7 +126,7 @@ class FZeroXEnvEngine:
     def close(self) -> None:
         self.backend.close()
 
-    def _reset_race_state(self) -> tuple[np.ndarray, dict[str, object]]:
+    def _reset_race_state(self) -> tuple[np.ndarray, dict[str, object], FZeroXTelemetry | None]:
         continue_error: str | None = None
         if self.config.reset_to_race and not _has_custom_baseline(self._last_info):
             if self._episode_done:
@@ -135,7 +134,7 @@ class FZeroXEnvEngine:
                     frame, reset_info = continue_to_next_race(self.backend)
                     info = _reset_context_info(self._last_info)
                     info.update(reset_info)
-                    return frame, info
+                    return frame, info, _read_live_telemetry(self.backend)
                 except RuntimeError as exc:
                     continue_error = str(exc)
 
@@ -149,8 +148,9 @@ class FZeroXEnvEngine:
         if self.config.reset_to_race and not _has_custom_baseline(info):
             frame, boot_info = boot_into_first_race(self.backend)
             info.update(boot_info)
+            return frame, info, _read_live_telemetry(self.backend)
 
-        return frame, info
+        return frame, info, _read_live_telemetry(self.backend)
 
     def _run_env_step(
         self,

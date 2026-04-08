@@ -65,7 +65,7 @@ class ScriptedStepBackend(SyntheticBackend):
         self._last_frame = self._build_frame()
         if result.observation.shape[2] != frame_stack * 3:
             raise AssertionError("Scripted observation stack does not match frame_stack")
-        if preset != "native_crop_v1":
+        if preset != "native_crop_v3":
             raise AssertionError(f"Unexpected preset {preset!r}")
         return result
 
@@ -85,12 +85,12 @@ def test_reset_returns_stacked_observation():
 
     obs, info = env.reset(seed=123)
 
-    assert obs.shape == (78, 222, 12)
+    assert obs.shape == (116, 164, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
-    assert info["observation_shape"] == (78, 222, 12)
-    assert info["observation_frame_shape"] == (78, 222, 3)
+    assert info["observation_shape"] == (116, 164, 12)
+    assert info["observation_frame_shape"] == (116, 164, 3)
     assert info["observation_stack"] == 4
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
@@ -119,7 +119,7 @@ def test_step_advances_backend_by_action_repeat():
     env.reset(seed=7)
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
 
-    assert obs.shape == (78, 222, 12)
+    assert obs.shape == (116, 164, 12)
     assert isinstance(reward, float)
     assert not terminated
     assert not truncated
@@ -167,9 +167,9 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
 
     obs, info = env.reset(seed=13)
 
-    assert obs.shape == (78, 222, 12)
-    assert info["observation_frame_shape"] == (78, 222, 3)
-    assert backend.render_observation_calls == [("native_crop_v1", 4)]
+    assert obs.shape == (116, 164, 12)
+    assert info["observation_frame_shape"] == (116, 164, 3)
+    assert backend.render_observation_calls == [("native_crop_v3", 4)]
 
 
 def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:
@@ -225,7 +225,7 @@ def test_reset_can_boot_into_the_first_race_path():
 
     obs, info = env.reset(seed=5)
 
-    assert obs.shape == (78, 222, 12)
+    assert obs.shape == (116, 164, 12)
     assert info["seed"] == 5
     assert info["reset_mode"] == "boot_to_race"
     assert info["boot_state"] == "gp_race"
@@ -504,7 +504,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     env.reset(seed=6)
     obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
-    assert obs.shape == (78, 222, 12)
+    assert obs.shape == (116, 164, 12)
     assert terminated
     assert not truncated
     assert info["repeat_index"] == 0
@@ -582,7 +582,7 @@ def _backend_step_result(
     status: StepStatus | None = None,
 ) -> BackendStepResult:
     value = np.uint8(summary.final_frame_index % 255)
-    observation = np.full((78, 222, 12), value, dtype=np.uint8)
+    observation = np.full((116, 164, 12), value, dtype=np.uint8)
     return BackendStepResult(
         observation=observation,
         summary=summary,

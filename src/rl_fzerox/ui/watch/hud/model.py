@@ -54,6 +54,7 @@ def _build_panel_columns(
     policy_reload_error: str | None,
     action_repeat: int,
     stuck_step_limit: int,
+    stuck_min_speed_kph: float,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
@@ -142,7 +143,7 @@ def _build_panel_columns(
             ),
         ],
         right=[
-            _game_section(telemetry),
+            _game_section(telemetry, stuck_min_speed_kph=stuck_min_speed_kph),
             PanelSection(
                 title="Display",
                 lines=[
@@ -346,7 +347,11 @@ def _panel_line(
     )
 
 
-def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
+def _game_section(
+    telemetry: FZeroXTelemetry | None,
+    *,
+    stuck_min_speed_kph: float,
+) -> PanelSection:
     if telemetry is None:
         return PanelSection(
             title="Game",
@@ -385,7 +390,11 @@ def _game_section(telemetry: FZeroXTelemetry | None) -> PanelSection:
                 PALETTE.text_primary,
             ),
         ],
-        flag_viz=_flag_viz(telemetry.player.state_labels),
+        flag_viz=_flag_viz(
+            telemetry.player.state_labels,
+            reverse_detected=telemetry.player.reverse_timer > 0,
+            low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
+        ),
     )
 
 
@@ -416,6 +425,8 @@ def _control_viz_height(fonts: ViewerFonts) -> int:
 
 
 _FLAG_DISPLAY_LABELS = {
+    "reverse_detected": "reverse",
+    "low_speed_detected": "slow",
     "can_boost": "can boost",
     "dash_pad_boost": "dash",
     "airborne": "airborne",
@@ -428,14 +439,24 @@ _FLAG_DISPLAY_LABELS = {
 }
 
 _FLAG_ROWS = (
+    ("reverse_detected", "low_speed_detected"),
     ("can_boost", "dash_pad_boost", "airborne"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
     ("retired", "finished"),
 )
 
 
-def _flag_viz(state_labels: tuple[str, ...]) -> FlagViz:
+def _flag_viz(
+    state_labels: tuple[str, ...],
+    *,
+    reverse_detected: bool,
+    low_speed_detected: bool,
+) -> FlagViz:
     active_flags = set(state_labels)
+    if reverse_detected:
+        active_flags.add("reverse_detected")
+    if low_speed_detected:
+        active_flags.add("low_speed_detected")
     known_flags = {flag_label for row in _FLAG_ROWS for flag_label in row}
     active_flags.intersection_update(known_flags)
     return FlagViz(

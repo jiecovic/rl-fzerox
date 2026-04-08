@@ -11,6 +11,8 @@ use crate::core::video::{VideoCrop, cropped_dimensions, display_size};
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationPreset {
     NativeCropV1,
+    NativeCropV2,
+    NativeCropV3,
 }
 
 /// Resolved spatial spec for one observation frame plus the matching display
@@ -30,6 +32,8 @@ impl ObservationPreset {
     pub fn parse(name: &str) -> Result<Self, CoreError> {
         match name {
             "native_crop_v1" => Ok(Self::NativeCropV1),
+            "native_crop_v2" => Ok(Self::NativeCropV2),
+            "native_crop_v3" => Ok(Self::NativeCropV3),
             _ => Err(CoreError::InvalidObservationPreset {
                 name: name.to_owned(),
             }),
@@ -39,12 +43,14 @@ impl ObservationPreset {
     pub fn name(self) -> &'static str {
         match self {
             Self::NativeCropV1 => "native_crop_v1",
+            Self::NativeCropV2 => "native_crop_v2",
+            Self::NativeCropV3 => "native_crop_v3",
         }
     }
 
     pub fn crop(self) -> VideoCrop {
         match self {
-            Self::NativeCropV1 => VideoCrop {
+            Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 => VideoCrop {
                 top: 16,
                 bottom: 16,
                 left: 24,
@@ -65,7 +71,9 @@ impl ObservationPreset {
         let (display_width, display_height) =
             display_size(cropped_width, cropped_height, display_aspect_ratio);
         let (frame_width, frame_height, channels) = match self {
-            Self::NativeCropV1 => (222, 78, 3),
+            Self::NativeCropV1 => (116, 84, 3),
+            Self::NativeCropV2 => (124, 92, 3),
+            Self::NativeCropV3 => (164, 116, 3),
         };
         Ok(ObservationSpec {
             preset_name: self.name(),
@@ -79,12 +87,7 @@ impl ObservationPreset {
 
     pub fn observation_aspect_ratio(self, display_aspect_ratio: f64) -> f64 {
         match self {
-            Self::NativeCropV1 => {
-                // `0.0` means "preserve the cropped native framebuffer aspect"
-                // instead of stretching to the human-facing display ratio.
-                let _ = display_aspect_ratio;
-                0.0
-            }
+            Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 => display_aspect_ratio,
         }
     }
 }
