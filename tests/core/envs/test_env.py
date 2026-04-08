@@ -365,14 +365,14 @@ def test_step_truncates_when_speed_is_stuck() -> None:
 
     assert not terminated
     assert truncated
-    assert reward == -100.01
+    assert reward == pytest.approx(-300.495)
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
-    assert info["step_reward"] == -100.01
+    assert info["step_reward"] == pytest.approx(-300.495)
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
-    assert reward_breakdown["time"] == -0.01
-    assert reward_breakdown["stuck_truncation"] == -100.0
+    assert reward_breakdown["time"] == -0.005
+    assert reward_breakdown["stuck_truncation"] == pytest.approx(-300.49)
 
 
 def test_step_truncates_when_driving_the_wrong_way() -> None:
@@ -420,19 +420,19 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     assert not terminated
     assert not truncated
-    assert reward == pytest.approx(-0.013)
+    assert reward == pytest.approx(-0.005)
     assert info["reverse_steps"] == 1
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-120.0135)
+    assert reward == pytest.approx(-320.495)
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_steps"] == 2
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
-    assert reward_breakdown["wrong_way_truncation"] == -120.0
+    assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.49)
 
 
 def test_terminal_step_exposes_monitor_info_keys() -> None:

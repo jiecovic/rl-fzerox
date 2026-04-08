@@ -50,7 +50,11 @@ def run_viewer(config: WatchAppConfig) -> None:
         baseline_state_path=config.emulator.baseline_state_path,
         renderer=config.emulator.renderer,
     )
-    env = FZeroXEnv(backend=emulator, config=config.env)
+    env = FZeroXEnv(
+        backend=emulator,
+        config=config.env,
+        reward_config=config.reward,
+    )
     pygame.init()
 
     try:

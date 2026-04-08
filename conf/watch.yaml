@@ -1,3 +1,7 @@
+defaults:
+  - reward: race_v2
+  - _self_
+
 seed: 123
 
 emulator:

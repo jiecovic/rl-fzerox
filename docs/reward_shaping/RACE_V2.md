@@ -1,100 +1,75 @@
-# docs/reward_shaping/RACE_V2.md
+# `race_v2`
 
-# Race V2 Reward
+`race_v2` is the current reward profile for training race completion instead of
+short-horizon driving tricks.
 
-`race_v2` is the first simplified replacement for the original highly-shaped
-reward draft.
+## Plan
 
-## Goal
+- Remove dense per-step frontier shaping.
+- Use coarse one-time milestones instead of trusting `race_distance` as a
+  precise local line-quality signal.
+- Reward lap completion with increasing bonuses.
+- Reward better placement at lap boundaries and more strongly on final finish.
+- Penalize time on every internal emulator frame so earlier completion stays
+  better than slower completion.
+- Keep energy loss negative and energy refill positive, but smaller than the
+  loss penalty.
+- Make death and truncation penalties dynamic:
+  - base penalty
+  - plus remaining-step pressure derived from `time_penalty_per_frame`
+  - plus remaining-lap penalty based on live game telemetry
 
-Optimize for:
+## Runtime assumptions
 
-- finishing the race
-- finishing sooner
-- avoiding crashes, spins, and off-track failures
-- avoiding wasteful damage and reverse driving
+- `race_v2` does not carry hidden race-format constants anymore.
+- Total laps and total racers are read from live emulator RAM through the native
+  telemetry path.
+- The reverse-engineered RAM layout currently targets the US ROM build.
 
-It intentionally removes many special-case incentives so the objective is easier
-to reason about and harder to exploit.
+## Terms
 
-## Formula
+- `time_penalty_per_frame`
+  - Small negative reward per internal emulator frame.
+- `milestone_distance`
+  - Absolute `race_distance` spacing for one-time milestone rewards.
+- `milestone_bonus`
+  - One-time reward paid for each newly crossed milestone bucket.
+- `lap_1_completion_bonus`
+  - Reward for first completed lap.
+- `lap_2_completion_bonus`
+  - Reward for second completed lap.
+- `final_lap_completion_bonus`
+  - Reward for the final completed lap that actually finishes the race.
+- `lap_position_scale`
+  - Small placement bonus scale applied when a lap is completed.
+- `finish_position_scale`
+  - Larger placement bonus scale applied on actual race finish.
+- `remaining_lap_penalty`
+  - Extra penalty per unfinished lap on death or truncation.
+- `energy_loss_penalty_scale`
+  - Penalty scale applied to `energy_loss_total`.
+- `energy_gain_reward_scale`
+  - Smaller reward scale applied to `energy_gain_total`.
 
-Per emulated game frame:
+## Current shape
 
-```text
-reward =
-  time_penalty
-  + progress_frontier_reward
-  + reverse_progress_penalty
-  + energy_loss_penalty
-  + event_penalties
-  + terminal_success_reward
-```
+Ordinary step:
 
-### Terms
+- negative time reward
+- one-time milestone reward
+- lap completion reward if a new lap was crossed
+- lap placement reward if a new lap was crossed
+- energy loss penalty
+- smaller energy refill reward
+- collision / spin entry penalties
 
-- `time_penalty`
-  - fixed negative reward every emulated frame
-  - pushes the policy to finish in less in-game time
+Finish:
 
-- `progress_frontier_reward`
-  - only rewards new best `race_distance`
-  - does not reward local forward/backward yo-yo movement
+- final lap completion reward
+- final placement reward
 
-- `reverse_progress_penalty`
-  - penalizes meaningful backward movement
+Crash / retire / off-track / truncation:
 
-- `energy_loss_penalty`
-  - penalizes losing energy, regardless of the cause
-
-- `event_penalties`
-  - entry-only penalties for:
-    - collision recoil
-    - spinning out
-    - falling off track
-    - crashing
-    - retiring
-
-- `terminal_success_reward`
-  - finish bonus
-  - plus placement bonus based on final race position
-
-### Truncation penalties
-
-Additional penalties apply on truncation:
-
-- `stuck`
-- `wrong_way`
-- `timeout`
-
-## Removed from v1
-
-`race_v2` intentionally removes these shaping terms:
-
-- checkpoint bonus
-- dash-pad bonus
-- refill bonus
-- low-speed penalty
-- low-energy manual-boost penalty
-- stall penalty
-
-The simplified design relies on:
-
-- progress
-- time pressure
-- damage costs
-- failure costs
-
-instead of many overlapping special-case bonuses.
-
-## Calibration rule
-
-Failure should be worse than a bad but legitimate finish.
-
-The intended tuning rule is:
-
-- a slow ugly 3-lap finish should still beat crashing out early
-- suicide should never be an efficient shortcut to save time
-
-That should be checked against real run logs before treating the weights as
-final.
+- base failure penalty
+- plus remaining-step penalty from skipped future time cost
+- plus remaining-lap penalty from unfinished race progress

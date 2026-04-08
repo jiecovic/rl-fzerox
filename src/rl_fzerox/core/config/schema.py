@@ -55,6 +55,32 @@ class EnvConfig(BaseModel):
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
 
 
+class RewardConfig(BaseModel):
+    """Reward-shaping settings for the current env."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: Literal["race_v2"] = "race_v2"
+    time_penalty_per_frame: float = -0.005
+    milestone_distance: PositiveFloat = 3_000.0
+    milestone_bonus: NonNegativeFloat = 2.0
+    lap_1_completion_bonus: NonNegativeFloat = 20.0
+    lap_2_completion_bonus: NonNegativeFloat = 35.0
+    final_lap_completion_bonus: NonNegativeFloat = 60.0
+    lap_position_scale: NonNegativeFloat = 1.0
+    remaining_lap_penalty: NonNegativeFloat = 50.0
+    energy_loss_epsilon: NonNegativeFloat = 0.01
+    energy_loss_penalty_scale: NonNegativeFloat = 0.05
+    energy_gain_reward_scale: NonNegativeFloat = 0.02
+    collision_recoil_penalty: float = -2.0
+    spinning_out_penalty: float = -4.0
+    terminal_failure_base_penalty: float = -120.0
+    stuck_truncation_base_penalty: float = -150.0
+    wrong_way_truncation_base_penalty: float = -170.0
+    timeout_truncation_base_penalty: float = -150.0
+    finish_position_scale: NonNegativeFloat = 4.0
+
+
 class EmulatorConfig(BaseModel):
     """Paths used to boot the libretro core, content, and optional state."""
 
@@ -138,6 +164,7 @@ class WatchAppConfig(BaseModel):
     seed: int | None = None
     emulator: EmulatorConfig
     env: EnvConfig = Field(default_factory=EnvConfig)
+    reward: RewardConfig = Field(default_factory=RewardConfig)
     watch: WatchConfig = Field(default_factory=WatchConfig)
 
 
@@ -149,5 +176,6 @@ class TrainAppConfig(BaseModel):
     seed: int | None = None
     emulator: EmulatorConfig
     env: EnvConfig = Field(default_factory=EnvConfig)
+    reward: RewardConfig = Field(default_factory=RewardConfig)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
     train: TrainConfig = Field(default_factory=TrainConfig)
