@@ -33,7 +33,7 @@ class ObservationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    preset: Literal["native_crop_v1"] = "native_crop_v1"
+    preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3"] = "native_crop_v3"
     frame_stack: PositiveInt = 4
 
 

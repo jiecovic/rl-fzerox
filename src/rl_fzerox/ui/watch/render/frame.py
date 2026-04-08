@@ -66,6 +66,7 @@ def _draw_frame(
     policy_reload_error: str | None,
     action_repeat: int,
     stuck_step_limit: int,
+    stuck_min_speed_kph: float,
     telemetry,
 ) -> None:
     game_surface = _rgb_surface(pygame, raw_frame)
@@ -117,6 +118,7 @@ def _draw_frame(
         policy_reload_error=policy_reload_error,
         action_repeat=action_repeat,
         stuck_step_limit=stuck_step_limit,
+        stuck_min_speed_kph=stuck_min_speed_kph,
         game_display_size=game_display_size,
         observation_shape=observation.shape,
         observation_surface=observation_surface,

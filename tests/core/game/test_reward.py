@@ -43,6 +43,62 @@ def test_race_v2_rewards_each_progress_milestone_once() -> None:
     assert repeated.breakdown == {}
 
 
+def test_race_v2_measures_milestones_from_episode_start_progress() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=3_000.0,
+            milestone_bonus=2.0,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=-500.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=2_600.0),
+        _status(step_count=1),
+        _telemetry(race_distance=2_600.0),
+    )
+    repeated = tracker.step_summary(
+        _summary(max_race_distance=2_900.0),
+        _status(step_count=2),
+        _telemetry(race_distance=2_900.0),
+    )
+
+    assert first.reward == pytest.approx(2.0)
+    assert first.breakdown == {"milestone": 2.0}
+    assert repeated.reward == 0.0
+    assert repeated.breakdown == {}
+
+
+def test_race_v2_initializes_progress_origin_from_first_in_race_sample() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=3_000.0,
+            milestone_bonus=2.0,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(None)
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=2_600.0),
+        _status(step_count=1),
+        _telemetry(race_distance=2_600.0),
+    )
+    repeated = tracker.step_summary(
+        _summary(max_race_distance=5_700.0),
+        _status(step_count=2),
+        _telemetry(race_distance=5_700.0),
+    )
+
+    assert first.reward == 0.0
+    assert first.breakdown == {}
+    assert repeated.reward == pytest.approx(2.0)
+    assert repeated.breakdown == {"milestone": 2.0}
+
+
 def test_race_v2_rewards_completed_laps() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
@@ -406,6 +462,34 @@ def test_race_v2_bootstrap_progress_only_applies_before_first_milestone() -> Non
     assert crossing.breakdown == {"bootstrap_progress": 1.5}
     assert after.reward == 0.0
     assert after.breakdown == {}
+
+
+def test_race_v2_bootstrap_progress_uses_episode_start_as_zero() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=1_000.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=-300.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+    )
+    crossing = tracker.step_summary(
+        _summary(max_race_distance=1_200.0),
+        _status(step_count=2),
+        _telemetry(race_distance=1_200.0),
+    )
+
+    assert first.reward == pytest.approx(40.0)
+    assert first.breakdown == {"bootstrap_progress": 40.0}
+    assert crossing.reward == pytest.approx(60.0)
+    assert crossing.breakdown == {"bootstrap_progress": 60.0}
 
 
 def _telemetry(

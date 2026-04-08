@@ -10,10 +10,26 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
 ConvSpec = tuple[tuple[int, tuple[int, int], tuple[int, int]], ...]
+NATURE_CNN_CONV_SPEC: ConvSpec = (
+    (32, (8, 8), (4, 4)),
+    (64, (4, 4), (2, 2)),
+    (64, (3, 3), (1, 1)),
+)
+LEGACY_DEEP_CONV_SPEC: ConvSpec = (
+    (32, (8, 8), (4, 4)),
+    (64, (4, 4), (2, 2)),
+    (64, (3, 3), (2, 2)),
+    (128, (3, 3), (1, 1)),
+)
+SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
+    (84, 116): NATURE_CNN_CONV_SPEC,
+    (92, 124): NATURE_CNN_CONV_SPEC,
+    (116, 164): LEGACY_DEEP_CONV_SPEC,
+}
 
 
 class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
-    """CNN extractor for stacked `222x78` native-crop F-Zero X RGB observations."""
+    """CNN extractor for the supported aspect-corrected F-Zero X observation presets."""
 
     def __init__(
         self,
@@ -34,12 +50,17 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         self._height = int(height)
         self._width = int(width)
         self._channels = int(channels)
-        self._conv_spec: ConvSpec = (
-            (64, (8, 4), (4, 2)),
-            (64, (4, 4), (2, 2)),
-            (128, (3, 3), (2, 2)),
-            (128, (3, 3), (1, 1)),
-        )
+        geometry = (self._height, self._width)
+        try:
+            self._conv_spec = SUPPORTED_POLICY_GEOMETRIES[geometry]
+        except KeyError as error:
+            supported = ", ".join(
+                f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES
+            )
+            raise ValueError(
+                f"Unsupported observation geometry {self._height}x{self._width} for "
+                f"{type(self).__name__}; supported presets: {supported}"
+            ) from error
 
         cnn = nn.Sequential(
             *self._build_conv_layers(

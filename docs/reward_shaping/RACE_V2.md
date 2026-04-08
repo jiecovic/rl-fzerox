@@ -40,12 +40,13 @@ short-horizon driving tricks.
 - `time_penalty_per_frame`
   - Small negative reward per internal emulator frame.
 - `milestone_distance`
-  - Absolute `race_distance` spacing for one-time milestone rewards.
+  - Episode-relative progress spacing for one-time milestone rewards, measured
+    from the reset-time `race_distance` origin.
 - `milestone_bonus`
   - One-time reward paid for each newly crossed milestone bucket.
 - `bootstrap_progress_scale`
   - Dense new-best frontier reward used only before the first milestone is
-    reached.
+    reached, also measured from the reset-time progress origin.
 - `reverse_time_penalty_scale`
   - Multiplier applied to the normal time penalty on frames where the live game
     reverse timer is active.

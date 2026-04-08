@@ -20,5 +20,5 @@ env:
     name: steer_drive_boost
     steer_buckets: 7
   observation:
-    preset: native_crop_v1
+    preset: native_crop_v3
     frame_stack: 4
