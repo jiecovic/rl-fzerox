@@ -22,6 +22,23 @@ class _FakePolicy:
         return self._action.copy(), None
 
 
+class _FakeMaskablePolicy(_FakePolicy):
+    def __init__(self, action: list[int]) -> None:
+        super().__init__(action)
+        self.action_masks_calls: list[np.ndarray | None] = []
+
+    def predict(
+        self,
+        observation: ObservationValue,
+        deterministic: bool = True,
+        action_masks: np.ndarray | None = None,
+    ):
+        _ = observation
+        self.deterministic_calls.append(deterministic)
+        self.action_masks_calls.append(None if action_masks is None else np.array(action_masks))
+        return self._action.copy(), None
+
+
 def test_policy_runner_reloads_updated_policy_artifact(
     tmp_path: Path,
     monkeypatch,
@@ -49,7 +66,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None: _FakePolicy([4, 1]),
     )
 
     assert runner.predict(observation).tolist() == [4, 1]
@@ -92,6 +109,30 @@ def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> N
     assert fake_policy.deterministic_calls == [False]
 
 
+def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) -> None:
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeMaskablePolicy([2, 0])
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation = np.zeros((84, 116, 12), dtype=np.uint8)
+    action_masks = np.array([True, False, True], dtype=bool)
+
+    assert runner.predict(observation, action_masks=action_masks).tolist() == [2, 0]
+    assert len(fake_policy.action_masks_calls) == 1
+    recorded_masks = fake_policy.action_masks_calls[0]
+    assert recorded_masks is not None
+    assert np.array_equal(recorded_masks, action_masks)
+
+
 def test_policy_runner_exposes_reload_error_until_success(
     tmp_path: Path,
     monkeypatch,
@@ -118,7 +159,7 @@ def test_policy_runner_exposes_reload_error_until_success(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path: (_ for _ in ()).throw(RuntimeError("bad checkpoint")),
+        lambda path, *, run_dir=None: (_ for _ in ()).throw(RuntimeError("bad checkpoint")),
     )
 
     observation = np.zeros((84, 116, 12), dtype=np.uint8)
@@ -128,7 +169,7 @@ def test_policy_runner_exposes_reload_error_until_success(
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None: _FakePolicy([4, 1]),
     )
 
     assert runner.predict(observation).tolist() == [4, 1]

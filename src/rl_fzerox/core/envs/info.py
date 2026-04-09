@@ -13,6 +13,7 @@ MONITOR_INFO_KEYS: tuple[str, ...] = (
     "laps_completed",
     "race_laps_completed",
     "raw_laps_completed",
+    "milestones_completed",
 )
 
 
@@ -30,3 +31,4 @@ def ensure_monitor_info_keys(info: dict[str, object]) -> None:
     info.setdefault("laps_completed", None)
     info.setdefault("race_laps_completed", None)
     info.setdefault("raw_laps_completed", None)
+    info.setdefault("milestones_completed", None)

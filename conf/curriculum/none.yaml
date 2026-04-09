@@ -1,0 +1,10 @@
+# Disable action-mask curriculum for standard PPO training runs.
+enabled: false
+# Promotion metric uses the mean over the last N completed episodes.
+# Example: 10 means "average the last 10 episodes before checking the trigger".
+smoothing_episodes: 1
+# Hard minimum number of completed episodes to stay in one stage before
+# promotion is even allowed, even if the smoothed trigger is already satisfied.
+min_stage_episodes: 1
+# Ordered curriculum stages; empty keeps the full action space enabled.
+stages: []

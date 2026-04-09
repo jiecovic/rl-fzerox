@@ -123,6 +123,20 @@ Train PPO:
 python -m rl_fzerox.apps.train --config conf/local/train.local.yaml
 ```
 
+`train.algorithm: auto` resolves to plain `PPO` by default and switches to
+`MaskablePPO` automatically whenever `env.action.mask` or a training
+`curriculum` is configured.
+
+The repo also ships one starter curriculum config:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.yaml curriculum=drift_after_finish
+```
+
+That curriculum starts with the shoulder/drift branch masked to `off` only and
+unlocks `off/left/right` after the agent completes all 3 race laps in one
+episode.
+
 For multi-env training, switch `train.vec_env` to `subproc` and raise `train.num_envs`. Each worker env gets an isolated runtime dir under the run folder, for example `local/runs/ppo_cnn_0007/runtime/env_000`.
 
 Watch the latest saved policy artifact from one training run:

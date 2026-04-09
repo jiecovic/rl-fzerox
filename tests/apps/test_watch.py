@@ -7,6 +7,10 @@ import pytest
 
 from rl_fzerox.apps.watch import main
 from rl_fzerox.core.config.schema import (
+    ActionMaskConfig,
+    CurriculumConfig,
+    CurriculumStageConfig,
+    CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -16,6 +20,24 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.ui.watch.session import _sync_policy_curriculum_stage
+
+
+class _FakePolicyRunner:
+    def __init__(self, stage_index: int | None) -> None:
+        self.checkpoint_curriculum_stage_index = stage_index
+        self.refresh_calls = 0
+
+    def refresh(self) -> None:
+        self.refresh_calls += 1
+
+
+class _FakeWatchEnv:
+    def __init__(self) -> None:
+        self.stage_indices: list[int] = []
+
+    def set_curriculum_stage(self, stage_index: int) -> None:
+        self.stage_indices.append(stage_index)
 
 
 def test_watch_rejects_artifact_without_run_dir(
@@ -103,6 +125,20 @@ def test_watch_allows_run_dir_without_config(
         env=EnvConfig(action_repeat=2),
         reward=RewardConfig(time_penalty_per_frame=-0.123),
         policy=PolicyConfig(),
+        curriculum=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(
+                    name="basic_drive",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
+                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                ),
+                CurriculumStageConfig(
+                    name="drift_enabled",
+                    action_mask=ActionMaskConfig(shoulder=(0, 1, 2)),
+                ),
+            ),
+        ),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
 
@@ -129,5 +165,17 @@ def test_watch_allows_run_dir_without_config(
     assert config.emulator.rom_path == rom_path.resolve()
     assert config.env.action_repeat == 2
     assert config.reward.time_penalty_per_frame == -0.123
+    assert config.curriculum.enabled is True
+    assert config.curriculum.stages[0].name == "basic_drive"
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "latest"
+
+
+def test_sync_policy_curriculum_stage_applies_checkpoint_stage_to_watch_env() -> None:
+    policy_runner = _FakePolicyRunner(stage_index=0)
+    env = _FakeWatchEnv()
+
+    _sync_policy_curriculum_stage(policy_runner, env)
+
+    assert policy_runner.refresh_calls == 1
+    assert env.stage_indices == [0]

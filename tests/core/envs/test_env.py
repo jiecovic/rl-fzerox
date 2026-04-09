@@ -13,7 +13,15 @@ from fzerox_emulator import (
     StepStatus,
     StepSummary,
 )
-from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
+from rl_fzerox.core.config.schema import (
+    ActionConfig,
+    ActionMaskConfig,
+    CurriculumConfig,
+    CurriculumStageConfig,
+    CurriculumTriggerConfig,
+    EnvConfig,
+    ObservationConfig,
+)
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -416,6 +424,112 @@ def test_boost_action_env_exposes_three_head_action_space() -> None:
 
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [7, 3, 2]
+
+
+def test_env_action_masks_reflect_base_action_mask_config() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                mask=ActionMaskConfig(shoulder=(0,)),
+            )
+        ),
+    )
+
+    mask = env.action_masks()
+
+    assert mask.tolist() == (([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False])
+
+
+def test_env_action_masks_update_with_curriculum_stage_changes() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                mask=ActionMaskConfig(shoulder=(0,)),
+            )
+        ),
+        curriculum_config=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(
+                    name="basic_drive",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
+                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                ),
+                CurriculumStageConfig(
+                    name="full_controls",
+                    action_mask=ActionMaskConfig(shoulder=(0, 1, 2)),
+                ),
+            ),
+        ),
+    )
+
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False]
+    )
+
+    env.set_curriculum_stage(1)
+
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2 + 3))
+
+
+def test_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action=ActionConfig(name="steer_drive_boost")),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+    env.step(np.array([3, 1, 0], dtype=np.int64))
+
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+
+
+def test_env_action_masks_intersect_curriculum_and_boost_unlock_rules() -> None:
+    env = FZeroXEnv(
+        backend=ScriptedStepBackend(
+            [],
+            reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+        ),
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                mask=ActionMaskConfig(shoulder=(0,)),
+            )
+        ),
+        curriculum_config=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(
+                    name="basic_drive",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
+                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                ),
+            ),
+        ),
+    )
+
+    env.reset(seed=2)
+
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 3) + [True, False] + [True, False, False]
+    )
 
 
 def test_reset_can_boot_into_the_first_race_path():

@@ -2,6 +2,10 @@
 from rl_fzerox.core.config.loader import load_train_app_config, load_watch_app_config
 from rl_fzerox.core.config.paths import config_root_dir, project_root_dir
 from rl_fzerox.core.config.schema import (
+    ActionMaskConfig,
+    CurriculumConfig,
+    CurriculumStageConfig,
+    CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
     ExtractorConfig,
@@ -14,6 +18,10 @@ from rl_fzerox.core.config.schema import (
 )
 
 __all__ = [
+    "ActionMaskConfig",
+    "CurriculumConfig",
+    "CurriculumStageConfig",
+    "CurriculumTriggerConfig",
     "EmulatorConfig",
     "EnvConfig",
     "ExtractorConfig",

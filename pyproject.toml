@@ -29,6 +29,7 @@ watch = [
 ]
 train = [
   "rich>=13,<15",
+  "sb3-contrib>=2.8,<3",
   "stable-baselines3>=2.6,<3",
   "tensorboard>=2.18,<3",
   "tqdm>=4.66,<5",

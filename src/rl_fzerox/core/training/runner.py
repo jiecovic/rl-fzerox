@@ -10,10 +10,13 @@ from rl_fzerox.core.training.session import (
     build_tensorboard_logger,
     build_training_env,
     cleanup_failed_run,
+    current_policy_artifact_metadata,
     print_training_startup,
     resolve_train_run_config,
     save_artifacts_atomically,
     save_latest_artifacts,
+    training_requires_action_masks,
+    validate_training_algorithm_config,
     validate_training_baseline_state,
 )
 
@@ -27,6 +30,7 @@ def run_training(config: TrainAppConfig) -> None:
         run_name=config.train.run_name,
     )
     validate_training_baseline_state(config)
+    validate_training_algorithm_config(config)
 
     ensure_run_dirs(run_paths)
     run_config = resolve_train_run_config(config=config, run_paths=run_paths)
@@ -40,6 +44,7 @@ def run_training(config: TrainAppConfig) -> None:
             train_config=run_config.train,
             policy_config=run_config.policy,
             tensorboard_log=None,
+            masking_required=training_requires_action_masks(run_config),
         )
         save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
         model.set_logger(build_tensorboard_logger(run_paths))
@@ -49,9 +54,14 @@ def run_training(config: TrainAppConfig) -> None:
             config=run_config,
             run_paths=run_paths,
         )
-        save_latest_artifacts(model, run_paths)
+        save_latest_artifacts(
+            model,
+            run_paths,
+            policy_metadata=current_policy_artifact_metadata(train_env),
+        )
         callbacks = build_callbacks(
             train_config=run_config.train,
+            curriculum_config=run_config.curriculum,
             run_paths=run_paths,
         )
         try:
@@ -62,14 +72,23 @@ def run_training(config: TrainAppConfig) -> None:
             )
         except Exception:
             if model.num_timesteps > 0:
-                save_latest_artifacts(model, run_paths)
+                save_latest_artifacts(
+                    model,
+                    run_paths,
+                    policy_metadata=current_policy_artifact_metadata(train_env),
+                )
             raise
         save_artifacts_atomically(
             model=model,
             model_path=run_paths.final_model_path,
             policy_path=run_paths.final_policy_path,
+            policy_metadata=current_policy_artifact_metadata(train_env),
         )
-        save_latest_artifacts(model, run_paths)
+        save_latest_artifacts(
+            model,
+            run_paths,
+            policy_metadata=current_policy_artifact_metadata(train_env),
+        )
     except Exception:
         cleanup_failed_run(run_paths, model)
         raise

@@ -1,5 +1,6 @@
 defaults:
   - reward: race_v2
+  - curriculum: none
   - _self_
 
 seed: 123
@@ -22,13 +23,15 @@ env:
   reset_to_race: true
   action:
     name: steer_drive_boost_drift
-    steer_buckets: 7
+    steer_buckets: 9
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state
     preset: native_crop_v3
     frame_stack: 4
 train:
+  # auto resolves to MaskablePPO whenever action masks or curriculum are enabled.
+  algorithm: auto
   vec_env: subproc
   num_envs: 8
   total_timesteps: 50_000_000

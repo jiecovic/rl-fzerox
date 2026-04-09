@@ -4,9 +4,13 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.config.schema import TrainConfig
+from rl_fzerox.core.config.schema import CurriculumConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
-from rl_fzerox.core.training.session.artifacts import save_artifacts_atomically
+from rl_fzerox.core.training.session.artifacts import (
+    current_policy_artifact_metadata,
+    save_artifacts_atomically,
+)
+from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 
 _STATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("race_distance", "state/race_distance_mean"),
@@ -114,7 +118,12 @@ class RolloutInfoAccumulator:
             )
 
 
-def build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
+def build_callbacks(
+    *,
+    train_config: TrainConfig,
+    curriculum_config: CurriculumConfig,
+    run_paths: RunPaths,
+):
     """Construct the SB3 callback list used during PPO training."""
 
     try:
@@ -162,6 +171,7 @@ def build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
                 model=self.model,
                 model_path=self._run_paths.latest_model_path,
                 policy_path=self._run_paths.latest_policy_path,
+                policy_metadata=current_policy_artifact_metadata(self.training_env),
             )
 
         def _save_best(self, episode_return: float) -> None:
@@ -175,6 +185,7 @@ def build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
                 model=self.model,
                 model_path=self._run_paths.best_model_path,
                 policy_path=self._run_paths.best_policy_path,
+                policy_metadata=current_policy_artifact_metadata(self.training_env),
             )
 
         def _on_step(self) -> bool:
@@ -196,16 +207,47 @@ def build_callbacks(*, train_config: TrainConfig, run_paths: RunPaths):
                     self._save_best(float(episode_return))
             return True
 
+    class CurriculumCallback(BaseCallback):
+        """Promote the action-mask curriculum when episode metrics cross thresholds."""
+
+        def __init__(self, curriculum: CurriculumConfig) -> None:
+            super().__init__(verbose=0)
+            self._controller = ActionMaskCurriculumController(curriculum)
+
+        def _on_training_start(self) -> None:
+            stage_index = self._controller.stage_index
+            if stage_index is None:
+                return
+            self.training_env.env_method("set_curriculum_stage", stage_index)
+
+        def _on_step(self) -> bool:
+            infos = info_sequence(self.locals.get("infos"))
+            if infos is None:
+                return True
+
+            promoted_stage = self._controller.record_episodes(_episode_dicts(infos))
+            if promoted_stage is not None:
+                self.training_env.env_method("set_curriculum_stage", promoted_stage)
+            return True
+
+        def _on_rollout_end(self) -> None:
+            stage_index = self._controller.stage_index
+            self.logger.record(
+                "curriculum/stage",
+                -1 if stage_index is None else stage_index,
+            )
+
     adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
-    return CallbackList(
-        [
-            RollingArtifactCallback(
-                save_freq=adjusted_save_freq,
-                run_paths=run_paths,
-            ),
-            InfoLoggingCallback(),
-        ]
-    )
+    callbacks: list[BaseCallback] = [
+        RollingArtifactCallback(
+            save_freq=adjusted_save_freq,
+            run_paths=run_paths,
+        ),
+        InfoLoggingCallback(),
+    ]
+    if curriculum_config.enabled:
+        callbacks.append(CurriculumCallback(curriculum_config))
+    return CallbackList(callbacks)
 
 
 def _numeric_values(infos: Sequence[object], key: str) -> list[float]:

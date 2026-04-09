@@ -13,7 +13,7 @@ from fzerox_emulator import (
     ObservationSpec,
 )
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
-from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
+from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
     DRIFT_LEFT_MASK,
@@ -53,10 +53,12 @@ class FZeroXEnvEngine:
         backend: EmulatorBackend,
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
+        curriculum_config: CurriculumConfig | None = None,
     ) -> None:
         self.backend = backend
         self.config = config
         self._action_adapter = build_action_adapter(config.action)
+        self._curriculum_config = curriculum_config
         self._observation_spec = backend.observation_spec(config.observation.preset)
         self._reward_tracker = build_reward_tracker(
             config=reward_config,
@@ -83,6 +85,13 @@ class FZeroXEnvEngine:
             frame_stack=config.observation.frame_stack,
             mode=config.observation.mode,
         )
+        self._base_action_mask_overrides = (
+            config.action.mask.branch_overrides() if config.action.mask is not None else None
+        )
+        self._curriculum_stage_masks = _curriculum_stage_masks(curriculum_config)
+        self._curriculum_stage_names = _curriculum_stage_names(curriculum_config)
+        self._curriculum_stage_index = 0 if self._curriculum_stage_masks else None
+        self._boost_unlocked: bool | None = None
 
     @property
     def action_space(self) -> spaces.Space:
@@ -91,6 +100,41 @@ class FZeroXEnvEngine:
     @property
     def observation_space(self) -> spaces.Space:
         return self._observation_space
+
+    def action_masks(self) -> np.ndarray:
+        """Return the flattened boolean action mask for the current stage."""
+
+        stage_overrides = None
+        if self._curriculum_stage_index is not None:
+            stage_overrides = self._curriculum_stage_masks[self._curriculum_stage_index]
+        return self._action_adapter.action_mask(
+            base_overrides=self._base_action_mask_overrides,
+            stage_overrides=stage_overrides,
+            dynamic_overrides=_dynamic_action_mask_overrides(boost_unlocked=self._boost_unlocked),
+        )
+
+    def set_curriculum_stage(self, stage_index: int) -> None:
+        """Switch the active curriculum stage for subsequent action masks."""
+
+        if not self._curriculum_stage_masks:
+            raise RuntimeError("No curriculum stages are configured for this env")
+        if not 0 <= stage_index < len(self._curriculum_stage_masks):
+            raise ValueError(f"Invalid curriculum stage index {stage_index}")
+        self._curriculum_stage_index = int(stage_index)
+
+    @property
+    def curriculum_stage_index(self) -> int | None:
+        """Return the active curriculum stage index, if any."""
+
+        return self._curriculum_stage_index
+
+    @property
+    def curriculum_stage_name(self) -> str | None:
+        """Return the active curriculum stage name, if any."""
+
+        if self._curriculum_stage_index is None:
+            return None
+        return self._curriculum_stage_names[self._curriculum_stage_index]
 
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode.
@@ -104,6 +148,7 @@ class FZeroXEnvEngine:
         if seed is not None:
             self._rng_seed_base = seed
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
+        self._boost_unlocked = _telemetry_can_boost(telemetry)
         self._reward_tracker.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
@@ -111,6 +156,11 @@ class FZeroXEnvEngine:
         self._clear_recent_boost_pressure()
         self._reset_drift_press_state()
         info["seed"] = seed
+        _set_curriculum_info(
+            info,
+            stage_index=self._curriculum_stage_index,
+            stage_names=self._curriculum_stage_names,
+        )
         if telemetry is not None:
             info.update(_telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
@@ -249,6 +299,7 @@ class FZeroXEnvEngine:
         )
         info = _backend_step_info(self.backend)
         telemetry = step_result.telemetry
+        self._boost_unlocked = _telemetry_can_boost(telemetry)
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
@@ -270,6 +321,11 @@ class FZeroXEnvEngine:
         info["reverse_timer"] = step_result.status.reverse_timer
         info["termination_reason"] = step_result.status.termination_reason
         info["truncation_reason"] = step_result.status.truncation_reason
+        _set_curriculum_info(
+            info,
+            stage_index=self._curriculum_stage_index,
+            stage_names=self._curriculum_stage_names,
+        )
         if telemetry is not None:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(_telemetry_info(telemetry))
@@ -446,6 +502,21 @@ def _telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
     }
 
 
+def _telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:
+    if telemetry is None:
+        return False
+    return bool(telemetry.player.can_boost)
+
+
+def _dynamic_action_mask_overrides(
+    *,
+    boost_unlocked: bool | None,
+) -> dict[str, tuple[int, ...]] | None:
+    if boost_unlocked is not False:
+        return None
+    return {"boost": (0,)}
+
+
 def _backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
     return {
         "backend": backend.name,
@@ -453,3 +524,35 @@ def _backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
         "display_aspect_ratio": backend.display_aspect_ratio,
         "native_fps": backend.native_fps,
     }
+
+
+def _curriculum_stage_masks(
+    curriculum_config: CurriculumConfig | None,
+) -> tuple[dict[str, tuple[int, ...]] | None, ...]:
+    if curriculum_config is None or not curriculum_config.enabled:
+        return ()
+    return tuple(
+        stage.action_mask.branch_overrides() if stage.action_mask is not None else None
+        for stage in curriculum_config.stages
+    )
+
+
+def _curriculum_stage_names(
+    curriculum_config: CurriculumConfig | None,
+) -> tuple[str, ...]:
+    if curriculum_config is None or not curriculum_config.enabled:
+        return ()
+    return tuple(stage.name for stage in curriculum_config.stages)
+
+
+def _set_curriculum_info(
+    info: dict[str, object],
+    *,
+    stage_index: int | None,
+    stage_names: tuple[str, ...],
+) -> None:
+    info["curriculum_stage"] = stage_index
+    if stage_index is None:
+        info["curriculum_stage_name"] = None
+        return
+    info["curriculum_stage_name"] = stage_names[stage_index]

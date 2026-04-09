@@ -14,7 +14,39 @@ from pydantic import (
     PositiveFloat,
     PositiveInt,
     field_validator,
+    model_validator,
 )
+
+
+class ActionMaskConfig(BaseModel):
+    """Optional branch-wise action-mask restrictions for MultiDiscrete actions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    steer: tuple[NonNegativeInt, ...] | None = None
+    drive: tuple[NonNegativeInt, ...] | None = None
+    boost: tuple[NonNegativeInt, ...] | None = None
+    shoulder: tuple[NonNegativeInt, ...] | None = None
+
+    @field_validator("steer", "drive", "boost", "shoulder")
+    @classmethod
+    def _validate_non_empty_mask_branch(
+        cls,
+        value: tuple[int, ...] | None,
+    ) -> tuple[int, ...] | None:
+        if value is not None and len(value) == 0:
+            raise ValueError("Action mask branches must not be empty")
+        return value
+
+    def branch_overrides(self) -> dict[str, tuple[int, ...]]:
+        """Return the explicitly configured branch restrictions only."""
+
+        overrides: dict[str, tuple[int, ...]] = {}
+        for branch_name in ("steer", "drive", "boost", "shoulder"):
+            values = getattr(self, branch_name)
+            if values is not None:
+                overrides[branch_name] = tuple(int(value) for value in values)
+        return overrides
 
 
 class ActionConfig(BaseModel):
@@ -28,6 +60,7 @@ class ActionConfig(BaseModel):
         "steer_drive_boost_drift",
     ] = "steer_drive_boost_drift"
     steer_buckets: int = Field(default=7, ge=3)
+    mask: ActionMaskConfig | None = None
 
     @field_validator("steer_buckets")
     @classmethod
@@ -158,11 +191,62 @@ class PolicyConfig(BaseModel):
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)
 
 
+class CurriculumTriggerConfig(BaseModel):
+    """Episode-smoothed promotion condition for one curriculum stage."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    race_laps_completed_mean_gte: NonNegativeFloat | None = None
+    milestones_completed_mean_gte: NonNegativeFloat | None = None
+
+    @model_validator(mode="after")
+    def _validate_exactly_one_trigger(self) -> CurriculumTriggerConfig:
+        configured = [
+            value
+            for value in (
+                self.race_laps_completed_mean_gte,
+                self.milestones_completed_mean_gte,
+            )
+            if value is not None
+        ]
+        if len(configured) != 1:
+            raise ValueError("Curriculum stage triggers must set exactly one condition")
+        return self
+
+
+class CurriculumStageConfig(BaseModel):
+    """One curriculum stage with optional promotion trigger and mask override."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    until: CurriculumTriggerConfig | None = None
+    action_mask: ActionMaskConfig | None = None
+
+
+class CurriculumConfig(BaseModel):
+    """Optional stage-based action-mask curriculum for training."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    smoothing_episodes: PositiveInt = 1
+    min_stage_episodes: PositiveInt = 1
+    stages: tuple[CurriculumStageConfig, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_enabled_stages(self) -> CurriculumConfig:
+        if self.enabled and len(self.stages) == 0:
+            raise ValueError("Enabled curriculum requires at least one stage")
+        return self
+
+
 class TrainConfig(BaseModel):
     """PPO training settings for the current run."""
 
     model_config = ConfigDict(extra="forbid")
 
+    algorithm: Literal["auto", "ppo", "maskable_ppo"] = "auto"
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
@@ -192,6 +276,7 @@ class WatchAppConfig(BaseModel):
     emulator: EmulatorConfig
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
+    curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
     watch: WatchConfig = Field(default_factory=WatchConfig)
 
 
@@ -205,4 +290,5 @@ class TrainAppConfig(BaseModel):
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
+    curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
     train: TrainConfig = Field(default_factory=TrainConfig)
