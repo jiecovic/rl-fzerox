@@ -5,8 +5,8 @@ from rl_fzerox.ui.watch.hud.format import _format_observation_summary
 from rl_fzerox.ui.watch.hud.model import (
     _build_panel_columns,
     _observation_preview_size,
-    _wrap_text,
 )
+from rl_fzerox.ui.watch.hud.viz import _wrap_text
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelSection, ViewerFonts
 from rl_fzerox.ui.watch.render.widgets import (
     _draw_control_viz,
