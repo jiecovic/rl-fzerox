@@ -1,0 +1,118 @@
+# src/rl_fzerox/core/envs/engine/info.py
+from __future__ import annotations
+
+from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
+from rl_fzerox.core.envs.laps import completed_race_laps
+from rl_fzerox.core.envs.observations import (
+    STATE_FEATURE_COUNT,
+    STATE_FEATURE_NAMES,
+    image_observation_shape,
+)
+
+
+def has_custom_baseline(info: dict[str, object]) -> bool:
+    """Return whether reset info points at a custom user baseline."""
+
+    return info.get("baseline_kind") == "custom"
+
+
+def read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
+    """Read the latest live telemetry snapshot, if one is available."""
+
+    return backend.try_read_telemetry()
+
+
+def set_observation_info(
+    info: dict[str, object],
+    *,
+    observation_shape: tuple[int, ...],
+    observation_spec: ObservationSpec,
+    frame_stack: int,
+    observation_mode: str,
+) -> None:
+    """Attach observation metadata used by watch/debug surfaces."""
+
+    expected_image_shape = image_observation_shape(observation_spec, frame_stack=frame_stack)
+    if observation_shape != expected_image_shape:
+        raise ValueError(
+            "Rendered observation shape did not match native observation spec: "
+            f"got={observation_shape}, expected={expected_image_shape}"
+        )
+
+    info["observation_mode"] = observation_mode
+    info["observation_shape"] = observation_shape
+    info["observation_frame_shape"] = (
+        observation_spec.height,
+        observation_spec.width,
+        observation_spec.channels,
+    )
+    info["observation_stack"] = frame_stack
+    if observation_mode == "image_state":
+        info["observation_state_shape"] = (STATE_FEATURE_COUNT,)
+        info["observation_state_features"] = STATE_FEATURE_NAMES
+
+
+def reset_context_info(info: dict[str, object]) -> dict[str, object]:
+    """Keep only reset metadata that still matters after race continuation."""
+
+    keys = (
+        "backend",
+        "core_path",
+        "rom_path",
+        "runtime_dir",
+        "baseline_state_path",
+        "baseline_kind",
+        "display_aspect_ratio",
+        "native_fps",
+    )
+    return {key: info[key] for key in keys if key in info}
+
+
+def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
+    """Project pickle-safe episode info from the live telemetry snapshot."""
+
+    race_laps_completed = completed_race_laps(telemetry)
+    return {
+        "game_mode": telemetry.game_mode_name,
+        "course_index": telemetry.course_index,
+        "race_time_ms": telemetry.player.race_time_ms,
+        "race_distance": telemetry.player.race_distance,
+        "speed_kph": telemetry.player.speed_kph,
+        "position": telemetry.player.position,
+        "lap": telemetry.player.lap,
+        "laps_completed": race_laps_completed,
+        "race_laps_completed": race_laps_completed,
+        "raw_laps_completed": telemetry.player.laps_completed,
+        "energy": telemetry.player.energy,
+    }
+
+
+def telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:
+    """Return whether the game currently allows manual boost."""
+
+    if telemetry is None:
+        return False
+    return bool(telemetry.player.can_boost)
+
+
+def backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
+    """Return backend-side timing/display metadata for the current frame."""
+
+    return {
+        "backend": backend.name,
+        "frame_index": backend.frame_index,
+        "display_aspect_ratio": backend.display_aspect_ratio,
+        "native_fps": backend.native_fps,
+    }
+
+
+def set_curriculum_info(
+    info: dict[str, object],
+    *,
+    stage_index: int | None,
+    stage_name: str | None,
+) -> None:
+    """Attach the active curriculum stage in a watch- and callback-friendly form."""
+
+    info["curriculum_stage"] = stage_index
+    info["curriculum_stage_name"] = stage_name

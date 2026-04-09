@@ -588,7 +588,7 @@ def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> 
         }
 
     monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine.continue_to_next_race",
+        "rl_fzerox.core.envs.engine.runtime.continue_to_next_race",
         fake_continue_to_next_race,
     )
 
@@ -610,7 +610,7 @@ def test_reset_surfaces_continue_to_next_race_fallback(monkeypatch) -> None:
     env._engine._episode_done = True
 
     monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine.continue_to_next_race",
+        "rl_fzerox.core.envs.engine.runtime.continue_to_next_race",
         lambda _backend: (_ for _ in ()).throw(RuntimeError("continue failed")),
     )
 
