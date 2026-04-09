@@ -31,6 +31,20 @@ impl Host {
         Ok(bytes)
     }
 
+    pub(super) fn system_ram_slice_mut(&mut self) -> Result<&mut [u8], CoreError> {
+        self.ensure_open()?;
+        let available = self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        let data =
+            self.call_core(|core| unsafe { core.memory_data(libretro_sys::MEMORY_SYSTEM_RAM) });
+        if data.is_null() {
+            return Err(CoreError::MemoryUnavailable {
+                memory_id: libretro_sys::MEMORY_SYSTEM_RAM,
+            });
+        }
+        let bytes = unsafe { slice::from_raw_parts_mut(data.cast::<u8>(), available) };
+        Ok(bytes)
+    }
+
     pub(super) fn read_memory(
         &mut self,
         memory_id: u32,

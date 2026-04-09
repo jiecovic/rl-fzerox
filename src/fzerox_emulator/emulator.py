@@ -106,6 +106,19 @@ class Emulator:
 
         self._native.step_frames(count, capture_video)
 
+    def game_rng_state(self) -> tuple[int, int, int, int]:
+        """Return the live F-Zero X RNG globals from system RAM."""
+
+        seed1, mask1, seed2, mask2 = self._native.game_rng_state()
+        return int(seed1), int(mask1), int(seed2), int(mask2)
+
+    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]:
+        """Patch the live F-Zero X RNG globals using a deterministic seed."""
+
+        normalized_seed = seed & ((1 << 64) - 1)
+        seed1, mask1, seed2, mask2 = self._native.randomize_game_rng(normalized_seed)
+        return int(seed1), int(mask1), int(seed2), int(mask2)
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,
