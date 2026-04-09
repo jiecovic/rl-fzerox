@@ -5,7 +5,7 @@ import inspect
 from collections.abc import Callable
 from importlib import import_module
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol, TypeGuard
 
 import numpy as np
 
@@ -13,10 +13,23 @@ from rl_fzerox.core.envs.observations import ObservationValue
 
 
 class _HasPredict(Protocol):
-    predict: Callable[..., tuple[object, object]]
+    def predict(
+        self,
+        observation: ObservationValue,
+        deterministic: bool = True,
+    ) -> tuple[object, object]: ...
 
 
-def _load_saved_policy(policy_path: Path, *, run_dir: Path | None = None):
+class _HasMaskablePredict(Protocol):
+    def predict(
+        self,
+        observation: ObservationValue,
+        deterministic: bool = True,
+        action_masks: np.ndarray | None = None,
+    ) -> tuple[object, object]: ...
+
+
+def _load_saved_policy(policy_path: Path, *, run_dir: Path | None = None) -> _HasPredict:
     """Load one saved policy-only SB3 artifact."""
 
     import torch
@@ -32,7 +45,10 @@ def _load_saved_policy(policy_path: Path, *, run_dir: Path | None = None):
     )
     CnnPolicy, MultiInputPolicy = policy_classes
     policy_class = MultiInputPolicy if isinstance(observation_space, spaces.Dict) else CnnPolicy
-    return policy_class.load(str(policy_path), device="auto")
+    loaded_policy = policy_class.load(str(policy_path), device="auto")
+    if not _has_predict(loaded_policy):
+        raise TypeError("Loaded policy does not expose a compatible predict(...) method")
+    return loaded_policy
 
 
 def _policy_mtime_ns(policy_path: Path) -> int:
@@ -46,7 +62,9 @@ def _ensure_policy_dependencies_loaded() -> None:
 
 
 def _policy_predict_fn(policy: object) -> Callable[..., tuple[object, object]]:
-    return cast(_HasPredict, policy).predict
+    if not _has_predict(policy):
+        raise TypeError("Policy does not expose a compatible predict(...) method")
+    return policy.predict
 
 
 def _predict_policy_action(
@@ -56,14 +74,30 @@ def _predict_policy_action(
     deterministic: bool,
     action_masks: np.ndarray | None,
 ) -> tuple[object, object]:
-    predict = _policy_predict_fn(policy)
     if action_masks is None:
-        return predict(observation, deterministic=deterministic)
-    return predict(observation, deterministic=deterministic, action_masks=action_masks)
+        return _policy_predict_fn(policy)(observation, deterministic=deterministic)
+    if not _has_maskable_predict(policy):
+        raise TypeError("Policy does not support masked action prediction")
+    return policy.predict(
+        observation,
+        deterministic=deterministic,
+        action_masks=action_masks,
+    )
 
 
 def _policy_supports_action_masks(policy: object) -> bool:
     return "action_masks" in inspect.signature(_policy_predict_fn(policy)).parameters
+
+
+def _has_predict(policy: object) -> TypeGuard[_HasPredict]:
+    predict = getattr(policy, "predict", None)
+    return callable(predict)
+
+
+def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
+    if not _has_predict(policy):
+        return False
+    return "action_masks" in inspect.signature(policy.predict).parameters
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):

@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast
 
 import numpy as np
 
@@ -29,11 +27,6 @@ class LoadedPolicy:
     artifact: str
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
-
-
-class _HasPredict(Protocol):
-    predict: Callable[..., tuple[object, object]]
-
 
 class PolicyRunner:
     """Small inference wrapper around one saved policy artifact."""
@@ -159,15 +152,10 @@ def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunn
     )
 
 
-def _policy_predict_fn(policy: object) -> Callable[..., tuple[object, object]]:
-    return cast(_HasPredict, policy).predict
-
-
 __all__ = [
     "LoadedPolicy",
     "PolicyRunner",
     "_load_saved_policy",
-    "_policy_predict_fn",
     "_policy_supports_action_masks",
     "_predict_policy_action",
     "load_policy_runner",
