@@ -16,6 +16,7 @@ from fzerox_emulator import (
 from rl_fzerox.core.config.schema import ActionConfig, EnvConfig, ObservationConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import THROTTLE_MASK
+from rl_fzerox.core.envs.observations import ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
     make_step_status,
@@ -84,6 +85,7 @@ def test_reset_returns_stacked_observation():
     )
 
     obs, info = env.reset(seed=123)
+    obs = _image_obs(obs)
 
     assert obs.shape == (116, 164, 12)
     assert obs.dtype == np.uint8
@@ -97,6 +99,47 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [7, 2]
+
+
+def test_reset_can_return_image_state_observation() -> None:
+    backend = ScriptedStepBackend(
+        [],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne", "can_boost"),
+            speed_kph=750.0,
+            energy=89.0,
+            max_energy=178.0,
+            reverse_timer=1,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            observation=ObservationConfig(mode="image_state", frame_stack=4),
+        ),
+    )
+
+    obs, info = env.reset(seed=123)
+
+    assert isinstance(obs, dict)
+    assert set(obs) == {"image", "state"}
+    assert obs["image"].shape == (116, 164, 12)
+    assert obs["image"].dtype == np.uint8
+    assert obs["state"].shape == (5,)
+    assert obs["state"].dtype == np.float32
+    assert obs["state"].tolist() == pytest.approx([0.5, 0.5, 1.0, 1.0, 1.0])
+    assert info["observation_mode"] == "image_state"
+    assert info["observation_shape"] == (116, 164, 12)
+    assert info["observation_state_shape"] == (5,)
+    assert info["observation_state_features"] == (
+        "speed_norm",
+        "energy_frac",
+        "reverse_active",
+        "airborne",
+        "can_boost",
+    )
 
 
 def test_reset_info_is_pickle_safe_with_live_telemetry() -> None:
@@ -174,6 +217,7 @@ def test_step_advances_backend_by_action_repeat():
 
     env.reset(seed=7)
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
+    obs = _image_obs(obs)
 
     assert obs.shape == (116, 164, 12)
     assert isinstance(reward, float)
@@ -186,6 +230,41 @@ def test_step_advances_backend_by_action_repeat():
         joypad_mask=THROTTLE_MASK,
         left_stick_x=0.0,
     )
+
+
+def test_step_updates_image_state_observation_from_step_telemetry() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    speed_kph=1_500.0,
+                    energy=178.0,
+                    max_energy=178.0,
+                    reverse_timer=0,
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            observation=ObservationConfig(mode="image_state", frame_stack=4),
+        ),
+    )
+
+    env.reset(seed=7)
+    obs, _, _, _, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert isinstance(obs, dict)
+    assert set(obs) == {"image", "state"}
+    assert obs["image"].shape == (116, 164, 12)
+    assert obs["state"].tolist() == pytest.approx([1.0, 1.0, 0.0, 0.0, 0.0])
+    assert info["observation_mode"] == "image_state"
 
 
 def test_step_shifts_the_frame_stack_forward():
@@ -202,6 +281,9 @@ def test_step_shifts_the_frame_stack_forward():
     obs_before, _ = env.reset(seed=9)
     obs_after, _, _, _, _ = env.step(np.array([2, 0], dtype=np.int64))
     obs_later, _, _, _, _ = env.step(np.array([2, 0], dtype=np.int64))
+    obs_before = _image_obs(obs_before)
+    obs_after = _image_obs(obs_after)
+    obs_later = _image_obs(obs_later)
 
     assert not np.array_equal(obs_before, obs_after)
     assert np.array_equal(obs_later[:, :, 0:9], obs_after[:, :, 3:12])
@@ -222,6 +304,7 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=1))
 
     obs, info = env.reset(seed=13)
+    obs = _image_obs(obs)
 
     assert obs.shape == (116, 164, 12)
     assert info["observation_frame_shape"] == (116, 164, 3)
@@ -280,6 +363,7 @@ def test_reset_can_boot_into_the_first_race_path():
     )
 
     obs, info = env.reset(seed=5)
+    obs = _image_obs(obs)
 
     assert obs.shape == (116, 164, 12)
     assert info["seed"] == 5
@@ -487,19 +571,20 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     assert not terminated
     assert not truncated
-    assert reward == pytest.approx(-0.01)
+    assert reward == pytest.approx(-0.016)
     assert info["reverse_timer"] == 80
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-320.99)
+    assert reward == pytest.approx(-320.997)
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_timer"] == 100
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["reverse_time"] == -0.005
+    assert reward_breakdown["bootstrap_regress"] == pytest.approx(-0.007)
     assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.98)
 
 
@@ -559,6 +644,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
 
     env.reset(seed=6)
     obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    obs = _image_obs(obs)
 
     assert obs.shape == (116, 164, 12)
     assert terminated
@@ -571,7 +657,7 @@ def test_step_info_is_pickle_safe_with_native_telemetry() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
-                telemetry=_telemetry(race_distance=42.0),
+                telemetry=_telemetry(race_distance=42.0, lap=1, laps_completed=1),
                 summary=_step_summary(
                     max_race_distance=42.0,
                     final_frame_index=1,
@@ -591,6 +677,10 @@ def test_step_info_is_pickle_safe_with_native_telemetry() -> None:
 
     assert "telemetry" not in info
     assert info["race_distance"] == pytest.approx(42.0)
+    assert info["lap"] == 1
+    assert info["laps_completed"] == 0
+    assert info["race_laps_completed"] == 0
+    assert info["raw_laps_completed"] == 1
     pickle.dumps(info)
 
 
@@ -599,14 +689,27 @@ def _telemetry(
     race_distance: float,
     state_labels: tuple[str, ...] = ("active",),
     speed_kph: float = 100.0,
+    energy: float = 178.0,
+    max_energy: float = 178.0,
     reverse_timer: int = 0,
+    lap: int = 1,
+    laps_completed: int = 0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         race_distance=race_distance,
         state_labels=state_labels,
         speed_kph=speed_kph,
+        energy=energy,
+        max_energy=max_energy,
         reverse_timer=reverse_timer,
+        lap=lap,
+        laps_completed=laps_completed,
     )
+
+
+def _image_obs(observation: ObservationValue) -> np.ndarray:
+    assert isinstance(observation, np.ndarray)
+    return observation
 
 
 def _step_summary(

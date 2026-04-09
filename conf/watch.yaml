@@ -22,5 +22,11 @@ env:
     name: steer_drive_boost
     steer_buckets: 7
   observation:
+    # image keeps screen-only obs; image_state adds the scalar telemetry vector.
+    mode: image_state
     preset: native_crop_v3
     frame_stack: 4
+
+watch:
+  fps: auto
+  deterministic_policy: true

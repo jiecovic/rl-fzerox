@@ -58,6 +58,8 @@ def _build_panel_columns(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
+    observation_state: np.ndarray | None = None,
+    observation_state_feature_names: tuple[str, ...] = (),
 ) -> PanelColumns:
     return PanelColumns(
         left=[
@@ -104,10 +106,14 @@ def _build_panel_columns(
                     ),
                     _panel_line(
                         "Step",
-                        f"{_float_info(info, 'step_reward'):.2f}",
+                        _format_reward_value(_float_info(info, "step_reward")),
                         PALETTE.text_primary,
                     ),
-                    _panel_line("Return", f"{episode_reward:.2f}", PALETTE.text_primary),
+                    _panel_line(
+                        "Return",
+                        _format_reward_value(episode_reward),
+                        PALETTE.text_primary,
+                    ),
                 ],
             ),
             PanelSection(
@@ -178,6 +184,10 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                 ],
+            ),
+            *_policy_state_sections(
+                observation_state=observation_state,
+                feature_names=observation_state_feature_names,
             ),
         ],
     )
@@ -283,6 +293,10 @@ def _format_next_milestone(info: dict[str, object]) -> str:
     if isinstance(remaining, int | float) and isinstance(next_distance, int | float):
         return f"{remaining:,.1f} to {next_distance:,.0f}"
     return "-"
+
+
+def _format_reward_value(value: float) -> str:
+    return f"{value:.4f}"
 
 
 def _column_content_height(
@@ -396,6 +410,31 @@ def _game_section(
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
         ),
     )
+
+
+def _policy_state_sections(
+    *,
+    observation_state: np.ndarray | None,
+    feature_names: tuple[str, ...],
+) -> list[PanelSection]:
+    if observation_state is None:
+        return []
+
+    values = np.asarray(observation_state, dtype=np.float32).reshape(-1)
+    names = (
+        feature_names
+        if len(feature_names) == values.size
+        else tuple(f"state_{index}" for index in range(values.size))
+    )
+    return [
+        PanelSection(
+            title="Obs Vector",
+            lines=[
+                _panel_line(name, f"{float(value):.3f}", PALETTE.text_primary)
+                for name, value in zip(names, values, strict=True)
+            ],
+        )
+    ]
 
 
 def _control_viz(control_state: ControllerState) -> ControlViz:

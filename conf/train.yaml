@@ -12,7 +12,7 @@ emulator:
 env:
   action_repeat: 2
   max_episode_steps: 50000
-  stuck_step_limit: 120
+  stuck_step_limit: 240
   stuck_min_speed_kph: 60.0
   wrong_way_timer_limit: 120
   randomize_game_rng_on_reset: true
@@ -22,17 +22,19 @@ env:
     name: steer_drive_boost
     steer_buckets: 7
   observation:
-    preset: native_crop_v3
+    # image keeps screen-only obs; image_state adds the scalar telemetry vector.
+    mode: image_state
+    preset: native_crop_v1
     frame_stack: 4
 train:
   vec_env: subproc
-  num_envs: 4
-  total_timesteps: 5_000_000
+  num_envs: 10
+  total_timesteps: 50_000_000
   n_steps: 2048
-  n_epochs: 8
-  batch_size: 512
-  learning_rate: 2.0e-4
-  gamma: 0.994
+  n_epochs: 10
+  batch_size: 256
+  learning_rate: 3.0e-4
+  gamma: 0.992
   gae_lambda: 0.95
   clip_range: 0.2
   ent_coef: 0.02
@@ -48,6 +50,7 @@ policy:
   activation: tanh
   extractor:
     features_dim: 512
+    state_features_dim: 64
   net_arch:
     pi: [256]
-    vf: [256]
+    vf: [64]

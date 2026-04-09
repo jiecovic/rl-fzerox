@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
+from rl_fzerox.core.config.schema import RewardConfig
 from rl_fzerox.core.envs.rewards import (
     DEFAULT_REWARD_NAME,
     REWARD_TRACKER_REGISTRY,
@@ -126,6 +127,33 @@ def test_race_v2_rewards_completed_laps() -> None:
     }
 
 
+def test_race_v2_ignores_initial_start_line_crossing_for_completed_laps() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+            bootstrap_lap_count=1,
+            lap_1_completion_bonus=20.0,
+            lap_position_scale=1.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=-100.0, lap=1, laps_completed=0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=10.0),
+        _status(step_count=20),
+        _telemetry(race_distance=10.0, lap=1, laps_completed=1, position=1),
+    )
+    info = tracker.info(_telemetry(race_distance=10.0, lap=1, laps_completed=1))
+
+    assert step.reward == pytest.approx(11.0)
+    assert step.breakdown == {"bootstrap_progress": 11.0}
+    assert info["bootstrap_progress_active"] is True
+    assert info["race_laps_completed"] == 0
+    assert info["rewarded_laps_completed"] == 0
+
+
 def test_race_v2_scales_time_penalty_while_reverse_timer_is_active() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
@@ -174,31 +202,40 @@ def test_race_v2_scales_time_penalty_while_below_stuck_speed_threshold() -> None
     }
 
 
-def test_race_v2_penalizes_energy_loss_more_than_refill_reward() -> None:
+def test_race_v2_penalizes_energy_loss_only_below_safe_fraction() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             energy_loss_epsilon=0.1,
-            energy_loss_penalty_scale=0.05,
+            energy_loss_penalty_scale=0.10,
+            energy_loss_safe_fraction=0.90,
+            energy_loss_danger_power=2.0,
             energy_gain_reward_scale=0.02,
             bootstrap_progress_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=100.0, energy=178.0))
 
-    loss = tracker.step_summary(
+    safe_loss = tracker.step_summary(
         _summary(max_race_distance=100.0, energy_loss_total=4.0),
         _status(step_count=1),
         _telemetry(race_distance=100.0, energy=174.0),
     )
+    dangerous_loss = tracker.step_summary(
+        _summary(max_race_distance=100.0, energy_loss_total=4.0),
+        _status(step_count=2),
+        _telemetry(race_distance=100.0, energy=89.0),
+    )
     gain = tracker.step_summary(
         _summary(max_race_distance=100.0, energy_gain_total=2.0),
-        _status(step_count=2),
+        _status(step_count=3),
         _telemetry(race_distance=100.0, energy=176.0),
     )
 
-    assert loss.reward == -0.2
-    assert loss.breakdown == {"energy_loss": -0.2}
+    assert safe_loss.reward == 0.0
+    assert safe_loss.breakdown == {}
+    assert dangerous_loss.reward == pytest.approx(-0.0790123457)
+    assert dangerous_loss.breakdown == {"energy_loss": pytest.approx(-0.0790123457)}
     assert gain.reward == pytest.approx(0.04)
     assert gain.breakdown == {"energy_gain": 0.04}
 
@@ -208,6 +245,8 @@ def test_race_v2_energy_gain_stays_net_negative_against_equal_loss() -> None:
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             energy_loss_penalty_scale=0.05,
+            energy_loss_safe_fraction=0.90,
+            energy_loss_danger_power=2.0,
             energy_gain_reward_scale=0.02,
             bootstrap_progress_scale=0.0,
         )
@@ -221,7 +260,7 @@ def test_race_v2_energy_gain_stays_net_negative_against_equal_loss() -> None:
             energy_gain_total=4.0,
         ),
         _status(step_count=1),
-        _telemetry(race_distance=100.0, energy=178.0),
+        _telemetry(race_distance=100.0, energy=0.0),
     )
 
     assert step.reward == pytest.approx(-0.12)
@@ -429,14 +468,16 @@ def test_race_v2_multiplies_time_penalty_by_frames_run() -> None:
     assert step.breakdown == {"time": -0.03}
 
 
-def test_race_v2_bootstrap_progress_only_applies_before_first_milestone() -> None:
+def test_race_v2_bootstrap_progress_applies_until_configured_lap_is_completed() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             milestone_distance=25.0,
             milestone_bonus=0.0,
             bootstrap_progress_scale=0.1,
-            bootstrap_milestone_count=1,
+            bootstrap_lap_count=1,
+            lap_1_completion_bonus=0.0,
+            lap_position_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -451,28 +492,89 @@ def test_race_v2_bootstrap_progress_only_applies_before_first_milestone() -> Non
         _status(step_count=2),
         _telemetry(race_distance=30.0),
     )
-    after = tracker.step_summary(
+    later_same_lap = tracker.step_summary(
         _summary(max_race_distance=40.0),
         _status(step_count=3),
         _telemetry(race_distance=40.0),
     )
+    lap_crossing = tracker.step_summary(
+        _summary(max_race_distance=80.0),
+        _status(step_count=4),
+        _telemetry(race_distance=80.0, laps_completed=1),
+    )
+    after_lap = tracker.step_summary(
+        _summary(max_race_distance=90.0),
+        _status(step_count=5),
+        _telemetry(race_distance=90.0, laps_completed=1),
+    )
 
     assert first.reward == pytest.approx(1.0)
     assert first.breakdown == {"bootstrap_progress": 1.0}
-    assert crossing.reward == pytest.approx(1.5)
-    assert crossing.breakdown == {"bootstrap_progress": 1.5}
-    assert after.reward == 0.0
-    assert after.breakdown == {}
+    assert crossing.reward == pytest.approx(2.0)
+    assert crossing.breakdown == {"bootstrap_progress": 2.0}
+    assert later_same_lap.reward == pytest.approx(1.0)
+    assert later_same_lap.breakdown == {"bootstrap_progress": 1.0}
+    assert lap_crossing.reward == pytest.approx(4.0)
+    assert lap_crossing.breakdown == {"bootstrap_progress": 4.0}
+    assert after_lap.reward == 0.0
+    assert after_lap.breakdown == {}
 
 
-def test_race_v2_bootstrap_progress_can_span_multiple_initial_milestones() -> None:
+def test_race_v2_bootstrap_progress_rewards_recovery_and_penalizes_regress() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=1_000.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+            bootstrap_regress_penalty_scale=0.2,
+            bootstrap_lap_count=3,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    forward = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+    )
+    backward = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=2),
+        _telemetry(race_distance=60.0),
+    )
+    recovery = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=3),
+        _telemetry(race_distance=90.0),
+    )
+    new_progress = tracker.step_summary(
+        _summary(max_race_distance=110.0),
+        _status(step_count=4),
+        _telemetry(race_distance=110.0),
+    )
+
+    assert forward.reward == pytest.approx(10.0)
+    assert forward.breakdown == {"bootstrap_progress": 10.0}
+    assert backward.reward == pytest.approx(-8.0)
+    assert backward.breakdown == {"bootstrap_regress": -8.0}
+    assert recovery.reward == pytest.approx(3.0)
+    assert recovery.breakdown == {"bootstrap_progress": 3.0}
+    assert new_progress.reward == pytest.approx(2.0)
+    assert new_progress.breakdown == {"bootstrap_progress": 2.0}
+
+
+def test_race_v2_bootstrap_progress_can_span_multiple_initial_laps() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             milestone_distance=25.0,
             milestone_bonus=0.0,
             bootstrap_progress_scale=0.1,
-            bootstrap_milestone_count=2,
+            bootstrap_lap_count=2,
+            lap_1_completion_bonus=0.0,
+            lap_2_completion_bonus=0.0,
+            lap_position_scale=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -487,32 +589,39 @@ def test_race_v2_bootstrap_progress_can_span_multiple_initial_milestones() -> No
         _status(step_count=2),
         _telemetry(race_distance=30.0),
     )
-    third = tracker.step_summary(
+    lap_1_crossing = tracker.step_summary(
         _summary(max_race_distance=45.0),
         _status(step_count=3),
-        _telemetry(race_distance=45.0),
+        _telemetry(race_distance=45.0, laps_completed=1),
     )
-    crossing = tracker.step_summary(
+    lap_2_progress = tracker.step_summary(
         _summary(max_race_distance=60.0),
         _status(step_count=4),
-        _telemetry(race_distance=60.0),
+        _telemetry(race_distance=60.0, laps_completed=1),
     )
-    after = tracker.step_summary(
+    lap_2_crossing = tracker.step_summary(
         _summary(max_race_distance=70.0),
         _status(step_count=5),
-        _telemetry(race_distance=70.0),
+        _telemetry(race_distance=70.0, laps_completed=2),
+    )
+    after_lap_2 = tracker.step_summary(
+        _summary(max_race_distance=80.0),
+        _status(step_count=6),
+        _telemetry(race_distance=80.0, laps_completed=2),
     )
 
     assert first.reward == pytest.approx(1.0)
     assert first.breakdown == {"bootstrap_progress": 1.0}
     assert second.reward == pytest.approx(2.0)
     assert second.breakdown == {"bootstrap_progress": 2.0}
-    assert third.reward == pytest.approx(1.5)
-    assert third.breakdown == {"bootstrap_progress": 1.5}
-    assert crossing.reward == pytest.approx(0.5)
-    assert crossing.breakdown == {"bootstrap_progress": 0.5}
-    assert after.reward == 0.0
-    assert after.breakdown == {}
+    assert lap_1_crossing.reward == pytest.approx(1.5)
+    assert lap_1_crossing.breakdown == {"bootstrap_progress": 1.5}
+    assert lap_2_progress.reward == pytest.approx(1.5)
+    assert lap_2_progress.breakdown == {"bootstrap_progress": 1.5}
+    assert lap_2_crossing.reward == pytest.approx(1.0)
+    assert lap_2_crossing.breakdown == {"bootstrap_progress": 1.0}
+    assert after_lap_2.reward == 0.0
+    assert after_lap_2.breakdown == {}
 
 
 def test_race_v2_bootstrap_progress_uses_episode_start_as_zero() -> None:
@@ -522,7 +631,7 @@ def test_race_v2_bootstrap_progress_uses_episode_start_as_zero() -> None:
             milestone_distance=1_000.0,
             milestone_bonus=0.0,
             bootstrap_progress_scale=0.1,
-            bootstrap_milestone_count=1,
+            bootstrap_lap_count=1,
         )
     )
     tracker.reset(_telemetry(race_distance=-300.0))
@@ -540,8 +649,30 @@ def test_race_v2_bootstrap_progress_uses_episode_start_as_zero() -> None:
 
     assert first.reward == pytest.approx(40.0)
     assert first.breakdown == {"bootstrap_progress": 40.0}
-    assert crossing.reward == pytest.approx(60.0)
-    assert crossing.breakdown == {"bootstrap_progress": 60.0}
+    assert crossing.reward == pytest.approx(110.0)
+    assert crossing.breakdown == {"bootstrap_progress": 110.0}
+
+
+def test_build_reward_tracker_passes_bootstrap_lap_count_from_config() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            time_penalty_per_frame=0.0,
+            bootstrap_lap_count=2,
+            bootstrap_progress_scale=0.1,
+            bootstrap_regress_penalty_scale=0.3,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=-10.0),
+    )
+    info = tracker.info(_telemetry(race_distance=0.0))
+
+    assert info["bootstrap_lap_count"] == 2
+    assert step.breakdown == {"bootstrap_regress": -3.0}
 
 
 def _telemetry(
@@ -554,6 +685,7 @@ def _telemetry(
     race_time_ms: int = 0,
     speed_kph: float = 100.0,
     laps_completed: int = 0,
+    lap: int | None = None,
     reverse_timer: int = 0,
 ) -> FZeroXTelemetry:
     return make_telemetry(
@@ -565,6 +697,7 @@ def _telemetry(
         race_time_ms=race_time_ms,
         position=position,
         laps_completed=laps_completed,
+        lap=max(laps_completed + 1, 1) if lap is None else lap,
         reverse_timer=reverse_timer,
     )
 

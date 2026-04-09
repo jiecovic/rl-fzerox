@@ -33,6 +33,7 @@ class ObservationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    mode: Literal["image", "image_state"] = "image"
     preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3"] = "native_crop_v3"
     frame_stack: PositiveInt = 4
 
@@ -68,7 +69,8 @@ class RewardConfig(BaseModel):
     milestone_distance: PositiveFloat = 3_000.0
     milestone_bonus: NonNegativeFloat = 2.0
     bootstrap_progress_scale: NonNegativeFloat = 0.001
-    bootstrap_milestone_count: PositiveInt = 3
+    bootstrap_regress_penalty_scale: NonNegativeFloat = 0.002
+    bootstrap_lap_count: PositiveInt = 1
     lap_1_completion_bonus: NonNegativeFloat = 20.0
     lap_2_completion_bonus: NonNegativeFloat = 35.0
     final_lap_completion_bonus: NonNegativeFloat = 60.0
@@ -77,6 +79,8 @@ class RewardConfig(BaseModel):
     remaining_lap_penalty: NonNegativeFloat = 50.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_loss_penalty_scale: NonNegativeFloat = 0.05
+    energy_loss_safe_fraction: float = Field(default=0.9, ge=0.0, le=1.0)
+    energy_loss_danger_power: PositiveFloat = 2.0
     energy_gain_reward_scale: NonNegativeFloat = 0.02
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
@@ -106,6 +110,7 @@ class WatchConfig(BaseModel):
 
     episodes: PositiveInt | None = None
     fps: PositiveFloat | Literal["auto"] | None = "auto"
+    deterministic_policy: bool = True
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
 
@@ -125,6 +130,7 @@ class ExtractorConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     features_dim: PositiveInt | Literal["auto"] = 512
+    state_features_dim: PositiveInt = 64
 
 
 class PolicyConfig(BaseModel):

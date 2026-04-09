@@ -35,6 +35,8 @@ def _draw_side_panel(
     stuck_min_speed_kph: float,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
+    observation_state,
+    observation_state_feature_names: tuple[str, ...],
     observation_surface,
     telemetry,
 ) -> None:
@@ -66,6 +68,8 @@ def _draw_side_panel(
         stuck_min_speed_kph=stuck_min_speed_kph,
         game_display_size=game_display_size,
         observation_shape=observation_shape,
+        observation_state=observation_state,
+        observation_state_feature_names=observation_state_feature_names,
         telemetry=telemetry,
     )
 

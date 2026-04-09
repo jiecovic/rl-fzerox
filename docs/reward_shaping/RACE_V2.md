@@ -5,8 +5,8 @@ short-horizon driving tricks.
 
 ## Plan
 
-- Keep dense frontier shaping only as a bootstrap signal for the first few
-  configured milestones.
+- Keep signed dense progress shaping only as a bootstrap signal for the first
+  few configured completed laps.
 - Use coarse one-time milestones after that instead of trusting `race_distance`
   as a precise local line-quality signal for the whole episode.
 - Reward lap completion with increasing bonuses.
@@ -17,8 +17,8 @@ short-horizon driving tricks.
   time penalty while the game reverse-warning timer is active.
 - Penalize low-speed frames more strongly by scaling the normal per-frame time
   penalty whenever speed drops below the env stuck-speed threshold.
-- Keep energy loss negative and energy refill positive, but smaller than the
-  loss penalty.
+- Keep energy refill positive, but penalize energy loss only when post-step
+  energy falls below the configured safe fraction.
 - Make death and truncation penalties dynamic:
   - base penalty
   - plus explicit remaining-step pressure from
@@ -30,6 +30,11 @@ short-horizon driving tricks.
 - `race_v2` does not carry hidden race-format constants anymore.
 - Total laps and total racers are read from live emulator RAM through the native
   telemetry path.
+- Completed race laps follow the HUD lap number (`lap - 1`), not the raw
+  `laps_completed` RAM field, because that raw field increments on the initial
+  start-line crossing while the HUD still shows lap 1/3.
+- Env info and training logs use `race_laps_completed` for that HUD-aligned
+  value; the raw RAM field is kept only as `raw_laps_completed` for debugging.
 - The reverse-engineered RAM layout currently targets the US ROM build.
 - Reverse-driving punishment starts as soon as the game's live reverse timer is
   non-zero. Wrong-way truncation uses the configured env timer limit directly.
@@ -44,10 +49,14 @@ short-horizon driving tricks.
 - `milestone_bonus`
   - One-time reward paid for each newly crossed milestone bucket.
 - `bootstrap_progress_scale`
-  - Dense new-best frontier reward used only during the configured bootstrap
-    milestone window, also measured from the reset-time progress origin.
-- `bootstrap_milestone_count`
-  - Number of initial milestones that still allow dense bootstrap frontier
+  - Dense reward scale for positive race-distance delta during the configured
+    bootstrap lap window.
+- `bootstrap_regress_penalty_scale`
+  - Dense penalty scale for negative race-distance delta during the configured
+    bootstrap lap window. Keep this higher than `bootstrap_progress_scale` so
+    back-and-forth oscillation is net negative.
+- `bootstrap_lap_count`
+  - Number of initial completed laps that still allow dense bootstrap progress
     reward before the profile switches fully to milestone-only progress shaping.
 - `reverse_time_penalty_scale`
   - Multiplier applied to the normal time penalty on frames where the live game
@@ -70,7 +79,13 @@ short-horizon driving tricks.
 - `remaining_step_penalty_per_frame`
   - Extra penalty per remaining internal frame on death or truncation.
 - `energy_loss_penalty_scale`
-  - Penalty scale applied to `energy_loss_total`.
+  - Maximum penalty scale applied to `energy_loss_total` when post-step energy
+    is near zero.
+- `energy_loss_safe_fraction`
+  - Post-step energy fraction above which energy loss is not penalized.
+- `energy_loss_danger_power`
+  - Exponent for the danger curve below `energy_loss_safe_fraction`; higher
+    values keep the penalty mild until energy gets lower.
 - `energy_gain_reward_scale`
   - Smaller reward scale applied to `energy_gain_total`.
 
@@ -79,14 +94,14 @@ short-horizon driving tricks.
 Ordinary step:
 
 - negative time reward
-- bootstrap frontier reward on new best progress during the configured initial
-  milestone warmup window
+- bootstrap signed progress reward or regress penalty during the configured
+  initial lap warmup window
 - one-time milestone reward
 - lap completion reward if a new lap was crossed
 - lap placement reward if a new lap was crossed
 - extra reverse-driving time penalty while the live reverse timer is active
 - extra low-speed time penalty while speed is below the stuck-speed threshold
-- energy loss penalty
+- danger-weighted energy loss penalty below the configured safe fraction
 - smaller energy refill reward
 - collision / spin entry penalties
 

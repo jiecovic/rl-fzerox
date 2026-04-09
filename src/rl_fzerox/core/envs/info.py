@@ -11,6 +11,8 @@ MONITOR_INFO_KEYS: tuple[str, ...] = (
     "position",
     "lap",
     "laps_completed",
+    "race_laps_completed",
+    "raw_laps_completed",
 )
 
 
@@ -26,3 +28,5 @@ def ensure_monitor_info_keys(info: dict[str, object]) -> None:
     info.setdefault("position", None)
     info.setdefault("lap", None)
     info.setdefault("laps_completed", None)
+    info.setdefault("race_laps_completed", None)
+    info.setdefault("raw_laps_completed", None)

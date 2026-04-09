@@ -82,6 +82,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "watch:",
             "  episodes: 2",
             "  fps: 30",
+            "  deterministic_policy: false",
         ],
     )
 
@@ -96,6 +97,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.env.reset_to_race is True
     assert config.watch.episodes == 2
     assert config.watch.fps == 30
+    assert config.watch.deterministic_policy is False
 
 
 def test_load_watch_app_config_accepts_larger_observation_preset(tmp_path: Path) -> None:
@@ -146,6 +148,30 @@ def test_load_watch_app_config_accepts_default_v3_observation_preset(tmp_path: P
     config = load_watch_app_config(config_path)
 
     assert config.env.observation.preset == "native_crop_v3"
+
+
+def test_load_watch_app_config_accepts_image_state_observation_mode(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "watch.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    mode: image_state",
+            "    preset: native_crop_v3",
+        ],
+    )
+
+    config = load_watch_app_config(config_path)
+
+    assert config.env.observation.mode == "image_state"
 
 
 def test_load_watch_app_config_accepts_auto_watch_fps(tmp_path: Path) -> None:
@@ -394,6 +420,32 @@ def test_load_train_app_config_reads_auto_extractor_features_dim(tmp_path: Path)
     config = load_train_app_config(config_path)
 
     assert config.policy.extractor.features_dim == "auto"
+
+
+def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "policy:",
+            "  extractor:",
+            "    state_features_dim: 32",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.policy.extractor.state_features_dim == 32
 
 
 def test_repo_watch_template_exists() -> None:

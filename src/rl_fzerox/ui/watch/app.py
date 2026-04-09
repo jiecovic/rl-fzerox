@@ -8,6 +8,7 @@ import numpy as np
 from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.input import _poll_viewer_input
 from rl_fzerox.ui.watch.render.frame import (
@@ -73,6 +74,8 @@ def run_viewer(config: WatchAppConfig) -> None:
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             observation, info = env.reset(seed=reset_seed)
+            observation_image = observation_utils.observation_image(observation)
+            observation_state = observation_utils.observation_state(observation)
             raw_frame = env.render()
             reset_info = dict(info)
             current_control_state = ControllerState()
@@ -83,7 +86,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 screen = _create_screen(
                     pygame,
                     (raw_frame.shape[1], raw_frame.shape[0]),
-                    observation.shape,
+                    observation_image.shape,
                 )
                 fonts = _create_fonts(pygame)
                 max_control_fps = env.backend.native_fps / config.env.action_repeat
@@ -117,7 +120,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 pygame,
                 screen,
                 emulator.display_size,
-                observation.shape,
+                observation_image.shape,
             )
 
             draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
@@ -131,7 +134,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                 screen=screen,
                 fonts=fonts,
                 raw_frame=raw_frame,
-                observation=observation,
+                observation=observation_image,
+                observation_state=observation_state,
+                observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
                 episode=episode,
                 info=draw_info,
                 reset_info=reset_info,
@@ -183,7 +188,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                         screen=screen,
                         fonts=fonts,
                         raw_frame=raw_frame,
-                        observation=observation,
+                        observation=observation_image,
+                        observation_state=observation_state,
+                        observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
                         episode=episode,
                         info=draw_info,
                         reset_info=reset_info,
@@ -209,10 +216,15 @@ def run_viewer(config: WatchAppConfig) -> None:
                         )
                         current_policy_action = None
                     else:
-                        action = policy_runner.predict(observation)
+                        action = policy_runner.predict(
+                            observation,
+                            deterministic=config.watch.deterministic_policy,
+                        )
                         current_policy_action = np.asarray(action, dtype=np.int64)
                         current_control_state = env.action_to_control_state(action)
                         observation, reward, terminated, truncated, info = env.step(action)
+                    observation_image = observation_utils.observation_image(observation)
+                    observation_state = observation_utils.observation_state(observation)
                     raw_frame = env.render()
                     episode_reward += reward
                     telemetry = _read_live_telemetry(emulator)
@@ -233,7 +245,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                         screen=screen,
                         fonts=fonts,
                         raw_frame=raw_frame,
-                        observation=observation,
+                        observation=observation_image,
+                        observation_state=observation_state,
+                        observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
                         episode=episode,
                         info=draw_info,
                         reset_info=reset_info,
@@ -258,10 +272,15 @@ def run_viewer(config: WatchAppConfig) -> None:
                     )
                     current_policy_action = None
                 else:
-                    action = policy_runner.predict(observation)
+                    action = policy_runner.predict(
+                        observation,
+                        deterministic=config.watch.deterministic_policy,
+                    )
                     current_policy_action = np.asarray(action, dtype=np.int64)
                     current_control_state = env.action_to_control_state(action)
                     observation, reward, terminated, truncated, info = env.step(action)
+                observation_image = observation_utils.observation_image(observation)
+                observation_state = observation_utils.observation_state(observation)
                 raw_frame = env.render()
                 episode_reward += reward
                 telemetry = _read_live_telemetry(emulator)
@@ -276,7 +295,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     pygame,
                     screen,
                     emulator.display_size,
-                    observation.shape,
+                    observation_image.shape,
                 )
                 draw_info, last_draw_time, viewer_fps = _with_viewer_fps(
                     info,
@@ -289,7 +308,9 @@ def run_viewer(config: WatchAppConfig) -> None:
                     screen=screen,
                     fonts=fonts,
                     raw_frame=raw_frame,
-                    observation=observation,
+                    observation=observation_image,
+                    observation_state=observation_state,
+                    observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
                     episode=episode,
                     info=draw_info,
                     reset_info=reset_info,

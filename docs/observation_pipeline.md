@@ -51,6 +51,33 @@ With `frame_stack: 4`, the env observation space becomes:
 - `native_crop_v2`: `92 x 124 x 12`
 - `native_crop_v3`: `116 x 164 x 12`
 
+## Observation Modes
+
+The screen-only path remains available with:
+
+- `env.observation.mode: image`
+
+The mixed image plus scalar state path is:
+
+- `env.observation.mode: image_state`
+
+`image_state` returns a Gym `Dict` observation with:
+
+- `image`: the same stacked RGB image used by screen-only mode
+- `state`: a `float32[5]` vector appended by the policy feature extractor
+
+The state vector order is:
+
+- `speed_norm`: `speed_kph / 1500`, clamped to `[0, 2]`
+- `energy_frac`: `energy / max_energy`, clamped to `[0, 1]`
+- `reverse_active`: `1` when the game reverse timer is above zero, else `0`
+- `airborne`: `1` when the game state flag is active, else `0`
+- `can_boost`: `1` when the game state flag is active, else `0`
+
+Training uses SB3 `CnnPolicy` for `image` mode and `MultiInputPolicy` for
+`image_state` mode. The custom mixed extractor keeps the same CNN image branch
+and concatenates a small MLP state branch before the PPO policy/value heads.
+
 ## Human Watch Display
 
 The watch display is a separate native render target. It uses the same crop,
@@ -78,6 +105,7 @@ Rust now owns:
 Python now owns:
 
 - preset selection in config
+- observation mode selection in config
 - PPO/CNN wiring
 - watch layout and controls
 
