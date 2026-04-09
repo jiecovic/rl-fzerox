@@ -110,6 +110,7 @@ impl PyEmulator {
         max_episode_steps,
         stuck_step_limit,
         wrong_way_timer_limit,
+        terminate_on_energy_depleted=true,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -128,6 +129,7 @@ impl PyEmulator {
         max_episode_steps: usize,
         stuck_step_limit: usize,
         wrong_way_timer_limit: usize,
+        terminate_on_energy_depleted: bool,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -157,6 +159,7 @@ impl PyEmulator {
                     max_episode_steps,
                     stuck_step_limit,
                     wrong_way_timer_limit,
+                    terminate_on_energy_depleted,
                 })
             })
             .map_err(map_core_error)?;

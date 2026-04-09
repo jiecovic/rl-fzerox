@@ -70,14 +70,16 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 
 `watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`, and any explicit numeric `watch.fps` is capped to that same maximum.
 
-The current policy action space is a `MultiDiscrete([5, 2])` adapter:
+The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:
 
-- 5 steering buckets from hard-left to hard-right
-- 2 drive modes: `coast` and `throttle`
+- 7 steering buckets from hard-left to hard-right
+- 3 drive modes: `coast`, `throttle`, and `brake`
 
-Brake and boost are intentionally not part of the first policy surface yet.
-They need a cleaner verified mapping from libretro controls to F-Zero X inputs
-before they belong in training code.
+The `steer_drive_boost` adapter adds a binary boost head for
+`MultiDiscrete([7, 3, 2])`. The `steer_drive_boost_drift` adapter also adds an
+explicit shoulder-input head for `MultiDiscrete([7, 3, 2, 3])` with
+`off`, `left`, and `right`. Steering bucket counts must be odd so one
+bucket is exactly straight.
 
 The current observation pipeline keeps the full game view, aspect-corrects the
 raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,

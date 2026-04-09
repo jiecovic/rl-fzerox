@@ -283,6 +283,7 @@ fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
         Some("crashed") => Ok(Some("crashed")),
         Some("retired") => Ok(Some("retired")),
         Some("falling_off_track") => Ok(Some("falling_off_track")),
+        Some("energy_depleted") => Ok(Some("energy_depleted")),
         Some("stuck") => Ok(Some("stuck")),
         Some("wrong_way") => Ok(Some("wrong_way")),
         Some("timeout") => Ok(Some("timeout")),

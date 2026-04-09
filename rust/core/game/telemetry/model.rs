@@ -5,6 +5,7 @@ const FLAG_RETIRED: u32 = 1 << 18;
 const FLAG_FALLING_OFF_TRACK: u32 = 1 << 19;
 const FLAG_FINISHED: u32 = 1 << 25;
 const FLAG_CRASHED: u32 = 1 << 27;
+const FLAG_ACTIVE: u32 = 1 << 30;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct StepTelemetrySample {
@@ -50,6 +51,10 @@ pub struct PlayerTelemetry {
 impl PlayerTelemetry {
     pub fn terminal_reason(&self) -> Option<&'static str> {
         terminal_reason_from_state_flags(self.state_flags)
+    }
+
+    pub fn active(&self) -> bool {
+        (self.state_flags & FLAG_ACTIVE) != 0
     }
 }
 

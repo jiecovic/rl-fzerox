@@ -209,11 +209,13 @@ class SyntheticBackend:
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        terminate_on_energy_depleted: bool,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
             energy_loss_epsilon,
             wrong_way_timer_limit,
+            terminate_on_energy_depleted,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:

@@ -15,22 +15,24 @@ env:
   stuck_step_limit: 240
   stuck_min_speed_kph: 60.0
   wrong_way_timer_limit: 120
+  # End the episode immediately when race telemetry shows player energy <= 0.
+  terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
   randomize_game_rng_requires_race_mode: true
   reset_to_race: true
   action:
-    name: steer_drive_boost
+    name: steer_drive_boost_drift
     steer_buckets: 7
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state
-    preset: native_crop_v1
+    preset: native_crop_v3
     frame_stack: 4
 train:
   vec_env: subproc
-  num_envs: 10
+  num_envs: 8
   total_timesteps: 50_000_000
-  n_steps: 2048
+  n_steps: 1024
   n_epochs: 10
   batch_size: 256
   learning_rate: 3.0e-4
@@ -49,8 +51,8 @@ train:
 policy:
   activation: tanh
   extractor:
-    features_dim: 512
+    features_dim: 1024
     state_features_dim: 64
   net_arch:
-    pi: [256]
-    vf: [64]
+    pi: [512, 256]
+    vf: [512]

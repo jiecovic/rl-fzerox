@@ -64,7 +64,7 @@ The mixed image plus scalar state path is:
 `image_state` returns a Gym `Dict` observation with:
 
 - `image`: the same stacked RGB image used by screen-only mode
-- `state`: a `float32[5]` vector appended by the policy feature extractor
+- `state`: a `float32[11]` vector appended by the policy feature extractor
 
 The state vector order is:
 
@@ -73,6 +73,17 @@ The state vector order is:
 - `reverse_active`: `1` when the game reverse timer is above zero, else `0`
 - `airborne`: `1` when the game state flag is active, else `0`
 - `can_boost`: `1` when the game state flag is active, else `0`
+- `boost_active`: `1` when `boost_timer > 0`, else `0`
+- `left_drift_held`: `1` when the previous env step held the left shoulder
+  input, else `0`
+- `right_drift_held`: `1` when the previous env step held the right shoulder
+  input, else `0`
+- `left_press_age_norm`: frames since the last left-shoulder press edge,
+  normalized and clipped to the game's 15-frame double-tap window
+- `right_press_age_norm`: frames since the last right-shoulder press edge,
+  normalized and clipped to the game's 15-frame double-tap window
+- `recent_boost_pressure`: fraction of the recent 120 internal frames where the
+  current action requested boost
 
 Training uses SB3 `CnnPolicy` for `image` mode and `MultiInputPolicy` for
 `image_state` mode. The custom mixed extractor keeps the same CNN image branch

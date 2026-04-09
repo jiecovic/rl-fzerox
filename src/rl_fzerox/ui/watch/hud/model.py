@@ -6,6 +6,7 @@ import numpy as np
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
+    BRAKE_MASK,
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
     THROTTLE_MASK,
@@ -141,15 +142,9 @@ def _build_panel_columns(
                 lines=[],
                 control_viz=_control_viz(control_state),
             ),
-            PanelSection(
-                title="Controls",
-                lines=[
-                    _panel_line("", "Arrows steer | Z/X | P/N/K", PALETTE.text_muted),
-                ],
-            ),
         ],
         right=[
-            _game_section(telemetry, stuck_min_speed_kph=stuck_min_speed_kph),
+            _game_section(info, telemetry, stuck_min_speed_kph=stuck_min_speed_kph),
             PanelSection(
                 title="Display",
                 lines=[
@@ -211,8 +206,8 @@ def _panel_content_height(
     left_height = _column_content_height(fonts, columns.left, width=left_width)
     right_height = _column_content_height(fonts, columns.right, width=right_width)
     preview_height = _preview_block_height(observation_shape, fonts)
-    right_total_height = right_height + LAYOUT.section_gap + preview_height
-    return y + max(left_height, right_total_height) + LAYOUT.panel_padding
+    left_total_height = left_height + LAYOUT.section_gap + preview_height
+    return y + max(left_total_height, right_height) + LAYOUT.panel_padding
 
 
 def _window_size(
@@ -362,6 +357,7 @@ def _panel_line(
 
 
 def _game_section(
+    info: dict[str, object],
     telemetry: FZeroXTelemetry | None,
     *,
     stuck_min_speed_kph: float,
@@ -408,6 +404,7 @@ def _game_section(
             telemetry.player.state_labels,
             reverse_detected=telemetry.player.reverse_timer > 0,
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
+            energy_depleted=info.get("termination_reason") == "energy_depleted",
         ),
     )
 
@@ -439,9 +436,10 @@ def _policy_state_sections(
 
 def _control_viz(control_state: ControllerState) -> ControlViz:
     joypad_mask = control_state.joypad_mask
+    drive_level = 1 if joypad_mask & THROTTLE_MASK else -1 if joypad_mask & BRAKE_MASK else 0
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
-        drive_level=1 if joypad_mask & THROTTLE_MASK else 0,
+        drive_level=drive_level,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         drift_direction=(
             -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
@@ -473,6 +471,7 @@ _FLAG_DISPLAY_LABELS = {
     "spinning_out": "spin",
     "crashed": "crash",
     "falling_off_track": "off-track",
+    "energy_depleted": "energy",
     "retired": "retired",
     "finished": "finish",
 }
@@ -481,7 +480,7 @@ _FLAG_ROWS = (
     ("reverse_detected", "low_speed_detected"),
     ("can_boost", "dash_pad_boost", "airborne"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
-    ("retired", "finished"),
+    ("energy_depleted", "retired", "finished"),
 )
 
 
@@ -490,12 +489,15 @@ def _flag_viz(
     *,
     reverse_detected: bool,
     low_speed_detected: bool,
+    energy_depleted: bool,
 ) -> FlagViz:
     active_flags = set(state_labels)
     if reverse_detected:
         active_flags.add("reverse_detected")
     if low_speed_detected:
         active_flags.add("low_speed_detected")
+    if energy_depleted:
+        active_flags.add("energy_depleted")
     known_flags = {flag_label for row in _FLAG_ROWS for flag_label in row}
     active_flags.intersection_update(known_flags)
     return FlagViz(

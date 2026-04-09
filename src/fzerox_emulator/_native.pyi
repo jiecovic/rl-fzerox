@@ -216,6 +216,7 @@ class Emulator:
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        terminate_on_energy_depleted: bool = True,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,

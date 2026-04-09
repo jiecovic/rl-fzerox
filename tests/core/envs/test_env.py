@@ -48,6 +48,7 @@ class ScriptedStepBackend(SyntheticBackend):
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        terminate_on_energy_depleted: bool,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -55,6 +56,7 @@ class ScriptedStepBackend(SyntheticBackend):
             max_episode_steps,
             stuck_step_limit,
             wrong_way_timer_limit,
+            terminate_on_energy_depleted,
         )
         self.set_controller_state(controller_state)
         result = self._results.pop(0)
@@ -98,7 +100,7 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 2]
+    assert env.action_space.nvec.tolist() == [7, 3, 2, 3]
 
 
 def test_reset_can_return_image_state_observation() -> None:
@@ -127,18 +129,26 @@ def test_reset_can_return_image_state_observation() -> None:
     assert set(obs) == {"image", "state"}
     assert obs["image"].shape == (116, 164, 12)
     assert obs["image"].dtype == np.uint8
-    assert obs["state"].shape == (5,)
+    assert obs["state"].shape == (11,)
     assert obs["state"].dtype == np.float32
-    assert obs["state"].tolist() == pytest.approx([0.5, 0.5, 1.0, 1.0, 1.0])
+    assert obs["state"].tolist() == pytest.approx(
+        [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+    )
     assert info["observation_mode"] == "image_state"
     assert info["observation_shape"] == (116, 164, 12)
-    assert info["observation_state_shape"] == (5,)
+    assert info["observation_state_shape"] == (11,)
     assert info["observation_state_features"] == (
         "speed_norm",
         "energy_frac",
         "reverse_active",
         "airborne",
         "can_boost",
+        "boost_active",
+        "left_drift_held",
+        "right_drift_held",
+        "left_press_age_norm",
+        "right_press_age_norm",
+        "recent_boost_pressure",
     )
 
 
@@ -213,7 +223,10 @@ def test_reset_skips_rng_randomization_outside_race() -> None:
 
 def test_step_advances_backend_by_action_repeat():
     backend = SyntheticBackend()
-    env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=3))
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
+    )
 
     env.reset(seed=7)
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
@@ -253,6 +266,7 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
+            action=ActionConfig(name="steer_drive"),
             observation=ObservationConfig(mode="image_state", frame_stack=4),
         ),
     )
@@ -263,8 +277,50 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
     assert obs["image"].shape == (116, 164, 12)
-    assert obs["state"].tolist() == pytest.approx([1.0, 1.0, 0.0, 0.0, 0.0])
+    assert obs["state"].tolist() == pytest.approx(
+        [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+    )
     assert info["observation_mode"] == "image_state"
+
+
+def test_step_updates_recent_boost_pressure_in_image_state_observation() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=120,
+            action=ActionConfig(name="steer_drive_boost"),
+            observation=ObservationConfig(mode="image_state", frame_stack=4),
+        ),
+    )
+
+    env.reset(seed=7)
+    obs, _, _, _, _ = env.step(np.array([3, 0, 1], dtype=np.int64))
+
+    assert isinstance(obs, dict)
+    assert obs["state"].tolist() == pytest.approx(
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
+    )
+
+
+def test_step_updates_right_drift_hold_and_press_age_in_image_state_observation() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(name="steer_drive_boost_drift"),
+            observation=ObservationConfig(mode="image_state", frame_stack=4),
+        ),
+    )
+
+    env.reset(seed=7)
+    obs, _, _, _, _ = env.step(np.array([4, 1, 0, 2], dtype=np.int64))
+
+    assert isinstance(obs, dict)
+    assert obs["state"].tolist() == pytest.approx(
+        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0 / 15.0, 0.0]
+    )
 
 
 def test_step_shifts_the_frame_stack_forward():
@@ -275,7 +331,11 @@ def test_step_shifts_the_frame_stack_forward():
 
     env = FZeroXEnv(
         backend=DistinctFrameBackend(),
-        config=EnvConfig(action_repeat=1, observation=ObservationConfig(frame_stack=4)),
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(name="steer_drive"),
+            observation=ObservationConfig(frame_stack=4),
+        ),
     )
 
     obs_before, _ = env.reset(seed=9)
@@ -326,7 +386,10 @@ def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:
 
 def test_step_control_applies_manual_controller_state() -> None:
     backend = SyntheticBackend()
-    env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=2))
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=2, action=ActionConfig(name="steer_drive")),
+    )
 
     env.reset(seed=21)
     control_state = ControllerState(joypad_mask=5, left_stick_x=-1.0)
@@ -342,7 +405,7 @@ def test_extended_action_env_exposes_four_head_action_space() -> None:
     )
 
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
+    assert env.action_space.nvec.tolist() == [7, 3, 2, 3]
 
 
 def test_boost_action_env_exposes_three_head_action_space() -> None:
@@ -352,7 +415,7 @@ def test_boost_action_env_exposes_three_head_action_space() -> None:
     )
 
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 2, 2]
+    assert env.action_space.nvec.tolist() == [7, 3, 2]
 
 
 def test_reset_can_boot_into_the_first_race_path():
@@ -453,6 +516,7 @@ def test_step_truncates_on_timeout() -> None:
             action_repeat=1,
             max_episode_steps=2,
             stuck_step_limit=10,
+            action=ActionConfig(name="steer_drive"),
         ),
     )
 
@@ -506,6 +570,7 @@ def test_step_truncates_when_speed_is_stuck() -> None:
             max_episode_steps=100,
             stuck_step_limit=2,
             stuck_min_speed_kph=50.0,
+            action=ActionConfig(name="steer_drive"),
         ),
     )
 
@@ -564,6 +629,7 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
             max_episode_steps=100,
             stuck_step_limit=10,
             wrong_way_timer_limit=100,
+            action=ActionConfig(name="steer_drive"),
         ),
     )
 
@@ -604,7 +670,7 @@ def test_terminal_step_exposes_monitor_info_keys() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=1),
+        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
     )
 
     env.reset(seed=5)
@@ -639,7 +705,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=3),
+        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
     )
 
     env.reset(seed=6)
@@ -669,7 +735,7 @@ def test_step_info_is_pickle_safe_with_native_telemetry() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=1),
+        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
     )
 
     env.reset(seed=8)

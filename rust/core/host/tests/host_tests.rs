@@ -110,6 +110,66 @@ fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
     assert_eq!(status.truncation_reason, None);
 }
 
+#[test]
+fn step_status_terminates_on_active_race_energy_depletion() {
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry_with_energy(true, 1 << 30, 0, 0.0, 178.0),
+        repeated_step_config(100, 5, 180),
+    );
+
+    assert_eq!(status.termination_reason, Some("energy_depleted"));
+}
+
+#[test]
+fn step_status_allows_disabling_energy_depletion_termination() {
+    let mut config = repeated_step_config(100, 5, 180);
+    config.terminate_on_energy_depleted = false;
+
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry_with_energy(true, 1 << 30, 0, 0.0, 178.0),
+        config,
+    );
+
+    assert_eq!(status.termination_reason, None);
+}
+
+#[test]
+fn step_status_ignores_energy_depletion_outside_active_race_state() {
+    let config = repeated_step_config(100, 5, 180);
+
+    let non_race = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry_with_energy(false, 1 << 30, 0, 0.0, 178.0),
+        config,
+    );
+    let inactive = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry_with_energy(true, 0, 0, 0.0, 178.0),
+        config,
+    );
+
+    assert_eq!(non_race.termination_reason, None);
+    assert_eq!(inactive.termination_reason, None);
+}
+
 fn repeated_step_config(
     max_episode_steps: usize,
     stuck_step_limit: usize,
@@ -125,6 +185,7 @@ fn repeated_step_config(
         max_episode_steps,
         stuck_step_limit,
         wrong_way_timer_limit,
+        terminate_on_energy_depleted: true,
     }
 }
 
@@ -151,4 +212,17 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
             position: 1,
         },
     }
+}
+
+fn telemetry_with_energy(
+    in_race_mode: bool,
+    state_flags: u32,
+    reverse_timer: i32,
+    energy: f32,
+    max_energy: f32,
+) -> TelemetrySnapshot {
+    let mut snapshot = telemetry(in_race_mode, state_flags, reverse_timer);
+    snapshot.player.energy = energy;
+    snapshot.player.max_energy = max_energy;
+    snapshot
 }

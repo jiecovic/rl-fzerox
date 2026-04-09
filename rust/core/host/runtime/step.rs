@@ -83,10 +83,14 @@ impl StepStatus {
         } else {
             None
         };
+        let termination_reason = final_telemetry
+            .player
+            .terminal_reason()
+            .or_else(|| energy_depleted_reason(final_telemetry, config));
         Self {
             counters,
             reverse_timer,
-            termination_reason: final_telemetry.player.terminal_reason(),
+            termination_reason,
             truncation_reason,
         }
     }
@@ -98,6 +102,22 @@ impl StepStatus {
     pub fn truncated(&self) -> bool {
         self.truncation_reason.is_some()
     }
+}
+
+fn energy_depleted_reason(
+    telemetry: &TelemetrySnapshot,
+    config: RepeatedStepConfig,
+) -> Option<&'static str> {
+    if !config.terminate_on_energy_depleted
+        || !telemetry.in_race_mode
+        || !telemetry.player.active()
+        || telemetry.player.max_energy <= 0.0
+        || telemetry.player.energy > 0.0
+    {
+        return None;
+    }
+
+    Some("energy_depleted")
 }
 
 fn carried_streak(
@@ -150,4 +170,6 @@ pub struct RepeatedStepConfig {
     pub stuck_step_limit: usize,
     /// Reverse timer limit that triggers wrong-way truncation.
     pub wrong_way_timer_limit: usize,
+    /// Treat depleted player energy as an immediate terminal failure.
+    pub terminate_on_energy_depleted: bool,
 }

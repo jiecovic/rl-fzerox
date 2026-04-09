@@ -3,6 +3,7 @@ from collections.abc import Callable
 
 from rl_fzerox.core.config.schema import RewardConfig
 from rl_fzerox.core.envs.rewards.common import (
+    RewardActionContext,
     RewardStep,
     RewardSummaryConfig,
     RewardTracker,
@@ -33,8 +34,11 @@ def build_reward_tracker(
         low_speed_time_penalty_scale=resolved_config.low_speed_time_penalty_scale,
         milestone_distance=resolved_config.milestone_distance,
         milestone_bonus=resolved_config.milestone_bonus,
+        milestone_speed_scale=resolved_config.milestone_speed_scale,
+        milestone_speed_bonus_cap=resolved_config.milestone_speed_bonus_cap,
         bootstrap_progress_scale=resolved_config.bootstrap_progress_scale,
         bootstrap_regress_penalty_scale=resolved_config.bootstrap_regress_penalty_scale,
+        bootstrap_position_multiplier_scale=resolved_config.bootstrap_position_multiplier_scale,
         bootstrap_lap_count=resolved_config.bootstrap_lap_count,
         lap_1_completion_bonus=resolved_config.lap_1_completion_bonus,
         lap_2_completion_bonus=resolved_config.lap_2_completion_bonus,
@@ -47,6 +51,8 @@ def build_reward_tracker(
         energy_loss_safe_fraction=resolved_config.energy_loss_safe_fraction,
         energy_loss_danger_power=resolved_config.energy_loss_danger_power,
         energy_gain_reward_scale=resolved_config.energy_gain_reward_scale,
+        energy_gain_collision_cooldown_frames=resolved_config.energy_gain_collision_cooldown_frames,
+        boost_redundant_press_penalty=resolved_config.boost_redundant_press_penalty,
         collision_recoil_penalty=resolved_config.collision_recoil_penalty,
         spinning_out_penalty=resolved_config.spinning_out_penalty,
         terminal_failure_base_penalty=resolved_config.terminal_failure_base_penalty,
@@ -69,6 +75,7 @@ __all__ = [
     "RaceV2RewardTracker",
     "RaceV2RewardWeights",
     "REWARD_TRACKER_REGISTRY",
+    "RewardActionContext",
     "RewardStep",
     "RewardSummaryConfig",
     "RewardTracker",

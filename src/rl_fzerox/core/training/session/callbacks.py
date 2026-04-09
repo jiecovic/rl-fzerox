@@ -24,6 +24,7 @@ _TERMINATION_REASON_KEYS: tuple[str, ...] = (
     "crashed",
     "retired",
     "falling_off_track",
+    "energy_depleted",
 )
 _TRUNCATION_REASON_KEYS: tuple[str, ...] = (
     "stuck",

@@ -12,7 +12,7 @@ from fzerox_emulator import (
     FZeroXTelemetry,
     display_size,
 )
-from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
+from rl_fzerox.core.envs.actions import BOOST_MASK, BRAKE_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES
 from rl_fzerox.ui.watch import (
     _build_panel_columns,
@@ -134,6 +134,54 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz.drift_direction == -1
 
 
+def test_input_section_can_visualize_brake_control_state() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=BRAKE_MASK, left_stick_x=0.0),
+        policy_label=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_level == -1
+
+
+def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    assert [section.title for section in columns.left] == ["Session", "Reset", "Input"]
+
+
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -244,7 +292,10 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
-        observation_state=np.array([0.5, 0.75, 1.0, 0.0, 1.0], dtype=np.float32),
+        observation_state=np.array(
+            [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.2, 0.25],
+            dtype=np.float32,
+        ),
         observation_state_feature_names=STATE_FEATURE_NAMES,
         telemetry=_sample_telemetry(),
     )
@@ -258,6 +309,12 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         "reverse_active": "1.000",
         "airborne": "0.000",
         "can_boost": "1.000",
+        "boost_active": "0.000",
+        "left_drift_held": "0.000",
+        "right_drift_held": "1.000",
+        "left_press_age_norm": "1.000",
+        "right_press_age_norm": "0.200",
+        "recent_boost_pressure": "0.250",
     }
 
 

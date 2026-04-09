@@ -109,7 +109,7 @@ def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
         spaces.Dict(
             {
                 "image": spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
-                "state": spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32),
             }
         ),
         features_dim=512,
@@ -119,7 +119,7 @@ def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
     features = extractor(
         {
             "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
-            "state": torch.zeros((2, 5), dtype=torch.float32),
+            "state": torch.zeros((2, 11), dtype=torch.float32),
         }
     )
 
@@ -132,7 +132,7 @@ def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_b
         spaces.Dict(
             {
                 "image": spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
-                "state": spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32),
             }
         ),
         features_dim="auto",
@@ -142,7 +142,7 @@ def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_b
     features = extractor(
         {
             "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
-            "state": torch.zeros((2, 5), dtype=torch.float32),
+            "state": torch.zeros((2, 11), dtype=torch.float32),
         }
     )
 

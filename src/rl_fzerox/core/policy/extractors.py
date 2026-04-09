@@ -16,9 +16,9 @@ NATURE_CNN_CONV_SPEC: ConvSpec = (
     (64, (3, 3), (1, 1)),
 )
 LEGACY_DEEP_CONV_SPEC: ConvSpec = (
-    (32, (8, 8), (4, 4)),
+    (64, (8, 8), (4, 4)),
     (64, (4, 4), (2, 2)),
-    (64, (3, 3), (2, 2)),
+    (128, (3, 3), (2, 2)),
     (128, (3, 3), (1, 1)),
 )
 SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
@@ -199,9 +199,7 @@ def _resolve_supported_image_geometry(
     try:
         conv_spec = SUPPORTED_POLICY_GEOMETRIES[geometry]
     except KeyError as error:
-        supported = ", ".join(
-            f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES
-        )
+        supported = ", ".join(f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES)
         raise ValueError(
             f"Unsupported observation geometry {resolved_height}x{resolved_width} for "
             f"{extractor_name}; supported presets: {supported}"

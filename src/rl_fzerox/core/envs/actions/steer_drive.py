@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import JOYPAD_B, ControllerState, joypad_mask
+from fzerox_emulator import JOYPAD_A, JOYPAD_B, ControllerState, joypad_mask
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
@@ -17,9 +17,10 @@ from rl_fzerox.core.envs.actions.base import (
     steer_values,
 )
 
-# Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A button
-# on RetroPad B. In F-Zero X, N64 A is the acceleration input.
+# Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A/C-Down
+# buttons on RetroPad B/A. In F-Zero X those are acceleration/brake.
 THROTTLE_MASK = joypad_mask(JOYPAD_B)
+BRAKE_MASK = joypad_mask(JOYPAD_A)
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +34,7 @@ class DriveMode:
 DRIVE_MODES: tuple[DriveMode, ...] = (
     DriveMode(label="coast", joypad_mask=0),
     DriveMode(label="throttle", joypad_mask=THROTTLE_MASK),
+    DriveMode(label="brake", joypad_mask=BRAKE_MASK),
 )
 
 
@@ -57,7 +59,7 @@ class SteerDriveActionAdapter:
         return np.array(self._idle_action, copy=True)
 
     def decode(self, action: ActionValue) -> ControllerState:
-        """Translate one policy action into a held steering/throttle state."""
+        """Translate one policy action into a held steering/drive state."""
 
         steer_index, drive_mode_index = _parse_action_pair(
             action,

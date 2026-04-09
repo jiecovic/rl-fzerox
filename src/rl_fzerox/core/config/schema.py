@@ -10,8 +10,10 @@ from pydantic import (
     Field,
     FilePath,
     NonNegativeFloat,
+    NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    field_validator,
 )
 
 
@@ -24,8 +26,15 @@ class ActionConfig(BaseModel):
         "steer_drive",
         "steer_drive_boost",
         "steer_drive_boost_drift",
-    ] = "steer_drive"
+    ] = "steer_drive_boost_drift"
     steer_buckets: int = Field(default=7, ge=3)
+
+    @field_validator("steer_buckets")
+    @classmethod
+    def _validate_odd_steer_buckets(cls, value: int) -> int:
+        if value % 2 == 0:
+            raise ValueError("steer_buckets must be odd so one bucket maps to straight")
+        return value
 
 
 class ObservationConfig(BaseModel):
@@ -50,6 +59,7 @@ class EnvConfig(BaseModel):
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
     wrong_way_timer_limit: PositiveInt = 300
+    terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
     reset_to_race: bool = False
@@ -68,8 +78,11 @@ class RewardConfig(BaseModel):
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
     milestone_distance: PositiveFloat = 3_000.0
     milestone_bonus: NonNegativeFloat = 2.0
+    milestone_speed_scale: NonNegativeFloat = 0.0
+    milestone_speed_bonus_cap: NonNegativeFloat = 0.0
     bootstrap_progress_scale: NonNegativeFloat = 0.001
     bootstrap_regress_penalty_scale: NonNegativeFloat = 0.002
+    bootstrap_position_multiplier_scale: NonNegativeFloat = 0.0
     bootstrap_lap_count: PositiveInt = 1
     lap_1_completion_bonus: NonNegativeFloat = 20.0
     lap_2_completion_bonus: NonNegativeFloat = 35.0
@@ -82,6 +95,8 @@ class RewardConfig(BaseModel):
     energy_loss_safe_fraction: float = Field(default=0.9, ge=0.0, le=1.0)
     energy_loss_danger_power: PositiveFloat = 2.0
     energy_gain_reward_scale: NonNegativeFloat = 0.02
+    energy_gain_collision_cooldown_frames: NonNegativeInt = 0
+    boost_redundant_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
     terminal_failure_base_penalty: float = -120.0
