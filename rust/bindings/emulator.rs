@@ -297,6 +297,20 @@ impl PyEmulator {
         Ok(PyBytes::new(py, &bytes))
     }
 
+    fn game_rng_state(&mut self, py: Python<'_>) -> PyResult<(u32, u32, u32, u32)> {
+        let state = py
+            .detach(|| self.host.game_rng_state())
+            .map_err(map_core_error)?;
+        Ok(state.as_tuple())
+    }
+
+    fn randomize_game_rng(&mut self, py: Python<'_>, seed: u64) -> PyResult<(u32, u32, u32, u32)> {
+        let state = py
+            .detach(|| self.host.randomize_game_rng(seed))
+            .map_err(map_core_error)?;
+        Ok(state.as_tuple())
+    }
+
     fn close(&mut self) {
         self.host.close();
     }

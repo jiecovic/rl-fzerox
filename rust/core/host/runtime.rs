@@ -9,6 +9,7 @@ mod baseline;
 mod bootstrap;
 mod host;
 mod memory;
+mod rng;
 mod step;
 mod step_accumulator;
 

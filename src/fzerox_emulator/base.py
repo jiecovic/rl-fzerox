@@ -75,6 +75,8 @@ class EmulatorBackend(Protocol):
 
     def step_frames(self, count: int, *, capture_video: bool = True) -> None: ...
 
+    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,
