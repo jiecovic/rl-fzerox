@@ -28,6 +28,27 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
+from rl_fzerox.core.training.session.artifacts import (
+    PolicyArtifactMetadata,
+    load_policy_artifact_metadata,
+    save_artifacts_atomically,
+)
+
+
+class _FakeSaveable:
+    def __init__(self, payload: bytes) -> None:
+        self._payload = payload
+
+    def save(self, path: str) -> None:
+        Path(path).write_bytes(self._payload)
+
+
+class _FakeModel:
+    def __init__(self) -> None:
+        self.policy = _FakeSaveable(b"policy")
+
+    def save(self, path: str) -> None:
+        Path(path).write_bytes(b"model")
 
 
 def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> None:
@@ -156,6 +177,28 @@ def test_resolve_latest_policy_path_prefers_latest_over_best_and_final(tmp_path:
     resolved_policy_path = resolve_latest_policy_path(run_paths.run_dir)
 
     assert resolved_policy_path == run_paths.latest_policy_path
+
+
+def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+
+    save_artifacts_atomically(
+        model=_FakeModel(),
+        model_path=run_paths.latest_model_path,
+        policy_path=run_paths.latest_policy_path,
+        policy_metadata=PolicyArtifactMetadata(
+            curriculum_stage_index=1,
+            curriculum_stage_name="drift_enabled",
+        ),
+    )
+
+    metadata = load_policy_artifact_metadata(run_paths.latest_policy_path)
+
+    assert metadata == PolicyArtifactMetadata(
+        curriculum_stage_index=1,
+        curriculum_stage_name="drift_enabled",
+    )
 
 
 def test_resolve_best_policy_path_requires_best_artifact(tmp_path: Path) -> None:

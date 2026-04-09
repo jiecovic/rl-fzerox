@@ -450,6 +450,55 @@ def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path
     assert config.policy.extractor.state_features_dim == 32
 
 
+def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    mask:",
+            "      shoulder: [0]",
+            "curriculum:",
+            "  enabled: true",
+            "  smoothing_episodes: 4",
+            "  min_stage_episodes: 2",
+            "  stages:",
+            "    - name: basic_drive",
+            "      until:",
+            "        race_laps_completed_mean_gte: 3.0",
+            "      action_mask:",
+            "        shoulder: [0]",
+            "    - name: drift_enabled",
+            "      action_mask:",
+            "        shoulder: [0, 1, 2]",
+            "train:",
+            "  algorithm: maskable_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.train.algorithm == "maskable_ppo"
+    assert config.env.action.mask is not None
+    assert config.env.action.mask.shoulder == (0,)
+    assert config.curriculum.enabled is True
+    assert config.curriculum.smoothing_episodes == 4
+    assert config.curriculum.min_stage_episodes == 2
+    assert len(config.curriculum.stages) == 2
+    assert config.curriculum.stages[0].until is not None
+    assert config.curriculum.stages[0].until.race_laps_completed_mean_gte == 3.0
+
+
 def test_repo_watch_template_exists() -> None:
     config_path = config_paths_module.project_root_dir() / "conf" / "watch.yaml"
 

@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 
 from fzerox_emulator import ControllerState, EmulatorBackend
-from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
+from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -21,12 +21,14 @@ class FZeroXEnv(gym.Env[ObservationValue, np.ndarray]):
         backend: EmulatorBackend,
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
+        curriculum_config: CurriculumConfig | None = None,
     ) -> None:
         super().__init__()
         self._engine = FZeroXEnvEngine(
             backend=backend,
             config=config,
             reward_config=reward_config,
+            curriculum_config=curriculum_config,
         )
         self.backend = self._engine.backend
         self.config = self._engine.config
@@ -50,6 +52,28 @@ class FZeroXEnv(gym.Env[ObservationValue, np.ndarray]):
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         return self._engine.action_to_control_state(action)
+
+    def action_masks(self) -> np.ndarray:
+        """Return the flattened boolean action mask for maskable PPO."""
+
+        return self._engine.action_masks()
+
+    def set_curriculum_stage(self, stage_index: int) -> None:
+        """Switch the active curriculum stage used for action masking."""
+
+        self._engine.set_curriculum_stage(stage_index)
+
+    @property
+    def curriculum_stage_index(self) -> int | None:
+        """Return the active curriculum stage index, if any."""
+
+        return self._engine.curriculum_stage_index
+
+    @property
+    def curriculum_stage_name(self) -> str | None:
+        """Return the active curriculum stage name, if any."""
+
+        return self._engine.curriculum_stage_name
 
     def step_control(self, control_state: ControllerState):
         return self._engine.step_control(control_state)

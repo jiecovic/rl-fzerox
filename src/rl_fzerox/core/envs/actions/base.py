@@ -34,8 +34,23 @@ class ActionAdapter(Protocol):
         """Return the neutral action value for this adapter."""
         ...
 
+    @property
+    def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
+        """Return the ordered discrete action heads used by this adapter."""
+        ...
+
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one policy action into a held controller state."""
+        ...
+
+    def action_mask(
+        self,
+        *,
+        base_overrides: dict[str, tuple[int, ...]] | None = None,
+        stage_overrides: dict[str, tuple[int, ...]] | None = None,
+        dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
+    ) -> np.ndarray:
+        """Return one flattened MultiDiscrete mask for this adapter."""
         ...
 
 
@@ -89,3 +104,69 @@ def parse_discrete_action(
         if not 0 <= value < dimension.size:
             raise ValueError(f"Invalid {dimension.label} index {value}")
     return tuple(values)
+
+
+def build_flat_action_mask(
+    dimensions: tuple[DiscreteActionDimension, ...],
+    *,
+    base_overrides: dict[str, tuple[int, ...]] | None = None,
+    stage_overrides: dict[str, tuple[int, ...]] | None = None,
+    dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
+) -> np.ndarray:
+    """Build one flattened boolean mask for a MultiDiscrete action space."""
+
+    mask_values: list[bool] = []
+    for dimension in dimensions:
+        allowed_indices = _resolve_allowed_indices(
+            dimension=dimension,
+            base_overrides=base_overrides,
+            stage_overrides=stage_overrides,
+        )
+        allowed_indices = _intersect_allowed_indices(
+            dimension=dimension,
+            allowed_indices=allowed_indices,
+            dynamic_overrides=dynamic_overrides,
+        )
+        branch_mask = np.zeros(dimension.size, dtype=bool)
+        if allowed_indices is None:
+            branch_mask[:] = True
+        else:
+            for index in allowed_indices:
+                if not 0 <= index < dimension.size:
+                    raise ValueError(
+                        f"Invalid masked {dimension.label} index {index}; "
+                        f"valid range is [0, {dimension.size - 1}]"
+                    )
+                branch_mask[index] = True
+            if not branch_mask.any():
+                raise ValueError(f"Masked {dimension.label} branch must allow at least one action")
+        mask_values.extend(branch_mask.tolist())
+    return np.asarray(mask_values, dtype=bool)
+
+
+def _resolve_allowed_indices(
+    *,
+    dimension: DiscreteActionDimension,
+    base_overrides: dict[str, tuple[int, ...]] | None,
+    stage_overrides: dict[str, tuple[int, ...]] | None,
+) -> tuple[int, ...] | None:
+    if stage_overrides is not None and dimension.label in stage_overrides:
+        return stage_overrides[dimension.label]
+    if base_overrides is not None and dimension.label in base_overrides:
+        return base_overrides[dimension.label]
+    return None
+
+
+def _intersect_allowed_indices(
+    *,
+    dimension: DiscreteActionDimension,
+    allowed_indices: tuple[int, ...] | None,
+    dynamic_overrides: dict[str, tuple[int, ...]] | None,
+) -> tuple[int, ...] | None:
+    if dynamic_overrides is None or dimension.label not in dynamic_overrides:
+        return allowed_indices
+    dynamic_indices = dynamic_overrides[dimension.label]
+    if allowed_indices is None:
+        return dynamic_indices
+    allowed_set = set(allowed_indices)
+    return tuple(index for index in dynamic_indices if index in allowed_set)

@@ -6,12 +6,19 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.core.config.schema import (
+    ActionConfig,
+    ActionMaskConfig,
+    CurriculumConfig,
+    CurriculumStageConfig,
+    CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
     TrainAppConfig,
     TrainConfig,
 )
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.training.runs import build_run_paths
 from rl_fzerox.core.training.session.artifacts import (
     atomic_save_artifact,
@@ -19,7 +26,15 @@ from rl_fzerox.core.training.session.artifacts import (
     validate_training_baseline_state,
 )
 from rl_fzerox.core.training.session.callbacks import RolloutInfoAccumulator, info_sequence
-from rl_fzerox.core.training.session.model import resolve_policy_activation_fn
+from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
+from rl_fzerox.core.training.session.model import (
+    build_ppo_model,
+    resolve_effective_training_algorithm,
+    resolve_policy_activation_fn,
+    training_requires_action_masks,
+    validate_training_algorithm_config,
+)
+from tests.support.fakes import SyntheticBackend
 
 
 def test_validate_training_baseline_state_requires_existing_file(
@@ -166,3 +181,106 @@ def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path
 
     assert target_path.read_bytes() == b"new-policy"
     assert list(tmp_path.glob("*.tmp.zip")) == []
+
+
+def test_validate_training_algorithm_config_requires_maskable_ppo_for_masks(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="ppo"),
+    )
+
+    with pytest.raises(RuntimeError, match="train.algorithm=auto"):
+        validate_training_algorithm_config(config)
+
+
+def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> None:
+    controller = ActionMaskCurriculumController(
+        CurriculumConfig(
+            enabled=True,
+            smoothing_episodes=1,
+            min_stage_episodes=1,
+            stages=(
+                CurriculumStageConfig(
+                    name="basic_drive",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
+                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                ),
+                CurriculumStageConfig(name="drift_enabled"),
+            ),
+        )
+    )
+
+    promoted_stage = controller.record_episodes(
+        [{"race_laps_completed": 3, "milestones_completed": 10}]
+    )
+
+    assert promoted_stage == 1
+    assert controller.stage_index == 1
+    assert controller.stage_name == "drift_enabled"
+
+
+def test_resolve_effective_training_algorithm_uses_maskable_auto_mode(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="auto"),
+    )
+
+    assert training_requires_action_masks(config) is True
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "maskable_ppo"
+    )
+
+
+def test_build_ppo_model_can_construct_maskable_ppo() -> None:
+    from sb3_contrib import MaskablePPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(algorithm="auto"),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+            masking_required=True,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskablePPO)
+
+
+def test_monitor_info_keys_include_milestones_completed_for_curriculum() -> None:
+    assert "milestones_completed" in MONITOR_INFO_KEYS

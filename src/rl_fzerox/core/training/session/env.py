@@ -72,6 +72,7 @@ def _make_env_factory(
             backend=emulator,
             config=config.env,
             reward_config=config.reward,
+            curriculum_config=config.curriculum,
         )
         wrapped = monitor_cls(env, info_keywords=MONITOR_INFO_KEYS)
         initial_seed = derive_seed(

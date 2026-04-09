@@ -50,6 +50,7 @@ def _build_panel_columns(
     paused: bool,
     control_state: ControllerState,
     policy_label: str | None,
+    policy_curriculum_stage: str | None,
     policy_action: np.ndarray | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
@@ -75,6 +76,11 @@ def _build_panel_columns(
                     _panel_line(
                         "Policy",
                         policy_label if policy_label is not None else "manual",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Checkpoint stage",
+                        policy_curriculum_stage if policy_curriculum_stage is not None else "-",
                         PALETTE.text_primary,
                     ),
                     _panel_line(

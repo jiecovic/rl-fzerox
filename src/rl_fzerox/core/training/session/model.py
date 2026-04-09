@@ -1,7 +1,11 @@
 # src/rl_fzerox/core/training/session/model.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig, TrainConfig
+from rl_fzerox.core.config.schema import (
+    PolicyConfig,
+    TrainAppConfig,
+    TrainConfig,
+)
 from rl_fzerox.core.training.runs import RunPaths
 
 
@@ -11,16 +15,20 @@ def build_ppo_model(
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
+    masking_required: bool,
 ):
-    """Construct the PPO model configured for the current run."""
+    """Construct the configured PPO-family model for the current run."""
 
-    try:
-        from stable_baselines3 import PPO
-    except ImportError as exc:
-        raise RuntimeError(
-            "stable-baselines3 and torch are required for training. "
-            "Install with `python -m pip install -e .[train]`."
-        ) from exc
+    effective_algorithm = resolve_effective_training_algorithm(
+        train_config=train_config,
+        masking_required=masking_required,
+    )
+    _validate_masking_configuration(
+        train_env=train_env,
+        effective_algorithm=effective_algorithm,
+    )
+
+    algorithm_class = _resolve_training_algorithm(effective_algorithm)
 
     from gymnasium import spaces
 
@@ -50,7 +58,7 @@ def build_ppo_model(
         "activation_fn": resolve_policy_activation_fn(policy_config.activation),
     }
 
-    return PPO(
+    return algorithm_class(
         policy=policy_name,
         env=train_env,
         learning_rate=train_config.learning_rate,
@@ -68,6 +76,61 @@ def build_ppo_model(
         verbose=train_config.verbose,
         device=train_config.device,
     )
+
+
+def validate_training_algorithm_config(config: TrainAppConfig) -> None:
+    """Reject incompatible algorithm/config combinations before training starts."""
+
+    masking_requested = config.env.action.mask is not None or config.curriculum.enabled
+    if masking_requested and config.train.algorithm == "ppo":
+        raise RuntimeError(
+            "Action-mask training requires `train.algorithm=auto` or `maskable_ppo`."
+        )
+
+
+def training_requires_action_masks(config: TrainAppConfig) -> bool:
+    """Return whether the resolved training config needs action masking."""
+
+    return config.env.action.mask is not None or config.curriculum.enabled
+
+
+def resolve_effective_training_algorithm(
+    *,
+    train_config: TrainConfig,
+    masking_required: bool,
+) -> str:
+    """Resolve the configured train.algorithm into the concrete algorithm used."""
+
+    if train_config.algorithm == "auto":
+        return "maskable_ppo" if masking_required else "ppo"
+    return train_config.algorithm
+
+
+def _resolve_training_algorithm(algorithm: str):
+    try:
+        if algorithm == "maskable_ppo":
+            from sb3_contrib import MaskablePPO
+
+            return MaskablePPO
+
+        from stable_baselines3 import PPO
+
+        return PPO
+    except ImportError as exc:
+        raise RuntimeError(
+            "stable-baselines3 and torch are required for training. "
+            "Install with `python -m pip install -e .[train]`."
+        ) from exc
+
+
+def _validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
+    if effective_algorithm != "maskable_ppo":
+        return
+
+    if not hasattr(train_env, "env_method"):
+        raise RuntimeError("Maskable PPO requires a vector env exposing env_method()")
+    if not train_env.has_attr("action_masks"):
+        raise RuntimeError("Maskable PPO requires env.action_masks() support")
 
 
 def resolve_policy_activation_fn(name: str):
@@ -110,6 +173,10 @@ def print_training_startup(
         from rich.panel import Panel
         from rich.table import Table
     except ImportError:
+        effective_algorithm = resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
         print(f"run_dir: {run_paths.run_dir}")
         print(f"runtime_root: {run_paths.runtime_root}")
         print(f"device: {model.device}")
@@ -118,6 +185,7 @@ def print_training_startup(
         print(f"action_space: {train_env.action_space}")
         print(
             "ppo: "
+            f"algo={effective_algorithm} "
             f"vec_env={config.train.vec_env} "
             f"num_envs={config.train.num_envs} "
             f"total_timesteps={config.train.total_timesteps} "
@@ -129,6 +197,10 @@ def print_training_startup(
         return
 
     console = Console()
+    effective_algorithm = resolve_effective_training_algorithm(
+        train_config=config.train,
+        masking_required=training_requires_action_masks(config),
+    )
     summary = Table(show_header=False, box=None, pad_edge=False)
     summary.add_column(style="bold cyan")
     summary.add_column()
@@ -142,6 +214,7 @@ def print_training_startup(
         "ppo",
         " ".join(
             [
+                f"algo={effective_algorithm}",
                 f"vec_env={config.train.vec_env}",
                 f"num_envs={config.train.num_envs}",
                 f"total_timesteps={config.train.total_timesteps}",

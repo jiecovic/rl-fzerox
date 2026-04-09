@@ -269,6 +269,7 @@ def apply_train_run_to_watch_config(
             "emulator": merged_emulator_config,
             "env": train_config.env,
             "reward": train_config.reward,
+            "curriculum": train_config.curriculum,
             "watch": watch_config.watch.model_copy(
                 update={"policy_run_dir": run_dir.expanduser().resolve()}
             ),

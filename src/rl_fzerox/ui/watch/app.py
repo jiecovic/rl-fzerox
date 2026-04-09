@@ -20,11 +20,13 @@ from rl_fzerox.ui.watch.render.frame import (
 from rl_fzerox.ui.watch.session import (
     _load_policy_runner,
     _persist_reload_error,
+    _policy_curriculum_stage,
     _policy_label,
     _policy_reload_age_seconds,
     _policy_reload_error,
     _read_live_telemetry,
     _save_baseline_state,
+    _sync_policy_curriculum_stage,
     _with_viewer_fps,
 )
 
@@ -55,6 +57,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         backend=emulator,
         config=config.env,
         reward_config=config.reward,
+        curriculum_config=config.curriculum,
     )
     pygame.init()
 
@@ -63,6 +66,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             config.watch.policy_run_dir,
             artifact=config.watch.policy_artifact,
         )
+        _sync_policy_curriculum_stage(policy_runner, env)
         screen = None
         fonts = None
         paused = False
@@ -144,6 +148,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 paused=paused,
                 control_state=current_control_state,
                 policy_label=_policy_label(policy_runner),
+                policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
                 policy_action=current_policy_action,
                 policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                 policy_reload_error=policy_reload_error,
@@ -198,6 +203,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         paused=True,
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
+                        policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
@@ -216,9 +222,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                         )
                         current_policy_action = None
                     else:
+                        _sync_policy_curriculum_stage(policy_runner, env)
                         action = policy_runner.predict(
                             observation,
                             deterministic=config.watch.deterministic_policy,
+                            action_masks=env.action_masks(),
                         )
                         current_policy_action = np.asarray(action, dtype=np.int64)
                         current_control_state = env.action_to_control_state(action)
@@ -255,6 +263,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         paused=True,
                         control_state=current_control_state,
                         policy_label=_policy_label(policy_runner),
+                        policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
@@ -272,9 +281,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                     )
                     current_policy_action = None
                 else:
+                    _sync_policy_curriculum_stage(policy_runner, env)
                     action = policy_runner.predict(
                         observation,
                         deterministic=config.watch.deterministic_policy,
+                        action_masks=env.action_masks(),
                     )
                     current_policy_action = np.asarray(action, dtype=np.int64)
                     current_control_state = env.action_to_control_state(action)
@@ -318,6 +329,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     paused=paused,
                     control_state=current_control_state,
                     policy_label=_policy_label(policy_runner),
+                    policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
                     policy_action=current_policy_action,
                     policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                     policy_reload_error=policy_reload_error,

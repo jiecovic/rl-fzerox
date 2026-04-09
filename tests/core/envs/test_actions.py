@@ -4,7 +4,7 @@ import pytest
 from gymnasium.spaces import MultiDiscrete
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig, ActionMaskConfig
 from rl_fzerox.core.envs.actions import (
     ACTION_ADAPTER_REGISTRY,
     BOOST_MASK,
@@ -177,3 +177,47 @@ def test_build_action_adapter_supports_boost_only_variant() -> None:
 
 def test_action_adapter_registry_exposes_registered_names() -> None:
     assert action_adapter_names() == tuple(ACTION_ADAPTER_REGISTRY)
+
+
+def test_extended_adapter_action_mask_defaults_to_all_actions_enabled() -> None:
+    adapter = SteerDriveBoostDriftActionAdapter(
+        ActionConfig(name="steer_drive_boost_drift", steer_buckets=7)
+    )
+
+    mask = adapter.action_mask()
+
+    assert mask.dtype == np.bool_
+    assert mask.tolist() == ([True] * (7 + 3 + 2 + 3))
+
+
+def test_extended_adapter_action_mask_can_disable_shoulder_branch() -> None:
+    base_mask = ActionMaskConfig(shoulder=(0,))
+    adapter = SteerDriveBoostDriftActionAdapter(
+        ActionConfig(
+            name="steer_drive_boost_drift",
+            steer_buckets=7,
+            mask=base_mask,
+        )
+    )
+
+    mask = adapter.action_mask(base_overrides=base_mask.branch_overrides())
+
+    assert mask.tolist() == (([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False])
+
+
+def test_stage_action_mask_overrides_base_mask_for_same_branch() -> None:
+    base_mask = ActionMaskConfig(shoulder=(0,))
+    adapter = SteerDriveBoostDriftActionAdapter(
+        ActionConfig(
+            name="steer_drive_boost_drift",
+            steer_buckets=7,
+            mask=base_mask,
+        )
+    )
+
+    mask = adapter.action_mask(
+        base_overrides=base_mask.branch_overrides(),
+        stage_overrides={"shoulder": (0, 1, 2)},
+    )
+
+    assert mask.tolist() == ([True] * (7 + 3 + 2 + 3))

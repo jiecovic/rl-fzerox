@@ -80,6 +80,7 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             paused=False,
             control_state=ControllerState(),
             policy_label=None,
+            policy_curriculum_stage=None,
             policy_action=None,
             policy_reload_age_seconds=None,
             policy_reload_error=None,
@@ -115,6 +116,7 @@ def test_input_section_includes_visualized_control_state() -> None:
             left_stick_x=0.5,
         ),
         policy_label=None,
+        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -143,6 +145,7 @@ def test_input_section_can_visualize_brake_control_state() -> None:
         paused=False,
         control_state=ControllerState(joypad_mask=BRAKE_MASK, left_stick_x=0.0),
         policy_label=None,
+        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -168,6 +171,7 @@ def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label=None,
+        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -191,6 +195,7 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label=None,
+        policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
         policy_reload_error=None,
@@ -250,6 +255,7 @@ def test_display_section_includes_action_repeat() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0013",
+        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -284,6 +290,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0017",
+        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -327,6 +334,7 @@ def test_session_section_includes_stuck_counter() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0017",
+        policy_curriculum_stage="drift_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -344,6 +352,38 @@ def test_session_section_includes_stuck_counter() -> None:
     assert stuck_line.value == "17 / 240"
 
 
+def test_session_section_shows_curriculum_stage_name() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_curriculum_stage="drift_enabled",
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    curriculum_line = next(
+        line for line in session_section.lines if line.label == "Checkpoint stage"
+    )
+
+    assert curriculum_line.value == "drift_enabled"
+
+
 def test_session_section_shows_reward_with_four_decimals() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -353,6 +393,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0017",
+        policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,

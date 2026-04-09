@@ -3,12 +3,19 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import Emulator, FZeroXTelemetry
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner
+
+
+class _CurriculumStagePolicyRunner(Protocol):
+    @property
+    def checkpoint_curriculum_stage_index(self) -> int | None: ...
+
+    def refresh(self) -> None: ...
 
 
 def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
@@ -43,6 +50,22 @@ def _policy_reload_error(policy_runner: PolicyRunner | None) -> str | None:
     if policy_runner is None:
         return None
     return policy_runner.last_reload_error
+
+
+def _policy_curriculum_stage(policy_runner: PolicyRunner | None) -> str | None:
+    if policy_runner is None:
+        return None
+    return policy_runner.checkpoint_curriculum_stage
+
+
+def _sync_policy_curriculum_stage(policy_runner: _CurriculumStagePolicyRunner | None, env) -> None:
+    if policy_runner is None:
+        return
+    policy_runner.refresh()
+    stage_index = policy_runner.checkpoint_curriculum_stage_index
+    if stage_index is None:
+        return
+    env.set_curriculum_stage(stage_index)
 
 
 def _persist_reload_error(
