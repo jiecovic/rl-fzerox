@@ -15,7 +15,9 @@ from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.seed import derive_seed
 
+_DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
 
 class FZeroXEnvEngine:
     """Environment step engine around one emulator backend.
@@ -45,6 +47,8 @@ class FZeroXEnvEngine:
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._last_info: dict[str, object] = {}
+        self._reset_count = 0
+        self._rng_seed_base: int | None = None
         self._action_space = self._action_adapter.action_space
         self._observation_space = _observation_space(
             self._observation_spec,
@@ -68,6 +72,9 @@ class FZeroXEnvEngine:
         """
 
         _, info, telemetry = self._reset_race_state()
+        if seed is not None:
+            self._rng_seed_base = seed
+        telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
         self._reward_tracker.reset(telemetry)
         self._episode_done = False
         self._episode_return = 0.0
@@ -84,6 +91,7 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
         )
         self._last_info = dict(info)
+        self._reset_count += 1
         return observation, info
 
     def step(
@@ -151,6 +159,34 @@ class FZeroXEnvEngine:
             return frame, info, _read_live_telemetry(self.backend)
 
         return frame, info, _read_live_telemetry(self.backend)
+
+    def _maybe_randomize_game_rng(
+        self,
+        seed: int | None,
+        telemetry: FZeroXTelemetry | None,
+        info: dict[str, object],
+    ) -> FZeroXTelemetry | None:
+        if not self.config.randomize_game_rng_on_reset:
+            return telemetry
+        seed_base = seed if seed is not None else self._rng_seed_base
+        if seed_base is None:
+            return telemetry
+        if (
+            self.config.randomize_game_rng_requires_race_mode
+            and (telemetry is None or not telemetry.in_race_mode)
+        ):
+            info["rng_randomized"] = False
+            info["rng_randomization_skip_reason"] = "not_in_race"
+            return telemetry
+
+        rng_seed = derive_seed(seed_base, _DOMAIN_RESET_RNG, self._reset_count)
+        if rng_seed is None:
+            return telemetry
+        rng_state = self.backend.randomize_game_rng(rng_seed)
+        info["rng_randomized"] = True
+        info["rng_seed"] = rng_seed
+        info["rng_state"] = rng_state
+        return _read_live_telemetry(self.backend) or telemetry
 
     def _run_env_step(
         self,

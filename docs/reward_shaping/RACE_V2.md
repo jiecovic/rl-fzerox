@@ -5,7 +5,8 @@ short-horizon driving tricks.
 
 ## Plan
 
-- Keep dense frontier shaping only as a bootstrap signal until milestone 1.
+- Keep dense frontier shaping only as a bootstrap signal for the first few
+  configured milestones.
 - Use coarse one-time milestones after that instead of trusting `race_distance`
   as a precise local line-quality signal for the whole episode.
 - Reward lap completion with increasing bonuses.
@@ -31,9 +32,7 @@ short-horizon driving tricks.
   telemetry path.
 - The reverse-engineered RAM layout currently targets the US ROM build.
 - Reverse-driving punishment starts as soon as the game's live reverse timer is
-  non-zero. The on-screen HUD warning still appears later at the game's hard
-  threshold (`100`), and wrong-way truncation remains a separate env limit
-  based on that same reverse timer.
+  non-zero. Wrong-way truncation uses the configured env timer limit directly.
 
 ## Terms
 
@@ -45,8 +44,11 @@ short-horizon driving tricks.
 - `milestone_bonus`
   - One-time reward paid for each newly crossed milestone bucket.
 - `bootstrap_progress_scale`
-  - Dense new-best frontier reward used only before the first milestone is
-    reached, also measured from the reset-time progress origin.
+  - Dense new-best frontier reward used only during the configured bootstrap
+    milestone window, also measured from the reset-time progress origin.
+- `bootstrap_milestone_count`
+  - Number of initial milestones that still allow dense bootstrap frontier
+    reward before the profile switches fully to milestone-only progress shaping.
 - `reverse_time_penalty_scale`
   - Multiplier applied to the normal time penalty on frames where the live game
     reverse timer is active.
@@ -77,7 +79,8 @@ short-horizon driving tricks.
 Ordinary step:
 
 - negative time reward
-- bootstrap frontier reward on new best progress before milestone 1 only
+- bootstrap frontier reward on new best progress during the configured initial
+  milestone warmup window
 - one-time milestone reward
 - lap completion reward if a new lap was crossed
 - lap placement reward if a new lap was crossed

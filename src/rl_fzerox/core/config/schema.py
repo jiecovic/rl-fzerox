@@ -48,7 +48,9 @@ class EnvConfig(BaseModel):
     max_episode_steps: PositiveInt = 12_000
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
-    wrong_way_timer_limit: int = Field(default=300, ge=100)
+    wrong_way_timer_limit: PositiveInt = 300
+    randomize_game_rng_on_reset: bool = False
+    randomize_game_rng_requires_race_mode: bool = True
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
@@ -66,6 +68,7 @@ class RewardConfig(BaseModel):
     milestone_distance: PositiveFloat = 3_000.0
     milestone_bonus: NonNegativeFloat = 2.0
     bootstrap_progress_scale: NonNegativeFloat = 0.001
+    bootstrap_milestone_count: PositiveInt = 3
     lap_1_completion_bonus: NonNegativeFloat = 20.0
     lap_2_completion_bonus: NonNegativeFloat = 35.0
     final_lap_completion_bonus: NonNegativeFloat = 60.0

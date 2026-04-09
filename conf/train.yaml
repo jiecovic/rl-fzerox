@@ -11,10 +11,12 @@ emulator:
 
 env:
   action_repeat: 2
-  max_episode_steps: 44000
-  stuck_step_limit: 360
+  max_episode_steps: 50000
+  stuck_step_limit: 120
   stuck_min_speed_kph: 60.0
-  wrong_way_timer_limit: 360
+  wrong_way_timer_limit: 120
+  randomize_game_rng_on_reset: true
+  randomize_game_rng_requires_race_mode: true
   reset_to_race: true
   action:
     name: steer_drive_boost
@@ -26,14 +28,14 @@ train:
   vec_env: subproc
   num_envs: 4
   total_timesteps: 5_000_000
-  n_steps: 1024
-  n_epochs: 6
+  n_steps: 2048
+  n_epochs: 8
   batch_size: 512
-  learning_rate: 1.0e-4
-  gamma: 0.993
+  learning_rate: 2.0e-4
+  gamma: 0.994
   gae_lambda: 0.95
   clip_range: 0.2
-  ent_coef: 0.01
+  ent_coef: 0.02
   vf_coef: 0.5
   max_grad_norm: 0.5
   verbose: 0
@@ -47,5 +49,5 @@ policy:
   extractor:
     features_dim: 512
   net_arch:
-    pi: [512]
-    vf: [512]
+    pi: [256]
+    vf: [256]
