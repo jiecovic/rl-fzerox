@@ -22,6 +22,7 @@ class RaceV2RewardWeights:
     milestone_distance: float = 3_000.0
     milestone_bonus: float = 2.0
     bootstrap_progress_scale: float = 0.001
+    bootstrap_milestone_count: int = 3
     lap_1_completion_bonus: float = 20.0
     lap_2_completion_bonus: float = 35.0
     final_lap_completion_bonus: float = 60.0
@@ -225,7 +226,7 @@ class RaceV2RewardTracker:
         info["relative_progress"] = current_relative_progress
         if self._bootstrap_progress_active():
             info["bootstrap_progress_remaining"] = max(
-                self._weights.milestone_distance - self._bootstrap_progress_frontier,
+                self._bootstrap_progress_distance_limit() - self._bootstrap_progress_frontier,
                 0.0,
             )
         return info
@@ -258,17 +259,23 @@ class RaceV2RewardTracker:
         return crossed_count * self._weights.milestone_bonus
 
     def _bootstrap_progress_active(self) -> bool:
-        return self._weights.bootstrap_progress_scale > 0.0 and self._next_milestone_index <= 1
+        return (
+            self._weights.bootstrap_progress_scale > 0.0
+            and self._next_milestone_index <= self._weights.bootstrap_milestone_count
+        )
 
     def _bootstrap_progress_reward(self, max_relative_progress: float) -> float:
         if not self._bootstrap_progress_active():
             return 0.0
-        capped_progress = min(max_relative_progress, self._weights.milestone_distance)
+        capped_progress = min(max_relative_progress, self._bootstrap_progress_distance_limit())
         frontier_gain = capped_progress - self._bootstrap_progress_frontier
         if frontier_gain <= 0.0 or self._weights.bootstrap_progress_scale <= 0.0:
             return 0.0
         self._bootstrap_progress_frontier = capped_progress
         return frontier_gain * self._weights.bootstrap_progress_scale
+
+    def _bootstrap_progress_distance_limit(self) -> float:
+        return self._weights.milestone_distance * float(self._weights.bootstrap_milestone_count)
 
     def _lap_completion_bonus(self, lap_number: int, total_lap_count: int) -> float:
         if lap_number <= 1:

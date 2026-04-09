@@ -112,6 +112,62 @@ def test_reset_info_is_pickle_safe_with_live_telemetry() -> None:
     pickle.dumps(info)
 
 
+def test_reset_randomizes_game_rng_when_enabled_and_in_race() -> None:
+    backend = ScriptedStepBackend([], reset_telemetry=_telemetry(race_distance=0.0))
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1, randomize_game_rng_on_reset=True),
+    )
+
+    _, first_info = env.reset(seed=123)
+    _, second_info = env.reset()
+
+    assert first_info["rng_randomized"] is True
+    assert second_info["rng_randomized"] is True
+    assert len(backend.randomized_rng_seeds) == 2
+    assert backend.randomized_rng_seeds[0] != backend.randomized_rng_seeds[1]
+    assert first_info["rng_state"] != second_info["rng_state"]
+
+
+def test_reset_can_randomize_game_rng_without_race_mode_requirement() -> None:
+    backend = ScriptedStepBackend([], reset_telemetry=None)
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            randomize_game_rng_on_reset=True,
+            randomize_game_rng_requires_race_mode=False,
+        ),
+    )
+
+    _, info = env.reset(seed=123)
+
+    assert info["rng_randomized"] is True
+    assert len(backend.randomized_rng_seeds) == 1
+
+
+def test_reset_skips_rng_randomization_outside_race() -> None:
+    backend = ScriptedStepBackend(
+        [],
+        reset_telemetry=make_telemetry(
+            game_mode_raw=0,
+            game_mode_name="title",
+            in_race_mode=False,
+            race_distance=0.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1, randomize_game_rng_on_reset=True),
+    )
+
+    _, info = env.reset(seed=123)
+
+    assert info["rng_randomized"] is False
+    assert info["rng_randomization_skip_reason"] == "not_in_race"
+    assert backend.randomized_rng_seeds == []
+
+
 def test_step_advances_backend_by_action_repeat():
     backend = SyntheticBackend()
     env = FZeroXEnv(backend=backend, config=EnvConfig(action_repeat=3))

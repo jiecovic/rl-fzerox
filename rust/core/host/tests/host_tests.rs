@@ -79,7 +79,7 @@ fn step_status_resets_non_race_trailing_counters() {
 }
 
 #[test]
-fn step_status_uses_game_reverse_warning_timer_limit_for_wrong_way() {
+fn step_status_uses_configured_reverse_timer_limit_for_wrong_way() {
     let status = StepStatus::from_step(
         StepCounters::default(),
         &StepSummary {
@@ -95,7 +95,7 @@ fn step_status_uses_game_reverse_warning_timer_limit_for_wrong_way() {
 }
 
 #[test]
-fn step_status_does_not_truncate_at_warning_threshold_when_limit_is_higher() {
+fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
     let status = StepStatus::from_step(
         StepCounters::default(),
         &StepSummary {

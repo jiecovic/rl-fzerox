@@ -43,6 +43,7 @@ class SyntheticBackend:
         self._last_controller_state = ControllerState()
         self._capture_video_flags: list[bool] = []
         self._observation_stacks: dict[tuple[str, int], tuple[np.ndarray, int | None]] = {}
+        self.randomized_rng_seeds: list[int] = []
 
     @property
     def name(self) -> str:
@@ -186,6 +187,15 @@ class SyntheticBackend:
         self._capture_video_flags.extend([capture_video] * count)
         for _ in range(count):
             self.step_frame()
+
+    def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]:
+        self.randomized_rng_seeds.append(seed)
+        return (
+            seed & 0xFFFF_FFFF,
+            (seed >> 32) & 0xFFFF_FFFF,
+            (seed ^ 0xA5A5_A5A5) & 0xFFFF_FFFF,
+            ((seed >> 32) ^ 0x5A5A_5A5A) & 0xFFFF_FFFF,
+        )
 
     def step_repeat_raw(
         self,

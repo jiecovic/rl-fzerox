@@ -11,10 +11,12 @@ emulator:
 
 env:
   action_repeat: 2
-  max_episode_steps: 12000
-  stuck_step_limit: 240
-  stuck_min_speed_kph: 50.0
-  wrong_way_timer_limit: 300
+  max_episode_steps: 50000
+  stuck_step_limit: 120
+  stuck_min_speed_kph: 60.0
+  wrong_way_timer_limit: 120
+  randomize_game_rng_on_reset: true
+  randomize_game_rng_requires_race_mode: true
   reset_to_race: true
   action:
     name: steer_drive_boost
