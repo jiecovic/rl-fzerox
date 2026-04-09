@@ -19,7 +19,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import BOOST_MASK
 
 
 class SteerDriveBoostActionAdapter:
-    """Map steering, throttle, and boost actions to controls."""
+    """Map steering, drive-mode, and boost actions to controls."""
 
     def __init__(self, config: ActionConfig) -> None:
         self._steer_values = steer_values(config.steer_buckets)

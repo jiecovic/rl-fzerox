@@ -89,7 +89,7 @@ def _draw_side_panel(
     left_x = x
     right_x = x + left_column_width + LAYOUT.column_gap
 
-    _draw_column(
+    left_column_bottom = _draw_column(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -98,7 +98,17 @@ def _draw_side_panel(
         width=left_column_width,
         sections=columns.left,
     )
-    right_column_bottom = _draw_column(
+    _draw_observation_preview(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        x=left_x,
+        y=left_column_bottom + LAYOUT.section_gap,
+        width=left_column_width,
+        observation_shape=observation_shape,
+    )
+    _draw_column(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -106,16 +116,6 @@ def _draw_side_panel(
         y=y,
         width=right_column_width,
         sections=columns.right,
-    )
-    _draw_observation_preview(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        surface=observation_surface,
-        x=right_x,
-        y=right_column_bottom + LAYOUT.section_gap,
-        width=right_column_width,
-        observation_shape=observation_shape,
     )
 
 

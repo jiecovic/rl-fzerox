@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/engine.py
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 from gymnasium import spaces
 
@@ -12,10 +14,18 @@ from fzerox_emulator import (
 )
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
-from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
+from rl_fzerox.core.envs.actions import (
+    BOOST_MASK,
+    DRIFT_LEFT_MASK,
+    DRIFT_RIGHT_MASK,
+    ActionValue,
+    build_action_adapter,
+)
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
+    DRIFT_DOUBLE_TAP_WINDOW_FRAMES,
+    RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
     STATE_FEATURE_COUNT,
     STATE_FEATURE_NAMES,
     ObservationValue,
@@ -23,7 +33,7 @@ from rl_fzerox.core.envs.observations import (
     build_observation_space,
     image_observation_shape,
 )
-from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracker
 from rl_fzerox.core.seed import derive_seed
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
@@ -59,6 +69,14 @@ class FZeroXEnvEngine:
         self._last_info: dict[str, object] = {}
         self._reset_count = 0
         self._rng_seed_base: int | None = None
+        self._recent_boost_frames: deque[int] = deque(
+            maxlen=RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
+        )
+        self._recent_boost_frame_sum = 0
+        self._left_drift_held = False
+        self._right_drift_held = False
+        self._left_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+        self._right_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
         self._action_space = self._action_adapter.action_space
         self._observation_space = build_observation_space(
             self._observation_spec,
@@ -90,6 +108,8 @@ class FZeroXEnvEngine:
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
+        self._clear_recent_boost_pressure()
+        self._reset_drift_press_state()
         info["seed"] = seed
         if telemetry is not None:
             info.update(_telemetry_info(telemetry))
@@ -99,6 +119,11 @@ class FZeroXEnvEngine:
             image=image_observation,
             telemetry=telemetry,
             mode=self.config.observation.mode,
+            left_drift_held=float(self._left_drift_held),
+            right_drift_held=float(self._right_drift_held),
+            left_press_age_norm=self._drift_press_age_norm(self._left_press_age_frames),
+            right_press_age_norm=self._drift_press_age_norm(self._right_press_age_frames),
+            recent_boost_pressure=self._recent_boost_pressure(),
         )
         _set_observation_info(
             info,
@@ -188,9 +213,8 @@ class FZeroXEnvEngine:
         seed_base = seed if seed is not None else self._rng_seed_base
         if seed_base is None:
             return telemetry
-        if (
-            self.config.randomize_game_rng_requires_race_mode
-            and (telemetry is None or not telemetry.in_race_mode)
+        if self.config.randomize_game_rng_requires_race_mode and (
+            telemetry is None or not telemetry.in_race_mode
         ):
             info["rng_randomized"] = False
             info["rng_randomization_skip_reason"] = "not_in_race"
@@ -221,6 +245,7 @@ class FZeroXEnvEngine:
             max_episode_steps=self.config.max_episode_steps,
             stuck_step_limit=self.config.stuck_step_limit,
             wrong_way_timer_limit=self.config.wrong_way_timer_limit,
+            terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
         )
         info = _backend_step_info(self.backend)
         telemetry = step_result.telemetry
@@ -228,6 +253,9 @@ class FZeroXEnvEngine:
             step_result.summary,
             step_result.status,
             telemetry,
+            RewardActionContext(
+                boost_requested=bool(control_state.joypad_mask & BOOST_MASK),
+            ),
         )
         reward = reward_step.reward
         reward_breakdown = dict(reward_step.breakdown)
@@ -246,11 +274,24 @@ class FZeroXEnvEngine:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(_telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
+        self._record_recent_boost_pressure(
+            boost_requested=bool(control_state.joypad_mask & BOOST_MASK),
+            frames_run=step_result.summary.frames_run,
+        )
+        self._update_drift_press_state(
+            control_state=control_state,
+            frames_run=step_result.summary.frames_run,
+        )
         image_observation = step_result.observation
         observation = build_observation(
             image=image_observation,
             telemetry=telemetry,
             mode=self.config.observation.mode,
+            left_drift_held=float(self._left_drift_held),
+            right_drift_held=float(self._right_drift_held),
+            left_press_age_norm=self._drift_press_age_norm(self._left_press_age_frames),
+            right_press_age_norm=self._drift_press_age_norm(self._right_press_age_frames),
+            recent_boost_pressure=self._recent_boost_pressure(),
         )
         self._episode_return += reward
         info["episode_return"] = self._episode_return
@@ -272,6 +313,58 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
         )
 
+    def _clear_recent_boost_pressure(self) -> None:
+        self._recent_boost_frames.clear()
+        self._recent_boost_frame_sum = 0
+
+    def _record_recent_boost_pressure(self, *, boost_requested: bool, frames_run: int) -> None:
+        encoded = 1 if boost_requested else 0
+        for _ in range(max(int(frames_run), 0)):
+            if len(self._recent_boost_frames) == self._recent_boost_frames.maxlen:
+                removed = self._recent_boost_frames.popleft()
+                self._recent_boost_frame_sum -= removed
+            self._recent_boost_frames.append(encoded)
+            self._recent_boost_frame_sum += encoded
+
+    def _recent_boost_pressure(self) -> float:
+        if not self._recent_boost_frames:
+            return 0.0
+        return self._recent_boost_frame_sum / len(self._recent_boost_frames)
+
+    def _reset_drift_press_state(self) -> None:
+        self._left_drift_held = False
+        self._right_drift_held = False
+        self._left_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+        self._right_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+
+    def _update_drift_press_state(
+        self,
+        *,
+        control_state: ControllerState,
+        frames_run: int,
+    ) -> None:
+        frames_elapsed = max(int(frames_run), 0)
+        left_held = bool(control_state.joypad_mask & DRIFT_LEFT_MASK)
+        right_held = bool(control_state.joypad_mask & DRIFT_RIGHT_MASK)
+        self._left_press_age_frames = _advance_press_age(
+            self._left_press_age_frames,
+            was_held=self._left_drift_held,
+            is_held=left_held,
+            frames_elapsed=frames_elapsed,
+        )
+        self._right_press_age_frames = _advance_press_age(
+            self._right_press_age_frames,
+            was_held=self._right_drift_held,
+            is_held=right_held,
+            frames_elapsed=frames_elapsed,
+        )
+        self._left_drift_held = left_held
+        self._right_drift_held = right_held
+
+    def _drift_press_age_norm(self, frames: int) -> float:
+        clamped_frames = min(max(int(frames), 0), DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
+        return clamped_frames / DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+
 
 def _has_custom_baseline(info: dict[str, object]) -> bool:
     baseline_kind = info.get("baseline_kind")
@@ -280,6 +373,18 @@ def _has_custom_baseline(info: dict[str, object]) -> bool:
 
 def _read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
     return backend.try_read_telemetry()
+
+
+def _advance_press_age(
+    previous_age_frames: int,
+    *,
+    was_held: bool,
+    is_held: bool,
+    frames_elapsed: int,
+) -> int:
+    if is_held and not was_held:
+        return min(frames_elapsed, DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
+    return min(previous_age_frames + frames_elapsed, DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
 
 
 def _set_observation_info(

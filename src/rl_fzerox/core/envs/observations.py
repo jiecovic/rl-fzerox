@@ -19,10 +19,21 @@ STATE_FEATURE_NAMES: tuple[str, ...] = (
     "reverse_active",
     "airborne",
     "can_boost",
+    "boost_active",
+    "left_drift_held",
+    "right_drift_held",
+    "left_press_age_norm",
+    "right_press_age_norm",
+    "recent_boost_pressure",
 )
 STATE_FEATURE_COUNT = len(STATE_FEATURE_NAMES)
 STATE_SPEED_NORMALIZER_KPH = 1_500.0
-STATE_FEATURE_HIGH = np.array([2.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+DRIFT_DOUBLE_TAP_WINDOW_FRAMES = 15
+RECENT_BOOST_PRESSURE_WINDOW_FRAMES = 120
+STATE_FEATURE_HIGH = np.array(
+    [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+    dtype=np.float32,
+)
 
 
 def build_observation(
@@ -30,26 +41,67 @@ def build_observation(
     image: np.ndarray,
     telemetry: FZeroXTelemetry | None,
     mode: ObservationMode,
+    left_drift_held: float = 0.0,
+    right_drift_held: float = 0.0,
+    left_press_age_norm: float = 1.0,
+    right_press_age_norm: float = 1.0,
+    recent_boost_pressure: float = 0.0,
 ) -> ObservationValue:
     if mode == "image":
         return image
     if mode == "image_state":
         return {
             "image": image,
-            "state": telemetry_state_vector(telemetry),
+            "state": telemetry_state_vector(
+                telemetry,
+                left_drift_held=left_drift_held,
+                right_drift_held=right_drift_held,
+                left_press_age_norm=left_press_age_norm,
+                right_press_age_norm=right_press_age_norm,
+                recent_boost_pressure=recent_boost_pressure,
+            ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")
 
 
-def telemetry_state_vector(telemetry: FZeroXTelemetry | None) -> np.ndarray:
+def telemetry_state_vector(
+    telemetry: FZeroXTelemetry | None,
+    *,
+    left_drift_held: float = 0.0,
+    right_drift_held: float = 0.0,
+    left_press_age_norm: float = 1.0,
+    right_press_age_norm: float = 1.0,
+    recent_boost_pressure: float = 0.0,
+) -> np.ndarray:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
+    left_held = _clamp(float(left_drift_held), 0.0, 1.0)
+    right_held = _clamp(float(right_drift_held), 0.0, 1.0)
+    left_age = _clamp(float(left_press_age_norm), 0.0, 1.0)
+    right_age = _clamp(float(right_press_age_norm), 0.0, 1.0)
+    boost_pressure = _clamp(float(recent_boost_pressure), 0.0, 1.0)
     if telemetry is None:
-        return np.zeros(STATE_FEATURE_COUNT, dtype=np.float32)
+        return np.array(
+            [
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                left_held,
+                right_held,
+                left_age,
+                right_age,
+                boost_pressure,
+            ],
+            dtype=np.float32,
+        )
 
     player = telemetry.player
     max_energy = float(player.max_energy)
     energy_frac = 0.0 if max_energy <= 0.0 else float(player.energy) / max_energy
+    boost_active = 1.0 if player.boost_timer > 0 else 0.0
     return np.array(
         [
             _clamp(float(player.speed_kph) / STATE_SPEED_NORMALIZER_KPH, 0.0, 2.0),
@@ -57,6 +109,12 @@ def telemetry_state_vector(telemetry: FZeroXTelemetry | None) -> np.ndarray:
             1.0 if player.reverse_timer > 0 else 0.0,
             1.0 if player.airborne else 0.0,
             1.0 if player.can_boost else 0.0,
+            boost_active,
+            left_held,
+            right_held,
+            left_age,
+            right_age,
+            boost_pressure,
         ],
         dtype=np.float32,
     )

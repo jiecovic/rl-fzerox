@@ -23,6 +23,13 @@ class RewardSummaryConfig:
     energy_loss_epsilon: float
 
 
+@dataclass(frozen=True)
+class RewardActionContext:
+    """Action bits the reward function may need for context-dependent shaping."""
+
+    boost_requested: bool = False
+
+
 class RewardTracker(Protocol):
     """Narrow interface the env engine expects from one reward implementation."""
 
@@ -39,6 +46,7 @@ class RewardTracker(Protocol):
         summary: StepSummary,
         status: StepStatus,
         telemetry: FZeroXTelemetry | None,
+        action_context: RewardActionContext | None = None,
     ) -> RewardStep:
         """Compute one env-step reward from the repeated-step summary."""
         ...

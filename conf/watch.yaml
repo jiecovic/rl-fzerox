@@ -15,11 +15,13 @@ env:
   stuck_step_limit: 120
   stuck_min_speed_kph: 60.0
   wrong_way_timer_limit: 120
+  # End the episode immediately when race telemetry shows player energy <= 0.
+  terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
   randomize_game_rng_requires_race_mode: true
   reset_to_race: true
   action:
-    name: steer_drive_boost
+    name: steer_drive_boost_drift
     steer_buckets: 7
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.

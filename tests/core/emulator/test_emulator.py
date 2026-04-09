@@ -109,6 +109,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         max_episode_steps=1_000,
         stuck_step_limit=240,
         wrong_way_timer_limit=180,
+        terminate_on_energy_depleted=True,
     )
 
     assert result.observation.shape == (84, 116, 6)

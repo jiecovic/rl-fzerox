@@ -106,6 +106,7 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         max_episode_steps,
         stuck_step_limit,
         wrong_way_timer_limit: 180,
+        terminate_on_energy_depleted: true,
     }
 }
 

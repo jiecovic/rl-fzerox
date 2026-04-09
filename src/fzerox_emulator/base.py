@@ -89,6 +89,7 @@ class EmulatorBackend(Protocol):
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        terminate_on_energy_depleted: bool,
     ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

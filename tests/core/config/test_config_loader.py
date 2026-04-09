@@ -79,6 +79,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "env:",
             "  action_repeat: 3",
             "  reset_to_race: true",
+            "  terminate_on_energy_depleted: false",
             "watch:",
             "  episodes: 2",
             "  fps: 30",
@@ -95,6 +96,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.seed == 7
     assert config.env.action_repeat == 3
     assert config.env.reset_to_race is True
+    assert config.env.terminate_on_energy_depleted is False
     assert config.watch.episodes == 2
     assert config.watch.fps == 30
     assert config.watch.deterministic_policy is False
