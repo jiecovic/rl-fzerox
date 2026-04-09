@@ -10,6 +10,7 @@ from rl_fzerox.core.config.schema import (
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
+    RewardConfig,
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
@@ -100,6 +101,7 @@ def test_watch_allows_run_dir_without_config(
             rom_path=rom_path,
         ),
         env=EnvConfig(action_repeat=2),
+        reward=RewardConfig(time_penalty_per_frame=-0.123),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
@@ -126,5 +128,6 @@ def test_watch_allows_run_dir_without_config(
     assert config.emulator.core_path == core_path.resolve()
     assert config.emulator.rom_path == rom_path.resolve()
     assert config.env.action_repeat == 2
+    assert config.reward.time_penalty_per_frame == -0.123
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "latest"

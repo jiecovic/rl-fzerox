@@ -14,10 +14,20 @@ from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue, build_action_adapter
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
+from rl_fzerox.core.envs.laps import completed_race_laps
+from rl_fzerox.core.envs.observations import (
+    STATE_FEATURE_COUNT,
+    STATE_FEATURE_NAMES,
+    ObservationValue,
+    build_observation,
+    build_observation_space,
+    image_observation_shape,
+)
 from rl_fzerox.core.envs.rewards import build_reward_tracker
 from rl_fzerox.core.seed import derive_seed
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
+
 
 class FZeroXEnvEngine:
     """Environment step engine around one emulator backend.
@@ -50,9 +60,10 @@ class FZeroXEnvEngine:
         self._reset_count = 0
         self._rng_seed_base: int | None = None
         self._action_space = self._action_adapter.action_space
-        self._observation_space = _observation_space(
+        self._observation_space = build_observation_space(
             self._observation_spec,
             frame_stack=config.observation.frame_stack,
+            mode=config.observation.mode,
         )
 
     @property
@@ -60,10 +71,10 @@ class FZeroXEnvEngine:
         return self._action_space
 
     @property
-    def observation_space(self) -> spaces.Box:
+    def observation_space(self) -> spaces.Space:
         return self._observation_space
 
-    def reset(self, seed: int | None = None) -> tuple[np.ndarray, dict[str, object]]:
+    def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode.
 
         The `seed` is kept for Gym compatibility and future Python-side reset
@@ -83,12 +94,18 @@ class FZeroXEnvEngine:
         if telemetry is not None:
             info.update(_telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
-        observation = self._transform_observation()
+        image_observation = self._render_observation_image()
+        observation = build_observation(
+            image=image_observation,
+            telemetry=telemetry,
+            mode=self.config.observation.mode,
+        )
         _set_observation_info(
             info,
-            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_shape=tuple(int(value) for value in image_observation.shape),
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
+            observation_mode=self.config.observation.mode,
         )
         self._last_info = dict(info)
         self._reset_count += 1
@@ -97,7 +114,7 @@ class FZeroXEnvEngine:
     def step(
         self,
         action: ActionValue,
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self.step_control(self._action_adapter.decode(action))
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
@@ -108,7 +125,7 @@ class FZeroXEnvEngine:
     def step_control(
         self,
         control_state: ControllerState,
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         self._held_controller_state = control_state
         return self._run_env_step(
             control_state,
@@ -118,7 +135,7 @@ class FZeroXEnvEngine:
     def step_frame(
         self,
         control_state: ControllerState | None = None,
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
         if control_state is not None:
@@ -193,7 +210,7 @@ class FZeroXEnvEngine:
         control_state: ControllerState,
         *,
         action_repeat: int,
-    ) -> tuple[np.ndarray, float, bool, bool, dict[str, object]]:
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         step_result = self.backend.step_repeat_raw(
             control_state,
             action_repeat=action_repeat,
@@ -229,7 +246,12 @@ class FZeroXEnvEngine:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(_telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
-        observation = step_result.observation
+        image_observation = step_result.observation
+        observation = build_observation(
+            image=image_observation,
+            telemetry=telemetry,
+            mode=self.config.observation.mode,
+        )
         self._episode_return += reward
         info["episode_return"] = self._episode_return
         ensure_monitor_info_keys(info)
@@ -237,13 +259,14 @@ class FZeroXEnvEngine:
         self._last_info = dict(info)
         _set_observation_info(
             info,
-            observation_shape=tuple(int(value) for value in observation.shape),
+            observation_shape=tuple(int(value) for value in image_observation.shape),
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
+            observation_mode=self.config.observation.mode,
         )
         return observation, reward, terminated, truncated, info
 
-    def _transform_observation(self) -> np.ndarray:
+    def _render_observation_image(self) -> np.ndarray:
         return self.backend.render_observation(
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
@@ -259,26 +282,22 @@ def _read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
     return backend.try_read_telemetry()
 
 
-def _observation_space(observation_spec: ObservationSpec, *, frame_stack: int) -> spaces.Box:
-    return spaces.Box(
-        low=0,
-        high=255,
-        shape=(
-            observation_spec.height,
-            observation_spec.width,
-            observation_spec.channels * frame_stack,
-        ),
-        dtype=np.uint8,
-    )
-
-
 def _set_observation_info(
     info: dict[str, object],
     *,
     observation_shape: tuple[int, ...],
     observation_spec: ObservationSpec,
     frame_stack: int,
+    observation_mode: str,
 ) -> None:
+    expected_image_shape = image_observation_shape(observation_spec, frame_stack=frame_stack)
+    if observation_shape != expected_image_shape:
+        raise ValueError(
+            "Rendered observation shape did not match native observation spec: "
+            f"got={observation_shape}, expected={expected_image_shape}"
+        )
+
+    info["observation_mode"] = observation_mode
     info["observation_shape"] = observation_shape
     info["observation_frame_shape"] = (
         observation_spec.height,
@@ -286,6 +305,9 @@ def _set_observation_info(
         observation_spec.channels,
     )
     info["observation_stack"] = frame_stack
+    if observation_mode == "image_state":
+        info["observation_state_shape"] = (STATE_FEATURE_COUNT,)
+        info["observation_state_features"] = STATE_FEATURE_NAMES
 
 
 def _reset_context_info(info: dict[str, object]) -> dict[str, object]:
@@ -303,6 +325,7 @@ def _reset_context_info(info: dict[str, object]) -> dict[str, object]:
 
 
 def _telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
+    race_laps_completed = completed_race_laps(telemetry)
     return {
         "game_mode": telemetry.game_mode_name,
         "course_index": telemetry.course_index,
@@ -311,7 +334,9 @@ def _telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "speed_kph": telemetry.player.speed_kph,
         "position": telemetry.player.position,
         "lap": telemetry.player.lap,
-        "laps_completed": telemetry.player.laps_completed,
+        "laps_completed": race_laps_completed,
+        "race_laps_completed": race_laps_completed,
+        "raw_laps_completed": telemetry.player.laps_completed,
         "energy": telemetry.player.energy,
     }
 

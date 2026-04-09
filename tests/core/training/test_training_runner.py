@@ -101,10 +101,10 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "speed_kph": 100.0,
             "position": 5,
             "lap": 1,
-            "laps_completed": 0,
+            "race_laps_completed": 0,
             "episode": {
                 "position": 2,
-                "laps_completed": 3,
+                "race_laps_completed": 3,
                 "termination_reason": "finished",
                 "truncation_reason": None,
             },
@@ -114,10 +114,10 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "speed_kph": 120.0,
             "position": 7,
             "lap": 1,
-            "laps_completed": 0,
+            "race_laps_completed": 0,
             "episode": {
                 "position": 8,
-                "laps_completed": 1,
+                "race_laps_completed": 1,
                 "termination_reason": None,
                 "truncation_reason": "wrong_way",
             },
@@ -128,8 +128,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
 
     assert accumulator.state_metrics["race_distance"].mean() == 12.0
     assert accumulator.state_metrics["speed_kph"].mean() == 110.0
+    assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
     assert accumulator.episode_metrics["position"].mean() == 5.0
-    assert accumulator.episode_metrics["laps_completed"].mean() == 2.0
+    assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
     assert accumulator.episode_count == 2
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["wrong_way"] == 1

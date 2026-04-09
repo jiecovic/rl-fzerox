@@ -13,11 +13,11 @@ _STATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("speed_kph", "state/speed_kph_mean"),
     ("position", "state/position_mean"),
     ("lap", "state/lap_mean"),
-    ("laps_completed", "state/laps_completed_mean"),
+    ("race_laps_completed", "state/race_laps_completed_mean"),
 )
 _EPISODE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("position", "episode/final_position_mean"),
-    ("laps_completed", "episode/laps_completed_mean"),
+    ("race_laps_completed", "episode/race_laps_completed_mean"),
 )
 _TERMINATION_REASON_KEYS: tuple[str, ...] = (
     "finished",

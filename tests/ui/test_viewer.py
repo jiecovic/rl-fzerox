@@ -13,6 +13,7 @@ from fzerox_emulator import (
     display_size,
 )
 from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
+from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES
 from rl_fzerox.ui.watch import (
     _build_panel_columns,
     _create_fonts,
@@ -226,6 +227,40 @@ def test_display_section_includes_action_repeat() -> None:
     assert next_milestone_line.value == "750.0 to 6,000"
 
 
+def test_side_panel_can_show_policy_observation_state_vector() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        observation_state=np.array([0.5, 0.75, 1.0, 0.0, 1.0], dtype=np.float32),
+        observation_state_feature_names=STATE_FEATURE_NAMES,
+        telemetry=_sample_telemetry(),
+    )
+
+    obs_vector_section = next(section for section in columns.right if section.title == "Obs Vector")
+    values = {line.label: line.value for line in obs_vector_section.lines}
+
+    assert values == {
+        "speed_norm": "0.500",
+        "energy_frac": "0.750",
+        "reverse_active": "1.000",
+        "airborne": "0.000",
+        "can_boost": "1.000",
+    }
+
+
 def test_session_section_includes_stuck_counter() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -250,6 +285,34 @@ def test_session_section_includes_stuck_counter() -> None:
     stuck_line = next(line for line in session_section.lines if line.label == "Stuck")
 
     assert stuck_line.value == "17 / 240"
+
+
+def test_session_section_shows_reward_with_four_decimals() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0, "step_reward": -0.016},
+        reset_info={},
+        episode_reward=-12.34567,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    step_line = next(line for line in session_section.lines if line.label == "Step")
+    return_line = next(line for line in session_section.lines if line.label == "Return")
+
+    assert step_line.value == "-0.0160"
+    assert return_line.value == "-12.3457"
 
 
 def test_format_reload_age_is_human_readable() -> None:

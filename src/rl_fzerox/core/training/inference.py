@@ -8,6 +8,7 @@ from pathlib import Path
 
 import numpy as np
 
+from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 
@@ -21,7 +22,7 @@ class LoadedPolicy:
 
 
 class PolicyRunner:
-    """Small deterministic inference wrapper around one saved policy artifact."""
+    """Small inference wrapper around one saved policy artifact."""
 
     def __init__(self, loaded_policy: LoadedPolicy, policy) -> None:
         self._loaded_policy = loaded_policy
@@ -55,11 +56,11 @@ class PolicyRunner:
 
         return self._last_reload_error
 
-    def predict(self, observation: np.ndarray) -> np.ndarray:
-        """Predict one deterministic action for the current observation."""
+    def predict(self, observation: ObservationValue, *, deterministic: bool = True) -> np.ndarray:
+        """Predict one action for the current observation."""
 
         self._maybe_reload()
-        action, _ = self._policy.predict(observation, deterministic=True)
+        action, _ = self._policy.predict(observation, deterministic=deterministic)
         return np.asarray(action, dtype=np.int64)
 
     def _maybe_reload(self) -> None:
@@ -116,14 +117,20 @@ def _load_saved_policy(policy_path: Path):
     """Load one saved policy-only SB3 artifact.
 
     This remains PPO-specific today because the current training path only
-    writes PPO `CnnPolicy` artifacts.
+    writes PPO policy artifacts.
     """
 
-    from stable_baselines3.ppo import CnnPolicy
+    import torch
+    from gymnasium import spaces
+    from stable_baselines3.ppo import CnnPolicy, MultiInputPolicy
 
     _ensure_policy_dependencies_loaded()
 
-    return CnnPolicy.load(str(policy_path), device="auto")
+    saved_policy = torch.load(policy_path, map_location="cpu", weights_only=False)
+    saved_data = saved_policy.get("data", {})
+    observation_space = saved_data.get("observation_space")
+    policy_class = MultiInputPolicy if isinstance(observation_space, spaces.Dict) else CnnPolicy
+    return policy_class.load(str(policy_path), device="auto")
 
 
 def _policy_mtime_ns(policy_path: Path) -> int:

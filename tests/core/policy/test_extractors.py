@@ -8,7 +8,7 @@ from gymnasium import spaces
 
 pytest.importorskip("stable_baselines3")
 
-from rl_fzerox.core.policy import FZeroXObservationCnnExtractor
+from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
 
 
 def test_observation_extractor_accepts_channels_last_observations() -> None:
@@ -102,3 +102,49 @@ def test_observation_extractor_auto_features_dim_uses_v3_legacy_deep_flatten() -
     assert isinstance(extractor._linear, torch.nn.Identity)
     assert extractor._flatten_dim == 3_584
     assert tuple(features.shape) == (2, extractor._flatten_dim)
+
+
+def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
+    extractor = FZeroXImageStateExtractor(
+        spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32),
+            }
+        ),
+        features_dim=512,
+        state_features_dim=64,
+    )
+
+    features = extractor(
+        {
+            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
+            "state": torch.zeros((2, 5), dtype=torch.float32),
+        }
+    )
+
+    assert extractor.features_dim == 576
+    assert tuple(features.shape) == (2, 576)
+
+
+def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_branch() -> None:
+    extractor = FZeroXImageStateExtractor(
+        spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(5,), dtype=np.float32),
+            }
+        ),
+        features_dim="auto",
+        state_features_dim=64,
+    )
+
+    features = extractor(
+        {
+            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
+            "state": torch.zeros((2, 5), dtype=torch.float32),
+        }
+    )
+
+    assert extractor.features_dim == 3_648
+    assert tuple(features.shape) == (2, 3_648)

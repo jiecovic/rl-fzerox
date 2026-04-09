@@ -2,23 +2,26 @@
 name: race_v2
 
 # Time pressure: small negative reward per internal emulator frame.
-time_penalty_per_frame: -0.002
+time_penalty_per_frame: -0.001
 # Time pressure: multiplier applied to the per-frame time penalty whenever the
 # game's live reverse timer is active (`reverse_timer > 0`).
-reverse_time_penalty_scale: 2.0
+reverse_time_penalty_scale: 4.0
 # Time pressure: multiplier applied to the per-frame time penalty on frames
 # below the env's configured stuck-speed threshold.
-low_speed_time_penalty_scale: 2.0
+low_speed_time_penalty_scale: 4.0
 
 # Milestones: episode-relative progress interval between one-time milestone rewards.
 milestone_distance: 5000.0
 # Milestones: one-time bonus for crossing a new race-distance milestone.
 milestone_bonus: 2.0
-# Milestones: dense new-frontier reward used only during the configured initial
-# milestone warmup window.
+# Bootstrap progress: dense reward scale for positive race-distance delta during
+# the configured lap warmup window.
 bootstrap_progress_scale: 0.002
-# Milestones: how many initial milestones still allow dense bootstrap progress reward.
-bootstrap_milestone_count: 3
+# Bootstrap progress: stronger penalty scale for negative race-distance delta
+# during the configured lap warmup window.
+bootstrap_regress_penalty_scale: 0.004
+# Bootstrap progress: how many initial completed laps allow dense progress reward.
+bootstrap_lap_count: 3
 
 # Lap rewards: one-time bonus for completing lap 1.
 lap_1_completion_bonus: 20.0
@@ -32,14 +35,18 @@ lap_position_scale: 1.0
 
 # Failure shaping: extra penalty per remaining internal emulator frame on
 # death or truncation.
-remaining_step_penalty_per_frame: 0.02
+remaining_step_penalty_per_frame: 0.0
 # Failure shaping: extra penalty per unfinished lap on death or truncation.
 remaining_lap_penalty: 50.0
 
 # Energy: ignore tiny energy changes below this threshold.
 energy_loss_epsilon: 0.01
-# Energy: penalty scale applied to lost energy within one env step.
-energy_loss_penalty_scale: 0.05
+# Energy: maximum penalty scale for lost energy when post-step energy is near zero.
+energy_loss_penalty_scale: 0.10
+# Energy: above this post-step energy fraction, energy loss is not penalized.
+energy_loss_safe_fraction: 0.90
+# Energy: curve exponent for danger weighting; higher stays mild until lower energy.
+energy_loss_danger_power: 2.0
 # Energy: smaller reward scale applied to regained energy within one env step.
 energy_gain_reward_scale: 0.02
 
@@ -49,13 +56,13 @@ collision_recoil_penalty: -2.0
 spinning_out_penalty: -4.0
 
 # Failure bases: base penalty when the episode ends by crash, retire, or off-track failure.
-terminal_failure_base_penalty: -120.0
+terminal_failure_base_penalty: -110.0
 # Failure bases: base penalty when the episode truncates for being stuck.
-stuck_truncation_base_penalty: -150.0
+stuck_truncation_base_penalty: -100.0
 # Failure bases: base penalty when the episode truncates for driving the wrong way.
-wrong_way_truncation_base_penalty: -170.0
+wrong_way_truncation_base_penalty: -120.0
 # Failure bases: base penalty when the episode truncates by hitting max episode steps.
-timeout_truncation_base_penalty: -150.0
+timeout_truncation_base_penalty: -100.0
 
 # Finish placement: larger final placement bonus on actual race finish as
 # `(total_racers - position) * finish_position_scale`.

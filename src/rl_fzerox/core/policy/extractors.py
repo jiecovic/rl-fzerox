@@ -36,31 +36,14 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         observation_space: spaces.Box,
         features_dim: int | Literal["auto"] = 512,
     ) -> None:
-        if len(observation_space.shape) != 3:
-            raise ValueError(
-                f"{type(self).__name__} expects a 3D image observation space, "
-                f"got {observation_space.shape!r}"
-            )
-
-        if is_image_space_channels_first(observation_space):
-            channels, height, width = observation_space.shape
-        else:
-            height, width, channels = observation_space.shape
-
-        self._height = int(height)
-        self._width = int(width)
-        self._channels = int(channels)
-        geometry = (self._height, self._width)
-        try:
-            self._conv_spec = SUPPORTED_POLICY_GEOMETRIES[geometry]
-        except KeyError as error:
-            supported = ", ".join(
-                f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES
-            )
-            raise ValueError(
-                f"Unsupported observation geometry {self._height}x{self._width} for "
-                f"{type(self).__name__}; supported presets: {supported}"
-            ) from error
+        image_geometry = _resolve_supported_image_geometry(
+            observation_space,
+            extractor_name=type(self).__name__,
+        )
+        self._height = image_geometry.height
+        self._width = image_geometry.width
+        self._channels = image_geometry.channels
+        self._conv_spec = image_geometry.conv_spec
 
         cnn = nn.Sequential(
             *self._build_conv_layers(
@@ -124,3 +107,128 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
             )
 
         return self._linear(self._cnn(channels_first))
+
+
+class FZeroXImageStateExtractor(BaseFeaturesExtractor):
+    """CNN image features plus a small scalar-state branch for Dict observations."""
+
+    def __init__(
+        self,
+        observation_space: spaces.Dict,
+        features_dim: int | Literal["auto"] = 512,
+        state_features_dim: int = 64,
+    ) -> None:
+        if not isinstance(observation_space, spaces.Dict):
+            raise ValueError(
+                f"{type(self).__name__} expects a Dict observation space, "
+                f"got {type(observation_space).__name__}"
+            )
+
+        image_space = observation_space.spaces.get("image")
+        state_space = observation_space.spaces.get("state")
+        if not isinstance(image_space, spaces.Box):
+            raise ValueError(f"{type(self).__name__} requires Box key 'image'")
+        if not isinstance(state_space, spaces.Box) or len(state_space.shape) != 1:
+            raise ValueError(f"{type(self).__name__} requires 1D Box key 'state'")
+
+        image_features_dim = (
+            _image_flatten_dim(image_space) if features_dim == "auto" else int(features_dim)
+        )
+        resolved_state_features_dim = int(state_features_dim)
+        super().__init__(observation_space, image_features_dim + resolved_state_features_dim)
+
+        self._state_dim = int(state_space.shape[0])
+        self._image_extractor = FZeroXObservationCnnExtractor(
+            image_space,
+            features_dim=features_dim,
+        )
+        self._state_mlp = nn.Sequential(
+            nn.Linear(self._state_dim, resolved_state_features_dim),
+            nn.ReLU(),
+        )
+
+    def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
+        image = observations.get("image")
+        state = observations.get("state")
+        if image is None or state is None:
+            raise ValueError(f"{type(self).__name__} expects observation keys 'image' and 'state'")
+
+        state_flat = torch.flatten(state.float(), start_dim=1)
+        if state_flat.shape[1] != self._state_dim:
+            raise ValueError(
+                f"Unexpected state vector width for {type(self).__name__}: "
+                f"got {state_flat.shape[1]}, expected {self._state_dim}"
+            )
+
+        return torch.cat(
+            [
+                self._image_extractor(image),
+                self._state_mlp(state_flat),
+            ],
+            dim=1,
+        )
+
+
+class _ImageGeometry:
+    def __init__(self, *, height: int, width: int, channels: int, conv_spec: ConvSpec) -> None:
+        self.height = height
+        self.width = width
+        self.channels = channels
+        self.conv_spec = conv_spec
+
+
+def _resolve_supported_image_geometry(
+    observation_space: spaces.Box,
+    *,
+    extractor_name: str,
+) -> _ImageGeometry:
+    if len(observation_space.shape) != 3:
+        raise ValueError(
+            f"{extractor_name} expects a 3D image observation space, "
+            f"got {observation_space.shape!r}"
+        )
+
+    if is_image_space_channels_first(observation_space):
+        channels, height, width = observation_space.shape
+    else:
+        height, width, channels = observation_space.shape
+
+    resolved_height = int(height)
+    resolved_width = int(width)
+    geometry = (resolved_height, resolved_width)
+    try:
+        conv_spec = SUPPORTED_POLICY_GEOMETRIES[geometry]
+    except KeyError as error:
+        supported = ", ".join(
+            f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES
+        )
+        raise ValueError(
+            f"Unsupported observation geometry {resolved_height}x{resolved_width} for "
+            f"{extractor_name}; supported presets: {supported}"
+        ) from error
+
+    return _ImageGeometry(
+        height=resolved_height,
+        width=resolved_width,
+        channels=int(channels),
+        conv_spec=conv_spec,
+    )
+
+
+def _image_flatten_dim(observation_space: spaces.Box) -> int:
+    geometry = _resolve_supported_image_geometry(
+        observation_space,
+        extractor_name=FZeroXImageStateExtractor.__name__,
+    )
+    height = geometry.height
+    width = geometry.width
+    output_channels = geometry.channels
+    for out_channels, kernel_size, stride in geometry.conv_spec:
+        output_channels = out_channels
+        height = _conv_output_size(height, kernel_size[0], stride[0])
+        width = _conv_output_size(width, kernel_size[1], stride[1])
+    return output_channels * height * width
+
+
+def _conv_output_size(input_size: int, kernel_size: int, stride: int) -> int:
+    return ((input_size - kernel_size) // stride) + 1

@@ -54,6 +54,8 @@ def _draw_frame(
     fonts,
     raw_frame: np.ndarray,
     observation: np.ndarray,
+    observation_state: np.ndarray | None,
+    observation_state_feature_names: tuple[str, ...],
     episode: int,
     info: dict[str, object],
     reset_info: dict[str, object],
@@ -121,6 +123,8 @@ def _draw_frame(
         stuck_min_speed_kph=stuck_min_speed_kph,
         game_display_size=game_display_size,
         observation_shape=observation.shape,
+        observation_state=observation_state,
+        observation_state_feature_names=observation_state_feature_names,
         observation_surface=observation_surface,
         telemetry=telemetry,
     )

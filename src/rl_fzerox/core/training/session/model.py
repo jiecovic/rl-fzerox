@@ -22,13 +22,27 @@ def build_ppo_model(
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    from rl_fzerox.core.policy import FZeroXObservationCnnExtractor
+    from gymnasium import spaces
+
+    from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
+
+    if isinstance(train_env.observation_space, spaces.Dict):
+        policy_name = "MultiInputPolicy"
+        extractor_class = FZeroXImageStateExtractor
+        extractor_kwargs = {
+            "features_dim": policy_config.extractor.features_dim,
+            "state_features_dim": policy_config.extractor.state_features_dim,
+        }
+    else:
+        policy_name = "CnnPolicy"
+        extractor_class = FZeroXObservationCnnExtractor
+        extractor_kwargs = {
+            "features_dim": policy_config.extractor.features_dim,
+        }
 
     policy_kwargs = {
-        "features_extractor_class": FZeroXObservationCnnExtractor,
-        "features_extractor_kwargs": {
-            "features_dim": policy_config.extractor.features_dim,
-        },
+        "features_extractor_class": extractor_class,
+        "features_extractor_kwargs": extractor_kwargs,
         "net_arch": {
             "pi": [int(value) for value in policy_config.net_arch.pi],
             "vf": [int(value) for value in policy_config.net_arch.vf],
@@ -37,7 +51,7 @@ def build_ppo_model(
     }
 
     return PPO(
-        policy="CnnPolicy",
+        policy=policy_name,
         env=train_env,
         learning_rate=train_config.learning_rate,
         n_steps=train_config.n_steps,

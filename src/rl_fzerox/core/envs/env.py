@@ -8,9 +8,10 @@ from fzerox_emulator import ControllerState, EmulatorBackend
 from rl_fzerox.core.config.schema import EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
+from rl_fzerox.core.envs.observations import ObservationValue
 
 
-class FZeroXEnv(gym.Env[np.ndarray, np.ndarray]):
+class FZeroXEnv(gym.Env[ObservationValue, np.ndarray]):
     """Gymnasium wrapper around the emulator-backed F-Zero X environment."""
 
     metadata = {"render_modes": ["rgb_array"]}
