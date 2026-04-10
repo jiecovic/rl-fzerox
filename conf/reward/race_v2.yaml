@@ -12,6 +12,9 @@ low_speed_time_penalty_scale: 4.0
 
 # Milestones: episode-relative progress interval between one-time milestone rewards.
 milestone_distance: 15000.0
+# Milestones: shift the whole milestone grid by one deterministic random phase
+# offset on each reset so the agent does not overfit to exact boundary locations.
+randomize_milestone_phase_on_reset: true
 # Milestones: one-time bonus for crossing a new race-distance milestone.
 milestone_bonus: 2.0
 # Milestones: extra reward scale for average progress per internal frame since
@@ -72,14 +75,14 @@ spinning_out_penalty: -4.0
 # Failure bases: base penalty when the episode ends by crash, retire, or off-track failure.
 terminal_failure_base_penalty: -110.0
 # Failure bases: base penalty when the episode truncates for being stuck.
-stuck_truncation_base_penalty: -100.0
+stuck_truncation_base_penalty: -110.0
 # Failure bases: base penalty when the episode truncates for driving the wrong way.
 wrong_way_truncation_base_penalty: -120.0
 # Failure bases: base penalty when the episode truncates for making no new
 # race-distance frontier progress for too long.
-progress_stalled_truncation_base_penalty: -100.0
+progress_stalled_truncation_base_penalty: -110.0
 # Failure bases: base penalty when the episode truncates by hitting max episode steps.
-timeout_truncation_base_penalty: -100.0
+timeout_truncation_base_penalty: -110.0
 
 # Finish placement: larger final placement bonus on actual race finish as
 # `(total_racers - position) * finish_position_scale`.

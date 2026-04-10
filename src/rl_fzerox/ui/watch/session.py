@@ -16,6 +16,7 @@ class _CurriculumStagePolicyRunner(Protocol):
     def checkpoint_curriculum_stage_index(self) -> int | None: ...
 
     def refresh(self) -> None: ...
+    def reset(self) -> None: ...
 
 
 class _CheckpointStageSyncEnv(Protocol):
@@ -30,12 +31,13 @@ def _load_policy_runner(
     policy_run_dir: Path | None,
     *,
     artifact: str,
+    device: str,
 ) -> PolicyRunner | None:
     if policy_run_dir is None:
         return None
     from rl_fzerox.core.training.inference import load_policy_runner
 
-    return load_policy_runner(policy_run_dir, artifact=artifact)
+    return load_policy_runner(policy_run_dir, artifact=artifact, device=device)
 
 
 def _policy_label(policy_runner: PolicyRunner | None) -> str | None:
@@ -60,6 +62,12 @@ def _policy_curriculum_stage(policy_runner: PolicyRunner | None) -> str | None:
     if policy_runner is None:
         return None
     return policy_runner.checkpoint_curriculum_stage
+
+
+def _reset_policy_runner(policy_runner: _CurriculumStagePolicyRunner | None) -> None:
+    if policy_runner is None:
+        return
+    policy_runner.reset()
 
 
 def _sync_policy_curriculum_stage(

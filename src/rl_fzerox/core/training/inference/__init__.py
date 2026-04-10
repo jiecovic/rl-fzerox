@@ -28,6 +28,7 @@ class LoadedPolicy:
     run_dir: Path
     policy_path: Path
     artifact: str
+    device: str = "cpu"
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
 
@@ -44,6 +45,8 @@ class PolicyRunner:
         self._last_reload_monotonic = time.monotonic()
         self._reload_error: str | None = None
         self._last_reload_error: str | None = None
+        self._predict_state: tuple[np.ndarray, ...] | None = None
+        self._episode_start = np.array([True], dtype=bool)
 
     @property
     def label(self) -> str:
@@ -86,6 +89,12 @@ class PolicyRunner:
 
         self._maybe_reload()
 
+    def reset(self) -> None:
+        """Reset any recurrent inference state for a fresh episode."""
+
+        self._predict_state = None
+        self._episode_start = np.array([True], dtype=bool)
+
     def predict(
         self,
         observation: ObservationValue,
@@ -96,12 +105,16 @@ class PolicyRunner:
         """Predict one action for the current observation."""
 
         self._maybe_reload()
-        action, _ = _predict_policy_action(
+        action, next_state = _predict_policy_action(
             self._policy,
             observation,
+            state=self._predict_state,
+            episode_start=self._episode_start,
             deterministic=deterministic,
             action_masks=action_masks if self._supports_action_masks else None,
         )
+        self._predict_state = next_state
+        self._episode_start = np.array([False], dtype=bool)
         return np.asarray(action, dtype=np.int64)
 
     def _maybe_reload(self) -> None:
@@ -128,7 +141,11 @@ class PolicyRunner:
 
         if policy_changed:
             try:
-                policy = _load_saved_policy(policy_path, run_dir=self._loaded_policy.run_dir)
+                policy = _load_saved_policy(
+                    policy_path,
+                    run_dir=self._loaded_policy.run_dir,
+                    device=self._loaded_policy.device,
+                )
             except Exception as exc:
                 self._reload_error = str(exc)
                 self._last_reload_error = self._reload_error
@@ -138,27 +155,39 @@ class PolicyRunner:
             self._policy_mtime_ns = policy_mtime_ns
             self._last_reload_monotonic = time.monotonic()
             self._reload_error = None
+            self.reset()
 
         self._loaded_policy = LoadedPolicy(
             run_dir=self._loaded_policy.run_dir,
             policy_path=policy_path,
             artifact=self._loaded_policy.artifact,
+            device=self._loaded_policy.device,
             **_loaded_policy_metadata_fields(policy_path),
         )
         self._policy_metadata_mtime_ns = policy_metadata_mtime_ns
 
 
-def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:
+def load_policy_runner(
+    run_dir: Path,
+    *,
+    artifact: str = "latest",
+    device: str = "cpu",
+) -> PolicyRunner:
     """Load one saved policy artifact from one run directory."""
 
     resolved_run_dir = run_dir.expanduser().resolve()
     policy_path = resolve_policy_artifact_path(resolved_run_dir, artifact=artifact)
-    policy = _load_saved_policy(policy_path, run_dir=resolved_run_dir)
+    policy = _load_saved_policy(
+        policy_path,
+        run_dir=resolved_run_dir,
+        device=device,
+    )
     return PolicyRunner(
         LoadedPolicy(
             run_dir=resolved_run_dir,
             policy_path=policy_path,
             artifact=artifact,
+            device=device,
             **_loaded_policy_metadata_fields(policy_path),
         ),
         policy=policy,

@@ -36,3 +36,4 @@ env:
 watch:
   fps: auto
   deterministic_policy: true
+  device: cpu

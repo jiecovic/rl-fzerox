@@ -69,6 +69,7 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 `env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Press `K` in `watch` once to save `local/states/first-race.state`; after that, both `watch` and `train` reset from that dedicated race-start baseline instead of replaying the menu path. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
 
 `watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`, and any explicit numeric `watch.fps` is capped to that same maximum.
+`watch.device` defaults to `cpu`, so policy inference in watch mode does not contend with training on the GPU unless you opt into `cuda` or `auto`.
 
 The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:
 
@@ -125,6 +126,18 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.yaml
 
 Training uses `MaskablePPO` by default because the env exposes live gameplay
 masks, including boost-unlocked and shoulder-latch constraints.
+
+For recurrent training, install `sb3x` into the same environment and switch the
+config to `train.algorithm=maskable_recurrent_ppo` with
+`policy.recurrent.enabled=true`.
+
+Because `conf/local/train.local.yaml` often carries a feedforward warm-start, the
+repo also ships a local recurrent entrypoint that disables that incompatible
+preload automatically:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.recurrent.yaml
+```
 
 The repo also ships one starter curriculum config:
 

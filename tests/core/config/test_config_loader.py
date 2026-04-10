@@ -84,6 +84,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "  episodes: 2",
             "  fps: 30",
             "  deterministic_policy: false",
+            "  device: cuda",
         ],
     )
 
@@ -100,6 +101,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.watch.episodes == 2
     assert config.watch.fps == 30
     assert config.watch.deterministic_policy is False
+    assert config.watch.device == "cuda"
 
 
 def test_load_watch_app_config_accepts_larger_observation_preset(tmp_path: Path) -> None:
@@ -424,6 +426,34 @@ def test_load_train_app_config_reads_auto_extractor_features_dim(tmp_path: Path)
     assert config.policy.extractor.features_dim == "auto"
 
 
+def test_load_train_app_config_resolves_init_run_dir(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "train:",
+            "  total_timesteps: 1000",
+            f"  init_run_dir: {run_dir}",
+            "  init_artifact: latest",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.train.init_run_dir == run_dir.resolve()
+    assert config.train.init_artifact == "latest"
+
+
 def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -497,6 +527,42 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
     assert len(config.curriculum.stages) == 2
     assert config.curriculum.stages[0].until is not None
     assert config.curriculum.stages[0].until.race_laps_completed_mean_gte == 3.0
+
+
+def test_load_train_app_config_reads_recurrent_policy_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "policy:",
+            "  recurrent:",
+            "    enabled: true",
+            "    hidden_size: 512",
+            "    n_lstm_layers: 1",
+            "    shared_lstm: false",
+            "    enable_critic_lstm: true",
+            "train:",
+            "  algorithm: maskable_recurrent_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.train.algorithm == "maskable_recurrent_ppo"
+    assert config.policy.recurrent.enabled is True
+    assert config.policy.recurrent.hidden_size == 512
+    assert config.policy.recurrent.n_lstm_layers == 1
+    assert config.policy.recurrent.shared_lstm is False
+    assert config.policy.recurrent.enable_critic_lstm is True
 
 
 def test_repo_watch_template_exists() -> None:

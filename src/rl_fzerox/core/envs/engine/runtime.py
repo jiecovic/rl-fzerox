@@ -31,6 +31,7 @@ from .info import (
 from .masks import ActionMaskController
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
+_DOMAIN_REWARD_MILESTONE_PHASE = 0xA409_3822_299F_31D0
 
 
 class FZeroXEnvEngine:
@@ -122,7 +123,10 @@ class FZeroXEnvEngine:
             self._rng_seed_base = seed
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
         self._mask_controller.set_boost_unlocked(telemetry_can_boost(telemetry))
-        self._reward_tracker.reset(telemetry)
+        self._reward_tracker.reset(
+            telemetry,
+            episode_seed=self._reward_episode_seed(seed),
+        )
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
@@ -239,6 +243,12 @@ class FZeroXEnvEngine:
         info["rng_seed"] = rng_seed
         info["rng_state"] = rng_state
         return read_live_telemetry(self.backend) or telemetry
+
+    def _reward_episode_seed(self, seed: int | None) -> int | None:
+        seed_base = seed if seed is not None else self._rng_seed_base
+        if seed_base is None:
+            return None
+        return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
 
     def _run_env_step(
         self,

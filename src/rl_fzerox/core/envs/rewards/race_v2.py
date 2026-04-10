@@ -12,6 +12,9 @@ from rl_fzerox.core.envs.rewards.common import (
     apply_event_penalty,
     finish_placement_bonus,
 )
+from rl_fzerox.core.seed import normalize_seed
+
+_U64_UNIT = float(1 << 64)
 
 
 @dataclass(frozen=True)
@@ -22,6 +25,7 @@ class RaceV2RewardWeights:
     reverse_time_penalty_scale: float = 2.0
     low_speed_time_penalty_scale: float = 2.0
     milestone_distance: float = 3_000.0
+    randomize_milestone_phase_on_reset: bool = False
     milestone_bonus: float = 2.0
     milestone_speed_scale: float = 0.0
     milestone_speed_bonus_cap: float = 0.0
@@ -68,6 +72,7 @@ class RaceV2RewardTracker:
     ) -> None:
         self._weights = weights or RaceV2RewardWeights()
         self._next_milestone_index = 1
+        self._milestone_phase_offset = 0.0
         self._last_milestone_step_count = 0
         self._awarded_laps_completed = 0
         self._previous_progress_delta_position = 0.0
@@ -77,12 +82,18 @@ class RaceV2RewardTracker:
         self._energy_gain_cooldown_frames_remaining = 0
         self._previous_boost_active = False
 
-    def reset(self, telemetry: FZeroXTelemetry | None) -> None:
+    def reset(
+        self,
+        telemetry: FZeroXTelemetry | None,
+        *,
+        episode_seed: int | None = None,
+    ) -> None:
         """Initialize reward state for a new episode."""
 
+        self._next_milestone_index = 1
+        self._milestone_phase_offset = self._resolve_milestone_phase_offset(episode_seed)
+        self._last_milestone_step_count = 0
         if telemetry is None or not telemetry.in_race_mode:
-            self._next_milestone_index = 1
-            self._last_milestone_step_count = 0
             self._awarded_laps_completed = 0
             self._previous_progress_delta_position = 0.0
             self._progress_origin = 0.0
@@ -90,8 +101,6 @@ class RaceV2RewardTracker:
             self._energy_gain_cooldown_frames_remaining = 0
             self._previous_boost_active = False
             return
-        self._next_milestone_index = 1
-        self._last_milestone_step_count = 0
         self._awarded_laps_completed = self._race_laps_completed(telemetry)
         self._previous_progress_delta_position = 0.0
         self._set_progress_origin(telemetry.player.race_distance)
@@ -264,6 +273,7 @@ class RaceV2RewardTracker:
             "milestones_completed": completed_milestones,
             "next_milestone_index": self._next_milestone_index,
             "milestone_distance": self._weights.milestone_distance,
+            "milestone_phase_offset": self._milestone_phase_offset,
             "bootstrap_progress_active": self._bootstrap_progress_active(),
             "bootstrap_lap_count": self._weights.bootstrap_lap_count,
             "energy_gain_cooldown_frames_remaining": self._energy_gain_cooldown_frames_remaining,
@@ -275,7 +285,7 @@ class RaceV2RewardTracker:
             return info
         self._ensure_progress_origin(telemetry)
         current_relative_progress = self._relative_progress(telemetry.player.race_distance)
-        next_milestone_distance = self._next_milestone_index * self._weights.milestone_distance
+        next_milestone_distance = self._next_milestone_distance()
         info["race_laps_completed"] = self._race_laps_completed(telemetry)
         info["bootstrap_position_multiplier"] = self._bootstrap_position_multiplier(telemetry)
         info["next_milestone_distance"] = next_milestone_distance
@@ -314,7 +324,21 @@ class RaceV2RewardTracker:
     def _milestone_index(self, relative_progress: float) -> int:
         if relative_progress <= 0.0:
             return 0
-        return int(relative_progress // self._weights.milestone_distance)
+        if self._milestone_phase_offset <= 0.0:
+            return int(relative_progress // self._weights.milestone_distance)
+        if relative_progress < self._milestone_phase_offset:
+            return 0
+        return int(
+            ((relative_progress - self._milestone_phase_offset) // self._weights.milestone_distance)
+            + 1
+        )
+
+    def _next_milestone_distance(self) -> float:
+        if self._milestone_phase_offset <= 0.0:
+            return self._next_milestone_index * self._weights.milestone_distance
+        return self._milestone_phase_offset + (
+            (self._next_milestone_index - 1) * self._weights.milestone_distance
+        )
 
     def _milestone_reward(
         self,
@@ -474,3 +498,10 @@ class RaceV2RewardTracker:
         if truncation_reason == "timeout":
             return self._weights.timeout_truncation_base_penalty
         raise ValueError(f"Unsupported truncation reason: {truncation_reason!r}")
+
+    def _resolve_milestone_phase_offset(self, episode_seed: int | None) -> float:
+        if not self._weights.randomize_milestone_phase_on_reset:
+            return 0.0
+        if episode_seed is None:
+            return 0.0
+        return (normalize_seed(episode_seed) / _U64_UNIT) * self._weights.milestone_distance

@@ -20,16 +20,20 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
     WatchConfig,
 )
-from rl_fzerox.ui.watch.session import _sync_policy_curriculum_stage
+from rl_fzerox.ui.watch.session import _load_policy_runner, _sync_policy_curriculum_stage
 
 
 class _FakePolicyRunner:
     def __init__(self, stage_index: int | None) -> None:
         self.checkpoint_curriculum_stage_index = stage_index
         self.refresh_calls = 0
+        self.reset_calls = 0
 
     def refresh(self) -> None:
         self.refresh_calls += 1
+
+    def reset(self) -> None:
+        self.reset_calls += 1
 
 
 class _FakeWatchEnv:
@@ -167,8 +171,37 @@ def test_watch_allows_run_dir_without_config(
     assert config.reward.time_penalty_per_frame == -0.123
     assert config.curriculum.enabled is True
     assert config.curriculum.stages[0].name == "basic_drive"
+    assert config.watch.device == "cpu"
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "latest"
+
+
+def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def _fake_load_policy_runner(
+        run_dir: Path,
+        *,
+        artifact: str,
+        device: str,
+    ) -> str:
+        captured["run_dir"] = run_dir
+        captured["artifact"] = artifact
+        captured["device"] = device
+        return "runner"
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.inference.load_policy_runner",
+        _fake_load_policy_runner,
+    )
+
+    run_dir = Path("/tmp/example-run")
+    assert _load_policy_runner(run_dir, artifact="best", device="cpu") == "runner"
+    assert captured == {
+        "run_dir": run_dir,
+        "artifact": "best",
+        "device": "cpu",
+    }
 
 
 def test_sync_policy_curriculum_stage_applies_checkpoint_stage_to_watch_env() -> None:

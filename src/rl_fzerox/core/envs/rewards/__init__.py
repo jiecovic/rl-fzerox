@@ -33,6 +33,7 @@ def build_reward_tracker(
         reverse_time_penalty_scale=resolved_config.reverse_time_penalty_scale,
         low_speed_time_penalty_scale=resolved_config.low_speed_time_penalty_scale,
         milestone_distance=resolved_config.milestone_distance,
+        randomize_milestone_phase_on_reset=resolved_config.randomize_milestone_phase_on_reset,
         milestone_bonus=resolved_config.milestone_bonus,
         milestone_speed_scale=resolved_config.milestone_speed_scale,
         milestone_speed_bonus_cap=resolved_config.milestone_speed_bonus_cap,

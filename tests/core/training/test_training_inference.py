@@ -18,10 +18,22 @@ class _FakePolicy:
     def __init__(self, action: list[int]) -> None:
         self._action = np.array(action, dtype=np.int64)
         self.deterministic_calls: list[bool] = []
+        self.state_calls: list[tuple[np.ndarray, ...] | None] = []
+        self.episode_start_calls: list[np.ndarray | None] = []
 
-    def predict(self, observation: ObservationValue, deterministic: bool = True):
+    def predict(
+        self,
+        observation: ObservationValue,
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
+        deterministic: bool = True,
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
         _ = observation
         self.deterministic_calls.append(deterministic)
+        self.state_calls.append(state)
+        self.episode_start_calls.append(
+            None if episode_start is None else np.array(episode_start, copy=True)
+        )
         return self._action.copy(), None
 
 
@@ -33,13 +45,47 @@ class _FakeMaskablePolicy(_FakePolicy):
     def predict(
         self,
         observation: ObservationValue,
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
         deterministic: bool = True,
         action_masks: np.ndarray | None = None,
-    ):
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
         _ = observation
         self.deterministic_calls.append(deterministic)
+        self.state_calls.append(state)
+        self.episode_start_calls.append(
+            None if episode_start is None else np.array(episode_start, copy=True)
+        )
         self.action_masks_calls.append(None if action_masks is None else np.array(action_masks))
         return self._action.copy(), None
+
+
+class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
+    def __init__(self, action: list[int]) -> None:
+        super().__init__(action)
+        self._next_state_id = 1
+
+    def predict(
+        self,
+        observation: ObservationValue,
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
+        deterministic: bool = True,
+        action_masks: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+        action, _ = super().predict(
+            observation,
+            state=state,
+            episode_start=episode_start,
+            deterministic=deterministic,
+            action_masks=action_masks,
+        )
+        next_state = (
+            np.full((1, 1, 1), self._next_state_id, dtype=np.float32),
+            np.full((1, 1, 1), self._next_state_id + 1, dtype=np.float32),
+        )
+        self._next_state_id += 2
+        return action, next_state
 
 
 def test_policy_runner_reloads_updated_policy_artifact(
@@ -69,7 +115,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
     )
 
     assert runner.predict(observation).tolist() == [4, 1]
@@ -136,6 +182,45 @@ def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) 
     assert np.array_equal(recorded_masks, action_masks)
 
 
+def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path) -> None:
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeRecurrentMaskablePolicy([2, 0])
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation = np.zeros((84, 116, 12), dtype=np.uint8)
+
+    assert runner.predict(observation).tolist() == [2, 0]
+    assert fake_policy.state_calls[0] is None
+    first_episode_start = fake_policy.episode_start_calls[0]
+    assert first_episode_start is not None
+    assert np.array_equal(first_episode_start, np.array([True]))
+
+    assert runner.predict(observation).tolist() == [2, 0]
+    second_state = fake_policy.state_calls[1]
+    assert second_state is not None
+    assert np.array_equal(second_state[0], np.full((1, 1, 1), 1, dtype=np.float32))
+    second_episode_start = fake_policy.episode_start_calls[1]
+    assert second_episode_start is not None
+    assert np.array_equal(second_episode_start, np.array([False]))
+
+    runner.reset()
+
+    assert runner.predict(observation).tolist() == [2, 0]
+    assert fake_policy.state_calls[2] is None
+    third_episode_start = fake_policy.episode_start_calls[2]
+    assert third_episode_start is not None
+    assert np.array_equal(third_episode_start, np.array([True]))
+
+
 def test_policy_runner_exposes_reload_error_until_success(
     tmp_path: Path,
     monkeypatch,
@@ -162,7 +247,9 @@ def test_policy_runner_exposes_reload_error_until_success(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None: (_ for _ in ()).throw(RuntimeError("bad checkpoint")),
+        lambda path, *, run_dir=None, device="cpu": (_ for _ in ()).throw(
+            RuntimeError("bad checkpoint")
+        ),
     )
 
     observation = np.zeros((84, 116, 12), dtype=np.uint8)
@@ -172,7 +259,7 @@ def test_policy_runner_exposes_reload_error_until_success(
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None: _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
     )
 
     assert runner.predict(observation).tolist() == [4, 1]
@@ -235,3 +322,35 @@ def test_load_saved_policy_algorithm_treats_legacy_auto_as_plain_ppo(tmp_path: P
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "ppo"
+
+
+def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "policy": {
+                    "recurrent": {
+                        "enabled": True,
+                    }
+                },
+                "train": {
+                    "algorithm": "maskable_recurrent_ppo",
+                    "total_timesteps": 1000,
+                },
+            }
+        ),
+        f=str(config_path),
+    )
+
+    assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"

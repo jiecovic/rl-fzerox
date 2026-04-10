@@ -33,7 +33,12 @@ class RewardActionContext:
 class RewardTracker(Protocol):
     """Narrow interface the env engine expects from one reward implementation."""
 
-    def reset(self, telemetry: FZeroXTelemetry | None) -> None:
+    def reset(
+        self,
+        telemetry: FZeroXTelemetry | None,
+        *,
+        episode_seed: int | None = None,
+    ) -> None:
         """Initialize reward state for a new episode."""
         ...
 
