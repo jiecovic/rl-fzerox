@@ -60,6 +60,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_loss_danger_power": 2.75,
         "energy_gain_reward_scale": 0.018,
         "energy_gain_collision_cooldown_frames": 17,
+        "airborne_landing_reward": 0.42,
         "boost_redundant_press_penalty": -0.013,
         "collision_recoil_penalty": -2.25,
         "spinning_out_penalty": -4.5,
@@ -146,6 +147,41 @@ def test_race_v2_adds_capped_milestone_speed_bonus() -> None:
     assert fast_step.reward == pytest.approx(4.0)
     assert multi_step.breakdown == {"milestone": 4.0, "milestone_speed": 4.0}
     assert multi_step.reward == pytest.approx(8.0)
+
+
+def test_race_v2_rewards_landing_once_when_airborne_clears() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.0,
+            airborne_landing_reward=1.5,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+
+    still_airborne = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
+    )
+    landing = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0),
+    )
+    grounded = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+    )
+
+    assert still_airborne.reward == 0.0
+    assert still_airborne.breakdown == {}
+    assert landing.reward == pytest.approx(1.5)
+    assert landing.breakdown == {"landing": 1.5}
+    assert grounded.reward == 0.0
+    assert grounded.breakdown == {}
 
 
 def test_race_v2_randomized_milestone_phase_shifts_first_threshold() -> None:

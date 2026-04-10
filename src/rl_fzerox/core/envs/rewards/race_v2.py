@@ -45,6 +45,7 @@ class RaceV2RewardWeights:
     energy_loss_danger_power: float = 2.0
     energy_gain_reward_scale: float = 0.02
     energy_gain_collision_cooldown_frames: int = 0
+    airborne_landing_reward: float = 0.0
     boost_redundant_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
@@ -81,6 +82,7 @@ class RaceV2RewardTracker:
         self._max_episode_steps = max_episode_steps
         self._energy_gain_cooldown_frames_remaining = 0
         self._previous_boost_active = False
+        self._previous_airborne = False
 
     def reset(
         self,
@@ -100,12 +102,14 @@ class RaceV2RewardTracker:
             self._has_progress_origin = False
             self._energy_gain_cooldown_frames_remaining = 0
             self._previous_boost_active = False
+            self._previous_airborne = False
             return
         self._awarded_laps_completed = self._race_laps_completed(telemetry)
         self._previous_progress_delta_position = 0.0
         self._set_progress_origin(telemetry.player.race_distance)
         self._energy_gain_cooldown_frames_remaining = 0
         self._previous_boost_active = telemetry.player.boost_timer > 0
+        self._previous_airborne = telemetry.player.airborne
 
     def summary_config(self) -> RewardSummaryConfig:
         """Describe the native aggregation thresholds needed by `race_v2`."""
@@ -125,6 +129,7 @@ class RaceV2RewardTracker:
 
         if telemetry is None or not telemetry.in_race_mode:
             self._previous_boost_active = False
+            self._previous_airborne = False
             return RewardStep(reward=0.0)
 
         resolved_action_context = action_context or RewardActionContext()
@@ -207,6 +212,11 @@ class RaceV2RewardTracker:
             if energy_gain_reward:
                 breakdown["energy_gain"] = energy_gain_reward
 
+        landing_reward = self._landing_reward(telemetry)
+        if landing_reward:
+            reward += landing_reward
+            breakdown["landing"] = landing_reward
+
         if (
             resolved_action_context.boost_requested
             and boost_active_before_step
@@ -229,6 +239,7 @@ class RaceV2RewardTracker:
         )
         self._advance_energy_gain_cooldown(summary.frames_run)
         self._previous_boost_active = telemetry.player.boost_timer > 0
+        self._previous_airborne = telemetry.player.airborne
 
         if status.termination_reason == "finished":
             placement_bonus = finish_placement_bonus(
@@ -478,6 +489,14 @@ class RaceV2RewardTracker:
             self._energy_gain_cooldown_frames_remaining - max(int(frames_run), 0),
             0,
         )
+
+    def _landing_reward(self, telemetry: FZeroXTelemetry) -> float:
+        reward = self._weights.airborne_landing_reward
+        if reward == 0.0:
+            return 0.0
+        if not self._previous_airborne or telemetry.player.airborne:
+            return 0.0
+        return reward
 
     def _remaining_lap_count(self, telemetry: FZeroXTelemetry) -> int:
         return max(

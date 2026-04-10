@@ -132,6 +132,7 @@ class RewardConfig(BaseModel):
     energy_loss_danger_power: PositiveFloat = 2.0
     energy_gain_reward_scale: NonNegativeFloat = 0.02
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
+    airborne_landing_reward: float = 0.0
     boost_redundant_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
