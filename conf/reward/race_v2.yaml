@@ -63,26 +63,29 @@ energy_gain_reward_scale: 0.02
 # Energy: suppress energy-gain reward for this many internal frames after
 # entering collision recoil.
 energy_gain_collision_cooldown_frames: 120
+# Air control: one-time reward when the machine transitions from airborne back
+# to grounded on an env-step boundary.
+airborne_landing_reward: 5.0
 # Boost discipline: fixed penalty per env step when boost is requested while a
 # boost effect was already active before that step.
 boost_redundant_press_penalty: -0.01
 
 # Minor events: entry-only penalty when the machine enters collision recoil.
-collision_recoil_penalty: -2.0
+collision_recoil_penalty: -5.0
 # Minor events: entry-only penalty when the machine enters a spin-out.
-spinning_out_penalty: -4.0
+spinning_out_penalty: -0.5
 
 # Failure bases: base penalty when the episode ends by crash, retire, or off-track failure.
-terminal_failure_base_penalty: -110.0
+terminal_failure_base_penalty: -100.0
 # Failure bases: base penalty when the episode truncates for being stuck.
-stuck_truncation_base_penalty: -110.0
+stuck_truncation_base_penalty: -120.0
 # Failure bases: base penalty when the episode truncates for driving the wrong way.
 wrong_way_truncation_base_penalty: -120.0
 # Failure bases: base penalty when the episode truncates for making no new
 # race-distance frontier progress for too long.
-progress_stalled_truncation_base_penalty: -110.0
+progress_stalled_truncation_base_penalty: -120.0
 # Failure bases: base penalty when the episode truncates by hitting max episode steps.
-timeout_truncation_base_penalty: -110.0
+timeout_truncation_base_penalty: -120.0
 
 # Finish placement: larger final placement bonus on actual race finish as
 # `(total_racers - position) * finish_position_scale`.
