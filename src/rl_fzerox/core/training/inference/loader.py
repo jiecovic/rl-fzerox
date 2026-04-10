@@ -10,6 +10,7 @@ from typing import Protocol, TypeGuard
 import numpy as np
 
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 PolicyState = tuple[np.ndarray, ...] | None
 
@@ -48,12 +49,29 @@ def _load_saved_policy(
 
     _ensure_policy_dependencies_loaded()
 
+    algorithm = _load_saved_policy_algorithm(run_dir)
+    if algorithm == "maskable_recurrent_ppo":
+        if run_dir is None:
+            raise RuntimeError("Recurrent policy loading requires the source run directory")
+        try:
+            from sb3x import MaskableRecurrentPPO
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading recurrent checkpoints requires sb3x in the active environment."
+            ) from exc
+        model_path = resolve_model_artifact_path(
+            run_dir,
+            artifact=_artifact_kind_from_policy_path(policy_path),
+        )
+        loaded_model = MaskableRecurrentPPO.load(str(model_path), device=device)
+        if not _has_predict(loaded_model):
+            raise TypeError("Loaded recurrent model does not expose a compatible predict(...)")
+        return loaded_model
+
     saved_policy = torch.load(policy_path, map_location="cpu", weights_only=False)
     saved_data = saved_policy.get("data", {})
     observation_space = saved_data.get("observation_space")
-    policy_classes = _policy_classes_for_algorithm(
-        algorithm=_load_saved_policy_algorithm(run_dir),
-    )
+    policy_classes = _policy_classes_for_algorithm(algorithm=algorithm)
     CnnPolicy, MultiInputPolicy = policy_classes
     policy_class = MultiInputPolicy if isinstance(observation_space, spaces.Dict) else CnnPolicy
     loaded_policy = policy_class.load(str(policy_path), device=device)
@@ -159,3 +177,14 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
         return "ppo"
     except Exception:
         return "ppo"
+
+
+def _artifact_kind_from_policy_path(policy_path: Path) -> str:
+    filename = policy_path.name
+    if filename.startswith("latest_"):
+        return "latest"
+    if filename.startswith("best_"):
+        return "best"
+    if filename.startswith("final_"):
+        return "final"
+    raise ValueError(f"Unsupported policy artifact filename: {filename}")

@@ -11,7 +11,11 @@ from omegaconf import OmegaConf
 
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
-from rl_fzerox.core.training.inference.loader import _load_saved_policy_algorithm
+from rl_fzerox.core.training.inference.loader import (
+    _artifact_kind_from_policy_path,
+    _load_saved_policy,
+    _load_saved_policy_algorithm,
+)
 
 
 class _FakePolicy:
@@ -354,3 +358,75 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
+
+
+def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "policy": {
+                    "recurrent": {
+                        "enabled": True,
+                    }
+                },
+                "train": {
+                    "algorithm": "maskable_recurrent_ppo",
+                    "total_timesteps": 1000,
+                },
+            }
+        ),
+        f=str(config_path),
+    )
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"policy")
+    model_path = tmp_path / "latest_model.zip"
+    model_path.write_bytes(b"model")
+
+    captured: dict[str, object] = {}
+
+    class _FakeLoadedRecurrentModel:
+        def predict(
+            self,
+            observation: ObservationValue,
+            state: tuple[np.ndarray, ...] | None = None,
+            episode_start: np.ndarray | None = None,
+            deterministic: bool = True,
+            action_masks: np.ndarray | None = None,
+        ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+            _ = (observation, state, episode_start, deterministic, action_masks)
+            return np.array([0], dtype=np.int64), None
+
+    def _fake_load(path: str, *, device: str) -> _FakeLoadedRecurrentModel:
+        captured["path"] = path
+        captured["device"] = device
+        return _FakeLoadedRecurrentModel()
+
+    monkeypatch.setattr("sb3x.MaskableRecurrentPPO.load", _fake_load)
+
+    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
+
+    assert isinstance(loaded, _FakeLoadedRecurrentModel)
+    assert captured == {
+        "path": str(model_path.resolve()),
+        "device": "cpu",
+    }
+
+
+def test_artifact_kind_from_policy_path_uses_standard_prefixes() -> None:
+    assert _artifact_kind_from_policy_path(Path("latest_policy.zip")) == "latest"
+    assert _artifact_kind_from_policy_path(Path("best_policy.zip")) == "best"
+    assert _artifact_kind_from_policy_path(Path("final_policy.zip")) == "final"
