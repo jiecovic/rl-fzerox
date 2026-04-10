@@ -6,7 +6,11 @@ from rl_fzerox.core.config.schema import (
     TrainAppConfig,
     TrainConfig,
 )
-from rl_fzerox.core.training.runs import RunPaths
+from rl_fzerox.core.training.runs import (
+    RunPaths,
+    load_train_run_config,
+    resolve_model_artifact_path,
+)
 
 
 def build_ppo_model(
@@ -23,6 +27,10 @@ def build_ppo_model(
         train_config=train_config,
         masking_required=masking_required,
     )
+    _validate_recurrent_configuration_alignment(
+        effective_algorithm=effective_algorithm,
+        policy_config=policy_config,
+    )
     _validate_masking_configuration(
         train_env=train_env,
         effective_algorithm=effective_algorithm,
@@ -34,15 +42,18 @@ def build_ppo_model(
 
     from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
 
+    recurrent_enabled = policy_config.recurrent.enabled
     if isinstance(train_env.observation_space, spaces.Dict):
-        policy_name = "MultiInputPolicy"
+        policy_name = (
+            "MultiInputLstmPolicy" if recurrent_enabled else "MultiInputPolicy"
+        )
         extractor_class = FZeroXImageStateExtractor
         extractor_kwargs = {
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
         }
     else:
-        policy_name = "CnnPolicy"
+        policy_name = "CnnLstmPolicy" if recurrent_enabled else "CnnPolicy"
         extractor_class = FZeroXObservationCnnExtractor
         extractor_kwargs = {
             "features_dim": policy_config.extractor.features_dim,
@@ -57,6 +68,15 @@ def build_ppo_model(
         },
         "activation_fn": resolve_policy_activation_fn(policy_config.activation),
     }
+    if recurrent_enabled:
+        policy_kwargs.update(
+            {
+                "lstm_hidden_size": policy_config.recurrent.hidden_size,
+                "n_lstm_layers": policy_config.recurrent.n_lstm_layers,
+                "shared_lstm": policy_config.recurrent.shared_lstm,
+                "enable_critic_lstm": policy_config.recurrent.enable_critic_lstm,
+            }
+        )
 
     return algorithm_class(
         policy=policy_name,
@@ -78,13 +98,40 @@ def build_ppo_model(
     )
 
 
+def maybe_preload_training_parameters(*, model, train_config: TrainConfig) -> None:
+    """Warm-start a fresh training model from a saved run artifact, if configured.
+
+    We intentionally copy only learned parameters into the freshly built model.
+    The current train config remains authoritative for optimizer settings,
+    rollout sizes, logging, and output paths.
+    """
+
+    if train_config.init_run_dir is None:
+        return
+
+    init_run_dir = train_config.init_run_dir.resolve()
+    source_train_config = load_train_run_config(init_run_dir).train
+    if source_train_config.algorithm != train_config.algorithm:
+        raise RuntimeError(
+            "Warm-start checkpoint algorithm mismatch: "
+            f"source={source_train_config.algorithm}, current={train_config.algorithm}. "
+            "Use a checkpoint produced by the same training algorithm."
+        )
+
+    model_path = resolve_model_artifact_path(
+        init_run_dir,
+        artifact=train_config.init_artifact,
+    )
+    model.set_parameters(str(model_path), exact_match=True, device=model.device)
+
+
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
     """Reject incompatible algorithm/config combinations before training starts."""
 
     if config.train.algorithm == "ppo":
         raise RuntimeError(
             "Plain PPO training is no longer supported. "
-            "Use `train.algorithm=maskable_ppo` or omit the field."
+            "Use `train.algorithm=maskable_ppo` or `maskable_recurrent_ppo`."
         )
 
 
@@ -105,8 +152,8 @@ def resolve_effective_training_algorithm(
 ) -> str:
     """Resolve the configured train.algorithm into the concrete algorithm used.
 
-    `auto` is now a backwards-compatible alias for `maskable_ppo`. Plain PPO is
-    only retained as a legacy value so older saved run configs still load.
+    `auto` is now a backwards-compatible alias for `maskable_ppo`. Recurrent
+    training must be selected explicitly so the saved run config is unambiguous.
     """
 
     _ = masking_required
@@ -117,6 +164,10 @@ def resolve_effective_training_algorithm(
 
 def _resolve_training_algorithm(algorithm: str):
     try:
+        if algorithm == "maskable_recurrent_ppo":
+            from sb3x import MaskableRecurrentPPO
+
+            return MaskableRecurrentPPO
         if algorithm == "maskable_ppo":
             from sb3_contrib import MaskablePPO
 
@@ -126,6 +177,12 @@ def _resolve_training_algorithm(algorithm: str):
 
         return PPO
     except ImportError as exc:
+        if algorithm == "maskable_recurrent_ppo":
+            raise RuntimeError(
+                "Maskable recurrent PPO requires stable-baselines3, sb3-contrib, "
+                "torch, and sb3x. Install train deps and then install sb3x in "
+                "the active environment."
+            ) from exc
         raise RuntimeError(
             "stable-baselines3 and torch are required for training. "
             "Install with `python -m pip install -e .[train]`."
@@ -133,13 +190,29 @@ def _resolve_training_algorithm(algorithm: str):
 
 
 def _validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
-    if effective_algorithm != "maskable_ppo":
+    if effective_algorithm not in {"maskable_ppo", "maskable_recurrent_ppo"}:
         return
 
     if not hasattr(train_env, "env_method"):
         raise RuntimeError("Maskable PPO requires a vector env exposing env_method()")
     if not train_env.has_attr("action_masks"):
         raise RuntimeError("Maskable PPO requires env.action_masks() support")
+
+
+def _validate_recurrent_configuration_alignment(
+    *,
+    effective_algorithm: str,
+    policy_config: PolicyConfig,
+) -> None:
+    recurrent_enabled = policy_config.recurrent.enabled
+    if recurrent_enabled and effective_algorithm != "maskable_recurrent_ppo":
+        raise RuntimeError(
+            "Recurrent policy config requires train.algorithm=maskable_recurrent_ppo"
+        )
+    if not recurrent_enabled and effective_algorithm == "maskable_recurrent_ppo":
+        raise RuntimeError(
+            "maskable_recurrent_ppo requires policy.recurrent.enabled=true"
+        )
 
 
 def resolve_policy_activation_fn(name: str):
@@ -202,6 +275,14 @@ def print_training_startup(
             f"batch_size={config.train.batch_size} "
             f"lr={config.train.learning_rate}"
         )
+        if config.policy.recurrent.enabled:
+            print(
+                "lstm: "
+                f"hidden={config.policy.recurrent.hidden_size} "
+                f"layers={config.policy.recurrent.n_lstm_layers} "
+                f"shared={config.policy.recurrent.shared_lstm} "
+                f"critic={config.policy.recurrent.enable_critic_lstm}"
+            )
         print(model.policy)
         return
 
@@ -233,5 +314,17 @@ def print_training_startup(
             ]
         ),
     )
+    if config.policy.recurrent.enabled:
+        summary.add_row(
+            "lstm",
+            " ".join(
+                [
+                    f"hidden={config.policy.recurrent.hidden_size}",
+                    f"layers={config.policy.recurrent.n_lstm_layers}",
+                    f"shared={config.policy.recurrent.shared_lstm}",
+                    f"critic={config.policy.recurrent.enable_critic_lstm}",
+                ]
+            ),
+        )
     console.print(Panel(summary, title="Training", expand=False))
     console.print(Panel(str(model.policy), title="Policy", expand=False))

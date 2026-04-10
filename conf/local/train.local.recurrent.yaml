@@ -1,0 +1,16 @@
+defaults:
+  - /local/train.local@_global_
+  - _self_
+
+train:
+  algorithm: maskable_recurrent_ppo
+  # Recurrent and feedforward checkpoints are not shape-compatible warm starts.
+  init_run_dir: null
+
+policy:
+  recurrent:
+    enabled: true
+    hidden_size: 512
+    n_lstm_layers: 1
+    shared_lstm: false
+    enable_critic_lstm: true

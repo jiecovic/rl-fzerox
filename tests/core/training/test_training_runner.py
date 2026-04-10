@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from rl_fzerox.core.config.schema import (
     ActionConfig,
@@ -13,7 +14,9 @@ from rl_fzerox.core.config.schema import (
     CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
+    ObservationConfig,
     PolicyConfig,
+    PolicyRecurrentConfig,
     TrainAppConfig,
     TrainConfig,
 )
@@ -29,6 +32,7 @@ from rl_fzerox.core.training.session.callbacks import RolloutInfoAccumulator, in
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
+    maybe_preload_training_parameters,
     resolve_effective_training_algorithm,
     resolve_policy_activation_fn,
     training_requires_action_masks,
@@ -203,6 +207,52 @@ def test_validate_training_algorithm_config_rejects_plain_ppo(
         validate_training_algorithm_config(config)
 
 
+def test_train_app_config_rejects_recurrent_policy_without_recurrent_algorithm(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    with pytest.raises(
+        ValidationError,
+        match="policy.recurrent.enabled=true requires "
+        "train.algorithm=maskable_recurrent_ppo",
+    ):
+        TrainAppConfig(
+            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+            env=EnvConfig(),
+            policy=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(enabled=True),
+            ),
+            curriculum=CurriculumConfig(),
+            train=TrainConfig(algorithm="maskable_ppo"),
+        )
+
+
+def test_train_app_config_rejects_recurrent_algorithm_without_recurrent_policy(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    with pytest.raises(
+        ValidationError,
+        match="train.algorithm=maskable_recurrent_ppo requires "
+        "policy.recurrent.enabled=true",
+    ):
+        TrainAppConfig(
+            emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+            env=EnvConfig(),
+            policy=PolicyConfig(),
+            curriculum=CurriculumConfig(),
+            train=TrainConfig(algorithm="maskable_recurrent_ppo"),
+        )
+
+
 def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> None:
     controller = ActionMaskCurriculumController(
         CurriculumConfig(
@@ -280,6 +330,179 @@ def test_build_ppo_model_can_construct_maskable_ppo() -> None:
         env.close()
 
     assert isinstance(model, MaskablePPO)
+
+
+def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+            )
+        ]
+    )
+
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match="Recurrent policy config requires train.algorithm=maskable_recurrent_ppo",
+        ):
+            build_ppo_model(
+                train_env=env,
+                train_config=TrainConfig(algorithm="maskable_ppo"),
+                policy_config=PolicyConfig(
+                    recurrent=PolicyRecurrentConfig(enabled=True),
+                ),
+                tensorboard_log=None,
+                masking_required=True,
+            )
+    finally:
+        env.close()
+
+
+def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
+    from sb3x import MaskableRecurrentPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,))),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(algorithm="maskable_recurrent_ppo"),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                )
+            ),
+            tensorboard_log=None,
+            masking_required=True,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableRecurrentPPO)
+    assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
+
+
+def test_maybe_preload_training_parameters_loads_requested_artifact(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    run_dir.mkdir(parents=True)
+    model_path = run_dir / "latest_model.zip"
+    model_path.write_bytes(b"checkpoint")
+    train_config_path = run_dir / "train_config.yaml"
+    train_config_path.write_text(
+        "\n".join(
+            [
+                "seed: 7",
+                "emulator:",
+                f"  core_path: {tmp_path / 'core.so'}",
+                f"  rom_path: {tmp_path / 'rom.n64'}",
+                "env: {}",
+                "reward: {}",
+                "policy: {}",
+                "curriculum: {}",
+                "train:",
+                "  algorithm: maskable_ppo",
+                "  total_timesteps: 1000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "core.so").touch()
+    (tmp_path / "rom.n64").touch()
+
+    class _FakeModel:
+        def __init__(self) -> None:
+            self.device = "cpu"
+            self.calls: list[tuple[str, bool, str]] = []
+
+        def set_parameters(
+            self,
+            load_path_or_dict: str,
+            *,
+            exact_match: bool,
+            device: str,
+        ) -> None:
+            self.calls.append((load_path_or_dict, exact_match, device))
+
+    model = _FakeModel()
+
+    maybe_preload_training_parameters(
+        model=model,
+        train_config=TrainConfig(
+            init_run_dir=run_dir,
+            init_artifact="latest",
+        ),
+    )
+
+    assert model.calls == [(str(model_path.resolve()), True, "cpu")]
+
+
+def test_maybe_preload_training_parameters_rejects_algorithm_mismatch(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    run_dir.mkdir(parents=True)
+    (run_dir / "latest_model.zip").write_bytes(b"checkpoint")
+    (tmp_path / "core.so").touch()
+    (tmp_path / "rom.n64").touch()
+    (run_dir / "train_config.yaml").write_text(
+        "\n".join(
+            [
+                "seed: 7",
+                "emulator:",
+                f"  core_path: {tmp_path / 'core.so'}",
+                f"  rom_path: {tmp_path / 'rom.n64'}",
+                "env: {}",
+                "reward: {}",
+                "policy: {}",
+                "curriculum: {}",
+                "train:",
+                "  algorithm: maskable_ppo",
+                "  total_timesteps: 1000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    class _FakeModel:
+        def __init__(self) -> None:
+            self.device = "cpu"
+
+        def set_parameters(
+            self,
+            load_path_or_dict: str,
+            *,
+            exact_match: bool,
+            device: str,
+        ) -> None:
+            raise AssertionError("set_parameters should not be reached on mismatch")
+
+    with pytest.raises(
+        RuntimeError,
+        match="Warm-start checkpoint algorithm mismatch",
+    ):
+        maybe_preload_training_parameters(
+            model=_FakeModel(),
+            train_config=TrainConfig(
+                algorithm="maskable_recurrent_ppo",
+                init_run_dir=run_dir,
+                init_artifact="latest",
+            ),
+        )
 
 
 def test_monitor_info_keys_include_milestones_completed_for_curriculum() -> None:

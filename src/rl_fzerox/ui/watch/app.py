@@ -25,6 +25,7 @@ from rl_fzerox.ui.watch.session import (
     _policy_reload_age_seconds,
     _policy_reload_error,
     _read_live_telemetry,
+    _reset_policy_runner,
     _save_baseline_state,
     _sync_policy_curriculum_stage,
     _with_viewer_fps,
@@ -65,6 +66,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         policy_runner = _load_policy_runner(
             config.watch.policy_run_dir,
             artifact=config.watch.policy_artifact,
+            device=config.watch.device,
         )
         _sync_policy_curriculum_stage(policy_runner, env)
         screen = None
@@ -78,6 +80,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             observation, info = env.reset(seed=reset_seed)
+            _reset_policy_runner(policy_runner)
             observation_image = observation_utils.observation_image(observation)
             observation_state = observation_utils.observation_state(observation)
             raw_frame = env.render()

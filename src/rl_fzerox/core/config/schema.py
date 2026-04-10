@@ -112,6 +112,7 @@ class RewardConfig(BaseModel):
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
     milestone_distance: PositiveFloat = 3_000.0
+    randomize_milestone_phase_on_reset: bool = False
     milestone_bonus: NonNegativeFloat = 2.0
     milestone_speed_scale: NonNegativeFloat = 0.0
     milestone_speed_bonus_cap: NonNegativeFloat = 0.0
@@ -162,6 +163,7 @@ class WatchConfig(BaseModel):
     episodes: PositiveInt | None = None
     fps: PositiveFloat | Literal["auto"] | None = "auto"
     deterministic_policy: bool = True
+    device: Literal["auto", "cpu", "cuda"] = "cpu"
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
 
@@ -184,12 +186,25 @@ class ExtractorConfig(BaseModel):
     state_features_dim: PositiveInt = 64
 
 
+class PolicyRecurrentConfig(BaseModel):
+    """Optional LSTM settings used only by recurrent PPO-family policies."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    hidden_size: PositiveInt = 512
+    n_lstm_layers: PositiveInt = 1
+    shared_lstm: bool = False
+    enable_critic_lstm: bool = True
+
+
 class PolicyConfig(BaseModel):
     """PPO policy and feature-extractor sizes."""
 
     model_config = ConfigDict(extra="forbid")
 
     extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
+    recurrent: PolicyRecurrentConfig = Field(default_factory=PolicyRecurrentConfig)
     activation: Literal["tanh", "relu"] = "tanh"
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)
 
@@ -249,7 +264,12 @@ class TrainConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    algorithm: Literal["auto", "ppo", "maskable_ppo"] = "maskable_ppo"
+    algorithm: Literal[
+        "auto",
+        "ppo",
+        "maskable_ppo",
+        "maskable_recurrent_ppo",
+    ] = "maskable_ppo"
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
@@ -268,6 +288,8 @@ class TrainConfig(BaseModel):
     save_freq: PositiveInt = 1_000
     output_root: Path = Path("local/runs")
     run_name: str = "ppo_cnn"
+    init_run_dir: Path | None = None
+    init_artifact: Literal["latest", "best", "final"] = "latest"
 
 
 class WatchAppConfig(BaseModel):
@@ -295,3 +317,19 @@ class TrainAppConfig(BaseModel):
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
     curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
     train: TrainConfig = Field(default_factory=TrainConfig)
+
+    @model_validator(mode="after")
+    def _validate_recurrent_algorithm_alignment(self) -> TrainAppConfig:
+        recurrent_enabled = self.policy.recurrent.enabled
+        algorithm = self.train.algorithm
+        if recurrent_enabled and algorithm != "maskable_recurrent_ppo":
+            raise ValueError(
+                "policy.recurrent.enabled=true requires "
+                "train.algorithm=maskable_recurrent_ppo"
+            )
+        if not recurrent_enabled and algorithm == "maskable_recurrent_ppo":
+            raise ValueError(
+                "train.algorithm=maskable_recurrent_ppo requires "
+                "policy.recurrent.enabled=true"
+            )
+        return self

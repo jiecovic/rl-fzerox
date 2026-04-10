@@ -58,7 +58,10 @@ def load_train_app_config(
                 "runtime_dir",
                 "baseline_state_path",
             ),
-            "train": ("output_root",),
+            "train": (
+                "output_root",
+                "init_run_dir",
+            ),
         },
     )
 

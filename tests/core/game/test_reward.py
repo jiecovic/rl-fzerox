@@ -40,6 +40,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "reverse_time_penalty_scale": 1.25,
         "low_speed_time_penalty_scale": 1.5,
         "milestone_distance": 1234.0,
+        "randomize_milestone_phase_on_reset": True,
         "milestone_bonus": 2.5,
         "milestone_speed_scale": 0.05,
         "milestone_speed_bonus_cap": 1.25,
@@ -145,6 +146,41 @@ def test_race_v2_adds_capped_milestone_speed_bonus() -> None:
     assert fast_step.reward == pytest.approx(4.0)
     assert multi_step.breakdown == {"milestone": 4.0, "milestone_speed": 4.0}
     assert multi_step.reward == pytest.approx(8.0)
+
+
+def test_race_v2_randomized_milestone_phase_shifts_first_threshold() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=100.0,
+            randomize_milestone_phase_on_reset=True,
+            milestone_bonus=3.0,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0), episode_seed=1)
+
+    info = tracker.info(_telemetry(race_distance=0.0))
+    phase_offset_value = info["milestone_phase_offset"]
+    assert isinstance(phase_offset_value, float)
+    phase_offset = phase_offset_value
+
+    before_threshold = max(phase_offset - 1.0, 0.0)
+    before = tracker.step_summary(
+        _summary(max_race_distance=before_threshold),
+        _status(step_count=1),
+        _telemetry(race_distance=before_threshold),
+    )
+    at_threshold = tracker.step_summary(
+        _summary(max_race_distance=phase_offset + 1.0),
+        _status(step_count=2),
+        _telemetry(race_distance=phase_offset + 1.0),
+    )
+
+    assert 0.0 < phase_offset < 100.0
+    assert before.reward == 0.0
+    assert at_threshold.reward == pytest.approx(3.0)
+    assert at_threshold.breakdown == {"milestone": 3.0}
 
 
 def test_race_v2_measures_milestones_from_episode_start_progress() -> None:

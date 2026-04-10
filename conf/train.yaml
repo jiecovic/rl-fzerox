@@ -34,7 +34,7 @@ env:
     preset: native_crop_v3
     frame_stack: 4
 train:
-  # Training always uses MaskablePPO because the env exposes live gameplay masks.
+  # Training always uses a mask-aware PPO variant because the env exposes live gameplay masks.
   algorithm: maskable_ppo
   vec_env: subproc
   num_envs: 8
@@ -60,6 +60,17 @@ policy:
   extractor:
     features_dim: 1024
     state_features_dim: 64
+  recurrent:
+    # Enable the LSTM-based policy path; requires train.algorithm=maskable_recurrent_ppo.
+    enabled: false
+    # LSTM hidden-state width used after the shared feature extractor.
+    hidden_size: 512
+    # Number of stacked LSTM layers in the recurrent policy core.
+    n_lstm_layers: 1
+    # Whether actor and critic should share the same LSTM weights.
+    shared_lstm: false
+    # Keep a dedicated critic LSTM instead of reusing the actor sequence state.
+    enable_critic_lstm: true
   net_arch:
     pi: [512, 256]
     vf: [512]

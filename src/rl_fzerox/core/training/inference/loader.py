@@ -11,25 +11,36 @@ import numpy as np
 
 from rl_fzerox.core.envs.observations import ObservationValue
 
+PolicyState = tuple[np.ndarray, ...] | None
+
 
 class _HasPredict(Protocol):
     def predict(
         self,
         observation: ObservationValue,
+        state: PolicyState = None,
+        episode_start: np.ndarray | None = None,
         deterministic: bool = True,
-    ) -> tuple[object, object]: ...
+    ) -> tuple[object, PolicyState]: ...
 
 
 class _HasMaskablePredict(Protocol):
     def predict(
         self,
         observation: ObservationValue,
+        state: PolicyState = None,
+        episode_start: np.ndarray | None = None,
         deterministic: bool = True,
         action_masks: np.ndarray | None = None,
-    ) -> tuple[object, object]: ...
+    ) -> tuple[object, PolicyState]: ...
 
 
-def _load_saved_policy(policy_path: Path, *, run_dir: Path | None = None) -> _HasPredict:
+def _load_saved_policy(
+    policy_path: Path,
+    *,
+    run_dir: Path | None = None,
+    device: str = "cpu",
+) -> _HasPredict:
     """Load one saved policy-only SB3 artifact."""
 
     import torch
@@ -45,7 +56,7 @@ def _load_saved_policy(policy_path: Path, *, run_dir: Path | None = None) -> _Ha
     )
     CnnPolicy, MultiInputPolicy = policy_classes
     policy_class = MultiInputPolicy if isinstance(observation_space, spaces.Dict) else CnnPolicy
-    loaded_policy = policy_class.load(str(policy_path), device="auto")
+    loaded_policy = policy_class.load(str(policy_path), device=device)
     if not _has_predict(loaded_policy):
         raise TypeError("Loaded policy does not expose a compatible predict(...) method")
     return loaded_policy
@@ -61,7 +72,7 @@ def _ensure_policy_dependencies_loaded() -> None:
     import_module("rl_fzerox.core.policy.extractors")
 
 
-def _policy_predict_fn(policy: object) -> Callable[..., tuple[object, object]]:
+def _policy_predict_fn(policy: object) -> Callable[..., tuple[object, PolicyState]]:
     if not _has_predict(policy):
         raise TypeError("Policy does not expose a compatible predict(...) method")
     return policy.predict
@@ -71,15 +82,24 @@ def _predict_policy_action(
     policy: object,
     observation: ObservationValue,
     *,
+    state: PolicyState,
+    episode_start: np.ndarray | None,
     deterministic: bool,
     action_masks: np.ndarray | None,
-) -> tuple[object, object]:
+) -> tuple[object, PolicyState]:
     if action_masks is None:
-        return _policy_predict_fn(policy)(observation, deterministic=deterministic)
+        return _policy_predict_fn(policy)(
+            observation,
+            state=state,
+            episode_start=episode_start,
+            deterministic=deterministic,
+        )
     if not _has_maskable_predict(policy):
         raise TypeError("Policy does not support masked action prediction")
     return policy.predict(
         observation,
+        state=state,
+        episode_start=episode_start,
         deterministic=deterministic,
         action_masks=action_masks,
     )
@@ -101,6 +121,15 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):
+    if algorithm == "maskable_recurrent_ppo":
+        try:
+            from sb3x.ppo_mask_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading recurrent checkpoints requires sb3x in the active environment."
+            ) from exc
+
+        return CnnLstmPolicy, MultiInputLstmPolicy
     if algorithm == "maskable_ppo":
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
@@ -123,8 +152,10 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
         from rl_fzerox.core.config import load_train_app_config
 
         config = load_train_app_config(config_path)
+        if config.train.algorithm in {"maskable_ppo", "maskable_recurrent_ppo"}:
+            return config.train.algorithm
         # Historical runs may have saved `auto` from the pre-maskable default
-        # era, so only explicit `maskable_ppo` is treated as maskable here.
-        return "maskable_ppo" if config.train.algorithm == "maskable_ppo" else "ppo"
+        # era, so only explicit algorithm values are treated as non-legacy here.
+        return "ppo"
     except Exception:
         return "ppo"
