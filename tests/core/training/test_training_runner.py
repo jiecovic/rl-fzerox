@@ -183,7 +183,7 @@ def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path
     assert list(tmp_path.glob("*.tmp.zip")) == []
 
 
-def test_validate_training_algorithm_config_requires_maskable_ppo_for_masks(
+def test_validate_training_algorithm_config_rejects_plain_ppo(
     tmp_path: Path,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
@@ -199,7 +199,7 @@ def test_validate_training_algorithm_config_requires_maskable_ppo_for_masks(
         train=TrainConfig(algorithm="ppo"),
     )
 
-    with pytest.raises(RuntimeError, match="train.algorithm=auto"):
+    with pytest.raises(RuntimeError, match="Plain PPO training is no longer supported"):
         validate_training_algorithm_config(config)
 
 
@@ -239,7 +239,7 @@ def test_resolve_effective_training_algorithm_uses_maskable_auto_mode(
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+        env=EnvConfig(),
         policy=PolicyConfig(),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="auto"),

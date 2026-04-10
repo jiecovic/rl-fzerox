@@ -23,7 +23,7 @@ from rl_fzerox.core.config.schema import (
     ObservationConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import THROTTLE_MASK
+from rl_fzerox.core.envs.actions import DRIFT_LEFT_MASK, THROTTLE_MASK
 from rl_fzerox.core.envs.observations import ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
@@ -56,6 +56,8 @@ class ScriptedStepBackend(SyntheticBackend):
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
     ) -> BackendStepResult:
         _ = (
@@ -64,6 +66,8 @@ class ScriptedStepBackend(SyntheticBackend):
             max_episode_steps,
             stuck_step_limit,
             wrong_way_timer_limit,
+            progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon,
             terminate_on_energy_depleted,
         )
         self.set_controller_state(controller_state)
@@ -476,6 +480,41 @@ def test_env_action_masks_update_with_curriculum_stage_changes() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2 + 3))
 
 
+def test_env_sync_checkpoint_curriculum_stage_resets_to_default_stage() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                mask=ActionMaskConfig(shoulder=(0,)),
+            )
+        ),
+        curriculum_config=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(
+                    name="basic_drive",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
+                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                ),
+                CurriculumStageConfig(
+                    name="full_controls",
+                    action_mask=ActionMaskConfig(shoulder=(0, 1, 2)),
+                ),
+            ),
+        ),
+    )
+
+    env.set_curriculum_stage(1)
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2 + 3))
+
+    env.sync_checkpoint_curriculum_stage(None)
+
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False]
+    )
+
+
 def test_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> None:
     backend = ScriptedStepBackend(
         [
@@ -530,6 +569,104 @@ def test_env_action_masks_intersect_curriculum_and_boost_unlock_rules() -> None:
     assert env.action_masks().tolist() == (
         ([True] * 7) + ([True] * 3) + [True, False] + [True, False, False]
     )
+
+
+def test_env_keeps_shoulder_input_latched_for_minimum_internal_frames() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=2, frames_run=2),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=20.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=20.0, final_frame_index=4, frames_run=2),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=2,
+            action=ActionConfig(name="steer_drive_boost_drift"),
+        ),
+    )
+
+    env.reset(seed=3)
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+
+    env.step(np.array([3, 0, 0, 0], dtype=np.int64))
+
+    assert backend.last_controller_state.joypad_mask == DRIFT_LEFT_MASK
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+
+
+def test_env_unlocks_shoulder_branch_after_minimum_hold_window() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=5, frames_run=5),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=20.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=20.0, final_frame_index=10, frames_run=5),
+                status=make_step_status(step_count=2),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=30.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=30.0, final_frame_index=15, frames_run=5),
+                status=make_step_status(step_count=3),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=5,
+            action=ActionConfig(name="steer_drive_boost_drift"),
+        ),
+    )
+
+    env.reset(seed=4)
+    assert env.action_masks().tolist()[-3:] == [True, True, True]
+
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert env.action_masks().tolist()[-3:] == [True, True, True]
 
 
 def test_reset_can_boot_into_the_first_race_path():
@@ -766,6 +903,64 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     assert reward_breakdown["reverse_time"] == -0.005
     assert reward_breakdown["bootstrap_regress"] == pytest.approx(-0.007)
     assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.98)
+
+
+def test_step_truncates_when_progress_frontier_stalls() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=1_000.0, speed_kph=400.0),
+                summary=_step_summary(
+                    max_race_distance=1_000.0,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(
+                    step_count=1,
+                    progress_frontier_stalled_frames=0,
+                ),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=1_000.0, speed_kph=300.0),
+                summary=_step_summary(
+                    max_race_distance=1_000.0,
+                    final_frame_index=6,
+                ),
+                status=make_step_status(
+                    step_count=6,
+                    progress_frontier_stalled_frames=5,
+                    truncation_reason="progress_stalled",
+                ),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=100,
+            progress_frontier_stall_limit_frames=5,
+            progress_frontier_epsilon=100.0,
+            action=ActionConfig(name="steer_drive"),
+        ),
+    )
+
+    env.reset(seed=11)
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    assert not terminated
+    assert not truncated
+    assert info["progress_frontier_stalled_frames"] == 0
+
+    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert not terminated
+    assert truncated
+    assert reward == pytest.approx(-300.945)
+    assert info["truncation_reason"] == "progress_stalled"
+    assert info["progress_frontier_stalled_frames"] == 5
+    reward_breakdown = info["reward_breakdown"]
+    assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["progress_stalled_truncation"] == pytest.approx(-300.94)
 
 
 def test_terminal_step_exposes_monitor_info_keys() -> None:

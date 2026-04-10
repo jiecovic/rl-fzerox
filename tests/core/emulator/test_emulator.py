@@ -109,6 +109,8 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         max_episode_steps=1_000,
         stuck_step_limit=240,
         wrong_way_timer_limit=180,
+        progress_frontier_stall_limit_frames=900,
+        progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=True,
     )
 
@@ -123,5 +125,6 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     assert result.status.step_count == 12
     assert result.status.stalled_steps == 2
     assert result.status.reverse_timer == 75
+    assert result.status.progress_frontier_stalled_frames == 0
     assert isinstance(result.telemetry, FZeroXTelemetry)
     assert result.telemetry.player.race_distance == 42.0

@@ -26,6 +26,9 @@ class SyntheticState:
     step_count: int = 0
     stalled_steps: int = 0
     reverse_timer: int = 0
+    progress_frontier_stalled_frames: int = 0
+    progress_frontier_distance: float = 0.0
+    progress_frontier_initialized: bool = False
 
 
 class SyntheticBackend:
@@ -209,6 +212,8 @@ class SyntheticBackend:
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
     ) -> BackendStepResult:
         _ = (
@@ -216,6 +221,7 @@ class SyntheticBackend:
             energy_loss_epsilon,
             wrong_way_timer_limit,
             terminate_on_energy_depleted,
+            stuck_step_limit,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:
@@ -226,10 +232,29 @@ class SyntheticBackend:
         for _ in range(action_repeat):
             self.step_frame()
         self._state.step_count += action_repeat
+        if self._state.progress_frontier_initialized:
+            frontier_reached = (
+                self._state.progress
+                >= self._state.progress_frontier_distance + progress_frontier_epsilon
+            )
+            if frontier_reached:
+                self._state.progress_frontier_distance = self._state.progress
+                self._state.progress_frontier_stalled_frames = 0
+            else:
+                self._state.progress_frontier_stalled_frames += action_repeat
+        else:
+            self._state.progress_frontier_distance = self._state.progress
+            self._state.progress_frontier_initialized = True
+            self._state.progress_frontier_stalled_frames = 0
         observation = self.render_observation(preset=preset, frame_stack=frame_stack)
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
             truncation_reason = "timeout"
+        elif (
+            progress_frontier_stall_limit_frames is not None
+            and self._state.progress_frontier_stalled_frames >= progress_frontier_stall_limit_frames
+        ):
+            truncation_reason = "progress_stalled"
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
@@ -247,6 +272,7 @@ class SyntheticBackend:
                 step_count=self._state.step_count,
                 stalled_steps=self._state.stalled_steps,
                 reverse_timer=self._state.reverse_timer,
+                progress_frontier_stalled_frames=self._state.progress_frontier_stalled_frames,
                 truncation_reason=truncation_reason,
             ),
             telemetry=None,

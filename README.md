@@ -123,9 +123,8 @@ Train PPO:
 python -m rl_fzerox.apps.train --config conf/local/train.local.yaml
 ```
 
-`train.algorithm: auto` resolves to plain `PPO` by default and switches to
-`MaskablePPO` automatically whenever `env.action.mask` or a training
-`curriculum` is configured.
+Training uses `MaskablePPO` by default because the env exposes live gameplay
+masks, including boost-unlocked and shoulder-latch constraints.
 
 The repo also ships one starter curriculum config:
 

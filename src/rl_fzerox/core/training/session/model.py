@@ -81,17 +81,21 @@ def build_ppo_model(
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
     """Reject incompatible algorithm/config combinations before training starts."""
 
-    masking_requested = config.env.action.mask is not None or config.curriculum.enabled
-    if masking_requested and config.train.algorithm == "ppo":
+    if config.train.algorithm == "ppo":
         raise RuntimeError(
-            "Action-mask training requires `train.algorithm=auto` or `maskable_ppo`."
+            "Plain PPO training is no longer supported. "
+            "Use `train.algorithm=maskable_ppo` or omit the field."
         )
 
 
-def training_requires_action_masks(config: TrainAppConfig) -> bool:
-    """Return whether the resolved training config needs action masking."""
+def training_requires_action_masks(_config: TrainAppConfig) -> bool:
+    """Return whether the current env stack depends on action masking.
 
-    return config.env.action.mask is not None or config.curriculum.enabled
+    Training always relies on MaskablePPO now because gameplay masks are part of
+    the base env contract, not only optional curriculum/static configuration.
+    """
+
+    return True
 
 
 def resolve_effective_training_algorithm(
@@ -99,10 +103,15 @@ def resolve_effective_training_algorithm(
     train_config: TrainConfig,
     masking_required: bool,
 ) -> str:
-    """Resolve the configured train.algorithm into the concrete algorithm used."""
+    """Resolve the configured train.algorithm into the concrete algorithm used.
 
+    `auto` is now a backwards-compatible alias for `maskable_ppo`. Plain PPO is
+    only retained as a legacy value so older saved run configs still load.
+    """
+
+    _ = masking_required
     if train_config.algorithm == "auto":
-        return "maskable_ppo" if masking_required else "ppo"
+        return "maskable_ppo"
     return train_config.algorithm
 
 

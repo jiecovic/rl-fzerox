@@ -153,7 +153,12 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                 policy_reload_error=policy_reload_error,
                 action_repeat=config.env.action_repeat,
+                max_episode_steps=config.env.max_episode_steps,
                 stuck_step_limit=config.env.stuck_step_limit,
+                wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                progress_frontier_stall_limit_frames=(
+                    config.env.progress_frontier_stall_limit_frames
+                ),
                 stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                 telemetry=telemetry,
             )
@@ -208,7 +213,12 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
                         action_repeat=config.env.action_repeat,
+                        max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
+                        wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                        progress_frontier_stall_limit_frames=(
+                            config.env.progress_frontier_stall_limit_frames
+                        ),
                         stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                         telemetry=telemetry,
                     )
@@ -268,7 +278,12 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
                         action_repeat=config.env.action_repeat,
+                        max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
+                        wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                        progress_frontier_stall_limit_frames=(
+                            config.env.progress_frontier_stall_limit_frames
+                        ),
                         stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                         telemetry=telemetry,
                     )
@@ -334,7 +349,12 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                     policy_reload_error=policy_reload_error,
                     action_repeat=config.env.action_repeat,
+                    max_episode_steps=config.env.max_episode_steps,
                     stuck_step_limit=config.env.stuck_step_limit,
+                    wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                    progress_frontier_stall_limit_frames=(
+                        config.env.progress_frontier_stall_limit_frames
+                    ),
                     stuck_min_speed_kph=config.env.stuck_min_speed_kph,
                     telemetry=telemetry,
                 )

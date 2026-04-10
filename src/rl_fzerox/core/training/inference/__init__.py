@@ -14,7 +14,10 @@ from rl_fzerox.core.training.inference.loader import (
     _policy_supports_action_masks,
     _predict_policy_action,
 )
-from rl_fzerox.core.training.inference.metadata import _loaded_policy_metadata_fields
+from rl_fzerox.core.training.inference.metadata import (
+    _loaded_policy_metadata_fields,
+    _policy_metadata_mtime_ns,
+)
 from rl_fzerox.core.training.runs import resolve_policy_artifact_path
 
 
@@ -28,6 +31,7 @@ class LoadedPolicy:
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
 
+
 class PolicyRunner:
     """Small inference wrapper around one saved policy artifact."""
 
@@ -36,6 +40,7 @@ class PolicyRunner:
         self._policy = policy
         self._supports_action_masks = _policy_supports_action_masks(policy)
         self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
+        self._policy_metadata_mtime_ns = _policy_metadata_mtime_ns(loaded_policy.policy_path)
         self._last_reload_monotonic = time.monotonic()
         self._reload_error: str | None = None
         self._last_reload_error: str | None = None
@@ -109,18 +114,30 @@ class PolicyRunner:
             return
 
         policy_mtime_ns = _policy_mtime_ns(policy_path)
-        if (
-            policy_path == self._loaded_policy.policy_path
-            and policy_mtime_ns == self._policy_mtime_ns
-        ):
+        policy_changed = (
+            policy_path != self._loaded_policy.policy_path
+            or policy_mtime_ns != self._policy_mtime_ns
+        )
+        policy_metadata_mtime_ns = _policy_metadata_mtime_ns(policy_path)
+        metadata_changed = (
+            policy_path != self._loaded_policy.policy_path
+            or policy_metadata_mtime_ns != self._policy_metadata_mtime_ns
+        )
+        if not policy_changed and not metadata_changed:
             return
 
-        try:
-            policy = _load_saved_policy(policy_path, run_dir=self._loaded_policy.run_dir)
-        except Exception as exc:
-            self._reload_error = str(exc)
-            self._last_reload_error = self._reload_error
-            return
+        if policy_changed:
+            try:
+                policy = _load_saved_policy(policy_path, run_dir=self._loaded_policy.run_dir)
+            except Exception as exc:
+                self._reload_error = str(exc)
+                self._last_reload_error = self._reload_error
+                return
+            self._policy = policy
+            self._supports_action_masks = _policy_supports_action_masks(policy)
+            self._policy_mtime_ns = policy_mtime_ns
+            self._last_reload_monotonic = time.monotonic()
+            self._reload_error = None
 
         self._loaded_policy = LoadedPolicy(
             run_dir=self._loaded_policy.run_dir,
@@ -128,11 +145,7 @@ class PolicyRunner:
             artifact=self._loaded_policy.artifact,
             **_loaded_policy_metadata_fields(policy_path),
         )
-        self._policy = policy
-        self._supports_action_masks = _policy_supports_action_masks(policy)
-        self._policy_mtime_ns = policy_mtime_ns
-        self._last_reload_monotonic = time.monotonic()
-        self._reload_error = None
+        self._policy_metadata_mtime_ns = policy_metadata_mtime_ns
 
 
 def load_policy_runner(run_dir: Path, *, artifact: str = "latest") -> PolicyRunner:

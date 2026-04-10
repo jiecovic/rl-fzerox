@@ -92,6 +92,8 @@ class EnvConfig(BaseModel):
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
     wrong_way_timer_limit: PositiveInt = 300
+    progress_frontier_stall_limit_frames: PositiveInt | None = 900
+    progress_frontier_epsilon: NonNegativeFloat = 100.0
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
@@ -135,6 +137,7 @@ class RewardConfig(BaseModel):
     terminal_failure_base_penalty: float = -120.0
     stuck_truncation_base_penalty: float = -150.0
     wrong_way_truncation_base_penalty: float = -170.0
+    progress_stalled_truncation_base_penalty: float = -150.0
     timeout_truncation_base_penalty: float = -150.0
     finish_position_scale: NonNegativeFloat = 4.0
 
@@ -246,7 +249,7 @@ class TrainConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    algorithm: Literal["auto", "ppo", "maskable_ppo"] = "auto"
+    algorithm: Literal["auto", "ppo", "maskable_ppo"] = "maskable_ppo"
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000

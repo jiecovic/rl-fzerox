@@ -97,6 +97,11 @@ class FZeroXEnvEngine:
 
         self._mask_controller.set_curriculum_stage(stage_index)
 
+    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
+        """Align watch-time stage masks with the loaded checkpoint metadata."""
+
+        self._mask_controller.sync_checkpoint_stage(stage_index)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""
@@ -122,6 +127,7 @@ class FZeroXEnvEngine:
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._control_state.reset()
+        self._mask_controller.set_shoulder_lock(None)
         info["seed"] = seed
         set_curriculum_info(
             info,
@@ -240,8 +246,9 @@ class FZeroXEnvEngine:
         *,
         action_repeat: int,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        applied_control_state = self._control_state.apply_minimum_shoulder_hold(control_state)
         step_result = self.backend.step_repeat_raw(
-            control_state,
+            applied_control_state,
             action_repeat=action_repeat,
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
@@ -250,6 +257,8 @@ class FZeroXEnvEngine:
             max_episode_steps=self.config.max_episode_steps,
             stuck_step_limit=self.config.stuck_step_limit,
             wrong_way_timer_limit=self.config.wrong_way_timer_limit,
+            progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
         )
         info = backend_step_info(self.backend)
@@ -260,7 +269,7 @@ class FZeroXEnvEngine:
             step_result.status,
             telemetry,
             RewardActionContext(
-                boost_requested=bool(control_state.joypad_mask & BOOST_MASK),
+                boost_requested=bool(applied_control_state.joypad_mask & BOOST_MASK),
             ),
         )
         reward = reward_step.reward
@@ -274,6 +283,9 @@ class FZeroXEnvEngine:
         info["episode_step"] = step_result.status.step_count
         info["stalled_steps"] = step_result.status.stalled_steps
         info["reverse_timer"] = step_result.status.reverse_timer
+        info["progress_frontier_stalled_frames"] = (
+            step_result.status.progress_frontier_stalled_frames
+        )
         info["termination_reason"] = step_result.status.termination_reason
         info["truncation_reason"] = step_result.status.truncation_reason
         set_curriculum_info(
@@ -286,8 +298,12 @@ class FZeroXEnvEngine:
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
         self._control_state.record_step(
-            control_state=control_state,
+            control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
+        )
+        shoulder_mask = self._control_state.dynamic_action_mask_overrides()
+        self._mask_controller.set_shoulder_lock(
+            None if shoulder_mask is None else shoulder_mask["shoulder"][0]
         )
         image_observation = step_result.observation
         observation = self._build_observation(image=image_observation, telemetry=telemetry)
