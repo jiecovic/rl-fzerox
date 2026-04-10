@@ -76,6 +76,35 @@ def _format_stuck_counter(
     return f"{_int_info(info, 'stalled_steps')} / {stuck_step_limit}"
 
 
+def _format_reverse_counter(
+    info: dict[str, object],
+    *,
+    wrong_way_timer_limit: int,
+) -> str:
+    return f"{_int_info(info, 'reverse_timer')} / {wrong_way_timer_limit}"
+
+
+def _format_progress_frontier_counter(
+    info: dict[str, object],
+    *,
+    progress_frontier_stall_limit_frames: int | None,
+) -> str:
+    if progress_frontier_stall_limit_frames is None:
+        return "-"
+    return (
+        f"{_int_info(info, 'progress_frontier_stalled_frames')} / "
+        f"{progress_frontier_stall_limit_frames}"
+    )
+
+
+def _format_episode_step(
+    info: dict[str, object],
+    *,
+    max_episode_steps: int,
+) -> str:
+    return f"{_int_info(info, 'episode_step')} / {max_episode_steps}"
+
+
 def _format_control_game_rate(info: dict[str, object]) -> str:
     return f"{_float_info(info, 'control_fps'):.1f} / {_float_info(info, 'game_fps'):.1f}"
 

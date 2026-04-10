@@ -65,6 +65,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "terminal_failure_base_penalty": -111.0,
         "stuck_truncation_base_penalty": -101.0,
         "wrong_way_truncation_base_penalty": -121.0,
+        "progress_stalled_truncation_base_penalty": -131.0,
         "timeout_truncation_base_penalty": -102.0,
         "finish_position_scale": 3.5,
     }
@@ -620,6 +621,34 @@ def test_race_v2_scales_truncation_penalty_by_remaining_steps_and_laps() -> None
     assert early.reward == pytest.approx(-320.91)
     assert late.reward == pytest.approx(-220.11)
     assert early.reward < late.reward
+
+
+def test_race_v2_supports_progress_stalled_truncation_penalty() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            lap_1_completion_bonus=0.0,
+            lap_2_completion_bonus=0.0,
+            final_lap_completion_bonus=0.0,
+            lap_position_scale=0.0,
+            remaining_step_penalty_per_frame=0.0,
+            remaining_lap_penalty=0.0,
+            progress_stalled_truncation_base_penalty=-99.0,
+            bootstrap_progress_scale=0.0,
+        ),
+        max_episode_steps=100,
+    )
+    tracker.reset(_telemetry(race_distance=0.0, laps_completed=0))
+
+    result = tracker.step_summary(
+        _summary(max_race_distance=10_000.0),
+        _status(step_count=25, truncation_reason="progress_stalled"),
+        _telemetry(race_distance=10_000.0, laps_completed=0),
+    )
+
+    assert result.reward == pytest.approx(-99.0)
+    assert result.breakdown["progress_stalled_truncation"] == pytest.approx(-99.0)
 
 
 def test_race_v2_applies_final_lap_reward_and_finish_position_bonus() -> None:

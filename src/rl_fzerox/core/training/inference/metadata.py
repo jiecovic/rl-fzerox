@@ -20,3 +20,12 @@ def _loaded_policy_metadata_fields(policy_path: Path) -> _LoadedPolicyMetadataFi
         "curriculum_stage_index": metadata.curriculum_stage_index,
         "curriculum_stage_name": metadata.curriculum_stage_name,
     }
+
+
+def _policy_metadata_mtime_ns(policy_path: Path) -> int | None:
+    """Return the sidecar metadata mtime, if the checkpoint currently has one."""
+
+    metadata_path = policy_path.with_name(f"{policy_path.stem}.metadata.json")
+    if not metadata_path.is_file():
+        return None
+    return metadata_path.stat().st_mtime_ns

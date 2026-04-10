@@ -22,6 +22,7 @@ class ActionMaskController:
     stage_names: tuple[str, ...]
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
+    _shoulder_lock_index: int | None = None
 
     @classmethod
     def from_config(
@@ -51,6 +52,7 @@ class ActionMaskController:
             stage_overrides=stage_overrides,
             dynamic_overrides=_dynamic_action_mask_overrides(
                 boost_unlocked=self._boost_unlocked,
+                shoulder_lock_index=self._shoulder_lock_index,
             ),
         )
 
@@ -63,10 +65,30 @@ class ActionMaskController:
             raise ValueError(f"Invalid curriculum stage index {stage_index}")
         self._stage_index = int(stage_index)
 
+    def sync_checkpoint_stage(self, stage_index: int | None) -> None:
+        """Align the active watch-stage mask with checkpoint metadata.
+
+        Missing metadata falls back to stage 0 when a curriculum exists so the
+        env does not keep a stale later stage from a previously watched policy.
+        """
+
+        if not self.stage_overrides:
+            self._stage_index = None
+            return
+        if stage_index is None:
+            self._stage_index = 0
+            return
+        self.set_curriculum_stage(stage_index)
+
     def set_boost_unlocked(self, boost_unlocked: bool | None) -> None:
         """Update live boost availability used by the dynamic action mask."""
 
         self._boost_unlocked = boost_unlocked
+
+    def set_shoulder_lock(self, shoulder_index: int | None) -> None:
+        """Update the live shoulder branch restriction used by the dynamic mask."""
+
+        self._shoulder_lock_index = shoulder_index
 
     @property
     def stage_index(self) -> int | None:
@@ -103,9 +125,15 @@ def _curriculum_stage_names(curriculum_config: CurriculumConfig | None) -> tuple
 def _dynamic_action_mask_overrides(
     *,
     boost_unlocked: bool | None,
+    shoulder_lock_index: int | None = None,
 ) -> ActionMaskOverrides | None:
+    overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
     # In that case keep the branch open instead of masking boost prematurely.
-    if boost_unlocked is not False:
+    if boost_unlocked is False:
+        overrides["boost"] = (0,)
+    if shoulder_lock_index is not None:
+        overrides["shoulder"] = (shoulder_lock_index,)
+    if not overrides:
         return None
-    return {"boost": (0,)}
+    return overrides

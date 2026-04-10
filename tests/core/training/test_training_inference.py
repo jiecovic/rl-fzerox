@@ -1,14 +1,17 @@
 # tests/core/training/test_training_inference.py
 from __future__ import annotations
 
+import json
 import os
 import time
 from pathlib import Path
 
 import numpy as np
+from omegaconf import OmegaConf
 
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
+from rl_fzerox.core.training.inference.loader import _load_saved_policy_algorithm
 
 
 class _FakePolicy:
@@ -175,3 +178,60 @@ def test_policy_runner_exposes_reload_error_until_success(
     assert runner.predict(observation).tolist() == [4, 1]
     assert runner.reload_error is None
     assert runner.last_reload_error == "bad checkpoint"
+
+
+def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Path) -> None:
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"v1")
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        _FakePolicy([2, 0]),
+    )
+
+    assert runner.checkpoint_curriculum_stage_index is None
+    assert runner.checkpoint_curriculum_stage is None
+
+    metadata_path = tmp_path / "latest_policy.metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "curriculum_stage_index": 1,
+                "curriculum_stage_name": "drift_enabled",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runner.refresh()
+
+    assert runner.checkpoint_curriculum_stage_index == 1
+    assert runner.checkpoint_curriculum_stage == "drift_enabled"
+
+
+def test_load_saved_policy_algorithm_treats_legacy_auto_as_plain_ppo(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "policy": {},
+                "train": {"algorithm": "auto", "total_timesteps": 1000},
+            }
+        ),
+        f=str(config_path),
+    )
+
+    assert _load_saved_policy_algorithm(tmp_path) == "ppo"

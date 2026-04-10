@@ -38,9 +38,13 @@ fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
         StepCounters {
             step_count: 9,
             stalled_steps: 2,
+            progress_frontier_stalled_frames: 0,
+            progress_frontier_distance: 100.0,
+            progress_frontier_initialized: true,
         },
         &StepSummary {
             frames_run: 2,
+            max_race_distance: 130.0,
             consecutive_low_speed_frames: 2,
             ..StepSummary::default()
         },
@@ -50,6 +54,7 @@ fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
 
     assert_eq!(status.counters.step_count, 11);
     assert_eq!(status.counters.stalled_steps, 4);
+    assert_eq!(status.counters.progress_frontier_stalled_frames, 0);
     assert_eq!(status.reverse_timer, 100);
     assert_eq!(status.termination_reason, Some("finished"));
     assert_eq!(status.truncation_reason, Some("timeout"));
@@ -61,9 +66,13 @@ fn step_status_resets_non_race_trailing_counters() {
         StepCounters {
             step_count: 3,
             stalled_steps: 5,
+            progress_frontier_stalled_frames: 7,
+            progress_frontier_distance: 120.0,
+            progress_frontier_initialized: true,
         },
         &StepSummary {
             frames_run: 1,
+            max_race_distance: 110.0,
             consecutive_low_speed_frames: 1,
             ..StepSummary::default()
         },
@@ -73,9 +82,62 @@ fn step_status_resets_non_race_trailing_counters() {
 
     assert_eq!(status.counters.step_count, 4);
     assert_eq!(status.counters.stalled_steps, 0);
+    assert_eq!(status.counters.progress_frontier_stalled_frames, 0);
+    assert!(!status.counters.progress_frontier_initialized);
     assert_eq!(status.reverse_timer, 0);
     assert!(status.termination_reason.is_none());
     assert!(status.truncation_reason.is_none());
+}
+
+#[test]
+fn step_status_accumulates_progress_frontier_stall_frames_until_new_best_distance() {
+    let status = StepStatus::from_step(
+        StepCounters {
+            step_count: 10,
+            stalled_steps: 0,
+            progress_frontier_stalled_frames: 6,
+            progress_frontier_distance: 150.0,
+            progress_frontier_initialized: true,
+        },
+        &StepSummary {
+            frames_run: 3,
+            max_race_distance: 170.0,
+            ..StepSummary::default()
+        },
+        &telemetry(true, 0, 0),
+        repeated_step_config(100, 5, 180),
+    );
+
+    assert_eq!(status.counters.progress_frontier_stalled_frames, 9);
+    assert_eq!(status.counters.progress_frontier_distance, 150.0);
+    assert_eq!(status.truncation_reason, None);
+}
+
+#[test]
+fn step_status_truncates_when_progress_frontier_stall_limit_is_reached() {
+    let mut config = repeated_step_config(100, 5, 180);
+    config.progress_frontier_stall_limit_frames = Some(8);
+    config.progress_frontier_epsilon = 25.0;
+
+    let status = StepStatus::from_step(
+        StepCounters {
+            step_count: 10,
+            stalled_steps: 0,
+            progress_frontier_stalled_frames: 6,
+            progress_frontier_distance: 150.0,
+            progress_frontier_initialized: true,
+        },
+        &StepSummary {
+            frames_run: 2,
+            max_race_distance: 170.0,
+            ..StepSummary::default()
+        },
+        &telemetry(true, 0, 0),
+        config,
+    );
+
+    assert_eq!(status.counters.progress_frontier_stalled_frames, 8);
+    assert_eq!(status.truncation_reason, Some("progress_stalled"));
 }
 
 #[test]
@@ -185,6 +247,8 @@ fn repeated_step_config(
         max_episode_steps,
         stuck_step_limit,
         wrong_way_timer_limit,
+        progress_frontier_stall_limit_frames: Some(900),
+        progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
     }
 }

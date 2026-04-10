@@ -131,6 +131,8 @@ class Emulator:
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
@@ -145,6 +147,8 @@ class Emulator:
             max_episode_steps=max_episode_steps,
             stuck_step_limit=stuck_step_limit,
             wrong_way_timer_limit=wrong_way_timer_limit,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             joypad_mask=state.joypad_mask,
             left_stick_x=state.left_stick_x,

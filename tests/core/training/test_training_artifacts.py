@@ -155,6 +155,36 @@ def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(
     assert merged_watch_config.emulator.baseline_state_path == baseline_state_path.resolve()
 
 
+def test_materialize_train_run_config_normalizes_auto_to_maskable_ppo(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(
+            algorithm="auto",
+            output_root=tmp_path / "runs",
+            run_name="ppo_cnn",
+        ),
+    )
+    run_paths = build_run_paths(
+        output_root=train_config.train.output_root,
+        run_name=train_config.train.run_name,
+    )
+
+    materialized = materialize_train_run_config(train_config, run_paths=run_paths)
+
+    assert materialized.train.algorithm == "maskable_ppo"
+
+
 def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)

@@ -18,6 +18,10 @@ class _CurriculumStagePolicyRunner(Protocol):
     def refresh(self) -> None: ...
 
 
+class _CheckpointStageSyncEnv(Protocol):
+    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None: ...
+
+
 def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
     return emulator.try_read_telemetry()
 
@@ -58,14 +62,14 @@ def _policy_curriculum_stage(policy_runner: PolicyRunner | None) -> str | None:
     return policy_runner.checkpoint_curriculum_stage
 
 
-def _sync_policy_curriculum_stage(policy_runner: _CurriculumStagePolicyRunner | None, env) -> None:
+def _sync_policy_curriculum_stage(
+    policy_runner: _CurriculumStagePolicyRunner | None,
+    env: _CheckpointStageSyncEnv,
+) -> None:
     if policy_runner is None:
         return
     policy_runner.refresh()
-    stage_index = policy_runner.checkpoint_curriculum_stage_index
-    if stage_index is None:
-        return
-    env.set_curriculum_stage(stage_index)
+    env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
 
 
 def _persist_reload_error(

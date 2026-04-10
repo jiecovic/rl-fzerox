@@ -58,6 +58,9 @@ def build_reward_tracker(
         terminal_failure_base_penalty=resolved_config.terminal_failure_base_penalty,
         stuck_truncation_base_penalty=resolved_config.stuck_truncation_base_penalty,
         wrong_way_truncation_base_penalty=resolved_config.wrong_way_truncation_base_penalty,
+        progress_stalled_truncation_base_penalty=(
+            resolved_config.progress_stalled_truncation_base_penalty
+        ),
         timeout_truncation_base_penalty=resolved_config.timeout_truncation_base_penalty,
         finish_position_scale=resolved_config.finish_position_scale,
     )

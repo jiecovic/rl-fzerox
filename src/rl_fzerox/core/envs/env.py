@@ -63,6 +63,11 @@ class FZeroXEnv(gym.Env[ObservationValue, np.ndarray]):
 
         self._engine.set_curriculum_stage(stage_index)
 
+    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
+        """Align watch-time curriculum masks with saved checkpoint metadata."""
+
+        self._engine.sync_checkpoint_curriculum_stage(stage_index)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""

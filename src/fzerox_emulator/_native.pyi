@@ -162,6 +162,7 @@ class StepStatus:
         step_count: int,
         stalled_steps: int,
         reverse_timer: int = 0,
+        progress_frontier_stalled_frames: int = 0,
         termination_reason: str | None = None,
         truncation_reason: str | None = None,
     ) -> None: ...
@@ -171,6 +172,8 @@ class StepStatus:
     def stalled_steps(self) -> int: ...
     @property
     def reverse_timer(self) -> int: ...
+    @property
+    def progress_frontier_stalled_frames(self) -> int: ...
     @property
     def terminated(self) -> bool: ...
     @property
@@ -216,6 +219,8 @@ class Emulator:
         max_episode_steps: int,
         stuck_step_limit: int,
         wrong_way_timer_limit: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,

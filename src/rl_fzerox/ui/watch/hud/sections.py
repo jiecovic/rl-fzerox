@@ -8,12 +8,15 @@ from rl_fzerox.ui.watch.hud.format import (
     _float_info,
     _format_control_game_rate,
     _format_distance,
+    _format_episode_step,
     _format_mode_name,
     _format_observation_shape,
     _format_policy_action,
+    _format_progress_frontier_counter,
     _format_race_time_ms,
     _format_reload_age,
     _format_reload_error,
+    _format_reverse_counter,
     _format_stuck_counter,
     _int_info,
 )
@@ -54,6 +57,9 @@ def _build_panel_columns(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
+    max_episode_steps: int = 50_000,
+    wrong_way_timer_limit: int = 300,
+    progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: np.ndarray | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
 ) -> PanelColumns:
@@ -99,10 +105,37 @@ def _build_panel_columns(
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
                     _panel_line(
+                        "Steps",
+                        _format_episode_step(info, max_episode_steps=max_episode_steps),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
                         "Stuck",
                         _format_stuck_counter(info, stuck_step_limit=stuck_step_limit),
                         PALETTE.text_warning
                         if _int_info(info, "stalled_steps") > 0
+                        else PALETTE.text_muted,
+                    ),
+                    _panel_line(
+                        "Reverse",
+                        _format_reverse_counter(
+                            info,
+                            wrong_way_timer_limit=wrong_way_timer_limit,
+                        ),
+                        PALETTE.text_warning
+                        if _int_info(info, "reverse_timer") > 0
+                        else PALETTE.text_muted,
+                    ),
+                    _panel_line(
+                        "Frontier",
+                        _format_progress_frontier_counter(
+                            info,
+                            progress_frontier_stall_limit_frames=(
+                                progress_frontier_stall_limit_frames
+                            ),
+                        ),
+                        PALETTE.text_warning
+                        if _int_info(info, "progress_frontier_stalled_frames") > 0
                         else PALETTE.text_muted,
                     ),
                     _panel_line(

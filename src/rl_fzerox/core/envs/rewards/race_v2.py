@@ -47,6 +47,7 @@ class RaceV2RewardWeights:
     terminal_failure_base_penalty: float = -120.0
     stuck_truncation_base_penalty: float = -150.0
     wrong_way_truncation_base_penalty: float = -170.0
+    progress_stalled_truncation_base_penalty: float = -150.0
     timeout_truncation_base_penalty: float = -150.0
     finish_position_scale: float = 4.0
 
@@ -468,6 +469,8 @@ class RaceV2RewardTracker:
             return self._weights.stuck_truncation_base_penalty
         if truncation_reason == "wrong_way":
             return self._weights.wrong_way_truncation_base_penalty
+        if truncation_reason == "progress_stalled":
+            return self._weights.progress_stalled_truncation_base_penalty
         if truncation_reason == "timeout":
             return self._weights.timeout_truncation_base_penalty
         raise ValueError(f"Unsupported truncation reason: {truncation_reason!r}")

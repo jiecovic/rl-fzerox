@@ -11,11 +11,15 @@ emulator:
   renderer: angrylion
 
 env:
-  action_repeat: 2
+  action_repeat: 1
   max_episode_steps: 50000
   stuck_step_limit: 240
   stuck_min_speed_kph: 60.0
   wrong_way_timer_limit: 120
+  # Truncate if this many internal frames pass without beating the best race-distance frontier.
+  progress_frontier_stall_limit_frames: 400
+  # Require at least this much new race-distance to reset the frontier stall timer.
+  progress_frontier_epsilon: 100.0
   # End the episode immediately when race telemetry shows player energy <= 0.
   terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
@@ -30,8 +34,8 @@ env:
     preset: native_crop_v3
     frame_stack: 4
 train:
-  # auto resolves to MaskablePPO whenever action masks or curriculum are enabled.
-  algorithm: auto
+  # Training always uses MaskablePPO because the env exposes live gameplay masks.
+  algorithm: maskable_ppo
   vec_env: subproc
   num_envs: 8
   total_timesteps: 50_000_000

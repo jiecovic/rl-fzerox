@@ -36,12 +36,18 @@ pub struct StepSummary {
 }
 
 /// Carried limit counters that persist across outer env steps.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepCounters {
     /// Total internal frames executed in the current episode.
     pub step_count: usize,
     /// Consecutive low-speed internal frames at the current episode frontier.
     pub stalled_steps: usize,
+    /// Consecutive internal frames since the last meaningful new progress frontier.
+    pub progress_frontier_stalled_frames: usize,
+    /// Highest race distance reached so far in the current in-race episode.
+    pub progress_frontier_distance: f32,
+    /// Whether the progress frontier has been initialized from in-race telemetry yet.
+    pub progress_frontier_initialized: bool,
 }
 
 /// Native stop/counter state after one repeated env step completes.
@@ -72,6 +78,7 @@ impl StepStatus {
                 summary.frames_run,
                 final_telemetry.in_race_mode,
             ),
+            ..carried_progress_frontier(previous, summary, final_telemetry, config)
         };
         let reverse_timer = final_telemetry.player.reverse_timer.max(0) as usize;
         let truncation_reason = if counters.step_count >= config.max_episode_steps {
@@ -80,6 +87,11 @@ impl StepStatus {
             Some("wrong_way")
         } else if counters.stalled_steps >= config.stuck_step_limit {
             Some("stuck")
+        } else if config
+            .progress_frontier_stall_limit_frames
+            .is_some_and(|limit| counters.progress_frontier_stalled_frames >= limit)
+        {
+            Some("progress_stalled")
         } else {
             None
         };
@@ -135,6 +147,50 @@ fn carried_streak(
     trailing_in_step
 }
 
+fn carried_progress_frontier(
+    previous: StepCounters,
+    summary: &StepSummary,
+    final_telemetry: &TelemetrySnapshot,
+    config: RepeatedStepConfig,
+) -> StepCounters {
+    if !final_telemetry.in_race_mode || summary.frames_run == 0 {
+        return StepCounters {
+            progress_frontier_stalled_frames: 0,
+            progress_frontier_distance: 0.0,
+            progress_frontier_initialized: false,
+            ..StepCounters::default()
+        };
+    }
+
+    if !previous.progress_frontier_initialized {
+        return StepCounters {
+            progress_frontier_stalled_frames: 0,
+            progress_frontier_distance: summary.max_race_distance,
+            progress_frontier_initialized: true,
+            ..StepCounters::default()
+        };
+    }
+
+    if summary.max_race_distance
+        >= previous.progress_frontier_distance + config.progress_frontier_epsilon
+    {
+        return StepCounters {
+            progress_frontier_stalled_frames: 0,
+            progress_frontier_distance: summary.max_race_distance,
+            progress_frontier_initialized: true,
+            ..StepCounters::default()
+        };
+    }
+
+    StepCounters {
+        progress_frontier_stalled_frames: previous.progress_frontier_stalled_frames
+            + summary.frames_run,
+        progress_frontier_distance: previous.progress_frontier_distance,
+        progress_frontier_initialized: true,
+        ..StepCounters::default()
+    }
+}
+
 /// Native env-step payload returned after executing a repeated step.
 #[allow(dead_code)]
 #[derive(Clone, Debug)]
@@ -170,6 +226,10 @@ pub struct RepeatedStepConfig {
     pub stuck_step_limit: usize,
     /// Reverse timer limit that triggers wrong-way truncation.
     pub wrong_way_timer_limit: usize,
+    /// Maximum internal frames allowed without beating the best race-distance frontier.
+    pub progress_frontier_stall_limit_frames: Option<usize>,
+    /// Minimum frontier improvement required to reset the progress-stall timer.
+    pub progress_frontier_epsilon: f32,
     /// Treat depleted player energy as an immediate terminal failure.
     pub terminate_on_energy_depleted: bool,
 }

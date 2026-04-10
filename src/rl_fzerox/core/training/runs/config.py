@@ -69,7 +69,18 @@ def materialize_train_run_config(
                         None if baseline_state_path is None else run_paths.baseline_state_path
                     ),
                 }
-            )
+            ),
+            # Persist the concrete training algorithm so future watch/inference
+            # does not need to guess what one historical `auto` meant.
+            "train": config.train.model_copy(
+                update={
+                    "algorithm": (
+                        "maskable_ppo"
+                        if config.train.algorithm == "auto"
+                        else config.train.algorithm
+                    )
+                }
+            ),
         }
     )
 

@@ -136,6 +136,7 @@ def make_step_status(
     step_count: int,
     stalled_steps: int = 0,
     reverse_timer: int = 0,
+    progress_frontier_stalled_frames: int = 0,
     termination_reason: str | None = None,
     truncation_reason: str | None = None,
 ) -> StepStatus:
@@ -143,6 +144,7 @@ def make_step_status(
         step_count=step_count,
         stalled_steps=stalled_steps,
         reverse_timer=reverse_timer,
+        progress_frontier_stalled_frames=progress_frontier_stalled_frames,
         termination_reason=termination_reason,
         truncation_reason=truncation_reason,
     )

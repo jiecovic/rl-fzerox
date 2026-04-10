@@ -196,6 +196,7 @@ impl PyStepStatus {
         step_count,
         stalled_steps,
         reverse_timer=0,
+        progress_frontier_stalled_frames=0,
         termination_reason=None,
         truncation_reason=None,
     ))]
@@ -203,6 +204,7 @@ impl PyStepStatus {
         step_count: usize,
         stalled_steps: usize,
         reverse_timer: usize,
+        progress_frontier_stalled_frames: usize,
         termination_reason: Option<String>,
         truncation_reason: Option<String>,
     ) -> PyResult<Self> {
@@ -211,6 +213,9 @@ impl PyStepStatus {
                 counters: crate::core::host::StepCounters {
                     step_count,
                     stalled_steps,
+                    progress_frontier_stalled_frames,
+                    progress_frontier_distance: 0.0,
+                    progress_frontier_initialized: false,
                 },
                 reverse_timer,
                 termination_reason: parse_reason(termination_reason)?,
@@ -232,6 +237,11 @@ impl PyStepStatus {
     #[getter]
     fn reverse_timer(&self) -> usize {
         self.inner.reverse_timer
+    }
+
+    #[getter]
+    fn progress_frontier_stalled_frames(&self) -> usize {
+        self.inner.counters.progress_frontier_stalled_frames
     }
 
     #[getter]
@@ -259,6 +269,10 @@ impl PyStepStatus {
         dict.set_item("step_count", self.step_count())?;
         dict.set_item("stalled_steps", self.stalled_steps())?;
         dict.set_item("reverse_timer", self.reverse_timer())?;
+        dict.set_item(
+            "progress_frontier_stalled_frames",
+            self.progress_frontier_stalled_frames(),
+        )?;
         dict.set_item("terminated", self.terminated())?;
         dict.set_item("truncated", self.truncated())?;
         dict.set_item("termination_reason", self.termination_reason())?;
@@ -286,6 +300,7 @@ fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
         Some("energy_depleted") => Ok(Some("energy_depleted")),
         Some("stuck") => Ok(Some("stuck")),
         Some("wrong_way") => Ok(Some("wrong_way")),
+        Some("progress_stalled") => Ok(Some("progress_stalled")),
         Some("timeout") => Ok(Some("timeout")),
         Some(other) => Err(pyo3::exceptions::PyValueError::new_err(format!(
             "Unknown step reason: {other}"

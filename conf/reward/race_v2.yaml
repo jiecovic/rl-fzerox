@@ -75,6 +75,9 @@ terminal_failure_base_penalty: -110.0
 stuck_truncation_base_penalty: -100.0
 # Failure bases: base penalty when the episode truncates for driving the wrong way.
 wrong_way_truncation_base_penalty: -120.0
+# Failure bases: base penalty when the episode truncates for making no new
+# race-distance frontier progress for too long.
+progress_stalled_truncation_base_penalty: -100.0
 # Failure bases: base penalty when the episode truncates by hitting max episode steps.
 timeout_truncation_base_penalty: -100.0
 

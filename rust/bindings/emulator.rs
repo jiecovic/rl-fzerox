@@ -110,6 +110,8 @@ impl PyEmulator {
         max_episode_steps,
         stuck_step_limit,
         wrong_way_timer_limit,
+        progress_frontier_stall_limit_frames=None,
+        progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=true,
         joypad_mask=0,
         left_stick_x=0.0,
@@ -129,6 +131,8 @@ impl PyEmulator {
         max_episode_steps: usize,
         stuck_step_limit: usize,
         wrong_way_timer_limit: usize,
+        progress_frontier_stall_limit_frames: Option<usize>,
+        progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,
         joypad_mask: u16,
         left_stick_x: f32,
@@ -159,6 +163,8 @@ impl PyEmulator {
                     max_episode_steps,
                     stuck_step_limit,
                     wrong_way_timer_limit,
+                    progress_frontier_stall_limit_frames,
+                    progress_frontier_epsilon,
                     terminate_on_energy_depleted,
                 })
             })

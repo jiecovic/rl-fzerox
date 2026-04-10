@@ -121,15 +121,10 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
 
     try:
         from rl_fzerox.core.config import load_train_app_config
-        from rl_fzerox.core.training.session.model import (
-            resolve_effective_training_algorithm,
-            training_requires_action_masks,
-        )
 
         config = load_train_app_config(config_path)
-        return resolve_effective_training_algorithm(
-            train_config=config.train,
-            masking_required=training_requires_action_masks(config),
-        )
+        # Historical runs may have saved `auto` from the pre-maskable default
+        # era, so only explicit `maskable_ppo` is treated as maskable here.
+        return "maskable_ppo" if config.train.algorithm == "maskable_ppo" else "ppo"
     except Exception:
         return "ppo"

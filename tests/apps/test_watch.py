@@ -34,9 +34,9 @@ class _FakePolicyRunner:
 
 class _FakeWatchEnv:
     def __init__(self) -> None:
-        self.stage_indices: list[int] = []
+        self.stage_indices: list[int | None] = []
 
-    def set_curriculum_stage(self, stage_index: int) -> None:
+    def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
         self.stage_indices.append(stage_index)
 
 
@@ -179,3 +179,13 @@ def test_sync_policy_curriculum_stage_applies_checkpoint_stage_to_watch_env() ->
 
     assert policy_runner.refresh_calls == 1
     assert env.stage_indices == [0]
+
+
+def test_sync_policy_curriculum_stage_resets_when_checkpoint_stage_is_missing() -> None:
+    policy_runner = _FakePolicyRunner(stage_index=None)
+    env = _FakeWatchEnv()
+
+    _sync_policy_curriculum_stage(policy_runner, env)
+
+    assert policy_runner.refresh_calls == 1
+    assert env.stage_indices == [None]
