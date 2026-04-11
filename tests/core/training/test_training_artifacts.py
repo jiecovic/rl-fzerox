@@ -155,6 +155,42 @@ def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(
     assert merged_watch_config.emulator.baseline_state_path == baseline_state_path.resolve()
 
 
+def test_watch_inheritance_uses_train_camera_setting(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(action_repeat=3, camera_setting="regular"),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    watch_config = WatchAppConfig(
+        seed=999,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(action_repeat=1, camera_setting="close_behind"),
+        watch=WatchConfig(fps=30.0),
+    )
+
+    merged_watch_config = apply_train_run_to_watch_config(
+        watch_config,
+        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
+        train_config=train_config,
+    )
+
+    assert merged_watch_config.env.action_repeat == 3
+    assert merged_watch_config.env.camera_setting == "regular"
+
+
 def test_materialize_train_run_config_normalizes_auto_to_maskable_ppo(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
