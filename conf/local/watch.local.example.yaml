@@ -10,6 +10,7 @@ emulator:
 
 env:
   reset_to_race: true
+  camera_setting: close_behind
   action:
     name: steer_drive_boost_drift
 

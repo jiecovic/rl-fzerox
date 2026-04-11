@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 import pytest
-from gymnasium.spaces import Box, MultiDiscrete
+from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from fzerox_emulator import (
     BackendStepResult,
@@ -86,6 +86,27 @@ class ScriptedStepBackend(SyntheticBackend):
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         return self._reset_telemetry
+
+
+class CameraSyncBackend(SyntheticBackend):
+    def __init__(self, *, camera_setting_raw: int = 2) -> None:
+        super().__init__()
+        self.camera_setting_raw = camera_setting_raw
+
+    def step_frame(self):
+        if self.last_controller_state.right_stick_x > 0.5:
+            self.camera_setting_raw = (self.camera_setting_raw + 1) % 4
+        return super().step_frame()
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        return make_telemetry(
+            game_mode_raw=1,
+            game_mode_name="gp_race",
+            in_race_mode=True,
+            race_distance=0.0,
+            camera_setting_raw=self.camera_setting_raw,
+            camera_setting_name=_camera_setting_name(self.camera_setting_raw),
+        )
 
 
 def test_reset_returns_stacked_observation():
@@ -231,6 +252,23 @@ def test_reset_skips_rng_randomization_outside_race() -> None:
     assert info["rng_randomized"] is False
     assert info["rng_randomization_skip_reason"] == "not_in_race"
     assert backend.randomized_rng_seeds == []
+
+
+def test_reset_applies_configured_camera_setting_with_button_loop() -> None:
+    backend = CameraSyncBackend(camera_setting_raw=2)
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1, camera_setting="close_behind"),
+    )
+
+    _, info = env.reset(seed=123)
+
+    assert info["camera_setting"] == "close_behind"
+    assert info["camera_setting_raw"] == 1
+    assert info["camera_setting_sync"] == "changed"
+    assert info["camera_setting_taps"] == 3
+    assert info["frame_index"] == 6
+    assert backend.last_controller_state == ControllerState()
 
 
 def test_step_advances_backend_by_action_repeat():
@@ -478,6 +516,60 @@ def test_continuous_drift_action_env_exposes_box_action_space() -> None:
     assert env.action_masks().tolist() == []
 
 
+def test_hybrid_drift_action_env_exposes_dict_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_drift")),
+    )
+
+    assert isinstance(env.action_space, Dict)
+    assert isinstance(env.action_space.spaces["continuous"], Box)
+    assert isinstance(env.action_space.spaces["discrete"], MultiDiscrete)
+    assert env.action_space.spaces["continuous"].shape == (2,)
+    assert env.action_space.spaces["discrete"].nvec.tolist() == [3]
+    assert env.action_masks().tolist() == [True, True, True]
+
+
+def test_hybrid_boost_drift_action_env_exposes_boost_mask_branch() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+    )
+
+    assert isinstance(env.action_space, Dict)
+    assert isinstance(env.action_space.spaces["continuous"], Box)
+    assert isinstance(env.action_space.spaces["discrete"], MultiDiscrete)
+    assert env.action_space.spaces["continuous"].shape == (2,)
+    assert env.action_space.spaces["discrete"].nvec.tolist() == [3, 2]
+    assert env.action_masks().tolist() == [True, True, True, True, True]
+
+
+def test_hybrid_boost_shoulder_primitive_env_masks_future_primitives_by_default() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")
+        ),
+    )
+
+    assert isinstance(env.action_space, Dict)
+    assert isinstance(env.action_space.spaces["continuous"], Box)
+    assert isinstance(env.action_space.spaces["discrete"], MultiDiscrete)
+    assert env.action_space.spaces["continuous"].shape == (3,)
+    assert env.action_space.spaces["discrete"].nvec.tolist() == [7, 2]
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+    ]
+
+
 def test_env_action_masks_reflect_base_action_mask_config() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),
@@ -492,6 +584,39 @@ def test_env_action_masks_reflect_base_action_mask_config() -> None:
     mask = env.action_masks()
 
     assert mask.tolist() == (([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False])
+
+
+def test_env_action_masks_reject_base_mask_branch_missing_from_adapter() -> None:
+    with pytest.raises(ValueError, match="env\\.action\\.mask.*'drive'"):
+        FZeroXEnv(
+            backend=SyntheticBackend(),
+            config=EnvConfig(
+                action=ActionConfig(
+                    name="hybrid_steer_drive_boost_drift",
+                    mask=ActionMaskConfig(drive=(0,)),
+                )
+            ),
+        )
+
+
+def test_env_action_masks_reject_curriculum_mask_branch_missing_from_adapter() -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"curriculum\.stages\[0\]\.action_mask.*'boost'",
+    ):
+        FZeroXEnv(
+            backend=SyntheticBackend(),
+            config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_drift")),
+            curriculum_config=CurriculumConfig(
+                enabled=True,
+                stages=(
+                    CurriculumStageConfig(
+                        name="no_boost_branch",
+                        action_mask=ActionMaskConfig(boost=(0,)),
+                    ),
+                ),
+            ),
+        )
 
 
 def test_env_action_masks_update_with_curriculum_stage_changes() -> None:
@@ -586,6 +711,88 @@ def test_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> None:
     env.step(np.array([3, 1, 0], dtype=np.int64))
 
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+
+
+def test_hybrid_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == [True, True, True, True, False]
+
+    env.step(
+        {
+            "continuous": np.array([0.0, 1.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    )
+
+    assert env.action_masks().tolist() == [True, True, True, True, True]
+
+
+def test_hybrid_shoulder_primitive_masks_boost_until_telemetry_unlocks_it() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+        False,
+    ]
+
+    env.step(
+        {
+            "continuous": np.array([0.0, 1.0, -1.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    )
+
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+    ]
 
 
 def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
@@ -1189,6 +1396,8 @@ def _telemetry(
     reverse_timer: int = 0,
     lap: int = 1,
     laps_completed: int = 0,
+    camera_setting_raw: int = 2,
+    camera_setting_name: str = "regular",
 ) -> FZeroXTelemetry:
     return make_telemetry(
         race_distance=race_distance,
@@ -1200,7 +1409,21 @@ def _telemetry(
         reverse_timer=reverse_timer,
         lap=lap,
         laps_completed=laps_completed,
+        camera_setting_raw=camera_setting_raw,
+        camera_setting_name=camera_setting_name,
     )
+
+
+def _camera_setting_name(camera_setting_raw: int) -> str:
+    if camera_setting_raw == 0:
+        return "overhead"
+    if camera_setting_raw == 1:
+        return "close_behind"
+    if camera_setting_raw == 2:
+        return "regular"
+    if camera_setting_raw == 3:
+        return "wide"
+    return "unknown"
 
 
 def _image_obs(observation: ObservationValue) -> np.ndarray:

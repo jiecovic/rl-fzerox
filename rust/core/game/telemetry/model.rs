@@ -64,6 +64,8 @@ pub struct TelemetrySnapshot {
     pub total_lap_count: i32,
     pub difficulty_raw: i32,
     pub difficulty_name: &'static str,
+    pub camera_setting_raw: i32,
+    pub camera_setting_name: &'static str,
     pub game_mode_raw: u32,
     pub game_mode_name: &'static str,
     pub in_race_mode: bool,
