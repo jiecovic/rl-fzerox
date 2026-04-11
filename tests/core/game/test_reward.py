@@ -67,6 +67,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_gain_reward_scale": 0.018,
         "energy_gain_collision_cooldown_frames": 17,
         "energy_full_refill_bonus": 1.25,
+        "energy_full_refill_cooldown_frames": 23,
         "airborne_landing_reward": 0.42,
         "boost_pad_reward": 0.33,
         "boost_pad_reward_cooldown_frames": 19,
@@ -531,6 +532,53 @@ def test_race_v2_rewards_full_energy_refill_once() -> None:
     assert full.breakdown == {"energy_full_refill": 1.5}
     assert still_full.reward == 0.0
     assert still_full.breakdown == {}
+
+
+def test_race_v2_full_energy_refill_bonus_obeys_cooldown() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            energy_gain_reward_scale=0.0,
+            energy_full_refill_bonus=1.5,
+            energy_full_refill_cooldown_frames=10,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, energy=120.0))
+
+    first_full = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1, energy_gain_total=58.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=178.0),
+    )
+    tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=3, energy_loss_total=10.0),
+        _status(step_count=2),
+        _telemetry(race_distance=100.0, energy=168.0),
+    )
+    cooldown_blocked = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=3, energy_gain_total=10.0),
+        _status(step_count=3),
+        _telemetry(race_distance=100.0, energy=178.0),
+    )
+    tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=4, energy_loss_total=10.0),
+        _status(step_count=4),
+        _telemetry(race_distance=100.0, energy=168.0),
+    )
+    rewarded_after_cooldown = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1, energy_gain_total=10.0),
+        _status(step_count=5),
+        _telemetry(race_distance=100.0, energy=178.0),
+    )
+
+    assert first_full.breakdown == {"energy_full_refill": 1.5}
+    assert cooldown_blocked.breakdown == {}
+    assert rewarded_after_cooldown.breakdown == {"energy_full_refill": 1.5}
+    assert tracker.info(_telemetry(race_distance=100.0, energy=178.0))[
+        "energy_full_refill_cooldown_frames_remaining"
+    ] == 10
 
 
 def test_build_reward_tracker_passes_energy_gain_collision_cooldown_from_config() -> None:
