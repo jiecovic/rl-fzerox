@@ -1,8 +1,11 @@
 # src/rl_fzerox/ui/watch/hud/format.py
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.layout import BUTTON_LABELS
 
 _RELOAD_ERROR_MAX_CHARS = 36
@@ -13,13 +16,28 @@ def _pressed_button_labels(joypad_mask_value: int) -> str:
     return " ".join(pressed) if pressed else "none"
 
 
-def _format_policy_action(policy_action: np.ndarray | None) -> str:
+def _format_policy_action(policy_action: ActionValue | None) -> str:
     if policy_action is None:
         return "manual"
 
-    values = np.asarray(policy_action).reshape(-1)
+    if isinstance(policy_action, Mapping):
+        continuous = policy_action.get("continuous")
+        discrete = policy_action.get("discrete")
+        if continuous is not None and discrete is not None:
+            return (
+                f"c={_format_action_values(continuous)} "
+                f"d={_format_action_values(discrete)}"
+            )
+
+    return _format_action_values(policy_action)
+
+
+def _format_action_values(value: object) -> str:
+    values = np.asarray(value).reshape(-1)
+    if values.dtype == np.dtype("O"):
+        return str(value)
     if np.issubdtype(values.dtype, np.floating):
-        formatted = [f"{float(value):.2f}" for value in values]
+        formatted = [f"{float(value):+.2f}" for value in values]
         return "[" + ",".join(formatted) + "]"
     return str(values.astype(np.int64, copy=False).tolist()).replace(" ", "")
 

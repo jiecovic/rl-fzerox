@@ -33,6 +33,4 @@ def _panel_content_height(
     right_width = content_width - LAYOUT.column_gap - left_width
     left_height = _column_content_height(fonts, columns.left, width=left_width)
     right_height = _column_content_height(fonts, columns.right, width=right_width)
-    preview_height = _preview_block_height(observation_shape, fonts)
-    left_total_height = left_height + LAYOUT.section_gap + preview_height
-    return y + max(left_total_height, right_height) + LAYOUT.panel_padding
+    return y + max(left_height, right_height) + LAYOUT.panel_padding

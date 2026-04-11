@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from fzerox_emulator import (
     JOYPAD_A,
@@ -41,7 +41,7 @@ class RenderFont(Protocol):
 class ViewerLayout:
     """Spacing and sizing used by the watch window layout."""
 
-    panel_width: int = 456
+    panel_width: int = 600
     panel_min_height: int = 720
     panel_padding: int = 12
     preview_gap: int = 12
@@ -55,6 +55,7 @@ class ViewerLayout:
     section_title_gap: int = 4
     section_rule_gap: int = 4
     line_gap: int = 2
+    inline_value_gap: int = 8
     wrapped_value_indent: int = 10
     control_viz_gap: int = 3
     control_widget_gap: int = 12
@@ -64,6 +65,7 @@ class ViewerLayout:
     control_steer_height: int = 10
     control_drive_width: int = 12
     control_drive_height: int = 56
+    control_drive_pair_gap: int = 20
     control_drive_offset_x: int = 8
     control_marker_radius: int = 6
     control_caption_gap: int = 3
@@ -112,6 +114,8 @@ class ControlViz:
     steer_x: float
     drive_level: int
     drive_axis: float | None
+    brake_axis: float | None
+    drive_axis_mode: Literal["signed", "gas"]
     boost_pressed: bool
     drift_direction: int
 
@@ -165,7 +169,9 @@ class ViewerFontSizes:
 
     title: int = 24
     section: int = 20
-    body: int = 18
+    # Mono fonts have taller metrics than pygame's default font; 12 matches the
+    # old body text height closely while keeping value columns tabular.
+    body: int = 12
     small: int = 16
 
 
