@@ -6,6 +6,8 @@ from rl_fzerox.core.envs.actions.base import ActionAdapter, ActionValue, Resetta
 from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveDriftActionAdapter,
+)
+from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
     HybridSteerDriveBoostDriftActionAdapter,
     HybridSteerDriveBoostShoulderPrimitiveActionAdapter,
     HybridSteerDriveDriftActionAdapter,
