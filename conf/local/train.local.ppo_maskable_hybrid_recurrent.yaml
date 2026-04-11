@@ -11,6 +11,8 @@ env:
     # Full-range PWM maps -1 to coast, 0 to half accelerate, and +1 to full accelerate.
     continuous_drive_mode: pwm
     continuous_drive_deadzone: 0.0
+    # Keep drift unavailable at low speed, without hard-masking it forever.
+    drift_unmask_min_speed_kph: 730.0
 
 train:
   algorithm: maskable_hybrid_recurrent_ppo
