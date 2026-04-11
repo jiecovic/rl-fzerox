@@ -24,7 +24,7 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import ACCELERATE_MASK, DRIFT_LEFT_MASK
-from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.observations import DRIFT_DOUBLE_TAP_WINDOW_FRAMES, ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
     make_step_status,
@@ -395,7 +395,19 @@ def test_step_updates_right_drift_hold_and_press_age_in_image_state_observation(
 
     assert isinstance(obs, dict)
     assert obs["state"].tolist() == pytest.approx(
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0 / 15.0, 0.0]
+        [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            1.0 / DRIFT_DOUBLE_TAP_WINDOW_FRAMES,
+            0.0,
+        ]
     )
 
 

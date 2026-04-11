@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/envs/observations.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 import numpy as np
@@ -14,27 +15,60 @@ ImageObservation: TypeAlias = np.ndarray
 ImageStateObservation: TypeAlias = dict[str, np.ndarray]
 ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
 
-STATE_FEATURE_NAMES: tuple[str, ...] = (
-    "speed_norm",
-    "energy_frac",
-    "reverse_active",
-    "airborne",
-    "can_boost",
-    "boost_active",
-    "left_drift_held",
-    "right_drift_held",
-    "left_press_age_norm",
-    "right_press_age_norm",
-    "recent_boost_pressure",
+
+@dataclass(frozen=True, slots=True)
+class StateFeature:
+    """One scalar policy-state feature and its observation-space upper bound."""
+
+    name: str
+    high: float
+
+
+@dataclass(frozen=True, slots=True)
+class StateVectorSpec:
+    """Ordered scalar state schema appended to image observations."""
+
+    features: tuple[StateFeature, ...]
+    speed_normalizer_kph: float
+    shoulder_tap_guard_frames: int
+    recent_boost_window_frames: int
+
+    @property
+    def names(self) -> tuple[str, ...]:
+        return tuple(feature.name for feature in self.features)
+
+    @property
+    def count(self) -> int:
+        return len(self.features)
+
+    def high_array(self) -> np.ndarray:
+        return np.array([feature.high for feature in self.features], dtype=np.float32)
+
+
+STATE_VECTOR_SPEC = StateVectorSpec(
+    features=(
+        StateFeature("speed_norm", 2.0),
+        StateFeature("energy_frac", 1.0),
+        StateFeature("reverse_active", 1.0),
+        StateFeature("airborne", 1.0),
+        StateFeature("can_boost", 1.0),
+        StateFeature("boost_active", 1.0),
+        StateFeature("left_drift_held", 1.0),
+        StateFeature("right_drift_held", 1.0),
+        StateFeature("left_press_age_norm", 1.0),
+        StateFeature("right_press_age_norm", 1.0),
+        StateFeature("recent_boost_pressure", 1.0),
+    ),
+    speed_normalizer_kph=1_500.0,
+    shoulder_tap_guard_frames=14,
+    recent_boost_window_frames=120,
 )
-STATE_FEATURE_COUNT = len(STATE_FEATURE_NAMES)
-STATE_SPEED_NORMALIZER_KPH = 1_500.0
-DRIFT_DOUBLE_TAP_WINDOW_FRAMES = 15
-RECENT_BOOST_PRESSURE_WINDOW_FRAMES = 120
-STATE_FEATURE_HIGH = np.array(
-    [2.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-    dtype=np.float32,
-)
+STATE_FEATURE_NAMES = STATE_VECTOR_SPEC.names
+STATE_FEATURE_COUNT = STATE_VECTOR_SPEC.count
+STATE_SPEED_NORMALIZER_KPH = STATE_VECTOR_SPEC.speed_normalizer_kph
+DRIFT_DOUBLE_TAP_WINDOW_FRAMES = STATE_VECTOR_SPEC.shoulder_tap_guard_frames
+RECENT_BOOST_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_boost_window_frames
+STATE_FEATURE_HIGH = STATE_VECTOR_SPEC.high_array()
 
 
 def build_observation(
