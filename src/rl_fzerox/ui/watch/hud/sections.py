@@ -182,7 +182,7 @@ def _build_panel_columns(
             PanelSection(
                 title="Input",
                 lines=[],
-                control_viz=_control_viz(control_state),
+                control_viz=_control_viz(control_state, policy_action=policy_action),
             ),
         ],
         right=[

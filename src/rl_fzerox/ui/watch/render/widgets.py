@@ -181,33 +181,42 @@ def _draw_control_viz(
         drive_track,
         border_radius=LAYOUT.control_drive_width // 2,
     )
-
-    drive_levels = {
-        1: drive_y + LAYOUT.control_marker_radius,
-        0: drive_y + LAYOUT.control_drive_height // 2,
-        -1: drive_y + LAYOUT.control_drive_height - LAYOUT.control_marker_radius,
-    }
-    inactive_radius = max(2, LAYOUT.control_marker_radius - 2)
     drive_center_x = drive_x + LAYOUT.control_drive_width // 2
-    for level, marker_y in drive_levels.items():
-        color = PALETTE.panel_border
-        radius = inactive_radius
-        if control_viz.drive_level == level:
-            if level > 0:
-                color = PALETTE.text_accent
-            elif level < 0:
-                color = PALETTE.text_warning
-            else:
-                color = PALETTE.control_coast
-            radius = LAYOUT.control_marker_radius
-        _draw_round_marker(
-            pygame=pygame,
-            screen=screen,
-            color=color,
-            center=(drive_center_x, marker_y),
-            radius=radius,
-            outline_color=None,
+    drive_mid_y = drive_y + LAYOUT.control_drive_height // 2
+    drive_value = (
+        control_viz.drive_axis
+        if control_viz.drive_axis is not None
+        else float(control_viz.drive_level)
+    )
+    drive_value = max(-1.0, min(1.0, drive_value))
+    drive_extent = (LAYOUT.control_drive_height // 2) - LAYOUT.control_marker_radius
+    drive_knob_y = drive_mid_y - round(drive_extent * drive_value)
+    drive_knob_y = max(
+        drive_y + LAYOUT.control_marker_radius,
+        min(drive_y + LAYOUT.control_drive_height - LAYOUT.control_marker_radius, drive_knob_y),
+    )
+    if drive_knob_y != drive_mid_y:
+        drive_fill = pygame.Rect(
+            drive_x,
+            min(drive_mid_y, drive_knob_y),
+            LAYOUT.control_drive_width,
+            abs(drive_knob_y - drive_mid_y),
         )
+        pygame.draw.rect(
+            screen,
+            PALETTE.text_accent if drive_value > 0.0 else PALETTE.text_warning,
+            drive_fill,
+            border_radius=LAYOUT.control_drive_width // 2,
+        )
+
+    _draw_round_marker(
+        pygame=pygame,
+        screen=screen,
+        color=PALETTE.control_knob if drive_value != 0.0 else PALETTE.control_coast,
+        center=(drive_center_x, drive_knob_y),
+        radius=LAYOUT.control_marker_radius,
+        outline_color=PALETTE.control_knob_outline,
+    )
 
     y += LAYOUT.control_drive_height + LAYOUT.control_caption_gap
     if control_viz.drive_level > 0:
