@@ -58,6 +58,9 @@ class ActionConfig(BaseModel):
     name: Literal[
         "continuous_steer_drive",
         "continuous_steer_drive_drift",
+        "hybrid_steer_drive_boost_drift",
+        "hybrid_steer_drive_boost_shoulder_primitive",
+        "hybrid_steer_drive_drift",
         "steer_drive",
         "steer_drive_boost",
         "steer_drive_boost_drift",
@@ -104,6 +107,7 @@ class EnvConfig(BaseModel):
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
+    camera_setting: Literal["overhead", "close_behind", "regular", "wide"] | None = None
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
@@ -206,7 +210,7 @@ class NetArchConfig(BaseModel):
 
 
 class ExtractorConfig(BaseModel):
-    """Shared feature-extractor settings for the PPO policy."""
+    """Shared feature-extractor settings for SB3 policies."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -227,7 +231,7 @@ class PolicyRecurrentConfig(BaseModel):
 
 
 class PolicyConfig(BaseModel):
-    """PPO policy and feature-extractor sizes."""
+    """SB3 policy and feature-extractor sizes."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -288,7 +292,7 @@ class CurriculumConfig(BaseModel):
 
 
 class TrainConfig(BaseModel):
-    """PPO training settings for the current run."""
+    """Training settings for the current run."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -297,6 +301,10 @@ class TrainConfig(BaseModel):
         "ppo",
         "maskable_ppo",
         "maskable_recurrent_ppo",
+        "hybrid_action_ppo",
+        "hybrid_recurrent_ppo",
+        "maskable_hybrid_action_ppo",
+        "maskable_hybrid_recurrent_ppo",
         "sac",
     ] = "maskable_ppo"
     vec_env: Literal["dummy", "subproc"] = "dummy"
@@ -365,14 +373,17 @@ class TrainAppConfig(BaseModel):
     def _validate_recurrent_algorithm_alignment(self) -> TrainAppConfig:
         recurrent_enabled = self.policy.recurrent.enabled
         algorithm = self.train.algorithm
-        if recurrent_enabled and algorithm != "maskable_recurrent_ppo":
+        recurrent_algorithms = {
+            "maskable_recurrent_ppo",
+            "hybrid_recurrent_ppo",
+            "maskable_hybrid_recurrent_ppo",
+        }
+        if recurrent_enabled and algorithm not in recurrent_algorithms:
             raise ValueError(
-                "policy.recurrent.enabled=true requires "
-                "train.algorithm=maskable_recurrent_ppo"
+                "policy.recurrent.enabled=true requires a recurrent train.algorithm"
             )
-        if not recurrent_enabled and algorithm == "maskable_recurrent_ppo":
+        if not recurrent_enabled and algorithm in recurrent_algorithms:
             raise ValueError(
-                "train.algorithm=maskable_recurrent_ppo requires "
-                "policy.recurrent.enabled=true"
+                f"train.algorithm={algorithm} requires policy.recurrent.enabled=true"
             )
         return self

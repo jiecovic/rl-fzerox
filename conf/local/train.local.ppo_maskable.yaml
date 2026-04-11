@@ -1,0 +1,12 @@
+defaults:
+  - /train_ppo_base
+  - /local/train.local.base@_global_
+  - _self_
+
+env:
+  action:
+    name: steer_drive_boost_drift
+
+train:
+  init_run_dir: local/runs/ppo_cnn_0043
+  init_artifact: latest

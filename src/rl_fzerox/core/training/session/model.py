@@ -220,8 +220,23 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
             "Plain PPO training is no longer supported. "
             "Use `train.algorithm=maskable_ppo` or `maskable_recurrent_ppo`."
         )
-    if config.train.algorithm != "sac":
+    if config.train.algorithm == "sac":
+        _validate_sac_training_config(config)
         return
+    if config.train.algorithm == "hybrid_action_ppo":
+        _validate_hybrid_action_ppo_training_config(config)
+        return
+    if config.train.algorithm == "hybrid_recurrent_ppo":
+        _validate_hybrid_recurrent_ppo_training_config(config)
+        return
+    if config.train.algorithm == "maskable_hybrid_action_ppo":
+        _validate_maskable_hybrid_action_ppo_training_config(config)
+        return
+    if config.train.algorithm == "maskable_hybrid_recurrent_ppo":
+        _validate_maskable_hybrid_recurrent_ppo_training_config(config)
+
+
+def _validate_sac_training_config(config: TrainAppConfig) -> None:
     if config.env.action.name not in {"continuous_steer_drive", "continuous_steer_drive_drift"}:
         raise RuntimeError(
             "SAC requires a continuous steer-drive action adapter so the action space is Box"
@@ -236,15 +251,78 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
         )
 
 
+def _validate_hybrid_action_ppo_training_config(config: TrainAppConfig) -> None:
+    _validate_unmasked_hybrid_action_ppo_training_config(
+        config,
+        algorithm_label="Hybrid action PPO",
+    )
+
+
+def _validate_hybrid_recurrent_ppo_training_config(config: TrainAppConfig) -> None:
+    _validate_unmasked_hybrid_action_ppo_training_config(
+        config,
+        algorithm_label="Hybrid recurrent PPO",
+    )
+
+
+def _validate_unmasked_hybrid_action_ppo_training_config(
+    config: TrainAppConfig,
+    *,
+    algorithm_label: str,
+) -> None:
+    _validate_hybrid_action_adapter(config, algorithm_label=algorithm_label)
+    if config.env.action.mask is not None:
+        raise RuntimeError(f"{algorithm_label} does not support env.action.mask yet")
+    if config.curriculum.enabled:
+        raise RuntimeError(f"{algorithm_label} does not support action-mask curriculum stages")
+
+
+def _validate_maskable_hybrid_action_ppo_training_config(config: TrainAppConfig) -> None:
+    _validate_hybrid_action_adapter(
+        config,
+        algorithm_label="Maskable hybrid action PPO",
+    )
+
+
+def _validate_maskable_hybrid_recurrent_ppo_training_config(
+    config: TrainAppConfig,
+) -> None:
+    _validate_hybrid_action_adapter(
+        config,
+        algorithm_label="Maskable hybrid recurrent PPO",
+    )
+
+
+def _validate_hybrid_action_adapter(
+    config: TrainAppConfig,
+    *,
+    algorithm_label: str,
+) -> None:
+    if config.env.action.name not in {
+        "hybrid_steer_drive_drift",
+        "hybrid_steer_drive_boost_drift",
+        "hybrid_steer_drive_boost_shoulder_primitive",
+    }:
+        raise RuntimeError(
+            f"{algorithm_label} requires a hybrid steer-drive action adapter "
+            "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"
+        )
+
+
 def training_requires_action_masks(config: TrainAppConfig) -> bool:
     """Return whether the current env stack depends on action masking.
 
-    PPO-family training always relies on mask-aware algorithms because gameplay
-    masks are part of that discrete-action contract. SAC uses a separate
-    continuous action adapter without boost/drift mask branches.
+    Maskable PPO variants own the gameplay-mask contract. SAC and plain hybrid
+    PPO stay unmasked; hybrid maskable PPO masks only its discrete branches.
     """
 
-    return config.train.algorithm != "sac"
+    return config.train.algorithm in {
+        "auto",
+        "maskable_ppo",
+        "maskable_recurrent_ppo",
+        "maskable_hybrid_action_ppo",
+        "maskable_hybrid_recurrent_ppo",
+    }
 
 
 def resolve_effective_training_algorithm(
@@ -274,15 +352,37 @@ def _resolve_training_algorithm(algorithm: str):
             from sb3_contrib import MaskablePPO
 
             return MaskablePPO
+        if algorithm == "hybrid_action_ppo":
+            from sb3x import HybridActionPPO
+
+            return HybridActionPPO
+        if algorithm == "hybrid_recurrent_ppo":
+            from sb3x import HybridRecurrentPPO
+
+            return HybridRecurrentPPO
+        if algorithm == "maskable_hybrid_action_ppo":
+            from sb3x import MaskableHybridActionPPO
+
+            return MaskableHybridActionPPO
+        if algorithm == "maskable_hybrid_recurrent_ppo":
+            from sb3x import MaskableHybridRecurrentPPO
+
+            return MaskableHybridRecurrentPPO
 
         from stable_baselines3 import PPO
 
         return PPO
     except ImportError as exc:
-        if algorithm == "maskable_recurrent_ppo":
+        if algorithm in {
+            "maskable_recurrent_ppo",
+            "hybrid_action_ppo",
+            "hybrid_recurrent_ppo",
+            "maskable_hybrid_action_ppo",
+            "maskable_hybrid_recurrent_ppo",
+        }:
             raise RuntimeError(
-                "Maskable recurrent PPO requires stable-baselines3, sb3-contrib, "
-                "torch, and sb3x. Install train deps and then install sb3x in "
+                f"{algorithm} requires stable-baselines3, torch, and sb3x. "
+                "Install train deps and then install sb3x in "
                 "the active environment."
             ) from exc
         raise RuntimeError(
@@ -325,7 +425,12 @@ def _policy_kwargs(
 
 
 def _validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
-    if effective_algorithm not in {"maskable_ppo", "maskable_recurrent_ppo"}:
+    if effective_algorithm not in {
+        "maskable_ppo",
+        "maskable_recurrent_ppo",
+        "maskable_hybrid_action_ppo",
+        "maskable_hybrid_recurrent_ppo",
+    }:
         return
 
     if not hasattr(train_env, "env_method"):
@@ -340,13 +445,18 @@ def _validate_recurrent_configuration_alignment(
     policy_config: PolicyConfig,
 ) -> None:
     recurrent_enabled = policy_config.recurrent.enabled
-    if recurrent_enabled and effective_algorithm != "maskable_recurrent_ppo":
+    recurrent_algorithms = {
+        "maskable_recurrent_ppo",
+        "hybrid_recurrent_ppo",
+        "maskable_hybrid_recurrent_ppo",
+    }
+    if recurrent_enabled and effective_algorithm not in recurrent_algorithms:
         raise RuntimeError(
-            "Recurrent policy config requires train.algorithm=maskable_recurrent_ppo"
+            "Recurrent policy config requires a recurrent train.algorithm"
         )
-    if not recurrent_enabled and effective_algorithm == "maskable_recurrent_ppo":
+    if not recurrent_enabled and effective_algorithm in recurrent_algorithms:
         raise RuntimeError(
-            "maskable_recurrent_ppo requires policy.recurrent.enabled=true"
+            f"{effective_algorithm} requires policy.recurrent.enabled=true"
         )
 
 

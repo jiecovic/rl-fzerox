@@ -1,5 +1,6 @@
 defaults:
-  - /local/train.local@_global_
+  - /train_ppo_base
+  - /local/train.local.base@_global_
   - _self_
 
 train:
@@ -9,6 +10,8 @@ train:
   ent_coef: 0.0
 
 env:
+  action:
+    name: steer_drive_boost_drift
   boost_min_energy_fraction: 0.30
 
 policy:

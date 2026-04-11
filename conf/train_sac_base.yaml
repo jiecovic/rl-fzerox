@@ -1,0 +1,37 @@
+defaults:
+  - train_base
+  - _self_
+
+env:
+  action:
+    # SAC uses continuous steering/throttle axes; boost and drift stay disabled here.
+    name: continuous_steer_drive
+    # Full-range PWM maps -1 to coast, 0 to half throttle, and +1 to full throttle.
+    continuous_drive_mode: pwm
+    # Low-end duty threshold before the throttle button starts pulsing.
+    continuous_drive_deadzone: 0.0
+
+train:
+  algorithm: sac
+  vec_env: subproc
+  num_envs: 2
+  run_name: sac_cnn
+  total_timesteps: 10_000_000
+  # Dict replay buffer stores image and next_image, so keep this conservative on 32 GB RAM.
+  buffer_size: 30_000
+  learning_starts: 5_000
+  train_freq: 8
+  gradient_steps: 2
+  batch_size: 128
+  learning_rate: 3.0e-4
+  tau: 0.005
+  gamma: 0.992
+  ent_coef: auto
+  target_entropy: auto
+  optimize_memory_usage: false
+
+policy:
+  net_arch:
+    # SAC maps the shared schema's vf list to SB3's qf critic head.
+    pi: [512, 256]
+    vf: [512]

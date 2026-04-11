@@ -149,4 +149,61 @@ def _learn_model(
         )
         return
 
+    try:
+        from sb3x import MaskableHybridRecurrentPPO
+    except ImportError:
+        MaskableHybridRecurrentPPO = None
+
+    if (
+        MaskableHybridRecurrentPPO is not None
+        and isinstance(model, MaskableHybridRecurrentPPO)
+    ):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            use_masking=use_masking,
+            progress_bar=progress_bar,
+        )
+        return
+
+    try:
+        from sb3x import HybridRecurrentPPO
+    except ImportError:
+        HybridRecurrentPPO = None
+
+    if HybridRecurrentPPO is not None and isinstance(model, HybridRecurrentPPO):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            progress_bar=progress_bar,
+        )
+        return
+
+    try:
+        from sb3x import MaskableHybridActionPPO
+    except ImportError:
+        MaskableHybridActionPPO = None
+
+    if MaskableHybridActionPPO is not None and isinstance(model, MaskableHybridActionPPO):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            use_masking=use_masking,
+            progress_bar=progress_bar,
+        )
+        return
+
+    try:
+        from sb3x import HybridActionPPO
+    except ImportError:
+        HybridActionPPO = None
+
+    if HybridActionPPO is not None and isinstance(model, HybridActionPPO):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            progress_bar=progress_bar,
+        )
+        return
+
     raise TypeError(f"Unsupported training model type: {type(model).__name__}")
