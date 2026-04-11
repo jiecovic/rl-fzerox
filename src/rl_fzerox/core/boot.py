@@ -1,4 +1,18 @@
 # src/rl_fzerox/core/boot.py
+"""Deterministic emulator boot and race-continuation helpers.
+
+This module owns the controller script that moves a freshly loaded F-Zero X
+ROM from the title screen into the default first GP race, plus the shorter
+path that advances an existing session from a terminal state into the next
+race. It combines measured Start-button sequences with telemetry checks so
+the env reset path can wait for real game-mode transitions instead of relying
+only on fixed sleeps.
+
+It intentionally stays separate from action adapters and training config:
+the functions here mutate emulator state directly and are part of runtime
+reset orchestration, not shared domain metadata.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

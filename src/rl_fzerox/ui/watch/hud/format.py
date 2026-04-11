@@ -5,11 +5,11 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.hybrid_action import (
+from rl_fzerox.core.domain.hybrid_action import (
     HYBRID_CONTINUOUS_ACTION_KEY,
     HYBRID_DISCRETE_ACTION_KEY,
 )
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.layout import BUTTON_LABELS
 
 _RELOAD_ERROR_MAX_CHARS = 36

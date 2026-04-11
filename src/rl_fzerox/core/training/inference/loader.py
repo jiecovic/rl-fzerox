@@ -9,10 +9,7 @@ from typing import Protocol, TypeGuard
 
 import numpy as np
 
-from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
-from rl_fzerox.core.training_algorithms import (
+from rl_fzerox.core.domain.training_algorithms import (
     FULL_MODEL_POLICY_ALGORITHMS,
     LEGACY_PPO_ALGORITHMS,
     SAVED_POLICY_ALGORITHMS,
@@ -25,6 +22,9 @@ from rl_fzerox.core.training_algorithms import (
     TRAIN_ALGORITHM_PPO,
     TRAIN_ALGORITHM_SAC,
 )
+from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
 
 PolicyState = tuple[np.ndarray, ...] | None
 

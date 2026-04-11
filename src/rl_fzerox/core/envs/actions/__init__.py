@@ -1,7 +1,8 @@
 # src/rl_fzerox/core/envs/actions/__init__.py
 from collections.abc import Callable
 
-from rl_fzerox.core.action_adapters import (
+from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_DRIFT,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_DRIFT,
@@ -13,7 +14,6 @@ from rl_fzerox.core.action_adapters import (
     DEFAULT_ACTION_ADAPTER_NAME,
     ActionAdapterName,
 )
-from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.envs.actions.base import ActionAdapter, ActionValue, ResettableActionAdapter
 from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     ContinuousSteerDriveActionAdapter,

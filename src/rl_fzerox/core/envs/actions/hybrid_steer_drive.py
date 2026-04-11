@@ -8,6 +8,10 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.domain.hybrid_action import (
+    HYBRID_CONTINUOUS_ACTION_KEY,
+    HYBRID_DISCRETE_ACTION_KEY,
+)
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
@@ -25,10 +29,6 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
     BOOST_MASK,
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
-)
-from rl_fzerox.core.hybrid_action import (
-    HYBRID_CONTINUOUS_ACTION_KEY,
-    HYBRID_DISCRETE_ACTION_KEY,
 )
 
 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE = 2

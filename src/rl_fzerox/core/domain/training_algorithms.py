@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/training_algorithms.py
+# src/rl_fzerox/core/domain/training_algorithms.py
 """String-backed training algorithm names shared by config, training, and watch."""
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ DEFAULT_TRAIN_ALGORITHM: Final[TrainAlgorithmName] = TRAIN_ALGORITHM_MASKABLE_PP
 
 def _algorithm_set(*names: TrainAlgorithmName) -> frozenset[TrainAlgorithmName]:
     """Build typed immutable groups while keeping YAML/SB3-facing values as strings."""
-
     return frozenset(names)
 
 

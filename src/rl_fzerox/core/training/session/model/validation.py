@@ -1,9 +1,9 @@
 # src/rl_fzerox/core/training/session/model/validation.py
 from __future__ import annotations
 
-from rl_fzerox.core.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
 from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
-from rl_fzerox.core.training_algorithms import (
+from rl_fzerox.core.domain.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
+from rl_fzerox.core.domain.training_algorithms import (
     MASKABLE_TRAINING_ALGORITHMS,
     RECURRENT_TRAINING_ALGORITHMS,
     TRAIN_ALGORITHM_HYBRID_ACTION_PPO,

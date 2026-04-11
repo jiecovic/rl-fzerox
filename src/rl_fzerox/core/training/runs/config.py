@@ -7,16 +7,16 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
+from rl_fzerox.core.domain.training_algorithms import (
+    TRAIN_ALGORITHM_AUTO,
+    TRAIN_ALGORITHM_MASKABLE_PPO,
+)
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
     build_watch_session_paths,
     ensure_watch_session_dirs,
     resolve_train_run_config_path,
-)
-from rl_fzerox.core.training_algorithms import (
-    TRAIN_ALGORITHM_AUTO,
-    TRAIN_ALGORITHM_MASKABLE_PPO,
 )
 
 

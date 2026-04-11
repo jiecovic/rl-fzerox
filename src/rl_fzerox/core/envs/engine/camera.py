@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.camera import CAMERA_SETTING_BY_NAME, CAMERA_SETTINGS, CameraSettingName
+from rl_fzerox.core.domain.camera import (
+    CAMERA_SETTING_BY_NAME,
+    CAMERA_SETTINGS,
+    CameraSettingName,
+)
 
 _CAMERA_SETTING_COUNT = len(CAMERA_SETTINGS)
 _CAMERA_RIGHT_TAP = ControllerState(right_stick_x=1.0)

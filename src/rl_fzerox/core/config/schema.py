@@ -18,9 +18,9 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
-from rl_fzerox.core.camera import CameraSettingName
-from rl_fzerox.core.training_algorithms import (
+from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
+from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.training_algorithms import (
     DEFAULT_TRAIN_ALGORITHM,
     RECURRENT_TRAINING_ALGORITHMS,
     TRAIN_ALGORITHM_SAC,

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
-from rl_fzerox.core.training_algorithms import (
+from rl_fzerox.core.domain.training_algorithms import (
     MASKABLE_TRAINING_ALGORITHMS,
     SB3X_TRAINING_ALGORITHMS,
     TRAIN_ALGORITHM_AUTO,
