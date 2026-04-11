@@ -62,7 +62,9 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_gain_collision_cooldown_frames": 17,
         "energy_full_refill_bonus": 1.25,
         "airborne_landing_reward": 0.42,
-        "boost_redundant_press_penalty": -0.013,
+        "boost_pad_reward": 0.33,
+        "boost_pad_reward_cooldown_frames": 19,
+        "boost_press_penalty": -0.013,
         "collision_recoil_penalty": -2.25,
         "spinning_out_penalty": -4.5,
         "terminal_failure_base_penalty": -111.0,
@@ -552,12 +554,34 @@ def test_build_reward_tracker_passes_energy_gain_collision_cooldown_from_config(
     assert step.breakdown == {"collision_recoil": -2.0}
 
 
+def test_race_v2_penalizes_boost_requests() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            boost_press_penalty=-0.25,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, boost_timer=0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, boost_timer=20),
+        RewardActionContext(boost_requested=True),
+    )
+
+    assert step.reward == -0.25
+    assert step.breakdown == {"boost_press": -0.25}
+
+
 def test_race_v2_penalizes_boost_requests_while_boost_is_already_active() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             milestone_bonus=0.0,
-            boost_redundant_press_penalty=-0.25,
+            boost_press_penalty=-0.25,
             bootstrap_progress_scale=0.0,
         )
     )
@@ -571,37 +595,15 @@ def test_race_v2_penalizes_boost_requests_while_boost_is_already_active() -> Non
     )
 
     assert step.reward == -0.25
-    assert step.breakdown == {"boost_redundant_press": -0.25}
+    assert step.breakdown == {"boost_press": -0.25}
 
 
-def test_race_v2_treats_dash_pad_boost_as_already_active() -> None:
+def test_race_v2_does_not_penalize_when_boost_is_not_requested() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=0.0,
             milestone_bonus=0.0,
-            boost_redundant_press_penalty=-0.25,
-            bootstrap_progress_scale=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")))
-
-    step = tracker.step_summary(
-        _summary(max_race_distance=100.0),
-        _status(step_count=1),
-        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
-        RewardActionContext(boost_requested=True),
-    )
-
-    assert step.reward == -0.25
-    assert step.breakdown == {"boost_redundant_press": -0.25}
-
-
-def test_race_v2_does_not_penalize_the_step_that_newly_starts_boost() -> None:
-    tracker = RaceV2RewardTracker(
-        RaceV2RewardWeights(
-            time_penalty_per_frame=0.0,
-            milestone_bonus=0.0,
-            boost_redundant_press_penalty=-0.25,
+            boost_press_penalty=-0.25,
             bootstrap_progress_scale=0.0,
         )
     )
@@ -611,11 +613,49 @@ def test_race_v2_does_not_penalize_the_step_that_newly_starts_boost() -> None:
         _summary(max_race_distance=100.0),
         _status(step_count=1),
         _telemetry(race_distance=100.0, boost_timer=20),
-        RewardActionContext(boost_requested=True),
+        RewardActionContext(boost_requested=False),
     )
 
     assert step.reward == 0.0
     assert step.breakdown == {}
+
+
+def test_race_v2_rewards_dash_pad_boost_entries_with_cooldown() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            boost_pad_reward=0.5,
+            boost_pad_reward_cooldown_frames=3,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
+    )
+    blocked = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=2),
+        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
+    )
+    rewarded_after_cooldown = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=2, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=4),
+        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
+    )
+    info = tracker.info(_telemetry(race_distance=100.0))
+
+    assert first.reward == 0.5
+    assert first.breakdown == {"boost_pad": 0.5}
+    assert blocked.reward == 0.0
+    assert blocked.breakdown == {}
+    assert rewarded_after_cooldown.reward == 0.5
+    assert rewarded_after_cooldown.breakdown == {"boost_pad": 0.5}
+    assert info["boost_pad_reward_cooldown_frames_remaining"] == 3
 
 
 def test_race_v2_applies_event_penalties_once_per_entry() -> None:
@@ -816,7 +856,7 @@ def test_race_v2_applies_final_lap_reward_and_finish_position_bonus() -> None:
     }
 
 
-def test_race_v2_applies_low_speed_time_penalty_but_not_dash_pad_bonus() -> None:
+def test_race_v2_applies_low_speed_time_penalty_when_dash_pad_reward_is_disabled() -> None:
     tracker = RaceV2RewardTracker(
         RaceV2RewardWeights(
             time_penalty_per_frame=-0.01,

@@ -108,9 +108,13 @@ short-horizon driving tricks.
 - `energy_gain_collision_cooldown_frames`
   - Internal-frame cooldown after entering collision recoil during which
     `energy_gain_total` is not rewarded.
-- `boost_redundant_press_penalty`
-  - Fixed penalty when the agent requests boost on an env step whose pre-step
-    telemetry already had `boost_timer > 0`.
+- `boost_pad_reward`
+  - One-time reward when the native step summary reports entry into a dash-pad
+    boost state.
+- `boost_pad_reward_cooldown_frames`
+  - Internal-frame cooldown before `boost_pad_reward` can fire again.
+- `boost_press_penalty`
+  - Fixed penalty when the agent requests manual boost on an env step.
 
 ## Current shape
 
@@ -127,7 +131,9 @@ Ordinary step:
 - extra low-speed time penalty while speed is below the stuck-speed threshold
 - danger-weighted energy loss penalty below the configured safe fraction
 - smaller energy refill reward, unless collision cooldown is active
-- fixed redundant-boost penalty when boost was already active before the step
+- one-time full-energy refill and airborne landing rewards when enabled
+- boost-pad entry reward, gated by its internal-frame cooldown
+- fixed manual-boost press penalty when boost is requested
 - collision / spin entry penalties
 
 Finish:

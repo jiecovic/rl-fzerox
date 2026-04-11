@@ -135,7 +135,9 @@ class RewardConfig(BaseModel):
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_bonus: NonNegativeFloat = 0.0
     airborne_landing_reward: float = 0.0
-    boost_redundant_press_penalty: float = 0.0
+    boost_pad_reward: NonNegativeFloat = 0.0
+    boost_pad_reward_cooldown_frames: NonNegativeInt = 0
+    boost_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
     terminal_failure_base_penalty: float = -120.0

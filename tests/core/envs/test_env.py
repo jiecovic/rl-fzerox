@@ -578,6 +578,39 @@ def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
 
 
+def test_env_action_masks_disable_boost_while_boost_is_active() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                    boost_timer=0,
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            boost_timer=12,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action=ActionConfig(name="steer_drive_boost")),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+    env.step(np.array([3, 1, 0], dtype=np.int64))
+
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+
+
 def test_env_action_masks_intersect_curriculum_and_boost_unlock_rules() -> None:
     env = FZeroXEnv(
         backend=ScriptedStepBackend(
@@ -1104,6 +1137,7 @@ def _telemetry(
     speed_kph: float = 100.0,
     energy: float = 178.0,
     max_energy: float = 178.0,
+    boost_timer: int = 0,
     reverse_timer: int = 0,
     lap: int = 1,
     laps_completed: int = 0,
@@ -1114,6 +1148,7 @@ def _telemetry(
         speed_kph=speed_kph,
         energy=energy,
         max_energy=max_energy,
+        boost_timer=boost_timer,
         reverse_timer=reverse_timer,
         lap=lap,
         laps_completed=laps_completed,
