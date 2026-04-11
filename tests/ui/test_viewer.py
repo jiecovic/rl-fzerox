@@ -247,7 +247,7 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
         policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_action={
-            "continuous": np.array([0.0, 0.5, -0.5], dtype=np.float32),
+            "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         policy_reload_age_seconds=None,
@@ -265,7 +265,7 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_axis == pytest.approx(0.75)
-    assert input_section.control_viz.air_brake_axis == pytest.approx(0.25)
+    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
     assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 

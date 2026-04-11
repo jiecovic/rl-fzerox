@@ -602,7 +602,7 @@ class _ContinuousDriveDecoder:
 
 
 class _ContinuousButtonPwmDecoder:
-    """Decode one continuous axis into a binary button using deterministic PWM."""
+    """Decode positive continuous intent into a binary button with deterministic PWM."""
 
     def __init__(self, *, deadzone: float) -> None:
         self._deadzone = deadzone
@@ -614,7 +614,7 @@ class _ContinuousButtonPwmDecoder:
         self._pwm_phase = 0.0
 
     def decode(self, value: float, *, button_mask: int) -> int:
-        duty = _pwm_duty_cycle(value, deadzone=self._deadzone)
+        duty = _positive_button_pwm_duty_cycle(value, deadzone=self._deadzone)
         if duty <= 0.0:
             self._pwm_phase = 0.0
             return 0
@@ -638,6 +638,13 @@ def _pwm_duty_cycle(drive: float, *, deadzone: float) -> float:
     if duty <= deadzone:
         return 0.0
     return (duty - deadzone) / (1.0 - deadzone)
+
+
+def _positive_button_pwm_duty_cycle(value: float, *, deadzone: float) -> float:
+    # One-sided buttons should be neutral at 0; positive values express duty.
+    if value <= deadzone:
+        return 0.0
+    return (value - deadzone) / (1.0 - deadzone)
 
 
 def _continuous_action_array(

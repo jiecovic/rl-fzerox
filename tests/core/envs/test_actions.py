@@ -371,6 +371,25 @@ def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_air_brake_a
     )
 
 
+def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_keeps_neutral_air_brake_off() -> None:
+    adapter = HybridSteerDriveBoostShoulderPrimitiveActionAdapter(
+        ActionConfig(
+            name="hybrid_steer_drive_boost_shoulder_primitive",
+            continuous_drive_mode="pwm",
+            continuous_drive_deadzone=0.0,
+        )
+    )
+
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([0.25, -1.0, 0.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    )
+
+    assert control_state == ControllerState(joypad_mask=0, left_stick_x=0.25)
+
+
 def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_allows_config_unmask() -> None:
     adapter = HybridSteerDriveBoostShoulderPrimitiveActionAdapter(
         ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")

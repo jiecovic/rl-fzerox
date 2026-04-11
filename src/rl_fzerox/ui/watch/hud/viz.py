@@ -96,7 +96,7 @@ def _continuous_air_brake_axis(
     if not np.isfinite(air_brake):
         return None
     air_brake = max(-1.0, min(1.0, air_brake))
-    return _continuous_drive_accelerate_level(
+    return _continuous_positive_button_level(
         air_brake,
         deadzone=continuous_drive_deadzone,
     )
@@ -107,6 +107,12 @@ def _continuous_drive_accelerate_level(drive: float, *, deadzone: float) -> floa
     if duty <= deadzone:
         return 0.0
     return (duty - deadzone) / (1.0 - deadzone)
+
+
+def _continuous_positive_button_level(value: float, *, deadzone: float) -> float:
+    if value <= deadzone:
+        return 0.0
+    return (value - deadzone) / (1.0 - deadzone)
 
 
 def _control_viz_height(fonts: ViewerFonts) -> int:
