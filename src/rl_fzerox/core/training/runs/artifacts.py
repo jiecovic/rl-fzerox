@@ -3,6 +3,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from rl_fzerox.core.training.runs.paths import (
+    MODEL_ARTIFACT_FILENAMES,
+    POLICY_ARTIFACT_FILENAMES,
+    ArtifactFilenames,
+)
+
 
 def resolve_latest_model_path(run_dir: Path) -> Path:
     """Resolve the newest full-model artifact from a run directory."""
@@ -26,9 +32,7 @@ def resolve_model_artifact_path(
     return _resolve_artifact_path(
         run_dir=run_dir,
         artifact=artifact,
-        latest_filename="latest_model.zip",
-        best_filename="best_model.zip",
-        final_filename="final_model.zip",
+        filenames=MODEL_ARTIFACT_FILENAMES,
     )
 
 
@@ -42,9 +46,7 @@ def resolve_policy_artifact_path(
     return _resolve_artifact_path(
         run_dir=run_dir,
         artifact=artifact,
-        latest_filename="latest_policy.zip",
-        best_filename="best_policy.zip",
-        final_filename="final_policy.zip",
+        filenames=POLICY_ARTIFACT_FILENAMES,
     )
 
 
@@ -52,17 +54,15 @@ def _resolve_artifact_path(
     *,
     run_dir: Path,
     artifact: str,
-    latest_filename: str,
-    best_filename: str,
-    final_filename: str,
+    filenames: ArtifactFilenames,
 ) -> Path:
     resolved_run_dir = run_dir.expanduser().resolve()
     if artifact == "latest":
-        preferred_filenames = (latest_filename, final_filename, best_filename)
+        preferred_filenames = (filenames.latest, filenames.final, filenames.best)
     elif artifact == "best":
-        preferred_filenames = (best_filename,)
+        preferred_filenames = (filenames.best,)
     elif artifact == "final":
-        preferred_filenames = (final_filename,)
+        preferred_filenames = (filenames.final,)
     else:
         raise ValueError(f"Unsupported artifact kind: {artifact!r}")
 

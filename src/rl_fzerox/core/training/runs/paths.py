@@ -6,10 +6,33 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+
+@dataclass(frozen=True, slots=True)
+class ArtifactFilenames:
+    """The latest/best/final filenames for one artifact family."""
+
+    latest: str
+    best: str
+    final: str
+
+
 RUN_CONFIG_FILENAME = "train_config.yaml"
-RUN_BASELINE_FILENAME = "baseline.state"
+BASELINE_STATE_FILENAME = "baseline.state"
+RUN_BASELINE_FILENAME = BASELINE_STATE_FILENAME
 WATCH_RUNTIME_ROOTNAME = "watch"
-WATCH_SESSION_BASELINE_FILENAME = "baseline.state"
+WATCH_SESSION_BASELINE_FILENAME = BASELINE_STATE_FILENAME
+RUNTIME_DIRNAME = "runtime"
+TENSORBOARD_DIRNAME = "tensorboard"
+MODEL_ARTIFACT_FILENAMES = ArtifactFilenames(
+    latest="latest_model.zip",
+    best="best_model.zip",
+    final="final_model.zip",
+)
+POLICY_ARTIFACT_FILENAMES = ArtifactFilenames(
+    latest="latest_policy.zip",
+    best="best_policy.zip",
+    final="final_policy.zip",
+)
 
 
 @dataclass(frozen=True)
@@ -49,14 +72,14 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
     run_dir = _next_run_dir(resolved_output_root, run_name)
     return RunPaths(
         run_dir=run_dir,
-        runtime_root=run_dir / "runtime",
-        tensorboard_dir=run_dir / "tensorboard",
-        latest_model_path=run_dir / "latest_model.zip",
-        latest_policy_path=run_dir / "latest_policy.zip",
-        best_model_path=run_dir / "best_model.zip",
-        best_policy_path=run_dir / "best_policy.zip",
-        final_model_path=run_dir / "final_model.zip",
-        final_policy_path=run_dir / "final_policy.zip",
+        runtime_root=run_dir / RUNTIME_DIRNAME,
+        tensorboard_dir=run_dir / TENSORBOARD_DIRNAME,
+        latest_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.latest,
+        latest_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.latest,
+        best_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.best,
+        best_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.best,
+        final_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.final,
+        final_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.final,
         baseline_state_path=run_dir / RUN_BASELINE_FILENAME,
     )
 
@@ -82,7 +105,7 @@ def build_watch_session_paths(
     session_dir = session_root / (session_name or _watch_session_name())
     return WatchSessionPaths(
         session_dir=session_dir,
-        runtime_dir=session_dir / "runtime",
+        runtime_dir=session_dir / RUNTIME_DIRNAME,
         baseline_state_path=(
             None if baseline_state_path is None else session_dir / WATCH_SESSION_BASELINE_FILENAME
         ),

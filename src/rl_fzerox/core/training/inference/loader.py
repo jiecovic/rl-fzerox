@@ -11,7 +11,7 @@ import numpy as np
 
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.training.runs import resolve_model_artifact_path
+from rl_fzerox.core.training.runs import RUN_CONFIG_FILENAME, resolve_model_artifact_path
 
 PolicyState = tuple[np.ndarray, ...] | None
 _FULL_MODEL_POLICY_ALGORITHMS = frozenset(
@@ -245,7 +245,7 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if run_dir is None:
         return "ppo"
 
-    config_path = run_dir / "train_config.yaml"
+    config_path = run_dir / RUN_CONFIG_FILENAME
     if not config_path.is_file():
         return "ppo"
 
