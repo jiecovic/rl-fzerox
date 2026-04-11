@@ -14,6 +14,7 @@ from rl_fzerox.core.training.session.model.validation import (
     validate_masking_configuration,
     validate_recurrent_configuration_alignment,
 )
+from rl_fzerox.core.training_algorithms import TRAIN_ALGORITHM_SAC
 
 
 def build_training_model(
@@ -30,7 +31,7 @@ def build_training_model(
         train_config=train_config,
         masking_required=masking_required,
     )
-    if effective_algorithm == "sac":
+    if effective_algorithm == TRAIN_ALGORITHM_SAC:
         return _build_sac_model(
             train_env=train_env,
             train_config=train_config,
@@ -60,7 +61,7 @@ def build_ppo_model(
         train_config=train_config,
         masking_required=masking_required,
     )
-    if effective_algorithm == "sac":
+    if effective_algorithm == TRAIN_ALGORITHM_SAC:
         raise RuntimeError("build_ppo_model cannot construct SAC; use build_training_model")
     return _build_ppo_family_model(
         train_env=train_env,

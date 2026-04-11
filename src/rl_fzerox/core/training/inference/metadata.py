@@ -4,7 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
-from rl_fzerox.core.training.session.artifacts import load_policy_artifact_metadata
+from rl_fzerox.core.training.session.artifacts import (
+    load_policy_artifact_metadata,
+    policy_artifact_metadata_path,
+)
 
 
 class _LoadedPolicyMetadataFields(TypedDict):
@@ -25,7 +28,7 @@ def _loaded_policy_metadata_fields(policy_path: Path) -> _LoadedPolicyMetadataFi
 def _policy_metadata_mtime_ns(policy_path: Path) -> int | None:
     """Return the sidecar metadata mtime, if the checkpoint currently has one."""
 
-    metadata_path = policy_path.with_name(f"{policy_path.stem}.metadata.json")
+    metadata_path = policy_artifact_metadata_path(policy_path)
     if not metadata_path.is_file():
         return None
     return metadata_path.stat().st_mtime_ns

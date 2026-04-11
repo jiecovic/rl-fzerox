@@ -10,6 +10,8 @@ from pathlib import Path
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import RunPaths, materialize_train_run_config
 
+POLICY_METADATA_SUFFIX = ".metadata.json"
+
 
 @dataclass(frozen=True)
 class PolicyArtifactMetadata:
@@ -68,7 +70,7 @@ def save_artifacts_atomically(
     atomic_save_artifact(model.save, model_path)
     atomic_save_artifact(model.policy.save, policy_path)
     if policy_metadata is not None:
-        _atomic_write_json(_policy_metadata_path(policy_path), asdict(policy_metadata))
+        _atomic_write_json(policy_artifact_metadata_path(policy_path), asdict(policy_metadata))
 
 
 def atomic_save_artifact(save_fn, target_path: Path) -> None:
@@ -85,7 +87,7 @@ def atomic_save_artifact(save_fn, target_path: Path) -> None:
 def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata | None:
     """Load the optional sidecar metadata for one saved policy artifact."""
 
-    metadata_path = _policy_metadata_path(policy_path)
+    metadata_path = policy_artifact_metadata_path(policy_path)
     if not metadata_path.is_file():
         return None
     data = json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -113,8 +115,10 @@ def _first_env_attr(train_env, attr_name: str):
     return values[0]
 
 
-def _policy_metadata_path(policy_path: Path) -> Path:
-    return policy_path.with_name(f"{policy_path.stem}.metadata.json")
+def policy_artifact_metadata_path(policy_path: Path) -> Path:
+    """Return the sidecar JSON path stored next to one policy checkpoint."""
+
+    return policy_path.with_name(f"{policy_path.stem}{POLICY_METADATA_SUFFIX}")
 
 
 def _atomic_write_json(target_path: Path, data: dict[str, object]) -> None:

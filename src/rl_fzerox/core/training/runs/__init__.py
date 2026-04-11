@@ -15,7 +15,7 @@ from rl_fzerox.core.training.runs.config import (
     save_train_run_config,
 )
 from rl_fzerox.core.training.runs.paths import (
-    RUN_CONFIG_FILENAME,
+    RUN_LAYOUT,
     RunPaths,
     WatchSessionPaths,
     build_run_paths,
@@ -26,7 +26,7 @@ from rl_fzerox.core.training.runs.paths import (
 )
 
 __all__ = [
-    "RUN_CONFIG_FILENAME",
+    "RUN_LAYOUT",
     "RunPaths",
     "WatchSessionPaths",
     "apply_train_run_to_watch_config",

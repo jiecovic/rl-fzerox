@@ -18,7 +18,14 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.camera import CameraSettingName
+from rl_fzerox.core.training_algorithms import (
+    DEFAULT_TRAIN_ALGORITHM,
+    RECURRENT_TRAINING_ALGORITHMS,
+    TRAIN_ALGORITHM_SAC,
+    TrainAlgorithmName,
+)
 
 
 class ActionMaskConfig(BaseModel):
@@ -57,16 +64,7 @@ class ActionConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal[
-        "continuous_steer_drive",
-        "continuous_steer_drive_drift",
-        "hybrid_steer_drive_boost_drift",
-        "hybrid_steer_drive_boost_shoulder_primitive",
-        "hybrid_steer_drive_drift",
-        "steer_drive",
-        "steer_drive_boost",
-        "steer_drive_boost_drift",
-    ] = "steer_drive_boost_drift"
+    name: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
     steer_buckets: int = Field(default=7, ge=3)
     continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
@@ -301,17 +299,7 @@ class TrainConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    algorithm: Literal[
-        "auto",
-        "ppo",
-        "maskable_ppo",
-        "maskable_recurrent_ppo",
-        "hybrid_action_ppo",
-        "hybrid_recurrent_ppo",
-        "maskable_hybrid_action_ppo",
-        "maskable_hybrid_recurrent_ppo",
-        "sac",
-    ] = "maskable_ppo"
+    algorithm: TrainAlgorithmName = DEFAULT_TRAIN_ALGORITHM
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
@@ -343,7 +331,7 @@ class TrainConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_algorithm_specific_values(self) -> TrainConfig:
-        if self.ent_coef == "auto" and self.algorithm != "sac":
+        if self.ent_coef == "auto" and self.algorithm != TRAIN_ALGORITHM_SAC:
             raise ValueError("train.ent_coef=auto is only supported with train.algorithm=sac")
         return self
 
@@ -378,16 +366,11 @@ class TrainAppConfig(BaseModel):
     def _validate_recurrent_algorithm_alignment(self) -> TrainAppConfig:
         recurrent_enabled = self.policy.recurrent.enabled
         algorithm = self.train.algorithm
-        recurrent_algorithms = {
-            "maskable_recurrent_ppo",
-            "hybrid_recurrent_ppo",
-            "maskable_hybrid_recurrent_ppo",
-        }
-        if recurrent_enabled and algorithm not in recurrent_algorithms:
+        if recurrent_enabled and algorithm not in RECURRENT_TRAINING_ALGORITHMS:
             raise ValueError(
                 "policy.recurrent.enabled=true requires a recurrent train.algorithm"
             )
-        if not recurrent_enabled and algorithm in recurrent_algorithms:
+        if not recurrent_enabled and algorithm in RECURRENT_TRAINING_ALGORITHMS:
             raise ValueError(
                 f"train.algorithm={algorithm} requires policy.recurrent.enabled=true"
             )

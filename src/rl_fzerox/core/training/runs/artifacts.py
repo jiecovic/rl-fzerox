@@ -4,8 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from rl_fzerox.core.training.runs.paths import (
-    MODEL_ARTIFACT_FILENAMES,
-    POLICY_ARTIFACT_FILENAMES,
+    RUN_LAYOUT,
     ArtifactFilenames,
 )
 
@@ -32,7 +31,7 @@ def resolve_model_artifact_path(
     return _resolve_artifact_path(
         run_dir=run_dir,
         artifact=artifact,
-        filenames=MODEL_ARTIFACT_FILENAMES,
+        filenames=RUN_LAYOUT.model_artifacts,
     )
 
 
@@ -46,7 +45,7 @@ def resolve_policy_artifact_path(
     return _resolve_artifact_path(
         run_dir=run_dir,
         artifact=artifact,
-        filenames=POLICY_ARTIFACT_FILENAMES,
+        filenames=RUN_LAYOUT.policy_artifacts,
     )
 
 

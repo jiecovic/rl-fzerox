@@ -16,22 +16,35 @@ class ArtifactFilenames:
     final: str
 
 
-RUN_CONFIG_FILENAME = "train_config.yaml"
-BASELINE_STATE_FILENAME = "baseline.state"
-RUN_BASELINE_FILENAME = BASELINE_STATE_FILENAME
-WATCH_RUNTIME_ROOTNAME = "watch"
-WATCH_SESSION_BASELINE_FILENAME = BASELINE_STATE_FILENAME
-RUNTIME_DIRNAME = "runtime"
-TENSORBOARD_DIRNAME = "tensorboard"
-MODEL_ARTIFACT_FILENAMES = ArtifactFilenames(
-    latest="latest_model.zip",
-    best="best_model.zip",
-    final="final_model.zip",
-)
-POLICY_ARTIFACT_FILENAMES = ArtifactFilenames(
-    latest="latest_policy.zip",
-    best="best_policy.zip",
-    final="final_policy.zip",
+@dataclass(frozen=True, slots=True)
+class RunLayout:
+    """Canonical filenames and directory names inside one run directory."""
+
+    config_filename: str
+    baseline_filename: str
+    watch_rootname: str
+    runtime_dirname: str
+    tensorboard_dirname: str
+    model_artifacts: ArtifactFilenames
+    policy_artifacts: ArtifactFilenames
+
+
+RUN_LAYOUT = RunLayout(
+    config_filename="train_config.yaml",
+    baseline_filename="baseline.state",
+    watch_rootname="watch",
+    runtime_dirname="runtime",
+    tensorboard_dirname="tensorboard",
+    model_artifacts=ArtifactFilenames(
+        latest="latest_model.zip",
+        best="best_model.zip",
+        final="final_model.zip",
+    ),
+    policy_artifacts=ArtifactFilenames(
+        latest="latest_policy.zip",
+        best="best_policy.zip",
+        final="final_policy.zip",
+    ),
 )
 
 
@@ -72,15 +85,15 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
     run_dir = _next_run_dir(resolved_output_root, run_name)
     return RunPaths(
         run_dir=run_dir,
-        runtime_root=run_dir / RUNTIME_DIRNAME,
-        tensorboard_dir=run_dir / TENSORBOARD_DIRNAME,
-        latest_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.latest,
-        latest_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.latest,
-        best_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.best,
-        best_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.best,
-        final_model_path=run_dir / MODEL_ARTIFACT_FILENAMES.final,
-        final_policy_path=run_dir / POLICY_ARTIFACT_FILENAMES.final,
-        baseline_state_path=run_dir / RUN_BASELINE_FILENAME,
+        runtime_root=run_dir / RUN_LAYOUT.runtime_dirname,
+        tensorboard_dir=run_dir / RUN_LAYOUT.tensorboard_dirname,
+        latest_model_path=run_dir / RUN_LAYOUT.model_artifacts.latest,
+        latest_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.latest,
+        best_model_path=run_dir / RUN_LAYOUT.model_artifacts.best,
+        best_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.best,
+        final_model_path=run_dir / RUN_LAYOUT.model_artifacts.final,
+        final_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.final,
+        baseline_state_path=run_dir / RUN_LAYOUT.baseline_filename,
     )
 
 
@@ -105,9 +118,9 @@ def build_watch_session_paths(
     session_dir = session_root / (session_name or _watch_session_name())
     return WatchSessionPaths(
         session_dir=session_dir,
-        runtime_dir=session_dir / RUNTIME_DIRNAME,
+        runtime_dir=session_dir / RUN_LAYOUT.runtime_dirname,
         baseline_state_path=(
-            None if baseline_state_path is None else session_dir / WATCH_SESSION_BASELINE_FILENAME
+            None if baseline_state_path is None else session_dir / RUN_LAYOUT.baseline_filename
         ),
     )
 
@@ -123,7 +136,7 @@ def resolve_train_run_config_path(run_dir: Path) -> Path:
     """Resolve the saved train config snapshot path for one run directory."""
 
     resolved_run_dir = run_dir.expanduser().resolve()
-    config_path = resolved_run_dir / RUN_CONFIG_FILENAME
+    config_path = resolved_run_dir / RUN_LAYOUT.config_filename
     if not config_path.is_file():
         raise FileNotFoundError(
             f"No saved train config could be found under run directory {resolved_run_dir}"
@@ -133,9 +146,9 @@ def resolve_train_run_config_path(run_dir: Path) -> Path:
 
 def _watch_session_root(*, run_dir: Path | None, runtime_dir: Path | None) -> Path:
     if run_dir is not None:
-        return run_dir.expanduser().resolve() / WATCH_RUNTIME_ROOTNAME
+        return run_dir.expanduser().resolve() / RUN_LAYOUT.watch_rootname
     if runtime_dir is not None:
-        return runtime_dir.expanduser().resolve().parent / WATCH_RUNTIME_ROOTNAME
+        return runtime_dir.expanduser().resolve().parent / RUN_LAYOUT.watch_rootname
     return Path("local/watch").expanduser().resolve()
 
 

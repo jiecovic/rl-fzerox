@@ -26,14 +26,16 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
 )
+from rl_fzerox.core.hybrid_action import (
+    HYBRID_CONTINUOUS_ACTION_KEY,
+    HYBRID_DISCRETE_ACTION_KEY,
+)
 
 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE = 2
 _HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE = 3
 _HYBRID_DRIFT_DISCRETE_SIZE = 1
 _HYBRID_BOOST_DRIFT_DISCRETE_SIZE = 2
 _HYBRID_SHOULDER_PRIMITIVE_SIZE = 7
-_HYBRID_CONTINUOUS_KEY = "continuous"
-_HYBRID_DISCRETE_KEY = "discrete"
 _HYBRID_ACTION_DIMENSIONS = (DiscreteActionDimension("shoulder", 3),)
 _HYBRID_BOOST_ACTION_DIMENSIONS = (
     DiscreteActionDimension("shoulder", 3),
@@ -56,12 +58,12 @@ class HybridSteerDriveDriftActionAdapter:
         )
         self._action_space = spaces.Dict(
             {
-                _HYBRID_CONTINUOUS_KEY: spaces.Box(
+                HYBRID_CONTINUOUS_ACTION_KEY: spaces.Box(
                     low=np.array([-1.0, -1.0], dtype=np.float32),
                     high=np.array([1.0, 1.0], dtype=np.float32),
                     dtype=np.float32,
                 ),
-                _HYBRID_DISCRETE_KEY: spaces.MultiDiscrete([3]),
+                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete([3]),
             }
         )
 
@@ -76,11 +78,11 @@ class HybridSteerDriveDriftActionAdapter:
         """Return a neutral hybrid action with no drift held."""
 
         return {
-            _HYBRID_CONTINUOUS_KEY: np.zeros(
+            HYBRID_CONTINUOUS_ACTION_KEY: np.zeros(
                 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
                 dtype=np.float32,
             ),
-            _HYBRID_DISCRETE_KEY: np.zeros(_HYBRID_DRIFT_DISCRETE_SIZE, dtype=np.int64),
+            HYBRID_DISCRETE_ACTION_KEY: np.zeros(_HYBRID_DRIFT_DISCRETE_SIZE, dtype=np.int64),
         }
 
     @property
@@ -136,13 +138,13 @@ class HybridSteerDriveBoostDriftActionAdapter:
         )
         self._action_space = spaces.Dict(
             {
-                _HYBRID_CONTINUOUS_KEY: spaces.Box(
+                HYBRID_CONTINUOUS_ACTION_KEY: spaces.Box(
                     low=np.array([-1.0, -1.0], dtype=np.float32),
                     high=np.array([1.0, 1.0], dtype=np.float32),
                     dtype=np.float32,
                 ),
                 # Discrete order is shoulder, then boost, matching action_dimensions below.
-                _HYBRID_DISCRETE_KEY: spaces.MultiDiscrete([3, 2]),
+                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete([3, 2]),
             }
         )
 
@@ -157,11 +159,11 @@ class HybridSteerDriveBoostDriftActionAdapter:
         """Return a neutral hybrid action with no drift or boost held."""
 
         return {
-            _HYBRID_CONTINUOUS_KEY: np.zeros(
+            HYBRID_CONTINUOUS_ACTION_KEY: np.zeros(
                 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
                 dtype=np.float32,
             ),
-            _HYBRID_DISCRETE_KEY: np.zeros(
+            HYBRID_DISCRETE_ACTION_KEY: np.zeros(
                 _HYBRID_BOOST_DRIFT_DISCRETE_SIZE,
                 dtype=np.int64,
             ),
@@ -231,13 +233,13 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
         )
         self._action_space = spaces.Dict(
             {
-                _HYBRID_CONTINUOUS_KEY: spaces.Box(
+                HYBRID_CONTINUOUS_ACTION_KEY: spaces.Box(
                     low=np.array([-1.0, -1.0, -1.0], dtype=np.float32),
                     high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
                     dtype=np.float32,
                 ),
                 # Discrete order is shoulder primitive, then boost.
-                _HYBRID_DISCRETE_KEY: spaces.MultiDiscrete(
+                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete(
                     [_HYBRID_SHOULDER_PRIMITIVE_SIZE, 2]
                 ),
             }
@@ -254,11 +256,11 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
         """Return a neutral hybrid action with no shoulder primitive or boost."""
 
         return {
-            _HYBRID_CONTINUOUS_KEY: np.zeros(
+            HYBRID_CONTINUOUS_ACTION_KEY: np.zeros(
                 _HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
                 dtype=np.float32,
             ),
-            _HYBRID_DISCRETE_KEY: np.zeros(
+            HYBRID_DISCRETE_ACTION_KEY: np.zeros(
                 _HYBRID_BOOST_DRIFT_DISCRETE_SIZE,
                 dtype=np.int64,
             ),
@@ -402,13 +404,13 @@ def _parse_hybrid_branches(
         )
 
     continuous_values = continuous_action_array(
-        hybrid_branch(action, _HYBRID_CONTINUOUS_KEY),
+        hybrid_branch(action, HYBRID_CONTINUOUS_ACTION_KEY),
         expected_size=continuous_size,
         action_label="Hybrid steer-drive continuous",
         field_labels=continuous_field_labels,
     )
     discrete_values = discrete_action_array(
-        hybrid_branch(action, _HYBRID_DISCRETE_KEY),
+        hybrid_branch(action, HYBRID_DISCRETE_ACTION_KEY),
         expected_size=expected_size,
         action_label=action_label,
         field_labels=field_labels,
