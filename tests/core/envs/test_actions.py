@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_RIGHT_MASK,
     THROTTLE_MASK,
     ContinuousSteerDriveActionAdapter,
+    ContinuousSteerDriveDriftActionAdapter,
     SteerDriveActionAdapter,
     SteerDriveBoostActionAdapter,
     SteerDriveBoostDriftActionAdapter,
@@ -81,16 +82,16 @@ def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:
     assert np.array_equal(adapter.idle_action, np.array([0.0, 0.0], dtype=np.float32))
 
 
-def test_continuous_steer_drive_adapter_decodes_throttle_and_brake() -> None:
+def test_continuous_steer_drive_adapter_decodes_throttle_and_coast() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
     )
 
     throttle_state = adapter.decode(np.array([0.5, 0.7], dtype=np.float32))
-    brake_state = adapter.decode(np.array([-0.5, -0.7], dtype=np.float32))
+    coast_state = adapter.decode(np.array([-0.5, -0.7], dtype=np.float32))
 
     assert throttle_state == ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.5)
-    assert brake_state == ControllerState(joypad_mask=BRAKE_MASK, left_stick_x=-0.5)
+    assert coast_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
 
 
 def test_continuous_steer_drive_adapter_coasts_inside_drive_deadzone() -> None:
@@ -102,6 +103,102 @@ def test_continuous_steer_drive_adapter_coasts_inside_drive_deadzone() -> None:
 
     assert control_state == ControllerState(joypad_mask=0, left_stick_x=1.0)
     assert adapter.action_mask().tolist() == []
+
+
+def test_continuous_steer_drive_adapter_pwm_decodes_throttle_duty_cycle() -> None:
+    adapter = ContinuousSteerDriveActionAdapter(
+        ActionConfig(
+            name="continuous_steer_drive",
+            continuous_drive_mode="pwm",
+            continuous_drive_deadzone=0.0,
+        )
+    )
+
+    joypad_masks = [
+        adapter.decode(np.array([0.0, 0.5], dtype=np.float32)).joypad_mask
+        for _ in range(4)
+    ]
+    adapter.reset()
+
+    assert joypad_masks == [0, THROTTLE_MASK, 0, THROTTLE_MASK]
+    assert adapter.decode(np.array([0.0, 0.5], dtype=np.float32)).joypad_mask == 0
+
+
+def test_continuous_steer_drive_drift_adapter_uses_three_axis_box_space() -> None:
+    adapter = ContinuousSteerDriveDriftActionAdapter(
+        ActionConfig(name="continuous_steer_drive_drift")
+    )
+
+    assert isinstance(adapter.action_space, Box)
+    assert adapter.action_space.shape == (3,)
+    assert adapter.action_space.dtype == np.float32
+    assert np.array_equal(
+        adapter.action_space.low,
+        np.array([-1.0, -1.0, -1.0], dtype=np.float32),
+    )
+    assert np.array_equal(
+        adapter.action_space.high,
+        np.array([1.0, 1.0, 1.0], dtype=np.float32),
+    )
+    assert np.array_equal(adapter.idle_action, np.zeros(3, dtype=np.float32))
+
+
+def test_continuous_steer_drive_drift_adapter_decodes_right_drift() -> None:
+    adapter = ContinuousSteerDriveDriftActionAdapter(
+        ActionConfig(
+            name="continuous_steer_drive_drift",
+            continuous_drive_deadzone=1.0 / 3.0,
+            continuous_drift_deadzone=1.0 / 3.0,
+        )
+    )
+
+    control_state = adapter.decode(np.array([0.25, 0.75, 0.75], dtype=np.float32))
+
+    assert control_state == ControllerState(
+        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK,
+        left_stick_x=0.25,
+    )
+
+
+def test_continuous_steer_drive_drift_adapter_negative_drive_coasts() -> None:
+    adapter = ContinuousSteerDriveDriftActionAdapter(
+        ActionConfig(
+            name="continuous_steer_drive_drift",
+            continuous_drive_deadzone=1.0 / 3.0,
+            continuous_drift_deadzone=1.0 / 3.0,
+        )
+    )
+
+    control_state = adapter.decode(np.array([-0.25, -0.75, -0.75], dtype=np.float32))
+
+    assert control_state == ControllerState(
+        joypad_mask=DRIFT_LEFT_MASK,
+        left_stick_x=-0.25,
+    )
+    assert adapter.action_mask().tolist() == []
+
+
+def test_continuous_steer_drive_drift_adapter_pwm_preserves_drift_hold() -> None:
+    adapter = ContinuousSteerDriveDriftActionAdapter(
+        ActionConfig(
+            name="continuous_steer_drive_drift",
+            continuous_drive_mode="pwm",
+            continuous_drive_deadzone=0.0,
+            continuous_drift_deadzone=1.0 / 3.0,
+        )
+    )
+
+    first_state = adapter.decode(np.array([0.25, 0.5, 0.75], dtype=np.float32))
+    second_state = adapter.decode(np.array([0.25, 0.5, 0.75], dtype=np.float32))
+
+    assert first_state == ControllerState(
+        joypad_mask=DRIFT_RIGHT_MASK,
+        left_stick_x=0.25,
+    )
+    assert second_state == ControllerState(
+        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK,
+        left_stick_x=0.25,
+    )
 
 
 def test_build_action_adapter_uses_basic_adapter_by_default() -> None:
@@ -214,6 +311,12 @@ def test_build_action_adapter_supports_continuous_steer_drive_variant() -> None:
     adapter = build_action_adapter(ActionConfig(name="continuous_steer_drive"))
 
     assert isinstance(adapter, ContinuousSteerDriveActionAdapter)
+
+
+def test_build_action_adapter_supports_continuous_steer_drive_drift_variant() -> None:
+    adapter = build_action_adapter(ActionConfig(name="continuous_steer_drive_drift"))
+
+    assert isinstance(adapter, ContinuousSteerDriveDriftActionAdapter)
 
 
 def test_action_adapter_registry_exposes_registered_names() -> None:

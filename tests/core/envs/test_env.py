@@ -257,6 +257,32 @@ def test_step_advances_backend_by_action_repeat():
     )
 
 
+def test_reset_resets_continuous_drive_pwm_phase() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="continuous_steer_drive",
+                continuous_drive_mode="pwm",
+                continuous_drive_deadzone=0.0,
+            ),
+        ),
+    )
+
+    env.reset(seed=7)
+    env.step(np.array([0.0, 0.5], dtype=np.float32))
+    assert backend.last_controller_state.joypad_mask == 0
+    env.step(np.array([0.0, 0.5], dtype=np.float32))
+    assert backend.last_controller_state.joypad_mask == THROTTLE_MASK
+
+    env.reset(seed=8)
+    env.step(np.array([0.0, 0.5], dtype=np.float32))
+
+    assert backend.last_controller_state.joypad_mask == 0
+
+
 def test_step_updates_image_state_observation_from_step_telemetry() -> None:
     backend = ScriptedStepBackend(
         [
@@ -438,6 +464,17 @@ def test_continuous_action_env_exposes_box_action_space() -> None:
 
     assert isinstance(env.action_space, Box)
     assert env.action_space.shape == (2,)
+    assert env.action_masks().tolist() == []
+
+
+def test_continuous_drift_action_env_exposes_box_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="continuous_steer_drive_drift")),
+    )
+
+    assert isinstance(env.action_space, Box)
+    assert env.action_space.shape == (3,)
     assert env.action_masks().tolist() == []
 
 

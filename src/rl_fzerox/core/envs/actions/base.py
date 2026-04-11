@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, TypeAlias
+from typing import Protocol, TypeAlias, runtime_checkable
 
 import numpy as np
 from gymnasium import spaces
@@ -52,6 +52,15 @@ class ActionAdapter(Protocol):
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
     ) -> np.ndarray:
         """Return one flattened MultiDiscrete mask for this adapter."""
+        ...
+
+
+@runtime_checkable
+class ResettableActionAdapter(Protocol):
+    """Optional hook for action adapters with episode-local state."""
+
+    def reset(self) -> None:
+        """Clear per-episode action adapter state."""
         ...
 
 
