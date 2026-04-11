@@ -33,9 +33,9 @@ env:
   action:
     name: steer_drive_boost_drift
     steer_buckets: 9
-    # Optional live speed gate for manual boost.
+    # Optional live speed cap for manual boost.
     # Boost still requires can_boost, enough energy, and no active boost; null disables this gate.
-    boost_unmask_min_speed_kph: null
+    boost_unmask_max_speed_kph: null
     # Optional live speed gate for shoulder/drift actions.
     # null disables it; 0 allows drift immediately; e.g. 500 masks drift below 500 km/h.
     drift_unmask_min_speed_kph: null

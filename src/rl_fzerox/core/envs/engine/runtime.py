@@ -79,7 +79,7 @@ class FZeroXEnvEngine:
                 config.action.mask.branch_overrides() if config.action.mask is not None else None
             ),
             curriculum_config=curriculum_config,
-            boost_unmask_min_speed_kph=config.action.boost_unmask_min_speed_kph,
+            boost_unmask_max_speed_kph=config.action.boost_unmask_max_speed_kph,
             drift_unmask_min_speed_kph=config.action.drift_unmask_min_speed_kph,
         )
         self._control_state = ControlStateTracker()
