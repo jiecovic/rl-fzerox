@@ -18,6 +18,8 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.camera import CameraSettingName
+
 
 class ActionMaskConfig(BaseModel):
     """Optional branch-wise action-mask restrictions for MultiDiscrete actions."""
@@ -109,7 +111,7 @@ class EnvConfig(BaseModel):
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
-    camera_setting: Literal["overhead", "close_behind", "regular", "wide"] | None = None
+    camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
