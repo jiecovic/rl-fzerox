@@ -7,11 +7,11 @@ import numpy as np
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
     BOOST_MASK,
-    BRAKE_MASK,
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
-    THROTTLE_MASK,
     ActionValue,
 )
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
@@ -25,8 +25,8 @@ def _control_viz(
     continuous_drive_deadzone: float = 0.2,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
-    drive_level = 1 if joypad_mask & THROTTLE_MASK else -1 if joypad_mask & BRAKE_MASK else 0
-    drive_axis, brake_axis = _continuous_drive_axes(
+    drive_level = 1 if joypad_mask & ACCELERATE_MASK else -1 if joypad_mask & AIR_BRAKE_MASK else 0
+    drive_axis, air_brake_axis = _continuous_drive_axes(
         policy_action,
         continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
@@ -35,9 +35,9 @@ def _control_viz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         drive_level=drive_level,
         drive_axis=drive_axis,
-        brake_axis=brake_axis,
+        air_brake_axis=air_brake_axis,
         drive_axis_mode=(
-            "gas"
+            "accelerate"
             if drive_axis is not None and continuous_drive_mode == "pwm"
             else "signed"
         ),
@@ -54,7 +54,7 @@ def _continuous_drive_axes(
     continuous_drive_mode: str,
     continuous_drive_deadzone: float,
 ) -> tuple[float | None, float | None]:
-    """Return HUD gas/brake values when the policy action exposes those axes."""
+    """Return HUD accelerate/air-brake values when the policy action exposes those axes."""
 
     if policy_action is None:
         return None, None
@@ -73,27 +73,36 @@ def _continuous_drive_axes(
     if not np.isfinite(drive):
         return None, None
     drive = max(-1.0, min(1.0, drive))
-    brake = _continuous_brake_axis(values, continuous_drive_deadzone=continuous_drive_deadzone)
+    air_brake = _continuous_air_brake_axis(
+        values,
+        continuous_drive_deadzone=continuous_drive_deadzone,
+    )
     if continuous_drive_mode == "pwm":
-        return _continuous_drive_gas_level(drive, deadzone=continuous_drive_deadzone), brake
-    return drive, brake
+        return _continuous_drive_accelerate_level(
+            drive,
+            deadzone=continuous_drive_deadzone,
+        ), air_brake
+    return drive, air_brake
 
 
-def _continuous_brake_axis(
+def _continuous_air_brake_axis(
     values: np.ndarray,
     *,
     continuous_drive_deadzone: float,
 ) -> float | None:
     if values.size < 3:
         return None
-    brake = float(values[2])
-    if not np.isfinite(brake):
+    air_brake = float(values[2])
+    if not np.isfinite(air_brake):
         return None
-    brake = max(-1.0, min(1.0, brake))
-    return _continuous_drive_gas_level(brake, deadzone=continuous_drive_deadzone)
+    air_brake = max(-1.0, min(1.0, air_brake))
+    return _continuous_drive_accelerate_level(
+        air_brake,
+        deadzone=continuous_drive_deadzone,
+    )
 
 
-def _continuous_drive_gas_level(drive: float, *, deadzone: float) -> float:
+def _continuous_drive_accelerate_level(drive: float, *, deadzone: float) -> float:
     duty = (drive + 1.0) * 0.5
     if duty <= deadzone:
         return 0.0

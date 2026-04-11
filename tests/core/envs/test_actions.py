@@ -6,12 +6,12 @@ from gymnasium.spaces import Box, Dict, MultiDiscrete
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig, ActionMaskConfig
 from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
     ACTION_ADAPTER_REGISTRY,
+    AIR_BRAKE_MASK,
     BOOST_MASK,
-    BRAKE_MASK,
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
-    THROTTLE_MASK,
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveDriftActionAdapter,
     HybridSteerDriveBoostDriftActionAdapter,
@@ -45,24 +45,24 @@ def test_action_config_rejects_even_steer_bucket_counts() -> None:
         ActionConfig(steer_buckets=6)
 
 
-def test_steer_drive_adapter_decodes_center_throttle_action() -> None:
+def test_steer_drive_adapter_decodes_center_accelerate_action() -> None:
     adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
 
     control_state = adapter.decode(np.array([3, 1], dtype=np.int64))
 
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK,
+        joypad_mask=ACCELERATE_MASK,
         left_stick_x=0.0,
     )
 
 
-def test_steer_drive_adapter_decodes_center_brake_action() -> None:
+def test_steer_drive_adapter_decodes_center_air_brake_action() -> None:
     adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
 
     control_state = adapter.decode(np.array([3, 2], dtype=np.int64))
 
     assert control_state == ControllerState(
-        joypad_mask=BRAKE_MASK,
+        joypad_mask=AIR_BRAKE_MASK,
         left_stick_x=0.0,
     )
 
@@ -85,15 +85,18 @@ def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:
     assert np.array_equal(adapter.idle_action, np.array([0.0, 0.0], dtype=np.float32))
 
 
-def test_continuous_steer_drive_adapter_decodes_throttle_and_coast() -> None:
+def test_continuous_steer_drive_adapter_decodes_accelerate_and_coast() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
     )
 
-    throttle_state = adapter.decode(np.array([0.5, 0.7], dtype=np.float32))
+    accelerate_state = adapter.decode(np.array([0.5, 0.7], dtype=np.float32))
     coast_state = adapter.decode(np.array([-0.5, -0.7], dtype=np.float32))
 
-    assert throttle_state == ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.5)
+    assert accelerate_state == ControllerState(
+        joypad_mask=ACCELERATE_MASK,
+        left_stick_x=0.5,
+    )
     assert coast_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
 
 
@@ -118,19 +121,19 @@ def test_continuous_steer_drive_adapter_pwm_uses_full_drive_range() -> None:
     )
 
     coast_mask = adapter.decode(np.array([0.0, -1.0], dtype=np.float32)).joypad_mask
-    half_throttle_masks = [
+    half_accelerate_masks = [
         adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask
         for _ in range(4)
     ]
     adapter.reset()
-    full_throttle_masks = [
+    full_accelerate_masks = [
         adapter.decode(np.array([0.0, 1.0], dtype=np.float32)).joypad_mask
         for _ in range(3)
     ]
 
     assert coast_mask == 0
-    assert half_throttle_masks == [0, THROTTLE_MASK, 0, THROTTLE_MASK]
-    assert full_throttle_masks == [THROTTLE_MASK, THROTTLE_MASK, THROTTLE_MASK]
+    assert half_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
+    assert full_accelerate_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
 
 
 def test_continuous_steer_drive_drift_adapter_uses_three_axis_box_space() -> None:
@@ -164,7 +167,7 @@ def test_continuous_steer_drive_drift_adapter_decodes_right_drift() -> None:
     control_state = adapter.decode(np.array([0.25, 0.75, 0.75], dtype=np.float32))
 
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_RIGHT_MASK,
         left_stick_x=0.25,
     )
 
@@ -205,7 +208,7 @@ def test_continuous_steer_drive_drift_adapter_pwm_preserves_drift_hold() -> None
         left_stick_x=0.25,
     )
     assert second_state == ControllerState(
-        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_RIGHT_MASK,
         left_stick_x=0.25,
     )
 
@@ -241,7 +244,7 @@ def test_hybrid_steer_drive_drift_adapter_decodes_discrete_drift_branch() -> Non
     )
 
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK | DRIFT_LEFT_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_LEFT_MASK,
         left_stick_x=0.25,
     )
 
@@ -263,7 +266,7 @@ def test_hybrid_steer_drive_boost_drift_adapter_decodes_boost_branch() -> None:
     assert discrete_space.nvec.tolist() == [3, 2]
     assert np.array_equal(adapter.idle_action["discrete"], np.zeros(2, dtype=np.int64))
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK | BOOST_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_RIGHT_MASK | BOOST_MASK,
         left_stick_x=0.25,
     )
 
@@ -320,7 +323,7 @@ def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_current_dri
     )
 
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK | DRIFT_RIGHT_MASK | BOOST_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_RIGHT_MASK | BOOST_MASK,
         left_stick_x=0.25,
     )
 
@@ -341,12 +344,12 @@ def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_keeps_reserved_valu
     )
 
     assert control_state == ControllerState(
-        joypad_mask=THROTTLE_MASK,
+        joypad_mask=ACCELERATE_MASK,
         left_stick_x=0.25,
     )
 
 
-def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_brake_axis() -> None:
+def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_air_brake_axis() -> None:
     adapter = HybridSteerDriveBoostShoulderPrimitiveActionAdapter(
         ActionConfig(
             name="hybrid_steer_drive_boost_shoulder_primitive",
@@ -363,7 +366,7 @@ def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_brake_axis(
     )
 
     assert control_state == ControllerState(
-        joypad_mask=BRAKE_MASK,
+        joypad_mask=AIR_BRAKE_MASK,
         left_stick_x=0.25,
     )
 
@@ -412,21 +415,21 @@ def test_boost_adapter_uses_three_head_multidiscrete_space() -> None:
     assert np.array_equal(adapter.idle_action, np.array([3, 0, 0], dtype=np.int64))
 
 
-def test_boost_adapter_decodes_throttle_and_boost() -> None:
+def test_boost_adapter_decodes_accelerate_and_boost() -> None:
     adapter = SteerDriveBoostActionAdapter(ActionConfig(name="steer_drive_boost", steer_buckets=7))
 
     control_state = adapter.decode(np.array([4, 1, 1], dtype=np.int64))
 
-    assert control_state.joypad_mask == (THROTTLE_MASK | BOOST_MASK)
+    assert control_state.joypad_mask == (ACCELERATE_MASK | BOOST_MASK)
     assert control_state.left_stick_x == pytest.approx(1.0 / 3.0)
 
 
-def test_boost_adapter_decodes_brake_without_boost() -> None:
+def test_boost_adapter_decodes_air_brake_without_boost() -> None:
     adapter = SteerDriveBoostActionAdapter(ActionConfig(name="steer_drive_boost", steer_buckets=7))
 
     control_state = adapter.decode(np.array([3, 2, 0], dtype=np.int64))
 
-    assert control_state.joypad_mask == BRAKE_MASK
+    assert control_state.joypad_mask == AIR_BRAKE_MASK
     assert control_state.left_stick_x == 0.0
 
 
@@ -437,14 +440,14 @@ def test_boost_adapter_rejects_wrong_action_shape() -> None:
         adapter.decode(np.array([3, 1], dtype=np.int64))
 
 
-def test_extended_adapter_decodes_throttle_boost_and_explicit_right_shoulder() -> None:
+def test_extended_adapter_decodes_accelerate_boost_and_explicit_right_shoulder() -> None:
     adapter = SteerDriveBoostDriftActionAdapter(
         ActionConfig(name="steer_drive_boost_drift", steer_buckets=7)
     )
 
     control_state = adapter.decode(np.array([1, 1, 1, 2], dtype=np.int64))
 
-    assert control_state.joypad_mask == (THROTTLE_MASK | BOOST_MASK | DRIFT_RIGHT_MASK)
+    assert control_state.joypad_mask == (ACCELERATE_MASK | BOOST_MASK | DRIFT_RIGHT_MASK)
     assert control_state.left_stick_x == pytest.approx(-2.0 / 3.0)
 
 
@@ -466,7 +469,7 @@ def test_extended_adapter_decodes_explicit_right_shoulder_while_steering_straigh
 
     control_state = adapter.decode(np.array([3, 2, 0, 2], dtype=np.int64))
 
-    assert control_state.joypad_mask == (BRAKE_MASK | DRIFT_RIGHT_MASK)
+    assert control_state.joypad_mask == (AIR_BRAKE_MASK | DRIFT_RIGHT_MASK)
     assert control_state.left_stick_x == 0.0
 
 

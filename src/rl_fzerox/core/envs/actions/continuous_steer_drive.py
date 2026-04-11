@@ -14,7 +14,7 @@ from rl_fzerox.core.envs.actions.base import (
     DiscreteActionDimension,
     build_flat_action_mask,
 )
-from rl_fzerox.core.envs.actions.steer_drive import BRAKE_MASK, THROTTLE_MASK
+from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK, AIR_BRAKE_MASK
 from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
     BOOST_MASK,
     DRIFT_LEFT_MASK,
@@ -24,7 +24,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
 _STEER_DRIVE_ACTION_SIZE = 2
 _STEER_DRIVE_DRIFT_ACTION_SIZE = 3
 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE = 2
-_HYBRID_STEER_DRIVE_BRAKE_CONTINUOUS_SIZE = 3
+_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE = 3
 _HYBRID_DRIFT_DISCRETE_SIZE = 1
 _HYBRID_BOOST_DRIFT_DISCRETE_SIZE = 2
 _HYBRID_SHOULDER_PRIMITIVE_SIZE = 7
@@ -43,7 +43,7 @@ _HYBRID_ENABLED_SHOULDER_PRIMITIVES = (0, 1, 2)
 
 
 class ContinuousSteerDriveActionAdapter:
-    """Map continuous steering and throttle intent to simple held controls."""
+    """Map continuous steering and accelerate intent to simple held controls."""
 
     def __init__(self, config: ActionConfig) -> None:
         self._drive_decoder = _ContinuousDriveDecoder(
@@ -76,7 +76,7 @@ class ContinuousSteerDriveActionAdapter:
         return ()
 
     def decode(self, action: ActionValue) -> ControllerState:
-        """Translate one continuous action into a held steering/throttle state."""
+        """Translate one continuous action into a held steering/accelerate state."""
 
         steer, drive = _parse_continuous_pair(action)
         joypad_mask = self._drive_decoder.decode(drive)
@@ -338,7 +338,7 @@ class HybridSteerDriveBoostDriftActionAdapter:
 
 
 class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
-    """Map hybrid PPO actions to continuous steer/gas/brake and shoulder primitives.
+    """Map hybrid PPO actions to continuous steer/drive/air-brake and shoulder primitives.
 
     The first three shoulder values match the current drift primitive:
     `off`, `drift_left`, `drift_right`. Values 3..6 reserve architecture
@@ -351,7 +351,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
         )
-        self._brake_decoder = _ContinuousButtonPwmDecoder(
+        self._air_brake_decoder = _ContinuousButtonPwmDecoder(
             deadzone=float(config.continuous_drive_deadzone),
         )
         self._action_space = spaces.Dict(
@@ -380,7 +380,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
 
         return {
             _HYBRID_CONTINUOUS_KEY: np.zeros(
-                _HYBRID_STEER_DRIVE_BRAKE_CONTINUOUS_SIZE,
+                _HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
                 dtype=np.float32,
             ),
             _HYBRID_DISCRETE_KEY: np.zeros(
@@ -398,12 +398,12 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering, drive, shoulder, and boost."""
 
-        steer, drive, brake, shoulder, boost = _parse_hybrid_steer_drive_boost_shoulder(
+        steer, drive, air_brake, shoulder, boost = _parse_hybrid_steer_drive_boost_shoulder(
             action
         )
-        joypad_mask = self._drive_decoder.decode(drive) | self._brake_decoder.decode(
-            brake,
-            button_mask=BRAKE_MASK,
+        joypad_mask = self._drive_decoder.decode(drive) | self._air_brake_decoder.decode(
+            air_brake,
+            button_mask=AIR_BRAKE_MASK,
         )
         if shoulder == 1:
             joypad_mask |= DRIFT_LEFT_MASK
@@ -418,10 +418,10 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
         )
 
     def reset(self) -> None:
-        """Reset drive and brake PWM accumulators for a new episode."""
+        """Reset drive and air-brake PWM accumulators for a new episode."""
 
         self._drive_decoder.reset()
-        self._brake_decoder.reset()
+        self._air_brake_decoder.reset()
 
     def action_mask(
         self,
@@ -507,8 +507,8 @@ def _parse_hybrid_steer_drive_boost_shoulder(
 ) -> tuple[float, float, float, int, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        continuous_size=_HYBRID_STEER_DRIVE_BRAKE_CONTINUOUS_SIZE,
-        continuous_field_labels=("steer", "drive", "brake"),
+        continuous_size=_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
+        continuous_field_labels=("steer", "drive", "air_brake"),
         expected_size=_HYBRID_BOOST_DRIFT_DISCRETE_SIZE,
         action_label="Hybrid steer-drive-boost-shoulder discrete",
         field_labels=("shoulder", "boost"),
@@ -522,8 +522,8 @@ def _parse_hybrid_steer_drive_boost_shoulder(
 
     steer = float(np.clip(continuous_values[0], -1.0, 1.0))
     drive = float(np.clip(continuous_values[1], -1.0, 1.0))
-    brake = float(np.clip(continuous_values[2], -1.0, 1.0))
-    return steer, drive, brake, shoulder, boost
+    air_brake = float(np.clip(continuous_values[2], -1.0, 1.0))
+    return steer, drive, air_brake, shoulder, boost
 
 
 def _with_default_shoulder_primitive_mask(
@@ -567,7 +567,7 @@ def _parse_hybrid_branches(
 
 
 class _ContinuousDriveDecoder:
-    """Decode one continuous drive axis into the game's binary throttle button."""
+    """Decode one continuous drive axis into the game's binary accelerate button."""
 
     def __init__(self, *, mode: str, deadzone: float) -> None:
         self._mode = mode
@@ -598,7 +598,7 @@ class _ContinuousDriveDecoder:
             return 0
 
         self._pwm_phase -= 1.0
-        return THROTTLE_MASK
+        return ACCELERATE_MASK
 
 
 class _ContinuousButtonPwmDecoder:
@@ -628,12 +628,12 @@ class _ContinuousButtonPwmDecoder:
 
 
 def _threshold_drive_mask(drive: float, *, deadzone: float) -> int:
-    # The SAC experiment keeps brake out of the action space: negative drive coasts.
-    return THROTTLE_MASK if drive > deadzone else 0
+    # The SAC experiment keeps air brake out of the action space: negative drive coasts.
+    return ACCELERATE_MASK if drive > deadzone else 0
 
 
 def _pwm_duty_cycle(drive: float, *, deadzone: float) -> float:
-    # Uses the full continuous policy range for throttle duty: -1 coast, +1 full throttle.
+    # Uses the full continuous policy range for accelerate duty: -1 coast, +1 full hold.
     duty = (drive + 1.0) * 0.5
     if duty <= deadzone:
         return 0.0

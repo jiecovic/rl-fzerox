@@ -4,11 +4,11 @@ defaults:
 
 env:
   action:
-    # SAC uses continuous steering/throttle axes; boost and drift stay disabled here.
+    # SAC uses continuous steering/accelerate axes; boost and drift stay disabled here.
     name: continuous_steer_drive
-    # Full-range PWM maps -1 to coast, 0 to half throttle, and +1 to full throttle.
+    # Full-range PWM maps -1 to coast, 0 to half accelerate, and +1 to full accelerate.
     continuous_drive_mode: pwm
-    # Low-end duty threshold before the throttle button starts pulsing.
+    # Low-end duty threshold before the accelerate button starts pulsing.
     continuous_drive_deadzone: 0.0
 
 train:
