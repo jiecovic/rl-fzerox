@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/config/schema.py
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -146,6 +147,23 @@ class RewardConfig(BaseModel):
     progress_stalled_truncation_base_penalty: float = -150.0
     timeout_truncation_base_penalty: float = -150.0
     finish_position_scale: NonNegativeFloat = 4.0
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_reward_fields(cls, data: object) -> object:
+        # LEGACY CHECKPOINT COMPATIBILITY:
+        # Run manifests saved before `boost_press_penalty` still contain
+        # `reward.boost_redundant_press_penalty`. Watch loads those manifests
+        # to reconstruct policy metadata, so reject-free migration must live at
+        # the schema boundary. New YAML should only use `boost_press_penalty`.
+        if not isinstance(data, Mapping):
+            return data
+        values: dict[str, object] = {str(key): value for key, value in data.items()}
+        missing = object()
+        legacy_penalty = values.pop("boost_redundant_press_penalty", missing)
+        if legacy_penalty is not missing and "boost_press_penalty" not in values:
+            values["boost_press_penalty"] = legacy_penalty
+        return values
 
 
 class EmulatorConfig(BaseModel):
