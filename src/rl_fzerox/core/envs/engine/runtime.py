@@ -23,6 +23,7 @@ from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracke
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import derive_seed
 
+from .camera import sync_camera_setting
 from .control_state import ControlStateTracker
 from .info import (
     backend_step_info,
@@ -129,6 +130,13 @@ class FZeroXEnvEngine:
         if seed is not None:
             self._rng_seed_base = seed
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
+        telemetry = sync_camera_setting(
+            self.backend,
+            target_name=self.config.camera_setting,
+            telemetry=telemetry,
+            info=info,
+        )
+        info.update(backend_step_info(self.backend))
         self._sync_boost_mask(telemetry)
         self._reward_tracker.reset(
             telemetry,

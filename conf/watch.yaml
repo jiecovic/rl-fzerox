@@ -25,6 +25,9 @@ env:
   terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
   randomize_game_rng_requires_race_mode: true
+  # Optional race camera target applied after reset via in-game C-Right taps.
+  # Values: overhead, close_behind, regular, wide. null preserves the current camera.
+  camera_setting: close_behind
   reset_to_race: true
   action:
     name: steer_drive_boost_drift

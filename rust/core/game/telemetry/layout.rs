@@ -24,8 +24,14 @@ pub(super) struct GlobalOffsets {
     pub game_mode: usize,
     pub total_racers: usize,
     pub course_index: usize,
+    pub cameras: usize,
     pub reverse_timers: usize,
     pub racers: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct CameraOffsets {
+    pub race_setting: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -53,8 +59,15 @@ pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     game_mode: rdram_offset(0x800DCE44),
     total_racers: rdram_offset(0x800E5EC0),
     course_index: rdram_offset(0x800F8514),
+    cameras: rdram_offset(0x800E5220),
     reverse_timers: rdram_offset(0x800F_80A8),
     racers: rdram_offset(0x802C4920),
+};
+
+// Byte offsets within `struct Camera`, derived from the decomp's
+// `include/fzx_camera.h`.
+pub(super) const CAMERA: CameraOffsets = CameraOffsets {
+    race_setting: 0x008,
 };
 
 // Byte offsets within `struct Racer`, derived from the decomp's
@@ -209,6 +222,41 @@ impl TryFrom<i32> for RaceDifficulty {
             x if x == Self::Standard as i32 => Ok(Self::Standard),
             x if x == Self::Expert as i32 => Ok(Self::Expert),
             x if x == Self::Master as i32 => Ok(Self::Master),
+            _ => Err(()),
+        }
+    }
+}
+
+// F-Zero X race camera settings derived from the decomp's `include/fzx_camera.h`.
+#[repr(i32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum CameraRaceSetting {
+    Overhead = 0x00,
+    CloseBehind = 0x01,
+    Regular = 0x02,
+    Wide = 0x03,
+}
+
+impl CameraRaceSetting {
+    pub(super) const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Overhead => "overhead",
+            Self::CloseBehind => "close_behind",
+            Self::Regular => "regular",
+            Self::Wide => "wide",
+        }
+    }
+}
+
+impl TryFrom<i32> for CameraRaceSetting {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            x if x == Self::Overhead as i32 => Ok(Self::Overhead),
+            x if x == Self::CloseBehind as i32 => Ok(Self::CloseBehind),
+            x if x == Self::Regular as i32 => Ok(Self::Regular),
+            x if x == Self::Wide as i32 => Ok(Self::Wide),
             _ => Err(()),
         }
     }

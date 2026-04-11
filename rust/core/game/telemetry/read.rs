@@ -6,7 +6,9 @@ use std::mem::size_of;
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
-use crate::core::telemetry::layout::{GLOBALS, GameMode, RACER, RaceDifficulty, TELEMETRY_CONFIG};
+use crate::core::telemetry::layout::{
+    CAMERA, CameraRaceSetting, GLOBALS, GameMode, RACER, RaceDifficulty, TELEMETRY_CONFIG,
+};
 use crate::core::telemetry::model::{PlayerTelemetry, StepTelemetrySample, TelemetrySnapshot};
 
 /// Decode a typed telemetry snapshot from a full system RAM view.
@@ -18,6 +20,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
     let game_mode = resolve_game_mode(game_mode_raw);
     let difficulty_raw = read_i32(system_ram, GLOBALS.difficulty)?;
     let difficulty = resolve_difficulty(difficulty_raw);
+    let camera_setting_raw = read_i32(system_ram, player_camera_setting_offset())?;
+    let camera_setting = resolve_camera_setting(camera_setting_raw);
     let player_state_flags = read_u32(system_ram, player_base + RACER.state_flags)?;
     let player = PlayerTelemetry {
         state_flags: player_state_flags,
@@ -38,6 +42,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         total_lap_count: read_i32(system_ram, GLOBALS.total_lap_count)?,
         difficulty_raw,
         difficulty_name: difficulty.map_or("unknown", RaceDifficulty::wire_name),
+        camera_setting_raw,
+        camera_setting_name: camera_setting.map_or("unknown", CameraRaceSetting::wire_name),
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
@@ -71,8 +77,9 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
 
     let player_base = GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size);
     let player_end = player_base + RACER.position + size_of::<i32>();
+    let camera_setting_end = player_camera_setting_offset() + size_of::<i32>();
     let reverse_timer_end = player_reverse_timer_offset() + size_of::<i32>();
-    let required_end = player_end.max(reverse_timer_end);
+    let required_end = player_end.max(camera_setting_end).max(reverse_timer_end);
     if required_end > system_ram.len() {
         return Err(CoreError::MemoryOutOfRange {
             memory_id: MEMORY_SYSTEM_RAM,
@@ -88,12 +95,20 @@ fn player_reverse_timer_offset() -> usize {
     GLOBALS.reverse_timers + (TELEMETRY_CONFIG.player_racer_index * size_of::<i32>())
 }
 
+fn player_camera_setting_offset() -> usize {
+    GLOBALS.cameras + CAMERA.race_setting
+}
+
 fn resolve_game_mode(game_mode_raw: u32) -> Option<GameMode> {
     GameMode::try_from(game_mode_raw & 0x1F).ok()
 }
 
 fn resolve_difficulty(difficulty_raw: i32) -> Option<RaceDifficulty> {
     RaceDifficulty::try_from(difficulty_raw).ok()
+}
+
+fn resolve_camera_setting(camera_setting_raw: i32) -> Option<CameraRaceSetting> {
+    CameraRaceSetting::try_from(camera_setting_raw).ok()
 }
 
 fn read_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {

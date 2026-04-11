@@ -61,6 +61,8 @@ def make_telemetry(
     course_index: int = 0,
     difficulty_raw: int = 0,
     difficulty_name: str = "novice",
+    camera_setting_raw: int = 2,
+    camera_setting_name: str = "regular",
     player: PlayerTelemetry | None = None,
     state_labels: tuple[str, ...] = ("active",),
     state_flags: int | None = None,
@@ -101,6 +103,8 @@ def make_telemetry(
         player=resolved_player,
         difficulty_raw=difficulty_raw,
         difficulty_name=difficulty_name,
+        camera_setting_raw=camera_setting_raw,
+        camera_setting_name=camera_setting_name,
     )
 
 

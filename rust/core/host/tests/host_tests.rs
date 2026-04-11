@@ -258,6 +258,8 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
         total_lap_count: 3,
         difficulty_raw: 0,
         difficulty_name: "novice",
+        camera_setting_raw: 2,
+        camera_setting_name: "regular",
         game_mode_raw: 1,
         game_mode_name: if in_race_mode { "gp_race" } else { "title" },
         in_race_mode,

@@ -234,6 +234,8 @@ pub struct PyTelemetry {
     total_lap_count: i32,
     difficulty_raw: i32,
     difficulty_name: String,
+    camera_setting_raw: i32,
+    camera_setting_name: String,
     game_mode_raw: u32,
     game_mode_name: String,
     in_race_mode: bool,
@@ -255,6 +257,8 @@ impl PyTelemetry {
         player,
         difficulty_raw = 0,
         difficulty_name = None,
+        camera_setting_raw = 2,
+        camera_setting_name = None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -267,11 +271,15 @@ impl PyTelemetry {
         player: Py<PyPlayerTelemetry>,
         difficulty_raw: i32,
         difficulty_name: Option<String>,
+        camera_setting_raw: i32,
+        camera_setting_name: Option<String>,
     ) -> Self {
         Self {
             total_lap_count,
             difficulty_raw,
             difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
+            camera_setting_raw,
+            camera_setting_name: camera_setting_name.unwrap_or_else(|| "regular".to_owned()),
             game_mode_raw,
             game_mode_name,
             in_race_mode,
@@ -294,6 +302,16 @@ impl PyTelemetry {
     #[getter]
     fn difficulty_name(&self) -> &str {
         &self.difficulty_name
+    }
+
+    #[getter]
+    fn camera_setting_raw(&self) -> i32 {
+        self.camera_setting_raw
+    }
+
+    #[getter]
+    fn camera_setting_name(&self) -> &str {
+        &self.camera_setting_name
     }
 
     #[getter]
@@ -331,6 +349,8 @@ impl PyTelemetry {
         dict.set_item("total_lap_count", self.total_lap_count())?;
         dict.set_item("difficulty_raw", self.difficulty_raw())?;
         dict.set_item("difficulty_name", self.difficulty_name())?;
+        dict.set_item("camera_setting_raw", self.camera_setting_raw())?;
+        dict.set_item("camera_setting_name", self.camera_setting_name())?;
         dict.set_item("game_mode_raw", self.game_mode_raw())?;
         dict.set_item("game_mode_name", self.game_mode_name())?;
         dict.set_item("in_race_mode", self.in_race_mode())?;
@@ -354,6 +374,8 @@ pub(super) fn telemetry_to_py(
             total_lap_count: telemetry.total_lap_count,
             difficulty_raw: telemetry.difficulty_raw,
             difficulty_name: telemetry.difficulty_name.to_owned(),
+            camera_setting_raw: telemetry.camera_setting_raw,
+            camera_setting_name: telemetry.camera_setting_name.to_owned(),
             game_mode_raw: telemetry.game_mode_raw,
             game_mode_name: telemetry.game_mode_name.to_owned(),
             in_race_mode: telemetry.in_race_mode,

@@ -1,5 +1,5 @@
 // Covers decoding a representative player-one race telemetry snapshot.
-use super::layout::{GLOBALS, RACER, TELEMETRY_CONFIG};
+use super::layout::{CAMERA, GLOBALS, RACER, TELEMETRY_CONFIG};
 use super::read_snapshot;
 
 #[test]
@@ -12,6 +12,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
     memory[GLOBALS.course_index..GLOBALS.course_index + 4].copy_from_slice(&0_u32.to_le_bytes());
+    memory[GLOBALS.cameras + CAMERA.race_setting..GLOBALS.cameras + CAMERA.race_setting + 4]
+        .copy_from_slice(&3_i32.to_le_bytes());
     memory[player_base + RACER.state_flags..player_base + RACER.state_flags + 4]
         .copy_from_slice(&((1_u32 << 20) | (1_u32 << 30)).to_le_bytes());
     memory[player_base + RACER.speed..player_base + RACER.speed + 4]
@@ -41,6 +43,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.total_lap_count, 3);
     assert_eq!(telemetry.difficulty_raw, 2);
     assert_eq!(telemetry.difficulty_name, "expert");
+    assert_eq!(telemetry.camera_setting_raw, 3);
+    assert_eq!(telemetry.camera_setting_name, "wide");
     assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.course_index, 0);
     assert!(

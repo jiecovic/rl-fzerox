@@ -75,6 +75,8 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
     return {
         "game_mode": telemetry.game_mode_name,
         "course_index": telemetry.course_index,
+        "camera_setting": telemetry.camera_setting_name,
+        "camera_setting_raw": telemetry.camera_setting_raw,
         "race_time_ms": telemetry.player.race_time_ms,
         "race_distance": telemetry.player.race_distance,
         "speed_kph": telemetry.player.speed_kph,
