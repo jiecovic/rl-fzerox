@@ -94,6 +94,7 @@ class EnvConfig(BaseModel):
     wrong_way_timer_limit: PositiveInt = 300
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
+    boost_min_energy_fraction: float = Field(default=0.1, ge=0.0, le=1.0)
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
@@ -132,6 +133,7 @@ class RewardConfig(BaseModel):
     energy_loss_danger_power: PositiveFloat = 2.0
     energy_gain_reward_scale: NonNegativeFloat = 0.02
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
+    energy_full_refill_bonus: NonNegativeFloat = 0.0
     airborne_landing_reward: float = 0.0
     boost_redundant_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0

@@ -95,6 +95,17 @@ def telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:
     return bool(telemetry.player.can_boost)
 
 
+def telemetry_energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None:
+    """Return player energy normalized to [0, 1], if telemetry is usable."""
+
+    if telemetry is None:
+        return None
+    max_energy = float(telemetry.player.max_energy)
+    if max_energy <= 0.0:
+        return None
+    return max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
+
+
 def backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
     """Return backend-side timing/display metadata for the current frame."""
 

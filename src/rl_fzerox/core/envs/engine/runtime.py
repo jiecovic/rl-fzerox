@@ -26,6 +26,7 @@ from .info import (
     set_curriculum_info,
     set_observation_info,
     telemetry_can_boost,
+    telemetry_energy_fraction,
     telemetry_info,
 )
 from .masks import ActionMaskController
@@ -122,7 +123,7 @@ class FZeroXEnvEngine:
         if seed is not None:
             self._rng_seed_base = seed
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-        self._mask_controller.set_boost_unlocked(telemetry_can_boost(telemetry))
+        self._sync_boost_mask(telemetry)
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
@@ -250,6 +251,14 @@ class FZeroXEnvEngine:
             return None
         return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
 
+    def _sync_boost_mask(self, telemetry: FZeroXTelemetry | None) -> None:
+        can_boost = telemetry_can_boost(telemetry)
+        energy_fraction = telemetry_energy_fraction(telemetry)
+        min_energy_fraction = float(self.config.boost_min_energy_fraction)
+        if energy_fraction is not None and min_energy_fraction > 0.0:
+            can_boost = can_boost and energy_fraction >= min_energy_fraction
+        self._mask_controller.set_boost_unlocked(can_boost)
+
     def _run_env_step(
         self,
         control_state: ControllerState,
@@ -273,7 +282,7 @@ class FZeroXEnvEngine:
         )
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
-        self._mask_controller.set_boost_unlocked(telemetry_can_boost(telemetry))
+        self._sync_boost_mask(telemetry)
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,

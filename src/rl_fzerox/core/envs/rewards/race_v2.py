@@ -12,6 +12,7 @@ from rl_fzerox.core.envs.rewards.common import (
     apply_event_penalty,
     finish_placement_bonus,
 )
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import normalize_seed
 
 _U64_UNIT = float(1 << 64)
@@ -45,6 +46,7 @@ class RaceV2RewardWeights:
     energy_loss_danger_power: float = 2.0
     energy_gain_reward_scale: float = 0.02
     energy_gain_collision_cooldown_frames: int = 0
+    energy_full_refill_bonus: float = 0.0
     airborne_landing_reward: float = 0.0
     boost_redundant_press_penalty: float = 0.0
     collision_recoil_penalty: float = -2.0
@@ -81,6 +83,7 @@ class RaceV2RewardTracker:
         self._has_progress_origin = False
         self._max_episode_steps = max_episode_steps
         self._energy_gain_cooldown_frames_remaining = 0
+        self._previous_energy_full = False
         self._previous_boost_active = False
         self._previous_airborne = False
 
@@ -101,6 +104,7 @@ class RaceV2RewardTracker:
             self._progress_origin = 0.0
             self._has_progress_origin = False
             self._energy_gain_cooldown_frames_remaining = 0
+            self._previous_energy_full = False
             self._previous_boost_active = False
             self._previous_airborne = False
             return
@@ -108,7 +112,8 @@ class RaceV2RewardTracker:
         self._previous_progress_delta_position = 0.0
         self._set_progress_origin(telemetry.player.race_distance)
         self._energy_gain_cooldown_frames_remaining = 0
-        self._previous_boost_active = telemetry.player.boost_timer > 0
+        self._previous_energy_full = self._energy_is_full(telemetry)
+        self._previous_boost_active = telemetry_boost_active(telemetry)
         self._previous_airborne = telemetry.player.airborne
 
     def summary_config(self) -> RewardSummaryConfig:
@@ -128,6 +133,7 @@ class RaceV2RewardTracker:
         """Compute one reward step from one repeated env-step summary."""
 
         if telemetry is None or not telemetry.in_race_mode:
+            self._previous_energy_full = False
             self._previous_boost_active = False
             self._previous_airborne = False
             return RewardStep(reward=0.0)
@@ -212,6 +218,11 @@ class RaceV2RewardTracker:
             if energy_gain_reward:
                 breakdown["energy_gain"] = energy_gain_reward
 
+        full_refill_bonus = self._energy_full_refill_bonus(telemetry)
+        if full_refill_bonus:
+            reward += full_refill_bonus
+            breakdown["energy_full_refill"] = full_refill_bonus
+
         landing_reward = self._landing_reward(telemetry)
         if landing_reward:
             reward += landing_reward
@@ -238,7 +249,8 @@ class RaceV2RewardTracker:
             breakdown,
         )
         self._advance_energy_gain_cooldown(summary.frames_run)
-        self._previous_boost_active = telemetry.player.boost_timer > 0
+        self._previous_energy_full = self._energy_is_full(telemetry)
+        self._previous_boost_active = telemetry_boost_active(telemetry)
         self._previous_airborne = telemetry.player.airborne
 
         if status.termination_reason == "finished":
@@ -484,6 +496,12 @@ class RaceV2RewardTracker:
             return 0.0
         return summary.energy_gain_total * self._weights.energy_gain_reward_scale
 
+    def _energy_full_refill_bonus(self, telemetry: FZeroXTelemetry) -> float:
+        bonus = self._weights.energy_full_refill_bonus
+        if bonus == 0.0:
+            return 0.0
+        return bonus if self._energy_is_full(telemetry) and not self._previous_energy_full else 0.0
+
     def _advance_energy_gain_cooldown(self, frames_run: int) -> None:
         self._energy_gain_cooldown_frames_remaining = max(
             self._energy_gain_cooldown_frames_remaining - max(int(frames_run), 0),
@@ -497,6 +515,10 @@ class RaceV2RewardTracker:
         if not self._previous_airborne or telemetry.player.airborne:
             return 0.0
         return reward
+
+    def _energy_is_full(self, telemetry: FZeroXTelemetry) -> bool:
+        max_energy = float(telemetry.player.max_energy)
+        return max_energy > 0.0 and float(telemetry.player.energy) >= max_energy
 
     def _remaining_lap_count(self, telemetry: FZeroXTelemetry) -> int:
         return max(

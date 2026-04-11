@@ -20,6 +20,8 @@ env:
   progress_frontier_stall_limit_frames: 400
   # Require at least this much new race-distance to reset the frontier stall timer.
   progress_frontier_epsilon: 100.0
+  # Mask manual boost below this normalized energy fraction, even after boost unlocks.
+  boost_min_energy_fraction: 0.5
   # End the episode immediately when race telemetry shows player energy <= 0.
   terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
