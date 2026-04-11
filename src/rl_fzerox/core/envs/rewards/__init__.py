@@ -54,6 +54,7 @@ def build_reward_tracker(
         energy_gain_reward_scale=resolved_config.energy_gain_reward_scale,
         energy_gain_collision_cooldown_frames=resolved_config.energy_gain_collision_cooldown_frames,
         energy_full_refill_bonus=resolved_config.energy_full_refill_bonus,
+        energy_full_refill_cooldown_frames=resolved_config.energy_full_refill_cooldown_frames,
         airborne_landing_reward=resolved_config.airborne_landing_reward,
         boost_pad_reward=resolved_config.boost_pad_reward,
         boost_pad_reward_cooldown_frames=resolved_config.boost_pad_reward_cooldown_frames,
