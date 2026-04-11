@@ -34,6 +34,12 @@ def test_race_v2_weight_fields_match_reward_config_schema() -> None:
     assert weight_fields == set(RewardConfig.model_fields) - {"name"}
 
 
+def test_reward_config_accepts_legacy_redundant_boost_penalty_key() -> None:
+    config = RewardConfig.model_validate({"boost_redundant_press_penalty": -0.013})
+
+    assert config.boost_press_penalty == -0.013
+
+
 def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
     overrides = {
         "time_penalty_per_frame": -0.123,
