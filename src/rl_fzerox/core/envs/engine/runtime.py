@@ -7,7 +7,12 @@ from gymnasium import spaces
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
-from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue, build_action_adapter
+from rl_fzerox.core.envs.actions import (
+    BOOST_MASK,
+    ActionValue,
+    ResettableActionAdapter,
+    build_action_adapter,
+)
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
@@ -133,6 +138,8 @@ class FZeroXEnvEngine:
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._control_state.reset()
+        if isinstance(self._action_adapter, ResettableActionAdapter):
+            self._action_adapter.reset()
         self._mask_controller.set_shoulder_lock(None)
         info["seed"] = seed
         set_curriculum_info(

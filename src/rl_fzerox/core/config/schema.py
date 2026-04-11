@@ -57,12 +57,15 @@ class ActionConfig(BaseModel):
 
     name: Literal[
         "continuous_steer_drive",
+        "continuous_steer_drive_drift",
         "steer_drive",
         "steer_drive_boost",
         "steer_drive_boost_drift",
     ] = "steer_drive_boost_drift"
     steer_buckets: int = Field(default=7, ge=3)
+    continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
+    continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     mask: ActionMaskConfig | None = None
 
     @field_validator("steer_buckets")

@@ -314,7 +314,7 @@ def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive")),
+        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive_drift")),
         policy=PolicyConfig(),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="sac", ent_coef="auto"),
@@ -346,7 +346,7 @@ def test_validate_training_algorithm_config_rejects_sac_without_continuous_actio
         train=TrainConfig(algorithm="sac", ent_coef="auto"),
     )
 
-    with pytest.raises(RuntimeError, match="continuous_steer_drive"):
+    with pytest.raises(RuntimeError, match="continuous steer-drive action adapter"):
         validate_training_algorithm_config(config)
 
 
@@ -386,7 +386,7 @@ def test_build_training_model_can_construct_sac() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(name="continuous_steer_drive"),
+                    action=ActionConfig(name="continuous_steer_drive_drift"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )

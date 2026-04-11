@@ -222,9 +222,9 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
         )
     if config.train.algorithm != "sac":
         return
-    if config.env.action.name != "continuous_steer_drive":
+    if config.env.action.name not in {"continuous_steer_drive", "continuous_steer_drive_drift"}:
         raise RuntimeError(
-            "SAC requires env.action.name=continuous_steer_drive so the action space is Box"
+            "SAC requires a continuous steer-drive action adapter so the action space is Box"
         )
     if config.env.action.mask is not None:
         raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
