@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/camera.py
+"""String-backed camera setting names shared by config and engine sync."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping

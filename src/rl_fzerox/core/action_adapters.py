@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/action_adapters.py
+"""String-backed action adapter names shared by config, env factories, and validation."""
+
 from __future__ import annotations
 
 from typing import Final, Literal, TypeAlias
@@ -34,16 +36,19 @@ ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT: Final[ActionAdapterName] = (
 )
 DEFAULT_ACTION_ADAPTER_NAME: Final[ActionAdapterName] = ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT
 
-SAC_ACTION_ADAPTERS: Final[frozenset[ActionAdapterName]] = frozenset(
-    {
-        ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-        ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_DRIFT,
-    }
+
+def _adapter_set(*names: ActionAdapterName) -> frozenset[ActionAdapterName]:
+    """Build typed immutable groups while keeping YAML-facing values as strings."""
+
+    return frozenset(names)
+
+
+SAC_ACTION_ADAPTERS: Final = _adapter_set(
+    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
+    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_DRIFT,
 )
-HYBRID_ACTION_ADAPTERS: Final[frozenset[ActionAdapterName]] = frozenset(
-    {
-        ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT,
-        ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_DRIFT,
-        ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER_PRIMITIVE,
-    }
+HYBRID_ACTION_ADAPTERS: Final = _adapter_set(
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT,
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_DRIFT,
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER_PRIMITIVE,
 )

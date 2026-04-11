@@ -1,4 +1,6 @@
 # src/rl_fzerox/core/training/runs/paths.py
+"""Canonical filesystem layout metadata and path builders for training runs."""
+
 from __future__ import annotations
 
 import os
