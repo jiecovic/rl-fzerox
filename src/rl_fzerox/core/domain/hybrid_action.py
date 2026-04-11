@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/hybrid_action.py
+# src/rl_fzerox/core/domain/hybrid_action.py
 """String-backed hybrid action branch keys shared by adapters and HUD rendering."""
 
 from __future__ import annotations

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
+from rl_fzerox.core.domain.training_algorithms import TRAIN_ALGORITHM_SAC
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     resolve_training_algorithm_class,
@@ -14,7 +15,6 @@ from rl_fzerox.core.training.session.model.validation import (
     validate_masking_configuration,
     validate_recurrent_configuration_alignment,
 )
-from rl_fzerox.core.training_algorithms import TRAIN_ALGORITHM_SAC
 
 
 def build_training_model(

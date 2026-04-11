@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/action_adapters.py
+# src/rl_fzerox/core/domain/action_adapters.py
 """String-backed action adapter names shared by config, env factories, and validation."""
 
 from __future__ import annotations
@@ -39,7 +39,6 @@ DEFAULT_ACTION_ADAPTER_NAME: Final[ActionAdapterName] = ACTION_ADAPTER_STEER_DRI
 
 def _adapter_set(*names: ActionAdapterName) -> frozenset[ActionAdapterName]:
     """Build typed immutable groups while keeping YAML-facing values as strings."""
-
     return frozenset(names)
 
 

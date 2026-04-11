@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator import ControllerState
+from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
@@ -14,7 +15,6 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_RIGHT_MASK,
     ActionValue,
 )
-from rl_fzerox.core.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
 
 
