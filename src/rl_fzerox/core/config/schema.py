@@ -69,6 +69,7 @@ class ActionConfig(BaseModel):
     continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
+    drift_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
 
     @field_validator("steer_buckets")

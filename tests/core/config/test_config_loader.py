@@ -733,6 +733,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
             "    name: hybrid_steer_drive_boost_shoulder_primitive",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
+            "    drift_unmask_min_speed_kph: 500.0",
             "train:",
             "  algorithm: maskable_hybrid_recurrent_ppo",
             "  total_timesteps: 1000",
@@ -747,6 +748,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
     assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.env.action.drift_unmask_min_speed_kph == 500.0
     assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert config.policy.recurrent.enabled is True
 

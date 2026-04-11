@@ -795,6 +795,73 @@ def test_hybrid_shoulder_primitive_masks_boost_until_telemetry_unlocks_it() -> N
     ]
 
 
+def test_env_action_masks_disable_drift_below_speed_threshold() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                    speed_kph=650.0,
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            speed_kph=300.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                drift_unmask_min_speed_kph=500.0,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False]
+    )
+
+    env.step(np.array([3, 1, 0, 0], dtype=np.int64))
+
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2 + 3))
+
+
+def test_env_action_masks_static_shoulder_mask_wins_over_speed_unmask() -> None:
+    backend = ScriptedStepBackend(
+        [],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            speed_kph=650.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                drift_unmask_min_speed_kph=500.0,
+                mask=ActionMaskConfig(shoulder=(0,)),
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 3) + ([True] * 2) + [True, False, False]
+    )
+
+
 def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
     backend = ScriptedStepBackend(
         [

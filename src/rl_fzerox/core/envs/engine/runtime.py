@@ -79,6 +79,7 @@ class FZeroXEnvEngine:
                 config.action.mask.branch_overrides() if config.action.mask is not None else None
             ),
             curriculum_config=curriculum_config,
+            drift_unmask_min_speed_kph=config.action.drift_unmask_min_speed_kph,
         )
         self._control_state = ControlStateTracker()
         self._episode_done = False
@@ -137,7 +138,7 @@ class FZeroXEnvEngine:
             info=info,
         )
         info.update(backend_step_info(self.backend))
-        self._sync_boost_mask(telemetry)
+        self._sync_dynamic_masks(telemetry)
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
@@ -267,10 +268,12 @@ class FZeroXEnvEngine:
             return None
         return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
 
-    def _sync_boost_mask(self, telemetry: FZeroXTelemetry | None) -> None:
+    def _sync_dynamic_masks(self, telemetry: FZeroXTelemetry | None) -> None:
         if telemetry is None:
             self._mask_controller.set_boost_unlocked(None)
+            self._mask_controller.set_speed_kph(None)
             return
+        self._mask_controller.set_speed_kph(float(telemetry.player.speed_kph))
         can_boost = telemetry_can_boost(telemetry)
         can_boost = can_boost and not telemetry_boost_active(telemetry)
         energy_fraction = telemetry_energy_fraction(telemetry)
@@ -302,7 +305,7 @@ class FZeroXEnvEngine:
         )
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
-        self._sync_boost_mask(telemetry)
+        self._sync_dynamic_masks(telemetry)
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,

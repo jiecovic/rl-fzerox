@@ -33,6 +33,9 @@ env:
   action:
     name: steer_drive_boost_drift
     steer_buckets: 9
+    # Optional live speed gate for shoulder/drift actions.
+    # null disables it; 0 allows drift immediately; e.g. 500 masks drift below 500 km/h.
+    drift_unmask_min_speed_kph: null
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state

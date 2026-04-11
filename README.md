@@ -90,6 +90,10 @@ The maskable recurrent hybrid pipeline uses continuous steer/drive/air-brake axe
 `0..2` are `off`, `drift_left`, and `drift_right`; values `3..6` are reserved
 for future side-attack/spin primitives and are masked by default. Accelerate and
 air brake use independent full-range PWM axes, so both buttons can be pulsed at once.
+`env.action.drift_unmask_min_speed_kph` can additionally keep the shoulder/drift
+branch masked to `off` until live speed reaches that threshold. Set it to `null`
+to disable the speed gate or `0` to allow drift immediately; explicit masks such
+as `env.action.mask.shoulder=[0]` still take precedence and keep drift disabled.
 
 The current observation pipeline keeps the full game view, aspect-corrects the
 raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,
