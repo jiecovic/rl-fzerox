@@ -63,7 +63,7 @@ class ViewerLayout:
     control_steer_width: int = 116
     control_steer_height: int = 10
     control_drive_width: int = 12
-    control_drive_height: int = 42
+    control_drive_height: int = 56
     control_drive_offset_x: int = 8
     control_marker_radius: int = 6
     control_caption_gap: int = 3
@@ -111,6 +111,7 @@ class ControlViz:
 
     steer_x: float
     drive_level: int
+    drive_axis: float | None
     boost_pressed: bool
     drift_direction: int
 

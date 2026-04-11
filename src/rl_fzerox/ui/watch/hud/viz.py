@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/hud/viz.py
 from __future__ import annotations
 
+import numpy as np
+
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
@@ -12,17 +14,39 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
 
 
-def _control_viz(control_state: ControllerState) -> ControlViz:
+def _control_viz(
+    control_state: ControllerState,
+    *,
+    policy_action: np.ndarray | None = None,
+) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     drive_level = 1 if joypad_mask & THROTTLE_MASK else -1 if joypad_mask & BRAKE_MASK else 0
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         drive_level=drive_level,
+        drive_axis=_continuous_drive_axis(policy_action),
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         drift_direction=(
             -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
         ),
     )
+
+
+def _continuous_drive_axis(policy_action: np.ndarray | None) -> float | None:
+    """Return raw SAC drive intent when the policy action is a float vector."""
+
+    if policy_action is None:
+        return None
+    action = np.asarray(policy_action)
+    if not np.issubdtype(action.dtype, np.floating):
+        return None
+    values = action.reshape(-1)
+    if values.size < 2:
+        return None
+    drive = float(values[1])
+    if not np.isfinite(drive):
+        return None
+    return max(-1.0, min(1.0, drive))
 
 
 def _control_viz_height(fonts: ViewerFonts) -> int:

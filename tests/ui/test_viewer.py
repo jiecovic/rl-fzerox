@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pygame
+import pytest
 
 from fzerox_emulator import (
     JOYPAD_A,
@@ -160,6 +161,59 @@ def test_input_section_can_visualize_brake_control_state() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_level == -1
+
+
+def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.25),
+        policy_label="sac_cnn_0013",
+        policy_curriculum_stage=None,
+        policy_action=np.array([0.25, 0.5], dtype=np.float32),
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_level == 1
+    assert input_section.control_viz.drive_axis == pytest.approx(0.5)
+
+
+def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.0),
+        policy_label="ppo_cnn_0013",
+        policy_curriculum_stage=None,
+        policy_action=np.array([4, 1], dtype=np.int64),
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_axis is None
 
 
 def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
