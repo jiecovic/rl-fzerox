@@ -79,6 +79,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "env:",
             "  action_repeat: 3",
             "  reset_to_race: true",
+            "  camera_setting: close_behind",
             "  terminate_on_energy_depleted: false",
             "watch:",
             "  episodes: 2",
@@ -97,6 +98,7 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.seed == 7
     assert config.env.action_repeat == 3
     assert config.env.reset_to_race is True
+    assert config.env.camera_setting == "close_behind"
     assert config.env.terminate_on_energy_depleted is False
     assert config.watch.episodes == 2
     assert config.watch.fps == 30
@@ -605,6 +607,148 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
     assert config.train.buffer_size == 30_000
     assert config.train.learning_starts == 5_000
     assert config.train.ent_coef == "auto"
+
+
+def test_load_train_app_config_reads_hybrid_action_ppo_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_drift",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.0",
+            "train:",
+            "  algorithm: hybrid_action_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_drift"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.train.algorithm == "hybrid_action_ppo"
+
+
+def test_load_train_app_config_reads_hybrid_recurrent_ppo_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_drift",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.0",
+            "train:",
+            "  algorithm: hybrid_recurrent_ppo",
+            "  total_timesteps: 1000",
+            "policy:",
+            "  recurrent:",
+            "    enabled: true",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_drift"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.train.algorithm == "hybrid_recurrent_ppo"
+    assert config.policy.recurrent.enabled is True
+
+
+def test_load_train_app_config_reads_maskable_hybrid_action_ppo_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_boost_shoulder_primitive",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.0",
+            "train:",
+            "  algorithm: maskable_hybrid_action_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.train.algorithm == "maskable_hybrid_action_ppo"
+
+
+def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_boost_shoulder_primitive",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.0",
+            "train:",
+            "  algorithm: maskable_hybrid_recurrent_ppo",
+            "  total_timesteps: 1000",
+            "policy:",
+            "  recurrent:",
+            "    enabled: true",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
+    assert config.policy.recurrent.enabled is True
 
 
 def test_repo_watch_template_exists() -> None:

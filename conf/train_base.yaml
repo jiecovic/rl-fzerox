@@ -26,6 +26,9 @@ env:
   terminate_on_energy_depleted: true
   randomize_game_rng_on_reset: true
   randomize_game_rng_requires_race_mode: true
+  # Optional race camera target applied after reset via in-game C-Right taps.
+  # Values: overhead, close_behind, regular, wide. null preserves the current camera.
+  camera_setting: close_behind
   reset_to_race: true
   action:
     name: steer_drive_boost_drift
@@ -35,27 +38,12 @@ env:
     mode: image_state
     preset: native_crop_v3
     frame_stack: 4
+
 train:
-  # Training always uses a mask-aware PPO variant because the env exposes live gameplay masks.
-  algorithm: maskable_ppo
-  vec_env: subproc
-  num_envs: 8
-  total_timesteps: 50_000_000
-  n_steps: 1024
-  n_epochs: 10
-  batch_size: 256
-  learning_rate: 3.0e-4
-  gamma: 0.992
-  gae_lambda: 0.95
-  clip_range: 0.2
-  ent_coef: 0.0
-  vf_coef: 0.5
-  max_grad_norm: 0.5
   verbose: 0
   device: cuda
   save_freq: 10_000
   output_root: local/runs
-  run_name: ppo_cnn
 
 policy:
   activation: tanh
@@ -63,7 +51,7 @@ policy:
     features_dim: 1024
     state_features_dim: 64
   recurrent:
-    # Enable the LSTM-based policy path; requires train.algorithm=maskable_recurrent_ppo.
+    # Enable the LSTM-based policy path only with train.algorithm=maskable_recurrent_ppo.
     enabled: false
     # LSTM hidden-state width used after the shared feature extractor.
     hidden_size: 512

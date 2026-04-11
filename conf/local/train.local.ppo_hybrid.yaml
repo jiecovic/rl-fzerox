@@ -1,0 +1,23 @@
+defaults:
+  - /train_ppo_base
+  - /local/train.local.base@_global_
+  - _self_
+
+env:
+  action:
+    # Hybrid PPO gets continuous steer/drive axes and one discrete drift head.
+    name: hybrid_steer_drive_drift
+    # Full-range PWM maps -1 to coast, 0 to half throttle, and +1 to full throttle.
+    continuous_drive_mode: pwm
+    continuous_drive_deadzone: 0.0
+
+train:
+  algorithm: hybrid_action_ppo
+  run_name: hybrid_ppo_cnn
+  init_run_dir: null
+  init_artifact: latest
+  ent_coef: 0.0
+
+policy:
+  recurrent:
+    enabled: false

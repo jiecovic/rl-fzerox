@@ -6,6 +6,9 @@ from rl_fzerox.core.envs.actions.base import ActionAdapter, ActionValue, Resetta
 from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveDriftActionAdapter,
+    HybridSteerDriveBoostDriftActionAdapter,
+    HybridSteerDriveBoostShoulderPrimitiveActionAdapter,
+    HybridSteerDriveDriftActionAdapter,
 )
 from rl_fzerox.core.envs.actions.steer_drive import (
     BRAKE_MASK,
@@ -25,6 +28,11 @@ DEFAULT_ACTION_NAME = "steer_drive_boost_drift"
 ACTION_ADAPTER_REGISTRY: dict[str, ActionAdapterFactory] = {
     "continuous_steer_drive": ContinuousSteerDriveActionAdapter,
     "continuous_steer_drive_drift": ContinuousSteerDriveDriftActionAdapter,
+    "hybrid_steer_drive_boost_drift": HybridSteerDriveBoostDriftActionAdapter,
+    "hybrid_steer_drive_boost_shoulder_primitive": (
+        HybridSteerDriveBoostShoulderPrimitiveActionAdapter
+    ),
+    "hybrid_steer_drive_drift": HybridSteerDriveDriftActionAdapter,
     "steer_drive": SteerDriveActionAdapter,
     "steer_drive_boost": SteerDriveBoostActionAdapter,
     "steer_drive_boost_drift": SteerDriveBoostDriftActionAdapter,
@@ -58,6 +66,9 @@ __all__ = [
     "DEFAULT_ACTION_NAME",
     "DRIFT_LEFT_MASK",
     "DRIFT_RIGHT_MASK",
+    "HybridSteerDriveBoostDriftActionAdapter",
+    "HybridSteerDriveBoostShoulderPrimitiveActionAdapter",
+    "HybridSteerDriveDriftActionAdapter",
     "ResettableActionAdapter",
     "SteerDriveActionAdapter",
     "SteerDriveBoostActionAdapter",

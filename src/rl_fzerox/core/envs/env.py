@@ -11,7 +11,7 @@ from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.observations import ObservationValue
 
 
-class FZeroXEnv(gym.Env[ObservationValue, np.ndarray]):
+class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
     """Gymnasium wrapper around the emulator-backed F-Zero X environment."""
 
     metadata = {"render_modes": ["rgb_array"]}

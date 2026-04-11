@@ -1,0 +1,21 @@
+defaults:
+  - train_base
+  - _self_
+
+train:
+  # PPO-family defaults. Hybrid PPO variants reuse these rollout/update settings.
+  algorithm: maskable_ppo
+  vec_env: subproc
+  num_envs: 8
+  total_timesteps: 50_000_000
+  n_steps: 1024
+  n_epochs: 10
+  batch_size: 256
+  learning_rate: 3.0e-4
+  gamma: 0.992
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  run_name: ppo_cnn

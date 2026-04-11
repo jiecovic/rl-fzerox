@@ -218,8 +218,7 @@ def test_train_app_config_rejects_recurrent_policy_without_recurrent_algorithm(
 
     with pytest.raises(
         ValidationError,
-        match="policy.recurrent.enabled=true requires "
-        "train.algorithm=maskable_recurrent_ppo",
+        match="policy.recurrent.enabled=true requires a recurrent train.algorithm",
     ):
         TrainAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
@@ -330,6 +329,106 @@ def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
     )
 
 
+def test_training_requires_no_action_masks_for_hybrid_action_ppo(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_drift")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="hybrid_action_ppo"),
+    )
+
+    assert training_requires_action_masks(config) is False
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "hybrid_action_ppo"
+    )
+
+
+def test_training_requires_no_action_masks_for_hybrid_recurrent_ppo(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_drift")),
+        policy=PolicyConfig(recurrent=PolicyRecurrentConfig(enabled=True)),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="hybrid_recurrent_ppo"),
+    )
+
+    assert training_requires_action_masks(config) is False
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "hybrid_recurrent_ppo"
+    )
+
+
+def test_training_requires_action_masks_for_maskable_hybrid_action_ppo(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
+    )
+
+    assert training_requires_action_masks(config) is True
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "maskable_hybrid_action_ppo"
+    )
+
+
+def test_training_requires_action_masks_for_maskable_hybrid_recurrent_ppo(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+        policy=PolicyConfig(recurrent=PolicyRecurrentConfig(enabled=True)),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="maskable_hybrid_recurrent_ppo"),
+    )
+
+    assert training_requires_action_masks(config) is True
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "maskable_hybrid_recurrent_ppo"
+    )
+
+
 def test_validate_training_algorithm_config_rejects_sac_without_continuous_action(
     tmp_path: Path,
 ) -> None:
@@ -347,6 +446,26 @@ def test_validate_training_algorithm_config_rejects_sac_without_continuous_actio
     )
 
     with pytest.raises(RuntimeError, match="continuous steer-drive action adapter"):
+        validate_training_algorithm_config(config)
+
+
+def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_action(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="hybrid_action_ppo"),
+    )
+
+    with pytest.raises(RuntimeError, match="hybrid steer-drive action adapter"):
         validate_training_algorithm_config(config)
 
 
@@ -413,6 +532,160 @@ def test_build_training_model_can_construct_sac() -> None:
     assert isinstance(model, SAC)
 
 
+def test_build_ppo_model_can_construct_hybrid_action_ppo() -> None:
+    from sb3x import HybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_drift"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="hybrid_action_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+            masking_required=False,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, HybridActionPPO)
+
+
+def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
+    from sb3x import MaskableHybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_boost_drift"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_action_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+            masking_required=True,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionPPO)
+
+
+def test_build_ppo_model_can_construct_hybrid_recurrent_ppo() -> None:
+    from sb3x import HybridRecurrentPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_drift"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                )
+            ),
+            tensorboard_log=None,
+            masking_required=False,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, HybridRecurrentPPO)
+    assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
+
+
+def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
+    from sb3x import MaskableHybridRecurrentPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_boost_drift"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                )
+            ),
+            tensorboard_log=None,
+            masking_required=True,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridRecurrentPPO)
+    assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
+
+
 def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -428,7 +701,7 @@ def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -
     try:
         with pytest.raises(
             RuntimeError,
-            match="Recurrent policy config requires train.algorithm=maskable_recurrent_ppo",
+            match="Recurrent policy config requires a recurrent train.algorithm",
         ):
             build_ppo_model(
                 train_env=env,

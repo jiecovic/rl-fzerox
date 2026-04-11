@@ -11,10 +11,10 @@ from rl_fzerox.core.training.runner import run_training
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for the PPO training app."""
+    """Parse CLI arguments for the training app."""
 
     parser = argparse.ArgumentParser(
-        description="Train an SB3 PPO agent from a Hydra-composed YAML config.",
+        description="Train an SB3 agent from a Hydra-composed YAML config.",
         allow_abbrev=False,
     )
     parser.add_argument(
@@ -35,7 +35,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Load the train config and start PPO training."""
+    """Load the train config and start training."""
 
     args = parse_args(argv)
     try:

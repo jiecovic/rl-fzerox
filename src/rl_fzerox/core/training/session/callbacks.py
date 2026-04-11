@@ -124,7 +124,7 @@ def build_callbacks(
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
 ):
-    """Construct the SB3 callback list used during PPO training."""
+    """Construct the SB3 callback list used during training."""
 
     try:
         from stable_baselines3.common.callbacks import BaseCallback, CallbackList

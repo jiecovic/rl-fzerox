@@ -9,10 +9,27 @@ from typing import Protocol, TypeGuard
 
 import numpy as np
 
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 PolicyState = tuple[np.ndarray, ...] | None
+_FULL_MODEL_POLICY_ALGORITHMS = frozenset(
+    {
+        "maskable_recurrent_ppo",
+        "hybrid_action_ppo",
+        "hybrid_recurrent_ppo",
+        "maskable_hybrid_action_ppo",
+        "maskable_hybrid_recurrent_ppo",
+    }
+)
+_SAVED_POLICY_ALGORITHMS = _FULL_MODEL_POLICY_ALGORITHMS | frozenset(
+    {
+        "maskable_ppo",
+        "sac",
+    }
+)
+_LEGACY_PPO_ALGORITHMS = frozenset({"auto", "ppo"})
 
 
 class _HasPredict(Protocol):
@@ -22,7 +39,7 @@ class _HasPredict(Protocol):
         state: PolicyState = None,
         episode_start: np.ndarray | None = None,
         deterministic: bool = True,
-    ) -> tuple[object, PolicyState]: ...
+    ) -> tuple[ActionValue, PolicyState]: ...
 
 
 class _HasMaskablePredict(Protocol):
@@ -33,7 +50,7 @@ class _HasMaskablePredict(Protocol):
         episode_start: np.ndarray | None = None,
         deterministic: bool = True,
         action_masks: np.ndarray | None = None,
-    ) -> tuple[object, PolicyState]: ...
+    ) -> tuple[ActionValue, PolicyState]: ...
 
 
 def _load_saved_policy(
@@ -50,22 +67,17 @@ def _load_saved_policy(
     _ensure_policy_dependencies_loaded()
 
     algorithm = _load_saved_policy_algorithm(run_dir)
-    if algorithm == "maskable_recurrent_ppo":
+    if algorithm in _FULL_MODEL_POLICY_ALGORITHMS:
         if run_dir is None:
-            raise RuntimeError("Recurrent policy loading requires the source run directory")
-        try:
-            from sb3x import MaskableRecurrentPPO
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading recurrent checkpoints requires sb3x in the active environment."
-            ) from exc
+            raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
+        algorithm_class = _full_model_class_for_algorithm(algorithm)
         model_path = resolve_model_artifact_path(
             run_dir,
             artifact=_artifact_kind_from_policy_path(policy_path),
         )
-        loaded_model = MaskableRecurrentPPO.load(str(model_path), device=device)
+        loaded_model = algorithm_class.load(str(model_path), device=device)
         if not _has_predict(loaded_model):
-            raise TypeError("Loaded recurrent model does not expose a compatible predict(...)")
+            raise TypeError("Loaded model does not expose a compatible predict(...)")
         return loaded_model
 
     saved_policy = torch.load(policy_path, map_location="cpu", weights_only=False)
@@ -90,7 +102,7 @@ def _ensure_policy_dependencies_loaded() -> None:
     import_module("rl_fzerox.core.policy.extractors")
 
 
-def _policy_predict_fn(policy: object) -> Callable[..., tuple[object, PolicyState]]:
+def _policy_predict_fn(policy: object) -> Callable[..., tuple[ActionValue, PolicyState]]:
     if not _has_predict(policy):
         raise TypeError("Policy does not expose a compatible predict(...) method")
     return policy.predict
@@ -104,7 +116,7 @@ def _predict_policy_action(
     episode_start: np.ndarray | None,
     deterministic: bool,
     action_masks: np.ndarray | None,
-) -> tuple[object, PolicyState]:
+) -> tuple[ActionValue, PolicyState]:
     if action_masks is None:
         return _policy_predict_fn(policy)(
             observation,
@@ -139,6 +151,44 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):
+    if algorithm == "maskable_hybrid_action_ppo":
+        try:
+            from sb3x.ppo_mask_hybrid_action import CnnPolicy, MultiInputPolicy
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading maskable hybrid action PPO checkpoints requires sb3x "
+                "in the active environment."
+            ) from exc
+
+        return CnnPolicy, MultiInputPolicy
+    if algorithm == "hybrid_action_ppo":
+        try:
+            from sb3x.ppo_hybrid_action import CnnPolicy, MultiInputPolicy
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading hybrid action PPO checkpoints requires sb3x in the active environment."
+            ) from exc
+
+        return CnnPolicy, MultiInputPolicy
+    if algorithm == "hybrid_recurrent_ppo":
+        try:
+            from sb3x.ppo_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading hybrid recurrent PPO checkpoints requires sb3x in the active environment."
+            ) from exc
+
+        return CnnLstmPolicy, MultiInputLstmPolicy
+    if algorithm == "maskable_hybrid_recurrent_ppo":
+        try:
+            from sb3x.ppo_mask_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
+        except ImportError as exc:
+            raise RuntimeError(
+                "Loading maskable hybrid recurrent PPO checkpoints requires sb3x "
+                "in the active environment."
+            ) from exc
+
+        return CnnLstmPolicy, MultiInputLstmPolicy
     if algorithm == "maskable_recurrent_ppo":
         try:
             from sb3x.ppo_mask_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
@@ -162,6 +212,35 @@ def _policy_classes_for_algorithm(*, algorithm: str):
     return CnnPolicy, MultiInputPolicy
 
 
+def _full_model_class_for_algorithm(algorithm: str):
+    try:
+        if algorithm == "maskable_recurrent_ppo":
+            from sb3x import MaskableRecurrentPPO
+
+            return MaskableRecurrentPPO
+        if algorithm == "hybrid_action_ppo":
+            from sb3x import HybridActionPPO
+
+            return HybridActionPPO
+        if algorithm == "hybrid_recurrent_ppo":
+            from sb3x import HybridRecurrentPPO
+
+            return HybridRecurrentPPO
+        if algorithm == "maskable_hybrid_action_ppo":
+            from sb3x import MaskableHybridActionPPO
+
+            return MaskableHybridActionPPO
+        if algorithm == "maskable_hybrid_recurrent_ppo":
+            from sb3x import MaskableHybridRecurrentPPO
+
+            return MaskableHybridRecurrentPPO
+    except ImportError as exc:
+        raise RuntimeError(
+            f"Loading {algorithm} checkpoints requires sb3x in the active environment."
+        ) from exc
+    raise ValueError(f"Unsupported full-model policy algorithm: {algorithm!r}")
+
+
 def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if run_dir is None:
         return "ppo"
@@ -170,17 +249,17 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if not config_path.is_file():
         return "ppo"
 
-    try:
-        from rl_fzerox.core.config import load_train_app_config
+    from rl_fzerox.core.config import load_train_app_config
 
-        config = load_train_app_config(config_path)
-        if config.train.algorithm in {"maskable_ppo", "maskable_recurrent_ppo", "sac"}:
-            return config.train.algorithm
-        # Historical runs may have saved `auto` from the pre-maskable default
-        # era, so only explicit algorithm values are treated as non-legacy here.
+    config = load_train_app_config(config_path)
+    algorithm = config.train.algorithm
+    if algorithm in _SAVED_POLICY_ALGORITHMS:
+        return algorithm
+    if algorithm in _LEGACY_PPO_ALGORITHMS:
+        # Historical runs may have saved `auto` or plain `ppo` before maskable
+        # variants became mandatory; only those explicit values use legacy loading.
         return "ppo"
-    except Exception:
-        return "ppo"
+    raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:

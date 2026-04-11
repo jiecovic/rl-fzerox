@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/actions/base.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypeAlias, runtime_checkable
 
@@ -11,7 +11,9 @@ from gymnasium import spaces
 from fzerox_emulator import ControllerState
 
 ActionScalar: TypeAlias = int | float | np.integer | np.floating
-ActionValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | np.ndarray
+ActionBranchValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | np.ndarray
+HybridActionValue: TypeAlias = Mapping[str, ActionBranchValue]
+ActionValue: TypeAlias = ActionBranchValue | HybridActionValue
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +33,7 @@ class ActionAdapter(Protocol):
         ...
 
     @property
-    def idle_action(self) -> np.ndarray:
+    def idle_action(self) -> ActionValue:
         """Return the neutral action value for this adapter."""
         ...
 
@@ -67,6 +69,8 @@ class ResettableActionAdapter(Protocol):
 def coerce_action_values(action: ActionValue) -> list[int]:
     """Normalize one policy action into a flat integer list."""
 
+    if isinstance(action, Mapping):
+        raise ValueError("Discrete actions must be a numeric scalar or sequence")
     if isinstance(action, np.ndarray):
         return action.astype(np.int64, copy=False).reshape(-1).tolist()
     if isinstance(action, np.integer):

@@ -1,0 +1,10 @@
+# Shared local filesystem overrides only. Algorithm configs compose this with
+# either /train_ppo_base or /train_sac_base.
+
+emulator:
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  baseline_state_path: local/states/first-race.state
+
+train:
+  output_root: local/runs

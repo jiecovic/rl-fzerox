@@ -33,6 +33,11 @@ class ActionMaskController:
         curriculum_config: CurriculumConfig | None,
     ) -> ActionMaskController:
         stage_overrides = _curriculum_stage_overrides(curriculum_config)
+        _validate_configured_overrides(
+            adapter=adapter,
+            base_overrides=base_overrides,
+            stage_overrides=stage_overrides,
+        )
         return cls(
             adapter=adapter,
             base_overrides=base_overrides,
@@ -120,6 +125,49 @@ def _curriculum_stage_names(curriculum_config: CurriculumConfig | None) -> tuple
     if curriculum_config is None or not curriculum_config.enabled:
         return ()
     return tuple(stage.name for stage in curriculum_config.stages)
+
+
+def _validate_configured_overrides(
+    *,
+    adapter: ActionAdapter,
+    base_overrides: ActionMaskOverrides | None,
+    stage_overrides: tuple[ActionMaskOverrides | None, ...],
+) -> None:
+    """Reject mask branches that the active action adapter cannot consume."""
+
+    valid_labels = frozenset(dimension.label for dimension in adapter.action_dimensions)
+    _validate_override_branches(
+        overrides=base_overrides,
+        valid_labels=valid_labels,
+        source_label="env.action.mask",
+    )
+    for stage_index, overrides in enumerate(stage_overrides):
+        _validate_override_branches(
+            overrides=overrides,
+            valid_labels=valid_labels,
+            source_label=f"curriculum.stages[{stage_index}].action_mask",
+        )
+
+
+def _validate_override_branches(
+    *,
+    overrides: ActionMaskOverrides | None,
+    valid_labels: frozenset[str],
+    source_label: str,
+) -> None:
+    if overrides is None:
+        return
+
+    unknown_labels = sorted(set(overrides) - valid_labels)
+    if not unknown_labels:
+        return
+
+    unknown = ", ".join(repr(label) for label in unknown_labels)
+    valid = ", ".join(repr(label) for label in sorted(valid_labels)) or "none"
+    raise ValueError(
+        f"Unsupported action mask branch in {source_label}: {unknown}. "
+        f"Valid branches for this action adapter: {valid}."
+    )
 
 
 def _dynamic_action_mask_overrides(

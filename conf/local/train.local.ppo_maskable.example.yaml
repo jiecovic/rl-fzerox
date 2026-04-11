@@ -1,8 +1,6 @@
 defaults:
-  - /train
+  - /train_ppo_base
   - _self_
-
-seed: 123
 
 emulator:
   baseline_state_path: local/states/first-race.state
@@ -19,4 +17,3 @@ train:
   vec_env: dummy
   num_envs: 1
   output_root: local/runs
-  run_name: ppo_cnn
