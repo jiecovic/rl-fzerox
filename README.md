@@ -76,7 +76,7 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:
 
 - 7 steering buckets from hard-left to hard-right
-- 3 drive modes: `coast`, `throttle`, and `brake`
+- 3 drive modes: `coast`, `accelerate`, and `air_brake`
 
 The `steer_drive_boost` adapter adds a binary boost head for
 `MultiDiscrete([7, 3, 2])`. The `steer_drive_boost_drift` adapter also adds an
@@ -84,12 +84,12 @@ explicit shoulder-input head for `MultiDiscrete([7, 3, 2, 3])` with
 `off`, `left`, and `right`. Steering bucket counts must be odd so one
 bucket is exactly straight.
 
-The maskable recurrent hybrid pipeline uses continuous steer/gas/brake axes plus
+The maskable recurrent hybrid pipeline uses continuous steer/drive/air-brake axes plus
 `hybrid_steer_drive_boost_shoulder_primitive`. Its discrete branch is
 `MultiDiscrete([7, 2])`: shoulder primitive plus boost. Shoulder values
 `0..2` are `off`, `drift_left`, and `drift_right`; values `3..6` are reserved
-for future side-attack/spin primitives and are masked by default. Gas and brake
-use independent full-range PWM axes, so both buttons can be pulsed at once.
+for future side-attack/spin primitives and are masked by default. Accelerate and
+air brake use independent full-range PWM axes, so both buttons can be pulsed at once.
 
 The current observation pipeline keeps the full game view, aspect-corrects the
 raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,
@@ -150,7 +150,7 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_recu
 
 For hybrid-action PPO, use the feedforward PPO variant with continuous steer and
 drive axes plus a discrete drift branch. The drive axis uses full-range PWM:
-`-1` coasts, `0` pulses half throttle, and `+1` holds full throttle.
+`-1` coasts, `0` pulses half accelerate, and `+1` holds accelerate.
 
 ```bash
 python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid.yaml

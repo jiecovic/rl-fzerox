@@ -13,7 +13,12 @@ from fzerox_emulator import (
     FZeroXTelemetry,
     display_size,
 )
-from rl_fzerox.core.envs.actions import BOOST_MASK, BRAKE_MASK, DRIFT_LEFT_MASK, THROTTLE_MASK
+from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    BOOST_MASK,
+    DRIFT_LEFT_MASK,
+)
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES
 from rl_fzerox.ui.watch import (
     _build_panel_columns,
@@ -113,7 +118,7 @@ def test_input_section_includes_visualized_control_state() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(
-            joypad_mask=THROTTLE_MASK | BOOST_MASK | DRIFT_LEFT_MASK,
+            joypad_mask=ACCELERATE_MASK | BOOST_MASK | DRIFT_LEFT_MASK,
             left_stick_x=0.5,
         ),
         policy_label=None,
@@ -137,14 +142,14 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz.drift_direction == -1
 
 
-def test_input_section_can_visualize_brake_control_state() -> None:
+def test_input_section_can_visualize_air_brake_control_state() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(joypad_mask=BRAKE_MASK, left_stick_x=0.0),
+        control_state=ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
         policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
@@ -190,8 +195,8 @@ def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_level == 0
     assert input_section.control_viz.drive_axis == pytest.approx(0.25)
-    assert input_section.control_viz.brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "gas"
+    assert input_section.control_viz.air_brake_axis is None
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
 def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
@@ -202,7 +207,7 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(
-            joypad_mask=THROTTLE_MASK | DRIFT_LEFT_MASK,
+            joypad_mask=ACCELERATE_MASK | DRIFT_LEFT_MASK,
             left_stick_x=0.25,
         ),
         policy_label="hybrid_ppo_cnn_0001",
@@ -226,19 +231,19 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_axis == pytest.approx(0.75)
-    assert input_section.control_viz.brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "gas"
+    assert input_section.control_viz.air_brake_axis is None
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
     assert input_section.control_viz.drift_direction == -1
 
 
-def test_input_section_visualizes_hybrid_policy_brake_axis() -> None:
+def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(joypad_mask=THROTTLE_MASK | BRAKE_MASK),
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
         policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_action={
@@ -260,8 +265,8 @@ def test_input_section_visualizes_hybrid_policy_brake_axis() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_axis == pytest.approx(0.75)
-    assert input_section.control_viz.brake_axis == pytest.approx(0.25)
-    assert input_section.control_viz.drive_axis_mode == "gas"
+    assert input_section.control_viz.air_brake_axis == pytest.approx(0.25)
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
 def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
@@ -271,7 +276,7 @@ def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.0),
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.0),
         policy_label="ppo_cnn_0013",
         policy_curriculum_stage=None,
         policy_action=np.array([4, 1], dtype=np.int64),
@@ -288,7 +293,7 @@ def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_axis is None
-    assert input_section.control_viz.brake_axis is None
+    assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.drive_axis_mode == "signed"
 
 

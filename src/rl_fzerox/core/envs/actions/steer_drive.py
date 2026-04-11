@@ -19,9 +19,13 @@ from rl_fzerox.core.envs.actions.base import (
 )
 
 # Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A/C-Down
-# buttons on RetroPad B/A. In F-Zero X those are acceleration/brake.
-THROTTLE_MASK = joypad_mask(JOYPAD_B)
-BRAKE_MASK = joypad_mask(JOYPAD_A)
+# buttons on RetroPad B/A. F-Zero X names those controls Accelerate/Air Brake.
+ACCELERATE_MASK = joypad_mask(JOYPAD_B)
+AIR_BRAKE_MASK = joypad_mask(JOYPAD_A)
+
+# Legacy aliases kept for existing imports and older tests/config-adjacent code.
+THROTTLE_MASK = ACCELERATE_MASK
+BRAKE_MASK = AIR_BRAKE_MASK
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,8 +38,8 @@ class DriveMode:
 
 DRIVE_MODES: tuple[DriveMode, ...] = (
     DriveMode(label="coast", joypad_mask=0),
-    DriveMode(label="throttle", joypad_mask=THROTTLE_MASK),
-    DriveMode(label="brake", joypad_mask=BRAKE_MASK),
+    DriveMode(label="accelerate", joypad_mask=ACCELERATE_MASK),
+    DriveMode(label="air_brake", joypad_mask=AIR_BRAKE_MASK),
 )
 
 

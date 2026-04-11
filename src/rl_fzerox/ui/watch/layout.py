@@ -65,7 +65,7 @@ class ViewerLayout:
     control_steer_height: int = 10
     control_drive_width: int = 12
     control_drive_height: int = 56
-    control_drive_pair_gap: int = 20
+    control_drive_pair_gap: int = 48
     control_drive_offset_x: int = 8
     control_marker_radius: int = 6
     control_caption_gap: int = 3
@@ -114,8 +114,8 @@ class ControlViz:
     steer_x: float
     drive_level: int
     drive_axis: float | None
-    brake_axis: float | None
-    drive_axis_mode: Literal["signed", "gas"]
+    air_brake_axis: float | None
+    drive_axis_mode: Literal["signed", "accelerate"]
     boost_pressed: bool
     drift_direction: int
 

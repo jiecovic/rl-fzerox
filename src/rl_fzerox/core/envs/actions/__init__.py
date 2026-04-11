@@ -11,6 +11,8 @@ from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     HybridSteerDriveDriftActionAdapter,
 )
 from rl_fzerox.core.envs.actions.steer_drive import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
     BRAKE_MASK,
     THROTTLE_MASK,
     SteerDriveActionAdapter,
@@ -56,6 +58,8 @@ def action_adapter_names() -> tuple[str, ...]:
 
 __all__ = [
     "ACTION_ADAPTER_REGISTRY",
+    "ACCELERATE_MASK",
+    "AIR_BRAKE_MASK",
     "ActionAdapter",
     "ActionAdapterFactory",
     "ActionValue",

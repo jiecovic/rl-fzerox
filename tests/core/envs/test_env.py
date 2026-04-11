@@ -23,7 +23,7 @@ from rl_fzerox.core.config.schema import (
     ObservationConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import DRIFT_LEFT_MASK, THROTTLE_MASK
+from rl_fzerox.core.envs.actions import ACCELERATE_MASK, DRIFT_LEFT_MASK
 from rl_fzerox.core.envs.observations import ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
@@ -290,7 +290,7 @@ def test_step_advances_backend_by_action_repeat():
     assert backend.capture_video_flags == [False, False, True]
     assert info["repeat_index"] == 2
     assert backend.last_controller_state == ControllerState(
-        joypad_mask=THROTTLE_MASK,
+        joypad_mask=ACCELERATE_MASK,
         left_stick_x=0.0,
     )
 
@@ -313,7 +313,7 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
     env.step(np.array([0.0, 0.5], dtype=np.float32))
     assert backend.last_controller_state.joypad_mask == 0
     env.step(np.array([0.0, 0.5], dtype=np.float32))
-    assert backend.last_controller_state.joypad_mask == THROTTLE_MASK
+    assert backend.last_controller_state.joypad_mask == ACCELERATE_MASK
 
     env.reset(seed=8)
     env.step(np.array([0.0, 0.5], dtype=np.float32))
