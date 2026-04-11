@@ -58,6 +58,7 @@ def _build_panel_columns(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
+    policy_deterministic: bool | None = None,
     max_episode_steps: int = 50_000,
     wrong_way_timer_limit: int = 300,
     progress_frontier_stall_limit_frames: int | None = 900,
@@ -83,6 +84,13 @@ def _build_panel_columns(
                         "Checkpoint stage",
                         policy_curriculum_stage if policy_curriculum_stage is not None else "-",
                         PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Deterministic",
+                        _format_policy_deterministic(policy_deterministic),
+                        PALETTE.text_primary
+                        if policy_deterministic is not None
+                        else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Action",
@@ -285,6 +293,12 @@ def _format_next_milestone(info: dict[str, object]) -> str:
 
 def _format_reward_value(value: float) -> str:
     return f"{value:.4f}"
+
+
+def _format_policy_deterministic(value: bool | None) -> str:
+    if value is None:
+        return "-"
+    return "true" if value else "false"
 
 
 def _panel_line(

@@ -564,6 +564,36 @@ def test_session_section_shows_curriculum_stage_name() -> None:
     assert curriculum_line.value == "drift_enabled"
 
 
+def test_session_section_shows_policy_deterministic_mode() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_curriculum_stage=None,
+        policy_deterministic=False,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    deterministic_line = next(
+        line for line in session_section.lines if line.label == "Deterministic"
+    )
+
+    assert deterministic_line.value == "false"
+
+
 def test_session_section_shows_reward_with_four_decimals() -> None:
     columns = _build_panel_columns(
         episode=0,
