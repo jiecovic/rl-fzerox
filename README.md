@@ -68,6 +68,8 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 
 `env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Press `K` in `watch` once to save `local/states/first-race.state`; after that, both `watch` and `train` reset from that dedicated race-start baseline instead of replaying the menu path. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
 
+`env.camera_setting` can pin the in-race camera to `overhead`, `close_behind`, `regular`, or `wide`. The env applies it after reset by tapping the real C-Right input until telemetry reports the requested setting; `null` preserves whatever the loaded baseline already uses.
+
 `watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`, and any explicit numeric `watch.fps` is capped to that same maximum.
 `watch.device` defaults to `cpu`, so policy inference in watch mode does not contend with training on the GPU unless you opt into `cuda` or `auto`.
 
@@ -81,6 +83,13 @@ The `steer_drive_boost` adapter adds a binary boost head for
 explicit shoulder-input head for `MultiDiscrete([7, 3, 2, 3])` with
 `off`, `left`, and `right`. Steering bucket counts must be odd so one
 bucket is exactly straight.
+
+The maskable recurrent hybrid pipeline uses continuous steer/gas/brake axes plus
+`hybrid_steer_drive_boost_shoulder_primitive`. Its discrete branch is
+`MultiDiscrete([7, 2])`: shoulder primitive plus boost. Shoulder values
+`0..2` are `off`, `drift_left`, and `drift_right`; values `3..6` are reserved
+for future side-attack/spin primitives and are masked by default. Gas and brake
+use independent full-range PWM axes, so both buttons can be pulsed at once.
 
 The current observation pipeline keeps the full game view, aspect-corrects the
 raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,
@@ -118,10 +127,10 @@ Watch the game:
 python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml
 ```
 
-Train PPO:
+Train maskable PPO:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.yaml
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml
 ```
 
 Training uses `MaskablePPO` by default because the env exposes live gameplay
@@ -131,18 +140,58 @@ For recurrent training, install `sb3x` into the same environment and switch the
 config to `train.algorithm=maskable_recurrent_ppo` with
 `policy.recurrent.enabled=true`.
 
-Because `conf/local/train.local.yaml` often carries a feedforward warm-start, the
-repo also ships a local recurrent entrypoint that disables that incompatible
-preload automatically:
+Because `conf/local/train.local.ppo_maskable.yaml` often carries a feedforward
+warm-start, the repo also ships a local recurrent PPO entrypoint that disables
+that incompatible preload automatically:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.recurrent.yaml
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_recurrent.yaml
+```
+
+For hybrid-action PPO, use the feedforward PPO variant with continuous steer and
+drive axes plus a discrete drift branch. The drive axis uses full-range PWM:
+`-1` coasts, `0` pulses half throttle, and `+1` holds full throttle.
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid.yaml
+```
+
+For the recurrent version of that same hybrid action space, use:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid_recurrent.yaml
+```
+
+For the same hybrid action space with invalid-action masks on the discrete
+drift and boost branches, use:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid.yaml
+```
+
+For the recurrent version with the wider shoulder-primitive branch and the same
+discrete action masks, use:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml
+```
+
+To start that policy with drift and boost masked off:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml -- '+env.action.mask.shoulder=[0]' '+env.action.mask.boost=[0]'
+```
+
+For the SAC continuous-control experiment, use:
+
+```bash
+python -m rl_fzerox.apps.train --config conf/local/train.local.sac.yaml
 ```
 
 The repo also ships one starter curriculum config:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.yaml curriculum=drift_after_finish
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml curriculum=drift_after_finish
 ```
 
 That curriculum starts with the shoulder/drift branch masked to `off` only and
