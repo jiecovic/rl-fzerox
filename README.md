@@ -90,6 +90,9 @@ The maskable recurrent hybrid pipeline uses continuous steer/drive/air-brake axe
 `0..2` are `off`, `drift_left`, and `drift_right`; values `3..6` are reserved
 for future side-attack/spin primitives and are masked by default. Accelerate and
 air brake use independent full-range PWM axes, so both buttons can be pulsed at once.
+`env.action.boost_unmask_min_speed_kph` can keep manual boost masked below a
+live speed threshold; boost still also requires the game's `can_boost` flag,
+enough energy, and no already-active boost effect.
 `env.action.drift_unmask_min_speed_kph` can additionally keep the shoulder/drift
 branch masked to `off` until live speed reaches that threshold. Set it to `null`
 to disable the speed gate or `0` to allow drift immediately; explicit masks such
