@@ -69,9 +69,25 @@ class ActionConfig(BaseModel):
     continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
-    boost_unmask_min_speed_kph: NonNegativeFloat | None = None
+    boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     drift_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_boost_speed_gate(cls, data: object) -> object:
+        # LEGACY CONFIG COMPATIBILITY:
+        # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
+        # boost gate is a max-speed cap: allow boost while slower, mask it when
+        # already fast. Keep old manifests loadable by carrying the number over.
+        if not isinstance(data, Mapping):
+            return data
+        values: dict[str, object] = {str(key): value for key, value in data.items()}
+        missing = object()
+        legacy_gate = values.pop("boost_unmask_min_speed_kph", missing)
+        if legacy_gate is not missing and "boost_unmask_max_speed_kph" not in values:
+            values["boost_unmask_max_speed_kph"] = legacy_gate
+        return values
 
     @field_validator("steer_buckets")
     @classmethod

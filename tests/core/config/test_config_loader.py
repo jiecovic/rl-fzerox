@@ -733,7 +733,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
             "    name: hybrid_steer_drive_boost_shoulder_primitive",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
-            "    boost_unmask_min_speed_kph: 700.0",
+            "    boost_unmask_max_speed_kph: 700.0",
             "    drift_unmask_min_speed_kph: 500.0",
             "train:",
             "  algorithm: maskable_hybrid_recurrent_ppo",
@@ -749,10 +749,36 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
     assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
-    assert config.env.action.boost_unmask_min_speed_kph == 700.0
+    assert config.env.action.boost_unmask_max_speed_kph == 700.0
     assert config.env.action.drift_unmask_min_speed_kph == 500.0
     assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert config.policy.recurrent.enabled is True
+
+
+def test_load_train_app_config_migrates_legacy_boost_speed_gate(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    boost_unmask_min_speed_kph: 800.0",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.boost_unmask_max_speed_kph == 800.0
 
 
 def test_repo_watch_template_exists() -> None:

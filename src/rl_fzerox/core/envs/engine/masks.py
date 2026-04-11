@@ -20,7 +20,7 @@ class ActionMaskController:
     base_overrides: ActionMaskOverrides | None
     stage_overrides: tuple[ActionMaskOverrides | None, ...]
     stage_names: tuple[str, ...]
-    boost_unmask_min_speed_kph: float | None
+    boost_unmask_max_speed_kph: float | None
     drift_unmask_min_speed_kph: float | None
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
@@ -34,7 +34,7 @@ class ActionMaskController:
         adapter: ActionAdapter,
         base_overrides: ActionMaskOverrides | None,
         curriculum_config: CurriculumConfig | None,
-        boost_unmask_min_speed_kph: float | None = None,
+        boost_unmask_max_speed_kph: float | None = None,
         drift_unmask_min_speed_kph: float | None = None,
     ) -> ActionMaskController:
         stage_overrides = _curriculum_stage_overrides(curriculum_config)
@@ -48,7 +48,7 @@ class ActionMaskController:
             base_overrides=base_overrides,
             stage_overrides=stage_overrides,
             stage_names=_curriculum_stage_names(curriculum_config),
-            boost_unmask_min_speed_kph=boost_unmask_min_speed_kph,
+            boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             drift_unmask_min_speed_kph=drift_unmask_min_speed_kph,
             _stage_index=0 if stage_overrides else None,
         )
@@ -66,7 +66,7 @@ class ActionMaskController:
                 boost_unlocked=self._boost_unlocked,
                 shoulder_lock_index=self._shoulder_lock_index,
                 speed_kph=self._speed_kph,
-                boost_unmask_min_speed_kph=self.boost_unmask_min_speed_kph,
+                boost_unmask_max_speed_kph=self.boost_unmask_max_speed_kph,
                 drift_unmask_min_speed_kph=self.drift_unmask_min_speed_kph,
             ),
         )
@@ -190,16 +190,16 @@ def _dynamic_action_mask_overrides(
     boost_unlocked: bool | None,
     shoulder_lock_index: int | None = None,
     speed_kph: float | None = None,
-    boost_unmask_min_speed_kph: float | None = None,
+    boost_unmask_max_speed_kph: float | None = None,
     drift_unmask_min_speed_kph: float | None = None,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
     # In that case keep the branch open instead of masking boost prematurely.
     if boost_unlocked is False or (
-        boost_unmask_min_speed_kph is not None
+        boost_unmask_max_speed_kph is not None
         and speed_kph is not None
-        and speed_kph < boost_unmask_min_speed_kph
+        and speed_kph > boost_unmask_max_speed_kph
     ):
         overrides["boost"] = (0,)
     if shoulder_lock_index is not None:
