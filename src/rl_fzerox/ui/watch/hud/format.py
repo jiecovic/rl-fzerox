@@ -6,6 +6,10 @@ from collections.abc import Mapping
 import numpy as np
 
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.hybrid_action import (
+    HYBRID_CONTINUOUS_ACTION_KEY,
+    HYBRID_DISCRETE_ACTION_KEY,
+)
 from rl_fzerox.ui.watch.layout import BUTTON_LABELS
 
 _RELOAD_ERROR_MAX_CHARS = 36
@@ -21,8 +25,8 @@ def _format_policy_action(policy_action: ActionValue | None) -> str:
         return "manual"
 
     if isinstance(policy_action, Mapping):
-        continuous = policy_action.get("continuous")
-        discrete = policy_action.get("discrete")
+        continuous = policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
+        discrete = policy_action.get(HYBRID_DISCRETE_ACTION_KEY)
         if continuous is not None and discrete is not None:
             return (
                 f"c={_format_action_values(continuous)} "

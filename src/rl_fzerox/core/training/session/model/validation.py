@@ -1,41 +1,44 @@
 # src/rl_fzerox/core/training/session/model/validation.py
 from __future__ import annotations
 
+from rl_fzerox.core.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
 from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
-from rl_fzerox.core.training.session.model.algorithms import (
+from rl_fzerox.core.training_algorithms import (
     MASKABLE_TRAINING_ALGORITHMS,
     RECURRENT_TRAINING_ALGORITHMS,
+    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_PPO,
+    TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
+    TRAIN_ALGORITHM_PPO,
+    TRAIN_ALGORITHM_SAC,
 )
-
-_SAC_ACTION_ADAPTERS = {"continuous_steer_drive", "continuous_steer_drive_drift"}
-_HYBRID_ACTION_ADAPTERS = {
-    "hybrid_steer_drive_drift",
-    "hybrid_steer_drive_boost_drift",
-    "hybrid_steer_drive_boost_shoulder_primitive",
-}
 
 
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
     """Reject incompatible algorithm/config combinations before training starts."""
 
-    if config.train.algorithm == "ppo":
+    if config.train.algorithm == TRAIN_ALGORITHM_PPO:
         raise RuntimeError(
             "Plain PPO training is no longer supported. "
-            "Use `train.algorithm=maskable_ppo` or `maskable_recurrent_ppo`."
+            f"Use `train.algorithm={TRAIN_ALGORITHM_MASKABLE_PPO}` or "
+            f"`{TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO}`."
         )
-    if config.train.algorithm == "sac":
+    if config.train.algorithm == TRAIN_ALGORITHM_SAC:
         _validate_sac_training_config(config)
         return
-    if config.train.algorithm == "hybrid_action_ppo":
+    if config.train.algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
         _validate_hybrid_action_ppo_training_config(config)
         return
-    if config.train.algorithm == "hybrid_recurrent_ppo":
+    if config.train.algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
         _validate_hybrid_recurrent_ppo_training_config(config)
         return
-    if config.train.algorithm == "maskable_hybrid_action_ppo":
+    if config.train.algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
         _validate_maskable_hybrid_action_ppo_training_config(config)
         return
-    if config.train.algorithm == "maskable_hybrid_recurrent_ppo":
+    if config.train.algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
         _validate_maskable_hybrid_recurrent_ppo_training_config(config)
 
 
@@ -66,7 +69,7 @@ def validate_recurrent_configuration_alignment(
 
 
 def _validate_sac_training_config(config: TrainAppConfig) -> None:
-    if config.env.action.name not in _SAC_ACTION_ADAPTERS:
+    if config.env.action.name not in SAC_ACTION_ADAPTERS:
         raise RuntimeError(
             "SAC requires a continuous steer-drive action adapter so the action space is Box"
         )
@@ -127,7 +130,7 @@ def _validate_hybrid_action_adapter(
     *,
     algorithm_label: str,
 ) -> None:
-    if config.env.action.name not in _HYBRID_ACTION_ADAPTERS:
+    if config.env.action.name not in HYBRID_ACTION_ADAPTERS:
         raise RuntimeError(
             f"{algorithm_label} requires a hybrid steer-drive action adapter "
             "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"

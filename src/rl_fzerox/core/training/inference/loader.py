@@ -11,25 +11,22 @@ import numpy as np
 
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.training.runs import RUN_CONFIG_FILENAME, resolve_model_artifact_path
+from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
+from rl_fzerox.core.training_algorithms import (
+    FULL_MODEL_POLICY_ALGORITHMS,
+    LEGACY_PPO_ALGORITHMS,
+    SAVED_POLICY_ALGORITHMS,
+    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_PPO,
+    TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
+    TRAIN_ALGORITHM_PPO,
+    TRAIN_ALGORITHM_SAC,
+)
 
 PolicyState = tuple[np.ndarray, ...] | None
-_FULL_MODEL_POLICY_ALGORITHMS = frozenset(
-    {
-        "maskable_recurrent_ppo",
-        "hybrid_action_ppo",
-        "hybrid_recurrent_ppo",
-        "maskable_hybrid_action_ppo",
-        "maskable_hybrid_recurrent_ppo",
-    }
-)
-_SAVED_POLICY_ALGORITHMS = _FULL_MODEL_POLICY_ALGORITHMS | frozenset(
-    {
-        "maskable_ppo",
-        "sac",
-    }
-)
-_LEGACY_PPO_ALGORITHMS = frozenset({"auto", "ppo"})
 
 
 class _HasPredict(Protocol):
@@ -67,7 +64,7 @@ def _load_saved_policy(
     _ensure_policy_dependencies_loaded()
 
     algorithm = _load_saved_policy_algorithm(run_dir)
-    if algorithm in _FULL_MODEL_POLICY_ALGORITHMS:
+    if algorithm in FULL_MODEL_POLICY_ALGORITHMS:
         if run_dir is None:
             raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
         algorithm_class = _full_model_class_for_algorithm(algorithm)
@@ -151,7 +148,7 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):
-    if algorithm == "maskable_hybrid_action_ppo":
+    if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
         try:
             from sb3x.ppo_mask_hybrid_action import CnnPolicy, MultiInputPolicy
         except ImportError as exc:
@@ -161,7 +158,7 @@ def _policy_classes_for_algorithm(*, algorithm: str):
             ) from exc
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == "hybrid_action_ppo":
+    if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
         try:
             from sb3x.ppo_hybrid_action import CnnPolicy, MultiInputPolicy
         except ImportError as exc:
@@ -170,7 +167,7 @@ def _policy_classes_for_algorithm(*, algorithm: str):
             ) from exc
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == "hybrid_recurrent_ppo":
+    if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
         try:
             from sb3x.ppo_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
         except ImportError as exc:
@@ -179,7 +176,7 @@ def _policy_classes_for_algorithm(*, algorithm: str):
             ) from exc
 
         return CnnLstmPolicy, MultiInputLstmPolicy
-    if algorithm == "maskable_hybrid_recurrent_ppo":
+    if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
         try:
             from sb3x.ppo_mask_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
         except ImportError as exc:
@@ -189,7 +186,7 @@ def _policy_classes_for_algorithm(*, algorithm: str):
             ) from exc
 
         return CnnLstmPolicy, MultiInputLstmPolicy
-    if algorithm == "maskable_recurrent_ppo":
+    if algorithm == TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO:
         try:
             from sb3x.ppo_mask_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
         except ImportError as exc:
@@ -198,11 +195,11 @@ def _policy_classes_for_algorithm(*, algorithm: str):
             ) from exc
 
         return CnnLstmPolicy, MultiInputLstmPolicy
-    if algorithm == "maskable_ppo":
+    if algorithm == TRAIN_ALGORITHM_MASKABLE_PPO:
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == "sac":
+    if algorithm == TRAIN_ALGORITHM_SAC:
         from stable_baselines3.sac import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
@@ -214,23 +211,23 @@ def _policy_classes_for_algorithm(*, algorithm: str):
 
 def _full_model_class_for_algorithm(algorithm: str):
     try:
-        if algorithm == "maskable_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO:
             from sb3x import MaskableRecurrentPPO
 
             return MaskableRecurrentPPO
-        if algorithm == "hybrid_action_ppo":
+        if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
             from sb3x import HybridActionPPO
 
             return HybridActionPPO
-        if algorithm == "hybrid_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
             from sb3x import HybridRecurrentPPO
 
             return HybridRecurrentPPO
-        if algorithm == "maskable_hybrid_action_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
             from sb3x import MaskableHybridActionPPO
 
             return MaskableHybridActionPPO
-        if algorithm == "maskable_hybrid_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
             from sb3x import MaskableHybridRecurrentPPO
 
             return MaskableHybridRecurrentPPO
@@ -243,22 +240,22 @@ def _full_model_class_for_algorithm(algorithm: str):
 
 def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if run_dir is None:
-        return "ppo"
+        return TRAIN_ALGORITHM_PPO
 
-    config_path = run_dir / RUN_CONFIG_FILENAME
+    config_path = run_dir / RUN_LAYOUT.config_filename
     if not config_path.is_file():
-        return "ppo"
+        return TRAIN_ALGORITHM_PPO
 
     from rl_fzerox.core.config import load_train_app_config
 
     config = load_train_app_config(config_path)
     algorithm = config.train.algorithm
-    if algorithm in _SAVED_POLICY_ALGORITHMS:
+    if algorithm in SAVED_POLICY_ALGORITHMS:
         return algorithm
-    if algorithm in _LEGACY_PPO_ALGORITHMS:
+    if algorithm in LEGACY_PPO_ALGORITHMS:
         # Historical runs may have saved `auto` or plain `ppo` before maskable
         # variants became mandatory; only those explicit values use legacy loading.
-        return "ppo"
+        return TRAIN_ALGORITHM_PPO
     raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
 

@@ -7,6 +7,7 @@ from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     training_requires_action_masks,
 )
+from rl_fzerox.core.training_algorithms import TRAIN_ALGORITHM_SAC
 
 
 def build_tensorboard_logger(run_paths: RunPaths):
@@ -134,7 +135,7 @@ def _training_summary_parts(
         f"batch_size={train_config.batch_size}",
         f"lr={train_config.learning_rate}",
     ]
-    if effective_algorithm == "sac":
+    if effective_algorithm == TRAIN_ALGORITHM_SAC:
         parts.extend(
             [
                 f"buffer_size={train_config.buffer_size}",

@@ -8,11 +8,15 @@ from omegaconf import OmegaConf
 
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
 from rl_fzerox.core.training.runs.paths import (
-    RUN_CONFIG_FILENAME,
+    RUN_LAYOUT,
     RunPaths,
     build_watch_session_paths,
     ensure_watch_session_dirs,
     resolve_train_run_config_path,
+)
+from rl_fzerox.core.training_algorithms import (
+    TRAIN_ALGORITHM_AUTO,
+    TRAIN_ALGORITHM_MASKABLE_PPO,
 )
 
 
@@ -75,8 +79,8 @@ def materialize_train_run_config(
             "train": config.train.model_copy(
                 update={
                     "algorithm": (
-                        "maskable_ppo"
-                        if config.train.algorithm == "auto"
+                        TRAIN_ALGORITHM_MASKABLE_PPO
+                        if config.train.algorithm == TRAIN_ALGORITHM_AUTO
                         else config.train.algorithm
                     )
                 }
@@ -88,7 +92,7 @@ def materialize_train_run_config(
 def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
     """Persist one resolved train config snapshot next to a training run."""
 
-    config_path = run_dir / RUN_CONFIG_FILENAME
+    config_path = run_dir / RUN_LAYOUT.config_filename
     data = config.model_dump(mode="json", exclude_none=True)
     OmegaConf.save(config=OmegaConf.create(data), f=str(config_path))
     return config_path

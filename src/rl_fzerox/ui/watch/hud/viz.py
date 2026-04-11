@@ -14,6 +14,7 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_RIGHT_MASK,
     ActionValue,
 )
+from rl_fzerox.core.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
 
 
@@ -59,7 +60,7 @@ def _continuous_drive_axes(
     if policy_action is None:
         return None, None
     source = (
-        policy_action.get("continuous")
+        policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
         if isinstance(policy_action, Mapping)
         else policy_action
     )

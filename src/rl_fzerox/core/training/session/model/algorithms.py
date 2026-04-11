@@ -2,26 +2,17 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
-
-MASKABLE_TRAINING_ALGORITHMS = {
-    "auto",
-    "maskable_ppo",
-    "maskable_recurrent_ppo",
-    "maskable_hybrid_action_ppo",
-    "maskable_hybrid_recurrent_ppo",
-}
-RECURRENT_TRAINING_ALGORITHMS = {
-    "maskable_recurrent_ppo",
-    "hybrid_recurrent_ppo",
-    "maskable_hybrid_recurrent_ppo",
-}
-SB3X_TRAINING_ALGORITHMS = {
-    "maskable_recurrent_ppo",
-    "hybrid_action_ppo",
-    "hybrid_recurrent_ppo",
-    "maskable_hybrid_action_ppo",
-    "maskable_hybrid_recurrent_ppo",
-}
+from rl_fzerox.core.training_algorithms import (
+    MASKABLE_TRAINING_ALGORITHMS,
+    SB3X_TRAINING_ALGORITHMS,
+    TRAIN_ALGORITHM_AUTO,
+    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
+    TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
+    TRAIN_ALGORITHM_MASKABLE_PPO,
+    TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
+)
 
 
 def training_requires_action_masks(config: TrainAppConfig) -> bool:
@@ -42,34 +33,34 @@ def resolve_effective_training_algorithm(
     """
 
     _ = masking_required
-    if train_config.algorithm == "auto":
-        return "maskable_ppo"
+    if train_config.algorithm == TRAIN_ALGORITHM_AUTO:
+        return TRAIN_ALGORITHM_MASKABLE_PPO
     return train_config.algorithm
 
 
 def resolve_training_algorithm_class(algorithm: str):
     try:
-        if algorithm == "maskable_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO:
             from sb3x import MaskableRecurrentPPO
 
             return MaskableRecurrentPPO
-        if algorithm == "maskable_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_PPO:
             from sb3_contrib import MaskablePPO
 
             return MaskablePPO
-        if algorithm == "hybrid_action_ppo":
+        if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
             from sb3x import HybridActionPPO
 
             return HybridActionPPO
-        if algorithm == "hybrid_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
             from sb3x import HybridRecurrentPPO
 
             return HybridRecurrentPPO
-        if algorithm == "maskable_hybrid_action_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
             from sb3x import MaskableHybridActionPPO
 
             return MaskableHybridActionPPO
-        if algorithm == "maskable_hybrid_recurrent_ppo":
+        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
             from sb3x import MaskableHybridRecurrentPPO
 
             return MaskableHybridRecurrentPPO
