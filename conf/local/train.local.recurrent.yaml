@@ -4,8 +4,11 @@ defaults:
 
 train:
   algorithm: maskable_recurrent_ppo
-  init_run_dir: local/runs/ppo_cnn_0045
+  init_run_dir: local/runs/ppo_cnn_0052
   init_artifact: latest
+
+env:
+  boost_min_energy_fraction: 0.30
 
 policy:
   recurrent:
