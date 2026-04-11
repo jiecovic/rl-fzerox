@@ -1,6 +1,7 @@
 # tests/apps/test_watch.py
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -174,6 +175,86 @@ def test_watch_allows_run_dir_without_config(
     assert config.watch.device == "cpu"
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "latest"
+
+
+def test_watch_cli_overrides_apply_after_run_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+
+    watch_config = WatchAppConfig(
+        seed=999,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(action_repeat=1, camera_setting="close_behind"),
+        watch=WatchConfig(fps=30.0),
+    )
+    overridden_watch_config = watch_config.model_copy(
+        update={
+            "env": watch_config.env.model_copy(update={"camera_setting": "close_behind"}),
+            "watch": watch_config.watch.model_copy(update={"fps": 15.0}),
+        }
+    )
+    train_config = TrainAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(action_repeat=3, camera_setting="regular"),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+
+    def _load_watch_config(
+        _config_path: Path,
+        *,
+        overrides: Sequence[str] | None = None,
+    ) -> WatchAppConfig:
+        return overridden_watch_config if overrides else watch_config
+
+    captured: dict[str, WatchAppConfig] = {}
+
+    monkeypatch.setattr("rl_fzerox.apps.watch.load_watch_app_config", _load_watch_config)
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.load_train_run_config",
+        lambda *_args, **_kwargs: train_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.materialize_watch_session_config",
+        lambda config, *, run_dir: config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.run_viewer",
+        lambda config: captured.setdefault("config", config),
+    )
+
+    main(
+        [
+            "--config",
+            str(tmp_path / "watch.yaml"),
+            "--run-dir",
+            str(run_dir),
+            "--",
+            "env.camera_setting=close_behind",
+            "watch.fps=15",
+        ]
+    )
+
+    config = captured["config"]
+    assert config.seed == 7
+    assert config.env.action_repeat == 3
+    assert config.env.camera_setting == "close_behind"
+    assert config.watch.fps == 15.0
+    assert config.watch.policy_run_dir == run_dir.resolve()
 
 
 def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.MonkeyPatch) -> None:
