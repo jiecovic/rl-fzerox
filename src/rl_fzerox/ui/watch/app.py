@@ -3,12 +3,11 @@ from __future__ import annotations
 
 import time
 
-import numpy as np
-
 from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs import observations as observation_utils
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.input import _poll_viewer_input
 from rl_fzerox.ui.watch.render.frame import (
@@ -87,7 +86,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             raw_frame = env.render()
             reset_info = dict(info)
             current_control_state = ControllerState()
-            current_policy_action: np.ndarray | None = None
+            current_policy_action: ActionValue | None = None
             telemetry = _read_live_telemetry(emulator)
 
             if screen is None or fonts is None:
@@ -160,6 +159,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_action=current_policy_action,
                 policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                 policy_reload_error=policy_reload_error,
+                continuous_drive_mode=config.env.action.continuous_drive_mode,
+                continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                 action_repeat=config.env.action_repeat,
                 max_episode_steps=config.env.max_episode_steps,
                 stuck_step_limit=config.env.stuck_step_limit,
@@ -224,6 +225,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
+                        continuous_drive_mode=config.env.action.continuous_drive_mode,
+                        continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
@@ -250,9 +253,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                             deterministic=config.watch.deterministic_policy,
                             action_masks=env.action_masks(),
                         )
-                        current_policy_action = np.asarray(action)
+                        current_policy_action = action
                         current_control_state = env.action_to_control_state(action)
-                        observation, reward, terminated, truncated, info = env.step(action)
+                        observation, reward, terminated, truncated, info = env.step_control(
+                            current_control_state
+                        )
                     observation_image = observation_utils.observation_image(observation)
                     observation_state = observation_utils.observation_state(observation)
                     raw_frame = env.render()
@@ -293,6 +298,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
+                        continuous_drive_mode=config.env.action.continuous_drive_mode,
+                        continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
@@ -318,9 +325,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                         deterministic=config.watch.deterministic_policy,
                         action_masks=env.action_masks(),
                     )
-                    current_policy_action = np.asarray(action)
+                    current_policy_action = action
                     current_control_state = env.action_to_control_state(action)
-                    observation, reward, terminated, truncated, info = env.step(action)
+                    observation, reward, terminated, truncated, info = env.step_control(
+                        current_control_state
+                    )
                 observation_image = observation_utils.observation_image(observation)
                 observation_state = observation_utils.observation_state(observation)
                 raw_frame = env.render()
@@ -368,6 +377,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_action=current_policy_action,
                     policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                     policy_reload_error=policy_reload_error,
+                    continuous_drive_mode=config.env.action.continuous_drive_mode,
+                    continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                     action_repeat=config.env.action_repeat,
                     max_episode_steps=config.env.max_episode_steps,
                     stuck_step_limit=config.env.stuck_step_limit,

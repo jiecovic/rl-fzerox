@@ -1,13 +1,9 @@
 # src/rl_fzerox/ui/watch/hud/draw.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.hud.format import _format_observation_summary
-from rl_fzerox.ui.watch.hud.model import (
-    _build_panel_columns,
-    _observation_preview_size,
-)
+from rl_fzerox.ui.watch.hud.model import _build_panel_columns
 from rl_fzerox.ui.watch.hud.viz import _wrap_text
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelSection, ViewerFonts
+from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelLine, PanelSection, ViewerFonts
 from rl_fzerox.ui.watch.render.widgets import (
     _draw_control_viz,
     _draw_flag_viz,
@@ -32,6 +28,8 @@ def _draw_side_panel(
     policy_action,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    continuous_drive_mode: str,
+    continuous_drive_deadzone: float,
     action_repeat: int,
     max_episode_steps: int,
     stuck_step_limit: int,
@@ -42,7 +40,6 @@ def _draw_side_panel(
     observation_shape: tuple[int, ...],
     observation_state,
     observation_state_feature_names: tuple[str, ...],
-    observation_surface,
     telemetry,
 ) -> None:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
@@ -70,6 +67,8 @@ def _draw_side_panel(
         policy_action=policy_action,
         policy_reload_age_seconds=policy_reload_age_seconds,
         policy_reload_error=policy_reload_error,
+        continuous_drive_mode=continuous_drive_mode,
+        continuous_drive_deadzone=continuous_drive_deadzone,
         action_repeat=action_repeat,
         max_episode_steps=max_episode_steps,
         stuck_step_limit=stuck_step_limit,
@@ -99,7 +98,7 @@ def _draw_side_panel(
     left_x = x
     right_x = x + left_column_width + LAYOUT.column_gap
 
-    left_column_bottom = _draw_column(
+    _draw_column(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -107,16 +106,6 @@ def _draw_side_panel(
         y=y,
         width=left_column_width,
         sections=columns.left,
-    )
-    _draw_observation_preview(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        surface=observation_surface,
-        x=left_x,
-        y=left_column_bottom + LAYOUT.section_gap,
-        width=left_column_width,
-        observation_shape=observation_shape,
     )
     _draw_column(
         pygame=pygame,
@@ -195,12 +184,14 @@ def _draw_section(
             )
             continue
         if line.label:
-            label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
-            screen.blit(label_surface, (x, y))
-            value_surface = fonts.body.render(line.value, True, line.color)
-            value_x = x + width - value_surface.get_width()
-            screen.blit(value_surface, (value_x, y - 1))
-            y += max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+            y = _draw_labeled_value_line(
+                screen=screen,
+                fonts=fonts,
+                x=x,
+                y=y,
+                width=width,
+                line=line,
+            )
             continue
 
         value_surface = fonts.small.render(line.value, True, line.color)
@@ -265,37 +256,43 @@ def _draw_wrapped_line(
     return y
 
 
-def _draw_observation_preview(
+def _draw_labeled_value_line(
     *,
-    pygame,
     screen,
     fonts: ViewerFonts,
-    surface,
     x: int,
     y: int,
     width: int,
-    observation_shape: tuple[int, ...],
-) -> None:
-    preview_width, preview_height = _observation_preview_size(observation_shape)
-    title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
-    subtitle_surface = fonts.small.render(
-        _format_observation_summary(observation_shape),
-        True,
-        PALETTE.text_muted,
-    )
-    screen.blit(title_surface, (x, y))
-    y += title_surface.get_height() + LAYOUT.preview_title_gap
-    screen.blit(subtitle_surface, (x, y))
-    y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
+    line: PanelLine,
+) -> int:
+    label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
+    value_surface = fonts.body.render(line.value, True, line.color)
+    inline_value_space = width - label_surface.get_width() - LAYOUT.inline_value_gap
+    if value_surface.get_width() <= inline_value_space:
+        screen.blit(label_surface, (x, y))
+        value_x = x + width - value_surface.get_width()
+        screen.blit(value_surface, (value_x, y - 1))
+        return y + max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
 
-    preview_x = x + max(0, (width - preview_width) // 2)
-    preview_rect = pygame.Rect(preview_x, y, preview_width, preview_height)
-    pygame.draw.rect(screen, PALETTE.app_background, preview_rect)
-    screen.blit(surface, preview_rect.topleft)
-    pygame.draw.rect(
-        screen,
-        PALETTE.text_warning,
-        preview_rect,
-        width=2,
-        border_radius=4,
-    )
+    screen.blit(label_surface, (x, y))
+    y += label_surface.get_height() + LAYOUT.line_gap
+    fitted_value = _fit_text(fonts.body, line.value, width)
+    value_surface = fonts.body.render(fitted_value, True, line.color)
+    screen.blit(value_surface, (x, y - 1))
+    return y + value_surface.get_height() + LAYOUT.line_gap
+
+
+def _fit_text(font, text: str, max_width: int) -> str:
+    if font.render(text, True, PALETTE.text_primary).get_width() <= max_width:
+        return text
+
+    suffix = "..."
+    suffix_width = font.render(suffix, True, PALETTE.text_primary).get_width()
+    if suffix_width >= max_width:
+        return ""
+
+    for end_index in range(len(text), 0, -1):
+        candidate = text[:end_index] + suffix
+        if font.render(candidate, True, PALETTE.text_primary).get_width() <= max_width:
+            return candidate
+    return suffix

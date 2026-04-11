@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.hud.format import (
     _float_info,
@@ -49,9 +50,11 @@ def _build_panel_columns(
     control_state: ControllerState,
     policy_label: str | None,
     policy_curriculum_stage: str | None,
-    policy_action: np.ndarray | None,
+    policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    continuous_drive_mode: str = "threshold",
+    continuous_drive_deadzone: float = 0.2,
     action_repeat: int,
     stuck_step_limit: int,
     stuck_min_speed_kph: float,
@@ -182,7 +185,12 @@ def _build_panel_columns(
             PanelSection(
                 title="Input",
                 lines=[],
-                control_viz=_control_viz(control_state, policy_action=policy_action),
+                control_viz=_control_viz(
+                    control_state,
+                    policy_action=policy_action,
+                    continuous_drive_mode=continuous_drive_mode,
+                    continuous_drive_deadzone=continuous_drive_deadzone,
+                ),
             ),
         ],
         right=[
@@ -262,7 +270,15 @@ def _column_content_height(
             if line.label:
                 label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
                 value_surface = fonts.body.render(line.value, True, line.color)
-                y += max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+                inline_value_space = width - label_surface.get_width() - LAYOUT.inline_value_gap
+                if value_surface.get_width() <= inline_value_space:
+                    y += (
+                        max(label_surface.get_height(), value_surface.get_height())
+                        + LAYOUT.line_gap
+                    )
+                else:
+                    y += label_surface.get_height() + LAYOUT.line_gap
+                    y += value_surface.get_height() + LAYOUT.line_gap
             else:
                 value_surface = fonts.small.render(line.value, True, line.color)
                 y += value_surface.get_height() + LAYOUT.line_gap
@@ -337,6 +353,7 @@ def _game_section(
         lines=[
             _panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
             _panel_line("Difficulty", _format_difficulty(telemetry), PALETTE.text_primary),
+            _panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
             _panel_line("Course", str(telemetry.course_index), PALETTE.text_primary),
             _panel_line(
                 "Time",
@@ -378,6 +395,13 @@ def _format_difficulty(telemetry: FZeroXTelemetry) -> str:
     if difficulty_name != "unknown":
         return difficulty_name
     return f"unknown ({telemetry.difficulty_raw})"
+
+
+def _format_camera_setting(telemetry: FZeroXTelemetry) -> str:
+    camera_setting_name = telemetry.camera_setting_name
+    if camera_setting_name != "unknown":
+        return _format_mode_name(camera_setting_name)
+    return f"unknown ({telemetry.camera_setting_raw})"
 
 
 def _policy_state_sections(

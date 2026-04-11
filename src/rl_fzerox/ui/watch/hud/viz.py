@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/hud/viz.py
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 
 from fzerox_emulator import ControllerState
@@ -10,6 +12,7 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
     THROTTLE_MASK,
+    ActionValue,
 )
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
 
@@ -17,14 +20,27 @@ from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, Fl
 def _control_viz(
     control_state: ControllerState,
     *,
-    policy_action: np.ndarray | None = None,
+    policy_action: ActionValue | None = None,
+    continuous_drive_mode: str = "threshold",
+    continuous_drive_deadzone: float = 0.2,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     drive_level = 1 if joypad_mask & THROTTLE_MASK else -1 if joypad_mask & BRAKE_MASK else 0
+    drive_axis, brake_axis = _continuous_drive_axes(
+        policy_action,
+        continuous_drive_mode=continuous_drive_mode,
+        continuous_drive_deadzone=continuous_drive_deadzone,
+    )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         drive_level=drive_level,
-        drive_axis=_continuous_drive_axis(policy_action),
+        drive_axis=drive_axis,
+        brake_axis=brake_axis,
+        drive_axis_mode=(
+            "gas"
+            if drive_axis is not None and continuous_drive_mode == "pwm"
+            else "signed"
+        ),
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         drift_direction=(
             -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
@@ -32,21 +48,56 @@ def _control_viz(
     )
 
 
-def _continuous_drive_axis(policy_action: np.ndarray | None) -> float | None:
-    """Return raw SAC drive intent when the policy action is a float vector."""
+def _continuous_drive_axes(
+    policy_action: ActionValue | None,
+    *,
+    continuous_drive_mode: str,
+    continuous_drive_deadzone: float,
+) -> tuple[float | None, float | None]:
+    """Return HUD gas/brake values when the policy action exposes those axes."""
 
     if policy_action is None:
-        return None
-    action = np.asarray(policy_action)
+        return None, None
+    source = (
+        policy_action.get("continuous")
+        if isinstance(policy_action, Mapping)
+        else policy_action
+    )
+    action = np.asarray(source)
     if not np.issubdtype(action.dtype, np.floating):
-        return None
+        return None, None
     values = action.reshape(-1)
     if values.size < 2:
-        return None
+        return None, None
     drive = float(values[1])
     if not np.isfinite(drive):
+        return None, None
+    drive = max(-1.0, min(1.0, drive))
+    brake = _continuous_brake_axis(values, continuous_drive_deadzone=continuous_drive_deadzone)
+    if continuous_drive_mode == "pwm":
+        return _continuous_drive_gas_level(drive, deadzone=continuous_drive_deadzone), brake
+    return drive, brake
+
+
+def _continuous_brake_axis(
+    values: np.ndarray,
+    *,
+    continuous_drive_deadzone: float,
+) -> float | None:
+    if values.size < 3:
         return None
-    return max(-1.0, min(1.0, drive))
+    brake = float(values[2])
+    if not np.isfinite(brake):
+        return None
+    brake = max(-1.0, min(1.0, brake))
+    return _continuous_drive_gas_level(brake, deadzone=continuous_drive_deadzone)
+
+
+def _continuous_drive_gas_level(drive: float, *, deadzone: float) -> float:
+    duty = (drive + 1.0) * 0.5
+    if duty <= deadzone:
+        return 0.0
+    return (duty - deadzone) / (1.0 - deadzone)
 
 
 def _control_viz_height(fonts: ViewerFonts) -> int:
