@@ -900,6 +900,68 @@ def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
 
 
+def test_env_action_masks_disable_boost_below_speed_threshold() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                    speed_kph=750.0,
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            speed_kph=650.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost",
+                boost_unmask_min_speed_kph=700.0,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+    env.step(np.array([3, 1, 0], dtype=np.int64))
+
+    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+
+
+def test_env_action_masks_keep_boost_masked_when_speed_passes_threshold_before_unlock() -> None:
+    backend = ScriptedStepBackend(
+        [],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active",),
+            speed_kph=750.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost",
+                boost_unmask_min_speed_kph=700.0,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+
 def test_env_action_masks_disable_boost_while_boost_is_active() -> None:
     backend = ScriptedStepBackend(
         [

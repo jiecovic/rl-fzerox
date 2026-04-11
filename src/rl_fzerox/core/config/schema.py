@@ -69,6 +69,7 @@ class ActionConfig(BaseModel):
     continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
+    boost_unmask_min_speed_kph: NonNegativeFloat | None = None
     drift_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
 
@@ -145,6 +146,7 @@ class RewardConfig(BaseModel):
     energy_gain_reward_scale: NonNegativeFloat = 0.02
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_bonus: NonNegativeFloat = 0.0
+    energy_full_refill_cooldown_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_cooldown_frames: NonNegativeInt = 0
