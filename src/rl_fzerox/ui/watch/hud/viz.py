@@ -43,20 +43,20 @@ _FLAG_DISPLAY_LABELS = {
     "reverse_detected": "reverse",
     "low_speed_detected": "slow",
     "can_boost": "can boost",
-    "dash_pad_boost": "dash",
+    "boost_active": "boost",
     "airborne": "airborne",
     "collision_recoil": "recoil",
     "spinning_out": "spin",
     "crashed": "crash",
     "falling_off_track": "off-track",
-    "energy_depleted": "energy",
+    "energy_depleted": "depleted",
     "retired": "retired",
     "finished": "finish",
 }
 
 _FLAG_ROWS = (
     ("reverse_detected", "low_speed_detected"),
-    ("can_boost", "dash_pad_boost", "airborne"),
+    ("can_boost", "boost_active", "airborne"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
     ("energy_depleted", "retired", "finished"),
 )
@@ -65,11 +65,14 @@ _FLAG_ROWS = (
 def _flag_viz(
     state_labels: tuple[str, ...],
     *,
+    boost_active: bool,
     reverse_detected: bool,
     low_speed_detected: bool,
     energy_depleted: bool,
 ) -> FlagViz:
     active_flags = set(state_labels)
+    if boost_active:
+        active_flags.add("boost_active")
     if reverse_detected:
         active_flags.add("reverse_detected")
     if low_speed_detected:

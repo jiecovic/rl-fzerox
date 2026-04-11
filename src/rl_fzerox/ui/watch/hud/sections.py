@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.hud.format import (
     _float_info,
     _format_control_game_rate,
@@ -321,6 +322,7 @@ def _game_section(
         title="Game",
         lines=[
             _panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
+            _panel_line("Difficulty", _format_difficulty(telemetry), PALETTE.text_primary),
             _panel_line("Course", str(telemetry.course_index), PALETTE.text_primary),
             _panel_line(
                 "Time",
@@ -349,11 +351,19 @@ def _game_section(
         ],
         flag_viz=_flag_viz(
             telemetry.player.state_labels,
+            boost_active=telemetry_boost_active(telemetry),
             reverse_detected=telemetry.player.reverse_timer > 0,
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
             energy_depleted=info.get("termination_reason") == "energy_depleted",
         ),
     )
+
+
+def _format_difficulty(telemetry: FZeroXTelemetry) -> str:
+    difficulty_name = telemetry.difficulty_name
+    if difficulty_name != "unknown":
+        return difficulty_name
+    return f"unknown ({telemetry.difficulty_raw})"
 
 
 def _policy_state_sections(
