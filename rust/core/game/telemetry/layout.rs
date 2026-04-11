@@ -63,7 +63,7 @@ pub(super) const RACER: RacerOffsets = RacerOffsets {
     size: 0x3A8,
     state_flags: 0x004,
     speed: 0x098,
-    boost_timer: 0x21C,
+    boost_timer: 0x218,
     energy: 0x228,
     max_energy: 0x22C,
     race_distance: 0x23C,
