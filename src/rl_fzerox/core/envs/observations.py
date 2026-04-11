@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
 ImageObservation: TypeAlias = np.ndarray
@@ -101,7 +102,7 @@ def telemetry_state_vector(
     player = telemetry.player
     max_energy = float(player.max_energy)
     energy_frac = 0.0 if max_energy <= 0.0 else float(player.energy) / max_energy
-    boost_active = 1.0 if player.boost_timer > 0 else 0.0
+    boost_active = 1.0 if telemetry_boost_active(telemetry) else 0.0
     return np.array(
         [
             _clamp(float(player.speed_kph) / STATE_SPEED_NORMALIZER_KPH, 0.0, 2.0),

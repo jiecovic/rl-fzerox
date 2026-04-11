@@ -63,6 +63,8 @@ energy_gain_reward_scale: 0.02
 # Energy: suppress energy-gain reward for this many internal frames after
 # entering collision recoil.
 energy_gain_collision_cooldown_frames: 120
+# Energy: one-time bonus when energy crosses from below full to full.
+energy_full_refill_bonus: 1.0
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
 airborne_landing_reward: 5.0
