@@ -415,6 +415,7 @@ def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(np.array([2, 0], dtype=np.int64)) == "[2,0]"
     assert _format_policy_action(np.array([4, 1], dtype=np.int64)) == "[4,1]"
     assert _format_policy_action(np.array([4, 1, 1, 2], dtype=np.int64)) == "[4,1,1,2]"
+    assert _format_policy_action(np.array([0.25, -0.75], dtype=np.float32)) == "[0.25,-0.75]"
 
 
 def test_display_section_includes_action_repeat() -> None:

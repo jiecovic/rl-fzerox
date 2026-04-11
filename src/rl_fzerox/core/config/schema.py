@@ -56,11 +56,13 @@ class ActionConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Literal[
+        "continuous_steer_drive",
         "steer_drive",
         "steer_drive_boost",
         "steer_drive_boost_drift",
     ] = "steer_drive_boost_drift"
     steer_buckets: int = Field(default=7, ge=3)
+    continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     mask: ActionMaskConfig | None = None
 
     @field_validator("steer_buckets")
@@ -292,6 +294,7 @@ class TrainConfig(BaseModel):
         "ppo",
         "maskable_ppo",
         "maskable_recurrent_ppo",
+        "sac",
     ] = "maskable_ppo"
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
@@ -303,9 +306,17 @@ class TrainConfig(BaseModel):
     gamma: float = Field(default=0.99, gt=0.0, le=1.0)
     gae_lambda: float = Field(default=0.95, gt=0.0, le=1.0)
     clip_range: PositiveFloat = 0.2
-    ent_coef: NonNegativeFloat = 0.01
+    ent_coef: NonNegativeFloat | Literal["auto"] = 0.01
     vf_coef: PositiveFloat = 0.5
     max_grad_norm: PositiveFloat = 0.5
+    buffer_size: PositiveInt = 1_000_000
+    learning_starts: NonNegativeInt = 100
+    tau: PositiveFloat = Field(default=0.005, le=1.0)
+    train_freq: PositiveInt = 1
+    gradient_steps: PositiveInt = 1
+    target_update_interval: PositiveInt = 1
+    target_entropy: float | Literal["auto"] = "auto"
+    optimize_memory_usage: bool = False
     verbose: int = Field(default=0, ge=0, le=2)
     device: str = "auto"
     save_freq: PositiveInt = 1_000
@@ -313,6 +324,12 @@ class TrainConfig(BaseModel):
     run_name: str = "ppo_cnn"
     init_run_dir: Path | None = None
     init_artifact: Literal["latest", "best", "final"] = "latest"
+
+    @model_validator(mode="after")
+    def _validate_algorithm_specific_values(self) -> TrainConfig:
+        if self.ent_coef == "auto" and self.algorithm != "sac":
+            raise ValueError("train.ent_coef=auto is only supported with train.algorithm=sac")
+        return self
 
 
 class WatchAppConfig(BaseModel):

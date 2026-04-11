@@ -1,7 +1,7 @@
 # tests/core/envs/test_actions.py
 import numpy as np
 import pytest
-from gymnasium.spaces import MultiDiscrete
+from gymnasium.spaces import Box, MultiDiscrete
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig, ActionMaskConfig
@@ -12,6 +12,7 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
     THROTTLE_MASK,
+    ContinuousSteerDriveActionAdapter,
     SteerDriveActionAdapter,
     SteerDriveBoostActionAdapter,
     SteerDriveBoostDriftActionAdapter,
@@ -67,6 +68,40 @@ def test_steer_drive_adapter_rejects_wrong_action_shape() -> None:
 
     with pytest.raises(ValueError):
         adapter.decode(np.array([3], dtype=np.int64))
+
+
+def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:
+    adapter = ContinuousSteerDriveActionAdapter(ActionConfig(name="continuous_steer_drive"))
+
+    assert isinstance(adapter.action_space, Box)
+    assert adapter.action_space.shape == (2,)
+    assert adapter.action_space.dtype == np.float32
+    assert np.array_equal(adapter.action_space.low, np.array([-1.0, -1.0], dtype=np.float32))
+    assert np.array_equal(adapter.action_space.high, np.array([1.0, 1.0], dtype=np.float32))
+    assert np.array_equal(adapter.idle_action, np.array([0.0, 0.0], dtype=np.float32))
+
+
+def test_continuous_steer_drive_adapter_decodes_throttle_and_brake() -> None:
+    adapter = ContinuousSteerDriveActionAdapter(
+        ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
+    )
+
+    throttle_state = adapter.decode(np.array([0.5, 0.7], dtype=np.float32))
+    brake_state = adapter.decode(np.array([-0.5, -0.7], dtype=np.float32))
+
+    assert throttle_state == ControllerState(joypad_mask=THROTTLE_MASK, left_stick_x=0.5)
+    assert brake_state == ControllerState(joypad_mask=BRAKE_MASK, left_stick_x=-0.5)
+
+
+def test_continuous_steer_drive_adapter_coasts_inside_drive_deadzone() -> None:
+    adapter = ContinuousSteerDriveActionAdapter(
+        ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
+    )
+
+    control_state = adapter.decode(np.array([2.0, 0.1], dtype=np.float32))
+
+    assert control_state == ControllerState(joypad_mask=0, left_stick_x=1.0)
+    assert adapter.action_mask().tolist() == []
 
 
 def test_build_action_adapter_uses_basic_adapter_by_default() -> None:
@@ -173,6 +208,12 @@ def test_build_action_adapter_supports_boost_only_variant() -> None:
     adapter = build_action_adapter(ActionConfig(name="steer_drive_boost"))
 
     assert isinstance(adapter, SteerDriveBoostActionAdapter)
+
+
+def test_build_action_adapter_supports_continuous_steer_drive_variant() -> None:
+    adapter = build_action_adapter(ActionConfig(name="continuous_steer_drive"))
+
+    assert isinstance(adapter, ContinuousSteerDriveActionAdapter)
 
 
 def test_action_adapter_registry_exposes_registered_names() -> None:

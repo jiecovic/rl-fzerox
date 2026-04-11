@@ -16,6 +16,7 @@ from rl_fzerox.core.training.session.env import build_training_env
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
     build_tensorboard_logger,
+    build_training_model,
     maybe_preload_training_parameters,
     print_training_startup,
     training_requires_action_masks,
@@ -27,6 +28,7 @@ __all__ = [
     "build_ppo_model",
     "build_tensorboard_logger",
     "build_training_env",
+    "build_training_model",
     "cleanup_failed_run",
     "current_policy_artifact_metadata",
     "maybe_preload_training_parameters",

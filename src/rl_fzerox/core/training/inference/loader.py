@@ -152,6 +152,10 @@ def _policy_classes_for_algorithm(*, algorithm: str):
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
+    if algorithm == "sac":
+        from stable_baselines3.sac import CnnPolicy, MultiInputPolicy
+
+        return CnnPolicy, MultiInputPolicy
 
     from stable_baselines3.ppo import CnnPolicy, MultiInputPolicy
 
@@ -170,7 +174,7 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
         from rl_fzerox.core.config import load_train_app_config
 
         config = load_train_app_config(config_path)
-        if config.train.algorithm in {"maskable_ppo", "maskable_recurrent_ppo"}:
+        if config.train.algorithm in {"maskable_ppo", "maskable_recurrent_ppo", "sac"}:
             return config.train.algorithm
         # Historical runs may have saved `auto` from the pre-maskable default
         # era, so only explicit algorithm values are treated as non-legacy here.

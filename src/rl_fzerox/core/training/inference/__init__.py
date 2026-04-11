@@ -115,7 +115,7 @@ class PolicyRunner:
         )
         self._predict_state = next_state
         self._episode_start = np.array([False], dtype=bool)
-        return np.asarray(action, dtype=np.int64)
+        return np.asarray(action)
 
     def _maybe_reload(self) -> None:
         try:

@@ -13,6 +13,36 @@ from rl_fzerox.core.training.runs import (
 )
 
 
+def build_training_model(
+    *,
+    train_env,
+    train_config: TrainConfig,
+    policy_config: PolicyConfig,
+    tensorboard_log: str | None,
+    masking_required: bool,
+):
+    """Construct the configured SB3 model for the current run."""
+
+    effective_algorithm = resolve_effective_training_algorithm(
+        train_config=train_config,
+        masking_required=masking_required,
+    )
+    if effective_algorithm == "sac":
+        return _build_sac_model(
+            train_env=train_env,
+            train_config=train_config,
+            policy_config=policy_config,
+            tensorboard_log=tensorboard_log,
+        )
+    return _build_ppo_family_model(
+        train_env=train_env,
+        train_config=train_config,
+        policy_config=policy_config,
+        tensorboard_log=tensorboard_log,
+        effective_algorithm=effective_algorithm,
+    )
+
+
 def build_ppo_model(
     *,
     train_env,
@@ -27,6 +57,27 @@ def build_ppo_model(
         train_config=train_config,
         masking_required=masking_required,
     )
+    if effective_algorithm == "sac":
+        raise RuntimeError("build_ppo_model cannot construct SAC; use build_training_model")
+    return _build_ppo_family_model(
+        train_env=train_env,
+        train_config=train_config,
+        policy_config=policy_config,
+        tensorboard_log=tensorboard_log,
+        effective_algorithm=effective_algorithm,
+    )
+
+
+def _build_ppo_family_model(
+    *,
+    train_env,
+    train_config: TrainConfig,
+    policy_config: PolicyConfig,
+    tensorboard_log: str | None,
+    effective_algorithm: str,
+):
+    """Construct a PPO-family model for the current run."""
+
     _validate_recurrent_configuration_alignment(
         effective_algorithm=effective_algorithm,
         policy_config=policy_config,
@@ -40,34 +91,19 @@ def build_ppo_model(
 
     from gymnasium import spaces
 
-    from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
-
     recurrent_enabled = policy_config.recurrent.enabled
     if isinstance(train_env.observation_space, spaces.Dict):
         policy_name = (
             "MultiInputLstmPolicy" if recurrent_enabled else "MultiInputPolicy"
         )
-        extractor_class = FZeroXImageStateExtractor
-        extractor_kwargs = {
-            "features_dim": policy_config.extractor.features_dim,
-            "state_features_dim": policy_config.extractor.state_features_dim,
-        }
     else:
         policy_name = "CnnLstmPolicy" if recurrent_enabled else "CnnPolicy"
-        extractor_class = FZeroXObservationCnnExtractor
-        extractor_kwargs = {
-            "features_dim": policy_config.extractor.features_dim,
-        }
 
-    policy_kwargs = {
-        "features_extractor_class": extractor_class,
-        "features_extractor_kwargs": extractor_kwargs,
-        "net_arch": {
-            "pi": [int(value) for value in policy_config.net_arch.pi],
-            "vf": [int(value) for value in policy_config.net_arch.vf],
-        },
-        "activation_fn": resolve_policy_activation_fn(policy_config.activation),
-    }
+    policy_kwargs = _policy_kwargs(
+        train_env=train_env,
+        policy_config=policy_config,
+        value_head_key="vf",
+    )
     if recurrent_enabled:
         policy_kwargs.update(
             {
@@ -88,7 +124,7 @@ def build_ppo_model(
         gamma=train_config.gamma,
         gae_lambda=train_config.gae_lambda,
         clip_range=train_config.clip_range,
-        ent_coef=train_config.ent_coef,
+        ent_coef=_ppo_ent_coef(train_config),
         vf_coef=train_config.vf_coef,
         max_grad_norm=train_config.max_grad_norm,
         policy_kwargs=policy_kwargs,
@@ -96,6 +132,57 @@ def build_ppo_model(
         verbose=train_config.verbose,
         device=train_config.device,
     )
+
+
+def _build_sac_model(
+    *,
+    train_env,
+    train_config: TrainConfig,
+    policy_config: PolicyConfig,
+    tensorboard_log: str | None,
+):
+    """Construct a SAC model for the continuous steering experiment."""
+
+    from gymnasium import spaces
+    from stable_baselines3 import SAC
+
+    if not isinstance(train_env.action_space, spaces.Box):
+        raise RuntimeError("SAC requires a continuous Box action space")
+    policy_name = (
+        "MultiInputPolicy" if isinstance(train_env.observation_space, spaces.Dict) else "CnnPolicy"
+    )
+    policy_kwargs = _policy_kwargs(
+        train_env=train_env,
+        policy_config=policy_config,
+        value_head_key="qf",
+    )
+    return SAC(
+        policy=policy_name,
+        env=train_env,
+        learning_rate=train_config.learning_rate,
+        buffer_size=train_config.buffer_size,
+        learning_starts=train_config.learning_starts,
+        batch_size=train_config.batch_size,
+        tau=train_config.tau,
+        gamma=train_config.gamma,
+        train_freq=train_config.train_freq,
+        gradient_steps=train_config.gradient_steps,
+        ent_coef=train_config.ent_coef,
+        target_update_interval=train_config.target_update_interval,
+        target_entropy=train_config.target_entropy,
+        optimize_memory_usage=train_config.optimize_memory_usage,
+        policy_kwargs=policy_kwargs,
+        tensorboard_log=tensorboard_log,
+        verbose=train_config.verbose,
+        device=train_config.device,
+    )
+
+
+def _ppo_ent_coef(train_config: TrainConfig) -> float:
+    ent_coef = train_config.ent_coef
+    if ent_coef == "auto":
+        raise RuntimeError("PPO-family algorithms require a numeric train.ent_coef")
+    return float(ent_coef)
 
 
 def maybe_preload_training_parameters(*, model, train_config: TrainConfig) -> None:
@@ -133,16 +220,31 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
             "Plain PPO training is no longer supported. "
             "Use `train.algorithm=maskable_ppo` or `maskable_recurrent_ppo`."
         )
+    if config.train.algorithm != "sac":
+        return
+    if config.env.action.name != "continuous_steer_drive":
+        raise RuntimeError(
+            "SAC requires env.action.name=continuous_steer_drive so the action space is Box"
+        )
+    if config.env.action.mask is not None:
+        raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
+    if config.curriculum.enabled:
+        raise RuntimeError("SAC does not support action-mask curriculum stages")
+    if config.env.observation.mode == "image_state" and config.train.optimize_memory_usage:
+        raise RuntimeError(
+            "SAC optimize_memory_usage is not supported with Dict image_state observations"
+        )
 
 
-def training_requires_action_masks(_config: TrainAppConfig) -> bool:
+def training_requires_action_masks(config: TrainAppConfig) -> bool:
     """Return whether the current env stack depends on action masking.
 
-    Training always relies on MaskablePPO now because gameplay masks are part of
-    the base env contract, not only optional curriculum/static configuration.
+    PPO-family training always relies on mask-aware algorithms because gameplay
+    masks are part of that discrete-action contract. SAC uses a separate
+    continuous action adapter without boost/drift mask branches.
     """
 
-    return True
+    return config.train.algorithm != "sac"
 
 
 def resolve_effective_training_algorithm(
@@ -187,6 +289,39 @@ def _resolve_training_algorithm(algorithm: str):
             "stable-baselines3 and torch are required for training. "
             "Install with `python -m pip install -e .[train]`."
         ) from exc
+
+
+def _policy_kwargs(
+    *,
+    train_env,
+    policy_config: PolicyConfig,
+    value_head_key: str,
+) -> dict[str, object]:
+    from gymnasium import spaces
+
+    from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
+
+    if isinstance(train_env.observation_space, spaces.Dict):
+        extractor_class = FZeroXImageStateExtractor
+        extractor_kwargs = {
+            "features_dim": policy_config.extractor.features_dim,
+            "state_features_dim": policy_config.extractor.state_features_dim,
+        }
+    else:
+        extractor_class = FZeroXObservationCnnExtractor
+        extractor_kwargs = {
+            "features_dim": policy_config.extractor.features_dim,
+        }
+
+    return {
+        "features_extractor_class": extractor_class,
+        "features_extractor_kwargs": extractor_kwargs,
+        "net_arch": {
+            "pi": [int(value) for value in policy_config.net_arch.pi],
+            value_head_key: [int(value) for value in policy_config.net_arch.vf],
+        },
+        "activation_fn": resolve_policy_activation_fn(policy_config.activation),
+    }
 
 
 def _validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
@@ -266,14 +401,13 @@ def print_training_startup(
         print(f"observation_space: {train_env.observation_space}")
         print(f"action_space: {train_env.action_space}")
         print(
-            "ppo: "
-            f"algo={effective_algorithm} "
-            f"vec_env={config.train.vec_env} "
-            f"num_envs={config.train.num_envs} "
-            f"total_timesteps={config.train.total_timesteps} "
-            f"n_steps={config.train.n_steps} "
-            f"batch_size={config.train.batch_size} "
-            f"lr={config.train.learning_rate}"
+            "train: "
+            + " ".join(
+                _training_summary_parts(
+                    train_config=config.train,
+                    effective_algorithm=effective_algorithm,
+                )
+            )
         )
         if config.policy.recurrent.enabled:
             print(
@@ -301,17 +435,12 @@ def print_training_startup(
     summary.add_row("observation", str(train_env.observation_space))
     summary.add_row("action", str(train_env.action_space))
     summary.add_row(
-        "ppo",
+        "train",
         " ".join(
-            [
-                f"algo={effective_algorithm}",
-                f"vec_env={config.train.vec_env}",
-                f"num_envs={config.train.num_envs}",
-                f"total_timesteps={config.train.total_timesteps}",
-                f"n_steps={config.train.n_steps}",
-                f"batch_size={config.train.batch_size}",
-                f"lr={config.train.learning_rate}",
-            ]
+            _training_summary_parts(
+                train_config=config.train,
+                effective_algorithm=effective_algorithm,
+            )
         ),
     )
     if config.policy.recurrent.enabled:
@@ -328,3 +457,30 @@ def print_training_startup(
         )
     console.print(Panel(summary, title="Training", expand=False))
     console.print(Panel(str(model.policy), title="Policy", expand=False))
+
+
+def _training_summary_parts(
+    *,
+    train_config: TrainConfig,
+    effective_algorithm: str,
+) -> list[str]:
+    parts = [
+        f"algo={effective_algorithm}",
+        f"vec_env={train_config.vec_env}",
+        f"num_envs={train_config.num_envs}",
+        f"total_timesteps={train_config.total_timesteps}",
+        f"batch_size={train_config.batch_size}",
+        f"lr={train_config.learning_rate}",
+    ]
+    if effective_algorithm == "sac":
+        parts.extend(
+            [
+                f"buffer_size={train_config.buffer_size}",
+                f"learning_starts={train_config.learning_starts}",
+                f"train_freq={train_config.train_freq}",
+                f"gradient_steps={train_config.gradient_steps}",
+            ]
+        )
+        return parts
+    parts.append(f"n_steps={train_config.n_steps}")
+    return parts

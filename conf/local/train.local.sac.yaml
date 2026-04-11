@@ -1,0 +1,32 @@
+defaults:
+  - /local/train.local@_global_
+  - _self_
+
+env:
+  action:
+    # SAC needs one continuous Box action; this disables boost and drift for the experiment.
+    name: continuous_steer_drive
+    # Axis 1 maps brake/coast/throttle. Values inside [-deadzone, deadzone] coast.
+    continuous_drive_deadzone: 0.2
+
+train:
+  algorithm: sac
+  vec_env: dummy
+  num_envs: 1
+  run_name: sac_cnn
+  init_run_dir: null
+  init_artifact: latest
+  total_timesteps: 10_000_000
+  # Dict replay buffer stores image and next_image, so keep this conservative on 32 GB RAM.
+  buffer_size: 30_000
+  learning_starts: 5_000
+  train_freq: 1
+  gradient_steps: 1
+  batch_size: 256
+  learning_rate: 3.0e-4
+  tau: 0.005
+  gamma: 0.992
+  ent_coef: auto
+  target_entropy: auto
+  optimize_memory_usage: false
+  save_freq: 10_000

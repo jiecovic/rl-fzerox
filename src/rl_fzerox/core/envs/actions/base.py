@@ -10,7 +10,8 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 
-ActionValue: TypeAlias = int | np.integer | Sequence[int] | np.ndarray
+ActionScalar: TypeAlias = int | float | np.integer | np.floating
+ActionValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | np.ndarray
 
 
 @dataclass(frozen=True, slots=True)
