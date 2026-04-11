@@ -59,6 +59,8 @@ def make_telemetry(
     in_race_mode: bool = True,
     total_racers: int = 30,
     course_index: int = 0,
+    difficulty_raw: int = 0,
+    difficulty_name: str = "novice",
     player: PlayerTelemetry | None = None,
     state_labels: tuple[str, ...] = ("active",),
     state_flags: int | None = None,
@@ -97,6 +99,8 @@ def make_telemetry(
         total_racers=total_racers,
         course_index=course_index,
         player=resolved_player,
+        difficulty_raw=difficulty_raw,
+        difficulty_name=difficulty_name,
     )
 
 

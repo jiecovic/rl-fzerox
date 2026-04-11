@@ -20,6 +20,7 @@ pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
 #[derive(Clone, Copy)]
 pub(super) struct GlobalOffsets {
     pub total_lap_count: usize,
+    pub difficulty: usize,
     pub game_mode: usize,
     pub total_racers: usize,
     pub course_index: usize,
@@ -48,6 +49,7 @@ pub(super) struct RacerOffsets {
 // audit and update as field semantics are validated.
 pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     total_lap_count: rdram_offset(0x800C_D00C),
+    difficulty: rdram_offset(0x800C_D008),
     game_mode: rdram_offset(0x800DCE44),
     total_racers: rdram_offset(0x800E5EC0),
     course_index: rdram_offset(0x800F8514),
@@ -172,6 +174,41 @@ impl TryFrom<u32> for GameMode {
             x if x == Self::OptionsMenu as u32 => Ok(Self::OptionsMenu),
             x if x == Self::DeathRace as u32 => Ok(Self::DeathRace),
             x if x == Self::EadDemo as u32 => Ok(Self::EadDemo),
+            _ => Err(()),
+        }
+    }
+}
+
+// F-Zero X race difficulty ids derived from the decomp's `include/fzx_game.h`.
+#[repr(i32)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum RaceDifficulty {
+    Novice = 0x00,
+    Standard = 0x01,
+    Expert = 0x02,
+    Master = 0x03,
+}
+
+impl RaceDifficulty {
+    pub(super) const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Novice => "novice",
+            Self::Standard => "standard",
+            Self::Expert => "expert",
+            Self::Master => "master",
+        }
+    }
+}
+
+impl TryFrom<i32> for RaceDifficulty {
+    type Error = ();
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            x if x == Self::Novice as i32 => Ok(Self::Novice),
+            x if x == Self::Standard as i32 => Ok(Self::Standard),
+            x if x == Self::Expert as i32 => Ok(Self::Expert),
+            x if x == Self::Master as i32 => Ok(Self::Master),
             _ => Err(()),
         }
     }

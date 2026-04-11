@@ -232,6 +232,8 @@ impl PyPlayerTelemetry {
 )]
 pub struct PyTelemetry {
     total_lap_count: i32,
+    difficulty_raw: i32,
+    difficulty_name: String,
     game_mode_raw: u32,
     game_mode_name: String,
     in_race_mode: bool,
@@ -251,7 +253,10 @@ impl PyTelemetry {
         total_racers,
         course_index,
         player,
+        difficulty_raw = 0,
+        difficulty_name = None,
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         total_lap_count: i32,
         game_mode_raw: u32,
@@ -260,9 +265,13 @@ impl PyTelemetry {
         total_racers: i32,
         course_index: u32,
         player: Py<PyPlayerTelemetry>,
+        difficulty_raw: i32,
+        difficulty_name: Option<String>,
     ) -> Self {
         Self {
             total_lap_count,
+            difficulty_raw,
+            difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
             game_mode_raw,
             game_mode_name,
             in_race_mode,
@@ -275,6 +284,16 @@ impl PyTelemetry {
     #[getter]
     fn total_lap_count(&self) -> i32 {
         self.total_lap_count
+    }
+
+    #[getter]
+    fn difficulty_raw(&self) -> i32 {
+        self.difficulty_raw
+    }
+
+    #[getter]
+    fn difficulty_name(&self) -> &str {
+        &self.difficulty_name
     }
 
     #[getter]
@@ -310,6 +329,8 @@ impl PyTelemetry {
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item("total_lap_count", self.total_lap_count())?;
+        dict.set_item("difficulty_raw", self.difficulty_raw())?;
+        dict.set_item("difficulty_name", self.difficulty_name())?;
         dict.set_item("game_mode_raw", self.game_mode_raw())?;
         dict.set_item("game_mode_name", self.game_mode_name())?;
         dict.set_item("in_race_mode", self.in_race_mode())?;
@@ -331,6 +352,8 @@ pub(super) fn telemetry_to_py(
         py,
         PyTelemetry {
             total_lap_count: telemetry.total_lap_count,
+            difficulty_raw: telemetry.difficulty_raw,
+            difficulty_name: telemetry.difficulty_name.to_owned(),
             game_mode_raw: telemetry.game_mode_raw,
             game_mode_name: telemetry.game_mode_name.to_owned(),
             in_race_mode: telemetry.in_race_mode,

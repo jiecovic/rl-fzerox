@@ -6,7 +6,7 @@ use std::mem::size_of;
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
-use crate::core::telemetry::layout::{GLOBALS, GameMode, RACER, TELEMETRY_CONFIG};
+use crate::core::telemetry::layout::{GLOBALS, GameMode, RACER, RaceDifficulty, TELEMETRY_CONFIG};
 use crate::core::telemetry::model::{PlayerTelemetry, StepTelemetrySample, TelemetrySnapshot};
 
 /// Decode a typed telemetry snapshot from a full system RAM view.
@@ -16,6 +16,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
 
     let game_mode_raw = read_u32(system_ram, GLOBALS.game_mode)?;
     let game_mode = resolve_game_mode(game_mode_raw);
+    let difficulty_raw = read_i32(system_ram, GLOBALS.difficulty)?;
+    let difficulty = resolve_difficulty(difficulty_raw);
     let player_state_flags = read_u32(system_ram, player_base + RACER.state_flags)?;
     let player = PlayerTelemetry {
         state_flags: player_state_flags,
@@ -34,6 +36,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
 
     Ok(TelemetrySnapshot {
         total_lap_count: read_i32(system_ram, GLOBALS.total_lap_count)?,
+        difficulty_raw,
+        difficulty_name: difficulty.map_or("unknown", RaceDifficulty::wire_name),
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
@@ -86,6 +90,10 @@ fn player_reverse_timer_offset() -> usize {
 
 fn resolve_game_mode(game_mode_raw: u32) -> Option<GameMode> {
     GameMode::try_from(game_mode_raw & 0x1F).ok()
+}
+
+fn resolve_difficulty(difficulty_raw: i32) -> Option<RaceDifficulty> {
+    RaceDifficulty::try_from(difficulty_raw).ok()
 }
 
 fn read_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {

@@ -53,11 +53,15 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             laps_completed=1,
             position=3,
         ),
+        difficulty_raw=2,
+        difficulty_name="expert",
     )
 
     payload = telemetry.to_dict()
 
     assert payload["total_lap_count"] == 3
+    assert payload["difficulty_raw"] == 2
+    assert payload["difficulty_name"] == "expert"
     assert payload["game_mode_name"] == "gp_race"
     assert payload["total_racers"] == 30
     player_payload = payload["player"]
