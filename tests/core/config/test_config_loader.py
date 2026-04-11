@@ -565,6 +565,44 @@ def test_load_train_app_config_reads_recurrent_policy_fields(tmp_path: Path) -> 
     assert config.policy.recurrent.enable_critic_lstm is True
 
 
+def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: continuous_steer_drive",
+            "    continuous_drive_deadzone: 0.15",
+            "train:",
+            "  algorithm: sac",
+            "  total_timesteps: 1000",
+            "  buffer_size: 30000",
+            "  learning_starts: 5000",
+            "  train_freq: 1",
+            "  gradient_steps: 1",
+            "  ent_coef: auto",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "continuous_steer_drive"
+    assert config.env.action.continuous_drive_deadzone == 0.15
+    assert config.train.algorithm == "sac"
+    assert config.train.buffer_size == 30_000
+    assert config.train.learning_starts == 5_000
+    assert config.train.ent_coef == "auto"
+
+
 def test_repo_watch_template_exists() -> None:
     config_path = config_paths_module.project_root_dir() / "conf" / "watch.yaml"
 

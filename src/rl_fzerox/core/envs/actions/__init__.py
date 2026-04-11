@@ -3,6 +3,9 @@ from collections.abc import Callable
 
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.envs.actions.base import ActionAdapter, ActionValue
+from rl_fzerox.core.envs.actions.continuous_steer_drive import (
+    ContinuousSteerDriveActionAdapter,
+)
 from rl_fzerox.core.envs.actions.steer_drive import (
     BRAKE_MASK,
     THROTTLE_MASK,
@@ -19,6 +22,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
 ActionAdapterFactory = Callable[[ActionConfig], ActionAdapter]
 DEFAULT_ACTION_NAME = "steer_drive_boost_drift"
 ACTION_ADAPTER_REGISTRY: dict[str, ActionAdapterFactory] = {
+    "continuous_steer_drive": ContinuousSteerDriveActionAdapter,
     "steer_drive": SteerDriveActionAdapter,
     "steer_drive_boost": SteerDriveBoostActionAdapter,
     "steer_drive_boost_drift": SteerDriveBoostDriftActionAdapter,
@@ -47,6 +51,7 @@ __all__ = [
     "ActionValue",
     "BRAKE_MASK",
     "BOOST_MASK",
+    "ContinuousSteerDriveActionAdapter",
     "DEFAULT_ACTION_NAME",
     "DRIFT_LEFT_MASK",
     "DRIFT_RIGHT_MASK",

@@ -250,7 +250,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                             deterministic=config.watch.deterministic_policy,
                             action_masks=env.action_masks(),
                         )
-                        current_policy_action = np.asarray(action, dtype=np.int64)
+                        current_policy_action = np.asarray(action)
                         current_control_state = env.action_to_control_state(action)
                         observation, reward, terminated, truncated, info = env.step(action)
                     observation_image = observation_utils.observation_image(observation)
@@ -318,7 +318,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         deterministic=config.watch.deterministic_policy,
                         action_masks=env.action_masks(),
                     )
-                    current_policy_action = np.asarray(action, dtype=np.int64)
+                    current_policy_action = np.asarray(action)
                     current_control_state = env.action_to_control_state(action)
                     observation, reward, terminated, truncated, info = env.step(action)
                 observation_image = observation_utils.observation_image(observation)

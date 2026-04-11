@@ -32,6 +32,7 @@ from rl_fzerox.core.training.session.callbacks import RolloutInfoAccumulator, in
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
+    build_training_model,
     maybe_preload_training_parameters,
     resolve_effective_training_algorithm,
     resolve_policy_activation_fn,
@@ -305,6 +306,50 @@ def test_resolve_effective_training_algorithm_uses_maskable_auto_mode(
     )
 
 
+def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="sac", ent_coef="auto"),
+    )
+
+    assert training_requires_action_masks(config) is False
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+            masking_required=training_requires_action_masks(config),
+        )
+        == "sac"
+    )
+
+
+def test_validate_training_algorithm_config_rejects_sac_without_continuous_action(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="steer_drive")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="sac", ent_coef="auto"),
+    )
+
+    with pytest.raises(RuntimeError, match="continuous_steer_drive"):
+        validate_training_algorithm_config(config)
+
+
 def test_build_ppo_model_can_construct_maskable_ppo() -> None:
     from sb3_contrib import MaskablePPO
     from stable_baselines3.common.vec_env import DummyVecEnv
@@ -330,6 +375,42 @@ def test_build_ppo_model_can_construct_maskable_ppo() -> None:
         env.close()
 
     assert isinstance(model, MaskablePPO)
+
+
+def test_build_training_model_can_construct_sac() -> None:
+    from stable_baselines3 import SAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="continuous_steer_drive"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_training_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="sac",
+                buffer_size=4,
+                learning_starts=0,
+                ent_coef="auto",
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+            masking_required=False,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, SAC)
 
 
 def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -> None:

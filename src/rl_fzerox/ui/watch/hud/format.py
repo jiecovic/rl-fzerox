@@ -17,8 +17,11 @@ def _format_policy_action(policy_action: np.ndarray | None) -> str:
     if policy_action is None:
         return "manual"
 
-    values = np.asarray(policy_action, dtype=np.int64).reshape(-1)
-    return str(values.tolist()).replace(" ", "")
+    values = np.asarray(policy_action).reshape(-1)
+    if np.issubdtype(values.dtype, np.floating):
+        formatted = [f"{float(value):.2f}" for value in values]
+        return "[" + ",".join(formatted) + "]"
+    return str(values.astype(np.int64, copy=False).tolist()).replace(" ", "")
 
 
 def _format_reload_age(reload_age_seconds: float | None) -> str:

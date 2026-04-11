@@ -64,6 +64,18 @@ class _FakeMaskablePolicy(_FakePolicy):
         return self._action.copy(), None
 
 
+class _FakeContinuousPolicy:
+    def predict(
+        self,
+        observation: ObservationValue,
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
+        deterministic: bool = True,
+    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+        _ = (observation, state, episode_start, deterministic)
+        return np.array([0.25, -0.75], dtype=np.float32), None
+
+
 class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
     def __init__(self, action: list[int]) -> None:
         super().__init__(action)
@@ -160,6 +172,26 @@ def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> N
     assert runner.predict(observation, deterministic=False).tolist() == [2, 0]
 
     assert fake_policy.deterministic_calls == [False]
+
+
+def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> None:
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"v1")
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        _FakeContinuousPolicy(),
+    )
+
+    observation = np.zeros((84, 116, 12), dtype=np.uint8)
+    action = runner.predict(observation)
+
+    assert action.dtype == np.float32
+    assert action.tolist() == [0.25, -0.75]
 
 
 def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) -> None:
@@ -358,6 +390,35 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
+
+
+def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "continuous_steer_drive"}},
+                "policy": {},
+                "train": {
+                    "algorithm": "sac",
+                    "ent_coef": "auto",
+                    "total_timesteps": 1000,
+                },
+            }
+        ),
+        f=str(config_path),
+    )
+
+    assert _load_saved_policy_algorithm(tmp_path) == "sac"
 
 
 def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(

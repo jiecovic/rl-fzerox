@@ -6,9 +6,9 @@ from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs, save_train_run_config
 from rl_fzerox.core.training.session import (
     build_callbacks,
-    build_ppo_model,
     build_tensorboard_logger,
     build_training_env,
+    build_training_model,
     cleanup_failed_run,
     current_policy_artifact_metadata,
     maybe_preload_training_parameters,
@@ -23,7 +23,7 @@ from rl_fzerox.core.training.session import (
 
 
 def run_training(config: TrainAppConfig) -> None:
-    """Run one PPO training session from the composed train config."""
+    """Run one training session from the composed train config."""
 
     seed_process(config.seed)
     run_paths = build_run_paths(
@@ -40,7 +40,7 @@ def run_training(config: TrainAppConfig) -> None:
 
     try:
         train_env = build_training_env(run_config, run_paths)
-        model = build_ppo_model(
+        model = build_training_model(
             train_env=train_env,
             train_config=run_config.train,
             policy_config=run_config.policy,
@@ -113,9 +113,18 @@ def _learn_model(
     use_masking: bool,
     progress_bar: bool,
 ) -> None:
-    """Train one mask-aware PPO-family model with the shared learn kwargs."""
+    """Train one configured SB3 model with the shared learn kwargs."""
 
     from sb3_contrib import MaskablePPO
+    from stable_baselines3 import SAC
+
+    if isinstance(model, SAC):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            progress_bar=progress_bar,
+        )
+        return
 
     if isinstance(model, MaskablePPO):
         model.learn(

@@ -3,7 +3,7 @@ import pickle
 
 import numpy as np
 import pytest
-from gymnasium.spaces import MultiDiscrete
+from gymnasium.spaces import Box, MultiDiscrete
 
 from fzerox_emulator import (
     BackendStepResult,
@@ -428,6 +428,17 @@ def test_boost_action_env_exposes_three_head_action_space() -> None:
 
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [7, 3, 2]
+
+
+def test_continuous_action_env_exposes_box_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(action=ActionConfig(name="continuous_steer_drive")),
+    )
+
+    assert isinstance(env.action_space, Box)
+    assert env.action_space.shape == (2,)
+    assert env.action_masks().tolist() == []
 
 
 def test_env_action_masks_reflect_base_action_mask_config() -> None:
