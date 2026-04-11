@@ -68,9 +68,12 @@ energy_full_refill_bonus: 1.0
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
 airborne_landing_reward: 5.0
-# Boost discipline: fixed penalty per env step when boost is requested while a
-# boost effect was already active before that step.
-boost_redundant_press_penalty: -0.01
+# Boost pads: small reward when entering a dash-pad boost state.
+boost_pad_reward: 0.25
+# Boost pads: internal-frame cooldown before the boost-pad reward can fire again.
+boost_pad_reward_cooldown_frames: 30
+# Boost discipline: small fixed penalty per env step when manual boost is requested.
+boost_press_penalty: -0.01
 
 # Minor events: entry-only penalty when the machine enters collision recoil.
 collision_recoil_penalty: -5.0

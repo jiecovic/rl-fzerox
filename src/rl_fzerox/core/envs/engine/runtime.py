@@ -15,6 +15,7 @@ from rl_fzerox.core.envs.observations import (
     build_observation_space,
 )
 from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracker
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import derive_seed
 
 from .control_state import ControlStateTracker
@@ -252,7 +253,11 @@ class FZeroXEnvEngine:
         return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
 
     def _sync_boost_mask(self, telemetry: FZeroXTelemetry | None) -> None:
+        if telemetry is None:
+            self._mask_controller.set_boost_unlocked(None)
+            return
         can_boost = telemetry_can_boost(telemetry)
+        can_boost = can_boost and not telemetry_boost_active(telemetry)
         energy_fraction = telemetry_energy_fraction(telemetry)
         min_energy_fraction = float(self.config.boost_min_energy_fraction)
         if energy_fraction is not None and min_energy_fraction > 0.0:
