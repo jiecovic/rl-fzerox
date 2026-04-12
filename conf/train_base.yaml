@@ -62,7 +62,7 @@ policy:
     features_dim: 1024
     state_features_dim: 64
   recurrent:
-    # Enable the LSTM-based policy path only with train.algorithm=maskable_recurrent_ppo.
+    # Enable the LSTM policy path only with a recurrent PPO-family algorithm.
     enabled: false
     # LSTM hidden-state width used after the shared feature extractor.
     hidden_size: 512
