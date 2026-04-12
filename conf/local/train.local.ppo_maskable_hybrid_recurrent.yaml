@@ -13,6 +13,8 @@ env:
     continuous_drive_deadzone: 0.0
     # Keep the 0009 policy shape, but clear air brake whenever telemetry says grounded.
     continuous_air_brake_mode: disable_on_ground
+    # Try vanilla-ish drift semantics: release immediately, then mask re-taps through the dash window.
+    shoulder_slide_mode: release_cooldown
     # Keep boost unavailable when already fast; can_boost/energy/active-boost gates still apply.
     boost_unmask_max_speed_kph: 790.0
     # Keep drift unavailable at low speed, without hard-masking it forever.
@@ -21,9 +23,9 @@ env:
 train:
   algorithm: maskable_hybrid_recurrent_ppo
   run_name: ppo_maskable_hybrid_recurrent_cnn
-  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0010
+  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0012
   init_artifact: latest
-  ent_coef: 0.02
+  ent_coef: 0.01
   n_steps: 2048
   batch_size: 512
 
