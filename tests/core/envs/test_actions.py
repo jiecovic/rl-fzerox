@@ -111,7 +111,7 @@ def test_continuous_steer_drive_adapter_coasts_inside_drive_deadzone() -> None:
     assert adapter.action_mask().tolist() == []
 
 
-def test_continuous_steer_drive_adapter_pwm_uses_full_drive_range() -> None:
+def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(
             name="continuous_steer_drive",
@@ -121,9 +121,14 @@ def test_continuous_steer_drive_adapter_pwm_uses_full_drive_range() -> None:
     )
 
     coast_mask = adapter.decode(np.array([0.0, -1.0], dtype=np.float32)).joypad_mask
-    half_accelerate_masks = [
-        adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask
+    partial_accelerate_masks = [
+        adapter.decode(np.array([0.0, -0.5], dtype=np.float32)).joypad_mask
         for _ in range(4)
+    ]
+    adapter.reset()
+    neutral_accelerate_masks = [
+        adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask
+        for _ in range(3)
     ]
     adapter.reset()
     full_accelerate_masks = [
@@ -132,7 +137,12 @@ def test_continuous_steer_drive_adapter_pwm_uses_full_drive_range() -> None:
     ]
 
     assert coast_mask == 0
-    assert half_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
+    assert partial_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
+    assert neutral_accelerate_masks == [
+        ACCELERATE_MASK,
+        ACCELERATE_MASK,
+        ACCELERATE_MASK,
+    ]
     assert full_accelerate_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
 
 
@@ -204,7 +214,7 @@ def test_continuous_steer_drive_drift_adapter_pwm_preserves_drift_hold() -> None
     second_state = adapter.decode(np.array([0.25, 0.5, 0.75], dtype=np.float32))
 
     assert first_state == ControllerState(
-        joypad_mask=DRIFT_RIGHT_MASK,
+        joypad_mask=ACCELERATE_MASK | DRIFT_RIGHT_MASK,
         left_stick_x=0.25,
     )
     assert second_state == ControllerState(
@@ -369,6 +379,26 @@ def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_decodes_air_brake_a
         joypad_mask=AIR_BRAKE_MASK,
         left_stick_x=0.25,
     )
+
+
+def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_can_disable_air_brake() -> None:
+    adapter = HybridSteerDriveBoostShoulderPrimitiveActionAdapter(
+        ActionConfig(
+            name="hybrid_steer_drive_boost_shoulder_primitive",
+            continuous_drive_mode="pwm",
+            continuous_drive_deadzone=0.0,
+            continuous_air_brake_mode="off",
+        )
+    )
+
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([0.25, -1.0, 1.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    )
+
+    assert control_state == ControllerState(joypad_mask=0, left_stick_x=0.25)
 
 
 def test_hybrid_steer_drive_boost_shoulder_primitive_adapter_keeps_neutral_air_brake_off() -> None:

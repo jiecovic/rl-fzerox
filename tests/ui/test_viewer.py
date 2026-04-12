@@ -194,7 +194,7 @@ def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
     assert input_section.control_viz.drive_level == 0
-    assert input_section.control_viz.drive_axis == pytest.approx(0.25)
+    assert input_section.control_viz.drive_axis == pytest.approx(0.5)
     assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.drive_axis_mode == "accelerate"
 
@@ -230,7 +230,7 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(0.75)
+    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.drive_axis_mode == "accelerate"
     assert input_section.control_viz.drift_direction == -1
@@ -264,9 +264,77 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(0.75)
+    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
     assert input_section.control_viz.drive_axis_mode == "accelerate"
+
+
+def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+        policy_label="hybrid_ppo_cnn_0002",
+        policy_curriculum_stage=None,
+        policy_action={
+            "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        },
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        continuous_drive_mode="pwm",
+        continuous_drive_deadzone=0.0,
+        continuous_air_brake_mode="off",
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.air_brake_axis is None
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
+
+
+def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+        policy_label="hybrid_ppo_cnn_0002",
+        policy_curriculum_stage=None,
+        policy_action={
+            "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        },
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        continuous_drive_mode="pwm",
+        continuous_drive_deadzone=0.0,
+        continuous_air_brake_mode="disable_on_ground",
+        continuous_air_brake_disabled=True,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
+    assert input_section.control_viz.air_brake_disabled is True
 
 
 def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:

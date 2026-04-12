@@ -115,6 +115,7 @@ class ControlViz:
     drive_level: int
     drive_axis: float | None
     air_brake_axis: float | None
+    air_brake_disabled: bool
     drive_axis_mode: Literal["signed", "accelerate"]
     boost_pressed: bool
     drift_direction: int

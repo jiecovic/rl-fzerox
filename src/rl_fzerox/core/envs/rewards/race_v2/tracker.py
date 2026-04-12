@@ -186,6 +186,14 @@ class RaceV2RewardTracker:
             reward += landing_reward
             breakdown["landing"] = landing_reward
 
+        if (
+            resolved_action_context.air_brake_requested
+            and not self._previous_airborne
+            and self._weights.grounded_air_brake_penalty != 0.0
+        ):
+            reward += self._weights.grounded_air_brake_penalty
+            breakdown["grounded_air_brake"] = self._weights.grounded_air_brake_penalty
+
         self._advance_boost_pad_reward_cooldown(summary.frames_run)
         boost_pad_reward = self._boost_pad_reward(summary)
         if boost_pad_reward:

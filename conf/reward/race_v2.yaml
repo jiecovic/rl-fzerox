@@ -70,6 +70,8 @@ energy_full_refill_cooldown_frames: 800
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
 airborne_landing_reward: 5.0
+# Air control: small penalty when air brake is requested while already grounded.
+grounded_air_brake_penalty: -0.1
 # Boost pads: small reward when entering a dash-pad boost state.
 boost_pad_reward: 0.25
 # Boost pads: internal-frame cooldown before the boost-pad reward can fire again.

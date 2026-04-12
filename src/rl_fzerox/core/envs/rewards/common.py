@@ -28,6 +28,7 @@ class RewardActionContext:
     """Action bits the reward function may need for context-dependent shaping."""
 
     boost_requested: bool = False
+    air_brake_requested: bool = False
 
 
 class RewardTracker(Protocol):
