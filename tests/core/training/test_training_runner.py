@@ -22,13 +22,19 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
-from rl_fzerox.core.training.runs import build_run_paths
+from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
+    PolicyArtifactMetadata,
     atomic_save_artifact,
+    load_policy_artifact_metadata,
     resolve_train_run_config,
     validate_training_baseline_state,
 )
-from rl_fzerox.core.training.session.callbacks import RolloutInfoAccumulator, info_sequence
+from rl_fzerox.core.training.session.callbacks import (
+    RolloutInfoAccumulator,
+    build_callbacks,
+    info_sequence,
+)
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
@@ -162,6 +168,53 @@ def test_info_sequence_accepts_tuple_infos() -> None:
     assert info_sequence(infos) == infos
     assert info_sequence([{"race_distance": 10.0}]) == [{"race_distance": 10.0}]
     assert info_sequence(None) is None
+
+
+def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    callbacks = build_callbacks(
+        train_config=TrainConfig(save_freq=1_000, num_envs=1),
+        curriculum_config=CurriculumConfig(),
+        run_paths=run_paths,
+    )
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+            masking_required=True,
+        )
+        assert model.num_timesteps == 0
+
+        callbacks.init_callback(model)
+        callbacks.on_training_start({}, {})
+    finally:
+        env.close()
+
+    assert run_paths.latest_model_path.is_file()
+    assert run_paths.latest_policy_path.is_file()
+    assert load_policy_artifact_metadata(run_paths.latest_policy_path) == PolicyArtifactMetadata(
+        curriculum_stage_index=None,
+        curriculum_stage_name=None,
+    )
 
 
 def test_resolve_policy_activation_fn_supports_known_names() -> None:

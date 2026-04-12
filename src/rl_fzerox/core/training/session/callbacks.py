@@ -188,6 +188,9 @@ def build_callbacks(
                 policy_metadata=current_policy_artifact_metadata(self.training_env),
             )
 
+        def _on_training_start(self) -> None:
+            self._save_latest()
+
         def _on_step(self) -> bool:
             if self.n_calls % self._save_freq == 0:
                 self._save_latest()
