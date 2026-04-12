@@ -231,6 +231,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
         self._air_brake_decoder = ContinuousButtonPwmDecoder(
             deadzone=float(config.continuous_drive_deadzone),
         )
+        self._air_brake_enabled = config.continuous_air_brake_mode != "off"
         self._action_space = spaces.Dict(
             {
                 HYBRID_CONTINUOUS_ACTION_KEY: spaces.Box(
@@ -278,10 +279,12 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
         steer, drive, air_brake, shoulder, boost = _parse_hybrid_steer_drive_boost_shoulder(
             action
         )
-        joypad_mask = self._drive_decoder.decode(drive) | self._air_brake_decoder.decode(
-            air_brake,
-            button_mask=AIR_BRAKE_MASK,
+        air_brake_mask = (
+            self._air_brake_decoder.decode(air_brake, button_mask=AIR_BRAKE_MASK)
+            if self._air_brake_enabled
+            else 0
         )
+        joypad_mask = self._drive_decoder.decode(drive) | air_brake_mask
         if shoulder == 1:
             joypad_mask |= DRIFT_LEFT_MASK
         elif shoulder == 2:

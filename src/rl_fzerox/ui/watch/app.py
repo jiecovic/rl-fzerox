@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from fzerox_emulator import ControllerState, Emulator
+from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs import observations as observation_utils
@@ -161,6 +161,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_reload_error=policy_reload_error,
                 continuous_drive_mode=config.env.action.continuous_drive_mode,
                 continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
+                continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
+                continuous_air_brake_disabled=_continuous_air_brake_disabled(
+                    config,
+                    telemetry,
+                ),
                 action_repeat=config.env.action_repeat,
                 max_episode_steps=config.env.max_episode_steps,
                 stuck_step_limit=config.env.stuck_step_limit,
@@ -227,6 +232,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_error=policy_reload_error,
                         continuous_drive_mode=config.env.action.continuous_drive_mode,
                         continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
+                        continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
+                        continuous_air_brake_disabled=_continuous_air_brake_disabled(
+                            config,
+                            telemetry,
+                        ),
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
@@ -300,6 +310,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_reload_error=policy_reload_error,
                         continuous_drive_mode=config.env.action.continuous_drive_mode,
                         continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
+                        continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
+                        continuous_air_brake_disabled=_continuous_air_brake_disabled(
+                            config,
+                            telemetry,
+                        ),
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
                         stuck_step_limit=config.env.stuck_step_limit,
@@ -379,6 +394,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_reload_error=policy_reload_error,
                     continuous_drive_mode=config.env.action.continuous_drive_mode,
                     continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
+                    continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
+                    continuous_air_brake_disabled=_continuous_air_brake_disabled(
+                        config,
+                        telemetry,
+                    ),
                     action_repeat=config.env.action_repeat,
                     max_episode_steps=config.env.max_episode_steps,
                     stuck_step_limit=config.env.stuck_step_limit,
@@ -403,3 +423,12 @@ def run_viewer(config: WatchAppConfig) -> None:
     finally:
         env.close()
         pygame.quit()
+
+
+def _continuous_air_brake_disabled(
+    config: WatchAppConfig,
+    telemetry: FZeroXTelemetry | None,
+) -> bool:
+    if config.env.action.continuous_air_brake_mode != "disable_on_ground":
+        return False
+    return telemetry is not None and not telemetry.player.airborne

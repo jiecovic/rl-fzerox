@@ -8,20 +8,24 @@ env:
     # Maskable recurrent hybrid PPO: continuous steer/drive/air-brake plus shoulder primitive and boost.
     # Shoulder values 3..6 reserve future side-attack/spin primitives and are masked by default.
     name: hybrid_steer_drive_boost_shoulder_primitive
-    # Full-range PWM maps -1 to coast, 0 to half accelerate, and +1 to full accelerate.
+    # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
     continuous_drive_mode: pwm
     continuous_drive_deadzone: 0.0
+    # Keep the 0009 policy shape, but clear air brake whenever telemetry says grounded.
+    continuous_air_brake_mode: disable_on_ground
     # Keep boost unavailable when already fast; can_boost/energy/active-boost gates still apply.
-    boost_unmask_max_speed_kph: 800.0
+    boost_unmask_max_speed_kph: 790.0
     # Keep drift unavailable at low speed, without hard-masking it forever.
-    drift_unmask_min_speed_kph: 700.0
+    drift_unmask_min_speed_kph: 630.0
 
 train:
   algorithm: maskable_hybrid_recurrent_ppo
   run_name: ppo_maskable_hybrid_recurrent_cnn
-  init_run_dir: null
+  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0010
   init_artifact: latest
-  ent_coef: 0.0
+  ent_coef: 0.02
+  n_steps: 2048
+  batch_size: 512
 
 policy:
   recurrent:

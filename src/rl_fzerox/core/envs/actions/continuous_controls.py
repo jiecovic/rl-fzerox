@@ -136,8 +136,8 @@ def _threshold_drive_mask(drive: float, *, deadzone: float) -> int:
 
 
 def _pwm_duty_cycle(drive: float, *, deadzone: float) -> float:
-    # Uses the full continuous policy range for accelerate duty: -1 coast, +1 full hold.
-    duty = (drive + 1.0) * 0.5
+    # F-Zero X usually wants full gas: negative values reduce duty, 0+ holds full throttle.
+    duty = min(max(drive + 1.0, 0.0), 1.0)
     if duty <= deadzone:
         return 0.0
     return (duty - deadzone) / (1.0 - deadzone)

@@ -7,7 +7,7 @@ env:
   action:
     # Hybrid maskable PPO gets continuous steer/drive plus discrete drift and boost heads.
     name: hybrid_steer_drive_boost_drift
-    # Full-range PWM maps -1 to coast, 0 to half accelerate, and +1 to full accelerate.
+    # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
     continuous_drive_mode: pwm
     continuous_drive_deadzone: 0.0
 

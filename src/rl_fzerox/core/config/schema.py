@@ -68,6 +68,7 @@ class ActionConfig(BaseModel):
     steer_buckets: int = Field(default=7, ge=3)
     continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
+    continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     drift_unmask_min_speed_kph: NonNegativeFloat | None = None
@@ -75,11 +76,12 @@ class ActionConfig(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _migrate_legacy_boost_speed_gate(cls, data: object) -> object:
+    def _migrate_legacy_action_fields(cls, data: object) -> object:
         # LEGACY CONFIG COMPATIBILITY:
         # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
         # boost gate is a max-speed cap: allow boost while slower, mask it when
-        # already fast. Keep old manifests loadable by carrying the number over.
+        # already fast. The old air-brake booleans were replaced by the explicit
+        # `continuous_air_brake_mode` string. Keep saved manifests loadable here.
         if not isinstance(data, Mapping):
             return data
         values: dict[str, object] = {str(key): value for key, value in data.items()}
@@ -87,6 +89,18 @@ class ActionConfig(BaseModel):
         legacy_gate = values.pop("boost_unmask_min_speed_kph", missing)
         if legacy_gate is not missing and "boost_unmask_max_speed_kph" not in values:
             values["boost_unmask_max_speed_kph"] = legacy_gate
+
+        legacy_air_brake_enabled = values.pop("continuous_air_brake_enabled", missing)
+        legacy_disable_on_ground = values.pop(
+            "continuous_air_brake_disable_on_ground",
+            missing,
+        )
+        legacy_airborne_only = values.pop("continuous_air_brake_airborne_only", missing)
+        if "continuous_air_brake_mode" not in values:
+            if legacy_air_brake_enabled is False:
+                values["continuous_air_brake_mode"] = "off"
+            elif legacy_disable_on_ground is True or legacy_airborne_only is True:
+                values["continuous_air_brake_mode"] = "disable_on_ground"
         return values
 
     @field_validator("steer_buckets")
@@ -164,6 +178,7 @@ class RewardConfig(BaseModel):
     energy_full_refill_bonus: NonNegativeFloat = 0.0
     energy_full_refill_cooldown_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
+    grounded_air_brake_penalty: float = 0.0
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_cooldown_frames: NonNegativeInt = 0
     boost_press_penalty: float = 0.0

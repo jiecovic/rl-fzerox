@@ -24,6 +24,8 @@ def _control_viz(
     policy_action: ActionValue | None = None,
     continuous_drive_mode: str = "threshold",
     continuous_drive_deadzone: float = 0.2,
+    continuous_air_brake_mode: str = "always",
+    continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     drive_level = 1 if joypad_mask & ACCELERATE_MASK else -1 if joypad_mask & AIR_BRAKE_MASK else 0
@@ -31,12 +33,14 @@ def _control_viz(
         policy_action,
         continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
+        continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         drive_level=drive_level,
         drive_axis=drive_axis,
         air_brake_axis=air_brake_axis,
+        air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
         drive_axis_mode=(
             "accelerate"
             if drive_axis is not None and continuous_drive_mode == "pwm"
@@ -54,6 +58,7 @@ def _continuous_drive_axes(
     *,
     continuous_drive_mode: str,
     continuous_drive_deadzone: float,
+    continuous_air_brake_enabled: bool,
 ) -> tuple[float | None, float | None]:
     """Return HUD accelerate/air-brake values when the policy action exposes those axes."""
 
@@ -74,9 +79,13 @@ def _continuous_drive_axes(
     if not np.isfinite(drive):
         return None, None
     drive = max(-1.0, min(1.0, drive))
-    air_brake = _continuous_air_brake_axis(
-        values,
-        continuous_drive_deadzone=continuous_drive_deadzone,
+    air_brake = (
+        _continuous_air_brake_axis(
+            values,
+            continuous_drive_deadzone=continuous_drive_deadzone,
+        )
+        if continuous_air_brake_enabled
+        else None
     )
     if continuous_drive_mode == "pwm":
         return _continuous_drive_accelerate_level(
@@ -104,7 +113,7 @@ def _continuous_air_brake_axis(
 
 
 def _continuous_drive_accelerate_level(drive: float, *, deadzone: float) -> float:
-    duty = (drive + 1.0) * 0.5
+    duty = min(max(drive + 1.0, 0.0), 1.0)
     if duty <= deadzone:
         return 0.0
     return (duty - deadzone) / (1.0 - deadzone)

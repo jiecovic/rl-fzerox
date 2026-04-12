@@ -218,6 +218,9 @@ def _draw_control_viz(
     if dual_drive_levers and control_viz.drive_axis is not None:
         accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
         air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis or 0.0))
+        air_brake_color = (
+            PALETTE.text_muted if control_viz.air_brake_disabled else PALETTE.text_warning
+        )
         _draw_unipolar_drive_lever(
             pygame=pygame,
             screen=screen,
@@ -232,7 +235,7 @@ def _draw_control_viz(
             x=air_brake_x,
             y=drive_y,
             level=air_brake_level,
-            fill_color=PALETTE.text_warning,
+            fill_color=air_brake_color,
         )
     elif control_viz.drive_axis_mode == "accelerate" and control_viz.drive_axis is not None:
         accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
@@ -311,7 +314,11 @@ def _draw_control_viz(
                 ("   ", PALETTE.text_muted),
                 (
                     f"{round(air_brake_level * 100):3d}%",
-                    PALETTE.text_warning if air_brake_level > 0.0 else PALETTE.text_muted,
+                    (
+                        PALETTE.text_muted
+                        if control_viz.air_brake_disabled or air_brake_level == 0.0
+                        else PALETTE.text_warning
+                    ),
                 ),
             )
     elif control_viz.drive_level > 0:

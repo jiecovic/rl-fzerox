@@ -8,6 +8,7 @@ from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import (
+    AIR_BRAKE_MASK,
     BOOST_MASK,
     ActionValue,
     ResettableActionAdapter,
@@ -87,6 +88,7 @@ class FZeroXEnvEngine:
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._last_info: dict[str, object] = {}
+        self._last_telemetry: FZeroXTelemetry | None = None
         self._reset_count = 0
         self._rng_seed_base: int | None = None
 
@@ -140,6 +142,7 @@ class FZeroXEnvEngine:
         )
         info.update(backend_step_info(self.backend))
         self._sync_dynamic_masks(telemetry)
+        self._last_telemetry = telemetry
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
@@ -188,10 +191,13 @@ class FZeroXEnvEngine:
         self,
         control_state: ControllerState,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        self._held_controller_state = control_state
+        requested_control_state = control_state
+        applied_control_state = self._apply_dynamic_control_gates(requested_control_state)
+        self._held_controller_state = applied_control_state
         return self._run_env_step(
-            control_state,
+            applied_control_state,
             action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
         )
 
     def step_frame(
@@ -200,9 +206,17 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
-        if control_state is not None:
-            self._held_controller_state = control_state
-        return self._run_env_step(self._held_controller_state, action_repeat=1)
+        requested_control_state = (
+            self._held_controller_state if control_state is None else control_state
+        )
+        self._held_controller_state = self._apply_dynamic_control_gates(
+            requested_control_state
+        )
+        return self._run_env_step(
+            self._held_controller_state,
+            action_repeat=1,
+            requested_control_state=requested_control_state,
+        )
 
     def render(self) -> np.ndarray:
         return self.backend.render_display(preset=self.config.observation.preset)
@@ -288,7 +302,9 @@ class FZeroXEnvEngine:
         control_state: ControllerState,
         *,
         action_repeat: int,
+        requested_control_state: ControllerState | None = None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        requested_control_state = requested_control_state or control_state
         applied_control_state = self._control_state.apply_minimum_shoulder_hold(control_state)
         step_result = self.backend.step_repeat_raw(
             applied_control_state,
@@ -307,11 +323,13 @@ class FZeroXEnvEngine:
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
         self._sync_dynamic_masks(telemetry)
+        self._last_telemetry = telemetry
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
             telemetry,
             RewardActionContext(
+                air_brake_requested=bool(requested_control_state.joypad_mask & AIR_BRAKE_MASK),
                 boost_requested=bool(applied_control_state.joypad_mask & BOOST_MASK),
             ),
         )
@@ -364,6 +382,18 @@ class FZeroXEnvEngine:
         )
         return observation, reward, terminated, truncated, info
 
+    def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
+        """Suppress controls whose validity depends on the latest telemetry."""
+
+        air_brake_mode = self.config.action.continuous_air_brake_mode
+        if air_brake_mode == "always":
+            return control_state
+        if air_brake_mode == "off":
+            return _without_joypad_mask(control_state, AIR_BRAKE_MASK)
+        if self._last_telemetry is None or self._last_telemetry.player.airborne:
+            return control_state
+        return _without_joypad_mask(control_state, AIR_BRAKE_MASK)
+
     def _render_observation_image(self) -> np.ndarray:
         return self.backend.render_observation(
             preset=self.config.observation.preset,
@@ -384,3 +414,15 @@ class FZeroXEnvEngine:
             mode=self.config.observation.mode,
             **self._control_state.observation_fields(),
         )
+
+
+def _without_joypad_mask(control_state: ControllerState, joypad_mask: int) -> ControllerState:
+    if not control_state.joypad_mask & joypad_mask:
+        return control_state
+    return ControllerState(
+        joypad_mask=control_state.joypad_mask & ~joypad_mask,
+        left_stick_x=control_state.left_stick_x,
+        left_stick_y=control_state.left_stick_y,
+        right_stick_x=control_state.right_stick_x,
+        right_stick_y=control_state.right_stick_y,
+    )

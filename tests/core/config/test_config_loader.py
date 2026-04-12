@@ -733,6 +733,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
             "    name: hybrid_steer_drive_boost_shoulder_primitive",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
+            "    continuous_air_brake_mode: disable_on_ground",
             "    boost_unmask_max_speed_kph: 700.0",
             "    drift_unmask_min_speed_kph: 500.0",
             "train:",
@@ -749,10 +750,49 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
     assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.env.action.continuous_air_brake_mode == "disable_on_ground"
     assert config.env.action.boost_unmask_max_speed_kph == 700.0
     assert config.env.action.drift_unmask_min_speed_kph == 500.0
     assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert config.policy.recurrent.enabled is True
+
+
+def test_load_train_app_config_migrates_legacy_air_brake_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    disabled_config_path = tmp_path / "disabled.yaml"
+    _write_yaml(
+        disabled_config_path,
+        [
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    continuous_air_brake_enabled: false",
+        ],
+    )
+    ground_gate_config_path = tmp_path / "ground_gate.yaml"
+    _write_yaml(
+        ground_gate_config_path,
+        [
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    continuous_air_brake_disable_on_ground: true",
+        ],
+    )
+
+    disabled_config = load_train_app_config(disabled_config_path)
+    ground_gate_config = load_train_app_config(ground_gate_config_path)
+
+    assert disabled_config.env.action.continuous_air_brake_mode == "off"
+    assert ground_gate_config.env.action.continuous_air_brake_mode == "disable_on_ground"
 
 
 def test_load_train_app_config_migrates_legacy_boost_speed_gate(tmp_path: Path) -> None:

@@ -21,9 +21,10 @@ from rl_fzerox.core.config.schema import (
     CurriculumTriggerConfig,
     EnvConfig,
     ObservationConfig,
+    RewardConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import ACCELERATE_MASK, DRIFT_LEFT_MASK
+from rl_fzerox.core.envs.actions import ACCELERATE_MASK, AIR_BRAKE_MASK, DRIFT_LEFT_MASK
 from rl_fzerox.core.envs.observations import DRIFT_DOUBLE_TAP_WINDOW_FRAMES, ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
@@ -310,13 +311,13 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
     )
 
     env.reset(seed=7)
-    env.step(np.array([0.0, 0.5], dtype=np.float32))
+    env.step(np.array([0.0, -0.5], dtype=np.float32))
     assert backend.last_controller_state.joypad_mask == 0
-    env.step(np.array([0.0, 0.5], dtype=np.float32))
+    env.step(np.array([0.0, -0.5], dtype=np.float32))
     assert backend.last_controller_state.joypad_mask == ACCELERATE_MASK
 
     env.reset(seed=8)
-    env.step(np.array([0.0, 0.5], dtype=np.float32))
+    env.step(np.array([0.0, -0.5], dtype=np.float32))
 
     assert backend.last_controller_state.joypad_mask == 0
 
@@ -484,6 +485,66 @@ def test_step_control_applies_manual_controller_state() -> None:
     env.step_control(control_state)
 
     assert backend.last_controller_state == control_state
+
+
+def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=5.0,
+                    state_labels=("active", "airborne"),
+                ),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "airborne"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=2),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="hybrid_steer_drive_boost_shoulder_primitive",
+                continuous_drive_mode="pwm",
+                continuous_drive_deadzone=0.0,
+                continuous_air_brake_mode="disable_on_ground",
+            ),
+        ),
+        reward_config=RewardConfig(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.0,
+            grounded_air_brake_penalty=-0.5,
+        ),
+    )
+    air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
+
+    env.reset(seed=21)
+    assert env.action_to_control_state(
+        {
+            "continuous": np.array([0.0, -1.0, 1.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    ) == air_brake_state
+    _, reward, _, _, info = env.step_control(air_brake_state)
+    assert backend.last_controller_state == ControllerState()
+    assert reward == -0.5
+    assert info["reward_breakdown"] == {"grounded_air_brake": -0.5}
+
+    _, reward, _, _, info = env.step_control(air_brake_state)
+    assert backend.last_controller_state == air_brake_state
+    assert reward == 0.0
+    assert "reward_breakdown" not in info
 
 
 def test_extended_action_env_exposes_four_head_action_space() -> None:

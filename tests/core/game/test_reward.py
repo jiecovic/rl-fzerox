@@ -69,6 +69,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_full_refill_bonus": 1.25,
         "energy_full_refill_cooldown_frames": 23,
         "airborne_landing_reward": 0.42,
+        "grounded_air_brake_penalty": -0.014,
         "boost_pad_reward": 0.33,
         "boost_pad_reward_cooldown_frames": 19,
         "boost_press_penalty": -0.013,
@@ -668,6 +669,50 @@ def test_race_v2_does_not_penalize_when_boost_is_not_requested() -> None:
         _status(step_count=1),
         _telemetry(race_distance=100.0, boost_timer=20),
         RewardActionContext(boost_requested=False),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_race_v2_penalizes_grounded_air_brake_requests() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            grounded_air_brake_penalty=-0.125,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+        RewardActionContext(air_brake_requested=True),
+    )
+
+    assert step.reward == -0.125
+    assert step.breakdown == {"grounded_air_brake": -0.125}
+
+
+def test_race_v2_does_not_penalize_air_brake_requests_while_airborne() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            grounded_air_brake_penalty=-0.125,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0, state_labels=("active", "airborne")))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, state_labels=("active", "airborne")),
+        RewardActionContext(air_brake_requested=True),
     )
 
     assert step.reward == 0.0
