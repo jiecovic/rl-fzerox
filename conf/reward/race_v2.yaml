@@ -42,7 +42,7 @@ lap_2_completion_bonus: 35.0
 final_lap_completion_bonus: 60.0
 # Lap rewards: small placement bonus scale paid at each completed lap as
 # `(total_racers - position) * lap_position_scale`.
-lap_position_scale: 1.0
+lap_position_scale: 1.05
 
 # Failure shaping: extra penalty per remaining internal emulator frame on
 # death or truncation.
@@ -53,31 +53,35 @@ remaining_lap_penalty: 50.0
 # Energy: ignore tiny energy changes below this threshold.
 energy_loss_epsilon: 0.01
 # Energy: maximum penalty scale for lost energy when post-step energy is near zero.
-energy_loss_penalty_scale: 0.20
+energy_loss_penalty_scale: 0.75
 # Energy: above this post-step energy fraction, energy loss is not penalized.
-energy_loss_safe_fraction: 0.90
+energy_loss_safe_fraction: 1.0
 # Energy: curve exponent for danger weighting; higher stays mild until lower energy.
-energy_loss_danger_power: 2.0
+energy_loss_danger_power: 1.05
 # Energy: smaller reward scale applied to regained energy within one env step.
 energy_gain_reward_scale: 0.05
 # Energy: suppress energy-gain reward for this many internal frames after
 # entering collision recoil.
 energy_gain_collision_cooldown_frames: 120
 # Energy: one-time bonus when energy crosses from below full to full.
-energy_full_refill_bonus: 0.2
+energy_full_refill_bonus: 0.0
 # Energy: internal-frame cooldown before the full-refill bonus can fire again.
 energy_full_refill_cooldown_frames: 800
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
-airborne_landing_reward: 5.0
+airborne_landing_reward: 10.0
 # Air control: small penalty when air brake is requested while already grounded.
-grounded_air_brake_penalty: -0.1
+grounded_air_brake_penalty: -0.001
+# Drive-axis shaping: small penalty for negative raw drive-axis output. Useful
+# when gas is forced on but we still want the currently ignored logit to learn
+# the old PWM full-gas threshold (`drive >= 0`).
+drive_axis_negative_penalty_scale: 0.0
 # Boost pads: small reward when entering a dash-pad boost state.
-boost_pad_reward: 0.25
+boost_pad_reward: 6.00
 # Boost pads: internal-frame cooldown before the boost-pad reward can fire again.
-boost_pad_reward_cooldown_frames: 50
+boost_pad_reward_cooldown_frames: 120
 # Boost discipline: small fixed penalty per env step when manual boost is requested.
-boost_press_penalty: -0.05
+boost_press_penalty: 0.5
 
 # Minor events: entry-only penalty when the machine enters collision recoil.
 collision_recoil_penalty: -5.0

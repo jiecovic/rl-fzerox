@@ -16,6 +16,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
         energy=92.25,
         max_energy=100.0,
         boost_timer=0,
+        recoil_tilt_magnitude=0.5,
         reverse_timer=12,
         race_distance=12_345.5,
         lap_distance=2_345.5,
@@ -28,6 +29,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
     assert player.can_boost is True
     assert player.active is True
     assert player.finished is False
+    assert player.recoil_tilt_magnitude == 0.5
     assert player.state_labels == ("can_boost", "active")
 
 
@@ -45,6 +47,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             energy=92.25,
             max_energy=100.0,
             boost_timer=0,
+            recoil_tilt_magnitude=0.5,
             reverse_timer=12,
             race_distance=12_345.5,
             lap_distance=2_345.5,
@@ -70,6 +73,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     assert payload["total_racers"] == 30
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
+    assert player_payload["recoil_tilt_magnitude"] == 0.5
     assert player_payload["state_labels"] == ("can_boost", "active")
 
 

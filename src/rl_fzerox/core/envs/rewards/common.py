@@ -29,6 +29,7 @@ class RewardActionContext:
 
     boost_requested: bool = False
     air_brake_requested: bool = False
+    drive_axis: float | None = None
 
 
 class RewardTracker(Protocol):

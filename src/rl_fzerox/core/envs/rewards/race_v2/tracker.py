@@ -194,16 +194,18 @@ class RaceV2RewardTracker:
             reward += self._weights.grounded_air_brake_penalty
             breakdown["grounded_air_brake"] = self._weights.grounded_air_brake_penalty
 
+        drive_axis_penalty = self._drive_axis_negative_penalty(resolved_action_context)
+        if drive_axis_penalty:
+            reward += drive_axis_penalty
+            breakdown["drive_axis_negative"] = drive_axis_penalty
+
         self._advance_boost_pad_reward_cooldown(summary.frames_run)
         boost_pad_reward = self._boost_pad_reward(summary)
         if boost_pad_reward:
             reward += boost_pad_reward
             breakdown["boost_pad"] = boost_pad_reward
 
-        if (
-            resolved_action_context.boost_requested
-            and self._weights.boost_press_penalty != 0.0
-        ):
+        if resolved_action_context.boost_requested and self._weights.boost_press_penalty != 0.0:
             reward += self._weights.boost_press_penalty
             breakdown["boost_press"] = self._weights.boost_press_penalty
 
@@ -268,9 +270,7 @@ class RaceV2RewardTracker:
             "milestone_phase_offset": self._milestone_phase_offset,
             "bootstrap_progress_active": self._bootstrap_progress_active(),
             "bootstrap_lap_count": self._weights.bootstrap_lap_count,
-            "energy_gain_cooldown_frames_remaining": (
-                self._energy.gain_cooldown_frames_remaining
-            ),
+            "energy_gain_cooldown_frames_remaining": (self._energy.gain_cooldown_frames_remaining),
             "energy_full_refill_cooldown_frames_remaining": (
                 self._energy.full_refill_cooldown_frames_remaining
             ),
@@ -468,6 +468,14 @@ class RaceV2RewardTracker:
         if not self._previous_airborne or telemetry.player.airborne:
             return 0.0
         return reward
+
+    def _drive_axis_negative_penalty(self, action_context: RewardActionContext) -> float:
+        drive_axis = action_context.drive_axis
+        scale = self._weights.drive_axis_negative_penalty_scale
+        if drive_axis is None or scale == 0.0 or drive_axis >= 0.0:
+            return 0.0
+        magnitude = min(abs(drive_axis), 1.0)
+        return scale * magnitude * magnitude
 
     def _remaining_lap_count(self, telemetry: FZeroXTelemetry) -> int:
         return max(

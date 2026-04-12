@@ -23,6 +23,8 @@ class ContinuousDriveDecoder:
         self._pwm_phase = 0.0
 
     def decode(self, drive: float) -> int:
+        if self._mode == "always_accelerate":
+            return ACCELERATE_MASK
         if self._mode == "threshold":
             return _threshold_drive_mask(drive, deadzone=self._deadzone)
         if self._mode == "pwm":

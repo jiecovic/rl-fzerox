@@ -4,9 +4,10 @@ from __future__ import annotations
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
-    STATE_FEATURE_COUNT,
-    STATE_FEATURE_NAMES,
+    ObservationStateProfile,
     image_observation_shape,
+    state_feature_count,
+    state_feature_names,
 )
 
 
@@ -29,6 +30,7 @@ def set_observation_info(
     observation_spec: ObservationSpec,
     frame_stack: int,
     observation_mode: str,
+    observation_state_profile: ObservationStateProfile,
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -48,8 +50,9 @@ def set_observation_info(
     )
     info["observation_stack"] = frame_stack
     if observation_mode == "image_state":
-        info["observation_state_shape"] = (STATE_FEATURE_COUNT,)
-        info["observation_state_features"] = STATE_FEATURE_NAMES
+        info["observation_state_profile"] = observation_state_profile
+        info["observation_state_shape"] = (state_feature_count(observation_state_profile),)
+        info["observation_state_features"] = state_feature_names(observation_state_profile)
 
 
 def reset_context_info(info: dict[str, object]) -> dict[str, object]:

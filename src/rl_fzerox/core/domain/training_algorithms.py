@@ -23,9 +23,7 @@ TRAIN_ALGORITHM_MASKABLE_PPO: Final[TrainAlgorithmName] = "maskable_ppo"
 TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO: Final[TrainAlgorithmName] = "maskable_recurrent_ppo"
 TRAIN_ALGORITHM_HYBRID_ACTION_PPO: Final[TrainAlgorithmName] = "hybrid_action_ppo"
 TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO: Final[TrainAlgorithmName] = "hybrid_recurrent_ppo"
-TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO: Final[TrainAlgorithmName] = (
-    "maskable_hybrid_action_ppo"
-)
+TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO: Final[TrainAlgorithmName] = "maskable_hybrid_action_ppo"
 TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO: Final[TrainAlgorithmName] = (
     "maskable_hybrid_recurrent_ppo"
 )

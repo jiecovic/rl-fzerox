@@ -1,12 +1,15 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.domain.shoulder_slide import SHOULDER_SLIDE_MODE_TIMER_ASSIST
 from rl_fzerox.core.envs.actions import (
     AIR_BRAKE_MASK,
@@ -74,6 +77,7 @@ class FZeroXEnvEngine:
             self._observation_spec,
             frame_stack=config.observation.frame_stack,
             mode=config.observation.mode,
+            state_profile=config.observation.state_profile,
         )
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
@@ -174,6 +178,7 @@ class FZeroXEnvEngine:
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
             observation_mode=self.config.observation.mode,
+            observation_state_profile=self.config.observation.state_profile,
         )
         self._last_info = dict(info)
         self._reset_count += 1
@@ -183,7 +188,10 @@ class FZeroXEnvEngine:
         self,
         action: ActionValue,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self.step_control(self._action_adapter.decode(action))
+        return self._step_control_state(
+            self._action_adapter.decode(action),
+            action_drive_axis=_action_drive_axis(action, self._action_space),
+        )
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         """Decode one policy action into the held controller state it represents."""
@@ -194,6 +202,14 @@ class FZeroXEnvEngine:
         self,
         control_state: ControllerState,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        return self._step_control_state(control_state, action_drive_axis=None)
+
+    def _step_control_state(
+        self,
+        control_state: ControllerState,
+        *,
+        action_drive_axis: float | None,
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
         self._held_controller_state = applied_control_state
@@ -201,6 +217,7 @@ class FZeroXEnvEngine:
             applied_control_state,
             action_repeat=self.config.action_repeat,
             requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
         )
 
     def step_frame(
@@ -217,6 +234,7 @@ class FZeroXEnvEngine:
             self._held_controller_state,
             action_repeat=1,
             requested_control_state=requested_control_state,
+            action_drive_axis=None,
         )
 
     def render(self) -> np.ndarray:
@@ -304,6 +322,7 @@ class FZeroXEnvEngine:
         *,
         action_repeat: int,
         requested_control_state: ControllerState | None = None,
+        action_drive_axis: float | None = None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = requested_control_state or control_state
         applied_control_state = control_state
@@ -335,6 +354,7 @@ class FZeroXEnvEngine:
             RewardActionContext(
                 air_brake_requested=bool(requested_control_state.joypad_mask & AIR_BRAKE_MASK),
                 boost_requested=bool(applied_control_state.joypad_mask & BOOST_MASK),
+                drive_axis=action_drive_axis,
             ),
         )
         reward = reward_step.reward
@@ -382,6 +402,7 @@ class FZeroXEnvEngine:
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
             observation_mode=self.config.observation.mode,
+            observation_state_profile=self.config.observation.state_profile,
         )
         return observation, reward, terminated, truncated, info
 
@@ -421,6 +442,7 @@ class FZeroXEnvEngine:
             image=image,
             telemetry=telemetry,
             mode=self.config.observation.mode,
+            state_profile=self.config.observation.state_profile,
             **self._control_state.observation_fields(),
         )
 
@@ -435,3 +457,26 @@ def _without_joypad_mask(control_state: ControllerState, joypad_mask: int) -> Co
         right_stick_x=control_state.right_stick_x,
         right_stick_y=control_state.right_stick_y,
     )
+
+
+def _action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float | None:
+    """Extract the raw continuous drive axis when the active action space has one."""
+
+    source: object
+    if isinstance(action_space, spaces.Dict):
+        if not isinstance(action, Mapping):
+            return None
+        source = action.get(HYBRID_CONTINUOUS_ACTION_KEY)
+    elif isinstance(action_space, spaces.Box):
+        source = action
+    else:
+        return None
+    if source is None or isinstance(source, str | bytes):
+        return None
+    try:
+        values = np.asarray(source, dtype=np.float32).reshape(-1)
+    except (TypeError, ValueError):
+        return None
+    if values.size < 2 or not np.isfinite(values[1]):
+        return None
+    return float(np.clip(values[1], -1.0, 1.0))

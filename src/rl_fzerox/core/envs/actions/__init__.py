@@ -11,6 +11,7 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_STEER_DRIVE,
     ACTION_ADAPTER_STEER_DRIVE_BOOST,
     ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT,
+    ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_DRIFT,
     DEFAULT_ACTION_ADAPTER_NAME,
     ActionAdapterName,
 )
@@ -37,6 +38,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
     SteerDriveBoostDriftActionAdapter,
+    SteerGasAirBrakeBoostDriftActionAdapter,
 )
 
 ActionAdapterFactory = Callable[[ActionConfig], ActionAdapter]
@@ -49,6 +51,7 @@ ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
         HybridSteerDriveBoostShoulderPrimitiveActionAdapter
     ),
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT: HybridSteerDriveDriftActionAdapter,
+    ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_DRIFT: (SteerGasAirBrakeBoostDriftActionAdapter),
     ACTION_ADAPTER_STEER_DRIVE: SteerDriveActionAdapter,
     ACTION_ADAPTER_STEER_DRIVE_BOOST: SteerDriveBoostActionAdapter,
     ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT: SteerDriveBoostDriftActionAdapter,
@@ -91,6 +94,7 @@ __all__ = [
     "SteerDriveActionAdapter",
     "SteerDriveBoostActionAdapter",
     "SteerDriveBoostDriftActionAdapter",
+    "SteerGasAirBrakeBoostDriftActionAdapter",
     "THROTTLE_MASK",
     "action_adapter_names",
     "build_action_adapter",

@@ -36,6 +36,7 @@ class RaceV2RewardWeights:
     energy_full_refill_cooldown_frames: int = 0
     airborne_landing_reward: float = 0.0
     grounded_air_brake_penalty: float = 0.0
+    drive_axis_negative_penalty_scale: float = 0.0
     boost_pad_reward: float = 0.0
     boost_pad_reward_cooldown_frames: int = 0
     boost_press_penalty: float = 0.0

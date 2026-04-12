@@ -77,6 +77,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         viewer_fps = 0.0
         last_logged_reload_error: str | None = None
         episode = 0
+        best_finish_position: int | None = None
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             observation, info = env.reset(seed=reset_seed)
@@ -143,7 +144,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 raw_frame=raw_frame,
                 observation=observation_image,
                 observation_state=observation_state,
-                observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
+                observation_state_feature_names=_observation_state_feature_names(config, info),
                 episode=episode,
                 info=draw_info,
                 reset_info=reset_info,
@@ -159,6 +160,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 policy_action=current_policy_action,
                 policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                 policy_reload_error=policy_reload_error,
+                best_finish_position=best_finish_position,
                 continuous_drive_mode=config.env.action.continuous_drive_mode,
                 continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                 continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
@@ -214,7 +216,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                         raw_frame=raw_frame,
                         observation=observation_image,
                         observation_state=observation_state,
-                        observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
+                        observation_state_feature_names=_observation_state_feature_names(
+                            config,
+                            info,
+                        ),
                         episode=episode,
                         info=draw_info,
                         reset_info=reset_info,
@@ -230,6 +235,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
+                        best_finish_position=best_finish_position,
                         continuous_drive_mode=config.env.action.continuous_drive_mode,
                         continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                         continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
@@ -273,6 +279,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                     raw_frame = env.render()
                     episode_reward += reward
                     telemetry = _read_live_telemetry(emulator)
+                    best_finish_position = _update_best_finish_position(
+                        best_finish_position,
+                        info,
+                        telemetry,
+                    )
                     policy_reload_error = _policy_reload_error(policy_runner)
                     last_logged_reload_error = _persist_reload_error(
                         reload_error=policy_reload_error,
@@ -292,7 +303,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                         raw_frame=raw_frame,
                         observation=observation_image,
                         observation_state=observation_state,
-                        observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
+                        observation_state_feature_names=_observation_state_feature_names(
+                            config,
+                            info,
+                        ),
                         episode=episode,
                         info=draw_info,
                         reset_info=reset_info,
@@ -308,6 +322,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                         policy_action=current_policy_action,
                         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                         policy_reload_error=policy_reload_error,
+                        best_finish_position=best_finish_position,
                         continuous_drive_mode=config.env.action.continuous_drive_mode,
                         continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                         continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
@@ -350,6 +365,11 @@ def run_viewer(config: WatchAppConfig) -> None:
                 raw_frame = env.render()
                 episode_reward += reward
                 telemetry = _read_live_telemetry(emulator)
+                best_finish_position = _update_best_finish_position(
+                    best_finish_position,
+                    info,
+                    telemetry,
+                )
                 policy_reload_error = _policy_reload_error(policy_runner)
                 last_logged_reload_error = _persist_reload_error(
                     reload_error=policy_reload_error,
@@ -376,7 +396,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     raw_frame=raw_frame,
                     observation=observation_image,
                     observation_state=observation_state,
-                    observation_state_feature_names=observation_utils.STATE_FEATURE_NAMES,
+                    observation_state_feature_names=_observation_state_feature_names(config, info),
                     episode=episode,
                     info=draw_info,
                     reset_info=reset_info,
@@ -392,6 +412,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     policy_action=current_policy_action,
                     policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
                     policy_reload_error=policy_reload_error,
+                    best_finish_position=best_finish_position,
                     continuous_drive_mode=config.env.action.continuous_drive_mode,
                     continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
                     continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
@@ -432,3 +453,49 @@ def _continuous_air_brake_disabled(
     if config.env.action.continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
+
+
+def _update_best_finish_position(
+    best_finish_position: int | None,
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+) -> int | None:
+    finish_position = _successful_finish_position(info, telemetry)
+    if finish_position is None:
+        return best_finish_position
+    if best_finish_position is None:
+        return finish_position
+    return min(best_finish_position, finish_position)
+
+
+def _successful_finish_position(
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+) -> int | None:
+    if info.get("termination_reason") != "finished":
+        return None
+
+    raw_position: object
+    if telemetry is not None:
+        raw_position = telemetry.player.position
+    else:
+        raw_position = info.get("position")
+    if isinstance(raw_position, bool) or not isinstance(raw_position, int):
+        return None
+    if raw_position <= 0:
+        return None
+    return raw_position
+
+
+def _observation_state_feature_names(
+    config: WatchAppConfig,
+    info: dict[str, object],
+) -> tuple[str, ...]:
+    names = info.get("observation_state_features")
+    if isinstance(names, tuple) and all(isinstance(name, str) for name in names):
+        return names
+    if isinstance(names, list) and all(isinstance(name, str) for name in names):
+        return tuple(names)
+    if config.env.observation.mode != "image_state":
+        return ()
+    return observation_utils.state_feature_names(config.env.observation.state_profile)

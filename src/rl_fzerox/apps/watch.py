@@ -98,9 +98,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     policy_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
     if cli_run_dir is None and cli_override_delta:
-        policy_run_dir = (
-            _apply_watch_config_delta(config, cli_override_delta).watch.policy_run_dir
-        )
+        policy_run_dir = _apply_watch_config_delta(config, cli_override_delta).watch.policy_run_dir
     if args.policy_artifact is not None and policy_run_dir is None:
         raise SystemExit("--artifact requires --run-dir or watch.policy_run_dir in the config")
     if policy_run_dir is not None:

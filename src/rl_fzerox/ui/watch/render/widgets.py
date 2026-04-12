@@ -73,8 +73,7 @@ def _draw_control_viz(
 ) -> int:
     steer_label = fonts.small.render("Steer", True, PALETTE.text_muted)
     dual_drive_levers = (
-        control_viz.drive_axis_mode == "accelerate"
-        and control_viz.air_brake_axis is not None
+        control_viz.drive_axis_mode == "accelerate" and control_viz.air_brake_axis is not None
     )
     drive_group_width = (
         (2 * LAYOUT.control_drive_width) + LAYOUT.control_drive_pair_gap
@@ -85,10 +84,7 @@ def _draw_control_viz(
     air_brake_x = drive_x + LAYOUT.control_drive_width + LAYOUT.control_drive_pair_gap
     left_widget_width = max(
         48,
-        width
-        - drive_group_width
-        - LAYOUT.control_drive_offset_x
-        - LAYOUT.control_widget_gap,
+        width - drive_group_width - LAYOUT.control_drive_offset_x - LAYOUT.control_widget_gap,
     )
     left_drift_width = _pill_width(fonts.small, "drift")
     right_drift_width = _pill_width(fonts.small, "drift")
@@ -131,9 +127,7 @@ def _draw_control_viz(
             y=y,
         )
     else:
-        drive_label_text = (
-            "Accel" if control_viz.drive_axis_mode == "accelerate" else "Drive"
-        )
+        drive_label_text = "Accel" if control_viz.drive_axis_mode == "accelerate" else "Drive"
         _draw_centered_label(
             screen=screen,
             font=fonts.small,
@@ -301,9 +295,7 @@ def _draw_control_viz(
         accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
         if control_viz.air_brake_axis is None:
             mode = f"{round(accelerate_level * 100):3d}%"
-            mode_color = (
-                PALETTE.text_accent if accelerate_level > 0.0 else PALETTE.text_muted
-            )
+            mode_color = PALETTE.text_accent if accelerate_level > 0.0 else PALETTE.text_muted
         else:
             air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis))
             caption_segments = (
@@ -407,12 +399,7 @@ def _draw_unipolar_drive_lever(
         border_radius=LAYOUT.control_drive_width // 2,
     )
     extent = LAYOUT.control_drive_height - (2 * LAYOUT.control_marker_radius)
-    knob_y = (
-        y
-        + LAYOUT.control_drive_height
-        - LAYOUT.control_marker_radius
-        - round(extent * level)
-    )
+    knob_y = y + LAYOUT.control_drive_height - LAYOUT.control_marker_radius - round(extent * level)
     fill_height = y + LAYOUT.control_drive_height - knob_y
     if fill_height > 0:
         fill = pygame.Rect(

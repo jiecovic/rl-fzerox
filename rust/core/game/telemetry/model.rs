@@ -39,6 +39,7 @@ pub struct PlayerTelemetry {
     pub energy: f32,
     pub max_energy: f32,
     pub boost_timer: i32,
+    pub recoil_tilt_magnitude: f32,
     pub reverse_timer: i32,
     pub race_distance: f32,
     pub lap_distance: f32,

@@ -39,10 +39,12 @@ class ActionMaskConfig(BaseModel):
 
     steer: tuple[NonNegativeInt, ...] | None = None
     drive: tuple[NonNegativeInt, ...] | None = None
+    gas: tuple[NonNegativeInt, ...] | None = None
+    air_brake: tuple[NonNegativeInt, ...] | None = None
     boost: tuple[NonNegativeInt, ...] | None = None
     shoulder: tuple[NonNegativeInt, ...] | None = None
 
-    @field_validator("steer", "drive", "boost", "shoulder")
+    @field_validator("steer", "drive", "gas", "air_brake", "boost", "shoulder")
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
@@ -56,7 +58,7 @@ class ActionMaskConfig(BaseModel):
         """Return the explicitly configured branch restrictions only."""
 
         overrides: dict[str, tuple[int, ...]] = {}
-        for branch_name in ("steer", "drive", "boost", "shoulder"):
+        for branch_name in ("steer", "drive", "gas", "air_brake", "boost", "shoulder"):
             values = getattr(self, branch_name)
             if values is not None:
                 overrides[branch_name] = tuple(int(value) for value in values)
@@ -70,7 +72,7 @@ class ActionConfig(BaseModel):
 
     name: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
     steer_buckets: int = Field(default=7, ge=3)
-    continuous_drive_mode: Literal["threshold", "pwm"] = "threshold"
+    continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
@@ -122,6 +124,7 @@ class ObservationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["image", "image_state"] = "image"
+    state_profile: Literal["default", "steer_history"] = "default"
     preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3"] = "native_crop_v3"
     frame_stack: PositiveInt = 4
 
@@ -184,6 +187,7 @@ class RewardConfig(BaseModel):
     energy_full_refill_cooldown_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
     grounded_air_brake_penalty: float = 0.0
+    drive_axis_negative_penalty_scale: float = Field(default=0.0, le=0.0)
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_cooldown_frames: NonNegativeInt = 0
     boost_press_penalty: float = 0.0

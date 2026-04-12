@@ -20,6 +20,7 @@ class PlayerTelemetry:
         energy: float,
         max_energy: float,
         boost_timer: int,
+        recoil_tilt_magnitude: float,
         reverse_timer: int,
         race_distance: float,
         lap_distance: float,
@@ -40,6 +41,8 @@ class PlayerTelemetry:
     def max_energy(self) -> float: ...
     @property
     def boost_timer(self) -> int: ...
+    @property
+    def recoil_tilt_magnitude(self) -> float: ...
     @property
     def reverse_timer(self) -> int: ...
     @property
