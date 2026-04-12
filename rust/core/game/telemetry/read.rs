@@ -29,6 +29,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         max_energy: read_f32(system_ram, player_base + RACER.max_energy)?,
         boost_timer: read_i32(system_ram, player_base + RACER.boost_timer)?,
+        recoil_tilt_magnitude: read_vec3_magnitude(system_ram, player_base + RACER.recoil_tilt)?,
         reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
         lap_distance: read_f32(system_ram, player_base + RACER.lap_distance)?,
@@ -125,6 +126,13 @@ fn read_u32(memory: &[u8], offset: usize) -> Result<u32, CoreError> {
 
 fn read_f32(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
     Ok(f32::from_le_bytes(read_array(memory, offset)?))
+}
+
+fn read_vec3_magnitude(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
+    let x = read_f32(memory, offset)?;
+    let y = read_f32(memory, offset + size_of::<f32>())?;
+    let z = read_f32(memory, offset + (2 * size_of::<f32>()))?;
+    Ok((x.mul_add(x, y.mul_add(y, z * z))).sqrt())
 }
 
 fn read_array<const N: usize>(memory: &[u8], offset: usize) -> Result<[u8; N], CoreError> {

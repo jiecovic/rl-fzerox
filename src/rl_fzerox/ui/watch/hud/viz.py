@@ -28,24 +28,31 @@ def _control_viz(
     continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
-    drive_level = 1 if joypad_mask & ACCELERATE_MASK else -1 if joypad_mask & AIR_BRAKE_MASK else 0
+    accelerate_pressed = bool(joypad_mask & ACCELERATE_MASK)
+    air_brake_pressed = bool(joypad_mask & AIR_BRAKE_MASK)
+    drive_level = 1 if accelerate_pressed else -1 if air_brake_pressed else 0
     drive_axis, air_brake_axis = _continuous_drive_axes(
         policy_action,
         continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
+    drive_axis_mode = (
+        "accelerate"
+        if drive_axis is not None and continuous_drive_mode in ("pwm", "always_accelerate")
+        else "signed"
+    )
+    if drive_axis is None and air_brake_axis is None and accelerate_pressed and air_brake_pressed:
+        drive_axis = 1.0
+        air_brake_axis = 1.0
+        drive_axis_mode = "accelerate"
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         drive_level=drive_level,
         drive_axis=drive_axis,
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
-        drive_axis_mode=(
-            "accelerate"
-            if drive_axis is not None and continuous_drive_mode == "pwm"
-            else "signed"
-        ),
+        drive_axis_mode=drive_axis_mode,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         drift_direction=(
             -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
@@ -75,6 +82,16 @@ def _continuous_drive_axes(
     values = action.reshape(-1)
     if values.size < 2:
         return None, None
+    if continuous_drive_mode == "always_accelerate":
+        air_brake = (
+            _continuous_air_brake_axis(
+                values,
+                continuous_drive_deadzone=continuous_drive_deadzone,
+            )
+            if continuous_air_brake_enabled
+            else None
+        )
+        return 1.0, air_brake
     drive = float(values[1])
     if not np.isfinite(drive):
         return None, None

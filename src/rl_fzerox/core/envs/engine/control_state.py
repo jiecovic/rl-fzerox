@@ -15,6 +15,7 @@ from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, DRIFT_RIGHT
 from rl_fzerox.core.envs.observations import (
     DRIFT_DOUBLE_TAP_WINDOW_FRAMES,
     RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
+    RECENT_STEER_PRESSURE_WINDOW_FRAMES,
 )
 
 
@@ -31,9 +32,15 @@ class ControlStateTracker:
     _recent_boost_frames: deque[int] = field(
         default_factory=lambda: deque(maxlen=RECENT_BOOST_PRESSURE_WINDOW_FRAMES),
     )
+    _recent_steer_frames: deque[float] = field(
+        default_factory=lambda: deque(maxlen=RECENT_STEER_PRESSURE_WINDOW_FRAMES),
+    )
     _recent_boost_frame_sum: int = 0
+    _recent_steer_frame_sum: float = 0.0
     _left_drift_held: bool = False
     _right_drift_held: bool = False
+    _left_steer_held: bool = False
+    _right_steer_held: bool = False
     _left_press_age_frames: int = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
     _right_press_age_frames: int = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
     _shoulder_lock_index: int = 0
@@ -44,9 +51,13 @@ class ControlStateTracker:
         """Clear all step-to-step control history."""
 
         self._recent_boost_frames.clear()
+        self._recent_steer_frames.clear()
         self._recent_boost_frame_sum = 0
+        self._recent_steer_frame_sum = 0.0
         self._left_drift_held = False
         self._right_drift_held = False
+        self._left_steer_held = False
+        self._right_steer_held = False
         self._left_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
         self._right_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
         self._shoulder_lock_index = 0
@@ -67,6 +78,7 @@ class ControlStateTracker:
 
         frames_elapsed = max(int(frames_run), 0)
         boost_requested = bool(control_state.joypad_mask & BOOST_MASK)
+        steer_axis = _clamp(float(control_state.left_stick_x), -1.0, 1.0)
         left_held = bool(control_state.joypad_mask & DRIFT_LEFT_MASK)
         right_held = bool(control_state.joypad_mask & DRIFT_RIGHT_MASK)
         previous_shoulder_index = _held_shoulder_index(
@@ -77,6 +89,10 @@ class ControlStateTracker:
 
         self._record_recent_boost_pressure(
             boost_requested=boost_requested,
+            frames_run=frames_elapsed,
+        )
+        self._record_recent_steer_pressure(
+            steer_axis=steer_axis,
             frames_run=frames_elapsed,
         )
         self._left_press_age_frames = _advance_press_age(
@@ -98,6 +114,8 @@ class ControlStateTracker:
         )
         self._left_drift_held = left_held
         self._right_drift_held = right_held
+        self._left_steer_held = steer_axis < -1.0e-6
+        self._right_steer_held = steer_axis > 1.0e-6
 
     def observation_fields(self) -> dict[str, float]:
         """Return control-history features passed into observation building."""
@@ -110,6 +128,9 @@ class ControlStateTracker:
             "left_press_age_norm": _drift_press_age_norm(self._left_press_age_frames),
             "right_press_age_norm": _drift_press_age_norm(self._right_press_age_frames),
             "recent_boost_pressure": self._recent_boost_pressure(),
+            "steer_left_held": float(self._left_steer_held),
+            "steer_right_held": float(self._right_steer_held),
+            "recent_steer_pressure": self._recent_steer_pressure(),
         }
 
     def shoulder_action_mask_override(self) -> tuple[int, ...] | None:
@@ -169,6 +190,22 @@ class ControlStateTracker:
         if not self._recent_boost_frames:
             return 0.0
         return self._recent_boost_frame_sum / len(self._recent_boost_frames)
+
+    def _record_recent_steer_pressure(self, *, steer_axis: float, frames_run: int) -> None:
+        for _ in range(frames_run):
+            if len(self._recent_steer_frames) == self._recent_steer_frames.maxlen:
+                removed = self._recent_steer_frames.popleft()
+                self._recent_steer_frame_sum -= removed
+            self._recent_steer_frames.append(steer_axis)
+            self._recent_steer_frame_sum += steer_axis
+
+    def _recent_steer_pressure(self) -> float:
+        if not self._recent_steer_frames:
+            return 0.0
+        window_size = self._recent_steer_frames.maxlen
+        if window_size is None or window_size <= 0:
+            return 0.0
+        return self._recent_steer_frame_sum / window_size
 
     def _update_shoulder_semantics(
         self,
@@ -285,3 +322,7 @@ def _advance_press_age(
 def _drift_press_age_norm(frames: int) -> float:
     clamped_frames = min(max(int(frames), 0), DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
     return clamped_frames / DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))

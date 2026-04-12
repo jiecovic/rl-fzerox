@@ -31,6 +31,7 @@ impl PyPlayerTelemetry {
         energy,
         max_energy,
         boost_timer,
+        recoil_tilt_magnitude,
         reverse_timer,
         race_distance,
         lap_distance,
@@ -46,6 +47,7 @@ impl PyPlayerTelemetry {
         energy: f32,
         max_energy: f32,
         boost_timer: i32,
+        recoil_tilt_magnitude: f32,
         reverse_timer: i32,
         race_distance: f32,
         lap_distance: f32,
@@ -61,6 +63,7 @@ impl PyPlayerTelemetry {
                 energy,
                 max_energy,
                 boost_timer,
+                recoil_tilt_magnitude,
                 reverse_timer,
                 race_distance,
                 lap_distance,
@@ -100,6 +103,11 @@ impl PyPlayerTelemetry {
     #[getter]
     fn boost_timer(&self) -> i32 {
         self.inner.boost_timer
+    }
+
+    #[getter]
+    fn recoil_tilt_magnitude(&self) -> f32 {
+        self.inner.recoil_tilt_magnitude
     }
 
     #[getter]
@@ -205,6 +213,7 @@ impl PyPlayerTelemetry {
         dict.set_item("energy", self.energy())?;
         dict.set_item("max_energy", self.max_energy())?;
         dict.set_item("boost_timer", self.boost_timer())?;
+        dict.set_item("recoil_tilt_magnitude", self.recoil_tilt_magnitude())?;
         dict.set_item("reverse_timer", self.reverse_timer())?;
         dict.set_item("race_distance", self.race_distance())?;
         dict.set_item("lap_distance", self.lap_distance())?;

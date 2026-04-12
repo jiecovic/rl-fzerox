@@ -57,6 +57,7 @@ def build_reward_tracker(
         energy_full_refill_cooldown_frames=resolved_config.energy_full_refill_cooldown_frames,
         airborne_landing_reward=resolved_config.airborne_landing_reward,
         grounded_air_brake_penalty=resolved_config.grounded_air_brake_penalty,
+        drive_axis_negative_penalty_scale=resolved_config.drive_axis_negative_penalty_scale,
         boost_pad_reward=resolved_config.boost_pad_reward,
         boost_pad_reward_cooldown_frames=resolved_config.boost_pad_reward_cooldown_frames,
         boost_press_penalty=resolved_config.boost_press_penalty,

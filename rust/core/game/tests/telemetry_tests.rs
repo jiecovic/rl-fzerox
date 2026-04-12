@@ -26,6 +26,10 @@ fn read_snapshot_decodes_player_one_race_values() {
     // distinct neighbor sentinel so manual boost does not get wired to spin-out.
     memory[player_base + 0x218..player_base + 0x218 + 4].copy_from_slice(&77_i32.to_le_bytes());
     memory[player_base + 0x21C..player_base + 0x21C + 4].copy_from_slice(&999_i32.to_le_bytes());
+    memory[player_base + RACER.recoil_tilt..player_base + RACER.recoil_tilt + 4]
+        .copy_from_slice(&0.3_f32.to_le_bytes());
+    memory[player_base + RACER.recoil_tilt + 4..player_base + RACER.recoil_tilt + 8]
+        .copy_from_slice(&0.4_f32.to_le_bytes());
     memory[player_base + RACER.race_distance..player_base + RACER.race_distance + 4]
         .copy_from_slice(&12_345.5_f32.to_le_bytes());
     memory[player_base + RACER.race_time..player_base + RACER.race_time + 4]
@@ -53,6 +57,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!((telemetry.player.energy - 92.25).abs() < f32::EPSILON);
     assert!((telemetry.player.max_energy - 100.0).abs() < f32::EPSILON);
     assert_eq!(telemetry.player.boost_timer, 77);
+    assert!((telemetry.player.recoil_tilt_magnitude - 0.5).abs() < f32::EPSILON);
     assert!((telemetry.player.race_distance - 12_345.5).abs() < f32::EPSILON);
     assert!((telemetry.player.lap_distance - 0.0).abs() < f32::EPSILON);
     assert_eq!(telemetry.player.race_time_ms, 12_345);

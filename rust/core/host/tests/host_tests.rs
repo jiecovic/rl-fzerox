@@ -272,6 +272,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
             energy: 100.0,
             max_energy: 178.0,
             boost_timer: 0,
+            recoil_tilt_magnitude: 0.0,
             reverse_timer,
             race_distance: 100.0,
             lap_distance: 100.0,

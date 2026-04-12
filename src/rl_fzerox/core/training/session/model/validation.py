@@ -59,13 +59,9 @@ def validate_recurrent_configuration_alignment(
 ) -> None:
     recurrent_enabled = policy_config.recurrent.enabled
     if recurrent_enabled and effective_algorithm not in RECURRENT_TRAINING_ALGORITHMS:
-        raise RuntimeError(
-            "Recurrent policy config requires a recurrent train.algorithm"
-        )
+        raise RuntimeError("Recurrent policy config requires a recurrent train.algorithm")
     if not recurrent_enabled and effective_algorithm in RECURRENT_TRAINING_ALGORITHMS:
-        raise RuntimeError(
-            f"{effective_algorithm} requires policy.recurrent.enabled=true"
-        )
+        raise RuntimeError(f"{effective_algorithm} requires policy.recurrent.enabled=true")
 
 
 def _validate_sac_training_config(config: TrainAppConfig) -> None:

@@ -11,6 +11,7 @@ ActionAdapterName: TypeAlias = Literal[
     "hybrid_steer_drive_boost_drift",
     "hybrid_steer_drive_boost_shoulder_primitive",
     "hybrid_steer_drive_drift",
+    "steer_gas_air_brake_boost_drift",
     "steer_drive",
     "steer_drive_boost",
     "steer_drive_boost_drift",
@@ -26,14 +27,13 @@ ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_DRIFT: Final[ActionAdapterName] = (
 ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER_PRIMITIVE: Final[ActionAdapterName] = (
     "hybrid_steer_drive_boost_shoulder_primitive"
 )
-ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT: Final[ActionAdapterName] = (
-    "hybrid_steer_drive_drift"
+ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT: Final[ActionAdapterName] = "hybrid_steer_drive_drift"
+ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_DRIFT: Final[ActionAdapterName] = (
+    "steer_gas_air_brake_boost_drift"
 )
 ACTION_ADAPTER_STEER_DRIVE: Final[ActionAdapterName] = "steer_drive"
 ACTION_ADAPTER_STEER_DRIVE_BOOST: Final[ActionAdapterName] = "steer_drive_boost"
-ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT: Final[ActionAdapterName] = (
-    "steer_drive_boost_drift"
-)
+ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT: Final[ActionAdapterName] = "steer_drive_boost_drift"
 DEFAULT_ACTION_ADAPTER_NAME: Final[ActionAdapterName] = ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT
 
 

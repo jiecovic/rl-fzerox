@@ -53,6 +53,7 @@ def _build_panel_columns(
     policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    best_finish_position: int | None = None,
     continuous_drive_mode: str = "threshold",
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -117,6 +118,13 @@ def _build_panel_columns(
                         min_value_lines=2,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
+                    _panel_line(
+                        "Best rank",
+                        _format_best_finish_position(best_finish_position),
+                        PALETTE.text_primary
+                        if best_finish_position is not None
+                        else PALETTE.text_muted,
+                    ),
                     _panel_line("Frame", str(info.get("frame_index", 0)), PALETTE.text_primary),
                     _panel_line(
                         "Steps",
@@ -321,6 +329,10 @@ def _format_policy_deterministic(value: bool | None) -> str:
     return "true" if value else "false"
 
 
+def _format_best_finish_position(value: int | None) -> str:
+    return "n/a" if value is None else str(value)
+
+
 def _panel_line(
     label: str,
     value: str,
@@ -352,6 +364,10 @@ def _game_section(
             ],
         )
 
+    recoil_magnitude = (
+        telemetry.player.recoil_tilt_magnitude if telemetry.player.collision_recoil else 0.0
+    )
+
     return PanelSection(
         title="Game",
         lines=[
@@ -366,6 +382,11 @@ def _game_section(
             ),
             _panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
             _panel_line("Boost", str(telemetry.player.boost_timer), PALETTE.text_primary),
+            _panel_line(
+                "Recoil",
+                f"{recoil_magnitude:.3f}",
+                PALETTE.text_warning if recoil_magnitude > 0.001 else PALETTE.text_muted,
+            ),
             _panel_line(
                 "Energy",
                 f"{telemetry.player.energy:.1f} / {telemetry.player.max_energy:.1f}",

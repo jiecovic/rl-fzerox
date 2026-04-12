@@ -389,6 +389,37 @@ def test_step_updates_recent_boost_pressure_in_image_state_observation() -> None
     )
 
 
+def test_step_updates_steer_history_state_profile() -> None:
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=30,
+            action=ActionConfig(name="steer_gas_air_brake_boost_drift", steer_buckets=3),
+            observation=ObservationConfig(
+                mode="image_state",
+                state_profile="steer_history",
+                frame_stack=4,
+            ),
+        ),
+    )
+
+    env.reset(seed=7)
+    obs, _, _, _, info = env.step(np.array([0, 1, 1, 0, 0], dtype=np.int64))
+
+    assert isinstance(obs, dict)
+    assert obs["state"].shape == (14,)
+    assert info["observation_state_profile"] == "steer_history"
+    assert info["observation_state_shape"] == (14,)
+    raw_feature_names = info["observation_state_features"]
+    assert isinstance(raw_feature_names, tuple)
+    feature_names = tuple(str(name) for name in raw_feature_names)
+    values = {name: float(value) for name, value in zip(feature_names, obs["state"], strict=True)}
+    assert values["steer_left_held"] == 1.0
+    assert values["steer_right_held"] == 0.0
+    assert values["recent_steer_pressure"] == pytest.approx(-1.0)
+
+
 def test_step_updates_right_drift_hold_and_press_age_in_image_state_observation() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
@@ -559,6 +590,48 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     assert "reward_breakdown" not in info
 
 
+def test_step_penalizes_raw_negative_drive_axis_while_forcing_accelerate() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=5.0),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="hybrid_steer_drive_boost_shoulder_primitive",
+                continuous_drive_mode="always_accelerate",
+                continuous_air_brake_mode="off",
+            ),
+        ),
+        reward_config=RewardConfig(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.0,
+            drive_axis_negative_penalty_scale=-0.02,
+        ),
+    )
+
+    env.reset(seed=21)
+    _, reward, _, _, info = env.step(
+        {
+            "continuous": np.array([0.0, -0.5, 0.0], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        }
+    )
+
+    assert backend.last_controller_state.joypad_mask & ACCELERATE_MASK
+    assert reward == pytest.approx(-0.005)
+    assert info["reward_breakdown"] == {"drive_axis_negative": pytest.approx(-0.005)}
+
+
 def test_extended_action_env_exposes_four_head_action_space() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),
@@ -577,6 +650,36 @@ def test_boost_action_env_exposes_three_head_action_space() -> None:
 
     assert isinstance(env.action_space, MultiDiscrete)
     assert env.action_space.nvec.tolist() == [7, 3, 2]
+
+
+def test_steer_gas_air_brake_boost_drift_env_exposes_maskable_full_action_space() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_gas_air_brake_boost_drift",
+                steer_buckets=3,
+                mask=ActionMaskConfig(boost=(0,), shoulder=(0,)),
+            )
+        ),
+    )
+
+    assert isinstance(env.action_space, MultiDiscrete)
+    assert env.action_space.nvec.tolist() == [3, 2, 2, 2, 3]
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        True,
+        False,
+        False,
+    ]
 
 
 def test_continuous_action_env_exposes_box_action_space() -> None:
@@ -1136,7 +1239,10 @@ def test_env_releases_shoulder_input_without_python_side_latch() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=2,
-            action=ActionConfig(name="steer_drive_boost_drift"),
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                shoulder_slide_mode="timer_assist",
+            ),
         ),
     )
 
@@ -1337,6 +1443,7 @@ def test_env_keeps_drift_speed_mask_without_shoulder_latch() -> None:
             action_repeat=5,
             action=ActionConfig(
                 name="steer_drive_boost_drift",
+                shoulder_slide_mode="timer_assist",
                 drift_unmask_min_speed_kph=500.0,
             ),
         ),

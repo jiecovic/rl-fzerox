@@ -1,7 +1,11 @@
 # tests/core/envs/test_observations.py
 import numpy as np
 
-from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, telemetry_state_vector
+from rl_fzerox.core.envs.observations import (
+    STATE_FEATURE_NAMES,
+    state_feature_names,
+    telemetry_state_vector,
+)
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_telemetry
 
@@ -62,3 +66,23 @@ def test_state_vector_treats_dash_pad_boost_as_boost_active() -> None:
 
     boost_active_index = STATE_FEATURE_NAMES.index("boost_active")
     assert vector[boost_active_index] == 1.0
+
+
+def test_steer_history_state_profile_appends_short_steer_memory() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(speed_kph=750.0),
+        state_profile="steer_history",
+        steer_left_held=1.0,
+        steer_right_held=0.0,
+        recent_steer_pressure=-0.5,
+    )
+    feature_names = state_feature_names("steer_history")
+
+    assert vector.shape == (14,)
+    assert feature_names[-3:] == (
+        "steer_left_held",
+        "steer_right_held",
+        "recent_steer_pressure",
+    )
+    assert vector[feature_names.index("steer_left_held")] == 1.0
+    assert vector[feature_names.index("recent_steer_pressure")] == -0.5

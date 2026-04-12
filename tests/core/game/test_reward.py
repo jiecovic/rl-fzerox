@@ -70,6 +70,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_full_refill_cooldown_frames": 23,
         "airborne_landing_reward": 0.42,
         "grounded_air_brake_penalty": -0.014,
+        "drive_axis_negative_penalty_scale": -0.015,
         "boost_pad_reward": 0.33,
         "boost_pad_reward_cooldown_frames": 19,
         "boost_press_penalty": -0.013,
@@ -577,9 +578,12 @@ def test_race_v2_full_energy_refill_bonus_obeys_cooldown() -> None:
     assert first_full.breakdown == {"energy_full_refill": 1.5}
     assert cooldown_blocked.breakdown == {}
     assert rewarded_after_cooldown.breakdown == {"energy_full_refill": 1.5}
-    assert tracker.info(_telemetry(race_distance=100.0, energy=178.0))[
-        "energy_full_refill_cooldown_frames_remaining"
-    ] == 10
+    assert (
+        tracker.info(_telemetry(race_distance=100.0, energy=178.0))[
+            "energy_full_refill_cooldown_frames_remaining"
+        ]
+        == 10
+    )
 
 
 def test_build_reward_tracker_passes_energy_gain_collision_cooldown_from_config() -> None:
@@ -713,6 +717,50 @@ def test_race_v2_does_not_penalize_air_brake_requests_while_airborne() -> None:
         _status(step_count=1),
         _telemetry(race_distance=100.0, state_labels=("active", "airborne")),
         RewardActionContext(air_brake_requested=True),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_race_v2_penalizes_negative_drive_axis() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            drive_axis_negative_penalty_scale=-0.02,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+        RewardActionContext(drive_axis=-0.5),
+    )
+
+    assert step.reward == pytest.approx(-0.005)
+    assert step.breakdown == {"drive_axis_negative": pytest.approx(-0.005)}
+
+
+def test_race_v2_does_not_penalize_non_negative_drive_axis() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_bonus=0.0,
+            drive_axis_negative_penalty_scale=-0.02,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=100.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+        RewardActionContext(drive_axis=0.0),
     )
 
     assert step.reward == 0.0

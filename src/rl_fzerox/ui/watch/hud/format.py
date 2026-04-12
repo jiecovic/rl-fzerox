@@ -28,10 +28,7 @@ def _format_policy_action(policy_action: ActionValue | None) -> str:
         continuous = policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
         discrete = policy_action.get(HYBRID_DISCRETE_ACTION_KEY)
         if continuous is not None and discrete is not None:
-            return (
-                f"c={_format_action_values(continuous)} "
-                f"d={_format_action_values(discrete)}"
-            )
+            return f"c={_format_action_values(continuous)} d={_format_action_values(discrete)}"
 
     return _format_action_values(policy_action)
 

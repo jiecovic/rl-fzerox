@@ -276,9 +276,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering, drive, shoulder, and boost."""
 
-        steer, drive, air_brake, shoulder, boost = _parse_hybrid_steer_drive_boost_shoulder(
-            action
-        )
+        steer, drive, air_brake, shoulder, boost = _parse_hybrid_steer_drive_boost_shoulder(action)
         air_brake_mask = (
             self._air_brake_decoder.decode(air_brake, button_mask=AIR_BRAKE_MASK)
             if self._air_brake_enabled
@@ -402,8 +400,7 @@ def _parse_hybrid_branches(
 ) -> tuple[np.ndarray, np.ndarray]:
     if not isinstance(action, Mapping):
         raise ValueError(
-            "Hybrid steer-drive actions must be a mapping with "
-            "'continuous' and 'discrete' branches"
+            "Hybrid steer-drive actions must be a mapping with 'continuous' and 'discrete' branches"
         )
 
     continuous_values = continuous_action_array(

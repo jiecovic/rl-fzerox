@@ -154,10 +154,7 @@ def _learn_model(
     except ImportError:
         MaskableHybridRecurrentPPO = None
 
-    if (
-        MaskableHybridRecurrentPPO is not None
-        and isinstance(model, MaskableHybridRecurrentPPO)
-    ):
+    if MaskableHybridRecurrentPPO is not None and isinstance(model, MaskableHybridRecurrentPPO):
         model.learn(
             total_timesteps=total_timesteps,
             callback=callback,

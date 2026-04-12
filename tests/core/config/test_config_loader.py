@@ -583,7 +583,7 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
             "env:",
             "  action:",
             "    name: continuous_steer_drive_drift",
-            "    continuous_drive_mode: pwm",
+            "    continuous_drive_mode: always_accelerate",
             "    continuous_drive_deadzone: 0.15",
             "    continuous_drift_deadzone: 0.25",
             "train:",
@@ -600,7 +600,7 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
     config = load_train_app_config(config_path)
 
     assert config.env.action.name == "continuous_steer_drive_drift"
-    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_mode == "always_accelerate"
     assert config.env.action.continuous_drive_deadzone == 0.15
     assert config.env.action.continuous_drift_deadzone == 0.25
     assert config.train.algorithm == "sac"

@@ -32,6 +32,7 @@ from rl_fzerox.ui.watch import (
     _preview_frame,
     _window_size,
 )
+from rl_fzerox.ui.watch.app import _update_best_finish_position
 from tests.support.native_objects import make_telemetry
 
 
@@ -168,6 +169,34 @@ def test_input_section_can_visualize_air_brake_control_state() -> None:
     assert input_section.control_viz.drive_level == -1
 
 
+def test_input_section_visualizes_parallel_gas_and_air_brake_buttons() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+        policy_label=None,
+        policy_curriculum_stage=None,
+        policy_action=np.array([1, 1, 1], dtype=np.int64),
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.air_brake_axis == pytest.approx(1.0)
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
+
+
 def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -196,6 +225,39 @@ def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
     assert input_section.control_viz.drive_level == 0
     assert input_section.control_viz.drive_axis == pytest.approx(0.5)
     assert input_section.control_viz.air_brake_axis is None
+    assert input_section.control_viz.drive_axis_mode == "accelerate"
+
+
+def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
+        policy_label="hybrid_recurrent_ppo_cnn_0015",
+        policy_curriculum_stage=None,
+        policy_action={
+            "continuous": np.array([0.25, -1.0, 0.5], dtype=np.float32),
+            "discrete": np.array([0, 0], dtype=np.int64),
+        },
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        continuous_drive_mode="always_accelerate",
+        continuous_drive_deadzone=0.0,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
     assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
@@ -893,7 +955,11 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
 def test_session_section_shows_reward_with_four_decimals() -> None:
     columns = _build_panel_columns(
         episode=0,
-        info={"frame_index": 0, "native_fps": 60.0, "step_reward": -0.016},
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "step_reward": -0.016,
+        },
         reset_info={},
         episode_reward=-12.34567,
         paused=False,
@@ -917,6 +983,91 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
 
     assert step_line.value == "-0.0160"
     assert return_line.value == "-12.3457"
+
+
+def test_session_section_shows_best_finish_rank() -> None:
+    columns = _build_panel_columns(
+        episode=2,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_curriculum_stage=None,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        best_finish_position=8,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    best_rank_line = next(line for line in session_section.lines if line.label == "Best rank")
+
+    assert best_rank_line.value == "8"
+
+
+def test_session_section_shows_na_before_successful_finish() -> None:
+    columns = _build_panel_columns(
+        episode=2,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="ppo_cnn_0017",
+        policy_curriculum_stage=None,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    best_rank_line = next(line for line in session_section.lines if line.label == "Best rank")
+
+    assert best_rank_line.value == "n/a"
+
+
+def test_best_finish_position_tracks_only_finished_episodes() -> None:
+    best_position = _update_best_finish_position(
+        None,
+        {"termination_reason": "crashed", "position": 4},
+        _sample_telemetry(position=4),
+    )
+    assert best_position is None
+
+    best_position = _update_best_finish_position(
+        best_position,
+        {"termination_reason": "finished"},
+        _sample_telemetry(position=8),
+    )
+    assert best_position == 8
+
+    best_position = _update_best_finish_position(
+        best_position,
+        {"termination_reason": "finished"},
+        _sample_telemetry(position=12),
+    )
+    assert best_position == 8
+
+    best_position = _update_best_finish_position(
+        best_position,
+        {"termination_reason": "finished"},
+        _sample_telemetry(position=3),
+    )
+    assert best_position == 3
 
 
 def test_format_reload_age_is_human_readable() -> None:
@@ -959,6 +1110,7 @@ def _sample_telemetry(
     difficulty_name: str = "novice",
     camera_setting_raw: int = 2,
     camera_setting_name: str = "regular",
+    position: int = 30,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         state_labels=state_labels,
@@ -972,4 +1124,5 @@ def _sample_telemetry(
         race_distance=-3040.8,
         lap_distance=75987.2,
         race_time_ms=116,
+        position=position,
     )

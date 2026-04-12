@@ -4,30 +4,38 @@ defaults:
   - _self_
 
 env:
+  # Mask manual boost below 20% energy for this continuation run.
+  boost_min_energy_fraction: 0.40
   action:
     # Maskable recurrent hybrid PPO: continuous steer/drive/air-brake plus shoulder primitive and boost.
     # Shoulder values 3..6 reserve future side-attack/spin primitives and are masked by default.
     name: hybrid_steer_drive_boost_shoulder_primitive
-    # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
-    continuous_drive_mode: pwm
+    # Continue 0014 with gas held at 100%; the policy still keeps the drive
+    # axis shape, but the env ignores it for accelerate.
+    continuous_drive_mode: always_accelerate
     continuous_drive_deadzone: 0.0
     # Keep the 0009 policy shape, but clear air brake whenever telemetry says grounded.
     continuous_air_brake_mode: disable_on_ground
     # Try vanilla-ish drift semantics: release immediately, then mask re-taps through the dash window.
     shoulder_slide_mode: release_cooldown
     # Keep boost unavailable when already fast; can_boost/energy/active-boost gates still apply.
-    boost_unmask_max_speed_kph: 790.0
+    boost_unmask_max_speed_kph: 800.0
     # Keep drift unavailable at low speed, without hard-masking it forever.
-    drift_unmask_min_speed_kph: 630.0
+    drift_unmask_min_speed_kph: 1000.0
+
+reward:
+  # Keep forced full gas, but teach the ignored drive axis to stop asking for coast.
+  drive_axis_negative_penalty_scale: -0.01
 
 train:
   algorithm: maskable_hybrid_recurrent_ppo
   run_name: ppo_maskable_hybrid_recurrent_cnn
-  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0012
+  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0021
   init_artifact: latest
-  ent_coef: 0.01
+  ent_coef: 0.001
   n_steps: 2048
   batch_size: 512
+  learning_rate: 1.5e-4
 
 policy:
   recurrent:

@@ -294,8 +294,7 @@ def test_train_app_config_rejects_recurrent_algorithm_without_recurrent_policy(
 
     with pytest.raises(
         ValidationError,
-        match="train.algorithm=maskable_recurrent_ppo requires "
-        "policy.recurrent.enabled=true",
+        match="train.algorithm=maskable_recurrent_ppo requires policy.recurrent.enabled=true",
     ):
         TrainAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
