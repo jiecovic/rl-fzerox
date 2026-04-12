@@ -19,20 +19,7 @@ const Z_BUTTON_TIMER_OFFSET: usize = player_z_button_timer_offset();
 const R_BUTTON_TIMER_OFFSET: usize = player_r_button_timer_offset();
 const SLIDE_ATTACK_TIMER_GUARD_FRAMES: i16 = 15;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct ShoulderTimerPatch {
-    button_id: u32,
-}
-
-const SHOULDER_TIMER_PATCHES: [ShoulderTimerPatch; 2] = [
-    ShoulderTimerPatch {
-        button_id: DEVICE_ID_JOYPAD_L2,
-    },
-    ShoulderTimerPatch {
-        button_id: DEVICE_ID_JOYPAD_R,
-    },
-];
-
+const SLIDE_SHOULDER_BUTTON_IDS: [u32; 2] = [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R];
 const SLIDE_TIMER_OFFSETS: [usize; 2] = [Z_BUTTON_TIMER_OFFSET, R_BUTTON_TIMER_OFFSET];
 
 impl Host {
@@ -49,9 +36,9 @@ impl Host {
 }
 
 fn has_held_slide_shoulder(controller_state: ControllerState) -> bool {
-    SHOULDER_TIMER_PATCHES
+    SLIDE_SHOULDER_BUTTON_IDS
         .iter()
-        .any(|patch| controller_state.joypad_state(patch.button_id) != 0)
+        .any(|button_id| controller_state.joypad_state(*button_id) != 0)
 }
 
 fn patch_shoulder_timers(
