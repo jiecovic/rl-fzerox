@@ -215,6 +215,7 @@ class SyntheticBackend:
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
+        shoulder_slide_timer_assist: bool = False,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -222,6 +223,7 @@ class SyntheticBackend:
             wrong_way_timer_limit,
             terminate_on_energy_depleted,
             stuck_step_limit,
+            shoulder_slide_timer_assist,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:

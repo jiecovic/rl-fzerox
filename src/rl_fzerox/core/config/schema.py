@@ -20,6 +20,10 @@ from pydantic import (
 
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.domain.camera import CameraSettingName
+from rl_fzerox.core.domain.shoulder_slide import (
+    DEFAULT_SHOULDER_SLIDE_MODE,
+    ShoulderSlideMode,
+)
 from rl_fzerox.core.domain.training_algorithms import (
     DEFAULT_TRAIN_ALGORITHM,
     RECURRENT_TRAINING_ALGORITHMS,
@@ -70,6 +74,7 @@ class ActionConfig(BaseModel):
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
     continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
+    shoulder_slide_mode: ShoulderSlideMode = DEFAULT_SHOULDER_SLIDE_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     drift_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
@@ -398,11 +403,7 @@ class TrainAppConfig(BaseModel):
         recurrent_enabled = self.policy.recurrent.enabled
         algorithm = self.train.algorithm
         if recurrent_enabled and algorithm not in RECURRENT_TRAINING_ALGORITHMS:
-            raise ValueError(
-                "policy.recurrent.enabled=true requires a recurrent train.algorithm"
-            )
+            raise ValueError("policy.recurrent.enabled=true requires a recurrent train.algorithm")
         if not recurrent_enabled and algorithm in RECURRENT_TRAINING_ALGORITHMS:
-            raise ValueError(
-                f"train.algorithm={algorithm} requires policy.recurrent.enabled=true"
-            )
+            raise ValueError(f"train.algorithm={algorithm} requires policy.recurrent.enabled=true")
         return self
