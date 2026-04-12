@@ -33,6 +33,7 @@ _TERMINATION_REASON_KEYS: tuple[str, ...] = (
 _TRUNCATION_REASON_KEYS: tuple[str, ...] = (
     "stuck",
     "wrong_way",
+    "progress_stalled",
     "timeout",
 )
 
