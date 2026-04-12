@@ -145,7 +145,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "position": 8,
                 "race_laps_completed": 1,
                 "termination_reason": None,
-                "truncation_reason": "wrong_way",
+                "truncation_reason": "progress_stalled",
             },
         },
     ]
@@ -159,7 +159,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
     assert accumulator.episode_count == 2
     assert accumulator.termination_counts["finished"] == 1
-    assert accumulator.truncation_counts["wrong_way"] == 1
+    assert accumulator.truncation_counts["progress_stalled"] == 1
 
 
 def test_info_sequence_accepts_tuple_infos() -> None:
