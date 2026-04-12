@@ -3,7 +3,7 @@
 //!
 //! F-Zero X uses a short Z/R timer window to detect double-tap side attacks.
 //! When the policy requests a slide, keep normal controller input semantics but
-//! patch the matching timer past that window before the frame update. That lets
+//! patch the slide timers past that window before the frame update. That lets
 //! the policy release early without the next shoulder edge turning into a dash.
 
 use std::mem::size_of;
@@ -22,19 +22,18 @@ const SLIDE_ATTACK_TIMER_GUARD_FRAMES: i16 = 15;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct ShoulderTimerPatch {
     button_id: u32,
-    timer_offset: usize,
 }
 
 const SHOULDER_TIMER_PATCHES: [ShoulderTimerPatch; 2] = [
     ShoulderTimerPatch {
         button_id: DEVICE_ID_JOYPAD_L2,
-        timer_offset: Z_BUTTON_TIMER_OFFSET,
     },
     ShoulderTimerPatch {
         button_id: DEVICE_ID_JOYPAD_R,
-        timer_offset: R_BUTTON_TIMER_OFFSET,
     },
 ];
+
+const SLIDE_TIMER_OFFSETS: [usize; 2] = [Z_BUTTON_TIMER_OFFSET, R_BUTTON_TIMER_OFFSET];
 
 impl Host {
     pub(super) fn patch_shoulder_timers_for_slide_assist(
@@ -59,14 +58,14 @@ fn patch_shoulder_timers(
     system_ram: &mut [u8],
     controller_state: ControllerState,
 ) -> Result<(), CoreError> {
-    for patch in SHOULDER_TIMER_PATCHES {
-        if controller_state.joypad_state(patch.button_id) != 0 {
-            write_i16(
-                system_ram,
-                patch.timer_offset,
-                SLIDE_ATTACK_TIMER_GUARD_FRAMES,
-            )?;
-        }
+    if !has_held_slide_shoulder(controller_state) {
+        return Ok(());
+    }
+
+    // The two timers are adjacent `s16` fields. Guard both together so the
+    // slide primitive remains safe even on byte/halfword-swapped RDRAM views.
+    for offset in SLIDE_TIMER_OFFSETS {
+        write_i16(system_ram, offset, SLIDE_ATTACK_TIMER_GUARD_FRAMES)?;
     }
     Ok(())
 }
@@ -104,7 +103,7 @@ mod tests {
     use crate::core::input::ControllerState;
 
     #[test]
-    fn held_left_shoulder_patches_z_timer_only() {
+    fn held_left_shoulder_patches_both_slide_timers() {
         let mut memory = vec![0_u8; R_BUTTON_TIMER_OFFSET + 2];
         let controller_state =
             ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_L2), 0.0, 0.0, 0.0, 0.0);
@@ -115,18 +114,24 @@ mod tests {
             read_i16(&memory, Z_BUTTON_TIMER_OFFSET),
             SLIDE_ATTACK_TIMER_GUARD_FRAMES,
         );
-        assert_eq!(read_i16(&memory, R_BUTTON_TIMER_OFFSET), 0);
+        assert_eq!(
+            read_i16(&memory, R_BUTTON_TIMER_OFFSET),
+            SLIDE_ATTACK_TIMER_GUARD_FRAMES,
+        );
     }
 
     #[test]
-    fn held_right_shoulder_patches_r_timer_only() {
+    fn held_right_shoulder_patches_both_slide_timers() {
         let mut memory = vec![0_u8; R_BUTTON_TIMER_OFFSET + 2];
         let controller_state =
             ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_R), 0.0, 0.0, 0.0, 0.0);
 
         patch_shoulder_timers(&mut memory, controller_state).unwrap();
 
-        assert_eq!(read_i16(&memory, Z_BUTTON_TIMER_OFFSET), 0);
+        assert_eq!(
+            read_i16(&memory, Z_BUTTON_TIMER_OFFSET),
+            SLIDE_ATTACK_TIMER_GUARD_FRAMES,
+        );
         assert_eq!(
             read_i16(&memory, R_BUTTON_TIMER_OFFSET),
             SLIDE_ATTACK_TIMER_GUARD_FRAMES,
