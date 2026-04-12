@@ -60,7 +60,7 @@ STATE_VECTOR_SPEC = StateVectorSpec(
         StateFeature("recent_boost_pressure", 1.0),
     ),
     speed_normalizer_kph=1_500.0,
-    # Conservative guard; 14 looked usable in one watch pass, but 15 is safer if side dashes appear.
+    # Mirrors the game's shoulder double-tap timer window used for side attacks.
     shoulder_tap_guard_frames=15,
     recent_boost_window_frames=120,
 )

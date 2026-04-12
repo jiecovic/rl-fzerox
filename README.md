@@ -141,7 +141,7 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml
 ```
 
 Training uses `MaskablePPO` by default because the env exposes live gameplay
-masks, including boost-unlocked and shoulder-latch constraints.
+masks, including boost availability and speed-gated drift constraints.
 
 For recurrent training, install `sb3x` into the same environment and switch the
 config to `train.algorithm=maskable_recurrent_ppo` with
