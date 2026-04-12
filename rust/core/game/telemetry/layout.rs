@@ -44,6 +44,8 @@ pub(super) struct RacerOffsets {
     pub max_energy: usize,
     pub race_distance: usize,
     pub lap_distance: usize,
+    pub z_button_timer: usize,
+    pub r_button_timer: usize,
     pub race_time: usize,
     pub lap: usize,
     pub laps_completed: usize,
@@ -81,11 +83,25 @@ pub(super) const RACER: RacerOffsets = RacerOffsets {
     max_energy: 0x22C,
     race_distance: 0x23C,
     lap_distance: 0x244,
+    z_button_timer: 0x278,
+    r_button_timer: 0x27A,
     race_time: 0x2A0,
     lap: 0x2A8,
     laps_completed: 0x2AA,
     position: 0x2AC,
 };
+
+pub(crate) const fn player_z_button_timer_offset() -> usize {
+    player_racer_field_offset(RACER.z_button_timer)
+}
+
+pub(crate) const fn player_r_button_timer_offset() -> usize {
+    player_racer_field_offset(RACER.r_button_timer)
+}
+
+const fn player_racer_field_offset(field_offset: usize) -> usize {
+    GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size) + field_offset
+}
 
 // F-Zero X game-mode ids derived from the decomp's `include/fzx_game.h`.
 #[repr(u32)]

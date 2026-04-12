@@ -10,6 +10,7 @@ mod bootstrap;
 mod host;
 mod memory;
 mod rng;
+mod shoulder_slide;
 mod step;
 mod step_accumulator;
 

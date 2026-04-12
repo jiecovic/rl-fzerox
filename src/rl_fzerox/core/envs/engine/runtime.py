@@ -153,7 +153,6 @@ class FZeroXEnvEngine:
         self._control_state.reset()
         if isinstance(self._action_adapter, ResettableActionAdapter):
             self._action_adapter.reset()
-        self._mask_controller.set_shoulder_lock(None)
         info["seed"] = seed
         set_curriculum_info(
             info,
@@ -209,9 +208,7 @@ class FZeroXEnvEngine:
         requested_control_state = (
             self._held_controller_state if control_state is None else control_state
         )
-        self._held_controller_state = self._apply_dynamic_control_gates(
-            requested_control_state
-        )
+        self._held_controller_state = self._apply_dynamic_control_gates(requested_control_state)
         return self._run_env_step(
             self._held_controller_state,
             action_repeat=1,
@@ -305,7 +302,7 @@ class FZeroXEnvEngine:
         requested_control_state: ControllerState | None = None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = requested_control_state or control_state
-        applied_control_state = self._control_state.apply_minimum_shoulder_hold(control_state)
+        applied_control_state = control_state
         step_result = self.backend.step_repeat_raw(
             applied_control_state,
             action_repeat=action_repeat,
@@ -361,10 +358,6 @@ class FZeroXEnvEngine:
         self._control_state.record_step(
             control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
-        )
-        shoulder_mask = self._control_state.dynamic_action_mask_overrides()
-        self._mask_controller.set_shoulder_lock(
-            None if shoulder_mask is None else shoulder_mask["shoulder"][0]
         )
         image_observation = step_result.observation
         observation = self._build_observation(image=image_observation, telemetry=telemetry)

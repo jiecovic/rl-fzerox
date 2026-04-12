@@ -530,12 +530,15 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
 
     env.reset(seed=21)
-    assert env.action_to_control_state(
-        {
-            "continuous": np.array([0.0, -1.0, 1.0], dtype=np.float32),
-            "discrete": np.array([0, 0], dtype=np.int64),
-        }
-    ) == air_brake_state
+    assert (
+        env.action_to_control_state(
+            {
+                "continuous": np.array([0.0, -1.0, 1.0], dtype=np.float32),
+                "discrete": np.array([0, 0], dtype=np.int64),
+            }
+        )
+        == air_brake_state
+    )
     _, reward, _, _, info = env.step_control(air_brake_state)
     assert backend.last_controller_state == ControllerState()
     assert reward == -0.5
@@ -620,9 +623,7 @@ def test_hybrid_boost_drift_action_env_exposes_boost_mask_branch() -> None:
 def test_hybrid_boost_shoulder_primitive_env_masks_future_primitives_by_default() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),
-        config=EnvConfig(
-            action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")
-        ),
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")),
     )
 
     assert isinstance(env.action_space, Dict)
@@ -829,9 +830,7 @@ def test_hybrid_shoulder_primitive_masks_boost_until_telemetry_unlocks_it() -> N
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(
-            action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")
-        ),
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_shoulder_primitive")),
     )
 
     env.reset(seed=1)
@@ -1099,7 +1098,7 @@ def test_env_action_masks_intersect_curriculum_and_boost_unlock_rules() -> None:
     )
 
 
-def test_env_keeps_shoulder_input_latched_for_minimum_internal_frames() -> None:
+def test_env_releases_shoulder_input_without_python_side_latch() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -1135,15 +1134,16 @@ def test_env_keeps_shoulder_input_latched_for_minimum_internal_frames() -> None:
     env.reset(seed=3)
     env.step(np.array([3, 0, 0, 1], dtype=np.int64))
 
-    assert env.action_masks().tolist()[-3:] == [False, True, False]
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK != 0
+    assert env.action_masks().tolist()[-3:] == [True, True, True]
 
     env.step(np.array([3, 0, 0, 0], dtype=np.int64))
 
-    assert backend.last_controller_state.joypad_mask == DRIFT_LEFT_MASK
-    assert env.action_masks().tolist()[-3:] == [False, True, False]
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK == 0
+    assert env.action_masks().tolist()[-3:] == [True, True, True]
 
 
-def test_env_unlocks_shoulder_branch_after_minimum_hold_window() -> None:
+def test_env_keeps_drift_speed_mask_without_shoulder_latch() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -1180,21 +1180,24 @@ def test_env_unlocks_shoulder_branch_after_minimum_hold_window() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=5,
-            action=ActionConfig(name="steer_drive_boost_drift"),
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                drift_unmask_min_speed_kph=500.0,
+            ),
         ),
     )
 
     env.reset(seed=4)
-    assert env.action_masks().tolist()[-3:] == [True, True, True]
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
 
     env.step(np.array([3, 0, 0, 1], dtype=np.int64))
-    assert env.action_masks().tolist()[-3:] == [False, True, False]
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
 
     env.step(np.array([3, 0, 0, 1], dtype=np.int64))
-    assert env.action_masks().tolist()[-3:] == [False, True, False]
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
 
     env.step(np.array([3, 0, 0, 1], dtype=np.int64))
-    assert env.action_masks().tolist()[-3:] == [True, True, True]
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
 
 
 def test_reset_can_boot_into_the_first_race_path():
