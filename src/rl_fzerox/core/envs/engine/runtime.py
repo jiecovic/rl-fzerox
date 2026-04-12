@@ -7,6 +7,7 @@ from gymnasium import spaces
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.domain.shoulder_slide import SHOULDER_SLIDE_MODE_TIMER_ASSIST
 from rl_fzerox.core.envs.actions import (
     AIR_BRAKE_MASK,
     BOOST_MASK,
@@ -83,7 +84,9 @@ class FZeroXEnvEngine:
             boost_unmask_max_speed_kph=config.action.boost_unmask_max_speed_kph,
             drift_unmask_min_speed_kph=config.action.drift_unmask_min_speed_kph,
         )
-        self._control_state = ControlStateTracker()
+        self._control_state = ControlStateTracker(
+            shoulder_slide_mode=config.action.shoulder_slide_mode,
+        )
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
@@ -151,6 +154,7 @@ class FZeroXEnvEngine:
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._control_state.reset()
+        self._mask_controller.set_shoulder_allowed_values(None)
         if isinstance(self._action_adapter, ResettableActionAdapter):
             self._action_adapter.reset()
         info["seed"] = seed
@@ -191,7 +195,7 @@ class FZeroXEnvEngine:
         control_state: ControllerState,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = control_state
-        applied_control_state = self._apply_dynamic_control_gates(requested_control_state)
+        applied_control_state = self._apply_control_semantics(requested_control_state)
         self._held_controller_state = applied_control_state
         return self._run_env_step(
             applied_control_state,
@@ -208,7 +212,7 @@ class FZeroXEnvEngine:
         requested_control_state = (
             self._held_controller_state if control_state is None else control_state
         )
-        self._held_controller_state = self._apply_dynamic_control_gates(requested_control_state)
+        self._held_controller_state = self._apply_control_semantics(requested_control_state)
         return self._run_env_step(
             self._held_controller_state,
             action_repeat=1,
@@ -316,6 +320,9 @@ class FZeroXEnvEngine:
             progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
+            shoulder_slide_timer_assist=(
+                self.config.action.shoulder_slide_mode == SHOULDER_SLIDE_MODE_TIMER_ASSIST
+            ),
         )
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
@@ -359,6 +366,9 @@ class FZeroXEnvEngine:
             control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
         )
+        self._mask_controller.set_shoulder_allowed_values(
+            self._control_state.shoulder_action_mask_override(),
+        )
         image_observation = step_result.observation
         observation = self._build_observation(image=image_observation, telemetry=telemetry)
         self._episode_return += reward
@@ -374,6 +384,12 @@ class FZeroXEnvEngine:
             observation_mode=self.config.observation.mode,
         )
         return observation, reward, terminated, truncated, info
+
+    def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
+        """Apply telemetry gates and configured shoulder-slide semantics."""
+
+        gated_control_state = self._apply_dynamic_control_gates(control_state)
+        return self._control_state.apply_shoulder_semantics(gated_control_state)
 
     def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
         """Suppress controls whose validity depends on the latest telemetry."""

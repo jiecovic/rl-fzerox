@@ -134,6 +134,7 @@ class Emulator:
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
+        shoulder_slide_timer_assist: bool = False,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
@@ -150,6 +151,7 @@ class Emulator:
             progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
+            shoulder_slide_timer_assist=shoulder_slide_timer_assist,
             joypad_mask=state.joypad_mask,
             left_stick_x=state.left_stick_x,
             left_stick_y=state.left_stick_y,

@@ -33,6 +33,11 @@ env:
   action:
     name: steer_drive_boost_drift
     steer_buckets: 9
+    # Shoulder/drift semantics:
+    # - minimum_hold: force a pressed shoulder to stay held through the tap window.
+    # - release_cooldown: release immediately, then mask re-presses through the tap window.
+    # - timer_assist: allow arbitrary short taps by patching the game's shoulder timers.
+    shoulder_slide_mode: timer_assist
     # Optional live speed cap for manual boost.
     # Boost still requires can_boost, enough energy, and no active boost; null disables this gate.
     boost_unmask_max_speed_kph: null

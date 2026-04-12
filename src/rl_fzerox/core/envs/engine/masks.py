@@ -24,6 +24,7 @@ class ActionMaskController:
     drift_unmask_min_speed_kph: float | None
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
+    _shoulder_allowed_values: tuple[int, ...] | None = None
     _speed_kph: float | None = None
 
     @classmethod
@@ -63,6 +64,7 @@ class ActionMaskController:
             stage_overrides=stage_overrides,
             dynamic_overrides=_dynamic_action_mask_overrides(
                 boost_unlocked=self._boost_unlocked,
+                shoulder_allowed_values=self._shoulder_allowed_values,
                 speed_kph=self._speed_kph,
                 boost_unmask_max_speed_kph=self.boost_unmask_max_speed_kph,
                 drift_unmask_min_speed_kph=self.drift_unmask_min_speed_kph,
@@ -97,6 +99,11 @@ class ActionMaskController:
         """Update live boost availability used by the dynamic action mask."""
 
         self._boost_unlocked = boost_unlocked
+
+    def set_shoulder_allowed_values(self, values: tuple[int, ...] | None) -> None:
+        """Update live shoulder restrictions used by slide primitive semantics."""
+
+        self._shoulder_allowed_values = values
 
     def set_speed_kph(self, speed_kph: float | None) -> None:
         """Update the live speed used by dynamic speed-gated masks."""
@@ -181,6 +188,7 @@ def _validate_override_branches(
 def _dynamic_action_mask_overrides(
     *,
     boost_unlocked: bool | None,
+    shoulder_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
     boost_unmask_max_speed_kph: float | None = None,
     drift_unmask_min_speed_kph: float | None = None,
@@ -194,12 +202,16 @@ def _dynamic_action_mask_overrides(
         and speed_kph > boost_unmask_max_speed_kph
     ):
         overrides["boost"] = (0,)
-    if (
-        drift_unmask_min_speed_kph is not None
-        and speed_kph is not None
-        and speed_kph < drift_unmask_min_speed_kph
-    ):
-        overrides["shoulder"] = (0,)
+    shoulder_values = shoulder_allowed_values
+    if shoulder_values is None:
+        if (
+            drift_unmask_min_speed_kph is not None
+            and speed_kph is not None
+            and speed_kph < drift_unmask_min_speed_kph
+        ):
+            shoulder_values = (0,)
+    if shoulder_values is not None:
+        overrides["shoulder"] = shoulder_values
     if not overrides:
         return None
     return overrides

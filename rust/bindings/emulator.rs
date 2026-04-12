@@ -113,6 +113,7 @@ impl PyEmulator {
         progress_frontier_stall_limit_frames=None,
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=true,
+        shoulder_slide_timer_assist=false,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -134,6 +135,7 @@ impl PyEmulator {
         progress_frontier_stall_limit_frames: Option<usize>,
         progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,
+        shoulder_slide_timer_assist: bool,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -166,6 +168,7 @@ impl PyEmulator {
                     progress_frontier_stall_limit_frames,
                     progress_frontier_epsilon,
                     terminate_on_energy_depleted,
+                    shoulder_slide_timer_assist,
                 })
             })
             .map_err(map_core_error)?;

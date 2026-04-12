@@ -234,6 +234,7 @@ class Emulator:
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
+        shoulder_slide_timer_assist: bool = False,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,

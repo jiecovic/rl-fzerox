@@ -232,4 +232,6 @@ pub struct RepeatedStepConfig {
     pub progress_frontier_epsilon: f32,
     /// Treat depleted player energy as an immediate terminal failure.
     pub terminate_on_energy_depleted: bool,
+    /// Patch shoulder timers so short drift taps cannot become side attacks.
+    pub shoulder_slide_timer_assist: bool,
 }

@@ -250,6 +250,7 @@ fn repeated_step_config(
         progress_frontier_stall_limit_frames: Some(900),
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
+        shoulder_slide_timer_assist: false,
     }
 }
 

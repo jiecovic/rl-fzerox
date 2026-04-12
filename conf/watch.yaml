@@ -32,6 +32,7 @@ env:
   action:
     name: steer_drive_boost_drift
     steer_buckets: 7
+    shoulder_slide_mode: timer_assist
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state

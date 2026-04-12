@@ -92,6 +92,7 @@ class EmulatorBackend(Protocol):
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
+        shoulder_slide_timer_assist: bool = False,
     ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

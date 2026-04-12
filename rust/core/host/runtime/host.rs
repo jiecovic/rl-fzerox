@@ -193,7 +193,9 @@ impl Host {
             for repeat_index in 0..config.action_repeat {
                 let capture_video = repeat_index + 1 == config.action_repeat;
                 self.callbacks.set_capture_video(capture_video);
-                self.patch_shoulder_timers_for_slide_assist(config.controller_state)?;
+                if config.shoulder_slide_timer_assist {
+                    self.patch_shoulder_timers_for_slide_assist(config.controller_state)?;
+                }
                 self.call_core(|core| unsafe {
                     core.run();
                 });

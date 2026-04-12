@@ -109,6 +109,7 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         progress_frontier_stall_limit_frames: Some(900),
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
+        shoulder_slide_timer_assist: false,
     }
 }
 

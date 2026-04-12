@@ -77,6 +77,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
 
         def step_repeat_raw(self, **kwargs):
             assert kwargs["action_repeat"] == 2
+            assert kwargs["shoulder_slide_timer_assist"] is False
             observation = np.zeros((84, 116, 6), dtype=np.uint8)
             summary = make_step_summary(
                 frames_run=2,

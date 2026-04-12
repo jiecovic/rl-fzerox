@@ -24,7 +24,12 @@ from rl_fzerox.core.config.schema import (
     RewardConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import ACCELERATE_MASK, AIR_BRAKE_MASK, DRIFT_LEFT_MASK
+from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    DRIFT_LEFT_MASK,
+    DRIFT_RIGHT_MASK,
+)
 from rl_fzerox.core.envs.observations import DRIFT_DOUBLE_TAP_WINDOW_FRAMES, ObservationValue
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
@@ -44,6 +49,7 @@ class ScriptedStepBackend(SyntheticBackend):
         super().__init__()
         self._results = list(results)
         self._reset_telemetry = reset_telemetry
+        self.last_shoulder_slide_timer_assist: bool | None = None
 
     def step_repeat_raw(
         self,
@@ -60,6 +66,7 @@ class ScriptedStepBackend(SyntheticBackend):
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
+        shoulder_slide_timer_assist: bool = False,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -70,8 +77,10 @@ class ScriptedStepBackend(SyntheticBackend):
             progress_frontier_stall_limit_frames,
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
+            shoulder_slide_timer_assist,
         )
         self.set_controller_state(controller_state)
+        self.last_shoulder_slide_timer_assist = shoulder_slide_timer_assist
         result = self._results.pop(0)
         frames_run = result.summary.frames_run
         self._capture_video_flags.extend([False] * max(frames_run - 1, 0))
@@ -1135,12 +1144,158 @@ def test_env_releases_shoulder_input_without_python_side_latch() -> None:
     env.step(np.array([3, 0, 0, 1], dtype=np.int64))
 
     assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK != 0
+    assert backend.last_shoulder_slide_timer_assist is True
     assert env.action_masks().tolist()[-3:] == [True, True, True]
 
     env.step(np.array([3, 0, 0, 0], dtype=np.int64))
 
     assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK == 0
     assert env.action_masks().tolist()[-3:] == [True, True, True]
+
+
+def test_env_minimum_hold_mode_keeps_shoulder_pressed_for_guard_window() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=2, frames_run=2),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=20.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=20.0, final_frame_index=4, frames_run=2),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=2,
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                shoulder_slide_mode="minimum_hold",
+            ),
+        ),
+    )
+
+    env.reset(seed=3)
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+    assert backend.last_shoulder_slide_timer_assist is False
+
+    env.step(np.array([3, 0, 0, 0], dtype=np.int64))
+
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK != 0
+    assert env.action_masks().tolist()[-3:] == [False, True, False]
+
+
+def test_env_release_cooldown_mode_blocks_retap_after_short_drift() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=5, frames_run=5),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=20.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=20.0, final_frame_index=10, frames_run=5),
+                status=make_step_status(step_count=2),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=30.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=30.0, final_frame_index=15, frames_run=5),
+                status=make_step_status(step_count=3),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=40.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=40.0, final_frame_index=20, frames_run=5),
+                status=make_step_status(step_count=4),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=5,
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                shoulder_slide_mode="release_cooldown",
+            ),
+        ),
+    )
+
+    env.reset(seed=3)
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK != 0
+    assert backend.last_shoulder_slide_timer_assist is False
+    assert env.action_masks().tolist()[-3:] == [True, True, False]
+
+    env.step(np.array([3, 0, 0, 0], dtype=np.int64))
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK == 0
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
+
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert backend.last_controller_state.joypad_mask & DRIFT_LEFT_MASK == 0
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
+
+    env.step(np.array([3, 0, 0, 0], dtype=np.int64))
+    assert env.action_masks().tolist()[-3:] == [True, True, True]
+
+
+def test_env_release_cooldown_mode_blocks_direct_shoulder_switch() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=5, frames_run=5),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=20.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=20.0, final_frame_index=10, frames_run=5),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=5,
+            action=ActionConfig(
+                name="steer_drive_boost_drift",
+                shoulder_slide_mode="release_cooldown",
+            ),
+        ),
+    )
+
+    env.reset(seed=3)
+    env.step(np.array([3, 0, 0, 1], dtype=np.int64))
+    assert env.action_masks().tolist()[-3:] == [True, True, False]
+
+    env.step(np.array([3, 0, 0, 2], dtype=np.int64))
+    assert backend.last_controller_state.joypad_mask & DRIFT_RIGHT_MASK == 0
+    assert env.action_masks().tolist()[-3:] == [True, False, False]
 
 
 def test_env_keeps_drift_speed_mask_without_shoulder_latch() -> None:
