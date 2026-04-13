@@ -60,8 +60,8 @@ DEFAULT_STATE_VECTOR_SPEC = StateVectorSpec(
         StateFeature("airborne", 1.0),
         StateFeature("can_boost", 1.0),
         StateFeature("boost_active", 1.0),
-        StateFeature("left_drift_held", 1.0),
-        StateFeature("right_drift_held", 1.0),
+        StateFeature("left_shoulder_held", 1.0),
+        StateFeature("right_shoulder_held", 1.0),
         StateFeature("left_press_age_norm", 1.0),
         StateFeature("right_press_age_norm", 1.0),
         StateFeature("recent_boost_pressure", 1.0),
@@ -93,7 +93,9 @@ STATE_VECTOR_SPEC = DEFAULT_STATE_VECTOR_SPEC
 STATE_FEATURE_NAMES = STATE_VECTOR_SPEC.names
 STATE_FEATURE_COUNT = STATE_VECTOR_SPEC.count
 STATE_SPEED_NORMALIZER_KPH = STATE_VECTOR_SPEC.speed_normalizer_kph
-DRIFT_DOUBLE_TAP_WINDOW_FRAMES = STATE_VECTOR_SPEC.shoulder_tap_guard_frames
+SHOULDER_DOUBLE_TAP_WINDOW_FRAMES = STATE_VECTOR_SPEC.shoulder_tap_guard_frames
+# COMPAT SHIM: legacy constant name for the shoulder double-tap guard window.
+DRIFT_DOUBLE_TAP_WINDOW_FRAMES = SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
 RECENT_BOOST_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_boost_window_frames
 RECENT_STEER_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_steer_window_frames
 STATE_FEATURE_LOW = STATE_VECTOR_SPEC.low_array()
@@ -106,8 +108,8 @@ def build_observation(
     telemetry: FZeroXTelemetry | None,
     mode: ObservationMode,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    left_drift_held: float = 0.0,
-    right_drift_held: float = 0.0,
+    left_shoulder_held: float = 0.0,
+    right_shoulder_held: float = 0.0,
     left_press_age_norm: float = 1.0,
     right_press_age_norm: float = 1.0,
     recent_boost_pressure: float = 0.0,
@@ -123,8 +125,8 @@ def build_observation(
             "state": telemetry_state_vector(
                 telemetry,
                 state_profile=state_profile,
-                left_drift_held=left_drift_held,
-                right_drift_held=right_drift_held,
+                left_shoulder_held=left_shoulder_held,
+                right_shoulder_held=right_shoulder_held,
                 left_press_age_norm=left_press_age_norm,
                 right_press_age_norm=right_press_age_norm,
                 recent_boost_pressure=recent_boost_pressure,
@@ -140,8 +142,8 @@ def telemetry_state_vector(
     telemetry: FZeroXTelemetry | None,
     *,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    left_drift_held: float = 0.0,
-    right_drift_held: float = 0.0,
+    left_shoulder_held: float = 0.0,
+    right_shoulder_held: float = 0.0,
     left_press_age_norm: float = 1.0,
     right_press_age_norm: float = 1.0,
     recent_boost_pressure: float = 0.0,
@@ -152,8 +154,8 @@ def telemetry_state_vector(
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
     spec = state_vector_spec(state_profile)
-    left_held = _clamp(float(left_drift_held), 0.0, 1.0)
-    right_held = _clamp(float(right_drift_held), 0.0, 1.0)
+    left_held = _clamp(float(left_shoulder_held), 0.0, 1.0)
+    right_held = _clamp(float(right_shoulder_held), 0.0, 1.0)
     left_age = _clamp(float(left_press_age_norm), 0.0, 1.0)
     right_age = _clamp(float(right_press_age_norm), 0.0, 1.0)
     boost_pressure = _clamp(float(recent_boost_pressure), 0.0, 1.0)

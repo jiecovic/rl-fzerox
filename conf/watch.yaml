@@ -30,7 +30,7 @@ env:
   camera_setting: close_behind
   reset_to_race: true
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost_shoulder
     steer_buckets: 7
     shoulder_slide_mode: release_cooldown
   observation:

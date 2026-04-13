@@ -586,10 +586,10 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: continuous_steer_drive_drift",
+            "    name: continuous_steer_drive_shoulder",
             "    continuous_drive_mode: always_accelerate",
             "    continuous_drive_deadzone: 0.15",
-            "    continuous_drift_deadzone: 0.25",
+            "    continuous_shoulder_deadzone: 0.25",
             "train:",
             "  algorithm: sac",
             "  total_timesteps: 1000",
@@ -603,10 +603,10 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "continuous_steer_drive_drift"
+    assert config.env.action.name == "continuous_steer_drive_shoulder"
     assert config.env.action.continuous_drive_mode == "always_accelerate"
     assert config.env.action.continuous_drive_deadzone == 0.15
-    assert config.env.action.continuous_drift_deadzone == 0.25
+    assert config.env.action.continuous_shoulder_deadzone == 0.25
     assert config.train.algorithm == "sac"
     assert config.train.buffer_size == 30_000
     assert config.train.learning_starts == 5_000
@@ -628,7 +628,7 @@ def test_load_train_app_config_reads_hybrid_action_ppo_fields(tmp_path: Path) ->
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: hybrid_steer_drive_drift",
+            "    name: hybrid_steer_drive_shoulder",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
             "train:",
@@ -639,7 +639,7 @@ def test_load_train_app_config_reads_hybrid_action_ppo_fields(tmp_path: Path) ->
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "hybrid_steer_drive_drift"
+    assert config.env.action.name == "hybrid_steer_drive_shoulder"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
     assert config.train.algorithm == "hybrid_action_ppo"
@@ -662,7 +662,7 @@ def test_load_train_app_config_reads_hybrid_recurrent_ppo_fields(
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: hybrid_steer_drive_drift",
+            "    name: hybrid_steer_drive_shoulder",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
             "train:",
@@ -676,7 +676,7 @@ def test_load_train_app_config_reads_hybrid_recurrent_ppo_fields(
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "hybrid_steer_drive_drift"
+    assert config.env.action.name == "hybrid_steer_drive_shoulder"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
     assert config.train.algorithm == "hybrid_recurrent_ppo"
@@ -739,7 +739,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
             "    continuous_drive_deadzone: 0.0",
             "    continuous_air_brake_mode: disable_on_ground",
             "    boost_unmask_max_speed_kph: 700.0",
-            "    drift_unmask_min_speed_kph: 500.0",
+            "    shoulder_unmask_min_speed_kph: 500.0",
             "train:",
             "  algorithm: maskable_hybrid_recurrent_ppo",
             "  total_timesteps: 1000",
@@ -756,7 +756,7 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
     assert config.env.action.continuous_drive_deadzone == 0.0
     assert config.env.action.continuous_air_brake_mode == "disable_on_ground"
     assert config.env.action.boost_unmask_max_speed_kph == 700.0
-    assert config.env.action.drift_unmask_min_speed_kph == 500.0
+    assert config.env.action.shoulder_unmask_min_speed_kph == 500.0
     assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert config.policy.recurrent.enabled is True
 
@@ -823,6 +823,34 @@ def test_load_train_app_config_migrates_legacy_boost_speed_gate(tmp_path: Path) 
     config = load_train_app_config(config_path)
 
     assert config.env.action.boost_unmask_max_speed_kph == 800.0
+
+
+def test_load_train_app_config_migrates_legacy_shoulder_fields(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    continuous_drift_deadzone: 0.25",
+            "    drift_unmask_min_speed_kph: 500.0",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.continuous_shoulder_deadzone == 0.25
+    assert config.env.action.shoulder_unmask_min_speed_kph == 500.0
 
 
 def test_repo_watch_template_exists() -> None:

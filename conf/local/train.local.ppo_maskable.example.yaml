@@ -8,7 +8,7 @@ emulator:
 
 env:
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost_shoulder
 
 policy:
   activation: tanh

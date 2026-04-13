@@ -37,6 +37,8 @@ def _algorithm_set(*names: TrainAlgorithmName) -> frozenset[TrainAlgorithmName]:
 
 
 LEGACY_PPO_ALGORITHMS: Final = _algorithm_set(
+    # COMPAT SHIM: saved run manifests may still contain these pre-maskable
+    # names; inference maps them through the legacy PPO loader path.
     TRAIN_ALGORITHM_AUTO,
     TRAIN_ALGORITHM_PPO,
 )

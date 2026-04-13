@@ -5,7 +5,7 @@ defaults:
 
 env:
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost_shoulder
 
 train:
   init_run_dir: local/runs/ppo_cnn_0043

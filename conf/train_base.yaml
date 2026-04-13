@@ -31,9 +31,9 @@ env:
   camera_setting: close_behind
   reset_to_race: true
   action:
-    name: steer_drive_boost_drift
+    name: steer_drive_boost_shoulder
     steer_buckets: 9
-    # Shoulder/drift semantics:
+    # Shoulder slide/lean semantics:
     # - minimum_hold: force a pressed shoulder to stay held through the tap window.
     # - release_cooldown: release immediately, then mask re-presses through the tap window.
     # - timer_assist: allow arbitrary short taps by patching the game's shoulder timers.
@@ -41,9 +41,9 @@ env:
     # Optional live speed cap for manual boost.
     # Boost still requires can_boost, enough energy, and no active boost; null disables this gate.
     boost_unmask_max_speed_kph: null
-    # Optional live speed gate for shoulder/drift actions.
-    # null disables it; 0 allows drift immediately; e.g. 500 masks drift below 500 km/h.
-    drift_unmask_min_speed_kph: null
+    # Optional live speed gate for shoulder actions.
+    # null disables it; 0 allows shoulder input immediately; e.g. 500 masks it below 500 km/h.
+    shoulder_unmask_min_speed_kph: null
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state

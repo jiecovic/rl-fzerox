@@ -196,6 +196,8 @@ def _apply_watch_config_delta(
 def _expand_legacy_watch_fps_delta(delta: Mapping[str, object]) -> dict[str, object]:
     """Keep CLI `watch.fps` overrides equivalent to both split FPS fields."""
 
+    # COMPAT SHIM: old watch CLI/config overrides used one `watch.fps` knob.
+    # Expand it here so CLI precedence still behaves like the new split fields.
     expanded: dict[str, object] = dict(delta)
     watch_delta = _string_key_mapping(expanded.get("watch"))
     if watch_delta is None or "fps" not in watch_delta:

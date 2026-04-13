@@ -11,11 +11,11 @@ from rl_fzerox.core.domain.shoulder_slide import (
     SHOULDER_SLIDE_MODE_RELEASE_COOLDOWN,
     ShoulderSlideMode,
 )
-from rl_fzerox.core.envs.actions import BOOST_MASK, DRIFT_LEFT_MASK, DRIFT_RIGHT_MASK
+from rl_fzerox.core.envs.actions import BOOST_MASK, SHOULDER_LEFT_MASK, SHOULDER_RIGHT_MASK
 from rl_fzerox.core.envs.observations import (
-    DRIFT_DOUBLE_TAP_WINDOW_FRAMES,
     RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
     RECENT_STEER_PRESSURE_WINDOW_FRAMES,
+    SHOULDER_DOUBLE_TAP_WINDOW_FRAMES,
 )
 
 
@@ -37,12 +37,12 @@ class ControlStateTracker:
     )
     _recent_boost_frame_sum: int = 0
     _recent_steer_frame_sum: float = 0.0
-    _left_drift_held: bool = False
-    _right_drift_held: bool = False
+    _left_shoulder_held: bool = False
+    _right_shoulder_held: bool = False
     _left_steer_held: bool = False
     _right_steer_held: bool = False
-    _left_press_age_frames: int = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
-    _right_press_age_frames: int = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+    _left_press_age_frames: int = SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
+    _right_press_age_frames: int = SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
     _shoulder_lock_index: int = 0
     _shoulder_lock_remaining_frames: int = 0
     _shoulder_cooldown_remaining_frames: int = 0
@@ -54,12 +54,12 @@ class ControlStateTracker:
         self._recent_steer_frames.clear()
         self._recent_boost_frame_sum = 0
         self._recent_steer_frame_sum = 0.0
-        self._left_drift_held = False
-        self._right_drift_held = False
+        self._left_shoulder_held = False
+        self._right_shoulder_held = False
         self._left_steer_held = False
         self._right_steer_held = False
-        self._left_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
-        self._right_press_age_frames = DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+        self._left_press_age_frames = SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
+        self._right_press_age_frames = SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
         self._shoulder_lock_index = 0
         self._shoulder_lock_remaining_frames = 0
         self._shoulder_cooldown_remaining_frames = 0
@@ -79,11 +79,11 @@ class ControlStateTracker:
         frames_elapsed = max(int(frames_run), 0)
         boost_requested = bool(control_state.joypad_mask & BOOST_MASK)
         steer_axis = _clamp(float(control_state.left_stick_x), -1.0, 1.0)
-        left_held = bool(control_state.joypad_mask & DRIFT_LEFT_MASK)
-        right_held = bool(control_state.joypad_mask & DRIFT_RIGHT_MASK)
+        left_held = bool(control_state.joypad_mask & SHOULDER_LEFT_MASK)
+        right_held = bool(control_state.joypad_mask & SHOULDER_RIGHT_MASK)
         previous_shoulder_index = _held_shoulder_index(
-            left_held=self._left_drift_held,
-            right_held=self._right_drift_held,
+            left_held=self._left_shoulder_held,
+            right_held=self._right_shoulder_held,
         )
         current_shoulder_index = _shoulder_index_from_mask(control_state.joypad_mask)
 
@@ -97,13 +97,13 @@ class ControlStateTracker:
         )
         self._left_press_age_frames = _advance_press_age(
             self._left_press_age_frames,
-            was_held=self._left_drift_held,
+            was_held=self._left_shoulder_held,
             is_held=left_held,
             frames_elapsed=frames_elapsed,
         )
         self._right_press_age_frames = _advance_press_age(
             self._right_press_age_frames,
-            was_held=self._right_drift_held,
+            was_held=self._right_shoulder_held,
             is_held=right_held,
             frames_elapsed=frames_elapsed,
         )
@@ -112,8 +112,8 @@ class ControlStateTracker:
             current_shoulder_index=current_shoulder_index,
             frames_elapsed=frames_elapsed,
         )
-        self._left_drift_held = left_held
-        self._right_drift_held = right_held
+        self._left_shoulder_held = left_held
+        self._right_shoulder_held = right_held
         self._left_steer_held = steer_axis < -1.0e-6
         self._right_steer_held = steer_axis > 1.0e-6
 
@@ -121,12 +121,12 @@ class ControlStateTracker:
         """Return control-history features passed into observation building."""
 
         return {
-            "left_drift_held": float(self._left_drift_held),
-            "right_drift_held": float(self._right_drift_held),
+            "left_shoulder_held": float(self._left_shoulder_held),
+            "right_shoulder_held": float(self._right_shoulder_held),
             # Normalize against the game's 15-frame double-tap window so the
             # policy can distinguish a fresh tap from an old one.
-            "left_press_age_norm": _drift_press_age_norm(self._left_press_age_frames),
-            "right_press_age_norm": _drift_press_age_norm(self._right_press_age_frames),
+            "left_press_age_norm": _shoulder_press_age_norm(self._left_press_age_frames),
+            "right_press_age_norm": _shoulder_press_age_norm(self._right_press_age_frames),
             "recent_boost_pressure": self._recent_boost_pressure(),
             "steer_left_held": float(self._left_steer_held),
             "steer_right_held": float(self._right_steer_held),
@@ -147,8 +147,8 @@ class ControlStateTracker:
             return (0,)
 
         shoulder_index = _held_shoulder_index(
-            left_held=self._left_drift_held,
-            right_held=self._right_drift_held,
+            left_held=self._left_shoulder_held,
+            right_held=self._right_shoulder_held,
         )
         if shoulder_index == 0:
             return None
@@ -170,8 +170,8 @@ class ControlStateTracker:
             return _replace_shoulder_index(control_state, 0)
 
         current_shoulder_index = _held_shoulder_index(
-            left_held=self._left_drift_held,
-            right_held=self._right_drift_held,
+            left_held=self._left_shoulder_held,
+            right_held=self._right_shoulder_held,
         )
         if current_shoulder_index != 0 and requested_shoulder_index != current_shoulder_index:
             return _replace_shoulder_index(control_state, 0)
@@ -242,7 +242,7 @@ class ControlStateTracker:
         if current_shoulder_index != 0 and current_shoulder_index != previous_shoulder_index:
             self._shoulder_lock_index = current_shoulder_index
             self._shoulder_lock_remaining_frames = max(
-                DRIFT_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
+                SHOULDER_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
                 0,
             )
             return
@@ -263,7 +263,7 @@ class ControlStateTracker:
     ) -> None:
         if previous_shoulder_index != 0 and current_shoulder_index != previous_shoulder_index:
             self._shoulder_cooldown_remaining_frames = max(
-                DRIFT_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
+                SHOULDER_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
                 0,
             )
             return
@@ -285,19 +285,19 @@ def _held_shoulder_index(*, left_held: bool, right_held: bool) -> int:
 
 
 def _shoulder_index_from_mask(joypad_mask: int) -> int:
-    if joypad_mask & DRIFT_LEFT_MASK:
+    if joypad_mask & SHOULDER_LEFT_MASK:
         return 1
-    if joypad_mask & DRIFT_RIGHT_MASK:
+    if joypad_mask & SHOULDER_RIGHT_MASK:
         return 2
     return 0
 
 
 def _replace_shoulder_index(control_state: ControllerState, shoulder_index: int) -> ControllerState:
-    joypad_mask = control_state.joypad_mask & ~(DRIFT_LEFT_MASK | DRIFT_RIGHT_MASK)
+    joypad_mask = control_state.joypad_mask & ~(SHOULDER_LEFT_MASK | SHOULDER_RIGHT_MASK)
     if shoulder_index == 1:
-        joypad_mask |= DRIFT_LEFT_MASK
+        joypad_mask |= SHOULDER_LEFT_MASK
     elif shoulder_index == 2:
-        joypad_mask |= DRIFT_RIGHT_MASK
+        joypad_mask |= SHOULDER_RIGHT_MASK
     return ControllerState(
         joypad_mask=joypad_mask,
         left_stick_x=control_state.left_stick_x,
@@ -315,13 +315,13 @@ def _advance_press_age(
     frames_elapsed: int,
 ) -> int:
     if is_held and not was_held:
-        return min(frames_elapsed, DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
-    return min(previous_age_frames + frames_elapsed, DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
+        return min(frames_elapsed, SHOULDER_DOUBLE_TAP_WINDOW_FRAMES)
+    return min(previous_age_frames + frames_elapsed, SHOULDER_DOUBLE_TAP_WINDOW_FRAMES)
 
 
-def _drift_press_age_norm(frames: int) -> float:
-    clamped_frames = min(max(int(frames), 0), DRIFT_DOUBLE_TAP_WINDOW_FRAMES)
-    return clamped_frames / DRIFT_DOUBLE_TAP_WINDOW_FRAMES
+def _shoulder_press_age_norm(frames: int) -> float:
+    clamped_frames = min(max(int(frames), 0), SHOULDER_DOUBLE_TAP_WINDOW_FRAMES)
+    return clamped_frames / SHOULDER_DOUBLE_TAP_WINDOW_FRAMES
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:

@@ -145,7 +145,7 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz.drive_level == 1
     assert input_section.control_viz.steer_x == 0.5
     assert input_section.control_viz.boost_pressed
-    assert input_section.control_viz.drift_direction == -1
+    assert input_section.control_viz.shoulder_direction == -1
 
 
 def test_input_section_can_visualize_air_brake_control_state() -> None:
@@ -300,7 +300,7 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
     assert input_section.control_viz.drive_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.drive_axis_mode == "accelerate"
-    assert input_section.control_viz.drift_direction == -1
+    assert input_section.control_viz.shoulder_direction == -1
 
 
 def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
@@ -861,8 +861,8 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         "airborne": "0.000",
         "can_boost": "1.000",
         "boost_active": "0.000",
-        "left_drift_held": "0.000",
-        "right_drift_held": "1.000",
+        "left_shoulder_held": "0.000",
+        "right_shoulder_held": "1.000",
         "left_press_age_norm": "1.000",
         "right_press_age_norm": "0.200",
         "recent_boost_pressure": "0.250",

@@ -80,7 +80,7 @@ The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:
 - 3 drive modes: `coast`, `accelerate`, and `air_brake`
 
 The `steer_drive_boost` adapter adds a binary boost head for
-`MultiDiscrete([7, 3, 2])`. The `steer_drive_boost_drift` adapter also adds an
+`MultiDiscrete([7, 3, 2])`. The `steer_drive_boost_shoulder` adapter also adds an
 explicit shoulder-input head for `MultiDiscrete([7, 3, 2, 3])` with
 `off`, `left`, and `right`. Steering bucket counts must be odd so one
 bucket is exactly straight.
@@ -88,16 +88,17 @@ bucket is exactly straight.
 The maskable recurrent hybrid pipeline uses continuous steer/drive/air-brake axes plus
 `hybrid_steer_drive_boost_shoulder_primitive`. Its discrete branch is
 `MultiDiscrete([7, 2])`: shoulder primitive plus boost. Shoulder values
-`0..2` are `off`, `drift_left`, and `drift_right`; values `3..6` are reserved
+`0..2` are `off`, `left`, and `right`; values `3..6` are reserved
 for future side-attack/spin primitives and are masked by default. Accelerate and
 air brake use independent full-range PWM axes, so both buttons can be pulsed at once.
-`env.action.boost_unmask_min_speed_kph` can keep manual boost masked below a
-live speed threshold; boost still also requires the game's `can_boost` flag,
-enough energy, and no already-active boost effect.
-`env.action.drift_unmask_min_speed_kph` can additionally keep the shoulder/drift
+`env.action.boost_unmask_max_speed_kph` can keep manual boost masked when the
+car is already above a live speed cap; boost still also requires the game's
+`can_boost` flag, enough energy, and no already-active boost effect.
+`env.action.shoulder_unmask_min_speed_kph` can additionally keep the shoulder
 branch masked to `off` until live speed reaches that threshold. Set it to `null`
-to disable the speed gate or `0` to allow drift immediately; explicit masks such
-as `env.action.mask.shoulder=[0]` still take precedence and keep drift disabled.
+to disable the speed gate or `0` to allow shoulder input immediately; explicit
+masks such as `env.action.mask.shoulder=[0]` still take precedence and keep it
+disabled.
 
 The current observation pipeline keeps the full game view, aspect-corrects the
 raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,
@@ -142,7 +143,7 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml
 ```
 
 Training uses `MaskablePPO` by default because the env exposes live gameplay
-masks, including boost availability and speed-gated drift constraints.
+masks, including boost availability and speed-gated shoulder constraints.
 
 For recurrent training, install `sb3x` into the same environment and switch the
 config to `train.algorithm=maskable_recurrent_ppo` with
@@ -157,7 +158,7 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_recu
 ```
 
 For hybrid-action PPO, use the feedforward PPO variant with continuous steer and
-drive axes plus a discrete drift branch. The drive axis uses full-range PWM:
+drive axes plus a discrete shoulder branch. The drive axis uses full-range PWM:
 `-1` coasts, `0` pulses half accelerate, and `+1` holds accelerate.
 
 ```bash
@@ -171,7 +172,7 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid_recurr
 ```
 
 For the same hybrid action space with invalid-action masks on the discrete
-drift and boost branches, use:
+shoulder and boost branches, use:
 
 ```bash
 python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid.yaml
@@ -184,7 +185,7 @@ discrete action masks, use:
 python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml
 ```
 
-To start that policy with drift and boost masked off:
+To start that policy with shoulder and boost masked off:
 
 ```bash
 python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml -- '+env.action.mask.shoulder=[0]' '+env.action.mask.boost=[0]'
@@ -199,10 +200,10 @@ python -m rl_fzerox.apps.train --config conf/local/train.local.sac.yaml
 The repo also ships one starter curriculum config:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml curriculum=drift_after_finish
+python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml curriculum=shoulder_after_finish
 ```
 
-That curriculum starts with the shoulder/drift branch masked to `off` only and
+That curriculum starts with the shoulder branch masked to `off` only and
 unlocks `off/left/right` after the agent completes all 3 race laps in one
 episode.
 

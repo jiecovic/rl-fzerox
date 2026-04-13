@@ -86,7 +86,7 @@ class FZeroXEnvEngine:
             ),
             curriculum_config=curriculum_config,
             boost_unmask_max_speed_kph=config.action.boost_unmask_max_speed_kph,
-            drift_unmask_min_speed_kph=config.action.drift_unmask_min_speed_kph,
+            shoulder_unmask_min_speed_kph=config.action.shoulder_unmask_min_speed_kph,
         )
         self._control_state = ControlStateTracker(
             shoulder_slide_mode=config.action.shoulder_slide_mode,
