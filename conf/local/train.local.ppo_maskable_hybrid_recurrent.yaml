@@ -30,11 +30,11 @@ reward:
 train:
   algorithm: maskable_hybrid_recurrent_ppo
   run_name: ppo_maskable_hybrid_recurrent_cnn
-  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0021
+  init_run_dir: local/runs/ppo_maskable_hybrid_recurrent_cnn_0022
   init_artifact: latest
-  ent_coef: 0.001
+  ent_coef: 0.0
   n_steps: 2048
-  batch_size: 512
+  batch_size: 256
   learning_rate: 1.5e-4
 
 policy:
