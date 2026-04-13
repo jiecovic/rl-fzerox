@@ -15,5 +15,6 @@ env:
     name: steer_drive_boost_drift
 
 watch:
-  fps: auto
+  control_fps: auto
+  render_fps: 60
   deterministic_policy: true

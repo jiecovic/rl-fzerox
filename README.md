@@ -59,7 +59,8 @@ env:
   reset_to_race: true
 
 watch:
-  fps: auto
+  control_fps: auto
+  render_fps: 60
 ```
 
 Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` points to the saved race-start baseline used for fast deterministic resets once you create it. The root `seed` is the master seed for Python/env randomness.
@@ -70,7 +71,7 @@ Relative emulator paths in repo configs are resolved relative to the project roo
 
 `env.camera_setting` can pin the in-race camera to `overhead`, `close_behind`, `regular`, or `wide`. The env applies it after reset by tapping the real C-Right input until telemetry reports the requested setting; `null` preserves whatever the loaded baseline already uses.
 
-`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`, and any explicit numeric `watch.fps` is capped to that same maximum.
+`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.control_fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`; use `unlimited` or a higher numeric value for fast-forward watch. `watch.render_fps` caps UI redraws separately so simulation can run faster than the display. The legacy `watch.fps` key still aliases both split settings. Press `+`/`-` or numpad `+`/`-` while watching to adjust the control speed.
 `watch.device` defaults to `cpu`, so policy inference in watch mode does not contend with training on the GPU unless you opt into `cuda` or `auto`.
 
 The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:

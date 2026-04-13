@@ -32,7 +32,12 @@ from rl_fzerox.ui.watch import (
     _preview_frame,
     _window_size,
 )
-from rl_fzerox.ui.watch.app import _update_best_finish_position
+from rl_fzerox.ui.watch.app import (
+    _adjust_control_fps,
+    _resolve_control_fps,
+    _resolve_render_fps,
+    _update_best_finish_position,
+)
 from tests.support.native_objects import make_telemetry
 
 
@@ -53,7 +58,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1204, 800)
+    assert _window_size((592, 444), (84, 116, 12)) == (1204, 840)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -759,6 +764,9 @@ def test_display_section_includes_action_repeat() -> None:
             "native_fps": 60.0,
             "control_fps": 30.0,
             "game_fps": 60.0,
+            "control_fps_target": 120.0,
+            "render_fps": 60.0,
+            "render_fps_target": 60.0,
             "milestones_completed": 1,
             "next_milestone_index": 2,
             "distance_to_next_milestone": 750.0,
@@ -784,6 +792,10 @@ def test_display_section_includes_action_repeat() -> None:
     display_section = next(section for section in columns.right if section.title == "Display")
     repeat_line = next(line for line in display_section.lines if line.label == "Frame skip")
     control_rate_line = next(line for line in display_section.lines if line.label == "Control/Game")
+    control_target_line = next(
+        line for line in display_section.lines if line.label == "Control target"
+    )
+    render_rate_line = next(line for line in display_section.lines if line.label == "Render")
     milestone_line = next(line for line in display_section.lines if line.label == "Milestones")
     next_milestone_line = next(
         line for line in display_section.lines if line.label == "Next milestone"
@@ -791,8 +803,26 @@ def test_display_section_includes_action_repeat() -> None:
 
     assert repeat_line.value == "2"
     assert control_rate_line.value == "30.0 / 60.0"
+    assert control_target_line.value == "120.0"
+    assert render_rate_line.value == "60.0 / 60.0"
     assert milestone_line.value == "1 done / next 2"
     assert next_milestone_line.value == "750.0 to 6,000"
+
+
+def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
+    assert _resolve_control_fps("auto", native_control_fps=30.0) == 30.0
+    assert _resolve_control_fps("unlimited", native_control_fps=30.0) is None
+    assert _resolve_control_fps(120.0, native_control_fps=30.0) == 120.0
+    assert _resolve_render_fps(None, native_fps=60.0) == 60.0
+    assert _resolve_render_fps("auto", native_fps=60.0) == 60.0
+    assert _resolve_render_fps("unlimited", native_fps=60.0) is None
+
+
+def test_watch_control_fps_adjustment_supports_uncapped_mode() -> None:
+    assert _adjust_control_fps(60.0, 1, native_control_fps=60.0) == 75.0
+    assert _adjust_control_fps(60.0, -1, native_control_fps=60.0) == 45.0
+    assert _adjust_control_fps(None, 1, native_control_fps=60.0) is None
+    assert _adjust_control_fps(None, -1, native_control_fps=60.0) == 45.0
 
 
 def test_side_panel_can_show_policy_observation_state_vector() -> None:
