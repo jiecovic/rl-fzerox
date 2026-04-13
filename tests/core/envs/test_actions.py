@@ -14,13 +14,18 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_RIGHT_MASK,
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveDriftActionAdapter,
+    ContinuousSteerDriveShoulderActionAdapter,
     HybridSteerDriveBoostDriftActionAdapter,
+    HybridSteerDriveBoostShoulderActionAdapter,
     HybridSteerDriveBoostShoulderPrimitiveActionAdapter,
     HybridSteerDriveDriftActionAdapter,
+    HybridSteerDriveShoulderActionAdapter,
     SteerDriveActionAdapter,
     SteerDriveBoostActionAdapter,
     SteerDriveBoostDriftActionAdapter,
+    SteerDriveBoostShoulderActionAdapter,
     SteerGasAirBrakeBoostDriftActionAdapter,
+    SteerGasAirBrakeBoostShoulderActionAdapter,
     action_adapter_names,
     build_action_adapter,
 )
@@ -238,7 +243,7 @@ def test_continuous_steer_drive_drift_adapter_decodes_right_drift() -> None:
         ActionConfig(
             name="continuous_steer_drive_drift",
             continuous_drive_deadzone=1.0 / 3.0,
-            continuous_drift_deadzone=1.0 / 3.0,
+            continuous_shoulder_deadzone=1.0 / 3.0,
         )
     )
 
@@ -255,7 +260,7 @@ def test_continuous_steer_drive_drift_adapter_negative_drive_coasts() -> None:
         ActionConfig(
             name="continuous_steer_drive_drift",
             continuous_drive_deadzone=1.0 / 3.0,
-            continuous_drift_deadzone=1.0 / 3.0,
+            continuous_shoulder_deadzone=1.0 / 3.0,
         )
     )
 
@@ -274,7 +279,7 @@ def test_continuous_steer_drive_drift_adapter_pwm_preserves_drift_hold() -> None
             name="continuous_steer_drive_drift",
             continuous_drive_mode="pwm",
             continuous_drive_deadzone=0.0,
-            continuous_drift_deadzone=1.0 / 3.0,
+            continuous_shoulder_deadzone=1.0 / 3.0,
         )
     )
 
@@ -610,6 +615,29 @@ def test_build_action_adapter_supports_boost_only_variant() -> None:
     adapter = build_action_adapter(ActionConfig(name="steer_drive_boost"))
 
     assert isinstance(adapter, SteerDriveBoostActionAdapter)
+
+
+def test_build_action_adapter_supports_current_shoulder_variants() -> None:
+    assert isinstance(
+        build_action_adapter(ActionConfig(name="steer_drive_boost_shoulder")),
+        SteerDriveBoostShoulderActionAdapter,
+    )
+    assert isinstance(
+        build_action_adapter(ActionConfig(name="steer_gas_air_brake_boost_shoulder")),
+        SteerGasAirBrakeBoostShoulderActionAdapter,
+    )
+    assert isinstance(
+        build_action_adapter(ActionConfig(name="continuous_steer_drive_shoulder")),
+        ContinuousSteerDriveShoulderActionAdapter,
+    )
+    assert isinstance(
+        build_action_adapter(ActionConfig(name="hybrid_steer_drive_shoulder")),
+        HybridSteerDriveShoulderActionAdapter,
+    )
+    assert isinstance(
+        build_action_adapter(ActionConfig(name="hybrid_steer_drive_boost_shoulder")),
+        HybridSteerDriveBoostShoulderActionAdapter,
+    )
 
 
 def test_build_action_adapter_supports_steer_gas_air_brake_boost_drift_variant() -> None:

@@ -30,7 +30,10 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_LEFT_MASK,
     DRIFT_RIGHT_MASK,
 )
-from rl_fzerox.core.envs.observations import DRIFT_DOUBLE_TAP_WINDOW_FRAMES, ObservationValue
+from rl_fzerox.core.envs.observations import (
+    SHOULDER_DOUBLE_TAP_WINDOW_FRAMES,
+    ObservationValue,
+)
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
     make_step_status,
@@ -187,8 +190,8 @@ def test_reset_can_return_image_state_observation() -> None:
         "airborne",
         "can_boost",
         "boost_active",
-        "left_drift_held",
-        "right_drift_held",
+        "left_shoulder_held",
+        "right_shoulder_held",
         "left_press_age_norm",
         "right_press_age_norm",
         "recent_boost_pressure",
@@ -477,7 +480,7 @@ def test_step_updates_right_drift_hold_and_press_age_in_image_state_observation(
             0.0,
             1.0,
             1.0,
-            1.0 / DRIFT_DOUBLE_TAP_WINDOW_FRAMES,
+            1.0 / SHOULDER_DOUBLE_TAP_WINDOW_FRAMES,
             0.0,
         ]
     )
@@ -1034,7 +1037,7 @@ def test_env_action_masks_disable_drift_below_speed_threshold() -> None:
         config=EnvConfig(
             action=ActionConfig(
                 name="steer_drive_boost_drift",
-                drift_unmask_min_speed_kph=500.0,
+                shoulder_unmask_min_speed_kph=500.0,
             ),
         ),
     )
@@ -1064,7 +1067,7 @@ def test_env_action_masks_static_shoulder_mask_wins_over_speed_unmask() -> None:
         config=EnvConfig(
             action=ActionConfig(
                 name="steer_drive_boost_drift",
-                drift_unmask_min_speed_kph=500.0,
+                shoulder_unmask_min_speed_kph=500.0,
                 mask=ActionMaskConfig(shoulder=(0,)),
             ),
         ),
@@ -1475,7 +1478,7 @@ def test_env_keeps_drift_speed_mask_without_shoulder_latch() -> None:
             action=ActionConfig(
                 name="steer_drive_boost_drift",
                 shoulder_slide_mode="timer_assist",
-                drift_unmask_min_speed_kph=500.0,
+                shoulder_unmask_min_speed_kph=500.0,
             ),
         ),
     )

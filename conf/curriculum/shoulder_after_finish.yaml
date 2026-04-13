@@ -1,6 +1,3 @@
-# COMPAT SHIM: legacy curriculum group name.
-# New configs should prefer `curriculum=shoulder_after_finish`; keep this file
-# so old commands and saved config references remain loadable.
 # Enable stage-based action masking for training.
 enabled: true
 # Promotion metric uses the mean over the last N completed episodes.
@@ -18,7 +15,7 @@ stages:
     action_mask:
       # Keep shoulder actions disabled until the agent can finish the race.
       shoulder: [0]
-  - name: drift_enabled
+  - name: shoulder_enabled
     action_mask:
       # Re-enable the full shoulder branch after the finish trigger is met.
       shoulder: [0, 1, 2]

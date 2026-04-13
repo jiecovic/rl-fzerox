@@ -23,16 +23,21 @@ from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK, AIR_BRAKE_M
 # - N64 Z -> left slide / left DT input
 # - N64 R -> right slide / right DT input
 BOOST_MASK = joypad_mask(JOYPAD_Y)
-DRIFT_LEFT_MASK = joypad_mask(JOYPAD_L2)
-DRIFT_RIGHT_MASK = joypad_mask(JOYPAD_R)
+SHOULDER_LEFT_MASK = joypad_mask(JOYPAD_L2)
+SHOULDER_RIGHT_MASK = joypad_mask(JOYPAD_R)
+# COMPAT SHIM: legacy "drift" mask names.
+# The controls are the Z/R shoulder lean/slide inputs; keep old exports for
+# historical tests, configs, and checkpoint metadata until those are retired.
+DRIFT_LEFT_MASK = SHOULDER_LEFT_MASK
+DRIFT_RIGHT_MASK = SHOULDER_RIGHT_MASK
 SHOULDER_MASKS = (
     0,
-    DRIFT_LEFT_MASK,
-    DRIFT_RIGHT_MASK,
+    SHOULDER_LEFT_MASK,
+    SHOULDER_RIGHT_MASK,
 )
 
 
-class SteerDriveBoostDriftActionAdapter:
+class SteerDriveBoostShoulderActionAdapter:
     """Map steering, drive-mode, boost, and explicit shoulder inputs."""
 
     def __init__(self, config: ActionConfig) -> None:
@@ -107,7 +112,7 @@ def _parse_action_quad(
 ) -> tuple[int, int, int, int]:
     steer_index, drive_mode_index, boost_index, shoulder_index = parse_discrete_action(
         action,
-        action_label="Steer-drive-boost-drift",
+        action_label="Steer-drive-boost-shoulder",
         dimensions=(
             DiscreteActionDimension("steer", steer_bucket_count),
             DiscreteActionDimension("drive", len(DRIVE_MODES)),
@@ -118,8 +123,8 @@ def _parse_action_quad(
     return steer_index, drive_mode_index, boost_index, shoulder_index
 
 
-class SteerGasAirBrakeBoostDriftActionAdapter:
-    """Map digital steering plus independent gas, air brake, boost, and drift heads."""
+class SteerGasAirBrakeBoostShoulderActionAdapter:
+    """Map digital steering plus independent gas, air brake, boost, and shoulder heads."""
 
     def __init__(self, config: ActionConfig) -> None:
         self._steer_values = steer_values(config.steer_buckets)
@@ -157,7 +162,7 @@ class SteerGasAirBrakeBoostDriftActionAdapter:
         """Translate one policy action into a held controller state."""
 
         steer_index, gas_index, air_brake_index, boost_index, shoulder_index = (
-            _parse_gas_air_brake_boost_drift_action(
+            _parse_gas_air_brake_boost_shoulder_action(
                 action,
                 steer_bucket_count=len(self._steer_values),
             )
@@ -192,14 +197,14 @@ class SteerGasAirBrakeBoostDriftActionAdapter:
         )
 
 
-def _parse_gas_air_brake_boost_drift_action(
+def _parse_gas_air_brake_boost_shoulder_action(
     action: ActionValue,
     *,
     steer_bucket_count: int,
 ) -> tuple[int, int, int, int, int]:
     steer_index, gas_index, air_brake_index, boost_index, shoulder_index = parse_discrete_action(
         action,
-        action_label="Steer-gas-air-brake-boost-drift",
+        action_label="Steer-gas-air-brake-boost-shoulder",
         dimensions=(
             DiscreteActionDimension("steer", steer_bucket_count),
             DiscreteActionDimension("gas", 2),
@@ -209,3 +214,9 @@ def _parse_gas_air_brake_boost_drift_action(
         ),
     )
     return steer_index, gas_index, air_brake_index, boost_index, shoulder_index
+
+
+# COMPAT SHIM: legacy action adapter class names.
+# Earlier public adapter names used "drift" for these Z/R shoulder inputs.
+SteerDriveBoostDriftActionAdapter = SteerDriveBoostShoulderActionAdapter
+SteerGasAirBrakeBoostDriftActionAdapter = SteerGasAirBrakeBoostShoulderActionAdapter

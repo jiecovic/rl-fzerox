@@ -77,20 +77,21 @@ class ActionConfig(BaseModel):
     continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
-    continuous_drift_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
+    continuous_shoulder_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     shoulder_slide_mode: ShoulderSlideMode = DEFAULT_SHOULDER_SLIDE_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
-    drift_unmask_min_speed_kph: NonNegativeFloat | None = None
+    shoulder_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
 
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_action_fields(cls, data: object) -> object:
-        # LEGACY CONFIG COMPATIBILITY:
+        # COMPAT SHIM: legacy action config field names.
         # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
         # boost gate is a max-speed cap: allow boost while slower, mask it when
-        # already fast. The old air-brake booleans were replaced by the explicit
-        # `continuous_air_brake_mode` string. Keep saved manifests loadable here.
+        # already fast. They also used "drift" for the Z/R shoulder inputs and
+        # older air-brake booleans before `continuous_air_brake_mode` existed.
+        # Keep these saved manifests loadable until old checkpoints are retired.
         if not isinstance(data, Mapping):
             return data
         values: dict[str, object] = {str(key): value for key, value in data.items()}
@@ -98,6 +99,14 @@ class ActionConfig(BaseModel):
         legacy_gate = values.pop("boost_unmask_min_speed_kph", missing)
         if legacy_gate is not missing and "boost_unmask_max_speed_kph" not in values:
             values["boost_unmask_max_speed_kph"] = legacy_gate
+
+        legacy_shoulder_deadzone = values.pop("continuous_drift_deadzone", missing)
+        if legacy_shoulder_deadzone is not missing and "continuous_shoulder_deadzone" not in values:
+            values["continuous_shoulder_deadzone"] = legacy_shoulder_deadzone
+
+        legacy_shoulder_speed = values.pop("drift_unmask_min_speed_kph", missing)
+        if legacy_shoulder_speed is not missing and "shoulder_unmask_min_speed_kph" not in values:
+            values["shoulder_unmask_min_speed_kph"] = legacy_shoulder_speed
 
         legacy_air_brake_enabled = values.pop("continuous_air_brake_enabled", missing)
         legacy_disable_on_ground = values.pop(
@@ -208,7 +217,7 @@ class RewardConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_reward_fields(cls, data: object) -> object:
-        # LEGACY CHECKPOINT COMPATIBILITY:
+        # COMPAT SHIM: legacy reward config field names.
         # Run manifests saved before `boost_press_penalty` still contain
         # `reward.boost_redundant_press_penalty`. Watch loads those manifests
         # to reconstruct policy metadata, so reject-free migration must live at
@@ -252,6 +261,9 @@ class WatchConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_fps(cls, data: object) -> object:
+        # COMPAT SHIM: legacy watch FPS field.
+        # `fps` used to control both stepping and rendering; split it into
+        # `control_fps` and `render_fps` while keeping old local configs valid.
         if not isinstance(data, Mapping):
             return data
         values: dict[str, object] = {str(key): value for key, value in data.items()}

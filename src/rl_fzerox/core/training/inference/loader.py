@@ -253,8 +253,9 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if algorithm in SAVED_POLICY_ALGORITHMS:
         return algorithm
     if algorithm in LEGACY_PPO_ALGORITHMS:
-        # Historical runs may have saved `auto` or plain `ppo` before maskable
-        # variants became mandatory; only those explicit values use legacy loading.
+        # COMPAT SHIM: historical runs may have saved `auto` or plain `ppo`
+        # before maskable variants became mandatory; only those explicit values
+        # use legacy loading.
         return TRAIN_ALGORITHM_PPO
     raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
 

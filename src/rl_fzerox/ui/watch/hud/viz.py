@@ -11,8 +11,8 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
     BOOST_MASK,
-    DRIFT_LEFT_MASK,
-    DRIFT_RIGHT_MASK,
+    SHOULDER_LEFT_MASK,
+    SHOULDER_RIGHT_MASK,
     ActionValue,
 )
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
@@ -54,8 +54,12 @@ def _control_viz(
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
         drive_axis_mode=drive_axis_mode,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
-        drift_direction=(
-            -1 if joypad_mask & DRIFT_LEFT_MASK else 1 if joypad_mask & DRIFT_RIGHT_MASK else 0
+        shoulder_direction=(
+            -1
+            if joypad_mask & SHOULDER_LEFT_MASK
+            else 1
+            if joypad_mask & SHOULDER_RIGHT_MASK
+            else 0
         ),
     )
 

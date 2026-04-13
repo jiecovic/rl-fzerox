@@ -16,9 +16,9 @@ train:
 env:
   action:
     # Simple digital-control experiment: left/neutral/right steering plus
-    # independent gas/air-brake buttons. Air brake, boost, and drift stay in
+    # independent gas/air-brake buttons. Air brake, boost, and shoulder stay in
     # the policy shape so they can be unmasked later without starting over.
-    name: steer_gas_air_brake_boost_drift
+    name: steer_gas_air_brake_boost_shoulder
     steer_buckets: 3
     # Masks list allowed action values, not blocked values.
     # Omitted branches keep all values available; here steer=[0,1,2].
@@ -33,7 +33,7 @@ env:
       shoulder: [0]
     # These gates only matter once the explicit boost/shoulder masks above are relaxed.
     boost_unmask_max_speed_kph: 800.0
-    drift_unmask_min_speed_kph: 730.0
+    shoulder_unmask_min_speed_kph: 730.0
   observation:
     # Lightweight recurrent experiment: smallest image preset and no frame stack.
     preset: native_crop_v1

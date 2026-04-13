@@ -16,12 +16,12 @@ env:
     continuous_drive_deadzone: 0.0
     # Keep the 0009 policy shape, but clear air brake whenever telemetry says grounded.
     continuous_air_brake_mode: disable_on_ground
-    # Try vanilla-ish drift semantics: release immediately, then mask re-taps through the dash window.
+    # Try vanilla-ish shoulder semantics: release immediately, then mask re-taps through the dash window.
     shoulder_slide_mode: release_cooldown
     # Keep boost unavailable when already fast; can_boost/energy/active-boost gates still apply.
     boost_unmask_max_speed_kph: 800.0
-    # Keep drift unavailable at low speed, without hard-masking it forever.
-    drift_unmask_min_speed_kph: 1000.0
+    # Keep shoulder input unavailable at low speed, without hard-masking it forever.
+    shoulder_unmask_min_speed_kph: 1000.0
 
 reward:
   # Keep forced full gas, but teach the ignored drive axis to stop asking for coast.
