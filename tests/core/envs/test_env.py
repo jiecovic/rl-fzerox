@@ -369,6 +369,37 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
     assert info["observation_mode"] == "image_state"
 
 
+def test_step_exposes_raw_step_signals_in_info() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, energy=120.0, max_energy=178.0),
+                summary=_step_summary(
+                    max_race_distance=10.0,
+                    energy_loss_total=3.5,
+                    damage_taken_frames=1,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, energy=123.5, max_energy=178.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(name="steer_drive"),
+        ),
+    )
+
+    env.reset(seed=7)
+    _, _, _, _, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert info["energy_loss_total"] == 3.5
+    assert info["damage_taken_frames"] == 1
+
+
 def test_step_updates_recent_boost_pressure_in_image_state_observation() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
@@ -1904,6 +1935,8 @@ def _step_summary(
     frames_run: int = 1,
     reverse_active_frames: int = 0,
     low_speed_frames: int = 0,
+    energy_loss_total: float = 0.0,
+    damage_taken_frames: int = 0,
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     final_frame_index: int = 1,
@@ -1913,7 +1946,8 @@ def _step_summary(
         max_race_distance=max_race_distance,
         reverse_active_frames=reverse_active_frames,
         low_speed_frames=low_speed_frames,
-        energy_loss_total=0.0,
+        energy_loss_total=energy_loss_total,
+        damage_taken_frames=damage_taken_frames,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_labels=entered_state_labels,
         final_frame_index=final_frame_index,

@@ -67,6 +67,12 @@ energy_gain_collision_cooldown_frames: 120
 energy_full_refill_bonus: 0.0
 # Energy: internal-frame cooldown before the full-refill bonus can fire again.
 energy_full_refill_cooldown_frames: 800
+# Damage: fixed penalty for each internal frame where the game reports damage.
+damage_taken_frame_penalty: -0.02
+# Damage: extra per-frame penalty multiplied by the consecutive damage streak.
+damage_taken_streak_ramp_penalty: -0.001
+# Damage: cap the streak multiplier so long wall grinds do not explode rewards.
+damage_taken_streak_cap_frames: 120
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
 airborne_landing_reward: 10.0
@@ -89,16 +95,16 @@ collision_recoil_penalty: -5.0
 spinning_out_penalty: -0.5
 
 # Failure bases: base penalty when the episode ends by crash, retire, or off-track failure.
-terminal_failure_base_penalty: -100.0
+terminal_failure_base_penalty: -25.0
 # Failure bases: base penalty when the episode truncates for being stuck.
-stuck_truncation_base_penalty: -120.0
+stuck_truncation_base_penalty: -30.0
 # Failure bases: base penalty when the episode truncates for driving the wrong way.
-wrong_way_truncation_base_penalty: -120.0
+wrong_way_truncation_base_penalty: -30.0
 # Failure bases: base penalty when the episode truncates for making no new
 # race-distance frontier progress for too long.
-progress_stalled_truncation_base_penalty: -120.0
+progress_stalled_truncation_base_penalty: -30.0
 # Failure bases: base penalty when the episode truncates by hitting max episode steps.
-timeout_truncation_base_penalty: -120.0
+timeout_truncation_base_penalty: -30.0
 
 # Finish placement: larger final placement bonus on actual race finish as
 # `(total_racers - position) * finish_position_scale`.

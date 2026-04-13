@@ -46,6 +46,7 @@ class RaceV2RewardTracker:
         self._energy = EnergyRewardState()
         self._boost_pad_reward_cooldown_frames_remaining = 0
         self._previous_airborne = False
+        self._damage_taken_streak_frames = 0
 
     def reset(
         self,
@@ -66,6 +67,7 @@ class RaceV2RewardTracker:
             self._energy.reset(None)
             self._boost_pad_reward_cooldown_frames_remaining = 0
             self._previous_airborne = False
+            self._damage_taken_streak_frames = 0
             return
         self._awarded_laps_completed = self._race_laps_completed(telemetry)
         self._previous_progress_delta_position = 0.0
@@ -73,6 +75,7 @@ class RaceV2RewardTracker:
         self._energy.reset(telemetry)
         self._boost_pad_reward_cooldown_frames_remaining = 0
         self._previous_airborne = telemetry.player.airborne
+        self._damage_taken_streak_frames = 0
 
     def summary_config(self) -> RewardSummaryConfig:
         """Describe the native aggregation thresholds needed by `race_v2`."""
@@ -94,6 +97,7 @@ class RaceV2RewardTracker:
             self._energy.reset(None)
             self._boost_pad_reward_cooldown_frames_remaining = 0
             self._previous_airborne = False
+            self._damage_taken_streak_frames = 0
             return RewardStep(reward=0.0)
 
         resolved_action_context = action_context or RewardActionContext()
@@ -167,6 +171,11 @@ class RaceV2RewardTracker:
             reward += energy_loss_penalty
             if energy_loss_penalty:
                 breakdown["energy_loss"] = energy_loss_penalty
+
+        damage_taken_penalty = self._damage_taken_penalty(summary)
+        if damage_taken_penalty:
+            reward += damage_taken_penalty
+            breakdown["damage_taken"] = damage_taken_penalty
 
         self._energy.start_gain_cooldown(summary, self._weights)
         if summary.energy_gain_total > 0.0:
@@ -277,6 +286,7 @@ class RaceV2RewardTracker:
             "boost_pad_reward_cooldown_frames_remaining": (
                 self._boost_pad_reward_cooldown_frames_remaining
             ),
+            "damage_taken_streak_frames": self._damage_taken_streak_frames,
             "rewarded_laps_completed": self._awarded_laps_completed,
         }
         if telemetry is None:
@@ -440,6 +450,27 @@ class RaceV2RewardTracker:
         if summary.low_speed_frames <= 0 or extra_scale == 0.0:
             return 0.0
         return summary.low_speed_frames * self._weights.time_penalty_per_frame * extra_scale
+
+    def _damage_taken_penalty(self, summary: StepSummary) -> float:
+        damage_frames = max(int(summary.damage_taken_frames), 0)
+        if damage_frames <= 0:
+            self._damage_taken_streak_frames = 0
+            return 0.0
+
+        previous_streak = self._damage_taken_streak_frames
+        cap = max(int(self._weights.damage_taken_streak_cap_frames), 0)
+        self._damage_taken_streak_frames += damage_frames
+        if cap > 0:
+            self._damage_taken_streak_frames = min(self._damage_taken_streak_frames, cap)
+        penalty = damage_frames * self._weights.damage_taken_frame_penalty
+        if self._weights.damage_taken_streak_ramp_penalty == 0.0:
+            return penalty
+
+        streak_sum = 0
+        for frame_offset in range(1, damage_frames + 1):
+            streak = previous_streak + frame_offset
+            streak_sum += min(streak, cap) if cap > 0 else streak
+        return penalty + (streak_sum * self._weights.damage_taken_streak_ramp_penalty)
 
     def _advance_boost_pad_reward_cooldown(self, frames_run: int) -> None:
         self._boost_pad_reward_cooldown_frames_remaining = max(

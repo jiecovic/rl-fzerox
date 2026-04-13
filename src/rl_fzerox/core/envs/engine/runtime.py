@@ -363,6 +363,8 @@ class FZeroXEnvEngine:
         truncated = step_result.status.truncated
         info["step_reward"] = reward
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
+        info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
+        info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count

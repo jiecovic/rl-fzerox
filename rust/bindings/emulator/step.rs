@@ -31,6 +31,7 @@ impl PyStepSummary {
         low_speed_frames=0,
         energy_loss_total=0.0,
         energy_gain_total=0.0,
+        damage_taken_frames=0,
         consecutive_low_speed_frames=0,
         entered_state_flags=0,
         final_frame_index=0,
@@ -43,6 +44,7 @@ impl PyStepSummary {
         low_speed_frames: usize,
         energy_loss_total: f32,
         energy_gain_total: f32,
+        damage_taken_frames: usize,
         consecutive_low_speed_frames: usize,
         entered_state_flags: u32,
         final_frame_index: usize,
@@ -55,6 +57,7 @@ impl PyStepSummary {
                 low_speed_frames,
                 energy_loss_total,
                 energy_gain_total,
+                damage_taken_frames,
                 consecutive_low_speed_frames,
                 entered_state_flags,
                 final_frame_index,
@@ -90,6 +93,11 @@ impl PyStepSummary {
     #[getter]
     fn energy_gain_total(&self) -> f32 {
         self.inner.energy_gain_total
+    }
+
+    #[getter]
+    fn damage_taken_frames(&self) -> usize {
+        self.inner.damage_taken_frames
     }
 
     #[getter]
@@ -155,6 +163,7 @@ impl PyStepSummary {
         dict.set_item("low_speed_frames", self.low_speed_frames())?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
+        dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
         dict.set_item(
             "consecutive_low_speed_frames",
             self.consecutive_low_speed_frames(),

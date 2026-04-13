@@ -28,6 +28,7 @@ fn step_summary_defaults_to_empty_step_accumulators() {
     assert_eq!(summary.low_speed_frames, 0);
     assert_eq!(summary.consecutive_low_speed_frames, 0);
     assert_eq!(summary.energy_gain_total, 0.0);
+    assert_eq!(summary.damage_taken_frames, 0);
     assert_eq!(summary.entered_state_flags, 0);
     assert_eq!(summary.final_frame_index, 0);
 }

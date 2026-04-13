@@ -68,6 +68,9 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "energy_gain_collision_cooldown_frames": 17,
         "energy_full_refill_bonus": 1.25,
         "energy_full_refill_cooldown_frames": 23,
+        "damage_taken_frame_penalty": -0.02,
+        "damage_taken_streak_ramp_penalty": -0.001,
+        "damage_taken_streak_cap_frames": 120,
         "airborne_landing_reward": 0.42,
         "grounded_air_brake_penalty": -0.014,
         "drive_axis_negative_penalty_scale": -0.015,
@@ -455,6 +458,51 @@ def test_race_v2_energy_gain_stays_net_negative_against_equal_loss() -> None:
         "energy_loss": -0.2,
         "energy_gain": 0.08,
     }
+
+
+def test_race_v2_penalizes_damage_taken_with_streak_ramp() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=-0.02,
+            damage_taken_streak_ramp_penalty=-0.001,
+            damage_taken_streak_cap_frames=120,
+            bootstrap_progress_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=100.0, damage_taken_frames=2),
+        _status(step_count=2),
+        _telemetry(race_distance=100.0),
+    )
+    second = tracker.step_summary(
+        _summary(max_race_distance=100.0, damage_taken_frames=1),
+        _status(step_count=3),
+        _telemetry(race_distance=100.0),
+    )
+    reset_step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=4),
+        _telemetry(race_distance=100.0),
+    )
+    reset_info = tracker.info(_telemetry(race_distance=100.0))
+    after_reset = tracker.step_summary(
+        _summary(max_race_distance=100.0, damage_taken_frames=1),
+        _status(step_count=5),
+        _telemetry(race_distance=100.0),
+    )
+
+    assert first.reward == pytest.approx(-0.043)
+    assert first.breakdown == {"damage_taken": pytest.approx(-0.043)}
+    assert second.reward == pytest.approx(-0.023)
+    assert second.breakdown == {"damage_taken": pytest.approx(-0.023)}
+    assert reset_step.reward == 0.0
+    assert reset_step.breakdown == {}
+    assert reset_info["damage_taken_streak_frames"] == 0
+    assert after_reset.reward == pytest.approx(-0.021)
+    assert after_reset.breakdown == {"damage_taken": pytest.approx(-0.021)}
 
 
 def test_race_v2_suppresses_energy_gain_after_collision_recoil() -> None:
@@ -1338,6 +1386,7 @@ def _summary(
     low_speed_frames: int = 0,
     energy_loss_total: float = 0.0,
     energy_gain_total: float = 0.0,
+    damage_taken_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
 ) -> StepSummary:
     return make_step_summary(
@@ -1347,6 +1396,7 @@ def _summary(
         low_speed_frames=low_speed_frames,
         energy_loss_total=energy_loss_total,
         energy_gain_total=energy_gain_total,
+        damage_taken_frames=damage_taken_frames,
         entered_state_labels=entered_state_labels,
         final_frame_index=frames_run,
     )

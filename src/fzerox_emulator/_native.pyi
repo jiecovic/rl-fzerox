@@ -131,6 +131,7 @@ class StepSummary:
         low_speed_frames: int = 0,
         energy_loss_total: float = 0.0,
         energy_gain_total: float = 0.0,
+        damage_taken_frames: int = 0,
         consecutive_low_speed_frames: int = 0,
         entered_state_flags: int = 0,
         final_frame_index: int = 0,
@@ -147,6 +148,8 @@ class StepSummary:
     def energy_loss_total(self) -> float: ...
     @property
     def energy_gain_total(self) -> float: ...
+    @property
+    def damage_taken_frames(self) -> int: ...
     @property
     def consecutive_low_speed_frames(self) -> int: ...
     @property
