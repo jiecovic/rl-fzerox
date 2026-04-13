@@ -35,14 +35,14 @@ bootstrap_position_multiplier_scale: 0.25
 bootstrap_lap_count: 3
 
 # Lap rewards: one-time bonus for completing lap 1.
-lap_1_completion_bonus: 20.0
+lap_1_completion_bonus: 10.0
 # Lap rewards: one-time bonus for completing lap 2.
-lap_2_completion_bonus: 35.0
+lap_2_completion_bonus: 15.0
 # Lap rewards: one-time bonus for completing the race's final lap.
-final_lap_completion_bonus: 60.0
+final_lap_completion_bonus: 25.0
 # Lap rewards: small placement bonus scale paid at each completed lap as
 # `(total_racers - position) * lap_position_scale`.
-lap_position_scale: 1.05
+lap_position_scale: 0.25
 
 # Failure shaping: extra penalty per remaining internal emulator frame on
 # death or truncation.
@@ -108,4 +108,4 @@ timeout_truncation_base_penalty: -30.0
 
 # Finish placement: larger final placement bonus on actual race finish as
 # `(total_racers - position) * finish_position_scale`.
-finish_position_scale: 4.0
+finish_position_scale: 1.0
