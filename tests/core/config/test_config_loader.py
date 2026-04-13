@@ -102,6 +102,8 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.env.terminate_on_energy_depleted is False
     assert config.watch.episodes == 2
     assert config.watch.fps == 30
+    assert config.watch.control_fps == 30
+    assert config.watch.render_fps == 30
     assert config.watch.deterministic_policy is False
     assert config.watch.device == "cuda"
 
@@ -201,6 +203,8 @@ def test_load_watch_app_config_accepts_auto_watch_fps(tmp_path: Path) -> None:
     config = load_watch_app_config(config_path)
 
     assert config.watch.fps == "auto"
+    assert config.watch.control_fps == "auto"
+    assert config.watch.render_fps == "auto"
 
 
 def test_load_watch_app_config_allows_missing_baseline_state_path(

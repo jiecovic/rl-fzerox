@@ -107,6 +107,8 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.reward.milestone_bonus == 9.0
     assert merged_watch_config.watch.policy_run_dir == run_paths.run_dir
     assert merged_watch_config.watch.fps == 30.0
+    assert merged_watch_config.watch.control_fps == 30.0
+    assert merged_watch_config.watch.render_fps == 30.0
 
 
 def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(

@@ -131,6 +131,25 @@ def _format_control_game_rate(info: dict[str, object]) -> str:
     return f"{_float_info(info, 'control_fps'):.1f} / {_float_info(info, 'game_fps'):.1f}"
 
 
+def _format_render_rate(info: dict[str, object]) -> str:
+    return (
+        f"{_float_info(info, 'render_fps'):.1f} / {_format_rate_target(info, 'render_fps_target')}"
+    )
+
+
+def _format_control_target(info: dict[str, object]) -> str:
+    return _format_rate_target(info, "control_fps_target")
+
+
+def _format_rate_target(info: dict[str, object], key: str) -> str:
+    value = info.get(key)
+    if value == "unlimited":
+        return "unlimited"
+    if isinstance(value, int | float):
+        return f"{float(value):.1f}"
+    return "-"
+
+
 def _float_info(info: dict[str, object], key: str) -> float:
     value = info.get(key)
     if isinstance(value, int | float):

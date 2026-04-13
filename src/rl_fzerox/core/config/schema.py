@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeAlias
 
 from pydantic import (
     BaseModel,
@@ -30,6 +30,8 @@ from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_SAC,
     TrainAlgorithmName,
 )
+
+WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
 
 
 class ActionMaskConfig(BaseModel):
@@ -239,11 +241,33 @@ class WatchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     episodes: PositiveInt | None = None
-    fps: PositiveFloat | Literal["auto"] | None = "auto"
+    fps: WatchFpsSetting | None = None
+    control_fps: WatchFpsSetting | None = None
+    render_fps: WatchFpsSetting | None = None
     deterministic_policy: bool = True
     device: Literal["auto", "cpu", "cuda"] = "cpu"
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_fps(cls, data: object) -> object:
+        if not isinstance(data, Mapping):
+            return data
+        values: dict[str, object] = {str(key): value for key, value in data.items()}
+        legacy_fps = values.get("fps")
+        if legacy_fps is not None:
+            values.setdefault("control_fps", legacy_fps)
+            values.setdefault("render_fps", legacy_fps)
+        return values
+
+    @model_validator(mode="after")
+    def _default_split_fps(self) -> WatchConfig:
+        if self.control_fps is None:
+            self.control_fps = "auto"
+        if self.render_fps is None:
+            self.render_fps = 60.0
+        return self
 
 
 class NetArchConfig(BaseModel):

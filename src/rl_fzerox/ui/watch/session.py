@@ -111,6 +111,9 @@ def _with_viewer_fps(
     last_draw_time: float | None,
     current_viewer_fps: float,
     action_repeat: int,
+    current_control_fps: float | None = None,
+    target_control_fps: float | None = None,
+    target_render_fps: float | None = None,
 ) -> tuple[dict[str, object], float, float]:
     now = time.perf_counter()
     if last_draw_time is None:
@@ -125,6 +128,12 @@ def _with_viewer_fps(
         )
     draw_info = dict(info)
     draw_info["viewer_fps"] = viewer_fps
-    draw_info["control_fps"] = viewer_fps
-    draw_info["game_fps"] = viewer_fps * float(action_repeat)
+    draw_info["render_fps"] = viewer_fps
+    measured_control_fps = viewer_fps if current_control_fps is None else current_control_fps
+    draw_info["control_fps"] = measured_control_fps
+    draw_info["game_fps"] = measured_control_fps * float(action_repeat)
+    draw_info["control_fps_target"] = (
+        "unlimited" if target_control_fps is None else target_control_fps
+    )
+    draw_info["render_fps_target"] = "unlimited" if target_render_fps is None else target_render_fps
     return draw_info, now, viewer_fps

@@ -254,6 +254,8 @@ def test_watch_cli_overrides_apply_after_run_manifest(
     assert config.env.action_repeat == 3
     assert config.env.camera_setting == "close_behind"
     assert config.watch.fps == 15.0
+    assert config.watch.control_fps == 15.0
+    assert config.watch.render_fps == 15.0
     assert config.watch.policy_run_dir == run_dir.resolve()
 
 

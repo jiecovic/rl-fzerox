@@ -40,6 +40,11 @@ env:
     frame_stack: 4
 
 watch:
-  fps: auto
+  # Env/policy step rate. `auto` means native_fps / action_repeat; use
+  # `unlimited` or a number above native FPS for fast-forward watch.
+  control_fps: auto
+  # UI redraw cap. 60 is a conservative cross-platform default; control speed
+  # can still be much faster and will render snapshots at this cadence.
+  render_fps: 60
   deterministic_policy: true
   device: cpu

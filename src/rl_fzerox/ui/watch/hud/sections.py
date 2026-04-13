@@ -9,6 +9,7 @@ from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.hud.format import (
     _float_info,
     _format_control_game_rate,
+    _format_control_target,
     _format_distance,
     _format_episode_step,
     _format_mode_name,
@@ -18,6 +19,7 @@ from rl_fzerox.ui.watch.hud.format import (
     _format_race_time_ms,
     _format_reload_age,
     _format_reload_error,
+    _format_render_rate,
     _format_reverse_counter,
     _format_stuck_counter,
     _int_info,
@@ -228,6 +230,16 @@ def _build_panel_columns(
                     _panel_line(
                         "Control/Game",
                         _format_control_game_rate(info),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Control target",
+                        _format_control_target(info),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Render",
+                        _format_render_rate(info),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
