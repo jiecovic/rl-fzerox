@@ -8,10 +8,10 @@ train:
   run_name: ppo_discrete_full_gas_recurrent_cnn
   init_run_dir: null
   init_artifact: latest
-  ent_coef: 0.02
+  ent_coef: 0.005
   n_steps: 2048
   batch_size: 512
-  learning_rate: 1.5e-4
+  learning_rate: 2.0e-4
 
 env:
   action:
@@ -35,14 +35,23 @@ env:
     boost_unmask_max_speed_kph: 800.0
     drift_unmask_min_speed_kph: 730.0
   observation:
+    # Lightweight recurrent experiment: smallest image preset and no frame stack.
+    preset: native_crop_v1
+    frame_stack: 1
     # Adds current left/right steer flags plus signed recent steer pressure.
     state_profile: steer_history
   boost_min_energy_fraction: 0.50
 
 policy:
+  extractor:
+    features_dim: 512
+    state_features_dim: 32
   recurrent:
     enabled: true
-    hidden_size: 512
+    hidden_size: 256
     n_lstm_layers: 1
     shared_lstm: false
     enable_critic_lstm: true
+  net_arch:
+    pi: [256, 64]
+    vf: [256]
