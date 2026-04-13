@@ -83,14 +83,14 @@ grounded_air_brake_penalty: -0.001
 # the old PWM full-gas threshold (`drive >= 0`).
 drive_axis_negative_penalty_scale: 0.0
 # Boost pads: small reward when entering a dash-pad boost state.
-boost_pad_reward: 6.00
+boost_pad_reward: 10.00
 # Boost pads: internal-frame cooldown before the boost-pad reward can fire again.
 boost_pad_reward_cooldown_frames: 120
 # Boost discipline: small fixed penalty per env step when manual boost is requested.
 boost_press_penalty: 0.5
 
 # Minor events: entry-only penalty when the machine enters collision recoil.
-collision_recoil_penalty: -5.0
+collision_recoil_penalty: -1.0
 # Minor events: entry-only penalty when the machine enters a spin-out.
 spinning_out_penalty: -0.5
 
