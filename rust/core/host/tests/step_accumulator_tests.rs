@@ -7,11 +7,11 @@ use crate::core::telemetry::StepTelemetrySample;
 
 #[test]
 fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
-    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 40);
 
-    accumulator.observe(&telemetry(130.0, 92.0, 120.0, 0b101, 0), 41);
-    accumulator.observe(&telemetry(140.0, 88.0, 45.0, 0b111, 12), 42);
+    accumulator.observe(&telemetry(130.0, 92.0, 120.0, 0b101, 0, 1), 41);
+    accumulator.observe(&telemetry(140.0, 88.0, 45.0, 0b111, 12, 0), 42);
 
     let summary = accumulator.finish();
 
@@ -21,6 +21,7 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
     assert_eq!(summary.low_speed_frames, 1);
     assert_eq!(summary.energy_loss_total, 12.0);
     assert_eq!(summary.energy_gain_total, 0.0);
+    assert_eq!(summary.damage_taken_frames, 1);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
     assert_eq!(summary.entered_state_flags, 0b110);
     assert_eq!(summary.final_frame_index, 42);
@@ -28,12 +29,12 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
 
 #[test]
 fn step_accumulator_counts_reverse_active_frames_when_reverse_timer_runs() {
-    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 5);
 
-    accumulator.observe(&telemetry(90.0, 100.0, 30.0, 0b001, 99), 6);
-    accumulator.observe(&telemetry(95.0, 100.0, 80.0, 0b001, 0), 7);
-    accumulator.observe(&telemetry(93.0, 100.0, 40.0, 0b001, 100), 8);
+    accumulator.observe(&telemetry(90.0, 100.0, 30.0, 0b001, 99, 0), 6);
+    accumulator.observe(&telemetry(95.0, 100.0, 80.0, 0b001, 0, 0), 7);
+    accumulator.observe(&telemetry(93.0, 100.0, 40.0, 0b001, 100, 0), 8);
 
     let summary = accumulator.finish();
 
@@ -47,11 +48,11 @@ fn step_accumulator_counts_reverse_active_frames_when_reverse_timer_runs() {
 
 #[test]
 fn step_accumulator_tracks_low_speed_streak_and_energy_changes() {
-    let initial = telemetry(100.0, 100.0, 30.0, 0b001, 5);
+    let initial = telemetry(100.0, 100.0, 30.0, 0b001, 5, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 11);
 
-    accumulator.observe(&telemetry(99.0, 110.0, 30.0, 0b001, 6), 12);
-    accumulator.observe(&telemetry(98.0, 108.0, 20.0, 0b001, 7), 13);
+    accumulator.observe(&telemetry(99.0, 110.0, 30.0, 0b001, 6, 0), 12);
+    accumulator.observe(&telemetry(98.0, 108.0, 20.0, 0b001, 7, 0), 13);
 
     let summary = accumulator.finish();
 
@@ -67,11 +68,11 @@ fn step_accumulator_tracks_low_speed_streak_and_energy_changes() {
 
 #[test]
 fn step_accumulator_tracks_energy_gain_separately_from_loss() {
-    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
-    accumulator.observe(&telemetry(102.0, 96.0, 120.0, 0b001, 0), 21);
-    accumulator.observe(&telemetry(104.0, 101.5, 120.0, 0b001, 0), 22);
+    accumulator.observe(&telemetry(102.0, 96.0, 120.0, 0b001, 0, 0), 21);
+    accumulator.observe(&telemetry(104.0, 101.5, 120.0, 0b001, 0, 0), 22);
 
     let summary = accumulator.finish();
 
@@ -80,11 +81,26 @@ fn step_accumulator_tracks_energy_gain_separately_from_loss() {
 }
 
 #[test]
+fn step_accumulator_counts_received_damage_state_as_damage_taken() {
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(&telemetry(102.0, 100.0, 120.0, 1 << 17, 0, 0), 21);
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.damage_taken_frames, 1);
+}
+
+#[test]
 fn step_accumulator_tracks_summary_needed_for_stop_state_derivation() {
-    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 99);
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 99, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(10, 2), 99);
 
-    accumulator.observe(&telemetry(99.0, 100.0, 30.0, (1 << 25) | 0b001, 100), 100);
+    accumulator.observe(
+        &telemetry(99.0, 100.0, 30.0, (1 << 25) | 0b001, 100, 0),
+        100,
+    );
 
     let summary = accumulator.finish();
 
@@ -119,6 +135,7 @@ fn telemetry(
     speed_kph: f32,
     state_flags: u32,
     reverse_timer: i32,
+    damage_rumble_counter: i32,
 ) -> StepTelemetrySample {
     StepTelemetrySample {
         state_flags,
@@ -126,5 +143,6 @@ fn telemetry(
         energy,
         race_distance,
         reverse_timer,
+        damage_rumble_counter,
     }
 }

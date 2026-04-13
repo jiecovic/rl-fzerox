@@ -161,6 +161,8 @@ _FLAG_DISPLAY_LABELS = {
     "low_speed_detected": "slow",
     "can_boost": "can boost",
     "boost_active": "boost",
+    "energy_loss": "energy loss",
+    "damage_taken": "damage taken",
     "airborne": "airborne",
     "collision_recoil": "recoil",
     "spinning_out": "spin",
@@ -174,6 +176,7 @@ _FLAG_DISPLAY_LABELS = {
 _FLAG_ROWS = (
     ("reverse_detected", "low_speed_detected"),
     ("can_boost", "boost_active", "airborne"),
+    ("energy_loss", "damage_taken"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
     ("energy_depleted", "retired", "finished"),
 )
@@ -186,6 +189,8 @@ def _flag_viz(
     reverse_detected: bool,
     low_speed_detected: bool,
     energy_depleted: bool,
+    energy_loss_detected: bool = False,
+    damage_taken_detected: bool = False,
 ) -> FlagViz:
     active_flags = set(state_labels)
     if boost_active:
@@ -196,6 +201,10 @@ def _flag_viz(
         active_flags.add("low_speed_detected")
     if energy_depleted:
         active_flags.add("energy_depleted")
+    if energy_loss_detected:
+        active_flags.add("energy_loss")
+    if damage_taken_detected:
+        active_flags.add("damage_taken")
     known_flags = {flag_label for row in _FLAG_ROWS for flag_label in row}
     active_flags.intersection_update(known_flags)
     return FlagViz(

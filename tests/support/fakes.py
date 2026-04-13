@@ -266,6 +266,7 @@ class SyntheticBackend:
                 low_speed_frames=0,
                 energy_loss_total=0.0,
                 energy_gain_total=0.0,
+                damage_taken_frames=0,
                 consecutive_low_speed_frames=0,
                 entered_state_flags=0,
                 final_frame_index=self._state.frame_index,

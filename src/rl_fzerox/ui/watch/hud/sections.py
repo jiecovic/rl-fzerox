@@ -411,6 +411,8 @@ def _game_section(
             reverse_detected=telemetry.player.reverse_timer > 0,
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
             energy_depleted=info.get("termination_reason") == "energy_depleted",
+            energy_loss_detected=_float_info(info, "energy_loss_total") > 0.0,
+            damage_taken_detected=_int_info(info, "damage_taken_frames") > 0,
         ),
     )
 

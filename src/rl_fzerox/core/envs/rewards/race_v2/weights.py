@@ -34,6 +34,9 @@ class RaceV2RewardWeights:
     energy_gain_collision_cooldown_frames: int = 0
     energy_full_refill_bonus: float = 0.0
     energy_full_refill_cooldown_frames: int = 0
+    damage_taken_frame_penalty: float = 0.0
+    damage_taken_streak_ramp_penalty: float = 0.0
+    damage_taken_streak_cap_frames: int = 0
     airborne_landing_reward: float = 0.0
     grounded_air_brake_penalty: float = 0.0
     drive_axis_negative_penalty_scale: float = 0.0

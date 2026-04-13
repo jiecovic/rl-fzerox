@@ -51,6 +51,9 @@ impl StepAccumulator {
         if telemetry.reverse_timer > 0 {
             self.summary.reverse_active_frames += 1;
         }
+        if telemetry.damage_taken() {
+            self.summary.damage_taken_frames += 1;
+        }
 
         let energy_delta = telemetry.energy - self.previous_energy;
         if energy_delta < -self.energy_loss_epsilon {

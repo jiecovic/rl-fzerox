@@ -19,7 +19,7 @@ from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
     DRIFT_LEFT_MASK,
 )
-from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES
+from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
 from rl_fzerox.ui.watch import (
     _build_panel_columns,
     _create_fonts,
@@ -53,7 +53,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1204, 720)
+    assert _window_size((592, 444), (84, 116, 12)) == (1204, 800)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -493,7 +493,12 @@ def test_session_section_shows_episode_step_counter() -> None:
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
     columns = _build_panel_columns(
         episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "energy_loss_total": 0.25,
+            "damage_taken_frames": 1,
+        },
         reset_info={},
         episode_reward=0.0,
         paused=False,
@@ -516,11 +521,13 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
 
     game_section = columns.right[0]
     assert game_section.flag_viz is not None
-    assert len(game_section.flag_viz.rows) == 4
+    assert len(game_section.flag_viz.rows) == 5
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
-    assert {"boost", "recoil", "reverse", "slow"}.issubset(active_labels)
+    assert {"boost", "energy loss", "damage taken", "recoil", "reverse", "slow"}.issubset(
+        active_labels
+    )
     assert "dash" not in active_labels
 
 
@@ -830,6 +837,48 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         "right_press_age_norm": "0.200",
         "recent_boost_pressure": "0.250",
     }
+
+
+def test_side_panel_fits_steer_history_observation_state_vector() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        feature_names = state_feature_names("steer_history")
+        observation_shape = (84, 116, 3)
+        columns = _build_panel_columns(
+            episode=0,
+            info={"frame_index": 0, "native_fps": 60.0, "display_aspect_ratio": 4.0 / 3.0},
+            reset_info={},
+            episode_reward=0.0,
+            paused=False,
+            control_state=ControllerState(),
+            policy_label="ppo_discrete_full_gas_recurrent_cnn_0001",
+            policy_curriculum_stage=None,
+            policy_action=np.array([1, 1, 0, 0, 0], dtype=np.int64),
+            policy_reload_age_seconds=0.0,
+            policy_reload_error=None,
+            action_repeat=1,
+            stuck_step_limit=240,
+            stuck_min_speed_kph=60.0,
+            game_display_size=(592, 444),
+            observation_shape=observation_shape,
+            observation_state=np.zeros((len(feature_names),), dtype=np.float32),
+            observation_state_feature_names=feature_names,
+            telemetry=_sample_telemetry(),
+        )
+
+        assert (
+            _panel_content_height(
+                fonts,
+                columns,
+                observation_shape=observation_shape,
+            )
+            <= _window_size((592, 444), observation_shape)[1]
+        )
+    finally:
+        pygame.quit()
 
 
 def test_session_section_includes_stuck_counter() -> None:

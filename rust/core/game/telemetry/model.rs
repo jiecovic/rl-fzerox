@@ -6,6 +6,7 @@ const FLAG_FALLING_OFF_TRACK: u32 = 1 << 19;
 const FLAG_FINISHED: u32 = 1 << 25;
 const FLAG_CRASHED: u32 = 1 << 27;
 const FLAG_ACTIVE: u32 = 1 << 30;
+const FLAG_RECEIVED_DAMAGE: u32 = 1 << 17;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct StepTelemetrySample {
@@ -14,6 +15,13 @@ pub(crate) struct StepTelemetrySample {
     pub energy: f32,
     pub race_distance: f32,
     pub reverse_timer: i32,
+    pub damage_rumble_counter: i32,
+}
+
+impl StepTelemetrySample {
+    pub(crate) fn damage_taken(&self) -> bool {
+        (self.state_flags & FLAG_RECEIVED_DAMAGE) != 0 || self.damage_rumble_counter > 0
+    }
 }
 
 pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'static str> {

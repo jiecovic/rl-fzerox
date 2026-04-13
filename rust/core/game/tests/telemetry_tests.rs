@@ -1,6 +1,6 @@
 // Covers decoding a representative player-one race telemetry snapshot.
 use super::layout::{CAMERA, GLOBALS, RACER, TELEMETRY_CONFIG};
-use super::read_snapshot;
+use super::{read_snapshot, read_step_sample};
 
 #[test]
 fn read_snapshot_decodes_player_one_race_values() {
@@ -65,4 +65,22 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.laps_completed, 1);
     assert_eq!(telemetry.player.position, 3);
     assert_eq!(telemetry.player.state_flags, (1_u32 << 20) | (1_u32 << 30));
+}
+
+#[test]
+fn read_step_sample_decodes_player_damage_rumble_counter() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let player_base = GLOBALS.racers;
+    memory[player_base + RACER.speed..player_base + RACER.speed + 4]
+        .copy_from_slice(&123.5_f32.to_le_bytes());
+    memory[player_base + RACER.energy..player_base + RACER.energy + 4]
+        .copy_from_slice(&92.25_f32.to_le_bytes());
+    memory[player_base + RACER.race_distance..player_base + RACER.race_distance + 4]
+        .copy_from_slice(&12_345.5_f32.to_le_bytes());
+    memory[GLOBALS.damage_rumble_counters..GLOBALS.damage_rumble_counters + 4]
+        .copy_from_slice(&1_i32.to_le_bytes());
+
+    let telemetry = read_step_sample(&memory).expect("step telemetry should decode");
+
+    assert_eq!(telemetry.damage_rumble_counter, 1);
 }

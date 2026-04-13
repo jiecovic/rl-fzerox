@@ -63,6 +63,7 @@ pub(crate) fn read_step_sample(system_ram: &[u8]) -> Result<StepTelemetrySample,
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
         reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
+        damage_rumble_counter: read_i32(system_ram, player_damage_rumble_counter_offset())?,
     })
 }
 
@@ -94,6 +95,10 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
 
 fn player_reverse_timer_offset() -> usize {
     GLOBALS.reverse_timers + (TELEMETRY_CONFIG.player_racer_index * size_of::<i32>())
+}
+
+fn player_damage_rumble_counter_offset() -> usize {
+    GLOBALS.damage_rumble_counters + (TELEMETRY_CONFIG.player_racer_index * size_of::<i32>())
 }
 
 fn player_camera_setting_offset() -> usize {
