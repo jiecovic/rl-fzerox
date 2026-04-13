@@ -8,9 +8,10 @@ train:
   run_name: ppo_discrete_full_gas_recurrent_cnn
   init_run_dir: null
   init_artifact: latest
-  ent_coef: 0.005
+  ent_coef: 0.0
   n_steps: 2048
   batch_size: 512
+  gamma: 0.993
   learning_rate: 2.0e-4
 
 env:

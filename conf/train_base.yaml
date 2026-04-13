@@ -15,7 +15,7 @@ env:
   max_episode_steps: 50000
   stuck_step_limit: 240
   stuck_min_speed_kph: 60.0
-  wrong_way_timer_limit: 120
+  wrong_way_timer_limit: 240
   # Truncate if this many internal frames pass without beating the best race-distance frontier.
   progress_frontier_stall_limit_frames: 400
   # Require at least this much new race-distance to reset the frontier stall timer.
@@ -32,7 +32,7 @@ env:
   reset_to_race: true
   action:
     name: steer_drive_boost_shoulder
-    steer_buckets: 9
+    steer_buckets: 5
     # Shoulder slide/lean semantics:
     # - minimum_hold: force a pressed shoulder to stay held through the tap window.
     # - release_cooldown: release immediately, then mask re-presses through the tap window.
