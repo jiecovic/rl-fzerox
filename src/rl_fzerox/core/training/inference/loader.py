@@ -11,15 +11,11 @@ import numpy as np
 
 from rl_fzerox.core.domain.training_algorithms import (
     FULL_MODEL_POLICY_ALGORITHMS,
-    LEGACY_PPO_ALGORITHMS,
     SAVED_POLICY_ALGORITHMS,
-    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
     TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_PPO,
     TRAIN_ALGORITHM_SAC,
 )
 from rl_fzerox.core.envs.actions import ActionValue
@@ -148,53 +144,6 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):
-    if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
-        try:
-            from sb3x.ppo_mask_hybrid_action import CnnPolicy, MultiInputPolicy
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading maskable hybrid action PPO checkpoints requires sb3x "
-                "in the active environment."
-            ) from exc
-
-        return CnnPolicy, MultiInputPolicy
-    if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
-        try:
-            from sb3x.ppo_hybrid_action import CnnPolicy, MultiInputPolicy
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading hybrid action PPO checkpoints requires sb3x in the active environment."
-            ) from exc
-
-        return CnnPolicy, MultiInputPolicy
-    if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
-        try:
-            from sb3x.ppo_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading hybrid recurrent PPO checkpoints requires sb3x in the active environment."
-            ) from exc
-
-        return CnnLstmPolicy, MultiInputLstmPolicy
-    if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
-        try:
-            from sb3x.ppo_mask_hybrid_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading maskable hybrid recurrent PPO checkpoints requires sb3x "
-                "in the active environment."
-            ) from exc
-
-        return CnnLstmPolicy, MultiInputLstmPolicy
-    if algorithm == TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO:
-        try:
-            from sb3x.ppo_mask_recurrent import CnnLstmPolicy, MultiInputLstmPolicy
-        except ImportError as exc:
-            raise RuntimeError(
-                "Loading recurrent checkpoints requires sb3x in the active environment."
-            ) from exc
-
-        return CnnLstmPolicy, MultiInputLstmPolicy
     if algorithm == TRAIN_ALGORITHM_MASKABLE_PPO:
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
@@ -204,9 +153,7 @@ def _policy_classes_for_algorithm(*, algorithm: str):
 
         return CnnPolicy, MultiInputPolicy
 
-    from stable_baselines3.ppo import CnnPolicy, MultiInputPolicy
-
-    return CnnPolicy, MultiInputPolicy
+    raise ValueError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
 
 def _full_model_class_for_algorithm(algorithm: str):
@@ -215,14 +162,6 @@ def _full_model_class_for_algorithm(algorithm: str):
             from sb3x import MaskableRecurrentPPO
 
             return MaskableRecurrentPPO
-        if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
-            from sb3x import HybridActionPPO
-
-            return HybridActionPPO
-        if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
-            from sb3x import HybridRecurrentPPO
-
-            return HybridRecurrentPPO
         if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
             from sb3x import MaskableHybridActionPPO
 
@@ -240,11 +179,11 @@ def _full_model_class_for_algorithm(algorithm: str):
 
 def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if run_dir is None:
-        return TRAIN_ALGORITHM_PPO
+        raise RuntimeError("Saved policy loading requires the source run directory")
 
     config_path = run_dir / RUN_LAYOUT.config_filename
     if not config_path.is_file():
-        return TRAIN_ALGORITHM_PPO
+        raise RuntimeError(f"Saved policy run is missing {RUN_LAYOUT.config_filename}")
 
     from rl_fzerox.core.config import load_train_app_config
 
@@ -252,11 +191,6 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     algorithm = config.train.algorithm
     if algorithm in SAVED_POLICY_ALGORITHMS:
         return algorithm
-    if algorithm in LEGACY_PPO_ALGORITHMS:
-        # COMPAT SHIM: historical runs may have saved `auto` or plain `ppo`
-        # before maskable variants became mandatory; only those explicit values
-        # use legacy loading.
-        return TRAIN_ALGORITHM_PPO
     raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
 

@@ -90,12 +90,15 @@ class FZeroXEnvEngine:
         )
         self._control_state = ControlStateTracker(
             shoulder_slide_mode=config.action.shoulder_slide_mode,
+            boost_decision_interval_frames=config.action.boost_decision_interval_frames,
+            boost_request_lockout_frames=config.action.boost_request_lockout_frames,
         )
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._last_info: dict[str, object] = {}
         self._last_telemetry: FZeroXTelemetry | None = None
+        self._manual_boost_allowed: bool | None = None
         self._reset_count = 0
         self._rng_seed_base: int | None = None
 
@@ -148,17 +151,17 @@ class FZeroXEnvEngine:
             info=info,
         )
         info.update(backend_step_info(self.backend))
+        self._episode_done = False
+        self._episode_return = 0.0
+        self._held_controller_state = ControllerState()
+        self._control_state.reset()
+        self._mask_controller.set_shoulder_allowed_values(None)
         self._sync_dynamic_masks(telemetry)
         self._last_telemetry = telemetry
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
         )
-        self._episode_done = False
-        self._episode_return = 0.0
-        self._held_controller_state = ControllerState()
-        self._control_state.reset()
-        self._mask_controller.set_shoulder_allowed_values(None)
         if isinstance(self._action_adapter, ResettableActionAdapter):
             self._action_adapter.reset()
         info["seed"] = seed
@@ -304,16 +307,25 @@ class FZeroXEnvEngine:
 
     def _sync_dynamic_masks(self, telemetry: FZeroXTelemetry | None) -> None:
         if telemetry is None:
+            self._manual_boost_allowed = None
             self._mask_controller.set_boost_unlocked(None)
             self._mask_controller.set_speed_kph(None)
             return
-        self._mask_controller.set_speed_kph(float(telemetry.player.speed_kph))
+        speed_kph = float(telemetry.player.speed_kph)
+        self._mask_controller.set_speed_kph(speed_kph)
         can_boost = telemetry_can_boost(telemetry)
         can_boost = can_boost and not telemetry_boost_active(telemetry)
+        can_boost = can_boost and not telemetry.player.airborne
+        can_boost = can_boost and telemetry.player.reverse_timer <= 0
+        can_boost = can_boost and self._control_state.boost_action_allowed_by_timing()
+        max_boost_speed = self.config.action.boost_unmask_max_speed_kph
+        if max_boost_speed is not None:
+            can_boost = can_boost and speed_kph < float(max_boost_speed)
         energy_fraction = telemetry_energy_fraction(telemetry)
         min_energy_fraction = float(self.config.boost_min_energy_fraction)
         if energy_fraction is not None and min_energy_fraction > 0.0:
             can_boost = can_boost and energy_fraction >= min_energy_fraction
+        self._manual_boost_allowed = can_boost
         self._mask_controller.set_boost_unlocked(can_boost)
 
     def _run_env_step(
@@ -345,7 +357,6 @@ class FZeroXEnvEngine:
         )
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
-        self._sync_dynamic_masks(telemetry)
         self._last_telemetry = telemetry
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
@@ -391,6 +402,7 @@ class FZeroXEnvEngine:
         self._mask_controller.set_shoulder_allowed_values(
             self._control_state.shoulder_action_mask_override(),
         )
+        self._sync_dynamic_masks(telemetry)
         image_observation = step_result.observation
         observation = self._build_observation(image=image_observation, telemetry=telemetry)
         self._episode_return += reward
@@ -417,6 +429,8 @@ class FZeroXEnvEngine:
     def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
         """Suppress controls whose validity depends on the latest telemetry."""
 
+        if self._manual_boost_allowed is False:
+            control_state = _without_joypad_mask(control_state, BOOST_MASK)
         air_brake_mode = self.config.action.continuous_air_brake_mode
         if air_brake_mode == "always":
             return control_state

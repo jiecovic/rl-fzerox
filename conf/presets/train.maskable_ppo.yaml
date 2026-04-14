@@ -1,6 +1,6 @@
 defaults:
   - /train_ppo_base
-  - /local/train.local.base@_global_
+  - /presets/local_runtime@_global_
   - _self_
 
 env:
@@ -8,5 +8,5 @@ env:
     name: steer_drive_boost_shoulder
 
 train:
-  init_run_dir: local/runs/ppo_cnn_0043
+  init_run_dir: null
   init_artifact: latest

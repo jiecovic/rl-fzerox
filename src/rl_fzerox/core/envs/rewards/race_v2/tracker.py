@@ -214,9 +214,12 @@ class RaceV2RewardTracker:
             reward += boost_pad_reward
             breakdown["boost_pad"] = boost_pad_reward
 
-        if resolved_action_context.boost_requested and self._weights.boost_press_penalty != 0.0:
-            reward += self._weights.boost_press_penalty
-            breakdown["boost_press"] = self._weights.boost_press_penalty
+        if (
+            resolved_action_context.boost_requested
+            and self._weights.manual_boost_request_reward != 0.0
+        ):
+            reward += self._weights.manual_boost_request_reward
+            breakdown["manual_boost_request"] = self._weights.manual_boost_request_reward
 
         reward += apply_event_penalty(
             summary.entered_collision_recoil,
@@ -483,6 +486,7 @@ class RaceV2RewardTracker:
         if (
             reward <= 0.0
             or not summary.entered_dash_pad_boost
+            or summary.reverse_active_frames > 0
             or self._boost_pad_reward_cooldown_frames_remaining > 0
         ):
             return 0.0

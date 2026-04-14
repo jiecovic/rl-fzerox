@@ -16,6 +16,7 @@ from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
     build_flat_action_mask,
+    shape_steer_value,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import (
     ContinuousButtonPwmDecoder,
@@ -24,7 +25,7 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
     discrete_action_array,
     hybrid_branch,
 )
-from rl_fzerox.core.envs.actions.steer_drive import AIR_BRAKE_MASK
+from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK, AIR_BRAKE_MASK
 from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
     BOOST_MASK,
     SHOULDER_LEFT_MASK,
@@ -33,13 +34,21 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
 
 _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE = 2
 _HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE = 3
+_HYBRID_STEER_CONTINUOUS_SIZE = 1
 _HYBRID_SHOULDER_DISCRETE_SIZE = 1
 _HYBRID_BOOST_SHOULDER_DISCRETE_SIZE = 2
+_HYBRID_GAS_AIR_BRAKE_BOOST_SHOULDER_DISCRETE_SIZE = 4
 _HYBRID_SHOULDER_PRIMITIVE_SIZE = 7
 _HYBRID_ACTION_DIMENSIONS = (DiscreteActionDimension("shoulder", 3),)
 _HYBRID_BOOST_ACTION_DIMENSIONS = (
     DiscreteActionDimension("shoulder", 3),
     DiscreteActionDimension("boost", 2),
+)
+_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_SHOULDER_ACTION_DIMENSIONS = (
+    DiscreteActionDimension("gas", 2),
+    DiscreteActionDimension("air_brake", 2),
+    DiscreteActionDimension("boost", 2),
+    DiscreteActionDimension("shoulder", 3),
 )
 _HYBRID_SHOULDER_PRIMITIVE_ACTION_DIMENSIONS = (
     DiscreteActionDimension("shoulder", _HYBRID_SHOULDER_PRIMITIVE_SIZE),
@@ -52,6 +61,7 @@ class HybridSteerDriveShoulderActionAdapter:
     """Map hybrid PPO actions to continuous steer/drive and discrete shoulder inputs."""
 
     def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
@@ -69,7 +79,7 @@ class HybridSteerDriveShoulderActionAdapter:
 
     @property
     def action_space(self) -> spaces.Dict:
-        """Return the public hybrid action space expected by HybridActionPPO."""
+        """Return the public hybrid action space expected by maskable hybrid PPO."""
 
         return self._action_space
 
@@ -106,7 +116,10 @@ class HybridSteerDriveShoulderActionAdapter:
 
         return ControllerState(
             joypad_mask=joypad_mask,
-            left_stick_x=steer,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
         )
 
     def reset(self) -> None:
@@ -135,6 +148,7 @@ class HybridSteerDriveBoostShoulderActionAdapter:
     """Map hybrid PPO actions to continuous steer/drive, shoulder, and boost."""
 
     def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
@@ -153,7 +167,7 @@ class HybridSteerDriveBoostShoulderActionAdapter:
 
     @property
     def action_space(self) -> spaces.Dict:
-        """Return the public hybrid action space expected by HybridActionPPO."""
+        """Return the public hybrid action space expected by maskable hybrid PPO."""
 
         return self._action_space
 
@@ -192,13 +206,102 @@ class HybridSteerDriveBoostShoulderActionAdapter:
 
         return ControllerState(
             joypad_mask=joypad_mask,
-            left_stick_x=steer,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
         )
 
     def reset(self) -> None:
         """Reset the drive PWM accumulator for a new episode."""
 
         self._drive_decoder.reset()
+
+    def action_mask(
+        self,
+        *,
+        base_overrides: dict[str, tuple[int, ...]] | None = None,
+        stage_overrides: dict[str, tuple[int, ...]] | None = None,
+        dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
+    ) -> np.ndarray:
+        """Return the discrete-branch mask used by MaskableHybridActionPPO."""
+
+        return build_flat_action_mask(
+            self.action_dimensions,
+            base_overrides=base_overrides,
+            stage_overrides=stage_overrides,
+            dynamic_overrides=dynamic_overrides,
+        )
+
+
+class HybridSteerGasAirBrakeBoostShoulderActionAdapter:
+    """Map continuous steering plus discrete gas, air-brake, boost, and shoulder heads."""
+
+    def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
+        self._action_space = spaces.Dict(
+            {
+                HYBRID_CONTINUOUS_ACTION_KEY: spaces.Box(
+                    low=np.array([-1.0], dtype=np.float32),
+                    high=np.array([1.0], dtype=np.float32),
+                    dtype=np.float32,
+                ),
+                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete([2, 2, 2, 3]),
+            }
+        )
+
+    @property
+    def action_space(self) -> spaces.Dict:
+        """Return the public hybrid action space expected by maskable hybrid PPO."""
+
+        return self._action_space
+
+    @property
+    def idle_action(self) -> dict[str, np.ndarray]:
+        """Return a neutral hybrid action with no buttons held."""
+
+        return {
+            HYBRID_CONTINUOUS_ACTION_KEY: np.zeros(
+                _HYBRID_STEER_CONTINUOUS_SIZE,
+                dtype=np.float32,
+            ),
+            HYBRID_DISCRETE_ACTION_KEY: np.zeros(
+                _HYBRID_GAS_AIR_BRAKE_BOOST_SHOULDER_DISCRETE_SIZE,
+                dtype=np.int64,
+            ),
+        }
+
+    @property
+    def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
+        """Return the discrete branches maskable by maskable hybrid PPO."""
+
+        return _HYBRID_STEER_GAS_AIR_BRAKE_BOOST_SHOULDER_ACTION_DIMENSIONS
+
+    def decode(self, action: ActionValue) -> ControllerState:
+        """Translate one hybrid action into steering and independent button heads."""
+
+        steer, gas, air_brake, boost, shoulder = _parse_hybrid_steer_gas_air_brake_boost_shoulder(
+            action
+        )
+        joypad_mask = 0
+        if gas == 1:
+            joypad_mask |= ACCELERATE_MASK
+        if air_brake == 1:
+            joypad_mask |= AIR_BRAKE_MASK
+        if boost == 1:
+            joypad_mask |= BOOST_MASK
+        if shoulder == 1:
+            joypad_mask |= SHOULDER_LEFT_MASK
+        elif shoulder == 2:
+            joypad_mask |= SHOULDER_RIGHT_MASK
+
+        return ControllerState(
+            joypad_mask=joypad_mask,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
+        )
 
     def action_mask(
         self,
@@ -227,6 +330,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
     """
 
     def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
@@ -251,7 +355,7 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
 
     @property
     def action_space(self) -> spaces.Dict:
-        """Return the public hybrid action space expected by HybridActionPPO."""
+        """Return the public hybrid action space expected by maskable hybrid PPO."""
 
         return self._action_space
 
@@ -295,7 +399,10 @@ class HybridSteerDriveBoostShoulderPrimitiveActionAdapter:
 
         return ControllerState(
             joypad_mask=joypad_mask,
-            left_stick_x=steer,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
         )
 
     def reset(self) -> None:
@@ -356,6 +463,34 @@ def _parse_hybrid_steer_drive_boost_shoulder_pair(
     steer = float(np.clip(continuous_values[0], -1.0, 1.0))
     drive = float(np.clip(continuous_values[1], -1.0, 1.0))
     return steer, drive, shoulder, boost
+
+
+def _parse_hybrid_steer_gas_air_brake_boost_shoulder(
+    action: ActionValue,
+) -> tuple[float, int, int, int, int]:
+    continuous_values, discrete_values = _parse_hybrid_branches(
+        action,
+        continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
+        continuous_field_labels=("steer",),
+        expected_size=_HYBRID_GAS_AIR_BRAKE_BOOST_SHOULDER_DISCRETE_SIZE,
+        action_label="Hybrid steer-gas-air-brake-boost-shoulder discrete",
+        field_labels=("gas", "air_brake", "boost", "shoulder"),
+    )
+    gas = int(discrete_values[0])
+    air_brake = int(discrete_values[1])
+    boost = int(discrete_values[2])
+    shoulder = int(discrete_values[3])
+    if not 0 <= gas < 2:
+        raise ValueError(f"Invalid hybrid gas index {gas}")
+    if not 0 <= air_brake < 2:
+        raise ValueError(f"Invalid hybrid air-brake index {air_brake}")
+    if not 0 <= boost < 2:
+        raise ValueError(f"Invalid hybrid boost index {boost}")
+    if not 0 <= shoulder < 3:
+        raise ValueError(f"Invalid hybrid shoulder index {shoulder}")
+
+    steer = float(np.clip(continuous_values[0], -1.0, 1.0))
+    return steer, gas, air_brake, boost, shoulder
 
 
 def _parse_hybrid_steer_drive_boost_shoulder(

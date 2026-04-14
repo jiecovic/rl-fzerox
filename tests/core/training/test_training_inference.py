@@ -377,7 +377,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_curriculum_stage == "drift_enabled"
 
 
-def test_load_saved_policy_algorithm_treats_legacy_auto_as_plain_ppo(tmp_path: Path) -> None:
+def test_load_saved_policy_algorithm_rejects_auto_manifest(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
     core_path.touch()
@@ -399,7 +399,8 @@ def test_load_saved_policy_algorithm_treats_legacy_auto_as_plain_ppo(tmp_path: P
         f=str(config_path),
     )
 
-    assert _load_saved_policy_algorithm(tmp_path) == "ppo"
+    with pytest.raises(RuntimeError, match="Unsupported saved policy algorithm"):
+        _load_saved_policy_algorithm(tmp_path)
 
 
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
@@ -494,68 +495,6 @@ def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "sac"
-
-
-def test_load_saved_policy_algorithm_recognizes_hybrid_action_ppo(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_drift"}},
-                "policy": {},
-                "train": {
-                    "algorithm": "hybrid_action_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "hybrid_action_ppo"
-
-
-def test_load_saved_policy_algorithm_recognizes_hybrid_recurrent_ppo(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_drift"}},
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "hybrid_recurrent_ppo"
 
 
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
@@ -682,138 +621,6 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
     loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
 
     assert isinstance(loaded, _FakeLoadedRecurrentModel)
-    assert captured == {
-        "path": str(model_path.resolve()),
-        "device": "cpu",
-    }
-
-
-def test_load_saved_policy_uses_full_model_artifact_for_hybrid_action_ppo_runs(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_drift"}},
-                "policy": {},
-                "train": {
-                    "algorithm": "hybrid_action_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-    policy_path = tmp_path / "latest_policy.zip"
-    policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
-    model_path.write_bytes(b"model")
-
-    captured: dict[str, object] = {}
-
-    class _FakeLoadedHybridModel:
-        def predict(
-            self,
-            observation: ObservationValue,
-            state: tuple[np.ndarray, ...] | None = None,
-            episode_start: np.ndarray | None = None,
-            deterministic: bool = True,
-        ) -> tuple[dict[str, np.ndarray], tuple[np.ndarray, ...] | None]:
-            _ = (observation, state, episode_start, deterministic)
-            return {
-                "continuous": np.array([0.0, 0.0], dtype=np.float32),
-                "discrete": np.array([0], dtype=np.int64),
-            }, None
-
-    def _fake_load(path: str, *, device: str) -> _FakeLoadedHybridModel:
-        captured["path"] = path
-        captured["device"] = device
-        return _FakeLoadedHybridModel()
-
-    monkeypatch.setattr("sb3x.HybridActionPPO.load", _fake_load)
-
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
-
-    assert isinstance(loaded, _FakeLoadedHybridModel)
-    assert captured == {
-        "path": str(model_path.resolve()),
-        "device": "cpu",
-    }
-
-
-def test_load_saved_policy_uses_full_model_artifact_for_hybrid_recurrent_runs(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_drift"}},
-                "policy": {
-                    "recurrent": {
-                        "enabled": True,
-                    }
-                },
-                "train": {
-                    "algorithm": "hybrid_recurrent_ppo",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-    policy_path = tmp_path / "latest_policy.zip"
-    policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
-    model_path.write_bytes(b"model")
-
-    captured: dict[str, object] = {}
-
-    class _FakeLoadedHybridRecurrentModel:
-        def predict(
-            self,
-            observation: ObservationValue,
-            state: tuple[np.ndarray, ...] | None = None,
-            episode_start: np.ndarray | None = None,
-            deterministic: bool = True,
-        ) -> tuple[dict[str, np.ndarray], tuple[np.ndarray, ...] | None]:
-            _ = (observation, state, episode_start, deterministic)
-            return {
-                "continuous": np.array([0.0, 0.0], dtype=np.float32),
-                "discrete": np.array([0], dtype=np.int64),
-            }, None
-
-    def _fake_load(path: str, *, device: str) -> _FakeLoadedHybridRecurrentModel:
-        captured["path"] = path
-        captured["device"] = device
-        return _FakeLoadedHybridRecurrentModel()
-
-    monkeypatch.setattr("sb3x.HybridRecurrentPPO.load", _fake_load)
-
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
-
-    assert isinstance(loaded, _FakeLoadedHybridRecurrentModel)
     assert captured == {
         "path": str(model_path.resolve()),
         "device": "cpu",

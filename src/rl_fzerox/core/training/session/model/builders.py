@@ -23,13 +23,11 @@ def build_training_model(
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
-    masking_required: bool,
 ):
     """Construct the configured SB3 model for the current run."""
 
     effective_algorithm = resolve_effective_training_algorithm(
         train_config=train_config,
-        masking_required=masking_required,
     )
     if effective_algorithm == TRAIN_ALGORITHM_SAC:
         return _build_sac_model(
@@ -53,13 +51,11 @@ def build_ppo_model(
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
-    masking_required: bool,
 ):
     """Construct the configured PPO-family model for the current run."""
 
     effective_algorithm = resolve_effective_training_algorithm(
         train_config=train_config,
-        masking_required=masking_required,
     )
     if effective_algorithm == TRAIN_ALGORITHM_SAC:
         raise RuntimeError("build_ppo_model cannot construct SAC; use build_training_model")

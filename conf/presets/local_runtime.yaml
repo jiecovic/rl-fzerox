@@ -1,5 +1,4 @@
-# Shared local filesystem overrides only. Algorithm configs compose this with
-# either /train_ppo_base or /train_sac_base.
+# Shared repo-local runtime convention for starter train presets.
 
 emulator:
   core_path: local/libretro/mupen64plus_next_libretro.so

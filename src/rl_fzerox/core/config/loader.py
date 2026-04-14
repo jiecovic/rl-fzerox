@@ -11,7 +11,7 @@ from omegaconf import OmegaConf
 from omegaconf.errors import OmegaConfBaseException
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.paths import config_root_dir, resolve_config_path_value
+from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
 
 ConfigModel = TypeVar("ConfigModel", WatchAppConfig, TrainAppConfig)
@@ -80,7 +80,7 @@ def _load_app_config(
             config_path=resolved_config_path,
             overrides=overrides,
         )
-        _resolve_config_paths(
+        resolve_config_data_paths(
             config_data,
             config_dir=resolved_config_path.parent,
             path_fields=path_fields,
@@ -125,22 +125,3 @@ def _compose_config_data(
         normalized[key] = value
     normalized.pop("hydra", None)
     return normalized
-
-
-def _resolve_config_paths(
-    config_data: dict[str, object],
-    *,
-    config_dir: Path,
-    path_fields: dict[str, tuple[str, ...]],
-) -> None:
-    for section_name, field_names in path_fields.items():
-        section = config_data.get(section_name)
-        if not isinstance(section, dict):
-            continue
-
-        for field_name in field_names:
-            raw_value = section.get(field_name)
-            if not isinstance(raw_value, str):
-                continue
-
-            section[field_name] = str(resolve_config_path_value(raw_value, config_dir=config_dir))

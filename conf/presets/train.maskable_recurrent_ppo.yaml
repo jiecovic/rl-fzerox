@@ -1,6 +1,6 @@
 defaults:
   - /train_ppo_base
-  - /local/train.local.base@_global_
+  - /presets/local_runtime@_global_
   - _self_
 
 train:
@@ -10,9 +10,11 @@ train:
   init_artifact: latest
   ent_coef: 0.0
   n_steps: 2048
-  batch_size: 512
-  gamma: 0.993
-  learning_rate: 2.0e-4
+  batch_size: 1024
+  clip_range: 0.15
+  gamma: 0.992
+  learning_rate: 3.0e-5
+  n_epochs: 5
 
 env:
   action:
@@ -29,19 +31,19 @@ env:
       # 0=off, 1=press air brake.
       air_brake: [0]
       # 0=off, 1=press boost.
-      boost: [0]
+      boost: [0, 1]
       # 0=off, 1=left slide, 2=right slide.
-      shoulder: [0]
+      shoulder: [0, 1, 2]
     # These gates only matter once the explicit boost/shoulder masks above are relaxed.
-    boost_unmask_max_speed_kph: 800.0
-    shoulder_unmask_min_speed_kph: 730.0
+    boost_unmask_max_speed_kph: 835.0
+    shoulder_unmask_min_speed_kph: 880.0
   observation:
     # Lightweight recurrent experiment: smallest image preset and no frame stack.
     preset: native_crop_v1
     frame_stack: 1
     # Adds current left/right steer flags plus signed recent steer pressure.
     state_profile: steer_history
-  boost_min_energy_fraction: 0.50
+  boost_min_energy_fraction: 0.25
 
 policy:
   extractor:

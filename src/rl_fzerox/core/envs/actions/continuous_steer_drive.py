@@ -6,7 +6,11 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import ActionConfig
-from rl_fzerox.core.envs.actions.base import ActionValue, DiscreteActionDimension
+from rl_fzerox.core.envs.actions.base import (
+    ActionValue,
+    DiscreteActionDimension,
+    shape_steer_value,
+)
 from rl_fzerox.core.envs.actions.continuous_controls import (
     ContinuousDriveDecoder,
     continuous_action_array,
@@ -24,6 +28,7 @@ class ContinuousSteerDriveActionAdapter:
     """Map continuous steering and accelerate intent to simple held controls."""
 
     def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
@@ -61,7 +66,10 @@ class ContinuousSteerDriveActionAdapter:
 
         return ControllerState(
             joypad_mask=joypad_mask,
-            left_stick_x=steer,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
         )
 
     def reset(self) -> None:
@@ -86,6 +94,7 @@ class ContinuousSteerDriveShoulderActionAdapter:
     """Map continuous steer/drive/shoulder intent to held controller inputs."""
 
     def __init__(self, config: ActionConfig) -> None:
+        self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
@@ -128,7 +137,10 @@ class ContinuousSteerDriveShoulderActionAdapter:
 
         return ControllerState(
             joypad_mask=joypad_mask,
-            left_stick_x=steer,
+            left_stick_x=shape_steer_value(
+                steer,
+                response_power=self._steer_response_power,
+            ),
         )
 
     def reset(self) -> None:

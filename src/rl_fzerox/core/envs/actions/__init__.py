@@ -11,6 +11,7 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER_PRIMITIVE,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_DRIFT,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_SHOULDER,
+    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_SHOULDER,
     ACTION_ADAPTER_STEER_DRIVE,
     ACTION_ADAPTER_STEER_DRIVE_BOOST,
     ACTION_ADAPTER_STEER_DRIVE_BOOST_DRIFT,
@@ -32,6 +33,7 @@ from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
     HybridSteerDriveBoostShoulderPrimitiveActionAdapter,
     HybridSteerDriveDriftActionAdapter,
     HybridSteerDriveShoulderActionAdapter,
+    HybridSteerGasAirBrakeBoostShoulderActionAdapter,
 )
 from rl_fzerox.core.envs.actions.steer_drive import (
     ACCELERATE_MASK,
@@ -61,6 +63,9 @@ ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER: (HybridSteerDriveBoostShoulderActionAdapter),
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_SHOULDER_PRIMITIVE: (
         HybridSteerDriveBoostShoulderPrimitiveActionAdapter
+    ),
+    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_SHOULDER: (
+        HybridSteerGasAirBrakeBoostShoulderActionAdapter
     ),
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_SHOULDER: HybridSteerDriveShoulderActionAdapter,
     ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_SHOULDER: (SteerGasAirBrakeBoostShoulderActionAdapter),
@@ -112,6 +117,7 @@ __all__ = [
     "HybridSteerDriveBoostShoulderPrimitiveActionAdapter",
     "HybridSteerDriveDriftActionAdapter",
     "HybridSteerDriveShoulderActionAdapter",
+    "HybridSteerGasAirBrakeBoostShoulderActionAdapter",
     "ResettableActionAdapter",
     "SHOULDER_LEFT_MASK",
     "SHOULDER_RIGHT_MASK",

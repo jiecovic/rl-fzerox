@@ -4,10 +4,7 @@ from __future__ import annotations
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAIN_ALGORITHM_SAC
 from rl_fzerox.core.training.runs import RunPaths
-from rl_fzerox.core.training.session.model.algorithms import (
-    resolve_effective_training_algorithm,
-    training_requires_action_masks,
-)
+from rl_fzerox.core.training.session.model.algorithms import resolve_effective_training_algorithm
 
 
 def build_tensorboard_logger(run_paths: RunPaths):
@@ -49,7 +46,6 @@ def print_training_startup(
     console = Console()
     effective_algorithm = resolve_effective_training_algorithm(
         train_config=config.train,
-        masking_required=training_requires_action_masks(config),
     )
     summary = Table(show_header=False, box=None, pad_edge=False)
     summary.add_column(style="bold cyan")
@@ -94,7 +90,6 @@ def _print_plain_startup(
 ) -> None:
     effective_algorithm = resolve_effective_training_algorithm(
         train_config=config.train,
-        masking_required=training_requires_action_masks(config),
     )
     print(f"run_dir: {run_paths.run_dir}")
     print(f"runtime_root: {run_paths.runtime_root}")

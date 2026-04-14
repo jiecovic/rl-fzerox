@@ -53,7 +53,7 @@ remaining_lap_penalty: 50.0
 # Energy: ignore tiny energy changes below this threshold.
 energy_loss_epsilon: 0.01
 # Energy: maximum penalty scale for lost energy when post-step energy is near zero.
-energy_loss_penalty_scale: 0.75
+energy_loss_penalty_scale: 0.35
 # Energy: above this post-step energy fraction, energy loss is not penalized.
 energy_loss_safe_fraction: 1.0
 # Energy: curve exponent for danger weighting; higher stays mild until lower energy.
@@ -86,11 +86,12 @@ drive_axis_negative_penalty_scale: 0.0
 boost_pad_reward: 10.00
 # Boost pads: internal-frame cooldown before the boost-pad reward can fire again.
 boost_pad_reward_cooldown_frames: 120
-# Boost discipline: small fixed penalty per env step when manual boost is requested.
-boost_press_penalty: 0.5
+# Manual boost: fixed reward scalar per env step when manual boost is requested.
+# Negative values penalize the request; positive values encourage it.
+manual_boost_request_reward: 2.0
 
 # Minor events: entry-only penalty when the machine enters collision recoil.
-collision_recoil_penalty: -1.0
+collision_recoil_penalty: -2.0
 # Minor events: entry-only penalty when the machine enters a spin-out.
 spinning_out_penalty: -0.5
 

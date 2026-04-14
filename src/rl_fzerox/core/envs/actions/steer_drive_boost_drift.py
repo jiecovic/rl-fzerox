@@ -41,7 +41,10 @@ class SteerDriveBoostShoulderActionAdapter:
     """Map steering, drive-mode, boost, and explicit shoulder inputs."""
 
     def __init__(self, config: ActionConfig) -> None:
-        self._steer_values = steer_values(config.steer_buckets)
+        self._steer_values = steer_values(
+            config.steer_buckets,
+            response_power=float(config.steer_response_power),
+        )
         self._action_dimensions = (
             DiscreteActionDimension("steer", config.steer_buckets),
             DiscreteActionDimension("drive", len(DRIVE_MODES)),
@@ -127,7 +130,10 @@ class SteerGasAirBrakeBoostShoulderActionAdapter:
     """Map digital steering plus independent gas, air brake, boost, and shoulder heads."""
 
     def __init__(self, config: ActionConfig) -> None:
-        self._steer_values = steer_values(config.steer_buckets)
+        self._steer_values = steer_values(
+            config.steer_buckets,
+            response_power=float(config.steer_response_power),
+        )
         self._action_dimensions = (
             DiscreteActionDimension("steer", config.steer_buckets),
             DiscreteActionDimension("gas", 2),

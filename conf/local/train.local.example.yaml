@@ -1,0 +1,14 @@
+defaults:
+  - /presets/train.maskable_recurrent_ppo@_global_
+  - _self_
+
+# Private local overrides can live in conf/local/train.local.yaml.
+# This file is only a template; copy it when you want a machine-specific setup.
+
+emulator:
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  baseline_state_path: local/states/first-race.state
+
+train:
+  output_root: local/runs

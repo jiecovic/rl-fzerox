@@ -45,7 +45,6 @@ def run_training(config: TrainAppConfig) -> None:
             train_config=run_config.train,
             policy_config=run_config.policy,
             tensorboard_log=None,
-            masking_required=training_requires_action_masks(run_config),
         )
         maybe_preload_training_parameters(
             model=model,
@@ -164,19 +163,6 @@ def _learn_model(
         return
 
     try:
-        from sb3x import HybridRecurrentPPO
-    except ImportError:
-        HybridRecurrentPPO = None
-
-    if HybridRecurrentPPO is not None and isinstance(model, HybridRecurrentPPO):
-        model.learn(
-            total_timesteps=total_timesteps,
-            callback=callback,
-            progress_bar=progress_bar,
-        )
-        return
-
-    try:
         from sb3x import MaskableHybridActionPPO
     except ImportError:
         MaskableHybridActionPPO = None
@@ -186,19 +172,6 @@ def _learn_model(
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
-            progress_bar=progress_bar,
-        )
-        return
-
-    try:
-        from sb3x import HybridActionPPO
-    except ImportError:
-        HybridActionPPO = None
-
-    if HybridActionPPO is not None and isinstance(model, HybridActionPPO):
-        model.learn(
-            total_timesteps=total_timesteps,
-            callback=callback,
             progress_bar=progress_bar,
         )
         return

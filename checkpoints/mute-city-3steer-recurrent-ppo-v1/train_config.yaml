@@ -1,0 +1,147 @@
+seed: 123
+emulator:
+  core_path: local/libretro/mupen64plus_next_libretro.so
+  rom_path: local/roms/F-Zero X (USA).n64
+  runtime_dir: local/runtime
+  baseline_state_path: baseline.state
+  renderer: angrylion
+env:
+  action_repeat: 1
+  max_episode_steps: 50000
+  stuck_step_limit: 240
+  stuck_min_speed_kph: 60.0
+  wrong_way_timer_limit: 240
+  progress_frontier_stall_limit_frames: 400
+  progress_frontier_epsilon: 100.0
+  boost_min_energy_fraction: 0.25
+  terminate_on_energy_depleted: true
+  randomize_game_rng_on_reset: true
+  randomize_game_rng_requires_race_mode: true
+  camera_setting: close_behind
+  reset_to_race: true
+  action:
+    name: steer_gas_air_brake_boost_shoulder
+    steer_buckets: 3
+    continuous_drive_mode: threshold
+    continuous_drive_deadzone: 0.2
+    continuous_air_brake_mode: always
+    continuous_shoulder_deadzone: 0.333333
+    shoulder_slide_mode: release_cooldown
+    boost_unmask_max_speed_kph: 835.0
+    boost_decision_interval_frames: 1
+    boost_request_lockout_frames: 5
+    shoulder_unmask_min_speed_kph: 880.0
+    mask:
+      gas:
+      - 1
+      air_brake:
+      - 0
+      boost:
+      - 0
+      - 1
+      shoulder:
+      - 0
+      - 1
+      - 2
+  observation:
+    mode: image_state
+    state_profile: steer_history
+    preset: native_crop_v1
+    frame_stack: 1
+reward:
+  name: race_v2
+  time_penalty_per_frame: -0.001
+  reverse_time_penalty_scale: 4.0
+  low_speed_time_penalty_scale: 4.0
+  milestone_distance: 15000.0
+  randomize_milestone_phase_on_reset: true
+  milestone_bonus: 2.0
+  milestone_speed_scale: 0.05
+  milestone_speed_bonus_cap: 2.0
+  bootstrap_progress_scale: 0.002
+  bootstrap_regress_penalty_scale: 0.004
+  bootstrap_position_multiplier_scale: 0.25
+  bootstrap_lap_count: 3
+  lap_1_completion_bonus: 10.0
+  lap_2_completion_bonus: 15.0
+  final_lap_completion_bonus: 25.0
+  lap_position_scale: 0.25
+  remaining_step_penalty_per_frame: 0.0
+  remaining_lap_penalty: 50.0
+  energy_loss_epsilon: 0.01
+  energy_loss_penalty_scale: 0.35
+  energy_loss_safe_fraction: 1.0
+  energy_loss_danger_power: 1.05
+  energy_gain_reward_scale: 0.05
+  energy_gain_collision_cooldown_frames: 120
+  energy_full_refill_bonus: 0.0
+  energy_full_refill_cooldown_frames: 800
+  damage_taken_frame_penalty: -0.02
+  damage_taken_streak_ramp_penalty: -0.001
+  damage_taken_streak_cap_frames: 120
+  airborne_landing_reward: 10.0
+  grounded_air_brake_penalty: -0.001
+  drive_axis_negative_penalty_scale: 0.0
+  boost_pad_reward: 10.0
+  boost_pad_reward_cooldown_frames: 120
+  manual_boost_request_reward: 2.0
+  collision_recoil_penalty: -1.0
+  spinning_out_penalty: -0.5
+  terminal_failure_base_penalty: -25.0
+  stuck_truncation_base_penalty: -30.0
+  wrong_way_truncation_base_penalty: -30.0
+  progress_stalled_truncation_base_penalty: -30.0
+  timeout_truncation_base_penalty: -30.0
+  finish_position_scale: 1.0
+policy:
+  extractor:
+    features_dim: 512
+    state_features_dim: 32
+  recurrent:
+    enabled: true
+    hidden_size: 256
+    n_lstm_layers: 1
+    shared_lstm: false
+    enable_critic_lstm: true
+  activation: tanh
+  net_arch:
+    pi:
+    - 256
+    - 64
+    vf:
+    - 256
+curriculum:
+  enabled: false
+  smoothing_episodes: 1
+  min_stage_episodes: 1
+  stages: []
+train:
+  algorithm: maskable_recurrent_ppo
+  vec_env: subproc
+  num_envs: 8
+  total_timesteps: 50000000
+  n_steps: 2048
+  n_epochs: 5
+  batch_size: 1024
+  learning_rate: 3.0e-05
+  gamma: 0.992
+  gae_lambda: 0.95
+  clip_range: 0.15
+  ent_coef: 0.0
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  buffer_size: 1000000
+  learning_starts: 100
+  tau: 0.005
+  train_freq: 1
+  gradient_steps: 1
+  target_update_interval: 1
+  target_entropy: auto
+  optimize_memory_usage: false
+  verbose: 0
+  device: cuda
+  save_freq: 10000
+  output_root: local/runs
+  run_name: ppo_discrete_full_gas_recurrent_cnn
+  init_run_dir: null
+  init_artifact: latest

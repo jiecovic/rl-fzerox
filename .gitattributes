@@ -1,0 +1,2 @@
+checkpoints/**/*.zip filter=lfs diff=lfs merge=lfs -text
+checkpoints/**/*.state filter=lfs diff=lfs merge=lfs -text

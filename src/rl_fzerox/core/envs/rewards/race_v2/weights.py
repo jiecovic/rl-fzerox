@@ -42,7 +42,7 @@ class RaceV2RewardWeights:
     drive_axis_negative_penalty_scale: float = 0.0
     boost_pad_reward: float = 0.0
     boost_pad_reward_cooldown_frames: int = 0
-    boost_press_penalty: float = 0.0
+    manual_boost_request_reward: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
     terminal_failure_base_penalty: float = -120.0

@@ -47,7 +47,10 @@ class SteerDriveActionAdapter:
     """Map MultiDiscrete steering and drive-mode actions to controls."""
 
     def __init__(self, config: ActionConfig) -> None:
-        self._steer_values = steer_values(config.steer_buckets)
+        self._steer_values = steer_values(
+            config.steer_buckets,
+            response_power=float(config.steer_response_power),
+        )
         self._action_dimensions = (
             DiscreteActionDimension("steer", config.steer_buckets),
             DiscreteActionDimension("drive", len(DRIVE_MODES)),

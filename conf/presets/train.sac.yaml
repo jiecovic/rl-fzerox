@@ -1,6 +1,6 @@
 defaults:
   - /train_sac_base
-  - /local/train.local.base@_global_
+  - /presets/local_runtime@_global_
   - _self_
 
 train:

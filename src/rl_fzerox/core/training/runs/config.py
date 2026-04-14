@@ -6,6 +6,7 @@ from pathlib import Path
 
 from omegaconf import OmegaConf
 
+from rl_fzerox.core.config.paths import resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
 from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_AUTO,
@@ -102,10 +103,41 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     """Load one previously saved resolved train config snapshot."""
 
     config_path = resolve_train_run_config_path(run_dir)
+    loaded = _load_train_config_mapping(config_path)
+    _resolve_train_config_paths(loaded, config_dir=config_path.parent)
+    return TrainAppConfig.model_validate(loaded)
+
+
+def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
     loaded = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
     if not isinstance(loaded, dict):
         raise ValueError(f"Train run config must resolve to a mapping: {config_path}")
-    return TrainAppConfig.model_validate(loaded)
+
+    normalized: dict[str, object] = {}
+    for key, value in loaded.items():
+        if not isinstance(key, str):
+            raise ValueError(f"Train run config keys must be strings: {config_path}")
+        normalized[key] = value
+    return normalized
+
+
+def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
+    resolve_config_data_paths(
+        config_data,
+        config_dir=config_dir,
+        path_fields={
+            "emulator": (
+                "core_path",
+                "rom_path",
+                "runtime_dir",
+                "baseline_state_path",
+            ),
+            "train": (
+                "output_root",
+                "init_run_dir",
+            ),
+        },
+    )
 
 
 def apply_train_run_to_watch_config(

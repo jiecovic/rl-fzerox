@@ -6,8 +6,6 @@ from rl_fzerox.core.domain.training_algorithms import (
     MASKABLE_TRAINING_ALGORITHMS,
     SB3X_TRAINING_ALGORITHMS,
     TRAIN_ALGORITHM_AUTO,
-    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
@@ -24,7 +22,6 @@ def training_requires_action_masks(config: TrainAppConfig) -> bool:
 def resolve_effective_training_algorithm(
     *,
     train_config: TrainConfig,
-    masking_required: bool,
 ) -> str:
     """Resolve the configured train.algorithm into the concrete algorithm used.
 
@@ -32,7 +29,6 @@ def resolve_effective_training_algorithm(
     training must be selected explicitly so the saved run config is unambiguous.
     """
 
-    _ = masking_required
     if train_config.algorithm == TRAIN_ALGORITHM_AUTO:
         return TRAIN_ALGORITHM_MASKABLE_PPO
     return train_config.algorithm
@@ -48,14 +44,6 @@ def resolve_training_algorithm_class(algorithm: str):
             from sb3_contrib import MaskablePPO
 
             return MaskablePPO
-        if algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
-            from sb3x import HybridActionPPO
-
-            return HybridActionPPO
-        if algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
-            from sb3x import HybridRecurrentPPO
-
-            return HybridRecurrentPPO
         if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
             from sb3x import MaskableHybridActionPPO
 
@@ -65,9 +53,7 @@ def resolve_training_algorithm_class(algorithm: str):
 
             return MaskableHybridRecurrentPPO
 
-        from stable_baselines3 import PPO
-
-        return PPO
+        raise ValueError(f"Unsupported PPO-family training algorithm: {algorithm!r}")
     except ImportError as exc:
         if algorithm in SB3X_TRAINING_ALGORITHMS:
             raise RuntimeError(
