@@ -127,6 +127,31 @@ def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
     assert tuple(features.shape) == (2, 576)
 
 
+def test_image_state_extractor_can_fuse_concatenated_features() -> None:
+    extractor = FZeroXImageStateExtractor(
+        spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32),
+            }
+        ),
+        features_dim=512,
+        state_features_dim=64,
+        fusion_features_dim=512,
+    )
+
+    features = extractor(
+        {
+            "image": torch.zeros((2, 116, 164, 12), dtype=torch.float32),
+            "state": torch.zeros((2, 11), dtype=torch.float32),
+        }
+    )
+
+    assert extractor.features_dim == 512
+    assert tuple(features.shape) == (2, 512)
+    assert isinstance(extractor._fusion_mlp, torch.nn.Sequential)
+
+
 def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_branch() -> None:
     extractor = FZeroXImageStateExtractor(
         spaces.Dict(

@@ -110,13 +110,14 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
 
 
 class FZeroXImageStateExtractor(BaseFeaturesExtractor):
-    """CNN image features plus a small scalar-state branch for Dict observations."""
+    """CNN image features plus a scalar-state branch for Dict observations."""
 
     def __init__(
         self,
         observation_space: spaces.Dict,
         features_dim: int | Literal["auto"] = 512,
         state_features_dim: int = 64,
+        fusion_features_dim: int | None = None,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
             raise ValueError(
@@ -135,7 +136,16 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             _image_flatten_dim(image_space) if features_dim == "auto" else int(features_dim)
         )
         resolved_state_features_dim = int(state_features_dim)
-        super().__init__(observation_space, image_features_dim + resolved_state_features_dim)
+        combined_features_dim = image_features_dim + resolved_state_features_dim
+        resolved_fusion_features_dim = (
+            None if fusion_features_dim is None else int(fusion_features_dim)
+        )
+        output_features_dim = (
+            combined_features_dim
+            if resolved_fusion_features_dim is None
+            else resolved_fusion_features_dim
+        )
+        super().__init__(observation_space, output_features_dim)
 
         self._state_dim = int(state_space.shape[0])
         self._image_extractor = FZeroXObservationCnnExtractor(
@@ -146,6 +156,15 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             nn.Linear(self._state_dim, resolved_state_features_dim),
             nn.ReLU(),
         )
+        if resolved_fusion_features_dim is None:
+            self._fusion_mlp: nn.Module = nn.Identity()
+        else:
+            # The fusion layer lets image and scalar-state features interact
+            # before the recurrent core, while keeping the legacy concat path.
+            self._fusion_mlp = nn.Sequential(
+                nn.Linear(combined_features_dim, resolved_fusion_features_dim),
+                nn.ReLU(),
+            )
 
     def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
         image = observations.get("image")
@@ -160,13 +179,11 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
                 f"got {state_flat.shape[1]}, expected {self._state_dim}"
             )
 
-        return torch.cat(
-            [
-                self._image_extractor(image),
-                self._state_mlp(state_flat),
-            ],
+        combined_features = torch.cat(
+            [self._image_extractor(image), self._state_mlp(state_flat)],
             dim=1,
         )
+        return self._fusion_mlp(combined_features)
 
 
 class _ImageGeometry:

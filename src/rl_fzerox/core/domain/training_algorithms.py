@@ -7,22 +7,16 @@ from typing import Final, Literal, TypeAlias
 
 TrainAlgorithmName: TypeAlias = Literal[
     "auto",
-    "ppo",
     "maskable_ppo",
     "maskable_recurrent_ppo",
-    "hybrid_action_ppo",
-    "hybrid_recurrent_ppo",
     "maskable_hybrid_action_ppo",
     "maskable_hybrid_recurrent_ppo",
     "sac",
 ]
 
 TRAIN_ALGORITHM_AUTO: Final[TrainAlgorithmName] = "auto"
-TRAIN_ALGORITHM_PPO: Final[TrainAlgorithmName] = "ppo"
 TRAIN_ALGORITHM_MASKABLE_PPO: Final[TrainAlgorithmName] = "maskable_ppo"
 TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO: Final[TrainAlgorithmName] = "maskable_recurrent_ppo"
-TRAIN_ALGORITHM_HYBRID_ACTION_PPO: Final[TrainAlgorithmName] = "hybrid_action_ppo"
-TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO: Final[TrainAlgorithmName] = "hybrid_recurrent_ppo"
 TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO: Final[TrainAlgorithmName] = "maskable_hybrid_action_ppo"
 TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO: Final[TrainAlgorithmName] = (
     "maskable_hybrid_recurrent_ppo"
@@ -36,12 +30,6 @@ def _algorithm_set(*names: TrainAlgorithmName) -> frozenset[TrainAlgorithmName]:
     return frozenset(names)
 
 
-LEGACY_PPO_ALGORITHMS: Final = _algorithm_set(
-    # COMPAT SHIM: saved run manifests may still contain these pre-maskable
-    # names; inference maps them through the legacy PPO loader path.
-    TRAIN_ALGORITHM_AUTO,
-    TRAIN_ALGORITHM_PPO,
-)
 MASKABLE_TRAINING_ALGORITHMS: Final = _algorithm_set(
     TRAIN_ALGORITHM_AUTO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
@@ -51,20 +39,15 @@ MASKABLE_TRAINING_ALGORITHMS: Final = _algorithm_set(
 )
 RECURRENT_TRAINING_ALGORITHMS: Final = _algorithm_set(
     TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
 )
 SB3X_TRAINING_ALGORITHMS: Final = _algorithm_set(
     TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
 )
 FULL_MODEL_POLICY_ALGORITHMS: Final = _algorithm_set(
     TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
 )

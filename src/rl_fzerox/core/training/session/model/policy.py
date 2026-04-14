@@ -29,6 +29,7 @@ def build_policy_kwargs(
         extractor_kwargs = {
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
+            "fusion_features_dim": policy_config.extractor.fusion_features_dim,
         }
     else:
         extractor_class = FZeroXObservationCnnExtractor

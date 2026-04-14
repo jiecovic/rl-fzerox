@@ -80,10 +80,23 @@ def coerce_action_values(action: ActionValue) -> list[int]:
     return [int(action)]
 
 
-def steer_values(steer_buckets: int) -> np.ndarray:
-    """Build evenly spaced steering levels spanning full left to full right."""
+def shape_steer_value(steer: float, *, response_power: float) -> float:
+    """Apply a sign-preserving response curve to normalized steering input."""
 
-    return np.linspace(-1.0, 1.0, num=steer_buckets, dtype=np.float32)
+    clipped = float(np.clip(steer, -1.0, 1.0))
+    if response_power == 1.0:
+        return clipped
+    return float(np.sign(clipped) * (abs(clipped) ** response_power))
+
+
+def steer_values(steer_buckets: int, *, response_power: float = 1.0) -> np.ndarray:
+    """Build steering levels spanning full left to full right."""
+
+    values = np.linspace(-1.0, 1.0, num=steer_buckets, dtype=np.float32)
+    if response_power == 1.0:
+        return values
+    shaped = np.sign(values) * (np.abs(values) ** float(response_power))
+    return shaped.astype(np.float32, copy=False)
 
 
 def multidiscrete_space(*sizes: int) -> spaces.MultiDiscrete:

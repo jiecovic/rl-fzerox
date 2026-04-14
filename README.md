@@ -1,256 +1,118 @@
 # rl-fzerox
 
-Experimental project to train a neural network to play F-Zero X with reinforcement learning.
+Experimental reinforcement-learning playground for training agents to race in
+F-Zero X through an N64/libretro emulator.
 
-The emulator boundary is handled by a custom Rust libretro host exposed to Python with `pyo3`. Python owns the Gymnasium env, config, telemetry tooling, and watch UI.
+It combines:
+
+- a Rust libretro host exposed to Python with `pyo3`
+- a Gymnasium environment around F-Zero X
+- game-state telemetry for rewards and action masks
+- a pygame watch UI
+- PPO-family training pipelines and an experimental SAC pipeline
+
+ROMs and emulator cores are not included. The current setup targets the US
+F-Zero X ROM.
+
+## What Works
+
+- Train agents on emulator frames plus game state.
+- Watch trained policies drive in the live game.
+- Resume from saved checkpoints and compare runs.
+- Experiment with discrete, continuous, recurrent, and masked action spaces.
+- Start from a saved race baseline for faster iteration.
+
+## Algorithms
+
+The main training path is maskable PPO.
+
+Implemented PPO-family variants:
+
+- `maskable_ppo`
+- `maskable_recurrent_ppo`
+- `maskable_hybrid_action_ppo`
+- `maskable_hybrid_recurrent_ppo`
+
+The recurrent and hybrid PPO variants come from the companion
+[`sb3x-extensions`](https://github.com/jiecovic/sb3x-extensions) package.
+
+SAC is included as a separate continuous-control experiment.
 
 ## Requirements
 
-- Python `3.11+`
-- Rust toolchain via `rustup` / `cargo`
-- `Mupen64Plus-Next` libretro core shared library (`.so`)
-- An extracted F-Zero X US ROM that you obtained yourself
+- Python 3.11+
+- Rust toolchain with `cargo`
+- Mupen64Plus-Next libretro core shared library (`.so`)
+- your own F-Zero X US ROM
+- `sb3x-extensions` for recurrent and hybrid PPO variants
 
-The repo does not include the emulator core or ROM files. You need to download or build those yourself. ROMs are not committed for copyright reasons.
+Mupen64Plus-Next libretro links: [docs](https://docs.libretro.com/library/mupen64plus/),
+[source](https://github.com/libretro/mupen64plus-libretro-nx).
 
-The reverse-engineered telemetry/RAM layout currently targets the US ROM build.
-Other regional revisions are not supported by the current memory offsets.
-
-Official `Mupen64Plus-Next` links:
-
-- Docs: https://docs.libretro.com/library/mupen64plus/
-- Source: https://github.com/libretro/mupen64plus-libretro-nx
+The RAM offsets currently target the US ROM build only.
 
 ## Setup
 
 ```bash
-curl https://sh.rustup.rs -sSf | sh
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e .[dev,watch]
+python -m pip install -e .[dev,watch,train]
+just native
+cp conf/local/watch.local.example.yaml conf/local/watch.local.yaml
 ```
 
-For PPO training and policy watch mode, install the extra dependencies too:
+Also install the companion `sb3x` package from
+https://github.com/jiecovic/sb3x-extensions.
 
-```bash
-python -m pip install -e .[train]
+Put local runtime files under `local/`:
+
+```text
+local/libretro/mupen64plus_next_libretro.so
+local/roms/F-Zero X (USA).n64
 ```
 
-## Local config
+Training presets live under `conf/presets/`. Private machine-specific overrides
+can live under `conf/local/`; examples are included there.
 
-Keep local runtime artifacts such as the libretro core and ROM under `local/`. That directory is ignored by git.
+## Basic Commands
 
-Put your local paths in `conf/local/watch.local.yaml`:
-
-```yaml
-defaults:
-  - /watch
-  - _self_
-
-seed: 123
-
-emulator:
-  core_path: local/libretro/mupen64plus_next_libretro.so
-  rom_path: local/roms/F-Zero X (USA).n64
-  runtime_dir: local/runtime
-  baseline_state_path: local/states/first-race.state
-
-env:
-  reset_to_race: true
-
-watch:
-  control_fps: auto
-  render_fps: 60
-```
-
-Relative emulator paths in repo configs are resolved relative to the project root. `emulator.runtime_dir` is the optional root for generated emulator state such as `mupen64plus.ini`; the native host creates it when needed. `emulator.baseline_state_path` points to the saved race-start baseline used for fast deterministic resets once you create it. The root `seed` is the master seed for Python/env randomness.
-
-`watch` uses its configured `emulator.runtime_dir` directly. `train` does not reuse that global runtime path anymore: each training run gets its own writable runtime root under the run directory, and each env instance gets its own subdirectory under that root.
-
-`env.reset_to_race: true` runs a deterministic first-race bootstrap from the boot baseline. It fast-forwards through the default menu path into the first Mute City grid. Press `K` in `watch` once to save `local/states/first-race.state`; after that, both `watch` and `train` reset from that dedicated race-start baseline instead of replaying the menu path. Without a custom baseline, terminal episodes try to continue into the next race on the same emulator session before falling back to a full reset.
-
-`env.camera_setting` can pin the in-race camera to `overhead`, `close_behind`, `regular`, or `wide`. The env applies it after reset by tapping the real C-Right input until telemetry reports the requested setting; `null` preserves whatever the loaded baseline already uses.
-
-`watch.episodes` defaults to `null`, so the watch app keeps resetting until you quit it. `watch.control_fps: auto` means "run at the natural control-loop cadence", i.e. `60 / action_repeat`; use `unlimited` or a higher numeric value for fast-forward watch. `watch.render_fps` caps UI redraws separately so simulation can run faster than the display. The legacy `watch.fps` key still aliases both split settings. Press `+`/`-` or numpad `+`/`-` while watching to adjust the control speed.
-`watch.device` defaults to `cpu`, so policy inference in watch mode does not contend with training on the GPU unless you opt into `cuda` or `auto`.
-
-The basic `steer_drive` policy action space is `MultiDiscrete([7, 3])`:
-
-- 7 steering buckets from hard-left to hard-right
-- 3 drive modes: `coast`, `accelerate`, and `air_brake`
-
-The `steer_drive_boost` adapter adds a binary boost head for
-`MultiDiscrete([7, 3, 2])`. The `steer_drive_boost_shoulder` adapter also adds an
-explicit shoulder-input head for `MultiDiscrete([7, 3, 2, 3])` with
-`off`, `left`, and `right`. Steering bucket counts must be odd so one
-bucket is exactly straight.
-
-The maskable recurrent hybrid pipeline uses continuous steer/drive/air-brake axes plus
-`hybrid_steer_drive_boost_shoulder_primitive`. Its discrete branch is
-`MultiDiscrete([7, 2])`: shoulder primitive plus boost. Shoulder values
-`0..2` are `off`, `left`, and `right`; values `3..6` are reserved
-for future side-attack/spin primitives and are masked by default. Accelerate and
-air brake use independent full-range PWM axes, so both buttons can be pulsed at once.
-`env.action.boost_unmask_max_speed_kph` can keep manual boost masked when the
-car is already above a live speed cap; boost still also requires the game's
-`can_boost` flag, enough energy, and no already-active boost effect.
-`env.action.shoulder_unmask_min_speed_kph` can additionally keep the shoulder
-branch masked to `off` until live speed reaches that threshold. Set it to `null`
-to disable the speed gate or `0` to allow shoulder input immediately; explicit
-masks such as `env.action.mask.shoulder=[0]` still take precedence and keep it
-disabled.
-
-The current observation pipeline keeps the full game view, aspect-corrects the
-raw `640x240` emulator framebuffer to `4:3`, downsamples it to `160x120 RGB`,
-and returns a channels-last stack of the last 4 observations.
-
-## Commands
-
-Probe the core:
-
-```bash
-python -m rl_fzerox.apps.probe /abs/path/to/mupen64plus_next_libretro.so
-```
-
-Headless smoke test:
-
-```bash
-python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/path/to/fzerox.n64 --frames 60
-```
-
-Headless smoke test with race bootstrap:
-
-```bash
-python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/path/to/fzerox.n64 --reset-to-race --frames 60
-```
-
-If you want to reuse a saved baseline state from the local watch flow, pass the same runtime directory as well:
-
-```bash
-python -m rl_fzerox.apps.smoke /abs/path/to/mupen64plus_next_libretro.so /abs/path/to/fzerox.n64 --runtime-dir /abs/path/to/runtime --baseline-state /abs/path/to/first-race.state --frames 0
-```
-
-Watch the game:
+Watch manually or with a policy:
 
 ```bash
 python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml
+python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir checkpoints/mute-city-3steer-recurrent-ppo-v1 --artifact best
 ```
 
-Train maskable PPO:
+Train recurrent PPO:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml
+python -m rl_fzerox.apps.train --config conf/presets/train.maskable_recurrent_ppo.yaml
 ```
 
-Training uses `MaskablePPO` by default because the env exposes live gameplay
-masks, including boost availability and speed-gated shoulder constraints.
-
-For recurrent training, install `sb3x` into the same environment and switch the
-config to `train.algorithm=maskable_recurrent_ppo` with
-`policy.recurrent.enabled=true`.
-
-Because `conf/local/train.local.ppo_maskable.yaml` often carries a feedforward
-warm-start, the repo also ships a local recurrent PPO entrypoint that disables
-that incompatible preload automatically:
+Train hybrid recurrent PPO:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_recurrent.yaml
+python -m rl_fzerox.apps.train --config conf/presets/train.maskable_hybrid_recurrent_ppo.yaml
 ```
 
-For hybrid-action PPO, use the feedforward PPO variant with continuous steer and
-drive axes plus a discrete shoulder branch. The drive axis uses full-range PWM:
-`-1` coasts, `0` pulses half accelerate, and `+1` holds accelerate.
+Train the SAC experiment:
 
 ```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid.yaml
+python -m rl_fzerox.apps.train --config conf/presets/train.sac.yaml
 ```
 
-For the recurrent version of that same hybrid action space, use:
+## Checkpoints
 
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_hybrid_recurrent.yaml
+A sample checkpoint is included:
+
+```text
+checkpoints/mute-city-3steer-recurrent-ppo-v1
 ```
 
-For the same hybrid action space with invalid-action masks on the discrete
-shoulder and boost branches, use:
+The checkpoint includes the model artifacts, run config, and baseline state.
+Edit the config paths if your ROM or libretro core live somewhere else.
 
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid.yaml
-```
+## Contributing
 
-For the recurrent version with the wider shoulder-primitive branch and the same
-discrete action masks, use:
-
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml
-```
-
-To start that policy with shoulder and boost masked off:
-
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml -- '+env.action.mask.shoulder=[0]' '+env.action.mask.boost=[0]'
-```
-
-For the SAC continuous-control experiment, use:
-
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.sac.yaml
-```
-
-The repo also ships one starter curriculum config:
-
-```bash
-python -m rl_fzerox.apps.train --config conf/local/train.local.ppo_maskable.yaml curriculum=shoulder_after_finish
-```
-
-That curriculum starts with the shoulder branch masked to `off` only and
-unlocks `off/left/right` after the agent completes all 3 race laps in one
-episode.
-
-For multi-env training, switch `train.vec_env` to `subproc` and raise `train.num_envs`. Each worker env gets an isolated runtime dir under the run folder, for example `local/runs/ppo_cnn_0007/runtime/env_000`.
-
-Watch the latest saved policy artifact from one training run:
-
-```bash
-python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir local/runs/ppo_cnn_0001
-```
-
-Watch the current best saved policy instead:
-
-```bash
-python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir local/runs/ppo_cnn_0001 --artifact best
-```
-
-Read a live telemetry snapshot from emulated RAM:
-
-```bash
-python -m rl_fzerox.apps.telemetry --config conf/local/watch.local.yaml
-```
-
-Watch controls:
-
-- `P`: pause / resume
-- `N`: advance one emulator frame while paused
-- `Left / Right`: steering and left/right D-pad
-- `Up / Down`: D-pad
-- `X`: A
-- `Z`: B
-- `Enter`: Start
-- `Backspace`: Select
-- `K`: promote the current state to the reset baseline and save it when `emulator.baseline_state_path` is set
-
-The watch UI shows the raw game view, a preview of the latest processed policy
-observation, and live telemetry plus the current step reward and total episode
-return.
-
-## Quality
-
-```bash
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo audit
-ruff check .
-pyright
-pytest
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local quality checks and development
+notes.

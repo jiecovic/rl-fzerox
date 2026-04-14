@@ -29,6 +29,8 @@ class ControlStateTracker:
     """
 
     shoulder_slide_mode: ShoulderSlideMode = DEFAULT_SHOULDER_SLIDE_MODE
+    boost_decision_interval_frames: int = 1
+    boost_request_lockout_frames: int = 0
     _recent_boost_frames: deque[int] = field(
         default_factory=lambda: deque(maxlen=RECENT_BOOST_PRESSURE_WINDOW_FRAMES),
     )
@@ -46,6 +48,9 @@ class ControlStateTracker:
     _shoulder_lock_index: int = 0
     _shoulder_lock_remaining_frames: int = 0
     _shoulder_cooldown_remaining_frames: int = 0
+    _episode_frame_index: int = 0
+    _next_boost_decision_frame: int = 0
+    _boost_request_lockout_remaining_frames: int = 0
 
     def reset(self) -> None:
         """Clear all step-to-step control history."""
@@ -63,6 +68,9 @@ class ControlStateTracker:
         self._shoulder_lock_index = 0
         self._shoulder_lock_remaining_frames = 0
         self._shoulder_cooldown_remaining_frames = 0
+        self._episode_frame_index = 0
+        self._next_boost_decision_frame = 0
+        self._boost_request_lockout_remaining_frames = 0
 
     def apply_shoulder_semantics(self, control_state: ControllerState) -> ControllerState:
         """Apply the selected shoulder-slide primitive semantics to one action."""
@@ -94,6 +102,10 @@ class ControlStateTracker:
         self._record_recent_steer_pressure(
             steer_axis=steer_axis,
             frames_run=frames_elapsed,
+        )
+        self._update_boost_timing(
+            boost_requested=boost_requested,
+            frames_elapsed=frames_elapsed,
         )
         self._left_press_age_frames = _advance_press_age(
             self._left_press_age_frames,
@@ -132,6 +144,14 @@ class ControlStateTracker:
             "steer_right_held": float(self._right_steer_held),
             "recent_steer_pressure": self._recent_steer_pressure(),
         }
+
+    def boost_action_allowed_by_timing(self) -> bool:
+        """Return whether this frame is a tactical manual-boost decision slot."""
+
+        if self._boost_request_lockout_remaining_frames > 0:
+            return False
+        interval = max(int(self.boost_decision_interval_frames), 1)
+        return interval <= 1 or self._episode_frame_index >= self._next_boost_decision_frame
 
     def shoulder_action_mask_override(self) -> tuple[int, ...] | None:
         """Return live shoulder branch restrictions implied by the selected mode."""
@@ -206,6 +226,27 @@ class ControlStateTracker:
         if window_size is None or window_size <= 0:
             return 0.0
         return self._recent_steer_frame_sum / window_size
+
+    def _update_boost_timing(self, *, boost_requested: bool, frames_elapsed: int) -> None:
+        lockout_frames = max(int(self.boost_request_lockout_frames), 0)
+        boost_decision_slot_was_open = (
+            self._episode_frame_index >= self._next_boost_decision_frame
+        )
+        if boost_requested and lockout_frames > 0:
+            self._boost_request_lockout_remaining_frames = max(
+                lockout_frames - frames_elapsed,
+                0,
+            )
+        else:
+            self._boost_request_lockout_remaining_frames = max(
+                self._boost_request_lockout_remaining_frames - frames_elapsed,
+                0,
+            )
+        if boost_decision_slot_was_open:
+            interval = max(int(self.boost_decision_interval_frames), 1)
+            while self._next_boost_decision_frame <= self._episode_frame_index:
+                self._next_boost_decision_frame += interval
+        self._episode_frame_index += frames_elapsed
 
     def _update_shoulder_semantics(
         self,

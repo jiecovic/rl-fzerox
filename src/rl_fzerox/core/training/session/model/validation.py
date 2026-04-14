@@ -6,13 +6,8 @@ from rl_fzerox.core.domain.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_AC
 from rl_fzerox.core.domain.training_algorithms import (
     MASKABLE_TRAINING_ALGORITHMS,
     RECURRENT_TRAINING_ALGORITHMS,
-    TRAIN_ALGORITHM_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
     TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
-    TRAIN_ALGORITHM_MASKABLE_PPO,
-    TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_PPO,
     TRAIN_ALGORITHM_SAC,
 )
 
@@ -20,20 +15,8 @@ from rl_fzerox.core.domain.training_algorithms import (
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
     """Reject incompatible algorithm/config combinations before training starts."""
 
-    if config.train.algorithm == TRAIN_ALGORITHM_PPO:
-        raise RuntimeError(
-            "Plain PPO training is no longer supported. "
-            f"Use `train.algorithm={TRAIN_ALGORITHM_MASKABLE_PPO}` or "
-            f"`{TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO}`."
-        )
     if config.train.algorithm == TRAIN_ALGORITHM_SAC:
         _validate_sac_training_config(config)
-        return
-    if config.train.algorithm == TRAIN_ALGORITHM_HYBRID_ACTION_PPO:
-        _validate_hybrid_action_ppo_training_config(config)
-        return
-    if config.train.algorithm == TRAIN_ALGORITHM_HYBRID_RECURRENT_PPO:
-        _validate_hybrid_recurrent_ppo_training_config(config)
         return
     if config.train.algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
         _validate_maskable_hybrid_action_ppo_training_config(config)
@@ -77,32 +60,6 @@ def _validate_sac_training_config(config: TrainAppConfig) -> None:
         raise RuntimeError(
             "SAC optimize_memory_usage is not supported with Dict image_state observations"
         )
-
-
-def _validate_hybrid_action_ppo_training_config(config: TrainAppConfig) -> None:
-    _validate_unmasked_hybrid_action_ppo_training_config(
-        config,
-        algorithm_label="Hybrid action PPO",
-    )
-
-
-def _validate_hybrid_recurrent_ppo_training_config(config: TrainAppConfig) -> None:
-    _validate_unmasked_hybrid_action_ppo_training_config(
-        config,
-        algorithm_label="Hybrid recurrent PPO",
-    )
-
-
-def _validate_unmasked_hybrid_action_ppo_training_config(
-    config: TrainAppConfig,
-    *,
-    algorithm_label: str,
-) -> None:
-    _validate_hybrid_action_adapter(config, algorithm_label=algorithm_label)
-    if config.env.action.mask is not None:
-        raise RuntimeError(f"{algorithm_label} does not support env.action.mask yet")
-    if config.curriculum.enabled:
-        raise RuntimeError(f"{algorithm_label} does not support action-mask curriculum stages")
 
 
 def _validate_maskable_hybrid_action_ppo_training_config(config: TrainAppConfig) -> None:

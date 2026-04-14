@@ -216,12 +216,4 @@ conf/local/*.yaml
 conf/local/*.yml
 !conf/local/*.example.yaml
 !conf/local/*.example.yml
-!conf/local/train.local.base.yaml
-!conf/local/train.local.ppo_maskable.yaml
-!conf/local/train.local.ppo_maskable_recurrent.yaml
-!conf/local/train.local.ppo_hybrid.yaml
-!conf/local/train.local.ppo_hybrid_recurrent.yaml
-!conf/local/train.local.ppo_maskable_hybrid.yaml
-!conf/local/train.local.ppo_maskable_hybrid_recurrent.yaml
-!conf/local/train.local.sac.yaml
 tmp/

@@ -1,0 +1,64 @@
+defaults:
+  - /train_ppo_base
+  - /presets/local_runtime@_global_
+  - _self_
+
+env:
+  action:
+    # Continuous-steering counterpart to the discrete full-gas recurrent setup:
+    # continuous steer plus discrete gas/air-brake/boost/shoulder heads.
+    name: hybrid_steer_gas_air_brake_boost_shoulder
+    # <1.0 pushes moderate steering toward full lock; 1.0 is identity.
+    steer_response_power: 1.0
+    # Release immediately, then mask re-taps through the dash window.
+    shoulder_slide_mode: release_cooldown
+    # Masks list allowed action values, not blocked values.
+    mask:
+      # 0=coast, 1=press gas. Force full gas while preserving the policy head.
+      gas: [1]
+      # 0=off, 1=press air brake.
+      air_brake: [0]
+      # 0=off, 1=press boost.
+      boost: [0]
+      # 0=off, 1=left slide, 2=right slide.
+      shoulder: [0]
+    # These gates only matter once the explicit shoulder mask above is relaxed.
+    boost_unmask_max_speed_kph: 820.0
+    shoulder_unmask_min_speed_kph: 730.0
+  observation:
+    # Match the digital full-gas experiment: smallest image preset and no frame stack.
+    preset: native_crop_v1
+    frame_stack: 1
+    state_profile: steer_history
+  boost_min_energy_fraction: 0.30
+
+train:
+  algorithm: maskable_hybrid_recurrent_ppo
+  run_name: ppo_hybrid_full_gas_recurrent_cnn
+  init_run_dir: null
+  init_artifact: latest
+  num_envs: 10
+  ent_coef: 0.01
+  n_steps: 2048
+  batch_size: 1024
+  clip_range: 0.15
+  gamma: 0.994
+  learning_rate: 1.0e-4
+  n_epochs: 5
+
+policy:
+  extractor:
+    features_dim: 512
+    state_features_dim: 32
+    # null feeds the raw image/state concat into the LSTM; set an int to add a
+    # post-concat fusion MLP before the recurrent core.
+    fusion_features_dim: null
+  recurrent:
+    enabled: true
+    hidden_size: 256
+    n_lstm_layers: 1
+    shared_lstm: false
+    enable_critic_lstm: true
+  net_arch:
+    pi: [256, 64]
+    vf: [256]

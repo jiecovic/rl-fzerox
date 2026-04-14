@@ -241,7 +241,7 @@ def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
-        policy_label="hybrid_recurrent_ppo_cnn_0015",
+        policy_label="maskable_hybrid_recurrent_ppo_cnn_0015",
         policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.25, -1.0, 0.5], dtype=np.float32),

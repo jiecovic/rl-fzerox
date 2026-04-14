@@ -63,7 +63,7 @@ def build_reward_tracker(
         drive_axis_negative_penalty_scale=resolved_config.drive_axis_negative_penalty_scale,
         boost_pad_reward=resolved_config.boost_pad_reward,
         boost_pad_reward_cooldown_frames=resolved_config.boost_pad_reward_cooldown_frames,
-        boost_press_penalty=resolved_config.boost_press_penalty,
+        manual_boost_request_reward=resolved_config.manual_boost_request_reward,
         collision_recoil_penalty=resolved_config.collision_recoil_penalty,
         spinning_out_penalty=resolved_config.spinning_out_penalty,
         terminal_failure_base_penalty=resolved_config.terminal_failure_base_penalty,

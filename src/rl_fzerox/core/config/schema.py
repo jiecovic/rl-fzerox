@@ -74,12 +74,15 @@ class ActionConfig(BaseModel):
 
     name: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
     steer_buckets: int = Field(default=7, ge=3)
+    steer_response_power: PositiveFloat = 1.0
     continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
     continuous_shoulder_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     shoulder_slide_mode: ShoulderSlideMode = DEFAULT_SHOULDER_SLIDE_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
+    boost_decision_interval_frames: PositiveInt = 1
+    boost_request_lockout_frames: NonNegativeInt = 0
     shoulder_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
 
@@ -204,7 +207,7 @@ class RewardConfig(BaseModel):
     drive_axis_negative_penalty_scale: float = Field(default=0.0, le=0.0)
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_cooldown_frames: NonNegativeInt = 0
-    boost_press_penalty: float = 0.0
+    manual_boost_request_reward: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
     terminal_failure_base_penalty: float = -120.0
@@ -218,17 +221,22 @@ class RewardConfig(BaseModel):
     @classmethod
     def _migrate_legacy_reward_fields(cls, data: object) -> object:
         # COMPAT SHIM: legacy reward config field names.
-        # Run manifests saved before `boost_press_penalty` still contain
-        # `reward.boost_redundant_press_penalty`. Watch loads those manifests
-        # to reconstruct policy metadata, so reject-free migration must live at
-        # the schema boundary. New YAML should only use `boost_press_penalty`.
+        # Run manifests saved before `manual_boost_request_reward` still contain
+        # `reward.boost_press_penalty` or the older
+        # `reward.boost_redundant_press_penalty`. Watch loads those manifests to
+        # reconstruct policy metadata, so reject-free migration must live at the
+        # schema boundary. New YAML should only use `manual_boost_request_reward`.
         if not isinstance(data, Mapping):
             return data
         values: dict[str, object] = {str(key): value for key, value in data.items()}
         missing = object()
-        legacy_penalty = values.pop("boost_redundant_press_penalty", missing)
-        if legacy_penalty is not missing and "boost_press_penalty" not in values:
-            values["boost_press_penalty"] = legacy_penalty
+        legacy_redundant_penalty = values.pop("boost_redundant_press_penalty", missing)
+        legacy_press_penalty = values.pop("boost_press_penalty", missing)
+        if "manual_boost_request_reward" not in values:
+            if legacy_press_penalty is not missing:
+                values["manual_boost_request_reward"] = legacy_press_penalty
+            elif legacy_redundant_penalty is not missing:
+                values["manual_boost_request_reward"] = legacy_redundant_penalty
         return values
 
 
@@ -298,6 +306,7 @@ class ExtractorConfig(BaseModel):
 
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
+    fusion_features_dim: PositiveInt | None = None
 
 
 class PolicyRecurrentConfig(BaseModel):
