@@ -13,7 +13,7 @@ from pathlib import Path
 from fzerox_emulator import JOYPAD_A, ControllerState, Emulator, joypad_mask
 from fzerox_emulator.base import BackendStepResult
 
-RENDERERS: tuple[str, ...] = ("angrylion", "gliden64", "parallel", "parallel-rdp")
+RENDERERS: tuple[str, ...] = ("angrylion", "gliden64")
 
 
 @dataclass(frozen=True, slots=True)

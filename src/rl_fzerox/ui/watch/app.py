@@ -15,6 +15,7 @@ from rl_fzerox.ui.watch.render.frame import (
     _create_screen,
     _draw_frame,
     _ensure_screen,
+    _watch_game_display_size,
 )
 from rl_fzerox.ui.watch.session import (
     _load_policy_runner,
@@ -88,6 +89,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         last_logged_reload_error: str | None = None
         episode = 0
         best_finish_position: int | None = None
+        game_display_size = _watch_game_display_size()
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             observation, info = env.reset(seed=reset_seed)
@@ -104,7 +106,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             if screen is None or fonts is None:
                 screen = _create_screen(
                     pygame,
-                    (raw_frame.shape[1], raw_frame.shape[0]),
+                    game_display_size,
                     observation_image.shape,
                 )
                 fonts = _create_fonts(pygame)
@@ -149,7 +151,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             screen = _ensure_screen(
                 pygame,
                 screen,
-                emulator.display_size,
+                game_display_size,
                 observation_image.shape,
             )
 
@@ -438,7 +440,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                     screen = _ensure_screen(
                         pygame,
                         screen,
-                        emulator.display_size,
+                        game_display_size,
                         observation_image.shape,
                     )
                     draw_info, last_draw_time, viewer_fps = _with_viewer_fps(

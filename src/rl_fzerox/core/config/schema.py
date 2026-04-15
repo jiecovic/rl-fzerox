@@ -259,7 +259,7 @@ class EmulatorConfig(BaseModel):
     rom_path: FilePath
     runtime_dir: Path | None = None
     baseline_state_path: Path | None = None
-    renderer: Literal["angrylion", "gliden64", "parallel"] = "angrylion"
+    renderer: Literal["angrylion", "gliden64"] = "angrylion"
 
 
 class WatchConfig(BaseModel):

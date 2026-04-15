@@ -9,11 +9,10 @@ use std::ptr;
 
 use libretro_sys::{
     ENVIRONMENT_GET_CAN_DUPE, ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
-    ENVIRONMENT_GET_HW_RENDER_INTERFACE, ENVIRONMENT_GET_LIBRETRO_PATH,
-    ENVIRONMENT_GET_LOG_INTERFACE, ENVIRONMENT_GET_OVERSCAN, ENVIRONMENT_GET_SAVE_DIRECTORY,
-    ENVIRONMENT_GET_SYSTEM_DIRECTORY, ENVIRONMENT_GET_VARIABLE, ENVIRONMENT_GET_VARIABLE_UPDATE,
-    ENVIRONMENT_SET_GEOMETRY, ENVIRONMENT_SET_HW_RENDER, ENVIRONMENT_SET_PIXEL_FORMAT,
-    ENVIRONMENT_SET_VARIABLES, GameGeometry, HwContextType, HwRenderCallback, LogCallback,
+    ENVIRONMENT_GET_LIBRETRO_PATH, ENVIRONMENT_GET_LOG_INTERFACE, ENVIRONMENT_GET_OVERSCAN,
+    ENVIRONMENT_GET_SAVE_DIRECTORY, ENVIRONMENT_GET_SYSTEM_DIRECTORY, ENVIRONMENT_GET_VARIABLE,
+    ENVIRONMENT_GET_VARIABLE_UPDATE, ENVIRONMENT_SET_GEOMETRY, ENVIRONMENT_SET_HW_RENDER,
+    ENVIRONMENT_SET_PIXEL_FORMAT, ENVIRONMENT_SET_VARIABLES, GameGeometry, LogCallback,
     PixelFormat, Variable,
 };
 
@@ -22,9 +21,7 @@ use super::util::{
     c_string, log_callback, path_to_c_string, read_u32, runtime_root_for_core, write_ptr,
 };
 use crate::core::error::CoreError;
-use crate::core::host::hardware::{
-    HardwareRenderContext, VulkanNegotiationInterface, write_negotiation_support,
-};
+use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
@@ -54,9 +51,7 @@ pub struct CallbackState {
     frame_serial: u64,
     pixel_format: PixelLayout,
     hardware_render: Option<HardwareRenderContext>,
-    pending_vulkan_render: Option<HwRenderCallback>,
     hardware_render_error: Option<String>,
-    vulkan_negotiation: Option<VulkanNegotiationInterface>,
     log_callback: LogCallback,
     geometry: Option<(usize, usize)>,
 }
@@ -122,9 +117,7 @@ impl CallbackState {
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
             hardware_render: None,
-            pending_vulkan_render: None,
             hardware_render_error: None,
-            vulkan_negotiation: None,
             log_callback: LogCallback { log: log_callback },
             geometry: None,
         })
@@ -299,13 +292,6 @@ impl CallbackState {
                 true
             }
             ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER => false,
-            ENVIRONMENT_GET_HW_RENDER_INTERFACE => self.get_hardware_render_interface(data),
-            cmd if cmd == EnvironmentCmd::SetHwRenderContextNegotiationInterface.code() => {
-                self.set_hardware_render_context_negotiation_interface(data)
-            }
-            cmd if cmd == EnvironmentCmd::GetHwRenderContextNegotiationInterfaceSupport.code() => {
-                write_negotiation_support(data)
-            }
             ENVIRONMENT_SET_HW_RENDER => self.set_hardware_render(data),
             _ => false,
         }
@@ -316,21 +302,6 @@ impl CallbackState {
     }
 
     pub fn reset_hardware_context(&mut self) -> Result<(), CoreError> {
-        if self.hardware_render.is_none()
-            && let Some(mut callback) = self.pending_vulkan_render.take()
-        {
-            match HardwareRenderContext::from_callback(&mut callback, self.vulkan_negotiation) {
-                Ok(context) => {
-                    self.hardware_render = Some(context);
-                    self.hardware_render_error = None;
-                }
-                Err(message) => {
-                    self.hardware_render_error = Some(message.clone());
-                    return Err(CoreError::HardwareRenderFailed { message });
-                }
-            }
-        }
-
         let Some(context) = self.hardware_render.as_ref() else {
             return Ok(());
         };
@@ -343,7 +314,6 @@ impl CallbackState {
         if let Some(context) = self.hardware_render.as_ref() {
             context.destroy_core_context();
         }
-        self.pending_vulkan_render = None;
     }
 
     fn set_variables(&mut self, data: *mut c_void) -> bool {
@@ -431,18 +401,9 @@ impl CallbackState {
         }
 
         let callback = unsafe { &mut *data.cast::<libretro_sys::HwRenderCallback>() };
-        if callback.context_type == HwContextType::Vulkan as u32 {
-            HardwareRenderContext::prepare_vulkan_callback(callback);
-            self.pending_vulkan_render = Some(callback.clone());
-            self.hardware_render = None;
-            self.hardware_render_error = None;
-            return true;
-        }
-
-        match HardwareRenderContext::from_callback(callback, self.vulkan_negotiation) {
+        match HardwareRenderContext::from_callback(callback) {
             Ok(context) => {
                 self.hardware_render = Some(context);
-                self.pending_vulkan_render = None;
                 self.hardware_render_error = None;
                 true
             }
@@ -451,28 +412,6 @@ impl CallbackState {
                 false
             }
         }
-    }
-
-    fn set_hardware_render_context_negotiation_interface(&mut self, data: *mut c_void) -> bool {
-        self.vulkan_negotiation = VulkanNegotiationInterface::from_raw(data);
-        self.vulkan_negotiation.is_some()
-    }
-
-    fn get_hardware_render_interface(&self, data: *mut c_void) -> bool {
-        if data.is_null() {
-            return false;
-        }
-        let Some(pointer) = self
-            .hardware_render
-            .as_ref()
-            .and_then(HardwareRenderContext::interface_ptr)
-        else {
-            return false;
-        };
-        unsafe {
-            *data.cast::<*const c_void>() = pointer;
-        }
-        true
     }
 
     pub(super) fn store_video_frame(

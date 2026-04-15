@@ -16,11 +16,6 @@ use libretro_sys::{
 
 use crate::core::video::VideoFrame;
 
-mod vulkan;
-
-use vulkan::VulkanRenderContext;
-pub use vulkan::{VulkanNegotiationInterface, write_negotiation_support};
-
 const EGL_FALSE: EglBoolean = 0;
 const EGL_NONE: EglInt = 0x3038;
 const EGL_RED_SIZE: EglInt = 0x3024;
@@ -94,73 +89,7 @@ struct GlFns {
     finish: GlFinish,
 }
 
-pub enum HardwareRenderContext {
-    OpenGl(OpenGlRenderContext),
-    Vulkan(Box<VulkanRenderContext>),
-}
-
-impl HardwareRenderContext {
-    pub fn prepare_vulkan_callback(callback: &mut HwRenderCallback) {
-        VulkanRenderContext::prepare_callback(callback);
-    }
-
-    pub fn from_callback(
-        callback: &mut HwRenderCallback,
-        vulkan_negotiation: Option<VulkanNegotiationInterface>,
-    ) -> Result<Self, String> {
-        match context_type(callback.context_type) {
-            Some(HwContextType::OpenGL | HwContextType::OpenGLCore) => {
-                OpenGlRenderContext::from_callback(callback).map(Self::OpenGl)
-            }
-            Some(HwContextType::Vulkan) => {
-                let mut context = Box::new(VulkanRenderContext::from_callback(
-                    callback,
-                    vulkan_negotiation,
-                )?);
-                context.set_interface_handle();
-                Ok(Self::Vulkan(context))
-            }
-            context_type => Err(format!(
-                "hardware context {:?} is not supported by this host yet",
-                context_type
-            )),
-        }
-    }
-
-    pub fn can_capture(data: *const c_void) -> bool {
-        data == HW_FRAME_BUFFER_VALID
-    }
-
-    pub fn interface_ptr(&self) -> Option<*const c_void> {
-        match self {
-            Self::OpenGl(_) => None,
-            Self::Vulkan(context) => Some(context.interface_ptr()),
-        }
-    }
-
-    pub fn reset_core_context(&self) -> Result<(), String> {
-        match self {
-            Self::OpenGl(context) => context.reset_core_context(),
-            Self::Vulkan(context) => context.reset_core_context(),
-        }
-    }
-
-    pub fn destroy_core_context(&self) {
-        match self {
-            Self::OpenGl(context) => context.destroy_core_context(),
-            Self::Vulkan(context) => context.destroy_core_context(),
-        }
-    }
-
-    pub fn capture_frame(&mut self, width: usize, height: usize) -> Option<VideoFrame> {
-        match self {
-            Self::OpenGl(context) => context.capture_frame(width, height),
-            Self::Vulkan(context) => context.capture_frame(width, height),
-        }
-    }
-}
-
-pub struct OpenGlRenderContext {
+pub struct HardwareRenderContext {
     egl: &'static EglFns,
     display: EglDisplay,
     surface: EglSurface,
@@ -171,7 +100,7 @@ pub struct OpenGlRenderContext {
     scratch: Vec<u8>,
 }
 
-impl OpenGlRenderContext {
+impl HardwareRenderContext {
     pub fn from_callback(callback: &mut HwRenderCallback) -> Result<Self, String> {
         let context_type = context_type(callback.context_type);
         if !matches!(
@@ -206,6 +135,10 @@ impl OpenGlRenderContext {
             gl,
             scratch: Vec::new(),
         })
+    }
+
+    pub fn can_capture(data: *const c_void) -> bool {
+        data == HW_FRAME_BUFFER_VALID
     }
 
     pub fn reset_core_context(&self) -> Result<(), String> {
@@ -253,7 +186,7 @@ impl OpenGlRenderContext {
     }
 }
 
-impl Drop for OpenGlRenderContext {
+impl Drop for HardwareRenderContext {
     fn drop(&mut self) {
         unsafe {
             let _ = (self.egl.make_current)(
@@ -344,8 +277,8 @@ impl GlFns {
     }
 }
 
-unsafe impl Send for OpenGlRenderContext {}
-unsafe impl Sync for OpenGlRenderContext {}
+unsafe impl Send for HardwareRenderContext {}
+unsafe impl Sync for HardwareRenderContext {}
 
 fn egl_fns() -> Result<&'static EglFns, String> {
     static EGL: OnceLock<Result<EglFns, String>> = OnceLock::new();
@@ -504,7 +437,6 @@ fn context_type(value: libc::c_uint) -> Option<HwContextType> {
         value if value == HwContextType::OpenGLESVersion as libc::c_uint => {
             Some(HwContextType::OpenGLESVersion)
         }
-        value if value == HwContextType::Vulkan as libc::c_uint => Some(HwContextType::Vulkan),
         value if value == HwContextType::None as libc::c_uint => Some(HwContextType::None),
         _ => None,
     }
