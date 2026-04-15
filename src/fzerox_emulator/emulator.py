@@ -36,12 +36,6 @@ class Emulator:
             baseline_state_path.resolve() if baseline_state_path is not None else None
         )
         self._renderer = renderer
-        if self._renderer != "angrylion":
-            raise RuntimeError(
-                f"Renderer {self._renderer!r} is not supported by the current host. "
-                "The libretro embedding still uses the software framebuffer path, "
-                "so hardware-render plugins like gliden64 are not wired up yet."
-            )
         self._native = NativeEmulator(
             str(self._core_path),
             str(self._rom_path),

@@ -144,9 +144,7 @@ class RaceV4RewardTracker:
         if telemetry is None or not telemetry.in_race_mode:
             return info
         self._progress.ensure_origin(telemetry)
-        current_relative_progress = self._progress.relative_distance(
-            telemetry.player.race_distance
-        )
+        current_relative_progress = self._progress.relative_distance(telemetry.player.race_distance)
         next_milestone_distance = self._next_milestone_distance()
         info["race_laps_completed"] = completed_race_laps(telemetry)
         info["next_milestone_distance"] = next_milestone_distance

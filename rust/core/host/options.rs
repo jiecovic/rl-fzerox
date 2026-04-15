@@ -14,8 +14,13 @@ pub fn default_option_value(spec: &str) -> String {
 
 /// Override core options that the host wants to pin explicitly.
 pub fn override_option(key: &str, default_value: &str, renderer: &CStr) -> String {
+    let renderer_name = renderer.to_string_lossy();
     match key {
-        "mupen64plus-rdp-plugin" => renderer.to_string_lossy().into_owned(),
+        "mupen64plus-rdp-plugin" => renderer_name.into_owned(),
+        // Keep GLideN64 readback close to native N64 resolution. Higher
+        // viewport defaults move more pixels over the CPU/GPU boundary and are
+        // counterproductive for RL observations.
+        "mupen64plus-43screensize" if renderer_name == "gliden64" => "320x240".to_owned(),
         _ => default_value.to_owned(),
     }
 }

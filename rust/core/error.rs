@@ -57,6 +57,9 @@ pub enum CoreError {
     LoadGameFailed {
         path: PathBuf,
     },
+    HardwareRenderFailed {
+        message: String,
+    },
     InvalidObservationPreset {
         name: String,
     },
@@ -163,6 +166,9 @@ impl Display for CoreError {
                     "Libretro core could not load ROM '{}'",
                     path.display()
                 )
+            }
+            Self::HardwareRenderFailed { message } => {
+                write!(formatter, "Hardware renderer setup failed: {message}")
             }
             Self::InvalidObservationPreset { name } => {
                 write!(formatter, "Unknown observation preset '{name}'")

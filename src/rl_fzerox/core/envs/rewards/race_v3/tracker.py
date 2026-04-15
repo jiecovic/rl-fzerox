@@ -178,9 +178,7 @@ class RaceV3RewardTracker:
             "pending_progress_reward_frames": self._pending_progress_frames,
             "energy_gain_cooldown_frames_remaining": (self._energy_gain_cooldown_frames_remaining),
             "boost_pad_reward_progress_window": self._weights.boost_pad_reward_progress_window,
-            "rewarded_boost_pad_progress_windows": len(
-                self._rewarded_boost_pad_progress_windows
-            ),
+            "rewarded_boost_pad_progress_windows": len(self._rewarded_boost_pad_progress_windows),
             "damage_taken_streak_frames": self._damage.streak_frames,
             "rewarded_laps_completed": self._awarded_laps_completed,
         }
@@ -281,11 +279,7 @@ class RaceV3RewardTracker:
 
     def _boost_pad_reward(self, summary: StepSummary) -> float:
         reward = self._weights.boost_pad_reward
-        if (
-            reward <= 0.0
-            or not summary.entered_dash_pad_boost
-            or summary.reverse_active_frames > 0
-        ):
+        if reward <= 0.0 or not summary.entered_dash_pad_boost or summary.reverse_active_frames > 0:
             return 0.0
         progress_window = self._weights.boost_pad_reward_progress_window
         if progress_window <= 0.0:

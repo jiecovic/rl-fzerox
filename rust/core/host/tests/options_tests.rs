@@ -20,3 +20,13 @@ fn override_option_uses_requested_renderer() {
         "gliden64"
     );
 }
+
+#[test]
+fn override_option_keeps_gliden64_at_native_resolution() {
+    let renderer = CString::new("gliden64").expect("renderer");
+
+    assert_eq!(
+        override_option("mupen64plus-43screensize", "640x480", renderer.as_c_str()),
+        "320x240"
+    );
+}

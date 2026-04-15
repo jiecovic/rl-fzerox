@@ -229,9 +229,7 @@ class ControlStateTracker:
 
     def _update_boost_timing(self, *, boost_requested: bool, frames_elapsed: int) -> None:
         lockout_frames = max(int(self.boost_request_lockout_frames), 0)
-        boost_decision_slot_was_open = (
-            self._episode_frame_index >= self._next_boost_decision_frame
-        )
+        boost_decision_slot_was_open = self._episode_frame_index >= self._next_boost_decision_frame
         if boost_requested and lockout_frames > 0:
             self._boost_request_lockout_remaining_frames = max(
                 lockout_frames - frames_elapsed,

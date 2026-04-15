@@ -26,14 +26,33 @@ def test_emulator_rejects_missing_rom(tmp_path: Path) -> None:
         Emulator(core_path=core_path, rom_path=missing_rom)
 
 
-def test_emulator_rejects_unsupported_renderer(tmp_path: Path) -> None:
+def test_emulator_passes_renderer_to_native_backend(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     core_path.touch()
     rom_path.touch()
 
-    with pytest.raises(RuntimeError, match="gliden64"):
+    class NativeStub:
+        def __init__(
+            self,
+            core: str,
+            rom: str,
+            runtime_dir: str | None,
+            baseline_state_path: str | None,
+            renderer: str,
+        ) -> None:
+            assert core == str(core_path.resolve())
+            assert rom == str(rom_path.resolve())
+            assert runtime_dir is None
+            assert baseline_state_path is None
+            assert renderer == "gliden64"
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("fzerox_emulator.emulator.NativeEmulator", NativeStub)
+    try:
         Emulator(core_path=core_path, rom_path=rom_path, renderer="gliden64")
+    finally:
+        monkeypatch.undo()
 
 
 def test_try_read_telemetry_returns_none_when_native_binding_reports_no_snapshot() -> None:

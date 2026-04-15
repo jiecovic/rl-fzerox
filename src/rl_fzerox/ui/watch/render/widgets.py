@@ -376,9 +376,7 @@ def _draw_steer_fill(*, pygame, screen, track, value: float) -> None:
         return
 
     fill_color = (
-        STEER_DEADZONE_COLOR
-        if magnitude <= STEER_AXIS_GUIDE.deadzone
-        else PALETTE.text_primary
+        STEER_DEADZONE_COLOR if magnitude <= STEER_AXIS_GUIDE.deadzone else PALETTE.text_primary
     )
     normal_magnitude = min(magnitude, STEER_AXIS_GUIDE.saturation)
     _draw_steer_segment(
