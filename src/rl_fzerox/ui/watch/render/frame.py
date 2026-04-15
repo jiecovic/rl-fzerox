@@ -51,6 +51,8 @@ def _ensure_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
 ):
+    if screen is None:
+        return _create_screen(pygame, game_display_size, observation_shape)
     if screen.get_size() == _window_size(game_display_size, observation_shape):
         return screen
     return _create_screen(pygame, game_display_size, observation_shape)
@@ -98,8 +100,9 @@ def _draw_frame(
     game_surface = _rgb_surface(pygame, raw_frame)
     if game_surface.get_size() != game_display_size:
         # Hardware renderers may expose different framebuffer sizes. Keep the
-        # watch layout stable and scale the renderer output into one UI target.
-        game_surface = pygame.transform.smoothscale(game_surface, game_display_size)
+        # watch layout stable; nearest-neighbor scaling keeps fast-forward draw
+        # ticks cheaper than filtering the diagnostic preview.
+        game_surface = pygame.transform.scale(game_surface, game_display_size)
 
     preview_frame = _preview_frame(observation)
     observation_display_size = _observation_preview_size(observation.shape)

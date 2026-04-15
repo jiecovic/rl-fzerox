@@ -1,7 +1,6 @@
 # src/rl_fzerox/ui/watch/session.py
 from __future__ import annotations
 
-import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
@@ -105,35 +104,25 @@ def _save_baseline_state(*, emulator: Emulator, baseline_state_path: Path | None
     emulator.capture_current_as_baseline(baseline_state_path)
 
 
-def _with_viewer_fps(
+def _with_viewer_rates(
     info: dict[str, object],
     *,
-    last_draw_time: float | None,
-    current_viewer_fps: float,
     action_repeat: int,
-    current_control_fps: float | None = None,
+    current_control_fps: float,
+    current_render_fps: float,
     target_control_fps: float | None = None,
     target_render_fps: float | None = None,
-) -> tuple[dict[str, object], float, float]:
-    now = time.perf_counter()
-    if last_draw_time is None:
-        viewer_fps = current_viewer_fps
-    else:
-        dt = now - last_draw_time
-        instant_fps = 0.0 if dt <= 0.0 else 1.0 / dt
-        viewer_fps = (
-            instant_fps
-            if current_viewer_fps <= 0.0
-            else ((0.8 * current_viewer_fps) + (0.2 * instant_fps))
-        )
+) -> dict[str, object]:
     draw_info = dict(info)
-    draw_info["viewer_fps"] = viewer_fps
-    draw_info["render_fps"] = viewer_fps
-    measured_control_fps = viewer_fps if current_control_fps is None else current_control_fps
-    draw_info["control_fps"] = measured_control_fps
-    draw_info["game_fps"] = measured_control_fps * float(action_repeat)
+    draw_info["viewer_fps"] = current_render_fps
+    draw_info["render_fps"] = current_render_fps
+    draw_info["control_fps"] = current_control_fps
+    draw_info["game_fps"] = current_control_fps * float(action_repeat)
     draw_info["control_fps_target"] = (
         "unlimited" if target_control_fps is None else target_control_fps
     )
+    draw_info["game_fps_target"] = (
+        "unlimited" if target_control_fps is None else target_control_fps * float(action_repeat)
+    )
     draw_info["render_fps_target"] = "unlimited" if target_render_fps is None else target_render_fps
-    return draw_info, now, viewer_fps
+    return draw_info
