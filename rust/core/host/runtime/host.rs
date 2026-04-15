@@ -310,6 +310,7 @@ impl Host {
             return;
         }
 
+        self.destroy_hardware_context();
         self.call_core(|core| unsafe {
             core.unload_game();
             core.deinit();
@@ -324,6 +325,12 @@ impl Host {
         let callbacks = self.callbacks.as_mut() as *mut CallbackState;
         let _guard = CallbackGuard::activate(callbacks);
         action(&self.core)
+    }
+
+    fn destroy_hardware_context(&mut self) {
+        let callbacks = self.callbacks.as_mut() as *mut CallbackState;
+        let _guard = CallbackGuard::activate(callbacks);
+        with_silenced_stdio(|| self.callbacks.destroy_hardware_context());
     }
 
     pub(super) fn ensure_open(&self) -> Result<(), CoreError> {

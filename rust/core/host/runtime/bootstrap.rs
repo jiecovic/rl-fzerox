@@ -7,8 +7,8 @@ use libretro_sys::{DEVICE_JOYPAD, GameInfo};
 
 use super::host::Host;
 use crate::core::callbacks::{
-    audio_sample_batch_callback, audio_sample_callback, environment_callback, input_device,
-    input_poll_callback, input_state_callback, video_refresh_callback,
+    CallbackGuard, audio_sample_batch_callback, audio_sample_callback, environment_callback,
+    input_device, input_poll_callback, input_state_callback, video_refresh_callback,
 };
 use crate::core::error::CoreError;
 use crate::core::stdio::with_silenced_stdio;
@@ -48,7 +48,7 @@ impl Host {
             })
         });
         if loaded {
-            with_silenced_stdio(|| self.callbacks.reset_hardware_context())
+            self.reset_hardware_context()
         } else if let Some(message) = self.callbacks.take_hardware_render_error() {
             Err(CoreError::HardwareRenderFailed { message })
         } else {
@@ -56,6 +56,14 @@ impl Host {
                 path: self.rom_path.clone(),
             })
         }
+    }
+
+    fn reset_hardware_context(&mut self) -> Result<(), CoreError> {
+        // A hardware context reset is a core callback in reverse: the core can
+        // synchronously call back into the frontend for API-specific handles.
+        let callbacks = self.callbacks.as_mut() as *mut _;
+        let _guard = CallbackGuard::activate(callbacks);
+        with_silenced_stdio(|| self.callbacks.reset_hardware_context())
     }
 
     pub(super) fn refresh_av_info(&mut self) {
