@@ -543,6 +543,8 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "        race_laps_completed_mean_gte: 3.0",
             "      action_mask:",
             "        shoulder: [0]",
+            "      train:",
+            "        ent_coef: 0.01",
             "    - name: drift_enabled",
             "      action_mask:",
             "        shoulder: [0, 1, 2]",
@@ -563,6 +565,8 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
     assert len(config.curriculum.stages) == 2
     assert config.curriculum.stages[0].until is not None
     assert config.curriculum.stages[0].until.race_laps_completed_mean_gte == 3.0
+    assert config.curriculum.stages[0].train is not None
+    assert config.curriculum.stages[0].train.ent_coef == 0.01
 
 
 def test_load_train_app_config_reads_recurrent_policy_fields(tmp_path: Path) -> None:

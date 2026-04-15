@@ -55,7 +55,7 @@ def _validate_sac_training_config(config: TrainAppConfig) -> None:
     if config.env.action.mask is not None:
         raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
     if config.curriculum.enabled:
-        raise RuntimeError("SAC does not support action-mask curriculum stages")
+        raise RuntimeError("SAC does not support curriculum stages")
     if config.env.observation.mode == "image_state" and config.train.optimize_memory_usage:
         raise RuntimeError(
             "SAC optimize_memory_usage is not supported with Dict image_state observations"

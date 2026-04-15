@@ -3,8 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from typing import Protocol, runtime_checkable
 
-from rl_fzerox.core.config.schema import CurriculumConfig, TrainConfig
+from rl_fzerox.core.config.schema import (
+    CurriculumConfig,
+    CurriculumTrainOverridesConfig,
+    TrainConfig,
+)
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,
@@ -37,6 +42,11 @@ _TRUNCATION_REASON_KEYS: tuple[str, ...] = (
     "progress_stalled",
     "timeout",
 )
+
+
+@runtime_checkable
+class _EntropyCoefficientModel(Protocol):
+    ent_coef: float
 
 
 @dataclass
@@ -213,17 +223,14 @@ def build_callbacks(
             return True
 
     class CurriculumCallback(BaseCallback):
-        """Promote the action-mask curriculum when episode metrics cross thresholds."""
+        """Promote curriculum stages and apply their rollout-time overrides."""
 
         def __init__(self, curriculum: CurriculumConfig) -> None:
             super().__init__(verbose=0)
             self._controller = ActionMaskCurriculumController(curriculum)
 
         def _on_training_start(self) -> None:
-            stage_index = self._controller.stage_index
-            if stage_index is None:
-                return
-            self.training_env.env_method("set_curriculum_stage", stage_index)
+            self._apply_current_stage()
 
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
@@ -232,7 +239,7 @@ def build_callbacks(
 
             promoted_stage = self._controller.record_episodes(_episode_dicts(infos))
             if promoted_stage is not None:
-                self.training_env.env_method("set_curriculum_stage", promoted_stage)
+                self._apply_current_stage()
             return True
 
         def _on_rollout_end(self) -> None:
@@ -241,6 +248,19 @@ def build_callbacks(
                 "curriculum/stage",
                 -1 if stage_index is None else stage_index,
             )
+            ent_coef = _stage_ent_coef(self._controller.stage_train_overrides)
+            if ent_coef is not None:
+                self.logger.record("curriculum/ent_coef", ent_coef)
+
+        def _apply_current_stage(self) -> None:
+            stage_index = self._controller.stage_index
+            if stage_index is None:
+                return
+            self.training_env.env_method("set_curriculum_stage", stage_index)
+            ent_coef = _stage_ent_coef(self._controller.stage_train_overrides)
+            if ent_coef is None:
+                return
+            _set_model_ent_coef(self.model, ent_coef)
 
     adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
     callbacks: list[BaseCallback] = [
@@ -281,6 +301,18 @@ def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
         if isinstance(episode, dict):
             episodes.append(episode)
     return episodes
+
+
+def _stage_ent_coef(overrides: CurriculumTrainOverridesConfig | None) -> float | None:
+    if overrides is None or overrides.ent_coef is None:
+        return None
+    return float(overrides.ent_coef)
+
+
+def _set_model_ent_coef(model: object, ent_coef: float) -> None:
+    if not isinstance(model, _EntropyCoefficientModel):
+        raise RuntimeError("Curriculum train.ent_coef requires a PPO-family model")
+    model.ent_coef = ent_coef
 
 
 def _numeric_episode_values(
