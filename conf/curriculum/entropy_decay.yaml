@@ -1,0 +1,23 @@
+# Entropy-only PPO curriculum. Useful for starting exploratory, then making
+# deterministic fine-tuning easier once the agent reliably reaches later laps.
+enabled: true
+# Promotion metric uses the mean over the last N completed episodes.
+smoothing_episodes: 10
+# Stay in each stage for at least this many completed episodes.
+min_stage_episodes: 20
+stages:
+  - name: explore
+    train:
+      ent_coef: 0.01
+    until:
+      # Promote after the policy usually completes at least one lap.
+      race_laps_completed_mean_gte: 1.0
+  - name: stabilize
+    train:
+      ent_coef: 0.003
+    until:
+      # Promote after the policy usually finishes the full race.
+      race_laps_completed_mean_gte: 3.0
+  - name: finetune
+    train:
+      ent_coef: 0.0

@@ -4,7 +4,11 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Sequence
 
-from rl_fzerox.core.config.schema import CurriculumConfig, CurriculumStageConfig
+from rl_fzerox.core.config.schema import (
+    CurriculumConfig,
+    CurriculumStageConfig,
+    CurriculumTrainOverridesConfig,
+)
 
 
 class ActionMaskCurriculumController:
@@ -36,6 +40,14 @@ class ActionMaskCurriculumController:
         if self._stage_index is None:
             return None
         return self._config.stages[self._stage_index].name
+
+    @property
+    def stage_train_overrides(self) -> CurriculumTrainOverridesConfig | None:
+        """Return train overrides for the current stage, if configured."""
+
+        if self._stage_index is None:
+            return None
+        return self._config.stages[self._stage_index].train
 
     def record_episodes(self, episodes: Sequence[dict[str, object]]) -> int | None:
         """Update the smoothing windows and return a promoted stage index, if any."""

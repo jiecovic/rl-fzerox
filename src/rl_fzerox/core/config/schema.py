@@ -342,6 +342,14 @@ class PolicyConfig(BaseModel):
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)
 
 
+class CurriculumTrainOverridesConfig(BaseModel):
+    """Training hyperparameter overrides applied while one stage is active."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ent_coef: NonNegativeFloat | None = None
+
+
 class CurriculumTriggerConfig(BaseModel):
     """Episode-smoothed promotion condition for one curriculum stage."""
 
@@ -366,13 +374,14 @@ class CurriculumTriggerConfig(BaseModel):
 
 
 class CurriculumStageConfig(BaseModel):
-    """One curriculum stage with optional promotion trigger and mask override."""
+    """One curriculum stage with optional promotion trigger and overrides."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
     until: CurriculumTriggerConfig | None = None
     action_mask: ActionMaskConfig | None = None
+    train: CurriculumTrainOverridesConfig | None = None
 
 
 class CurriculumConfig(BaseModel):

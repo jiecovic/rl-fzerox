@@ -11,6 +11,7 @@ from rl_fzerox.core.config.schema import (
     ActionMaskConfig,
     CurriculumConfig,
     CurriculumStageConfig,
+    CurriculumTrainOverridesConfig,
     CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
@@ -326,6 +327,111 @@ def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> Non
     assert promoted_stage == 1
     assert controller.stage_index == 1
     assert controller.stage_name == "drift_enabled"
+
+
+def test_curriculum_controller_exposes_active_train_overrides() -> None:
+    controller = ActionMaskCurriculumController(
+        CurriculumConfig(
+            enabled=True,
+            smoothing_episodes=1,
+            min_stage_episodes=1,
+            stages=(
+                CurriculumStageConfig(
+                    name="explore",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
+                    train=CurriculumTrainOverridesConfig(ent_coef=0.01),
+                ),
+                CurriculumStageConfig(
+                    name="finetune",
+                    train=CurriculumTrainOverridesConfig(ent_coef=0.0),
+                ),
+            ),
+        )
+    )
+
+    assert controller.stage_train_overrides is not None
+    assert controller.stage_train_overrides.ent_coef == 0.01
+
+    promoted_stage = controller.record_episodes(
+        [{"race_laps_completed": 1, "milestones_completed": 0}]
+    )
+
+    assert promoted_stage == 1
+    assert controller.stage_train_overrides is not None
+    assert controller.stage_train_overrides.ent_coef == 0.0
+
+
+def test_curriculum_callback_applies_stage_ent_coef(tmp_path: Path) -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    curriculum = CurriculumConfig(
+        enabled=True,
+        smoothing_episodes=1,
+        min_stage_episodes=1,
+        stages=(
+            CurriculumStageConfig(
+                name="explore",
+                until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
+                train=CurriculumTrainOverridesConfig(ent_coef=0.01),
+            ),
+            CurriculumStageConfig(
+                name="finetune",
+                train=CurriculumTrainOverridesConfig(ent_coef=0.0),
+            ),
+        ),
+    )
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    callbacks = build_callbacks(
+        train_config=TrainConfig(save_freq=1_000, num_envs=1),
+        curriculum_config=curriculum,
+        run_paths=run_paths,
+    )
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+                curriculum_config=curriculum,
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+                ent_coef=0.0,
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+        callbacks.init_callback(model)
+        callbacks.on_training_start({}, {})
+
+        assert model.ent_coef == pytest.approx(0.01)
+
+        callbacks.update_locals(
+            {
+                "infos": [
+                    {
+                        "episode": {
+                            "race_laps_completed": 1,
+                            "milestones_completed": 0,
+                        }
+                    }
+                ]
+            }
+        )
+        callbacks.on_step()
+
+        assert model.ent_coef == pytest.approx(0.0)
+    finally:
+        env.close()
 
 
 def test_resolve_effective_training_algorithm_uses_maskable_auto_mode(
