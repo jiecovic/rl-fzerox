@@ -5,6 +5,7 @@
 //! processing, and runtime helpers used by the Python-facing bindings.
 
 pub mod callbacks;
+mod hardware;
 pub mod input;
 pub mod options;
 pub mod runtime;

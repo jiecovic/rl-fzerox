@@ -21,6 +21,7 @@ use super::util::{
     c_string, log_callback, path_to_c_string, read_u32, runtime_root_for_core, write_ptr,
 };
 use crate::core::error::CoreError;
+use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
@@ -49,6 +50,8 @@ pub struct CallbackState {
     capture_video: bool,
     frame_serial: u64,
     pixel_format: PixelLayout,
+    hardware_render: Option<HardwareRenderContext>,
+    hardware_render_error: Option<String>,
     log_callback: LogCallback,
     geometry: Option<(usize, usize)>,
 }
@@ -113,6 +116,8 @@ impl CallbackState {
             capture_video: true,
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,
+            hardware_render: None,
+            hardware_render_error: None,
             log_callback: LogCallback { log: log_callback },
             geometry: None,
         })
@@ -287,9 +292,22 @@ impl CallbackState {
                 true
             }
             ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER => false,
-            ENVIRONMENT_SET_HW_RENDER => false,
+            ENVIRONMENT_SET_HW_RENDER => self.set_hardware_render(data),
             _ => false,
         }
+    }
+
+    pub fn take_hardware_render_error(&mut self) -> Option<String> {
+        self.hardware_render_error.take()
+    }
+
+    pub fn reset_hardware_context(&mut self) -> Result<(), CoreError> {
+        let Some(context) = self.hardware_render.as_ref() else {
+            return Ok(());
+        };
+        context
+            .reset_core_context()
+            .map_err(|message| CoreError::HardwareRenderFailed { message })
     }
 
     fn set_variables(&mut self, data: *mut c_void) -> bool {
@@ -370,6 +388,26 @@ impl CallbackState {
         self.geometry = Some((geometry.base_width as usize, geometry.base_height as usize));
     }
 
+    fn set_hardware_render(&mut self, data: *mut c_void) -> bool {
+        if data.is_null() {
+            self.hardware_render_error = Some("SET_HW_RENDER received null callback".to_owned());
+            return false;
+        }
+
+        let callback = unsafe { &mut *data.cast::<libretro_sys::HwRenderCallback>() };
+        match HardwareRenderContext::from_callback(callback) {
+            Ok(context) => {
+                self.hardware_render = Some(context);
+                self.hardware_render_error = None;
+                true
+            }
+            Err(message) => {
+                self.hardware_render_error = Some(message);
+                false
+            }
+        }
+    }
+
     pub(super) fn store_video_frame(
         &mut self,
         data: *const c_void,
@@ -379,6 +417,17 @@ impl CallbackState {
     ) {
         self.geometry = Some((width, height));
         if !self.capture_video {
+            return;
+        }
+
+        if HardwareRenderContext::can_capture(data) {
+            if let Some(hardware_render) = self.hardware_render.as_mut()
+                && let Some(frame) = hardware_render.capture_frame(width, height)
+            {
+                self.raw_frame = None;
+                self.frame = Some(frame);
+                self.frame_serial += 1;
+            }
             return;
         }
 

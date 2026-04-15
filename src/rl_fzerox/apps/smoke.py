@@ -37,7 +37,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--renderer",
-        choices=("angrylion",),
+        choices=("angrylion", "gliden64", "parallel"),
         default="angrylion",
         help="Retro plugin renderer to request from the core.",
     )
