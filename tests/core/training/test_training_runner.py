@@ -339,17 +339,33 @@ def test_curriculum_controller_exposes_active_train_overrides() -> None:
                 CurriculumStageConfig(
                     name="explore",
                     until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
-                    train=CurriculumTrainOverridesConfig(ent_coef=0.01),
+                    train=CurriculumTrainOverridesConfig(
+                        learning_rate=2.0e-4,
+                        n_epochs=5,
+                        batch_size=512,
+                        clip_range=0.2,
+                        ent_coef=0.01,
+                    ),
                 ),
                 CurriculumStageConfig(
                     name="finetune",
-                    train=CurriculumTrainOverridesConfig(ent_coef=0.0),
+                    train=CurriculumTrainOverridesConfig(
+                        learning_rate=3.0e-5,
+                        n_epochs=2,
+                        batch_size=1024,
+                        clip_range=0.1,
+                        ent_coef=0.0,
+                    ),
                 ),
             ),
         )
     )
 
     assert controller.stage_train_overrides is not None
+    assert controller.stage_train_overrides.learning_rate == 2.0e-4
+    assert controller.stage_train_overrides.n_epochs == 5
+    assert controller.stage_train_overrides.batch_size == 512
+    assert controller.stage_train_overrides.clip_range == 0.2
     assert controller.stage_train_overrides.ent_coef == 0.01
 
     promoted_stage = controller.record_episodes(
@@ -358,10 +374,14 @@ def test_curriculum_controller_exposes_active_train_overrides() -> None:
 
     assert promoted_stage == 1
     assert controller.stage_train_overrides is not None
+    assert controller.stage_train_overrides.learning_rate == 3.0e-5
+    assert controller.stage_train_overrides.n_epochs == 2
+    assert controller.stage_train_overrides.batch_size == 1024
+    assert controller.stage_train_overrides.clip_range == 0.1
     assert controller.stage_train_overrides.ent_coef == 0.0
 
 
-def test_curriculum_callback_applies_stage_ent_coef(tmp_path: Path) -> None:
+def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     curriculum = CurriculumConfig(
@@ -372,11 +392,23 @@ def test_curriculum_callback_applies_stage_ent_coef(tmp_path: Path) -> None:
             CurriculumStageConfig(
                 name="explore",
                 until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
-                train=CurriculumTrainOverridesConfig(ent_coef=0.01),
+                train=CurriculumTrainOverridesConfig(
+                    learning_rate=2.0e-4,
+                    n_epochs=5,
+                    batch_size=4,
+                    clip_range=0.2,
+                    ent_coef=0.01,
+                ),
             ),
             CurriculumStageConfig(
                 name="finetune",
-                train=CurriculumTrainOverridesConfig(ent_coef=0.0),
+                train=CurriculumTrainOverridesConfig(
+                    learning_rate=3.0e-5,
+                    n_epochs=2,
+                    batch_size=4,
+                    clip_range=0.1,
+                    ent_coef=0.0,
+                ),
             ),
         ),
     )
@@ -413,6 +445,13 @@ def test_curriculum_callback_applies_stage_ent_coef(tmp_path: Path) -> None:
         callbacks.init_callback(model)
         callbacks.on_training_start({}, {})
 
+        assert model.lr_schedule(1.0) == pytest.approx(2.0e-4)
+        assert model.policy.optimizer.param_groups[0]["lr"] == pytest.approx(2.0e-4)
+        assert model.n_epochs == 5
+        assert model.batch_size == 4
+        clip_range = model.clip_range
+        assert callable(clip_range)
+        assert clip_range(1.0) == pytest.approx(0.2)
         assert model.ent_coef == pytest.approx(0.01)
 
         callbacks.update_locals(
@@ -429,6 +468,13 @@ def test_curriculum_callback_applies_stage_ent_coef(tmp_path: Path) -> None:
         )
         callbacks.on_step()
 
+        assert model.lr_schedule(1.0) == pytest.approx(3.0e-5)
+        assert model.policy.optimizer.param_groups[0]["lr"] == pytest.approx(3.0e-5)
+        assert model.n_epochs == 2
+        assert model.batch_size == 4
+        clip_range = model.clip_range
+        assert callable(clip_range)
+        assert clip_range(1.0) == pytest.approx(0.1)
         assert model.ent_coef == pytest.approx(0.0)
     finally:
         env.close()
