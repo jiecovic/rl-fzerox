@@ -61,51 +61,62 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Load the watch config and launch the viewer."""
 
     args = parse_args(argv)
-    normalized_overrides = normalize_hydra_overrides(args.overrides)
-    cli_run_dir = (
-        args.policy_run_dir.expanduser().resolve() if args.policy_run_dir is not None else None
-    )
+    try:
+        config = resolve_watch_app_config(
+            config_path=args.config_path,
+            policy_run_dir=args.policy_run_dir,
+            policy_artifact=args.policy_artifact,
+            overrides=args.overrides,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    run_viewer(config)
+
+
+def resolve_watch_app_config(
+    *,
+    config_path: Path | None,
+    policy_run_dir: Path | None,
+    policy_artifact: Literal["latest", "best", "final"] | None,
+    overrides: Sequence[str],
+) -> WatchAppConfig:
+    """Resolve watch config with the same precedence used by the watch CLI."""
+
+    normalized_overrides = normalize_hydra_overrides(overrides)
+    cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
     cli_override_delta: dict[str, object] = {}
-    if args.config_path is None:
+    if config_path is None:
         if cli_run_dir is None:
-            raise SystemExit("--config is required unless --run-dir is provided")
+            raise ValueError("--config is required unless --run-dir is provided")
         if normalized_overrides:
-            raise SystemExit("Hydra overrides require --config")
-        try:
-            train_config = load_train_run_config(cli_run_dir)
-        except (FileNotFoundError, ValueError) as exc:
-            raise SystemExit(str(exc)) from exc
+            raise ValueError("Hydra overrides require --config")
+        train_config = load_train_run_config(cli_run_dir)
         config = _default_watch_config_from_train_run(
             train_config,
             run_dir=cli_run_dir,
-            artifact=args.policy_artifact or "latest",
+            artifact=policy_artifact or "latest",
         )
     else:
-        try:
-            config = load_watch_app_config(args.config_path)
-            if normalized_overrides:
-                overridden_config = load_watch_app_config(
-                    args.config_path,
-                    overrides=normalized_overrides,
-                )
-                cli_override_delta = _watch_config_delta(
-                    config,
-                    overridden_config,
-                    normalized_overrides,
-                )
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
+        config = load_watch_app_config(config_path)
+        if normalized_overrides:
+            overridden_config = load_watch_app_config(
+                config_path,
+                overrides=normalized_overrides,
+            )
+            cli_override_delta = _watch_config_delta(
+                config,
+                overridden_config,
+                normalized_overrides,
+            )
 
     policy_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
     if cli_run_dir is None and cli_override_delta:
         policy_run_dir = _apply_watch_config_delta(config, cli_override_delta).watch.policy_run_dir
-    if args.policy_artifact is not None and policy_run_dir is None:
-        raise SystemExit("--artifact requires --run-dir or watch.policy_run_dir in the config")
+    if policy_artifact is not None and policy_run_dir is None:
+        raise ValueError("--artifact requires --run-dir or watch.policy_run_dir in the config")
     if policy_run_dir is not None:
-        try:
-            train_config = load_train_run_config(policy_run_dir)
-        except (FileNotFoundError, ValueError) as exc:
-            raise SystemExit(str(exc)) from exc
+        train_config = load_train_run_config(policy_run_dir)
         config = apply_train_run_to_watch_config(
             config,
             run_dir=policy_run_dir,
@@ -113,11 +124,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         )
         if cli_override_delta:
             config = _apply_watch_config_delta(config, cli_override_delta)
-        if args.policy_artifact is not None:
+        if policy_artifact is not None:
             config = config.model_copy(
                 update={
                     "watch": config.watch.model_copy(
-                        update={"policy_artifact": args.policy_artifact}
+                        update={"policy_artifact": policy_artifact}
                     )
                 }
             )
@@ -128,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         config,
         run_dir=config.watch.policy_run_dir,
     )
-    run_viewer(config)
+    return config
 
 
 def _default_watch_config_from_train_run(
