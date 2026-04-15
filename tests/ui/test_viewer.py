@@ -495,6 +495,35 @@ def test_session_section_shows_episode_step_counter() -> None:
     assert frontier_line.value == "300 / 900"
 
 
+def test_session_section_marks_reverse_truncation_as_off() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0, "reverse_timer": 45},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label=None,
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        max_episode_steps=50_000,
+        stuck_step_limit=240,
+        wrong_way_timer_limit=None,
+        progress_frontier_stall_limit_frames=900,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = columns.left[0]
+    reverse_line = next(line for line in session_section.lines if line.label == "Reverse")
+    assert reverse_line.value == "45 / off"
+
+
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
     columns = _build_panel_columns(
         episode=0,

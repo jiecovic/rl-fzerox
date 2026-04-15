@@ -152,8 +152,10 @@ class EnvConfig(BaseModel):
     # The step-like env limits below are counted per internal telemetry sample,
     # i.e. once per emulated frame, not once per outer env.step().
     max_episode_steps: PositiveInt = 12_000
+    stuck_truncation_enabled: bool = True
     stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
+    wrong_way_truncation_enabled: bool = True
     wrong_way_timer_limit: PositiveInt = 300
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
@@ -163,6 +165,7 @@ class EnvConfig(BaseModel):
     randomize_game_rng_requires_race_mode: bool = True
     camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
+    race_intro_target_timer: int | None = Field(default=39, ge=0, le=460)
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
 
@@ -172,7 +175,7 @@ class RewardConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["race_v2"] = "race_v2"
+    name: Literal["race_v2", "race_v3", "race_v4"] = "race_v2"
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
@@ -183,8 +186,12 @@ class RewardConfig(BaseModel):
     milestone_speed_bonus_cap: NonNegativeFloat = 0.0
     bootstrap_progress_scale: NonNegativeFloat = 0.001
     bootstrap_regress_penalty_scale: NonNegativeFloat = 0.002
+    progress_bucket_distance: PositiveFloat = 1_000.0
+    progress_bucket_reward: NonNegativeFloat = 1.0
+    progress_reward_interval_frames: PositiveInt = 1
     bootstrap_position_multiplier_scale: NonNegativeFloat = 0.0
     bootstrap_lap_count: PositiveInt = 1
+    lap_completion_bonus: NonNegativeFloat = 5.0
     lap_1_completion_bonus: NonNegativeFloat = 20.0
     lap_2_completion_bonus: NonNegativeFloat = 35.0
     final_lap_completion_bonus: NonNegativeFloat = 60.0
@@ -207,9 +214,12 @@ class RewardConfig(BaseModel):
     drive_axis_negative_penalty_scale: float = Field(default=0.0, le=0.0)
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_cooldown_frames: NonNegativeInt = 0
+    boost_pad_reward_progress_window: PositiveFloat = 1_000.0
     manual_boost_request_reward: float = 0.0
     collision_recoil_penalty: float = -2.0
     spinning_out_penalty: float = -4.0
+    failure_penalty: float = -20.0
+    truncation_penalty: float = -20.0
     terminal_failure_base_penalty: float = -120.0
     stuck_truncation_base_penalty: float = -150.0
     wrong_way_truncation_base_penalty: float = -170.0

@@ -303,6 +303,7 @@ fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
     match reason.as_deref() {
         None => Ok(None),
         Some("finished") => Ok(Some("finished")),
+        Some("spinning_out") => Ok(Some("spinning_out")),
         Some("crashed") => Ok(Some("crashed")),
         Some("retired") => Ok(Some("retired")),
         Some("falling_off_track") => Ok(Some("falling_off_track")),

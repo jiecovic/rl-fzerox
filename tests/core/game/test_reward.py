@@ -14,6 +14,8 @@ from rl_fzerox.core.envs.rewards import (
     REWARD_TRACKER_REGISTRY,
     RaceV2RewardTracker,
     RaceV2RewardWeights,
+    RaceV3RewardTracker,
+    RaceV4RewardTracker,
     RewardActionContext,
     build_reward_tracker,
     reward_tracker_names,
@@ -21,17 +23,80 @@ from rl_fzerox.core.envs.rewards import (
 from tests.support.native_objects import make_step_summary, make_telemetry
 
 
-def test_race_v2_yaml_keys_match_reward_config_schema() -> None:
-    yaml_path = Path("conf/reward/race_v2.yaml")
-    yaml_keys = set(yaml.safe_load(yaml_path.read_text(encoding="utf-8")))
+def test_reward_yamls_use_known_reward_config_keys() -> None:
+    schema_keys = set(RewardConfig.model_fields)
+    for yaml_path in Path("conf/reward").glob("*.yaml"):
+        config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
 
-    assert yaml_keys == set(RewardConfig.model_fields)
+        assert set(config_data) <= schema_keys
+        assert RewardConfig.model_validate(config_data).name in reward_tracker_names()
+
+
+def test_race_v2_yaml_restores_ppo_hybrid_full_gas_0001_reward_values() -> None:
+    yaml_path = Path("conf/reward/race_v2.yaml")
+    current_reward = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+    expected_reward = {
+        "name": "race_v2",
+        "time_penalty_per_frame": -0.001,
+        "reverse_time_penalty_scale": 4.0,
+        "low_speed_time_penalty_scale": 4.0,
+        "milestone_distance": 15000.0,
+        "randomize_milestone_phase_on_reset": True,
+        "milestone_bonus": 2.0,
+        "milestone_speed_scale": 0.05,
+        "milestone_speed_bonus_cap": 2.0,
+        "bootstrap_progress_scale": 0.002,
+        "bootstrap_regress_penalty_scale": 0.004,
+        "bootstrap_position_multiplier_scale": 0.25,
+        "bootstrap_lap_count": 3,
+        "lap_1_completion_bonus": 10.0,
+        "lap_2_completion_bonus": 15.0,
+        "final_lap_completion_bonus": 25.0,
+        "lap_position_scale": 0.25,
+        "remaining_step_penalty_per_frame": 0.0,
+        "remaining_lap_penalty": 50.0,
+        "energy_loss_epsilon": 0.01,
+        "energy_loss_penalty_scale": 0.35,
+        "energy_loss_safe_fraction": 1.0,
+        "energy_loss_danger_power": 1.05,
+        "energy_gain_reward_scale": 0.05,
+        "energy_gain_collision_cooldown_frames": 120,
+        "energy_full_refill_bonus": 0.0,
+        "energy_full_refill_cooldown_frames": 800,
+        "damage_taken_frame_penalty": -0.02,
+        "damage_taken_streak_ramp_penalty": -0.001,
+        "damage_taken_streak_cap_frames": 120,
+        "airborne_landing_reward": 10.0,
+        "grounded_air_brake_penalty": -0.001,
+        "drive_axis_negative_penalty_scale": 0.0,
+        "boost_pad_reward": 10.0,
+        "boost_pad_reward_cooldown_frames": 120,
+        "manual_boost_request_reward": 2.0,
+        "collision_recoil_penalty": -2.0,
+        "spinning_out_penalty": -0.5,
+        "terminal_failure_base_penalty": -25.0,
+        "stuck_truncation_base_penalty": -30.0,
+        "wrong_way_truncation_base_penalty": -30.0,
+        "progress_stalled_truncation_base_penalty": -30.0,
+        "timeout_truncation_base_penalty": -30.0,
+        "finish_position_scale": 1.0,
+    }
+
+    assert current_reward == expected_reward
 
 
 def test_race_v2_weight_fields_match_reward_config_schema() -> None:
     weight_fields = {field.name for field in fields(RaceV2RewardWeights)}
+    non_v2_fields = {
+        "boost_pad_reward_progress_window",
+        "failure_penalty",
+        "lap_completion_bonus",
+        "progress_bucket_distance",
+        "progress_bucket_reward",
+        "truncation_penalty",
+    }
 
-    assert weight_fields == set(RewardConfig.model_fields) - {"name"}
+    assert weight_fields == set(RewardConfig.model_fields) - {"name"} - non_v2_fields
 
 
 def test_reward_config_accepts_legacy_redundant_boost_penalty_key() -> None:
@@ -58,6 +123,7 @@ def test_build_reward_tracker_wires_all_race_v2_weight_fields() -> None:
         "milestone_speed_bonus_cap": 1.25,
         "bootstrap_progress_scale": 0.003,
         "bootstrap_regress_penalty_scale": 0.007,
+        "progress_reward_interval_frames": 11,
         "bootstrap_position_multiplier_scale": 0.11,
         "bootstrap_lap_count": 2,
         "lap_1_completion_bonus": 21.0,
@@ -1128,7 +1194,401 @@ def test_race_v2_applies_low_speed_time_penalty_when_dash_pad_reward_is_disabled
 def test_reward_tracker_registry_exposes_registered_names() -> None:
     assert DEFAULT_REWARD_NAME == "race_v2"
     assert reward_tracker_names() == tuple(REWARD_TRACKER_REGISTRY)
+    assert reward_tracker_names() == ("race_v2", "race_v3", "race_v4")
     assert isinstance(build_reward_tracker(), RaceV2RewardTracker)
+
+
+def test_race_v3_rewards_new_spline_buckets_once() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=1000.0,
+            progress_bucket_reward=1.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    before_first_bucket = tracker.step_summary(
+        _summary(max_race_distance=999.0),
+        _status(step_count=1),
+        _telemetry(race_distance=999.0),
+    )
+    first_step = tracker.step_summary(
+        _summary(max_race_distance=2500.0),
+        _status(step_count=2),
+        _telemetry(race_distance=2500.0),
+    )
+    repeated_step = tracker.step_summary(
+        _summary(max_race_distance=2500.0),
+        _status(step_count=3),
+        _telemetry(race_distance=500.0),
+    )
+
+    assert isinstance(tracker, RaceV3RewardTracker)
+    assert before_first_bucket.reward == 0.0
+    assert before_first_bucket.breakdown == {}
+    assert first_step.reward == 2.0
+    assert first_step.breakdown == {"frontier_progress": 2.0}
+    assert repeated_step.reward == 0.0
+    assert repeated_step.breakdown == {}
+    info = tracker.info(_telemetry(race_distance=2500.0))
+    assert info["frontier_progress_bucket_index"] == 2
+    assert info["frontier_progress_distance"] == 2000.0
+
+
+def test_race_v3_can_delay_spline_bucket_rewards_by_interval() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            progress_reward_interval_frames=3,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    held_step = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0),
+    )
+    flushed_step = tracker.step_summary(
+        _summary(max_race_distance=300.0, frames_run=2),
+        _status(step_count=3),
+        _telemetry(race_distance=300.0),
+    )
+
+    assert held_step.reward == 0.0
+    assert flushed_step.breakdown == {"frontier_progress": 3.0}
+
+
+def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            energy_gain_reward_scale=2.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=89.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0, energy_gain_total=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=99.0),
+    )
+
+    refill_bonus = 1.0 * 2.0 * (10.0 / 178.0) * 0.5
+    assert step.reward == pytest.approx(1.0 + refill_bonus)
+    assert step.breakdown["frontier_progress"] == 1.0
+    assert step.breakdown["energy_refill_progress"] == pytest.approx(refill_bonus)
+
+
+def test_race_v3_does_not_reward_refill_without_new_frontier_progress() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            energy_gain_reward_scale=2.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=89.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, energy_gain_total=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, energy=99.0),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            energy_gain_reward_scale=2.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=89.0))
+
+    step = tracker.step_summary(
+        _summary(
+            max_race_distance=100.0,
+            energy_gain_total=10.0,
+            reverse_active_frames=1,
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=99.0),
+    )
+
+    assert step.reward == 1.0
+    assert step.breakdown == {"frontier_progress": 1.0}
+
+
+def test_race_v3_rewards_dash_pad_boost_entries_once_per_progress_window() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            boost_pad_reward=0.5,
+            boost_pad_reward_progress_window=1000.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
+    )
+    blocked_same_window = tracker.step_summary(
+        _summary(max_race_distance=900.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=2),
+        _telemetry(race_distance=900.0, state_labels=("active", "dash_pad_boost")),
+    )
+    rewarded_next_window = tracker.step_summary(
+        _summary(max_race_distance=1100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _status(step_count=3),
+        _telemetry(race_distance=1100.0, state_labels=("active", "dash_pad_boost")),
+    )
+
+    assert first.breakdown["boost_pad"] == 0.5
+    assert "boost_pad" not in blocked_same_window.breakdown
+    assert rewarded_next_window.breakdown["boost_pad"] == 0.5
+    info = tracker.info(_telemetry(race_distance=1100.0))
+    assert info["rewarded_boost_pad_progress_windows"] == 2
+
+
+def test_race_v3_blocks_dash_pad_boost_reward_while_reversing() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            boost_pad_reward=0.5,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(
+            max_race_distance=0.0,
+            reverse_active_frames=1,
+            entered_state_labels=("dash_pad_boost",),
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, state_labels=("active", "dash_pad_boost")),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_race_v3_rewards_airborne_landing_transition() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            airborne_landing_reward=3.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+
+    still_airborne = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
+    )
+    landing = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    grounded = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+
+    assert still_airborne.reward == 0.0
+    assert still_airborne.breakdown == {}
+    assert landing.reward == 3.0
+    assert landing.breakdown == {"landing": 3.0}
+    assert grounded.reward == 0.0
+    assert grounded.breakdown == {}
+
+
+def test_race_v3_treats_finish_as_final_lap_reward_only() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            lap_completion_bonus=5.0,
+            lap_position_scale=1.0,
+            finish_position_scale=4.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, laps_completed=2))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, entered_state_labels=("finished",)),
+        _status(step_count=120, termination_reason="finished"),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "finished"),
+            position=1,
+            laps_completed=3,
+        ),
+    )
+
+    assert step.reward == pytest.approx(34.0)
+    assert step.breakdown == {
+        "lap_completion": 5.0,
+        "lap_position": 29.0,
+    }
+
+
+def test_race_v3_applies_small_collision_recoil_entry_penalty() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            bootstrap_progress_scale=0.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+            collision_recoil_penalty=-0.25,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, entered_state_labels=("collision_recoil",)),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0),
+    )
+
+    assert step.reward == -0.25
+    assert step.breakdown == {"collision_recoil": -0.25}
+
+
+def test_race_v3_uses_spinning_out_as_failure_not_raw_energy_depletion() -> None:
+    spinning_tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            bootstrap_progress_scale=0.0,
+            time_penalty_per_frame=0.0,
+            failure_penalty=-20.0,
+            remaining_step_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    spinning_tracker.reset(_telemetry(race_distance=0.0))
+
+    spinning = spinning_tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1, termination_reason="spinning_out"),
+        _telemetry(
+            race_distance=0.0,
+            energy=0.0,
+            state_labels=("active", "spinning_out"),
+        ),
+    )
+
+    energy_tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            bootstrap_progress_scale=0.0,
+            time_penalty_per_frame=0.0,
+            failure_penalty=-20.0,
+            remaining_step_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    energy_tracker.reset(_telemetry(race_distance=0.0))
+    energy_depleted = energy_tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1, termination_reason="energy_depleted"),
+        _telemetry(race_distance=0.0, energy=0.0),
+    )
+
+    assert spinning.reward == -20.0
+    assert spinning.breakdown == {"spinning_out": -20.0}
+    assert energy_depleted.reward == 0.0
+    assert energy_depleted.breakdown == {}
+
+
+def test_race_v4_rewards_milestones_with_frame_time_pressure() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v4",
+            time_penalty_per_frame=-0.01,
+            milestone_distance=100.0,
+            milestone_bonus=1.0,
+            randomize_milestone_phase_on_reset=False,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    before_milestone = tracker.step_summary(
+        _summary(max_race_distance=99.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=99.0),
+    )
+    crossing = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=2),
+        _status(step_count=5),
+        _telemetry(race_distance=100.0),
+    )
+    repeated = tracker.step_summary(
+        _summary(max_race_distance=100.0, frames_run=1),
+        _status(step_count=6),
+        _telemetry(race_distance=100.0),
+    )
+
+    assert isinstance(tracker, RaceV4RewardTracker)
+    assert before_milestone.reward == pytest.approx(-0.03)
+    assert crossing.reward == pytest.approx(0.98)
+    assert crossing.breakdown == {"time": -0.02, "milestone": 1.0}
+    assert repeated.reward == pytest.approx(-0.01)
 
 
 def test_race_v2_multiplies_time_penalty_by_frames_run() -> None:
@@ -1244,6 +1704,79 @@ def test_race_v2_bootstrap_progress_rewards_recovery_and_penalizes_regress() -> 
     assert recovery.breakdown == {"bootstrap_progress": 3.0}
     assert new_progress.reward == pytest.approx(2.0)
     assert new_progress.breakdown == {"bootstrap_progress": 2.0}
+
+
+def test_race_v2_can_pay_bootstrap_progress_on_frame_intervals() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=1_000.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+            bootstrap_regress_penalty_scale=0.2,
+            progress_reward_interval_frames=3,
+            bootstrap_lap_count=3,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=10.0),
+    )
+    second = tracker.step_summary(
+        _summary(max_race_distance=6.0),
+        _status(step_count=2),
+        _telemetry(race_distance=6.0),
+    )
+    third = tracker.step_summary(
+        _summary(max_race_distance=9.0),
+        _status(step_count=3),
+        _telemetry(race_distance=9.0),
+    )
+
+    assert first.reward == 0.0
+    assert first.breakdown == {}
+    assert second.reward == 0.0
+    assert second.breakdown == {}
+    assert third.reward == pytest.approx(0.9)
+    assert third.breakdown == {"bootstrap_progress": 0.9}
+
+
+def test_race_v2_flushes_pending_bootstrap_progress_on_terminal_step() -> None:
+    tracker = RaceV2RewardTracker(
+        RaceV2RewardWeights(
+            time_penalty_per_frame=0.0,
+            milestone_distance=1_000.0,
+            milestone_bonus=0.0,
+            bootstrap_progress_scale=0.1,
+            progress_reward_interval_frames=10,
+            bootstrap_lap_count=3,
+            lap_1_completion_bonus=0.0,
+            lap_2_completion_bonus=0.0,
+            final_lap_completion_bonus=0.0,
+            lap_position_scale=0.0,
+            finish_position_scale=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=10.0),
+    )
+    finished = tracker.step_summary(
+        _summary(max_race_distance=20.0),
+        _status(step_count=2, termination_reason="finished"),
+        _telemetry(race_distance=20.0, laps_completed=3),
+    )
+
+    assert first.reward == 0.0
+    assert first.breakdown == {}
+    assert finished.reward == pytest.approx(2.0)
+    assert finished.breakdown == {"bootstrap_progress": 2.0}
 
 
 def test_race_v2_bootstrap_progress_can_span_multiple_initial_laps() -> None:

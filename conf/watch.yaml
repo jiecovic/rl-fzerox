@@ -29,6 +29,8 @@ env:
   # Values: overhead, close_behind, regular, wide. null preserves the current camera.
   camera_setting: close_behind
   reset_to_race: true
+  # 39 is the first gameplay-active GO frame; null keeps the raw baseline timing.
+  race_intro_target_timer: 39
   action:
     name: steer_drive_boost_shoulder
     steer_buckets: 7

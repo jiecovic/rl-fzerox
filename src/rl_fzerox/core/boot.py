@@ -20,7 +20,13 @@ from enum import StrEnum
 
 import numpy as np
 
-from fzerox_emulator import JOYPAD_START, ControllerState, EmulatorBackend, joypad_mask
+from fzerox_emulator import (
+    JOYPAD_START,
+    ControllerState,
+    EmulatorBackend,
+    FZeroXTelemetry,
+    joypad_mask,
+)
 
 
 @dataclass(frozen=True)
@@ -36,6 +42,7 @@ class BootConfig:
     settle_frames: int = 60
     race_mode_wait_frames: int = 360
     pre_race_settle_frames: int = 180
+    race_intro_wait_frames: int = 600
     next_race_max_start_presses: int = 12
     next_race_settle_frames: int = 45
 
@@ -167,6 +174,59 @@ def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[st
         backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
     raise RuntimeError("Could not advance the current session into the next race")
+
+
+def sync_race_intro_target(
+    backend: EmulatorBackend,
+    *,
+    target_timer: int | None,
+) -> tuple[dict[str, object], FZeroXTelemetry | None]:
+    """Wait until the race countdown reaches the configured gameplay start point."""
+
+    if target_timer is None:
+        return {"race_intro_timer_sync": "skipped"}, _read_telemetry(backend)
+
+    telemetry = _read_telemetry(backend)
+    if telemetry is None:
+        return {
+            "race_intro_timer_target": target_timer,
+            "race_intro_timer_sync": "skipped",
+            "race_intro_timer_sync_reason": "telemetry_unavailable",
+        }, None
+    if not telemetry.in_race_mode:
+        return {
+            "race_intro_timer": telemetry.race_intro_timer,
+            "race_intro_timer_target": target_timer,
+            "race_intro_timer_sync": "skipped",
+            "race_intro_timer_sync_reason": "not_in_race",
+        }, telemetry
+    if telemetry.race_intro_timer <= target_timer:
+        return {
+            "race_intro_timer": telemetry.race_intro_timer,
+            "race_intro_timer_target": target_timer,
+            "race_intro_timer_sync": "already_set",
+            "race_intro_timer_waited_frames": 0,
+        }, telemetry
+
+    for waited_frames in range(1, BOOT_CONFIG.race_intro_wait_frames + 1):
+        _advance_poll_frame(backend)
+        telemetry = _read_telemetry(backend)
+        if telemetry is None:
+            continue
+        if telemetry.in_race_mode and telemetry.race_intro_timer <= target_timer:
+            return {
+                "race_intro_timer": telemetry.race_intro_timer,
+                "race_intro_timer_target": target_timer,
+                "race_intro_timer_sync": "changed",
+                "race_intro_timer_waited_frames": waited_frames,
+            }, telemetry
+
+    telemetry = _read_telemetry(backend)
+    current_timer = None if telemetry is None else telemetry.race_intro_timer
+    raise RuntimeError(
+        "Timed out waiting for race intro timer "
+        f"<= {target_timer}; current timer is {current_timer!r}."
+    )
 
 
 def _wait_for_gp_race(backend: EmulatorBackend) -> bool:

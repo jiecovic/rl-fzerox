@@ -131,7 +131,7 @@ impl PyEmulator {
         energy_loss_epsilon: f32,
         max_episode_steps: usize,
         stuck_step_limit: usize,
-        wrong_way_timer_limit: usize,
+        wrong_way_timer_limit: Option<usize>,
         progress_frontier_stall_limit_frames: Option<usize>,
         progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,

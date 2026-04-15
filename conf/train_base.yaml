@@ -13,8 +13,14 @@ emulator:
 env:
   action_repeat: 1
   max_episode_steps: 50000
+  # If false, low-speed/stuck detection is still visible in info/HUD but no
+  # longer ends the episode directly.
+  stuck_truncation_enabled: true
   stuck_step_limit: 240
   stuck_min_speed_kph: 60.0
+  # If false, reverse driving no longer truncates directly; progress-frontier
+  # stall can still stop episodes that stop making useful forward progress.
+  wrong_way_truncation_enabled: true
   wrong_way_timer_limit: 240
   # Truncate if this many internal frames pass without beating the best race-distance frontier.
   progress_frontier_stall_limit_frames: 400
@@ -30,6 +36,9 @@ env:
   # Values: overhead, close_behind, regular, wide. null preserves the current camera.
   camera_setting: close_behind
   reset_to_race: true
+  # When reset lands during the race intro, wait until this countdown timer.
+  # 39 is the first gameplay-active GO frame; null keeps the raw baseline timing.
+  race_intro_target_timer: 39
   action:
     name: steer_drive_boost_shoulder
     steer_buckets: 5

@@ -9,11 +9,24 @@ from rl_fzerox.core.envs.rewards.common import (
     RewardTracker,
 )
 from rl_fzerox.core.envs.rewards.race_v2 import RaceV2RewardTracker, RaceV2RewardWeights
+from rl_fzerox.core.envs.rewards.race_v3 import RaceV3RewardTracker, RaceV3RewardWeights
+from rl_fzerox.core.envs.rewards.race_v4 import RaceV4RewardTracker, RaceV4RewardWeights
 
-RewardTrackerFactory = Callable[..., RewardTracker]
+RewardTrackerFactory = Callable[[RewardConfig, int], RewardTracker]
 DEFAULT_REWARD_NAME = "race_v2"
 REWARD_TRACKER_REGISTRY: dict[str, RewardTrackerFactory] = {
-    DEFAULT_REWARD_NAME: RaceV2RewardTracker,
+    DEFAULT_REWARD_NAME: lambda config, max_episode_steps: RaceV2RewardTracker(
+        weights=_race_v2_weights(config),
+        max_episode_steps=max_episode_steps,
+    ),
+    "race_v3": lambda config, max_episode_steps: RaceV3RewardTracker(
+        weights=_race_v3_weights(config),
+        max_episode_steps=max_episode_steps,
+    ),
+    "race_v4": lambda config, max_episode_steps: RaceV4RewardTracker(
+        weights=_race_v4_weights(config),
+        max_episode_steps=max_episode_steps,
+    ),
 }
 
 
@@ -28,54 +41,115 @@ def build_reward_tracker(
     factory = REWARD_TRACKER_REGISTRY.get(resolved_config.name)
     if factory is None:
         raise ValueError(f"Unsupported reward profile: {resolved_config.name!r}")
+    return factory(resolved_config, max_episode_steps)
+
+
+def _race_v2_weights(config: RewardConfig) -> RaceV2RewardWeights:
+    """Map schema fields to the race_v2 weights dataclass."""
+
     weights = RaceV2RewardWeights(
-        time_penalty_per_frame=resolved_config.time_penalty_per_frame,
-        reverse_time_penalty_scale=resolved_config.reverse_time_penalty_scale,
-        low_speed_time_penalty_scale=resolved_config.low_speed_time_penalty_scale,
-        milestone_distance=resolved_config.milestone_distance,
-        randomize_milestone_phase_on_reset=resolved_config.randomize_milestone_phase_on_reset,
-        milestone_bonus=resolved_config.milestone_bonus,
-        milestone_speed_scale=resolved_config.milestone_speed_scale,
-        milestone_speed_bonus_cap=resolved_config.milestone_speed_bonus_cap,
-        bootstrap_progress_scale=resolved_config.bootstrap_progress_scale,
-        bootstrap_regress_penalty_scale=resolved_config.bootstrap_regress_penalty_scale,
-        bootstrap_position_multiplier_scale=resolved_config.bootstrap_position_multiplier_scale,
-        bootstrap_lap_count=resolved_config.bootstrap_lap_count,
-        lap_1_completion_bonus=resolved_config.lap_1_completion_bonus,
-        lap_2_completion_bonus=resolved_config.lap_2_completion_bonus,
-        final_lap_completion_bonus=resolved_config.final_lap_completion_bonus,
-        lap_position_scale=resolved_config.lap_position_scale,
-        remaining_step_penalty_per_frame=resolved_config.remaining_step_penalty_per_frame,
-        remaining_lap_penalty=resolved_config.remaining_lap_penalty,
-        energy_loss_epsilon=resolved_config.energy_loss_epsilon,
-        energy_loss_penalty_scale=resolved_config.energy_loss_penalty_scale,
-        energy_loss_safe_fraction=resolved_config.energy_loss_safe_fraction,
-        energy_loss_danger_power=resolved_config.energy_loss_danger_power,
-        energy_gain_reward_scale=resolved_config.energy_gain_reward_scale,
-        energy_gain_collision_cooldown_frames=resolved_config.energy_gain_collision_cooldown_frames,
-        energy_full_refill_bonus=resolved_config.energy_full_refill_bonus,
-        energy_full_refill_cooldown_frames=resolved_config.energy_full_refill_cooldown_frames,
-        damage_taken_frame_penalty=resolved_config.damage_taken_frame_penalty,
-        damage_taken_streak_ramp_penalty=resolved_config.damage_taken_streak_ramp_penalty,
-        damage_taken_streak_cap_frames=resolved_config.damage_taken_streak_cap_frames,
-        airborne_landing_reward=resolved_config.airborne_landing_reward,
-        grounded_air_brake_penalty=resolved_config.grounded_air_brake_penalty,
-        drive_axis_negative_penalty_scale=resolved_config.drive_axis_negative_penalty_scale,
-        boost_pad_reward=resolved_config.boost_pad_reward,
-        boost_pad_reward_cooldown_frames=resolved_config.boost_pad_reward_cooldown_frames,
-        manual_boost_request_reward=resolved_config.manual_boost_request_reward,
-        collision_recoil_penalty=resolved_config.collision_recoil_penalty,
-        spinning_out_penalty=resolved_config.spinning_out_penalty,
-        terminal_failure_base_penalty=resolved_config.terminal_failure_base_penalty,
-        stuck_truncation_base_penalty=resolved_config.stuck_truncation_base_penalty,
-        wrong_way_truncation_base_penalty=resolved_config.wrong_way_truncation_base_penalty,
-        progress_stalled_truncation_base_penalty=(
-            resolved_config.progress_stalled_truncation_base_penalty
-        ),
-        timeout_truncation_base_penalty=resolved_config.timeout_truncation_base_penalty,
-        finish_position_scale=resolved_config.finish_position_scale,
+        time_penalty_per_frame=config.time_penalty_per_frame,
+        reverse_time_penalty_scale=config.reverse_time_penalty_scale,
+        low_speed_time_penalty_scale=config.low_speed_time_penalty_scale,
+        milestone_distance=config.milestone_distance,
+        randomize_milestone_phase_on_reset=config.randomize_milestone_phase_on_reset,
+        milestone_bonus=config.milestone_bonus,
+        milestone_speed_scale=config.milestone_speed_scale,
+        milestone_speed_bonus_cap=config.milestone_speed_bonus_cap,
+        bootstrap_progress_scale=config.bootstrap_progress_scale,
+        bootstrap_regress_penalty_scale=config.bootstrap_regress_penalty_scale,
+        progress_reward_interval_frames=config.progress_reward_interval_frames,
+        bootstrap_position_multiplier_scale=config.bootstrap_position_multiplier_scale,
+        bootstrap_lap_count=config.bootstrap_lap_count,
+        lap_1_completion_bonus=config.lap_1_completion_bonus,
+        lap_2_completion_bonus=config.lap_2_completion_bonus,
+        final_lap_completion_bonus=config.final_lap_completion_bonus,
+        lap_position_scale=config.lap_position_scale,
+        remaining_step_penalty_per_frame=config.remaining_step_penalty_per_frame,
+        remaining_lap_penalty=config.remaining_lap_penalty,
+        energy_loss_epsilon=config.energy_loss_epsilon,
+        energy_loss_penalty_scale=config.energy_loss_penalty_scale,
+        energy_loss_safe_fraction=config.energy_loss_safe_fraction,
+        energy_loss_danger_power=config.energy_loss_danger_power,
+        energy_gain_reward_scale=config.energy_gain_reward_scale,
+        energy_gain_collision_cooldown_frames=config.energy_gain_collision_cooldown_frames,
+        energy_full_refill_bonus=config.energy_full_refill_bonus,
+        energy_full_refill_cooldown_frames=config.energy_full_refill_cooldown_frames,
+        damage_taken_frame_penalty=config.damage_taken_frame_penalty,
+        damage_taken_streak_ramp_penalty=config.damage_taken_streak_ramp_penalty,
+        damage_taken_streak_cap_frames=config.damage_taken_streak_cap_frames,
+        airborne_landing_reward=config.airborne_landing_reward,
+        grounded_air_brake_penalty=config.grounded_air_brake_penalty,
+        drive_axis_negative_penalty_scale=config.drive_axis_negative_penalty_scale,
+        boost_pad_reward=config.boost_pad_reward,
+        boost_pad_reward_cooldown_frames=config.boost_pad_reward_cooldown_frames,
+        manual_boost_request_reward=config.manual_boost_request_reward,
+        collision_recoil_penalty=config.collision_recoil_penalty,
+        spinning_out_penalty=config.spinning_out_penalty,
+        terminal_failure_base_penalty=config.terminal_failure_base_penalty,
+        stuck_truncation_base_penalty=config.stuck_truncation_base_penalty,
+        wrong_way_truncation_base_penalty=config.wrong_way_truncation_base_penalty,
+        progress_stalled_truncation_base_penalty=config.progress_stalled_truncation_base_penalty,
+        timeout_truncation_base_penalty=config.timeout_truncation_base_penalty,
+        finish_position_scale=config.finish_position_scale,
     )
-    return factory(weights=weights, max_episode_steps=max_episode_steps)
+    return weights
+
+
+def _race_v3_weights(config: RewardConfig) -> RaceV3RewardWeights:
+    """Map schema fields to the race_v3 weights dataclass."""
+
+    return RaceV3RewardWeights(
+        energy_loss_epsilon=config.energy_loss_epsilon,
+        progress_bucket_distance=config.progress_bucket_distance,
+        progress_bucket_reward=config.progress_bucket_reward,
+        progress_reward_interval_frames=config.progress_reward_interval_frames,
+        time_penalty_per_frame=config.time_penalty_per_frame,
+        reverse_time_penalty_scale=config.reverse_time_penalty_scale,
+        low_speed_time_penalty_scale=config.low_speed_time_penalty_scale,
+        lap_completion_bonus=config.lap_completion_bonus,
+        lap_position_scale=config.lap_position_scale,
+        damage_taken_frame_penalty=config.damage_taken_frame_penalty,
+        damage_taken_streak_ramp_penalty=config.damage_taken_streak_ramp_penalty,
+        damage_taken_streak_cap_frames=config.damage_taken_streak_cap_frames,
+        boost_pad_reward=config.boost_pad_reward,
+        boost_pad_reward_progress_window=config.boost_pad_reward_progress_window,
+        energy_gain_reward_scale=config.energy_gain_reward_scale,
+        energy_gain_collision_cooldown_frames=config.energy_gain_collision_cooldown_frames,
+        airborne_landing_reward=config.airborne_landing_reward,
+        collision_recoil_penalty=config.collision_recoil_penalty,
+        failure_penalty=config.failure_penalty,
+        truncation_penalty=config.truncation_penalty,
+    )
+
+
+def _race_v4_weights(config: RewardConfig) -> RaceV4RewardWeights:
+    """Map schema fields to the race_v4 weights dataclass."""
+
+    return RaceV4RewardWeights(
+        energy_loss_epsilon=config.energy_loss_epsilon,
+        time_penalty_per_frame=config.time_penalty_per_frame,
+        reverse_time_penalty_scale=config.reverse_time_penalty_scale,
+        low_speed_time_penalty_scale=config.low_speed_time_penalty_scale,
+        milestone_distance=config.milestone_distance,
+        randomize_milestone_phase_on_reset=config.randomize_milestone_phase_on_reset,
+        milestone_bonus=config.milestone_bonus,
+        lap_1_completion_bonus=config.lap_1_completion_bonus,
+        lap_2_completion_bonus=config.lap_2_completion_bonus,
+        final_lap_completion_bonus=config.final_lap_completion_bonus,
+        lap_position_scale=config.lap_position_scale,
+        remaining_step_penalty_per_frame=config.remaining_step_penalty_per_frame,
+        remaining_lap_penalty=config.remaining_lap_penalty,
+        damage_taken_frame_penalty=config.damage_taken_frame_penalty,
+        damage_taken_streak_ramp_penalty=config.damage_taken_streak_ramp_penalty,
+        damage_taken_streak_cap_frames=config.damage_taken_streak_cap_frames,
+        terminal_failure_base_penalty=config.terminal_failure_base_penalty,
+        stuck_truncation_base_penalty=config.stuck_truncation_base_penalty,
+        wrong_way_truncation_base_penalty=config.wrong_way_truncation_base_penalty,
+        progress_stalled_truncation_base_penalty=config.progress_stalled_truncation_base_penalty,
+        timeout_truncation_base_penalty=config.timeout_truncation_base_penalty,
+        finish_position_scale=config.finish_position_scale,
+    )
 
 
 def reward_tracker_names() -> tuple[str, ...]:
@@ -88,6 +162,10 @@ __all__ = [
     "DEFAULT_REWARD_NAME",
     "RaceV2RewardTracker",
     "RaceV2RewardWeights",
+    "RaceV3RewardTracker",
+    "RaceV3RewardWeights",
+    "RaceV4RewardTracker",
+    "RaceV4RewardWeights",
     "REWARD_TRACKER_REGISTRY",
     "RewardActionContext",
     "RewardStep",

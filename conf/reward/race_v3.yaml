@@ -1,0 +1,55 @@
+# TMRL-like reward profile:
+# - treats the game spline centerline as the reference trajectory
+# - divides that trajectory into equally spaced progress buckets
+# - pays only newly covered buckets
+# - uses discounting as the main speed pressure
+# - keeps terminal/lap bonuses modest
+name: race_v3
+
+# Spline coverage: distance between equally spaced reward points on the game spline.
+progress_bucket_distance: 100.0
+# Spline coverage: reward for each newly covered point.
+progress_bucket_reward: 0.2
+# Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
+progress_reward_interval_frames: 1
+
+# Time pressure: off by default for the TMRL-like profile.
+time_penalty_per_frame: 0.0
+reverse_time_penalty_scale: 1.0
+low_speed_time_penalty_scale: 1.0
+
+# Lap rewards: flat per-lap marker plus small rank pressure. The finish line is
+# just the final lap completion, not a separate bonus event.
+lap_completion_bonus: 5.0
+# Lap position bonus is `(total_racers - position) * lap_position_scale`.
+lap_position_scale: 0.25
+
+# Failure shaping: flat terminal pressure; frontier-stall truncation is still
+# controlled by env.progress_frontier_stall_limit_frames.
+# Game-ending failures: spin-out/death, crash, fall-off, or retire.
+# Raw energy depletion stays an env fallback, not a v3 failure reward event.
+failure_penalty: -20.0
+# Training guard endings: stuck/slow-speed, wrong-way, progress-stalled, or timeout.
+truncation_penalty: -20.0
+
+# Damage: continuous anti-wall-grinding pressure.
+damage_taken_frame_penalty: -0.02
+damage_taken_streak_ramp_penalty: -0.001
+damage_taken_streak_cap_frames: 120
+# Damage: small entry-only penalty for collision recoil. Kept mild because other
+# racers can also bump into the player.
+collision_recoil_penalty: -0.5
+
+# Boost pads: small route incentive for entering dash-pad boost, guarded so
+# reversing or revisiting the same unwrapped progress region cannot farm it.
+boost_pad_reward: 15.0
+boost_pad_reward_progress_window: 1000.0
+
+# Energy refill: multiplier scale applied only to actual frontier-progress reward.
+# No new progress means no refill reward, so recharge strips cannot be farmed by stalling.
+energy_gain_reward_scale: 2.0
+# Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
+energy_gain_collision_cooldown_frames: 240
+
+# Airborne: event reward when an airborne machine lands back on the track.
+airborne_landing_reward: 10.0

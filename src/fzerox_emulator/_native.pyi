@@ -97,6 +97,7 @@ class FZeroXTelemetry:
         difficulty_name: str | None = None,
         camera_setting_raw: int = 2,
         camera_setting_name: str | None = None,
+        race_intro_timer: int = 0,
     ) -> None: ...
     @property
     def total_lap_count(self) -> int: ...
@@ -108,6 +109,8 @@ class FZeroXTelemetry:
     def camera_setting_raw(self) -> int: ...
     @property
     def camera_setting_name(self) -> str: ...
+    @property
+    def race_intro_timer(self) -> int: ...
     @property
     def game_mode_raw(self) -> int: ...
     @property
@@ -236,7 +239,7 @@ class Emulator:
         energy_loss_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_timer_limit: int,
+        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
