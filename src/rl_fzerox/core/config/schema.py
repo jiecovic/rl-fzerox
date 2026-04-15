@@ -347,6 +347,10 @@ class CurriculumTrainOverridesConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    learning_rate: PositiveFloat | None = None
+    n_epochs: PositiveInt | None = None
+    batch_size: PositiveInt | None = None
+    clip_range: PositiveFloat | None = None
     ent_coef: NonNegativeFloat | None = None
 
 

@@ -544,6 +544,10 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "      action_mask:",
             "        shoulder: [0]",
             "      train:",
+            "        learning_rate: 0.0001",
+            "        n_epochs: 3",
+            "        batch_size: 512",
+            "        clip_range: 0.15",
             "        ent_coef: 0.01",
             "    - name: drift_enabled",
             "      action_mask:",
@@ -566,6 +570,10 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
     assert config.curriculum.stages[0].until is not None
     assert config.curriculum.stages[0].until.race_laps_completed_mean_gte == 3.0
     assert config.curriculum.stages[0].train is not None
+    assert config.curriculum.stages[0].train.learning_rate == 0.0001
+    assert config.curriculum.stages[0].train.n_epochs == 3
+    assert config.curriculum.stages[0].train.batch_size == 512
+    assert config.curriculum.stages[0].train.clip_range == 0.15
     assert config.curriculum.stages[0].train.ent_coef == 0.01
 
 

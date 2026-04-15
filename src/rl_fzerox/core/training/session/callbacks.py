@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/callbacks.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
@@ -45,8 +45,24 @@ _TRUNCATION_REASON_KEYS: tuple[str, ...] = (
 
 
 @runtime_checkable
-class _EntropyCoefficientModel(Protocol):
+class _PpoTunableModel(Protocol):
+    learning_rate: float | Callable[[float], float]
+    lr_schedule: Callable[[float], float]
+    clip_range: Callable[[float], float]
+    n_epochs: int
+    batch_size: int
     ent_coef: float
+    policy: object
+
+
+@runtime_checkable
+class _OptimizerLike(Protocol):
+    param_groups: list[dict[str, object]]
+
+
+@runtime_checkable
+class _PolicyWithOptimizer(Protocol):
+    optimizer: _OptimizerLike
 
 
 @dataclass
@@ -248,19 +264,20 @@ def build_callbacks(
                 "curriculum/stage",
                 -1 if stage_index is None else stage_index,
             )
-            ent_coef = _stage_ent_coef(self._controller.stage_train_overrides)
-            if ent_coef is not None:
-                self.logger.record("curriculum/ent_coef", ent_coef)
+            _record_stage_train_overrides(
+                logger=self.logger,
+                overrides=self._controller.stage_train_overrides,
+            )
 
         def _apply_current_stage(self) -> None:
             stage_index = self._controller.stage_index
             if stage_index is None:
                 return
             self.training_env.env_method("set_curriculum_stage", stage_index)
-            ent_coef = _stage_ent_coef(self._controller.stage_train_overrides)
-            if ent_coef is None:
-                return
-            _set_model_ent_coef(self.model, ent_coef)
+            _apply_stage_train_overrides(
+                model=self.model,
+                overrides=self._controller.stage_train_overrides,
+            )
 
     adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
     callbacks: list[BaseCallback] = [
@@ -303,16 +320,61 @@ def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
     return episodes
 
 
-def _stage_ent_coef(overrides: CurriculumTrainOverridesConfig | None) -> float | None:
-    if overrides is None or overrides.ent_coef is None:
-        return None
-    return float(overrides.ent_coef)
+def _apply_stage_train_overrides(
+    *,
+    model: object,
+    overrides: CurriculumTrainOverridesConfig | None,
+) -> None:
+    if overrides is None:
+        return
+    if not isinstance(model, _PpoTunableModel):
+        raise RuntimeError("Curriculum train overrides require a PPO-family model")
+    if overrides.learning_rate is not None:
+        _set_model_learning_rate(model, float(overrides.learning_rate))
+    if overrides.n_epochs is not None:
+        model.n_epochs = int(overrides.n_epochs)
+    if overrides.batch_size is not None:
+        model.batch_size = int(overrides.batch_size)
+    if overrides.clip_range is not None:
+        model.clip_range = _constant_schedule(float(overrides.clip_range))
+    if overrides.ent_coef is not None:
+        model.ent_coef = float(overrides.ent_coef)
 
 
-def _set_model_ent_coef(model: object, ent_coef: float) -> None:
-    if not isinstance(model, _EntropyCoefficientModel):
-        raise RuntimeError("Curriculum train.ent_coef requires a PPO-family model")
-    model.ent_coef = ent_coef
+def _set_model_learning_rate(model: _PpoTunableModel, learning_rate: float) -> None:
+    model.learning_rate = learning_rate
+    model.lr_schedule = _constant_schedule(learning_rate)
+    policy = model.policy
+    if not isinstance(policy, _PolicyWithOptimizer):
+        return
+    for param_group in policy.optimizer.param_groups:
+        param_group["lr"] = learning_rate
+
+
+def _constant_schedule(value: float) -> Callable[[float], float]:
+    def schedule(_progress_remaining: float) -> float:
+        return value
+
+    return schedule
+
+
+def _record_stage_train_overrides(
+    *,
+    logger,
+    overrides: CurriculumTrainOverridesConfig | None,
+) -> None:
+    if overrides is None:
+        return
+    if overrides.learning_rate is not None:
+        logger.record("curriculum/learning_rate", float(overrides.learning_rate))
+    if overrides.n_epochs is not None:
+        logger.record("curriculum/n_epochs", int(overrides.n_epochs))
+    if overrides.batch_size is not None:
+        logger.record("curriculum/batch_size", int(overrides.batch_size))
+    if overrides.clip_range is not None:
+        logger.record("curriculum/clip_range", float(overrides.clip_range))
+    if overrides.ent_coef is not None:
+        logger.record("curriculum/ent_coef", float(overrides.ent_coef))
 
 
 def _numeric_episode_values(
