@@ -5,10 +5,9 @@ import os
 
 import numpy as np
 
-from fzerox_emulator import display_size
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.hud.draw import _draw_side_panel
-from rl_fzerox.ui.watch.hud.format import _display_aspect_ratio, _format_observation_summary
+from rl_fzerox.ui.watch.hud.format import _format_observation_summary
 from rl_fzerox.ui.watch.hud.model import (
     _observation_preview_size,
     _preview_frame,
@@ -57,6 +56,10 @@ def _ensure_screen(
     return _create_screen(pygame, game_display_size, observation_shape)
 
 
+def _watch_game_display_size() -> tuple[int, int]:
+    return LAYOUT.game_display_size
+
+
 def _draw_frame(
     *,
     pygame,
@@ -91,13 +94,12 @@ def _draw_frame(
     stuck_min_speed_kph: float,
     telemetry,
 ) -> None:
+    game_display_size = _watch_game_display_size()
     game_surface = _rgb_surface(pygame, raw_frame)
-    game_display_size = display_size(raw_frame.shape, _display_aspect_ratio(info))
     if game_surface.get_size() != game_display_size:
-        raise RuntimeError(
-            "Native display frame size did not match the expected watch size: "
-            f"frame={game_surface.get_size()}, expected={game_display_size}"
-        )
+        # Hardware renderers may expose different framebuffer sizes. Keep the
+        # watch layout stable and scale the renderer output into one UI target.
+        game_surface = pygame.transform.smoothscale(game_surface, game_display_size)
 
     preview_frame = _preview_frame(observation)
     observation_display_size = _observation_preview_size(observation.shape)

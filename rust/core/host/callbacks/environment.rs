@@ -21,8 +21,6 @@ pub(super) enum EnvironmentCmd {
     GetInputBitmasks = 51 | ENVIRONMENT_EXPERIMENTAL,
     GetCoreOptionsVersion = 52 | ENVIRONMENT_EXPERIMENTAL,
     SetCoreOptionsDisplay = 55 | ENVIRONMENT_EXPERIMENTAL,
-    SetHwRenderContextNegotiationInterface = 43 | ENVIRONMENT_EXPERIMENTAL,
-    GetHwRenderContextNegotiationInterfaceSupport = 73 | ENVIRONMENT_EXPERIMENTAL,
     SetCoreOptionsUpdateDisplayCallback = 69,
 }
 

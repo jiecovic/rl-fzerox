@@ -4,6 +4,13 @@ from rl_fzerox.ui.watch.render.frame import (
     _create_screen,
     _draw_frame,
     _ensure_screen,
+    _watch_game_display_size,
 )
 
-__all__ = ["_create_fonts", "_create_screen", "_draw_frame", "_ensure_screen"]
+__all__ = [
+    "_create_fonts",
+    "_create_screen",
+    "_draw_frame",
+    "_ensure_screen",
+    "_watch_game_display_size",
+]
