@@ -10,7 +10,7 @@ use crate::core::api::LoadedCore;
 use crate::core::callbacks::{CallbackGuard, CallbackState};
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationSpec};
+use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
 use crate::core::video::VideoFrame;
@@ -38,6 +38,7 @@ pub struct Host {
     pub(super) baseline_frame: Option<VideoFrame>,
     pub(super) baseline_kind: BaselineKind,
     pub(super) display_aspect_ratio: f64,
+    pub(super) observation_crop_profile: ObservationCropProfile,
     pub(super) native_fps: f64,
     pub(super) frame_shape: (usize, usize, usize),
     pub(super) frame_index: usize,
@@ -82,6 +83,7 @@ impl Host {
             baseline_frame: None,
             baseline_kind: BaselineKind::Startup,
             display_aspect_ratio: 0.0,
+            observation_crop_profile: ObservationCropProfile::from_renderer_name(renderer),
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
             frame_index: 0,
@@ -275,7 +277,12 @@ impl Host {
         preset: ObservationPreset,
     ) -> Result<ObservationSpec, CoreError> {
         let (frame_height, frame_width, _) = self.frame_shape;
-        preset.resolve(frame_width, frame_height, self.display_aspect_ratio)
+        preset.resolve(
+            frame_width,
+            frame_height,
+            self.display_aspect_ratio,
+            self.observation_crop_profile,
+        )
     }
 
     pub fn observation_frame(
@@ -289,7 +296,7 @@ impl Host {
             spec.frame_width,
             spec.frame_height,
             spec.channels == 3,
-            preset.crop(),
+            preset.crop(self.observation_crop_profile),
             frame_stack,
         )
     }
@@ -301,7 +308,7 @@ impl Host {
             spec.display_width,
             spec.display_height,
             true,
-            preset.crop(),
+            preset.crop(self.observation_crop_profile),
         )
     }
 
