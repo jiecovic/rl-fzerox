@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.apps.watch import main
+from rl_fzerox.apps.watch import main, resolve_watch_app_config
 from rl_fzerox.core.config.schema import (
     ActionMaskConfig,
     CurriculumConfig,
@@ -108,6 +108,48 @@ def test_watch_rejects_overrides_without_config(
 
     with pytest.raises(SystemExit, match="Hydra overrides require --config"):
         main(["--run-dir", str(run_dir), "--", "watch.fps=30"])
+
+
+def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    train_config = TrainAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.load_train_run_config",
+        lambda *_args, **_kwargs: train_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.materialize_watch_session_config",
+        lambda config, **_kwargs: config,
+    )
+
+    config = resolve_watch_app_config(
+        config_path=None,
+        policy_run_dir=run_dir,
+        policy_artifact="best",
+        overrides=[],
+    )
+
+    assert config.watch.policy_run_dir == run_dir.resolve()
+    assert config.watch.policy_artifact == "best"
+    assert config.emulator.core_path == core_path
 
 
 def test_watch_allows_run_dir_without_config(

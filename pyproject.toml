@@ -25,6 +25,7 @@ dev = [
   "ruff>=0.11.0,<0.12",
 ]
 watch = [
+  "imageio-ffmpeg>=0.5,<1",
   "pygame>=2.5,<3",
 ]
 train = [
@@ -40,6 +41,7 @@ fzerox-probe = "rl_fzerox.apps.probe:main"
 fzerox-smoke = "rl_fzerox.apps.smoke:main"
 fzerox-train = "rl_fzerox.apps.train:main"
 fzerox-watch = "rl_fzerox.apps.watch:main"
+fzerox-record-policy = "rl_fzerox.apps.record_policy:main"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
