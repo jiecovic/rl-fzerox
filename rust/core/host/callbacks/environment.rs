@@ -8,11 +8,11 @@ use libretro_sys::{
     ENVIRONMENT_SET_SUBSYSTEM_INFO,
 };
 
-const ENVIRONMENT_EXPERIMENTAL: u32 = 1 << 31;
+const ENVIRONMENT_EXPERIMENTAL: u32 = 0x10000;
 
 // These frontend environment command ids come from libretro.h. The
-// "experimental" ones are tagged by OR-ing bit 31, matching the libretro
-// header convention used by libretro-sys.
+// "experimental" ones are tagged by OR-ing RETRO_ENVIRONMENT_EXPERIMENTAL
+// from libretro.h.
 #[repr(u32)]
 pub(super) enum EnvironmentCmd {
     GetAudioVideoEnable = 47 | ENVIRONMENT_EXPERIMENTAL,
@@ -21,6 +21,8 @@ pub(super) enum EnvironmentCmd {
     GetInputBitmasks = 51 | ENVIRONMENT_EXPERIMENTAL,
     GetCoreOptionsVersion = 52 | ENVIRONMENT_EXPERIMENTAL,
     SetCoreOptionsDisplay = 55 | ENVIRONMENT_EXPERIMENTAL,
+    SetHwRenderContextNegotiationInterface = 43 | ENVIRONMENT_EXPERIMENTAL,
+    GetHwRenderContextNegotiationInterfaceSupport = 73 | ENVIRONMENT_EXPERIMENTAL,
     SetCoreOptionsUpdateDisplayCallback = 69,
 }
 
