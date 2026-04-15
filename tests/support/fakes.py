@@ -211,7 +211,7 @@ class SyntheticBackend:
         energy_loss_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_timer_limit: int,
+        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,

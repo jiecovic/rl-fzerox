@@ -195,8 +195,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 ),
                 action_repeat=config.env.action_repeat,
                 max_episode_steps=config.env.max_episode_steps,
-                stuck_step_limit=config.env.stuck_step_limit,
-                wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                stuck_step_limit=_display_stuck_step_limit(config),
+                wrong_way_timer_limit=_display_wrong_way_timer_limit(config),
                 progress_frontier_stall_limit_frames=(
                     config.env.progress_frontier_stall_limit_frames
                 ),
@@ -290,8 +290,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                             ),
                             action_repeat=config.env.action_repeat,
                             max_episode_steps=config.env.max_episode_steps,
-                            stuck_step_limit=config.env.stuck_step_limit,
-                            wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                            stuck_step_limit=_display_stuck_step_limit(config),
+                            wrong_way_timer_limit=_display_wrong_way_timer_limit(config),
                             progress_frontier_stall_limit_frames=(
                                 config.env.progress_frontier_stall_limit_frames
                             ),
@@ -380,8 +380,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                         ),
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
-                        stuck_step_limit=config.env.stuck_step_limit,
-                        wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                        stuck_step_limit=_display_stuck_step_limit(config),
+                        wrong_way_timer_limit=_display_wrong_way_timer_limit(config),
                         progress_frontier_stall_limit_frames=(
                             config.env.progress_frontier_stall_limit_frames
                         ),
@@ -486,8 +486,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                         ),
                         action_repeat=config.env.action_repeat,
                         max_episode_steps=config.env.max_episode_steps,
-                        stuck_step_limit=config.env.stuck_step_limit,
-                        wrong_way_timer_limit=config.env.wrong_way_timer_limit,
+                        stuck_step_limit=_display_stuck_step_limit(config),
+                        wrong_way_timer_limit=_display_wrong_way_timer_limit(config),
                         progress_frontier_stall_limit_frames=(
                             config.env.progress_frontier_stall_limit_frames
                         ),
@@ -601,6 +601,18 @@ def _continuous_air_brake_disabled(
     if config.env.action.continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
+
+
+def _display_wrong_way_timer_limit(config: WatchAppConfig) -> int | None:
+    if not config.env.wrong_way_truncation_enabled:
+        return None
+    return config.env.wrong_way_timer_limit
+
+
+def _display_stuck_step_limit(config: WatchAppConfig) -> int | None:
+    if not config.env.stuck_truncation_enabled:
+        return None
+    return config.env.stuck_step_limit
 
 
 def _update_best_finish_position(

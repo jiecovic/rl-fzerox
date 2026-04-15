@@ -18,6 +18,7 @@ class RaceV2RewardWeights:
     milestone_speed_bonus_cap: float = 0.0
     bootstrap_progress_scale: float = 0.001
     bootstrap_regress_penalty_scale: float = 0.002
+    progress_reward_interval_frames: int = 1
     bootstrap_position_multiplier_scale: float = 0.0
     bootstrap_lap_count: int = 1
     lap_1_completion_bonus: float = 20.0

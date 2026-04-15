@@ -40,6 +40,8 @@ class RaceV2RewardTracker:
         self._last_milestone_step_count = 0
         self._awarded_laps_completed = 0
         self._previous_progress_delta_position = 0.0
+        self._pending_bootstrap_progress_delta = 0.0
+        self._pending_bootstrap_progress_frames = 0
         self._progress_origin = 0.0
         self._has_progress_origin = False
         self._max_episode_steps = max_episode_steps
@@ -62,6 +64,7 @@ class RaceV2RewardTracker:
         if telemetry is None or not telemetry.in_race_mode:
             self._awarded_laps_completed = 0
             self._previous_progress_delta_position = 0.0
+            self._clear_pending_bootstrap_progress()
             self._progress_origin = 0.0
             self._has_progress_origin = False
             self._energy.reset(None)
@@ -71,6 +74,7 @@ class RaceV2RewardTracker:
             return
         self._awarded_laps_completed = self._race_laps_completed(telemetry)
         self._previous_progress_delta_position = 0.0
+        self._clear_pending_bootstrap_progress()
         self._set_progress_origin(telemetry.player.race_distance)
         self._energy.reset(telemetry)
         self._boost_pad_reward_cooldown_frames_remaining = 0
@@ -120,6 +124,8 @@ class RaceV2RewardTracker:
         bootstrap_progress_reward = self._bootstrap_progress_reward(
             current_delta_position,
             telemetry,
+            summary,
+            status,
         )
         if bootstrap_progress_reward:
             reward += bootstrap_progress_reward
@@ -248,6 +254,7 @@ class RaceV2RewardTracker:
             return RewardStep(reward=reward, breakdown=breakdown)
 
         if status.termination_reason in {
+            "spinning_out",
             "crashed",
             "retired",
             "falling_off_track",
@@ -282,6 +289,9 @@ class RaceV2RewardTracker:
             "milestone_phase_offset": self._milestone_phase_offset,
             "bootstrap_progress_active": self._bootstrap_progress_active(),
             "bootstrap_lap_count": self._weights.bootstrap_lap_count,
+            "progress_reward_interval_frames": self._weights.progress_reward_interval_frames,
+            "pending_progress_reward_frames": self._pending_bootstrap_progress_frames,
+            "pending_progress_reward_delta": self._pending_bootstrap_progress_delta,
             "energy_gain_cooldown_frames_remaining": (self._energy.gain_cooldown_frames_remaining),
             "energy_full_refill_cooldown_frames_remaining": (
                 self._energy.full_refill_cooldown_frames_remaining
@@ -327,6 +337,7 @@ class RaceV2RewardTracker:
     def _set_progress_origin(self, race_distance: float) -> None:
         self._progress_origin = race_distance
         self._previous_progress_delta_position = 0.0
+        self._clear_pending_bootstrap_progress()
         self._has_progress_origin = True
 
     def _ensure_progress_origin(self, telemetry: FZeroXTelemetry) -> None:
@@ -391,12 +402,36 @@ class RaceV2RewardTracker:
         self,
         current_delta_position: float,
         telemetry: FZeroXTelemetry,
+        summary: StepSummary,
+        status: StepStatus,
     ) -> float:
         if not self._bootstrap_progress_active():
+            self._clear_pending_bootstrap_progress()
             return 0.0
 
         progress_delta = current_delta_position - self._previous_progress_delta_position
         self._previous_progress_delta_position = current_delta_position
+        interval_frames = max(int(self._weights.progress_reward_interval_frames), 1)
+        if interval_frames <= 1:
+            return self._scaled_bootstrap_progress_reward(progress_delta, telemetry)
+
+        self._pending_bootstrap_progress_delta += progress_delta
+        self._pending_bootstrap_progress_frames += max(int(summary.frames_run), 0)
+        if (
+            self._pending_bootstrap_progress_frames < interval_frames
+            and not self._should_flush_bootstrap_progress(status, telemetry)
+        ):
+            return 0.0
+
+        pending_delta = self._pending_bootstrap_progress_delta
+        self._clear_pending_bootstrap_progress()
+        return self._scaled_bootstrap_progress_reward(pending_delta, telemetry)
+
+    def _scaled_bootstrap_progress_reward(
+        self,
+        progress_delta: float,
+        telemetry: FZeroXTelemetry,
+    ) -> float:
         position_multiplier = self._bootstrap_position_multiplier(telemetry)
         if progress_delta > 0.0 and self._weights.bootstrap_progress_scale > 0.0:
             return progress_delta * self._weights.bootstrap_progress_scale * position_multiplier
@@ -405,6 +440,21 @@ class RaceV2RewardTracker:
                 progress_delta * self._weights.bootstrap_regress_penalty_scale * position_multiplier
             )
         return 0.0
+
+    def _clear_pending_bootstrap_progress(self) -> None:
+        self._pending_bootstrap_progress_delta = 0.0
+        self._pending_bootstrap_progress_frames = 0
+
+    def _should_flush_bootstrap_progress(
+        self,
+        status: StepStatus,
+        telemetry: FZeroXTelemetry,
+    ) -> bool:
+        return (
+            status.termination_reason is not None
+            or status.truncation_reason is not None
+            or self._race_laps_completed(telemetry) >= self._weights.bootstrap_lap_count
+        )
 
     def _bootstrap_position_multiplier(self, telemetry: FZeroXTelemetry) -> float:
         scale = self._weights.bootstrap_position_multiplier_scale

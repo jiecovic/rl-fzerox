@@ -85,7 +85,10 @@ impl StepStatus {
         let reverse_timer = final_telemetry.player.reverse_timer.max(0) as usize;
         let truncation_reason = if counters.step_count >= config.max_episode_steps {
             Some("timeout")
-        } else if reverse_timer >= config.wrong_way_timer_limit {
+        } else if config
+            .wrong_way_timer_limit
+            .is_some_and(|limit| reverse_timer >= limit)
+        {
             Some("wrong_way")
         } else if counters.stalled_steps >= config.stuck_step_limit {
             Some("stuck")
@@ -226,8 +229,8 @@ pub struct RepeatedStepConfig {
     pub max_episode_steps: usize,
     /// Low-speed frame limit that triggers a stuck truncation.
     pub stuck_step_limit: usize,
-    /// Reverse timer limit that triggers wrong-way truncation.
-    pub wrong_way_timer_limit: usize,
+    /// Reverse timer limit that triggers wrong-way truncation; `None` disables this guard.
+    pub wrong_way_timer_limit: Option<usize>,
     /// Maximum internal frames allowed without beating the best race-distance frontier.
     pub progress_frontier_stall_limit_frames: Option<usize>,
     /// Minimum frontier improvement required to reset the progress-stall timer.

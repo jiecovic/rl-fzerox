@@ -65,6 +65,7 @@ def make_telemetry(
     difficulty_name: str = "novice",
     camera_setting_raw: int = 2,
     camera_setting_name: str = "regular",
+    race_intro_timer: int = 0,
     player: PlayerTelemetry | None = None,
     state_labels: tuple[str, ...] = ("active",),
     state_flags: int | None = None,
@@ -109,6 +110,7 @@ def make_telemetry(
         difficulty_name=difficulty_name,
         camera_setting_raw=camera_setting_raw,
         camera_setting_name=camera_setting_name,
+        race_intro_timer=race_intro_timer,
     )
 
 

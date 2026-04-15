@@ -21,6 +21,7 @@ pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
 pub(super) struct GlobalOffsets {
     pub total_lap_count: usize,
     pub difficulty: usize,
+    pub race_intro_timer: usize,
     pub game_mode: usize,
     pub total_racers: usize,
     pub course_index: usize,
@@ -60,6 +61,7 @@ pub(super) struct RacerOffsets {
 pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     total_lap_count: rdram_offset(0x800C_D00C),
     difficulty: rdram_offset(0x800C_D008),
+    race_intro_timer: rdram_offset(0x800F_5E98),
     game_mode: rdram_offset(0x800DCE44),
     total_racers: rdram_offset(0x800E5EC0),
     course_index: rdram_offset(0x800F8514),

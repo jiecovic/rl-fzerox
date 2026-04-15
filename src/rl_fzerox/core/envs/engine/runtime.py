@@ -7,7 +7,11 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.boot import boot_into_first_race, continue_to_next_race
+from rl_fzerox.core.boot import (
+    boot_into_first_race,
+    continue_to_next_race,
+    sync_race_intro_target,
+)
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.domain.shoulder_slide import SHOULDER_SLIDE_MODE_TIMER_ASSIST
@@ -150,6 +154,11 @@ class FZeroXEnvEngine:
             telemetry=telemetry,
             info=info,
         )
+        race_intro_info, telemetry = sync_race_intro_target(
+            self.backend,
+            target_timer=self.config.race_intro_target_timer,
+        )
+        info.update(race_intro_info)
         info.update(backend_step_info(self.backend))
         self._episode_done = False
         self._episode_return = 0.0
@@ -338,6 +347,11 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = requested_control_state or control_state
         applied_control_state = control_state
+        stuck_step_limit = (
+            self.config.stuck_step_limit
+            if self.config.stuck_truncation_enabled
+            else self.config.max_episode_steps + 1
+        )
         step_result = self.backend.step_repeat_raw(
             applied_control_state,
             action_repeat=action_repeat,
@@ -346,8 +360,12 @@ class FZeroXEnvEngine:
             stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
             max_episode_steps=self.config.max_episode_steps,
-            stuck_step_limit=self.config.stuck_step_limit,
-            wrong_way_timer_limit=self.config.wrong_way_timer_limit,
+            stuck_step_limit=stuck_step_limit,
+            wrong_way_timer_limit=(
+                self.config.wrong_way_timer_limit
+                if self.config.wrong_way_truncation_enabled
+                else None
+            ),
             progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
@@ -379,6 +397,7 @@ class FZeroXEnvEngine:
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count
+        info["stuck_truncation_enabled"] = self.config.stuck_truncation_enabled
         info["stalled_steps"] = step_result.status.stalled_steps
         info["reverse_timer"] = step_result.status.reverse_timer
         info["progress_frontier_stalled_frames"] = (

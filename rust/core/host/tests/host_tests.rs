@@ -174,6 +174,40 @@ fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
 }
 
 #[test]
+fn step_status_allows_disabling_wrong_way_truncation() {
+    let mut config = repeated_step_config(100, 5, 180);
+    config.wrong_way_timer_limit = None;
+
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry(true, 0, 10_000),
+        config,
+    );
+
+    assert_eq!(status.reverse_timer, 10_000);
+    assert_eq!(status.truncation_reason, None);
+}
+
+#[test]
+fn step_status_reports_spinning_out_before_energy_depletion_fallback() {
+    let status = StepStatus::from_step(
+        StepCounters::default(),
+        &StepSummary {
+            frames_run: 1,
+            ..StepSummary::default()
+        },
+        &telemetry_with_energy(true, (1 << 14) | (1 << 30), 0, 0.0, 178.0),
+        repeated_step_config(100, 5, 180),
+    );
+
+    assert_eq!(status.termination_reason, Some("spinning_out"));
+}
+
+#[test]
 fn step_status_terminates_on_active_race_energy_depletion() {
     let status = StepStatus::from_step(
         StepCounters::default(),
@@ -247,7 +281,7 @@ fn repeated_step_config(
         energy_loss_epsilon: 0.1,
         max_episode_steps,
         stuck_step_limit,
-        wrong_way_timer_limit,
+        wrong_way_timer_limit: Some(wrong_way_timer_limit),
         progress_frontier_stall_limit_frames: Some(900),
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
@@ -262,6 +296,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
         difficulty_name: "novice",
         camera_setting_raw: 2,
         camera_setting_name: "regular",
+        race_intro_timer: 0,
         game_mode_raw: 1,
         game_mode_name: if in_race_mode { "gp_race" } else { "title" },
         in_race_mode,

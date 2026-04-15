@@ -9,6 +9,8 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.total_lap_count..GLOBALS.total_lap_count + 4]
         .copy_from_slice(&3_i32.to_le_bytes());
     memory[GLOBALS.difficulty..GLOBALS.difficulty + 4].copy_from_slice(&2_i32.to_le_bytes());
+    memory[GLOBALS.race_intro_timer..GLOBALS.race_intro_timer + 4]
+        .copy_from_slice(&39_i32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
     memory[GLOBALS.course_index..GLOBALS.course_index + 4].copy_from_slice(&0_u32.to_le_bytes());
@@ -47,6 +49,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.total_lap_count, 3);
     assert_eq!(telemetry.difficulty_raw, 2);
     assert_eq!(telemetry.difficulty_name, "expert");
+    assert_eq!(telemetry.race_intro_timer, 39);
     assert_eq!(telemetry.camera_setting_raw, 3);
     assert_eq!(telemetry.camera_setting_name, "wide");
     assert_eq!(telemetry.total_racers, 30);

@@ -12,6 +12,12 @@ local/roms/F-Zero X (USA).n64
 checkpoints/mute-city-3steer-recurrent-ppo-v1/baseline.state
 ```
 
+Reusable reset baselines:
+
+```text
+checkpoints/baselines/mute-city-novice-blue-falcon-balanced-go-window.state
+```
+
 Current checkpoint:
 
 ```bash

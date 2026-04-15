@@ -1,0 +1,38 @@
+# Milestone/time-pressure reward profile:
+# - pays fixed one-time rewards for progress buckets
+# - explicitly charges every frame until the next bucket is reached
+# - avoids dense progress deltas so tiny RAM-progress jitter is less useful
+name: race_v4
+
+# Time pressure: direct frame cost; reverse/low-speed frames multiply the extra cost.
+time_penalty_per_frame: -0.0003
+reverse_time_penalty_scale: 2.0
+low_speed_time_penalty_scale: 2.0
+
+# Milestones: scalar race-distance buckets measured relative to episode start.
+# 5000 gives frequent enough feedback from scratch while still avoiding per-frame jitter.
+milestone_distance: 5000.0
+randomize_milestone_phase_on_reset: true
+milestone_bonus: 1.0
+
+# Lap rewards: modest completion bonuses; the main objective is reaching buckets quickly.
+lap_1_completion_bonus: 1.0
+lap_2_completion_bonus: 1.0
+final_lap_completion_bonus: 3.0
+lap_position_scale: 0.0
+finish_position_scale: 0.0
+
+# Failure shaping: lightweight terminal pressure; frontier-stall truncation is
+# still controlled by env.progress_frontier_stall_limit_frames.
+remaining_step_penalty_per_frame: 0.0
+remaining_lap_penalty: 10.0
+terminal_failure_base_penalty: -20.0
+stuck_truncation_base_penalty: -20.0
+wrong_way_truncation_base_penalty: -20.0
+progress_stalled_truncation_base_penalty: -20.0
+timeout_truncation_base_penalty: -20.0
+
+# Damage: continuous anti-wall-grinding pressure.
+damage_taken_frame_penalty: -0.02
+damage_taken_streak_ramp_penalty: -0.001
+damage_taken_streak_cap_frames: 120

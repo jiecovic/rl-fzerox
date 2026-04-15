@@ -54,6 +54,8 @@ class ScriptedStepBackend(SyntheticBackend):
         self._results = list(results)
         self._reset_telemetry = reset_telemetry
         self.last_shoulder_slide_timer_assist: bool | None = None
+        self.last_stuck_step_limit: int | None = None
+        self.last_wrong_way_timer_limit: int | None = None
 
     def step_repeat_raw(
         self,
@@ -66,7 +68,7 @@ class ScriptedStepBackend(SyntheticBackend):
         energy_loss_epsilon: float,
         max_episode_steps: int,
         stuck_step_limit: int,
-        wrong_way_timer_limit: int,
+        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
@@ -85,6 +87,8 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         self.set_controller_state(controller_state)
         self.last_shoulder_slide_timer_assist = shoulder_slide_timer_assist
+        self.last_stuck_step_limit = stuck_step_limit
+        self.last_wrong_way_timer_limit = wrong_way_timer_limit
         result = self._results.pop(0)
         frames_run = result.summary.frames_run
         self._capture_video_flags.extend([False] * max(frames_run - 1, 0))
@@ -1905,6 +1909,42 @@ def test_step_truncates_when_speed_is_stuck() -> None:
     assert reward_breakdown["stuck_truncation"] == pytest.approx(-300.98)
 
 
+def test_stuck_truncation_can_be_disabled() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=0.0, speed_kph=40.0),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    low_speed_frames=1,
+                    consecutive_low_speed_frames=1,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(step_count=1, stalled_steps=1),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=100,
+            stuck_truncation_enabled=False,
+            stuck_step_limit=2,
+            stuck_min_speed_kph=50.0,
+            action=ActionConfig(name="steer_drive"),
+        ),
+    )
+
+    env.reset(seed=4)
+    _, _, _, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert not truncated
+    assert backend.last_stuck_step_limit == 101
+    assert info["stuck_truncation_enabled"] is False
+
+
 def test_step_truncates_when_driving_the_wrong_way() -> None:
     backend = ScriptedStepBackend(
         [
@@ -1963,6 +2003,42 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     assert reward_breakdown["reverse_time"] == -0.005
     assert reward_breakdown["bootstrap_regress"] == pytest.approx(-0.007)
     assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.98)
+
+
+def test_step_disables_wrong_way_truncation_when_configured() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=-3.0, reverse_timer=10_000),
+                summary=_step_summary(
+                    max_race_distance=0.0,
+                    reverse_active_frames=1,
+                    final_frame_index=1,
+                ),
+                status=make_step_status(step_count=1, reverse_timer=10_000),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            max_episode_steps=100,
+            stuck_step_limit=10,
+            wrong_way_truncation_enabled=False,
+            wrong_way_timer_limit=100,
+            action=ActionConfig(name="steer_drive"),
+        ),
+    )
+
+    env.reset(seed=7)
+    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert backend.last_wrong_way_timer_limit is None
+    assert info["reverse_timer"] == 10_000
+    assert not terminated
+    assert not truncated
 
 
 def test_step_truncates_when_progress_frontier_stalls() -> None:

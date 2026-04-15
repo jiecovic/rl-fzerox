@@ -22,6 +22,7 @@ milestone_bonus: 2.0
 milestone_speed_scale: 0.05
 # Milestones: maximum extra speed reward paid per crossed milestone.
 milestone_speed_bonus_cap: 2.0
+
 # Bootstrap progress: dense reward scale for positive race-distance delta during
 # the configured lap warmup window.
 bootstrap_progress_scale: 0.002
@@ -67,12 +68,14 @@ energy_gain_collision_cooldown_frames: 120
 energy_full_refill_bonus: 0.0
 # Energy: internal-frame cooldown before the full-refill bonus can fire again.
 energy_full_refill_cooldown_frames: 800
+
 # Damage: fixed penalty for each internal frame where the game reports damage.
 damage_taken_frame_penalty: -0.02
 # Damage: extra per-frame penalty multiplied by the consecutive damage streak.
 damage_taken_streak_ramp_penalty: -0.001
 # Damage: cap the streak multiplier so long wall grinds do not explode rewards.
 damage_taken_streak_cap_frames: 120
+
 # Air control: one-time reward when the machine transitions from airborne back
 # to grounded on an env-step boundary.
 airborne_landing_reward: 10.0
@@ -82,8 +85,9 @@ grounded_air_brake_penalty: -0.001
 # when gas is forced on but we still want the currently ignored logit to learn
 # the old PWM full-gas threshold (`drive >= 0`).
 drive_axis_negative_penalty_scale: 0.0
+
 # Boost pads: small reward when entering a dash-pad boost state.
-boost_pad_reward: 10.00
+boost_pad_reward: 10.0
 # Boost pads: internal-frame cooldown before the boost-pad reward can fire again.
 boost_pad_reward_cooldown_frames: 120
 # Manual boost: fixed reward scalar per env step when manual boost is requested.

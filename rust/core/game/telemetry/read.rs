@@ -45,6 +45,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         difficulty_name: difficulty.map_or("unknown", RaceDifficulty::wire_name),
         camera_setting_raw,
         camera_setting_name: camera_setting.map_or("unknown", CameraRaceSetting::wire_name),
+        race_intro_timer: read_i32(system_ram, GLOBALS.race_intro_timer)?,
         game_mode_raw,
         game_mode_name: game_mode.map_or("unknown", GameMode::wire_name),
         in_race_mode: game_mode.is_some_and(GameMode::is_race),

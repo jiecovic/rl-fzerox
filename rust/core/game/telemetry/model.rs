@@ -7,6 +7,7 @@ const FLAG_FINISHED: u32 = 1 << 25;
 const FLAG_CRASHED: u32 = 1 << 27;
 const FLAG_ACTIVE: u32 = 1 << 30;
 const FLAG_RECEIVED_DAMAGE: u32 = 1 << 17;
+const FLAG_SPINNING_OUT: u32 = 1 << 14;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct StepTelemetrySample {
@@ -27,6 +28,9 @@ impl StepTelemetrySample {
 pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'static str> {
     if (state_flags & FLAG_FINISHED) != 0 {
         return Some("finished");
+    }
+    if (state_flags & FLAG_SPINNING_OUT) != 0 {
+        return Some("spinning_out");
     }
     if (state_flags & FLAG_CRASHED) != 0 {
         return Some("crashed");
@@ -75,6 +79,7 @@ pub struct TelemetrySnapshot {
     pub difficulty_name: &'static str,
     pub camera_setting_raw: i32,
     pub camera_setting_name: &'static str,
+    pub race_intro_timer: i32,
     pub game_mode_raw: u32,
     pub game_mode_name: &'static str,
     pub in_race_mode: bool,

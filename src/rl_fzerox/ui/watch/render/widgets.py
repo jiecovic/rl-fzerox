@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/render/widgets.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rl_fzerox.ui.watch.layout import (
     LAYOUT,
     PALETTE,
@@ -9,6 +11,18 @@ from rl_fzerox.ui.watch.layout import (
     FlagViz,
     ViewerFonts,
 )
+
+
+@dataclass(frozen=True)
+class SteerAxisGuide:
+    """Approximate F-Zero X steering thresholds in policy action space."""
+
+    deadzone: float = 0.08
+    saturation: float = 63.0 / 80.0
+
+
+STEER_AXIS_GUIDE = SteerAxisGuide()
+STEER_DEADZONE_COLOR: Color = (96, 165, 250)
 
 
 def _draw_round_marker(*, pygame, screen, color, center, radius: int, outline_color) -> None:
@@ -141,7 +155,6 @@ def _draw_control_viz(
     drive_y = y
     steer_y = drive_y + (LAYOUT.control_drive_height - LAYOUT.control_steer_height) // 2
     steer_mid_y = steer_y + LAYOUT.control_steer_height // 2
-    steer_mid_x = steer_x + steer_width // 2
     shoulder_pill_y = steer_mid_y - (_pill_height(fonts.small) // 2)
 
     _draw_pill(
@@ -181,27 +194,31 @@ def _draw_control_viz(
         steer_track,
         border_radius=LAYOUT.control_steer_height // 2,
     )
+    _draw_steer_fill(
+        pygame=pygame,
+        screen=screen,
+        track=steer_track,
+        value=control_viz.steer_x,
+    )
+    _draw_steer_axis_guides(
+        pygame=pygame,
+        screen=screen,
+        track=steer_track,
+    )
 
-    steer_extent = round((steer_width // 2) * min(1.0, abs(control_viz.steer_x)))
-    if steer_extent > 0:
-        steer_fill = pygame.Rect(
-            steer_mid_x - steer_extent if control_viz.steer_x < 0 else steer_mid_x,
-            steer_y,
-            steer_extent,
-            LAYOUT.control_steer_height,
-        )
-        pygame.draw.rect(
-            screen,
-            PALETTE.text_primary,
-            steer_fill,
-            border_radius=LAYOUT.control_steer_height // 2,
-        )
-
-    steer_knob_x = steer_mid_x + round((steer_width // 2) * control_viz.steer_x)
+    steer_value = max(-1.0, min(1.0, control_viz.steer_x))
+    steer_knob_x = _steer_track_x(track=steer_track, value=steer_value)
+    steer_knob_color = (
+        PALETTE.text_warning
+        if abs(steer_value) >= STEER_AXIS_GUIDE.saturation
+        else PALETTE.control_knob
+    )
+    if abs(steer_value) <= STEER_AXIS_GUIDE.deadzone:
+        steer_knob_color = STEER_DEADZONE_COLOR
     _draw_round_marker(
         pygame=pygame,
         screen=screen,
-        color=PALETTE.control_knob,
+        color=steer_knob_color,
         center=(steer_knob_x, steer_mid_y),
         radius=LAYOUT.control_marker_radius,
         outline_color=PALETTE.control_knob_outline,
@@ -350,6 +367,85 @@ def _draw_control_viz(
         active_border_color=PALETTE.text_warning,
     )
     return y + _pill_height(fonts.small)
+
+
+def _draw_steer_fill(*, pygame, screen, track, value: float) -> None:
+    value = max(-1.0, min(1.0, value))
+    magnitude = abs(value)
+    if magnitude == 0.0:
+        return
+
+    fill_color = (
+        STEER_DEADZONE_COLOR
+        if magnitude <= STEER_AXIS_GUIDE.deadzone
+        else PALETTE.text_primary
+    )
+    normal_magnitude = min(magnitude, STEER_AXIS_GUIDE.saturation)
+    _draw_steer_segment(
+        pygame=pygame,
+        screen=screen,
+        track=track,
+        start=0.0,
+        end=normal_magnitude if value > 0.0 else -normal_magnitude,
+        color=fill_color,
+    )
+    if magnitude <= STEER_AXIS_GUIDE.saturation:
+        return
+
+    _draw_steer_segment(
+        pygame=pygame,
+        screen=screen,
+        track=track,
+        start=STEER_AXIS_GUIDE.saturation if value > 0.0 else -STEER_AXIS_GUIDE.saturation,
+        end=value,
+        color=PALETTE.text_warning,
+    )
+
+
+def _draw_steer_segment(*, pygame, screen, track, start: float, end: float, color) -> None:
+    start_x = _steer_track_x(track=track, value=start)
+    end_x = _steer_track_x(track=track, value=end)
+    segment_x = min(start_x, end_x)
+    segment_width = max(1, abs(end_x - start_x))
+    pygame.draw.rect(
+        screen,
+        color,
+        pygame.Rect(segment_x, track.y, segment_width, track.height),
+        border_radius=track.height // 2,
+    )
+
+
+def _draw_steer_axis_guides(*, pygame, screen, track) -> None:
+    marker_top = track.top - 2
+    marker_bottom = track.bottom + 2
+    center_x = _steer_track_x(track=track, value=0.0)
+    pygame.draw.line(
+        screen,
+        PALETTE.flag_inactive_border,
+        (center_x, marker_top),
+        (center_x, marker_bottom),
+    )
+    for value in (-STEER_AXIS_GUIDE.deadzone, STEER_AXIS_GUIDE.deadzone):
+        marker_x = _steer_track_x(track=track, value=value)
+        pygame.draw.line(
+            screen,
+            STEER_DEADZONE_COLOR,
+            (marker_x, marker_top),
+            (marker_x, marker_bottom),
+        )
+    for value in (-STEER_AXIS_GUIDE.saturation, STEER_AXIS_GUIDE.saturation):
+        marker_x = _steer_track_x(track=track, value=value)
+        pygame.draw.line(
+            screen,
+            PALETTE.text_warning,
+            (marker_x, marker_top),
+            (marker_x, marker_bottom),
+        )
+
+
+def _steer_track_x(*, track, value: float) -> int:
+    value = max(-1.0, min(1.0, value))
+    return track.centerx + round((track.width // 2) * value)
 
 
 def _draw_centered_label(*, screen, font, label: str, color, center_x: int, y: int) -> None:

@@ -245,6 +245,7 @@ pub struct PyTelemetry {
     difficulty_name: String,
     camera_setting_raw: i32,
     camera_setting_name: String,
+    race_intro_timer: i32,
     game_mode_raw: u32,
     game_mode_name: String,
     in_race_mode: bool,
@@ -268,6 +269,7 @@ impl PyTelemetry {
         difficulty_name = None,
         camera_setting_raw = 2,
         camera_setting_name = None,
+        race_intro_timer = 0,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -282,6 +284,7 @@ impl PyTelemetry {
         difficulty_name: Option<String>,
         camera_setting_raw: i32,
         camera_setting_name: Option<String>,
+        race_intro_timer: i32,
     ) -> Self {
         Self {
             total_lap_count,
@@ -289,6 +292,7 @@ impl PyTelemetry {
             difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
             camera_setting_raw,
             camera_setting_name: camera_setting_name.unwrap_or_else(|| "regular".to_owned()),
+            race_intro_timer,
             game_mode_raw,
             game_mode_name,
             in_race_mode,
@@ -321,6 +325,11 @@ impl PyTelemetry {
     #[getter]
     fn camera_setting_name(&self) -> &str {
         &self.camera_setting_name
+    }
+
+    #[getter]
+    fn race_intro_timer(&self) -> i32 {
+        self.race_intro_timer
     }
 
     #[getter]
@@ -360,6 +369,7 @@ impl PyTelemetry {
         dict.set_item("difficulty_name", self.difficulty_name())?;
         dict.set_item("camera_setting_raw", self.camera_setting_raw())?;
         dict.set_item("camera_setting_name", self.camera_setting_name())?;
+        dict.set_item("race_intro_timer", self.race_intro_timer())?;
         dict.set_item("game_mode_raw", self.game_mode_raw())?;
         dict.set_item("game_mode_name", self.game_mode_name())?;
         dict.set_item("in_race_mode", self.in_race_mode())?;
@@ -385,6 +395,7 @@ pub(super) fn telemetry_to_py(
             difficulty_name: telemetry.difficulty_name.to_owned(),
             camera_setting_raw: telemetry.camera_setting_raw,
             camera_setting_name: telemetry.camera_setting_name.to_owned(),
+            race_intro_timer: telemetry.race_intro_timer,
             game_mode_raw: telemetry.game_mode_raw,
             game_mode_name: telemetry.game_mode_name.to_owned(),
             in_race_mode: telemetry.in_race_mode,

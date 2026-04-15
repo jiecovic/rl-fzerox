@@ -25,6 +25,7 @@ _EPISODE_LOG_KEYS: tuple[tuple[str, str], ...] = (
 )
 _TERMINATION_REASON_KEYS: tuple[str, ...] = (
     "finished",
+    "spinning_out",
     "crashed",
     "retired",
     "falling_off_track",
