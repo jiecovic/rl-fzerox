@@ -7,6 +7,26 @@
 use crate::core::error::CoreError;
 use crate::core::video::{VideoCrop, cropped_dimensions, display_size};
 
+/// Renderer-specific crop profile for raw framebuffers.
+///
+/// Angrylion exposes F-Zero X as a 640x240 software frame, while GLideN64's
+/// smallest useful hardware viewport is 320x240. The visible game borders are
+/// stable but not the same number of pixels in each renderer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ObservationCropProfile {
+    Angrylion,
+    Gliden64,
+}
+
+impl ObservationCropProfile {
+    pub fn from_renderer_name(renderer: &str) -> Self {
+        match renderer {
+            "gliden64" => Self::Gliden64,
+            _ => Self::Angrylion,
+        }
+    }
+}
+
 /// Named single-frame observation layouts exposed to Python.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationPreset {
@@ -48,13 +68,25 @@ impl ObservationPreset {
         }
     }
 
-    pub fn crop(self) -> VideoCrop {
-        match self {
-            Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 => VideoCrop {
+    pub fn crop(self, crop_profile: ObservationCropProfile) -> VideoCrop {
+        match (self, crop_profile) {
+            (
+                Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3,
+                ObservationCropProfile::Angrylion,
+            ) => VideoCrop {
                 top: 16,
                 bottom: 16,
                 left: 24,
                 right: 24,
+            },
+            (
+                Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3,
+                ObservationCropProfile::Gliden64,
+            ) => VideoCrop {
+                top: 15,
+                bottom: 17,
+                left: 12,
+                right: 12,
             },
         }
     }
@@ -64,8 +96,9 @@ impl ObservationPreset {
         raw_frame_width: usize,
         raw_frame_height: usize,
         display_aspect_ratio: f64,
+        crop_profile: ObservationCropProfile,
     ) -> Result<ObservationSpec, CoreError> {
-        let crop = self.crop();
+        let crop = self.crop(crop_profile);
         let (cropped_width, cropped_height) =
             cropped_dimensions(raw_frame_width, raw_frame_height, crop)?;
         let (display_width, display_height) =
@@ -89,5 +122,47 @@ impl ObservationPreset {
         match self {
             Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 => display_aspect_ratio,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ObservationCropProfile, ObservationPreset};
+    use crate::core::video::VideoCrop;
+
+    #[test]
+    fn crop_profile_keeps_existing_angrylion_crop() {
+        assert_eq!(
+            ObservationPreset::NativeCropV1.crop(ObservationCropProfile::Angrylion),
+            VideoCrop {
+                top: 16,
+                bottom: 16,
+                left: 24,
+                right: 24,
+            }
+        );
+    }
+
+    #[test]
+    fn crop_profile_uses_measured_gliden64_borders() {
+        assert_eq!(
+            ObservationPreset::NativeCropV1.crop(ObservationCropProfile::Gliden64),
+            VideoCrop {
+                top: 15,
+                bottom: 17,
+                left: 12,
+                right: 12,
+            }
+        );
+    }
+
+    #[test]
+    fn gliden64_crop_resolves_to_half_size_watch_display() {
+        let spec = ObservationPreset::NativeCropV1
+            .resolve(320, 240, 4.0 / 3.0, ObservationCropProfile::Gliden64)
+            .expect("gliden64 crop should resolve");
+
+        assert_eq!((spec.display_width, spec.display_height), (296, 222));
+        assert_eq!((spec.frame_width, spec.frame_height), (116, 84));
     }
 }
