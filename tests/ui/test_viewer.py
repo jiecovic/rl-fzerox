@@ -20,24 +20,26 @@ from rl_fzerox.core.envs.actions import (
     DRIFT_LEFT_MASK,
 )
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
-from rl_fzerox.ui.watch import (
-    _build_panel_columns,
-    _create_fonts,
+from rl_fzerox.ui.watch.hud.format import (
     _format_policy_action,
     _format_reload_age,
     _format_reload_error,
-    _panel_content_height,
-    _persist_reload_error,
     _pressed_button_labels,
+)
+from rl_fzerox.ui.watch.hud.model import (
+    _build_panel_columns,
+    _panel_content_height,
     _preview_frame,
     _window_size,
 )
-from rl_fzerox.ui.watch.app import (
+from rl_fzerox.ui.watch.render.frame import _create_fonts
+from rl_fzerox.ui.watch.runtime.episode_result import _update_best_finish_position
+from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
     _resolve_control_fps,
     _resolve_render_fps,
-    _update_best_finish_position,
 )
+from rl_fzerox.ui.watch.session import _persist_reload_error
 from tests.support.native_objects import make_telemetry
 
 
@@ -58,7 +60,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1204, 840)
+    assert _window_size((592, 444), (84, 116, 12)) == (1204, 880)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -794,6 +796,7 @@ def test_display_section_includes_action_repeat() -> None:
             "control_fps": 30.0,
             "game_fps": 60.0,
             "control_fps_target": 120.0,
+            "game_fps_target": 240.0,
             "render_fps": 60.0,
             "render_fps_target": 60.0,
             "milestones_completed": 1,
@@ -820,19 +823,17 @@ def test_display_section_includes_action_repeat() -> None:
 
     display_section = next(section for section in columns.right if section.title == "Display")
     repeat_line = next(line for line in display_section.lines if line.label == "Frame skip")
-    control_rate_line = next(line for line in display_section.lines if line.label == "Control/Game")
-    control_target_line = next(
-        line for line in display_section.lines if line.label == "Control target"
-    )
-    render_rate_line = next(line for line in display_section.lines if line.label == "Render")
+    control_rate_line = next(line for line in display_section.lines if line.label == "Control FPS")
+    game_rate_line = next(line for line in display_section.lines if line.label == "Game FPS")
+    render_rate_line = next(line for line in display_section.lines if line.label == "Render FPS")
     milestone_line = next(line for line in display_section.lines if line.label == "Milestones")
     next_milestone_line = next(
         line for line in display_section.lines if line.label == "Next milestone"
     )
 
     assert repeat_line.value == "2"
-    assert control_rate_line.value == "30.0 / 60.0"
-    assert control_target_line.value == "120.0"
+    assert control_rate_line.value == "30.0 / 120.0"
+    assert game_rate_line.value == "60.0 / 240.0"
     assert render_rate_line.value == "60.0 / 60.0"
     assert milestone_line.value == "1 done / next 2"
     assert next_milestone_line.value == "750.0 to 6,000"

@@ -131,18 +131,28 @@ def _format_episode_step(
     return f"{_int_info(info, 'episode_step')} / {max_episode_steps}"
 
 
-def _format_control_game_rate(info: dict[str, object]) -> str:
-    return f"{_float_info(info, 'control_fps'):.1f} / {_float_info(info, 'game_fps'):.1f}"
+def _format_control_rate(info: dict[str, object]) -> str:
+    return _format_rate_pair(info, actual_key="control_fps", target_key="control_fps_target")
+
+
+def _format_game_rate(info: dict[str, object]) -> str:
+    return _format_rate_pair(info, actual_key="game_fps", target_key="game_fps_target")
 
 
 def _format_render_rate(info: dict[str, object]) -> str:
+    return _format_rate_pair(info, actual_key="render_fps", target_key="render_fps_target")
+
+
+def _format_rate_pair(
+    info: dict[str, object],
+    *,
+    actual_key: str,
+    target_key: str,
+) -> str:
     return (
-        f"{_float_info(info, 'render_fps'):.1f} / {_format_rate_target(info, 'render_fps_target')}"
+        f"{_float_info(info, actual_key):.1f} / "
+        f"{_format_rate_target(info, target_key)}"
     )
-
-
-def _format_control_target(info: dict[str, object]) -> str:
-    return _format_rate_target(info, "control_fps_target")
 
 
 def _format_rate_target(info: dict[str, object], key: str) -> str:
