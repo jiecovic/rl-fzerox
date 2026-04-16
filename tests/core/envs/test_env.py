@@ -216,6 +216,36 @@ def test_reset_info_is_pickle_safe_with_live_telemetry() -> None:
     pickle.dumps(info)
 
 
+def test_benchmark_noop_reset_skips_backend_reset() -> None:
+    class ResetCountingBackend(SyntheticBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.reset_calls = 0
+
+        def reset(self) -> ResetState:
+            self.reset_calls += 1
+            return super().reset()
+
+    backend = ResetCountingBackend()
+    backend.step_frames(5)
+    backend.set_controller_state(ControllerState(joypad_mask=BOOST_MASK))
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1, benchmark_noop_reset=True),
+    )
+
+    obs, info = env.reset(seed=123)
+    obs = _image_obs(obs)
+
+    assert backend.reset_calls == 0
+    assert backend.frame_index == 5
+    assert backend.last_controller_state == ControllerState()
+    assert info["reset_mode"] == "benchmark_noop_reset"
+    assert info["benchmark_noop_reset"] is True
+    assert info["frame_index"] == 5
+    assert obs.shape == (116, 164, 12)
+
+
 def test_reset_randomizes_game_rng_when_enabled_and_in_race() -> None:
     backend = ScriptedStepBackend([], reset_telemetry=_telemetry(race_distance=0.0))
     env = FZeroXEnv(

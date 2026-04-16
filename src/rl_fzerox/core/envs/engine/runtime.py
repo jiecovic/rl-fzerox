@@ -144,25 +144,29 @@ class FZeroXEnvEngine:
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""
 
-        _, info, telemetry = self._reset_race_state()
         if seed is not None:
             self._rng_seed_base = seed
-        telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-        telemetry = sync_camera_setting(
-            self.backend,
-            target_name=self.config.camera_setting,
-            telemetry=telemetry,
-            info=info,
-        )
-        race_intro_info, telemetry = sync_race_intro_target(
-            self.backend,
-            target_timer=self.config.race_intro_target_timer,
-        )
-        info.update(race_intro_info)
-        info.update(backend_step_info(self.backend))
+        if self.config.benchmark_noop_reset:
+            info, telemetry = self._benchmark_noop_reset_state()
+        else:
+            _, info, telemetry = self._reset_race_state()
+            telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
+            telemetry = sync_camera_setting(
+                self.backend,
+                target_name=self.config.camera_setting,
+                telemetry=telemetry,
+                info=info,
+            )
+            race_intro_info, telemetry = sync_race_intro_target(
+                self.backend,
+                target_timer=self.config.race_intro_target_timer,
+            )
+            info.update(race_intro_info)
+            info.update(backend_step_info(self.backend))
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
+        self.backend.set_controller_state(self._held_controller_state)
         self._control_state.reset()
         self._mask_controller.set_shoulder_allowed_values(None)
         self._sync_dynamic_masks(telemetry)
@@ -195,6 +199,18 @@ class FZeroXEnvEngine:
         self._last_info = dict(info)
         self._reset_count += 1
         return observation, info
+
+    def _benchmark_noop_reset_state(self) -> tuple[dict[str, object], FZeroXTelemetry | None]:
+        """Reset Python episode bookkeeping without restoring emulator state.
+
+        This is only for throughput diagnostics. It preserves the live game
+        state, so it is not a valid training reset for real learning runs.
+        """
+
+        info = backend_step_info(self.backend)
+        info["reset_mode"] = "benchmark_noop_reset"
+        info["benchmark_noop_reset"] = True
+        return info, read_live_telemetry(self.backend)
 
     def step(
         self,
