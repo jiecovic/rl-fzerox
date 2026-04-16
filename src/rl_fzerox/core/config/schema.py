@@ -163,6 +163,7 @@ class EnvConfig(BaseModel):
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
+    benchmark_noop_reset: bool = False
     camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
     race_intro_target_timer: int | None = Field(default=39, ge=0, le=460)
