@@ -1,4 +1,4 @@
-# TMRL-like reward profile:
+# Progress-bucket reward profile:
 # - treats the game spline centerline as the reference trajectory
 # - divides that trajectory into equally spaced progress buckets
 # - pays only newly covered buckets
@@ -13,7 +13,7 @@ progress_bucket_reward: 0.2
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
 
-# Time pressure: off by default for the TMRL-like profile.
+# Time pressure: off by default for this frontier-progress profile.
 time_penalty_per_frame: 0.0
 reverse_time_penalty_scale: 1.0
 low_speed_time_penalty_scale: 1.0

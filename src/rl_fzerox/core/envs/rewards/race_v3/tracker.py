@@ -22,7 +22,7 @@ _FAILURE_TERMINATION_REASONS = frozenset(
 
 
 class RaceV3RewardTracker:
-    """TMRL-like reward: pay newly covered points on the game spline."""
+    """Reward newly covered progress buckets on the game spline."""
 
     def __init__(
         self,
@@ -81,7 +81,7 @@ class RaceV3RewardTracker:
         telemetry: FZeroXTelemetry | None,
         action_context: RewardActionContext | None = None,
     ) -> RewardStep:
-        """Compute TMRL-like progress reward from one repeated env step."""
+        """Compute frontier-progress reward from one repeated env step."""
 
         del action_context
         if telemetry is None or not telemetry.in_race_mode:
