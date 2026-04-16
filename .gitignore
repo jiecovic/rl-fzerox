@@ -214,6 +214,8 @@ AGENTS.md
 /local/
 conf/local/*.yaml
 conf/local/*.yml
+conf/local/**/*.yaml
+conf/local/**/*.yml
 !conf/local/*.example.yaml
 !conf/local/*.example.yml
 tmp/

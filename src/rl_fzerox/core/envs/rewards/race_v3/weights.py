@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class RaceV3RewardWeights:
-    """Weights for the TMRL-like spline-bucket coverage profile (`race_v3`)."""
+    """Weights for the spline-bucket frontier coverage profile (`race_v3`)."""
 
     energy_loss_epsilon: float = 0.01
     progress_bucket_distance: float = 1_000.0
