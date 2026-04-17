@@ -2,6 +2,7 @@
 import numpy as np
 import pytest
 
+from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.envs.observations import (
     STATE_FEATURE_NAMES,
     state_feature_names,
@@ -25,7 +26,7 @@ def test_native_observation_stack_repeats_the_first_frame() -> None:
 
 def test_native_observation_stack_shifts_forward_on_new_frames() -> None:
     class DistinctFrameBackend(SyntheticBackend):
-        def _build_frame(self) -> np.ndarray:
+        def _build_frame(self) -> RgbFrame:
             value = np.uint8((self.frame_index * 40) % 255)
             return np.full((240, 640, 3), value, dtype=np.uint8)
 

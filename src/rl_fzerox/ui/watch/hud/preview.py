@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from rl_fzerox.ui.watch.hud.format import (
     _format_observation_summary,
     _preview_frame_shape,
@@ -20,7 +21,7 @@ def _window_size(
     )
 
 
-def _preview_frame(observation: np.ndarray) -> np.ndarray:
+def _preview_frame(observation: ObservationFrame) -> RgbFrame:
     if observation.ndim != 3:
         raise ValueError(f"Expected an HxWxC observation, got {observation.shape!r}")
 

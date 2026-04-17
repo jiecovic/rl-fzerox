@@ -9,9 +9,10 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import ActionMask, DiscreteAction, Float32Array, NumpyArray
 
 ActionScalar: TypeAlias = int | float | np.integer | np.floating
-ActionBranchValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | np.ndarray
+ActionBranchValue: TypeAlias = ActionScalar | Sequence[ActionScalar] | NumpyArray
 HybridActionValue: TypeAlias = Mapping[str, ActionBranchValue]
 ActionValue: TypeAlias = ActionBranchValue | HybridActionValue
 
@@ -52,7 +53,7 @@ class ActionAdapter(Protocol):
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return one flattened MultiDiscrete mask for this adapter."""
         ...
 
@@ -89,7 +90,7 @@ def shape_steer_value(steer: float, *, response_power: float) -> float:
     return float(np.sign(clipped) * (abs(clipped) ** response_power))
 
 
-def steer_values(steer_buckets: int, *, response_power: float = 1.0) -> np.ndarray:
+def steer_values(steer_buckets: int, *, response_power: float = 1.0) -> Float32Array:
     """Build steering levels spanning full left to full right."""
 
     values = np.linspace(-1.0, 1.0, num=steer_buckets, dtype=np.float32)
@@ -105,7 +106,7 @@ def multidiscrete_space(*sizes: int) -> spaces.MultiDiscrete:
     return spaces.MultiDiscrete(np.array(sizes, dtype=np.int64))
 
 
-def idle_action(*values: int) -> np.ndarray:
+def idle_action(*values: int) -> DiscreteAction:
     """Build one neutral action value using the repo's int64 convention."""
 
     return np.array(values, dtype=np.int64)
@@ -139,7 +140,7 @@ def build_flat_action_mask(
     base_overrides: dict[str, tuple[int, ...]] | None = None,
     stage_overrides: dict[str, tuple[int, ...]] | None = None,
     dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-) -> np.ndarray:
+) -> ActionMask:
     """Build one flattened boolean mask for a MultiDiscrete action space."""
 
     mask_values: list[bool] = []

@@ -17,6 +17,7 @@ from fzerox_emulator import (
     StepSummary,
     display_size,
 )
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from tests.support.native_objects import make_telemetry
 
 
@@ -46,7 +47,7 @@ class SyntheticBackend:
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
         self._capture_video_flags: list[bool] = []
-        self._observation_stacks: dict[tuple[str, int], tuple[np.ndarray, int | None]] = {}
+        self._observation_stacks: dict[tuple[str, int], tuple[ObservationFrame, int | None]] = {}
         self.randomized_rng_seeds: list[int] = []
         self.loaded_baselines: list[Path] = []
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
@@ -116,7 +117,7 @@ class SyntheticBackend:
             },
         )
 
-    def render(self) -> np.ndarray:
+    def render(self) -> RgbFrame:
         return self._last_frame.copy()
 
     def observation_spec(self, preset: str) -> ObservationSpec:
@@ -141,7 +142,7 @@ class SyntheticBackend:
             display_height=display_height,
         )
 
-    def render_display(self, *, preset: str) -> np.ndarray:
+    def render_display(self, *, preset: str) -> RgbFrame:
         spec = self.observation_spec(preset)
         cropped = _crop_native_crop_v1(self._last_frame)
         aspect_corrected = _resize_frame(
@@ -151,7 +152,7 @@ class SyntheticBackend:
         )
         return aspect_corrected
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
+    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
         spec = self.observation_spec(preset)
         cropped = _crop_native_crop_v1(self._last_frame)
         aspect_corrected = _resize_frame(
@@ -304,7 +305,7 @@ class SyntheticBackend:
     def close(self) -> None:
         return None
 
-    def _build_frame(self) -> np.ndarray:
+    def _build_frame(self) -> RgbFrame:
         frame = np.zeros((self._height, self._width, 3), dtype=np.uint8)
         frame[:, :, 0] = 32
         frame[:, :, 1] = 40
@@ -321,13 +322,13 @@ class SyntheticBackend:
         return frame
 
 
-def _crop_native_crop_v1(frame: np.ndarray) -> np.ndarray:
+def _crop_native_crop_v1(frame: RgbFrame) -> RgbFrame:
     if frame.shape[0] <= 32 or frame.shape[1] <= 48:
         raise ValueError(f"Frame too small for native_crop_v1: {frame.shape!r}")
     return np.ascontiguousarray(frame[16:-16, 24:-24])
 
 
-def _resize_frame(frame: np.ndarray, *, width: int, height: int) -> np.ndarray:
+def _resize_frame(frame: RgbFrame, *, width: int, height: int) -> RgbFrame:
     input_height, input_width, _ = frame.shape
     if input_height == height and input_width == width:
         return np.array(frame, copy=True)

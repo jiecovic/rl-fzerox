@@ -28,14 +28,15 @@ rust-test:
 
 # Apply Python formatters only.
 py-fmt:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format src tests
+    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format src tests scripts/check_numpy_typing.py
 
 py-fmt-check:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format --check src tests
+    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format --check src tests scripts/check_numpy_typing.py
 
 py-lint:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff check src tests
-    PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pyright src tests
+    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" scripts/check_numpy_typing.py src tests scripts
+    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff check src tests scripts/check_numpy_typing.py
+    PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pyright src tests scripts/check_numpy_typing.py
 
 py-test: native
     PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pytest

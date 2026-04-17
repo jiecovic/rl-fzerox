@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import gymnasium as gym
-import numpy as np
 
 from fzerox_emulator import ControllerState, EmulatorBackend
+from fzerox_emulator.arrays import ActionMask, RgbFrame
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
@@ -53,7 +53,7 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         return self._engine.action_to_control_state(action)
 
-    def action_masks(self) -> np.ndarray:
+    def action_masks(self) -> ActionMask:
         """Return the flattened boolean action mask for maskable PPO."""
 
         return self._engine.action_masks()
@@ -86,7 +86,7 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
     def step_frame(self, control_state: ControllerState | None = None):
         return self._engine.step_frame(control_state)
 
-    def render(self) -> np.ndarray:
+    def render(self) -> RgbFrame:
         return self._engine.render()
 
     def close(self) -> None:

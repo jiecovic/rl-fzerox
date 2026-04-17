@@ -7,6 +7,7 @@ import numpy as np
 
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import (
     BackendStepResult,
     FrameStep,
@@ -207,7 +208,7 @@ class Emulator:
         if path is not None:
             self._baseline_state_path = path.resolve()
 
-    def render(self) -> np.ndarray:
+    def render(self) -> RgbFrame:
         """Return the latest raw RGB frame as a NumPy array."""
 
         frame_bytes = self._native.frame_rgb()
@@ -225,7 +226,7 @@ class Emulator:
         self,
         *,
         preset: str,
-    ) -> np.ndarray:
+    ) -> RgbFrame:
         """Return one native display frame for the requested observation preset."""
 
         spec = self.observation_spec(preset)
@@ -262,7 +263,7 @@ class Emulator:
         self._observation_specs[preset] = spec
         return spec
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
+    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
         """Return one native stacked observation tensor for the requested preset."""
 
         spec = self.observation_spec(preset)

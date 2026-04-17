@@ -7,8 +7,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Protocol, TypeGuard
 
-import numpy as np
-
+from fzerox_emulator.arrays import ActionMask, BoolArray, PolicyState
 from rl_fzerox.core.domain.training_algorithms import (
     FULL_MODEL_POLICY_ALGORITHMS,
     SAVED_POLICY_ALGORITHMS,
@@ -22,15 +21,13 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
 
-PolicyState = tuple[np.ndarray, ...] | None
-
 
 class _HasPredict(Protocol):
     def predict(
         self,
         observation: ObservationValue,
         state: PolicyState = None,
-        episode_start: np.ndarray | None = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
     ) -> tuple[ActionValue, PolicyState]: ...
 
@@ -40,9 +37,9 @@ class _HasMaskablePredict(Protocol):
         self,
         observation: ObservationValue,
         state: PolicyState = None,
-        episode_start: np.ndarray | None = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-        action_masks: np.ndarray | None = None,
+        action_masks: ActionMask | None = None,
     ) -> tuple[ActionValue, PolicyState]: ...
 
 
@@ -106,9 +103,9 @@ def _predict_policy_action(
     observation: ObservationValue,
     *,
     state: PolicyState,
-    episode_start: np.ndarray | None,
+    episode_start: BoolArray | None,
     deterministic: bool,
-    action_masks: np.ndarray | None,
+    action_masks: ActionMask | None,
 ) -> tuple[ActionValue, PolicyState]:
     if action_masks is None:
         return _policy_predict_fn(policy)(

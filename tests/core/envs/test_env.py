@@ -14,6 +14,7 @@ from fzerox_emulator import (
     StepStatus,
     StepSummary,
 )
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from rl_fzerox.core.config.schema import (
     ActionConfig,
     ActionMaskConfig,
@@ -741,7 +742,7 @@ def test_step_updates_right_lean_hold_and_press_age_in_image_state_observation()
 
 def test_step_shifts_the_frame_stack_forward():
     class DistinctFrameBackend(SyntheticBackend):
-        def _build_frame(self) -> np.ndarray:
+        def _build_frame(self) -> RgbFrame:
             value = np.uint8((self.frame_index * 40) % 255)
             return np.full((240, 640, 3), value, dtype=np.uint8)
 
@@ -771,7 +772,7 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
             super().__init__(*args, **kwargs)
             self.render_observation_calls: list[tuple[str, int]] = []
 
-        def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray:
+        def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
             self.render_observation_calls.append((preset, frame_stack))
             return super().render_observation(preset=preset, frame_stack=frame_stack)
 
@@ -2444,7 +2445,7 @@ def _camera_setting_name(camera_setting_raw: int) -> str:
     return "unknown"
 
 
-def _image_obs(observation: ObservationValue) -> np.ndarray:
+def _image_obs(observation: ObservationValue) -> ObservationFrame:
     assert isinstance(observation, np.ndarray)
     return observation
 

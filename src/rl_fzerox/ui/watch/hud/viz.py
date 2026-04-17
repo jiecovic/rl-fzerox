@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import ContinuousAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
@@ -101,7 +102,7 @@ def _continuous_gas_axes(
 
 
 def _continuous_air_brake_axis(
-    values: np.ndarray,
+    values: ContinuousAction,
     *,
     continuous_drive_deadzone: float,
 ) -> float | None:

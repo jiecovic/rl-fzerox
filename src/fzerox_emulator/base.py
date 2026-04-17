@@ -5,9 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-import numpy as np
-
 from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.control import ControllerState
 
 
@@ -15,7 +14,7 @@ from fzerox_emulator.control import ControllerState
 class ResetState:
     """State returned immediately after an emulator reset."""
 
-    frame: np.ndarray
+    frame: RgbFrame
     info: dict[str, object] = field(default_factory=dict)
 
 
@@ -23,7 +22,7 @@ class ResetState:
 class FrameStep:
     """One emulator frame worth of output and metadata."""
 
-    frame: np.ndarray
+    frame: RgbFrame
     reward: float
     terminated: bool
     truncated: bool
@@ -46,7 +45,7 @@ class ObservationSpec:
 class BackendStepResult:
     """Native repeated-step payload consumed by the env engine."""
 
-    observation: np.ndarray
+    observation: ObservationFrame
     summary: StepSummary
     status: StepStatus
     telemetry: FZeroXTelemetry | None
@@ -102,13 +101,13 @@ class EmulatorBackend(Protocol):
 
     def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None: ...
 
-    def render(self) -> np.ndarray: ...
+    def render(self) -> RgbFrame: ...
 
     def observation_spec(self, preset: str) -> ObservationSpec: ...
 
-    def render_display(self, *, preset: str) -> np.ndarray: ...
+    def render_display(self, *, preset: str) -> RgbFrame: ...
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> np.ndarray: ...
+    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame: ...
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
 

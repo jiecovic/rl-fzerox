@@ -4,8 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TypeAlias
 
-import numpy as np
-
+from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.config.schema import CurriculumConfig
 from rl_fzerox.core.envs.actions import ActionAdapter
 
@@ -53,7 +52,7 @@ class ActionMaskController:
             _stage_index=0 if stage_overrides else None,
         )
 
-    def action_mask(self) -> np.ndarray:
+    def action_mask(self) -> ActionMask:
         """Return the flattened boolean mask for the current action adapter."""
 
         stage_overrides = None

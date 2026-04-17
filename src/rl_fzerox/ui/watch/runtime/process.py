@@ -9,9 +9,8 @@ from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
 from typing import Protocol
 
-import numpy as np
-
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs.actions import ActionValue
 
@@ -60,9 +59,9 @@ class WorkerClosed:
 class WatchSnapshot:
     """Pickle-safe frame and HUD payload published by the simulation process."""
 
-    raw_frame: np.ndarray
-    observation_image: np.ndarray
-    observation_state: np.ndarray | None
+    raw_frame: RgbFrame
+    observation_image: ObservationFrame
+    observation_state: StateVector | None
     info: dict[str, object]
     reset_info: dict[str, object]
     episode: int
