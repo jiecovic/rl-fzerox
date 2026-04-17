@@ -49,7 +49,7 @@ class ControlStateTracker:
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_decision_interval_frames: int = 1
     boost_request_lockout_frames: int = 0
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS
     _recent_boost_frames: deque[int] = field(
         default_factory=lambda: deque(maxlen=RECENT_BOOST_PRESSURE_WINDOW_FRAMES),
@@ -58,6 +58,7 @@ class ControlStateTracker:
         default_factory=lambda: deque(maxlen=RECENT_STEER_PRESSURE_WINDOW_FRAMES),
     )
     _action_history: deque[_ActionHistorySample] = field(init=False)
+    _resolved_action_history_len: int = field(init=False, default=0)
     _recent_boost_frame_sum: int = 0
     _recent_steer_frame_sum: float = 0.0
     _left_lean_held: bool = False
@@ -74,8 +75,8 @@ class ControlStateTracker:
     _boost_request_lockout_remaining_frames: int = 0
 
     def __post_init__(self) -> None:
-        self.action_history_len = max(int(self.action_history_len), 0)
-        self._action_history = deque(maxlen=self.action_history_len)
+        self._resolved_action_history_len = _resolve_action_history_len(self.action_history_len)
+        self._action_history = deque(maxlen=self._resolved_action_history_len)
 
     def reset(self) -> None:
         """Clear all step-to-step control history."""
@@ -274,7 +275,7 @@ class ControlStateTracker:
     def _action_history_fields(self) -> dict[str, float]:
         samples = list(reversed(self._action_history))
         fields: dict[str, float] = {}
-        for index in range(self.action_history_len):
+        for index in range(self._resolved_action_history_len):
             sample = samples[index] if index < len(samples) else _empty_action_history_sample()
             suffix = index + 1
             fields[f"prev_steer_{suffix}"] = sample.steer
@@ -408,6 +409,15 @@ def _empty_action_history_sample() -> _ActionHistorySample:
         boost=0.0,
         lean=0.0,
     )
+
+
+def _resolve_action_history_len(action_history_len: int | None) -> int:
+    if action_history_len is None:
+        return 0
+    length = int(action_history_len)
+    if length <= 0:
+        raise ValueError("action_history_len must be positive or None")
+    return length
 
 
 def _action_history_field_control(field_name: str) -> ActionHistoryControl:

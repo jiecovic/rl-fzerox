@@ -20,18 +20,14 @@ ActionAdapterName: TypeAlias = Literal[
 ]
 
 ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE: Final[ActionAdapterName] = "continuous_steer_drive"
-ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN: Final[ActionAdapterName] = (
-    "continuous_steer_drive_lean"
-)
+ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN: Final[ActionAdapterName] = "continuous_steer_drive_lean"
 ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: Final[ActionAdapterName] = (
     "hybrid_steer_drive_boost_lean"
 )
 ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE: Final[ActionAdapterName] = (
     "hybrid_steer_drive_boost_lean_primitive"
 )
-ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: Final[ActionAdapterName] = (
-    "hybrid_steer_gas_boost_lean"
-)
+ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: Final[ActionAdapterName] = "hybrid_steer_gas_boost_lean"
 ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: Final[ActionAdapterName] = (
     "hybrid_steer_gas_air_brake_boost_lean"
 )

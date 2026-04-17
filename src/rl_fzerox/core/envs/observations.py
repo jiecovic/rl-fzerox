@@ -16,14 +16,13 @@ ObservationStateProfile: TypeAlias = Literal[
     "default",
     "steer_history",
     "race_core",
-    "race_core_action_history",
 ]
 ActionHistoryControl: TypeAlias = Literal["steer", "gas", "air_brake", "boost", "lean"]
 ImageObservation: TypeAlias = np.ndarray
 ImageStateObservation: TypeAlias = dict[str, np.ndarray]
 ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
 DEFAULT_OBSERVATION_STATE_PROFILE: ObservationStateProfile = "default"
-DEFAULT_ACTION_HISTORY_LEN = 2
+DEFAULT_ACTION_HISTORY_LEN: int | None = None
 DEFAULT_ACTION_HISTORY_CONTROLS: tuple[ActionHistoryControl, ...] = (
     "steer",
     "gas",
@@ -92,6 +91,7 @@ RACE_CORE_STATE_VECTOR_SPEC = StateVectorSpec(
         StateFeature("energy_frac", 1.0),
         StateFeature("reverse_active", 1.0),
         StateFeature("airborne", 1.0),
+        StateFeature("can_boost", 1.0),
         StateFeature("boost_active", 1.0),
     ),
     speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
@@ -149,7 +149,7 @@ def build_observation(
     steer_left_held: float = 0.0,
     steer_right_held: float = 0.0,
     recent_steer_pressure: float = 0.0,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
     action_history: Mapping[str, float] | None = None,
 ) -> ObservationValue:
@@ -189,7 +189,7 @@ def telemetry_state_vector(
     steer_left_held: float = 0.0,
     steer_right_held: float = 0.0,
     recent_steer_pressure: float = 0.0,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
     action_history: Mapping[str, float] | None = None,
 ) -> np.ndarray:
@@ -208,13 +208,9 @@ def telemetry_state_vector(
     steer_left = _clamp(float(steer_left_held), 0.0, 1.0)
     steer_right = _clamp(float(steer_right_held), 0.0, 1.0)
     steer_pressure = _clamp(float(recent_steer_pressure), -1.0, 1.0)
-    previous_actions = _action_history_values(
-        action_history or {},
-        action_history_len=action_history_len,
-        action_history_controls=action_history_controls,
-    )
     if telemetry is None:
         race_core_values = [
+            0.0,
             0.0,
             0.0,
             0.0,
@@ -226,8 +222,8 @@ def telemetry_state_vector(
             race_core_values[1],
             race_core_values[2],
             race_core_values[3],
-            0.0,
             race_core_values[4],
+            race_core_values[5],
             left_held,
             right_held,
             left_age,
@@ -244,6 +240,7 @@ def telemetry_state_vector(
             _clamp(energy_frac, 0.0, 1.0),
             1.0 if player.reverse_timer > 0 else 0.0,
             1.0 if player.airborne else 0.0,
+            1.0 if player.can_boost else 0.0,
             boost_active,
         ]
         values = [
@@ -251,8 +248,8 @@ def telemetry_state_vector(
             race_core_values[1],
             race_core_values[2],
             race_core_values[3],
-            1.0 if player.can_boost else 0.0,
             race_core_values[4],
+            race_core_values[5],
             left_held,
             right_held,
             left_age,
@@ -262,11 +259,17 @@ def telemetry_state_vector(
 
     if state_profile == "race_core":
         values = race_core_values
-    elif state_profile == "race_core_action_history":
-        values = [*race_core_values, *previous_actions]
-
-    if state_profile == "steer_history":
+    elif state_profile == "steer_history":
         values.extend([steer_left, steer_right, steer_pressure])
+
+    if action_history_len is not None:
+        values.extend(
+            _action_history_values(
+                action_history or {},
+                action_history_len=action_history_len,
+                action_history_controls=action_history_controls,
+            )
+        )
 
     return np.array(values, dtype=np.float32)
 
@@ -277,7 +280,7 @@ def build_observation_space(
     frame_stack: int,
     mode: ObservationMode,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> spaces.Box | spaces.Dict:
     image_space = build_image_observation_space(observation_spec, frame_stack=frame_stack)
@@ -351,26 +354,28 @@ def observation_state(observation: ObservationValue) -> np.ndarray | None:
 def state_vector_spec(
     state_profile: ObservationStateProfile,
     *,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> StateVectorSpec:
     """Return the scalar-state schema selected by config."""
 
-    if state_profile == "race_core_action_history":
-        return _race_core_action_history_state_vector_spec(
-            action_history_len,
-            action_history_controls=action_history_controls,
-        )
     try:
-        return STATE_VECTOR_SPECS[state_profile]
+        base_spec = STATE_VECTOR_SPECS[state_profile]
     except KeyError as exc:
         raise ValueError(f"Unsupported observation state profile: {state_profile!r}") from exc
+    if action_history_len is None:
+        return base_spec
+    return _state_vector_spec_with_action_history(
+        base_spec,
+        action_history_len,
+        action_history_controls=action_history_controls,
+    )
 
 
 def state_feature_names(
     state_profile: ObservationStateProfile,
     *,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> tuple[str, ...]:
     """Return ordered scalar-state feature names for one profile."""
@@ -385,7 +390,7 @@ def state_feature_names(
 def state_feature_count(
     state_profile: ObservationStateProfile,
     *,
-    action_history_len: int = DEFAULT_ACTION_HISTORY_LEN,
+    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> int:
     """Return scalar-state width for one profile."""
@@ -398,12 +403,14 @@ def state_feature_count(
 
 
 def action_history_feature_names(
-    action_history_len: int,
+    action_history_len: int | None,
     *,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> tuple[str, ...]:
     """Return ordered feature names for the configured previous-action buffer."""
 
+    if action_history_len is None:
+        return ()
     return tuple(
         feature.name
         for feature in _action_history_features(
@@ -413,23 +420,24 @@ def action_history_feature_names(
     )
 
 
-def _race_core_action_history_state_vector_spec(
+def _state_vector_spec_with_action_history(
+    base_spec: StateVectorSpec,
     action_history_len: int,
     *,
     action_history_controls: tuple[ActionHistoryControl, ...],
 ) -> StateVectorSpec:
     return StateVectorSpec(
         features=(
-            *RACE_CORE_STATE_VECTOR_SPEC.features,
+            *base_spec.features,
             *_action_history_features(
                 action_history_len,
                 action_history_controls=action_history_controls,
             ),
         ),
-        speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
-        lean_tap_guard_frames=DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
-        recent_boost_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames,
-        recent_steer_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames,
+        speed_normalizer_kph=base_spec.speed_normalizer_kph,
+        lean_tap_guard_frames=base_spec.lean_tap_guard_frames,
+        recent_boost_window_frames=base_spec.recent_boost_window_frames,
+        recent_steer_window_frames=base_spec.recent_steer_window_frames,
     )
 
 
@@ -470,8 +478,8 @@ def _action_history_values(
 
 def _validate_action_history_len(action_history_len: int) -> int:
     length = int(action_history_len)
-    if length < 0:
-        raise ValueError("action_history_len must be non-negative")
+    if length <= 0:
+        raise ValueError("action_history_len must be positive or None")
     return length
 
 

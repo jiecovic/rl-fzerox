@@ -627,7 +627,7 @@ def test_step_updates_steer_history_state_profile() -> None:
     assert values["recent_steer_pressure"] == pytest.approx(-1.0)
 
 
-def test_step_updates_race_core_action_history_state_profile() -> None:
+def test_step_updates_race_core_with_action_history() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
@@ -636,7 +636,7 @@ def test_step_updates_race_core_action_history_state_profile() -> None:
             action=ActionConfig(name="hybrid_steer_gas_boost_lean"),
             observation=ObservationConfig(
                 mode="image_state",
-                state_profile="race_core_action_history",
+                state_profile="race_core",
                 action_history_len=3,
                 frame_stack=4,
             ),
@@ -652,11 +652,11 @@ def test_step_updates_race_core_action_history_state_profile() -> None:
     )
 
     assert isinstance(obs, dict)
-    assert obs["state"].shape == (17,)
-    assert info["observation_state_profile"] == "race_core_action_history"
+    assert obs["state"].shape == (18,)
+    assert info["observation_state_profile"] == "race_core"
     assert info["observation_action_history_len"] == 3
     assert info["observation_action_history_controls"] == ("steer", "gas", "boost", "lean")
-    assert info["observation_state_shape"] == (17,)
+    assert info["observation_state_shape"] == (18,)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
     feature_names = tuple(str(name) for name in raw_feature_names)

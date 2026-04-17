@@ -18,6 +18,10 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.config.action_branches import (
+    ActionBranchesConfig,
+    compile_action_branches,
+)
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
@@ -83,6 +87,7 @@ class ActionConfig(BaseModel):
     boost_request_lockout_frames: NonNegativeInt = 0
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
+    branches: ActionBranchesConfig | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -111,6 +116,18 @@ class ActionConfig(BaseModel):
                 values["continuous_air_brake_mode"] = "off"
             elif legacy_disable_on_ground is True or legacy_airborne_only is True:
                 values["continuous_air_brake_mode"] = "disable_on_ground"
+
+        branch_config = values.get("branches")
+        if branch_config is not None:
+            # COMPAT SHIM: branch-style configs are compiled to the existing
+            # adapter fields so older run manifests and adapter classes keep
+            # loading until the legacy names can be removed.
+            compiled = compile_action_branches(branch_config)
+            if compiled.values.get("mask") is not None and values.get("mask") is not None:
+                raise ValueError(
+                    "env.action.branches masks cannot be combined with env.action.mask"
+                )
+            values.update(compiled.values)
         return values
 
     @field_validator("steer_buckets")
@@ -131,11 +148,12 @@ class ObservationConfig(BaseModel):
         "default",
         "steer_history",
         "race_core",
-        "race_core_action_history",
     ] = "default"
-    preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3"] = "native_crop_v3"
+    preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3", "native_crop_v4"] = (
+        "native_crop_v3"
+    )
     frame_stack: PositiveInt = 4
-    action_history_len: NonNegativeInt = Field(default=2, le=16)
+    action_history_len: PositiveInt | None = Field(default=None, le=16)
     action_history_controls: tuple[ActionHistoryControlName, ...] = (
         "steer",
         "gas",
@@ -247,6 +265,7 @@ class RewardConfig(BaseModel):
     energy_full_refill_bonus: NonNegativeFloat = 0.0
     energy_full_refill_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
+    energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0
@@ -371,6 +390,7 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    conv_profile: Literal["auto", "nature", "compact_deep"] = "auto"
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     fusion_features_dim: PositiveInt | None = None

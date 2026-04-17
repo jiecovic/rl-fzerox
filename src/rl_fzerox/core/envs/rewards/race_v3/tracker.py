@@ -43,6 +43,7 @@ class RaceV3RewardTracker:
         self._energy_gain_cooldown_frames_remaining = 0
         self._rewarded_boost_pad_progress_windows: set[int] = set()
         self._rewarded_full_refill_laps: set[int] = set()
+        self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = False
         self._previous_energy_fraction = 0.0
         self._awarded_laps_completed = 0
@@ -64,6 +65,7 @@ class RaceV3RewardTracker:
         self._energy_gain_cooldown_frames_remaining = 0
         self._rewarded_boost_pad_progress_windows.clear()
         self._rewarded_full_refill_laps.clear()
+        self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
         self._previous_energy_fraction = _normalized_energy(telemetry)
         if telemetry is None or not telemetry.in_race_mode:
@@ -95,6 +97,7 @@ class RaceV3RewardTracker:
             self._energy_gain_cooldown_frames_remaining = 0
             self._rewarded_boost_pad_progress_windows.clear()
             self._rewarded_full_refill_laps.clear()
+            self._energy_refill_since_full_fraction = 0.0
             self._previous_airborne = False
             self._previous_energy_fraction = 0.0
             return RewardStep(reward=0.0)
@@ -136,6 +139,7 @@ class RaceV3RewardTracker:
             reward += boost_pad_reward
             breakdown["boost_pad"] = boost_pad_reward
 
+        self._accumulate_refill_since_full(summary, telemetry)
         full_refill_reward = self._full_refill_lap_reward(summary, telemetry)
         if full_refill_reward:
             reward += full_refill_reward
@@ -168,6 +172,8 @@ class RaceV3RewardTracker:
             reward += terminal_penalty
 
         self._advance_energy_gain_cooldown(summary.frames_run)
+        if _normalized_energy(telemetry) >= 1.0:
+            self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = telemetry.player.airborne
         self._previous_energy_fraction = _normalized_energy(telemetry)
         return RewardStep(reward=reward, breakdown=breakdown)
@@ -188,6 +194,7 @@ class RaceV3RewardTracker:
             "boost_pad_reward_progress_window": self._weights.boost_pad_reward_progress_window,
             "rewarded_boost_pad_progress_windows": len(self._rewarded_boost_pad_progress_windows),
             "rewarded_full_refill_laps": len(self._rewarded_full_refill_laps),
+            "energy_refill_since_full_fraction": self._energy_refill_since_full_fraction,
             "damage_taken_streak_frames": self._damage.streak_frames,
             "rewarded_laps_completed": self._awarded_laps_completed,
         }
@@ -300,6 +307,24 @@ class RaceV3RewardTracker:
         self._rewarded_boost_pad_progress_windows.add(window_index)
         return reward
 
+    def _accumulate_refill_since_full(
+        self,
+        summary: StepSummary,
+        telemetry: FZeroXTelemetry,
+    ) -> None:
+        current_energy_fraction = _normalized_energy(telemetry)
+        if self._previous_energy_fraction >= 1.0 and current_energy_fraction >= 1.0:
+            self._energy_refill_since_full_fraction = 0.0
+            return
+        max_energy = float(telemetry.player.max_energy)
+        if max_energy <= 0.0 or summary.energy_gain_total <= 0.0:
+            return
+        self._energy_refill_since_full_fraction = min(
+            self._energy_refill_since_full_fraction
+            + (max(float(summary.energy_gain_total), 0.0) / max_energy),
+            1.0,
+        )
+
     def _full_refill_lap_reward(
         self,
         summary: StepSummary,
@@ -317,12 +342,15 @@ class RaceV3RewardTracker:
         current_energy_fraction = _normalized_energy(telemetry)
         if self._previous_energy_fraction >= 1.0 or current_energy_fraction < 1.0:
             return 0.0
+        recovered_fraction = self._energy_refill_since_full_fraction
+        if recovered_fraction < self._weights.energy_full_refill_min_gain_fraction:
+            return 0.0
 
         lap_index = completed_race_laps(telemetry)
         if lap_index in self._rewarded_full_refill_laps:
             return 0.0
         self._rewarded_full_refill_laps.add(lap_index)
-        return reward
+        return reward * min(recovered_fraction, 1.0)
 
     def _landing_reward(self, telemetry: FZeroXTelemetry) -> float:
         reward = self._weights.airborne_landing_reward

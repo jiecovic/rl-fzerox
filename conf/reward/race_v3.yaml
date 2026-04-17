@@ -50,9 +50,13 @@ boost_pad_reward_progress_window: 1000.0
 energy_gain_reward_scale: 8.0
 # Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
 energy_gain_collision_cooldown_frames: 240
-# Energy refill: once-per-lap bonus for reaching full energy from below while
-# actually gaining energy. Suppressed while reversing or in the damage cooldown.
+# Energy refill: max once-per-lap bonus for reaching full energy from below.
+# The payout is scaled by the recovered energy fraction since the last full
+# state, so a tiny scratch/refill cannot collect the full bonus.
 energy_full_refill_lap_bonus: 20.0
+# Energy refill: require at least this much recovered energy before the flat
+# full-refill bonus can fire. At 0.10 and bonus 20, the threshold payout is 2.
+energy_full_refill_min_gain_fraction: 0.10
 
 # Airborne: event reward when an airborne machine lands back on the track.
 airborne_landing_reward: 10.0

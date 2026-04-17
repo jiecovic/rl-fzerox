@@ -286,9 +286,7 @@ class HybridSteerGasAirBrakeBoostLeanActionAdapter:
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering and independent button heads."""
 
-        steer, gas, air_brake, boost, lean = _parse_hybrid_steer_gas_air_brake_boost_lean(
-            action
-        )
+        steer, gas, air_brake, boost, lean = _parse_hybrid_steer_gas_air_brake_boost_lean(action)
         joypad_mask = 0
         if gas == 1:
             joypad_mask |= ACCELERATE_MASK
@@ -435,9 +433,7 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
                     dtype=np.float32,
                 ),
                 # Discrete order is lean primitive, then boost.
-                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete(
-                    [_HYBRID_LEAN_PRIMITIVE_SIZE, 2]
-                ),
+                HYBRID_DISCRETE_ACTION_KEY: spaces.MultiDiscrete([_HYBRID_LEAN_PRIMITIVE_SIZE, 2]),
             }
         )
 

@@ -104,10 +104,7 @@ def _draw_control_viz(
     right_lean_width = _pill_width(fonts.small, "lean")
     max_steer_width = max(
         48,
-        left_widget_width
-        - left_lean_width
-        - right_lean_width
-        - (2 * LAYOUT.control_side_pill_gap),
+        left_widget_width - left_lean_width - right_lean_width - (2 * LAYOUT.control_side_pill_gap),
     )
     steer_width = min(LAYOUT.control_steer_width, max_steer_width)
     steer_group_width = (

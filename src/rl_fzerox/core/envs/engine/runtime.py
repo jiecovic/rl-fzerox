@@ -440,9 +440,7 @@ class FZeroXEnvEngine:
             progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
-            lean_timer_assist=(
-                self.config.action.lean_mode == LEAN_MODE_TIMER_ASSIST
-            ),
+            lean_timer_assist=(self.config.action.lean_mode == LEAN_MODE_TIMER_ASSIST),
         )
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
