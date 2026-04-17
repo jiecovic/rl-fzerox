@@ -313,6 +313,41 @@ def test_reset_can_disable_sampled_track_baseline_cache(tmp_path: Path) -> None:
     assert backend.loaded_baseline_bytes == []
 
 
+def test_terminal_reset_reuses_sampled_baseline_instead_of_continuing_race(
+    tmp_path: Path,
+) -> None:
+    baseline_path = tmp_path / "silence.state"
+    baseline_path.write_bytes(b"state")
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            reset_to_race=True,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        baseline_state_path=baseline_path,
+                        weight=1.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+    env.reset(seed=123)
+    env._engine._episode_done = True
+    _, info = env.reset(seed=124)
+
+    assert info["baseline_kind"] == "custom"
+    assert info["track_id"] == "silence"
+    assert backend.loaded_baseline_bytes == [
+        (baseline_path, len(b"state")),
+        (baseline_path, len(b"state")),
+    ]
+
+
 def test_track_baseline_cache_reads_each_state_once(tmp_path: Path) -> None:
     baseline_path = tmp_path / "silence.state"
     baseline_path.write_bytes(b"one")
@@ -1973,21 +2008,15 @@ def test_env_keeps_lean_speed_mask_without_lean_latch() -> None:
     assert env.action_masks().tolist()[-3:] == [True, False, False]
 
 
-def test_reset_can_boot_into_the_first_race_path():
+def test_reset_to_race_requires_custom_baseline():
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(action_repeat=2, reset_to_race=True),
     )
 
-    obs, info = env.reset(seed=5)
-    obs = _image_obs(obs)
-
-    assert obs.shape == (116, 164, 12)
-    assert info["seed"] == 5
-    assert info["reset_mode"] == "boot_to_race"
-    assert info["boot_state"] == "gp_race"
-    assert backend.frame_index == 1_592
+    with pytest.raises(RuntimeError, match="requires a custom baseline state"):
+        env.reset(seed=5)
 
 
 def test_reset_skips_bootstrap_when_a_custom_baseline_is_active():
@@ -2009,58 +2038,6 @@ def test_reset_skips_bootstrap_when_a_custom_baseline_is_active():
     assert info["seed"] == 11
     assert "boot_state" not in info
     assert backend.frame_index == 0
-
-
-def test_reset_can_continue_to_next_race_after_terminal_episode(monkeypatch) -> None:
-    backend = SyntheticBackend()
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(action_repeat=2, reset_to_race=True),
-    )
-
-    env.reset(seed=1)
-    env._engine._episode_done = True
-
-    def fake_continue_to_next_race(_backend):
-        return backend.render(), {
-            "reset_mode": "continue_to_next_race",
-            "boot_state": "gp_race",
-            "frame_index": 4242,
-        }
-
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine.runtime.continue_to_next_race",
-        fake_continue_to_next_race,
-    )
-
-    _, info = env.reset(seed=2)
-
-    assert info["seed"] == 2
-    assert info["reset_mode"] == "continue_to_next_race"
-    assert info["boot_state"] == "gp_race"
-
-
-def test_reset_surfaces_continue_to_next_race_fallback(monkeypatch) -> None:
-    backend = SyntheticBackend()
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(action_repeat=2, reset_to_race=True),
-    )
-
-    env.reset(seed=1)
-    env._engine._episode_done = True
-
-    monkeypatch.setattr(
-        "rl_fzerox.core.envs.engine.runtime.continue_to_next_race",
-        lambda _backend: (_ for _ in ()).throw(RuntimeError("continue failed")),
-    )
-
-    _, info = env.reset(seed=2)
-
-    assert info["seed"] == 2
-    assert info["reset_mode"] == "boot_to_race"
-    assert info["reset_fallback"] == "continue_to_next_race_failed"
-    assert info["continue_to_next_race_error"] == "continue failed"
 
 
 def test_step_truncates_on_timeout() -> None:

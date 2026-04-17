@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/engine/info.py
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
@@ -12,7 +14,7 @@ from rl_fzerox.core.envs.observations import (
 )
 
 
-def has_custom_baseline(info: dict[str, object]) -> bool:
+def has_custom_baseline(info: Mapping[str, object]) -> bool:
     """Return whether reset info points at a custom user baseline."""
 
     return info.get("baseline_kind") == "custom"
@@ -68,22 +70,6 @@ def set_observation_info(
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
         )
-
-
-def reset_context_info(info: dict[str, object]) -> dict[str, object]:
-    """Keep only reset metadata that still matters after race continuation."""
-
-    keys = (
-        "backend",
-        "core_path",
-        "rom_path",
-        "runtime_dir",
-        "baseline_state_path",
-        "baseline_kind",
-        "display_aspect_ratio",
-        "native_fps",
-    )
-    return {key: info[key] for key in keys if key in info}
 
 
 def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
