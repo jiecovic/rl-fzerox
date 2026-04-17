@@ -94,7 +94,7 @@ def save_train_run_config(*, config: TrainAppConfig, run_dir: Path) -> Path:
     """Persist one resolved train config snapshot next to a training run."""
 
     config_path = run_dir / RUN_LAYOUT.config_filename
-    data = config.model_dump(mode="json", exclude_none=True)
+    data = _train_config_snapshot_data(config)
     OmegaConf.save(config=OmegaConf.create(data), f=str(config_path))
     return config_path
 
@@ -119,6 +119,34 @@ def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
             raise ValueError(f"Train run config keys must be strings: {config_path}")
         normalized[key] = value
     return normalized
+
+
+def _train_config_snapshot_data(config: TrainAppConfig) -> dict[str, object]:
+    data = {
+        str(key): value for key, value in config.model_dump(mode="json", exclude_none=True).items()
+    }
+    _prefer_action_branch_snapshot(data)
+    return data
+
+
+def _prefer_action_branch_snapshot(config_data: dict[str, object]) -> None:
+    env_data = config_data.get("env")
+    if not isinstance(env_data, dict):
+        return
+
+    action_data = env_data.get("action")
+    if not isinstance(action_data, dict):
+        return
+
+    branches_data = action_data.get("branches")
+    if branches_data is None:
+        return
+
+    # COMPAT SHIM: new branch configs compile to adapter-era fields at runtime.
+    # Do not persist those generated fields in fresh run manifests; keeping the
+    # branch declaration as the only saved source makes this bridge removable.
+    action_data.clear()
+    action_data["branches"] = branches_data
 
 
 def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:

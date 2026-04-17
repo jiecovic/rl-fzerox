@@ -4,7 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveFloat, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+    field_validator,
+)
 
 from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
@@ -47,6 +55,8 @@ class ActionBranchConfig(BaseModel):
     mode: LeanMode | None = None
     unmask_max_speed_kph: NonNegativeFloat | None = None
     unmask_min_speed_kph: NonNegativeFloat | None = None
+    decision_interval_frames: PositiveInt | None = None
+    request_lockout_frames: NonNegativeInt | None = None
 
     @field_validator("mask")
     @classmethod
@@ -104,6 +114,10 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
     boost_branch = branches.boost
     if boost_branch is not None:
         compiled["boost_unmask_max_speed_kph"] = boost_branch.unmask_max_speed_kph
+        if boost_branch.decision_interval_frames is not None:
+            compiled["boost_decision_interval_frames"] = boost_branch.decision_interval_frames
+        if boost_branch.request_lockout_frames is not None:
+            compiled["boost_request_lockout_frames"] = boost_branch.request_lockout_frames
 
     lean_branch = branches.lean
     if lean_branch is not None:
@@ -165,6 +179,10 @@ def _validate_branch_specific_fields(branch_name: str, branch: ActionBranchConfi
         raise ValueError(f"action branch {branch_name!r} cannot define mode")
     if branch.unmask_max_speed_kph is not None and branch_name != "boost":
         raise ValueError(f"action branch {branch_name!r} cannot define unmask_max_speed_kph")
+    if branch.decision_interval_frames is not None and branch_name != "boost":
+        raise ValueError(f"action branch {branch_name!r} cannot define decision_interval_frames")
+    if branch.request_lockout_frames is not None and branch_name != "boost":
+        raise ValueError(f"action branch {branch_name!r} cannot define request_lockout_frames")
     if branch.unmask_min_speed_kph is not None and branch_name != "lean":
         raise ValueError(f"action branch {branch_name!r} cannot define unmask_min_speed_kph")
 

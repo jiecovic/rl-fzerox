@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from omegaconf import OmegaConf
+
 from rl_fzerox.core.config.schema import (
+    ActionConfig,
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -109,6 +112,77 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.watch.fps == 30.0
     assert merged_watch_config.watch.control_fps == 30.0
     assert merged_watch_config.watch.render_fps == 30.0
+
+
+def test_save_train_run_config_persists_action_branches_without_adapter_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    train_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(
+            action=ActionConfig.model_validate(
+                {
+                    "branches": {
+                        "steer": {
+                            "type": "continuous",
+                            "response_power": 1.0,
+                        },
+                        "gas": {
+                            "type": "discrete",
+                            "mask": ("idle", "engaged"),
+                        },
+                        "boost": {
+                            "type": "discrete",
+                            "mask": ("idle",),
+                            "decision_interval_frames": 1,
+                            "request_lockout_frames": 5,
+                        },
+                        "lean": {
+                            "type": "discrete",
+                            "mask": ("idle", "left", "right"),
+                            "mode": "release_cooldown",
+                        },
+                    }
+                }
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="exp_v3_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=train_config.train.output_root,
+        run_name=train_config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    config_path = save_train_run_config(config=train_config, run_dir=run_paths.run_dir)
+
+    saved = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
+    assert isinstance(saved, dict)
+    env_data = saved["env"]
+    assert isinstance(env_data, dict)
+    action_data = env_data["action"]
+    assert isinstance(action_data, dict)
+    assert set(action_data) == {"branches"}
+    branches_data = action_data["branches"]
+    assert isinstance(branches_data, dict)
+    boost_data = branches_data["boost"]
+    assert isinstance(boost_data, dict)
+    assert boost_data["request_lockout_frames"] == 5
+
+    loaded_config = load_train_run_config(run_paths.run_dir)
+
+    assert loaded_config.env.action.name == "hybrid_steer_gas_boost_lean"
+    assert loaded_config.env.action.boost_request_lockout_frames == 5
 
 
 def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(
