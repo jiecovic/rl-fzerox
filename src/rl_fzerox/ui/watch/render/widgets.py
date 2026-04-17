@@ -86,19 +86,17 @@ def _draw_control_viz(
     control_viz: ControlViz,
 ) -> int:
     steer_label = fonts.small.render("Steer", True, PALETTE.text_muted)
-    dual_drive_levers = (
-        control_viz.drive_axis_mode == "accelerate" and control_viz.air_brake_axis is not None
+    dual_gas_levers = control_viz.air_brake_axis is not None
+    gas_group_width = (
+        (2 * LAYOUT.control_gas_width) + LAYOUT.control_gas_pair_gap
+        if dual_gas_levers
+        else LAYOUT.control_gas_width
     )
-    drive_group_width = (
-        (2 * LAYOUT.control_drive_width) + LAYOUT.control_drive_pair_gap
-        if dual_drive_levers
-        else LAYOUT.control_drive_width
-    )
-    drive_x = x + width - drive_group_width - LAYOUT.control_drive_offset_x
-    air_brake_x = drive_x + LAYOUT.control_drive_width + LAYOUT.control_drive_pair_gap
+    gas_x = x + width - gas_group_width - LAYOUT.control_gas_offset_x
+    air_brake_x = gas_x + LAYOUT.control_gas_width + LAYOUT.control_gas_pair_gap
     left_widget_width = max(
         48,
-        width - drive_group_width - LAYOUT.control_drive_offset_x - LAYOUT.control_widget_gap,
+        width - gas_group_width - LAYOUT.control_gas_offset_x - LAYOUT.control_widget_gap,
     )
     left_lean_width = _pill_width(fonts.small, "lean")
     right_lean_width = _pill_width(fonts.small, "lean")
@@ -120,13 +118,13 @@ def _draw_control_viz(
     right_lean_x = steer_x + steer_width + LAYOUT.control_side_pill_gap
 
     screen.blit(steer_label, (x, y))
-    if dual_drive_levers:
+    if dual_gas_levers:
         _draw_centered_label(
             screen=screen,
             font=fonts.small,
-            label="Accel",
+            label="Gas",
             color=PALETTE.text_muted,
-            center_x=drive_x + (LAYOUT.control_drive_width // 2),
+            center_x=gas_x + (LAYOUT.control_gas_width // 2),
             y=y,
         )
         _draw_centered_label(
@@ -134,23 +132,22 @@ def _draw_control_viz(
             font=fonts.small,
             label="Air Brake",
             color=PALETTE.text_muted,
-            center_x=air_brake_x + (LAYOUT.control_drive_width // 2),
+            center_x=air_brake_x + (LAYOUT.control_gas_width // 2),
             y=y,
         )
     else:
-        drive_label_text = "Accel" if control_viz.drive_axis_mode == "accelerate" else "Drive"
         _draw_centered_label(
             screen=screen,
             font=fonts.small,
-            label=drive_label_text,
+            label="Gas",
             color=PALETTE.text_muted,
-            center_x=drive_x + (LAYOUT.control_drive_width // 2),
+            center_x=gas_x + (LAYOUT.control_gas_width // 2),
             y=y,
         )
     y += steer_label.get_height() + LAYOUT.control_track_gap
 
-    drive_y = y
-    steer_y = drive_y + (LAYOUT.control_drive_height - LAYOUT.control_steer_height) // 2
+    gas_y = y
+    steer_y = gas_y + (LAYOUT.control_gas_height - LAYOUT.control_steer_height) // 2
     steer_mid_y = steer_y + LAYOUT.control_steer_height // 2
     lean_pill_y = steer_mid_y - (_pill_height(fonts.small) // 2)
 
@@ -221,136 +218,78 @@ def _draw_control_viz(
         outline_color=PALETTE.control_knob_outline,
     )
 
-    drive_group_center_x = drive_x + drive_group_width // 2
-    drive_mid_y = drive_y + LAYOUT.control_drive_height // 2
-    if dual_drive_levers and control_viz.drive_axis is not None:
-        accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
+    gas_group_center_x = gas_x + gas_group_width // 2
+    gas_level = (
+        control_viz.gas_axis if control_viz.gas_axis is not None else float(control_viz.gas_level)
+    )
+    gas_level = max(0.0, min(1.0, gas_level))
+    if dual_gas_levers:
         air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis or 0.0))
         air_brake_color = (
             PALETTE.text_muted if control_viz.air_brake_disabled else PALETTE.text_warning
         )
-        _draw_unipolar_drive_lever(
+        _draw_unipolar_gas_lever(
             pygame=pygame,
             screen=screen,
-            x=drive_x,
-            y=drive_y,
-            level=accelerate_level,
+            x=gas_x,
+            y=gas_y,
+            level=gas_level,
             fill_color=PALETTE.text_accent,
         )
-        _draw_unipolar_drive_lever(
+        _draw_unipolar_gas_lever(
             pygame=pygame,
             screen=screen,
             x=air_brake_x,
-            y=drive_y,
+            y=gas_y,
             level=air_brake_level,
             fill_color=air_brake_color,
         )
-    elif control_viz.drive_axis_mode == "accelerate" and control_viz.drive_axis is not None:
-        accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
-        _draw_unipolar_drive_lever(
+    else:
+        _draw_unipolar_gas_lever(
             pygame=pygame,
             screen=screen,
-            x=drive_x,
-            y=drive_y,
-            level=accelerate_level,
+            x=gas_x,
+            y=gas_y,
+            level=gas_level,
             fill_color=PALETTE.text_accent,
         )
-    else:
-        drive_value = (
-            control_viz.drive_axis
-            if control_viz.drive_axis is not None
-            else float(control_viz.drive_level)
-        )
-        drive_value = max(-1.0, min(1.0, drive_value))
-        pygame.draw.rect(
-            screen,
-            PALETTE.control_track,
-            pygame.Rect(
-                drive_x,
-                drive_y,
-                LAYOUT.control_drive_width,
-                LAYOUT.control_drive_height,
-            ),
-            border_radius=LAYOUT.control_drive_width // 2,
-        )
-        drive_extent = (LAYOUT.control_drive_height // 2) - LAYOUT.control_marker_radius
-        drive_knob_y = drive_mid_y - round(drive_extent * drive_value)
-        drive_knob_y = max(
-            drive_y + LAYOUT.control_marker_radius,
-            min(drive_y + LAYOUT.control_drive_height - LAYOUT.control_marker_radius, drive_knob_y),
-        )
-        if drive_knob_y != drive_mid_y:
-            drive_fill = pygame.Rect(
-                drive_x,
-                min(drive_mid_y, drive_knob_y),
-                LAYOUT.control_drive_width,
-                abs(drive_knob_y - drive_mid_y),
-            )
-            pygame.draw.rect(
-                screen,
-                PALETTE.text_accent if drive_value > 0.0 else PALETTE.text_warning,
-                drive_fill,
-                border_radius=LAYOUT.control_drive_width // 2,
-            )
-        _draw_round_marker(
-            pygame=pygame,
-            screen=screen,
-            color=PALETTE.control_knob if drive_value != 0.0 else PALETTE.control_coast,
-            center=(drive_x + LAYOUT.control_drive_width // 2, drive_knob_y),
-            radius=LAYOUT.control_marker_radius,
-            outline_color=PALETTE.control_knob_outline,
-        )
 
-    y += LAYOUT.control_drive_height + LAYOUT.control_caption_gap
+    y += LAYOUT.control_gas_height + LAYOUT.control_caption_gap
     caption_segments: tuple[tuple[str, Color], ...] | None = None
-    mode = "coast"
-    mode_color = PALETTE.text_muted
-    if control_viz.drive_axis_mode == "accelerate" and control_viz.drive_axis is not None:
-        accelerate_level = max(0.0, min(1.0, control_viz.drive_axis))
-        if control_viz.air_brake_axis is None:
-            mode = f"{round(accelerate_level * 100):3d}%"
-            mode_color = PALETTE.text_accent if accelerate_level > 0.0 else PALETTE.text_muted
-        else:
-            air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis))
-            caption_segments = (
+    mode = f"{round(gas_level * 100):3d}%"
+    mode_color = PALETTE.text_accent if gas_level > 0.0 else PALETTE.text_muted
+    if control_viz.air_brake_axis is not None:
+        air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis))
+        caption_segments = (
+            (
+                f"{round(gas_level * 100):3d}%",
+                PALETTE.text_accent if gas_level > 0.0 else PALETTE.text_muted,
+            ),
+            ("   ", PALETTE.text_muted),
+            (
+                f"{round(air_brake_level * 100):3d}%",
                 (
-                    f"{round(accelerate_level * 100):3d}%",
-                    PALETTE.text_accent if accelerate_level > 0.0 else PALETTE.text_muted,
+                    PALETTE.text_muted
+                    if control_viz.air_brake_disabled or air_brake_level == 0.0
+                    else PALETTE.text_warning
                 ),
-                ("   ", PALETTE.text_muted),
-                (
-                    f"{round(air_brake_level * 100):3d}%",
-                    (
-                        PALETTE.text_muted
-                        if control_viz.air_brake_disabled or air_brake_level == 0.0
-                        else PALETTE.text_warning
-                    ),
-                ),
-            )
-    elif control_viz.drive_level > 0:
-        mode = "accelerate"
-        mode_color = PALETTE.text_accent
-    elif control_viz.drive_level < 0:
-        mode = "air brake"
-        mode_color = PALETTE.text_warning
-    else:
-        mode = "coast"
-        mode_color = PALETTE.text_muted
+            ),
+        )
     if caption_segments is not None:
         y = _draw_centered_caption_segments(
             screen=screen,
             font=fonts.body,
             segments=caption_segments,
-            center_x=drive_group_center_x,
+            center_x=gas_group_center_x,
             y=y,
         )
     else:
         mode_surface = fonts.body.render(mode, True, mode_color)
-        mode_x = drive_group_center_x - (mode_surface.get_width() // 2)
+        mode_x = gas_group_center_x - (mode_surface.get_width() // 2)
         screen.blit(mode_surface, (mode_x, y))
         y += mode_surface.get_height()
     y += LAYOUT.control_boost_gap
-    boost_x = drive_group_center_x - (_pill_width(fonts.small, "boost") // 2)
+    boost_x = gas_group_center_x - (_pill_width(fonts.small, "boost") // 2)
     _draw_pill(
         pygame=pygame,
         screen=screen,
@@ -467,7 +406,7 @@ def _draw_centered_caption_segments(
     return y + max_height
 
 
-def _draw_unipolar_drive_lever(
+def _draw_unipolar_gas_lever(
     *,
     pygame,
     screen,
@@ -480,36 +419,36 @@ def _draw_unipolar_drive_lever(
     track = pygame.Rect(
         x,
         y,
-        LAYOUT.control_drive_width,
-        LAYOUT.control_drive_height,
+        LAYOUT.control_gas_width,
+        LAYOUT.control_gas_height,
     )
     pygame.draw.rect(
         screen,
         PALETTE.control_track,
         track,
-        border_radius=LAYOUT.control_drive_width // 2,
+        border_radius=LAYOUT.control_gas_width // 2,
     )
-    extent = LAYOUT.control_drive_height - (2 * LAYOUT.control_marker_radius)
-    knob_y = y + LAYOUT.control_drive_height - LAYOUT.control_marker_radius - round(extent * level)
-    fill_height = y + LAYOUT.control_drive_height - knob_y
+    extent = LAYOUT.control_gas_height - (2 * LAYOUT.control_marker_radius)
+    knob_y = y + LAYOUT.control_gas_height - LAYOUT.control_marker_radius - round(extent * level)
+    fill_height = y + LAYOUT.control_gas_height - knob_y
     if fill_height > 0:
         fill = pygame.Rect(
             x,
             knob_y,
-            LAYOUT.control_drive_width,
+            LAYOUT.control_gas_width,
             fill_height,
         )
         pygame.draw.rect(
             screen,
             fill_color,
             fill,
-            border_radius=LAYOUT.control_drive_width // 2,
+            border_radius=LAYOUT.control_gas_width // 2,
         )
     _draw_round_marker(
         pygame=pygame,
         screen=screen,
         color=PALETTE.control_knob if level > 0.0 else PALETTE.control_coast,
-        center=(x + LAYOUT.control_drive_width // 2, knob_y),
+        center=(x + LAYOUT.control_gas_width // 2, knob_y),
         radius=LAYOUT.control_marker_radius,
         outline_color=PALETTE.control_knob_outline,
     )

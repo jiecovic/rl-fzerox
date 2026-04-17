@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Protocol
 
 from fzerox_emulator import (
     JOYPAD_A,
@@ -64,10 +64,10 @@ class ViewerLayout:
     control_side_pill_gap: int = 8
     control_steer_width: int = 116
     control_steer_height: int = 10
-    control_drive_width: int = 12
-    control_drive_height: int = 56
-    control_drive_pair_gap: int = 48
-    control_drive_offset_x: int = 8
+    control_gas_width: int = 12
+    control_gas_height: int = 56
+    control_gas_pair_gap: int = 48
+    control_gas_offset_x: int = 20
     control_marker_radius: int = 6
     control_caption_gap: int = 3
     control_boost_gap: int = 4
@@ -113,11 +113,10 @@ class ControlViz:
     """Compact control-state visualization for the watch panel."""
 
     steer_x: float
-    drive_level: int
-    drive_axis: float | None
+    gas_level: int
+    gas_axis: float | None
     air_brake_axis: float | None
     air_brake_disabled: bool
-    drive_axis_mode: Literal["signed", "accelerate"]
     boost_pressed: bool
     lean_direction: int
 
