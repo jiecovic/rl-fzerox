@@ -458,12 +458,26 @@ def _policy_state_sections(
         if len(feature_names) == values.size
         else tuple(f"state_{index}" for index in range(values.size))
     )
-    return [
+    state_lines: list[PanelLine] = []
+    action_history_lines: list[PanelLine] = []
+    for name, value in zip(names, values, strict=True):
+        line = _panel_line(name, f"{float(value):.3f}", PALETTE.text_primary)
+        if name.startswith("prev_"):
+            action_history_lines.append(line)
+        else:
+            state_lines.append(line)
+
+    sections = [
         PanelSection(
-            title="Obs Vector",
-            lines=[
-                _panel_line(name, f"{float(value):.3f}", PALETTE.text_primary)
-                for name, value in zip(names, values, strict=True)
-            ],
+            title="Obs State",
+            lines=state_lines,
         )
     ]
+    if action_history_lines:
+        sections.append(
+            PanelSection(
+                title="Action Buffer",
+                lines=action_history_lines,
+            )
+        )
+    return sections
