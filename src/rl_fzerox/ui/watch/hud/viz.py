@@ -9,7 +9,6 @@ from fzerox_emulator import ControllerState
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
     BOOST_MASK,
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
@@ -29,30 +28,19 @@ def _control_viz(
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     accelerate_pressed = bool(joypad_mask & ACCELERATE_MASK)
-    air_brake_pressed = bool(joypad_mask & AIR_BRAKE_MASK)
-    drive_level = 1 if accelerate_pressed else -1 if air_brake_pressed else 0
-    drive_axis, air_brake_axis = _continuous_drive_axes(
+    gas_level = 1 if accelerate_pressed else 0
+    gas_axis, air_brake_axis = _continuous_gas_axes(
         policy_action,
         continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
-    drive_axis_mode = (
-        "accelerate"
-        if drive_axis is not None and continuous_drive_mode in ("pwm", "always_accelerate")
-        else "signed"
-    )
-    if drive_axis is None and air_brake_axis is None and accelerate_pressed and air_brake_pressed:
-        drive_axis = 1.0
-        air_brake_axis = 1.0
-        drive_axis_mode = "accelerate"
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
-        drive_level=drive_level,
-        drive_axis=drive_axis,
+        gas_level=gas_level,
+        gas_axis=gas_axis,
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
-        drive_axis_mode=drive_axis_mode,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         lean_direction=(
             -1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0
@@ -60,14 +48,14 @@ def _control_viz(
     )
 
 
-def _continuous_drive_axes(
+def _continuous_gas_axes(
     policy_action: ActionValue | None,
     *,
     continuous_drive_mode: str,
     continuous_drive_deadzone: float,
     continuous_air_brake_enabled: bool,
 ) -> tuple[float | None, float | None]:
-    """Return HUD accelerate/air-brake values when the policy action exposes those axes."""
+    """Return HUD gas/air-brake values when the policy action exposes those axes."""
 
     if policy_action is None:
         return None, None
@@ -105,11 +93,11 @@ def _continuous_drive_axes(
         else None
     )
     if continuous_drive_mode == "pwm":
-        return _continuous_drive_accelerate_level(
+        return _continuous_gas_level(
             drive,
             deadzone=continuous_drive_deadzone,
         ), air_brake
-    return drive, air_brake
+    return (1.0 if drive > continuous_drive_deadzone else 0.0), air_brake
 
 
 def _continuous_air_brake_axis(
@@ -129,7 +117,7 @@ def _continuous_air_brake_axis(
     )
 
 
-def _continuous_drive_accelerate_level(drive: float, *, deadzone: float) -> float:
+def _continuous_gas_level(drive: float, *, deadzone: float) -> float:
     duty = min(max(drive + 1.0, 0.0), 1.0)
     if duty <= deadzone:
         return 0.0
@@ -143,11 +131,11 @@ def _continuous_positive_button_level(value: float, *, deadzone: float) -> float
 
 
 def _control_viz_height(fonts: ViewerFonts) -> int:
-    small_height = fonts.small.render("Drive", True, PALETTE.text_primary).get_height()
+    small_height = fonts.small.render("Gas", True, PALETTE.text_primary).get_height()
     return (
         small_height
         + LAYOUT.control_track_gap
-        + LAYOUT.control_drive_height
+        + LAYOUT.control_gas_height
         + LAYOUT.control_caption_gap
         + small_height
         + LAYOUT.control_boost_gap

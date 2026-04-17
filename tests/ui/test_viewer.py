@@ -144,13 +144,13 @@ def test_input_section_includes_visualized_control_state() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_level == 1
+    assert input_section.control_viz.gas_level == 1
     assert input_section.control_viz.steer_x == 0.5
     assert input_section.control_viz.boost_pressed
     assert input_section.control_viz.lean_direction == -1
 
 
-def test_input_section_can_visualize_air_brake_control_state() -> None:
+def test_input_section_ignores_air_brake_button_without_air_brake_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -173,10 +173,11 @@ def test_input_section_can_visualize_air_brake_control_state() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_level == -1
+    assert input_section.control_viz.gas_level == 0
+    assert input_section.control_viz.air_brake_axis is None
 
 
-def test_input_section_visualizes_parallel_gas_and_air_brake_buttons() -> None:
+def test_input_section_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -199,12 +200,12 @@ def test_input_section_visualizes_parallel_gas_and_air_brake_buttons() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis == pytest.approx(1.0)
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
+    assert input_section.control_viz.gas_level == 1
+    assert input_section.control_viz.gas_axis is None
+    assert input_section.control_viz.air_brake_axis is None
 
 
-def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
+def test_input_section_visualizes_continuous_policy_gas_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -229,10 +230,9 @@ def test_input_section_visualizes_continuous_policy_drive_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_level == 0
-    assert input_section.control_viz.drive_axis == pytest.approx(0.5)
+    assert input_section.control_viz.gas_level == 0
+    assert input_section.control_viz.gas_axis == pytest.approx(0.5)
     assert input_section.control_viz.air_brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
 def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
@@ -263,12 +263,11 @@ def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
-def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
+def test_input_section_visualizes_hybrid_policy_gas_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -299,9 +298,8 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
     assert input_section.control_viz.lean_direction == -1
 
 
@@ -333,9 +331,8 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
 def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
@@ -367,9 +364,8 @@ def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "accelerate"
 
 
 def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
@@ -406,7 +402,7 @@ def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
     assert input_section.control_viz.air_brake_disabled is True
 
 
-def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
+def test_input_section_ignores_discrete_policy_action_as_gas_axis() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -429,9 +425,8 @@ def test_input_section_ignores_discrete_policy_action_as_drive_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.drive_axis is None
+    assert input_section.control_viz.gas_axis is None
     assert input_section.control_viz.air_brake_axis is None
-    assert input_section.control_viz.drive_axis_mode == "signed"
 
 
 def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
