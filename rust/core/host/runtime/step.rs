@@ -3,7 +3,7 @@
 //!
 //! These types describe one outer RL step, not one internal emulator frame.
 //! They intentionally carry only the step-level aggregates the current
-//! `race_v2` reward and env limits need.
+//! reward tracker and env limits need.
 
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{input::ControllerState, observation::ObservationPreset};

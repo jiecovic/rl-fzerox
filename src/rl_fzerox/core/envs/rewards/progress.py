@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
-from rl_fzerox.core.envs.laps import completed_race_laps
+from fzerox_emulator import FZeroXTelemetry, StepSummary
 
 
 class EpisodeProgressState:
@@ -71,51 +70,3 @@ class DamagePenaltyState:
             streak = previous_streak + frame_offset
             streak_sum += min(streak, cap) if cap > 0 else streak
         return penalty + (streak_sum * streak_ramp_penalty)
-
-
-def lap_completion_bonus(
-    *,
-    lap_number: int,
-    total_lap_count: int,
-    lap_1_completion_bonus: float,
-    lap_2_completion_bonus: float,
-    final_lap_completion_bonus: float,
-) -> float:
-    if lap_number <= 1:
-        return lap_1_completion_bonus
-    if lap_number >= max(total_lap_count, 1):
-        return final_lap_completion_bonus
-    return lap_2_completion_bonus
-
-
-def remaining_lap_count(telemetry: FZeroXTelemetry) -> int:
-    return max(telemetry.total_lap_count - completed_race_laps(telemetry), 0)
-
-
-def remaining_step_penalty(
-    *,
-    status: StepStatus,
-    max_episode_steps: int,
-    remaining_step_penalty_per_frame: float,
-) -> float:
-    remaining_steps = max(max_episode_steps - status.step_count, 0)
-    return remaining_steps * remaining_step_penalty_per_frame
-
-
-def truncation_base_penalty(
-    truncation_reason: str,
-    *,
-    stuck_truncation_base_penalty: float,
-    wrong_way_truncation_base_penalty: float,
-    progress_stalled_truncation_base_penalty: float,
-    timeout_truncation_base_penalty: float,
-) -> float:
-    if truncation_reason == "stuck":
-        return stuck_truncation_base_penalty
-    if truncation_reason == "wrong_way":
-        return wrong_way_truncation_base_penalty
-    if truncation_reason == "progress_stalled":
-        return progress_stalled_truncation_base_penalty
-    if truncation_reason == "timeout":
-        return timeout_truncation_base_penalty
-    raise ValueError(f"Unsupported truncation reason: {truncation_reason!r}")

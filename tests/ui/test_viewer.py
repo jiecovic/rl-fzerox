@@ -450,7 +450,7 @@ def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    assert [section.title for section in columns.left] == ["Session", "Reset", "Input"]
+    assert [section.title for section in columns.left] == ["Session", "Input"]
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -666,6 +666,32 @@ def test_game_section_shows_unknown_camera_setting_raw_value() -> None:
     assert camera_line.value == "unknown (99)"
 
 
+def test_game_section_shows_position_out_of_total_racers() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label=None,
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(position=1, total_racers=30),
+    )
+
+    game_section = columns.right[0]
+    position_line = next(line for line in game_section.lines if line.label == "Position")
+    assert position_line.value == "1 / 30"
+
+
 def test_dash_pad_boost_lights_single_boost_pill() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -794,10 +820,6 @@ def test_display_section_includes_action_repeat() -> None:
             "game_fps_target": 240.0,
             "render_fps": 60.0,
             "render_fps_target": 60.0,
-            "milestones_completed": 1,
-            "next_milestone_index": 2,
-            "distance_to_next_milestone": 750.0,
-            "next_milestone_distance": 6000.0,
         },
         reset_info={},
         episode_reward=0.0,
@@ -821,17 +843,11 @@ def test_display_section_includes_action_repeat() -> None:
     control_rate_line = next(line for line in display_section.lines if line.label == "Control FPS")
     game_rate_line = next(line for line in display_section.lines if line.label == "Game FPS")
     render_rate_line = next(line for line in display_section.lines if line.label == "Render FPS")
-    milestone_line = next(line for line in display_section.lines if line.label == "Milestones")
-    next_milestone_line = next(
-        line for line in display_section.lines if line.label == "Next milestone"
-    )
 
     assert repeat_line.value == "2"
     assert control_rate_line.value == "30.0 / 120.0"
     assert game_rate_line.value == "60.0 / 240.0"
     assert render_rate_line.value == "60.0 / 60.0"
-    assert milestone_line.value == "1 done / next 2"
-    assert next_milestone_line.value == "750.0 to 6,000"
 
 
 def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
@@ -1138,7 +1154,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
     assert return_line.value == "-12.3457"
 
 
-def test_session_section_shows_best_finish_rank() -> None:
+def test_session_section_shows_best_finish_position() -> None:
     columns = _build_panel_columns(
         episode=2,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -1161,9 +1177,11 @@ def test_session_section_shows_best_finish_rank() -> None:
     )
 
     session_section = next(section for section in columns.left if section.title == "Session")
-    best_rank_line = next(line for line in session_section.lines if line.label == "Best rank")
+    best_position_line = next(
+        line for line in session_section.lines if line.label == "Best position"
+    )
 
-    assert best_rank_line.value == "8"
+    assert best_position_line.value == "8"
 
 
 def test_session_section_shows_na_before_successful_finish() -> None:
@@ -1188,9 +1206,11 @@ def test_session_section_shows_na_before_successful_finish() -> None:
     )
 
     session_section = next(section for section in columns.left if section.title == "Session")
-    best_rank_line = next(line for line in session_section.lines if line.label == "Best rank")
+    best_position_line = next(
+        line for line in session_section.lines if line.label == "Best position"
+    )
 
-    assert best_rank_line.value == "n/a"
+    assert best_position_line.value == "n/a"
 
 
 def test_best_finish_position_tracks_only_finished_episodes() -> None:
@@ -1264,6 +1284,7 @@ def _sample_telemetry(
     camera_setting_raw: int = 2,
     camera_setting_name: str = "regular",
     position: int = 30,
+    total_racers: int = 30,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         state_labels=state_labels,
@@ -1278,4 +1299,5 @@ def _sample_telemetry(
         lap_distance=75987.2,
         race_time_ms=116,
         position=position,
+        total_racers=total_racers,
     )

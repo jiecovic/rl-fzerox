@@ -119,6 +119,7 @@ def _draw_snapshot(
         target_control_fps=snapshot.target_control_fps,
         target_render_fps=target_render_fps,
     )
+    _add_config_track_info(draw_info, config)
     _draw_frame(
         pygame=pygame,
         screen=screen,
@@ -167,6 +168,17 @@ def _display_stuck_step_limit(config: WatchAppConfig) -> int | None:
     if not config.env.stuck_truncation_enabled:
         return None
     return config.env.stuck_step_limit
+
+
+def _add_config_track_info(info: dict[str, object], config: WatchAppConfig) -> None:
+    if info.get("track_display_name") or info.get("track_id"):
+        return
+    if config.track.display_name is not None:
+        info["track_display_name"] = config.track.display_name
+    if config.track.id is not None:
+        info["track_id"] = config.track.id
+    if config.track.course_index is not None:
+        info["track_course_index"] = int(config.track.course_index)
 
 
 def _observation_state_feature_names(

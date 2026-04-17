@@ -18,7 +18,7 @@ time_penalty_per_frame: 0.0
 reverse_time_penalty_scale: 1.0
 low_speed_time_penalty_scale: 1.0
 
-# Lap rewards: flat per-lap marker plus small rank pressure. The finish line is
+# Lap rewards: flat per-lap marker plus small position pressure. The finish line is
 # just the final lap completion, not a separate bonus event.
 lap_completion_bonus: 5.0
 # Lap position bonus is `(total_racers - position) * lap_position_scale`.

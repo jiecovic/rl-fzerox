@@ -86,6 +86,7 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "race_distance": telemetry.player.race_distance,
         "speed_kph": telemetry.player.speed_kph,
         "position": telemetry.player.position,
+        "total_racers": telemetry.total_racers,
         "lap": telemetry.player.lap,
         "laps_completed": race_laps_completed,
         "race_laps_completed": race_laps_completed,
