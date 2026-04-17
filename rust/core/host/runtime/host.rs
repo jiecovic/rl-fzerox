@@ -133,6 +133,16 @@ impl Host {
         }
     }
 
+    pub fn load_baseline(&mut self, path: &Path) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.load_baseline_from_file(path)
+    }
+
+    pub fn load_baseline_bytes(&mut self, state: &[u8]) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.load_baseline_from_state_bytes(state)
+    }
+
     pub fn reset(&mut self) -> Result<(), CoreError> {
         self.ensure_open()?;
         self.restore_baseline()?;
@@ -195,8 +205,8 @@ impl Host {
             for repeat_index in 0..config.action_repeat {
                 let capture_video = repeat_index + 1 == config.action_repeat;
                 self.callbacks.set_capture_video(capture_video);
-                if config.shoulder_slide_timer_assist {
-                    self.patch_shoulder_timers_for_slide_assist(config.controller_state)?;
+                if config.lean_timer_assist {
+                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
                 }
                 self.call_core(|core| unsafe {
                     core.run();

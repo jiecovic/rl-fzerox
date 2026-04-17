@@ -1,10 +1,10 @@
-// rust/core/host/runtime/shoulder_slide.rs
-//! RAM-assisted shoulder slide handling for F-Zero X.
+// rust/core/host/runtime/lean_slide.rs
+//! RAM-assisted lean slide handling for F-Zero X.
 //!
 //! F-Zero X uses a short Z/R timer window to detect double-tap side attacks.
 //! When the policy requests a slide, keep normal controller input semantics but
 //! patch the slide timers past that window before the frame update. That lets
-//! the policy release early without the next shoulder edge turning into a dash.
+//! the policy release early without the next lean edge turning into a dash.
 
 use std::mem::size_of;
 
@@ -19,33 +19,33 @@ const Z_BUTTON_TIMER_OFFSET: usize = player_z_button_timer_offset();
 const R_BUTTON_TIMER_OFFSET: usize = player_r_button_timer_offset();
 const SLIDE_ATTACK_TIMER_GUARD_FRAMES: i16 = 15;
 
-const SLIDE_SHOULDER_BUTTON_IDS: [u32; 2] = [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R];
+const SLIDE_LEAN_BUTTON_IDS: [u32; 2] = [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R];
 const SLIDE_TIMER_OFFSETS: [usize; 2] = [Z_BUTTON_TIMER_OFFSET, R_BUTTON_TIMER_OFFSET];
 
 impl Host {
-    pub(super) fn patch_shoulder_timers_for_slide_assist(
+    pub(super) fn patch_lean_timers_for_slide_assist(
         &mut self,
         controller_state: ControllerState,
     ) -> Result<(), CoreError> {
-        if !has_held_slide_shoulder(controller_state) {
+        if !has_held_slide_lean(controller_state) {
             return Ok(());
         }
         let system_ram = self.system_ram_slice_mut()?;
-        patch_shoulder_timers(system_ram, controller_state)
+        patch_lean_timers(system_ram, controller_state)
     }
 }
 
-fn has_held_slide_shoulder(controller_state: ControllerState) -> bool {
-    SLIDE_SHOULDER_BUTTON_IDS
+fn has_held_slide_lean(controller_state: ControllerState) -> bool {
+    SLIDE_LEAN_BUTTON_IDS
         .iter()
         .any(|button_id| controller_state.joypad_state(*button_id) != 0)
 }
 
-fn patch_shoulder_timers(
+fn patch_lean_timers(
     system_ram: &mut [u8],
     controller_state: ControllerState,
 ) -> Result<(), CoreError> {
-    if !has_held_slide_shoulder(controller_state) {
+    if !has_held_slide_lean(controller_state) {
         return Ok(());
     }
 
@@ -85,17 +85,17 @@ mod tests {
 
     use super::{
         R_BUTTON_TIMER_OFFSET, SLIDE_ATTACK_TIMER_GUARD_FRAMES, Z_BUTTON_TIMER_OFFSET,
-        patch_shoulder_timers,
+        patch_lean_timers,
     };
     use crate::core::input::ControllerState;
 
     #[test]
-    fn held_left_shoulder_patches_both_slide_timers() {
+    fn held_left_lean_patches_both_slide_timers() {
         let mut memory = vec![0_u8; R_BUTTON_TIMER_OFFSET + 2];
         let controller_state =
             ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_L2), 0.0, 0.0, 0.0, 0.0);
 
-        patch_shoulder_timers(&mut memory, controller_state).unwrap();
+        patch_lean_timers(&mut memory, controller_state).unwrap();
 
         assert_eq!(
             read_i16(&memory, Z_BUTTON_TIMER_OFFSET),
@@ -108,12 +108,12 @@ mod tests {
     }
 
     #[test]
-    fn held_right_shoulder_patches_both_slide_timers() {
+    fn held_right_lean_patches_both_slide_timers() {
         let mut memory = vec![0_u8; R_BUTTON_TIMER_OFFSET + 2];
         let controller_state =
             ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_R), 0.0, 0.0, 0.0, 0.0);
 
-        patch_shoulder_timers(&mut memory, controller_state).unwrap();
+        patch_lean_timers(&mut memory, controller_state).unwrap();
 
         assert_eq!(
             read_i16(&memory, Z_BUTTON_TIMER_OFFSET),
@@ -126,11 +126,11 @@ mod tests {
     }
 
     #[test]
-    fn idle_shoulders_leave_timers_unchanged() {
+    fn idle_leans_leave_timers_unchanged() {
         let mut memory = vec![0_u8; R_BUTTON_TIMER_OFFSET + 2];
         let controller_state = ControllerState::default();
 
-        patch_shoulder_timers(&mut memory, controller_state).unwrap();
+        patch_lean_timers(&mut memory, controller_state).unwrap();
 
         assert_eq!(read_i16(&memory, Z_BUTTON_TIMER_OFFSET), 0);
         assert_eq!(read_i16(&memory, R_BUTTON_TIMER_OFFSET), 0);

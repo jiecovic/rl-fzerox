@@ -7,12 +7,17 @@ from dataclasses import dataclass
 from multiprocessing.process import BaseProcess
 from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
+from typing import Protocol
 
 import numpy as np
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs.actions import ActionValue
+
+
+class _ReadableCommandQueue(Protocol):
+    def get_nowait(self) -> object: ...
 
 
 @dataclass(frozen=True)
@@ -23,6 +28,7 @@ class ViewerCommand:
     toggle_pause: bool = False
     step_once: bool = False
     save_state: bool = False
+    force_reset: bool = False
     control_fps_delta: int = 0
     control_state: ControllerState | None = None
 
@@ -35,6 +41,7 @@ class WorkerCommandBatch:
     paused: bool
     step_requests: int
     save_requests: int
+    reset_requested: bool
     control_fps_delta: int
     control_state: ControllerState
 
@@ -130,7 +137,7 @@ def send_command(command_queue: ProcessQueue, command: ViewerCommand) -> None:
 
 
 def drain_worker_commands(
-    command_queue: ProcessQueue,
+    command_queue: _ReadableCommandQueue,
     *,
     paused: bool,
     control_state: ControllerState,
@@ -140,6 +147,7 @@ def drain_worker_commands(
     quit_requested = False
     step_requests = 0
     save_requests = 0
+    reset_requested = False
     control_fps_delta = 0
     while True:
         try:
@@ -151,6 +159,7 @@ def drain_worker_commands(
                     paused=next_paused,
                     step_requests=step_requests,
                     save_requests=save_requests,
+                    reset_requested=reset_requested,
                     control_fps_delta=control_fps_delta,
                     control_state=next_control_state,
                 ),
@@ -167,6 +176,8 @@ def drain_worker_commands(
             step_requests += 1
         if command.save_state:
             save_requests += 1
+        if command.force_reset:
+            reset_requested = True
         control_fps_delta += command.control_fps_delta
         if command.control_state is not None:
             next_control_state = command.control_state
@@ -186,6 +197,7 @@ def apply_viewer_input(
             toggle_pause=viewer_input.toggle_pause,
             step_once=viewer_input.step_once,
             save_state=viewer_input.save_state,
+            force_reset=viewer_input.force_reset,
             control_fps_delta=viewer_input.control_fps_delta,
             control_state=viewer_input.control_state,
         ),

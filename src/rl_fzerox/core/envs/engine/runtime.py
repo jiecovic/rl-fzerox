@@ -12,9 +12,14 @@ from rl_fzerox.core.boot import (
     continue_to_next_race,
     sync_race_intro_target,
 )
-from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.config.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    RewardConfig,
+    TrackSamplingConfig,
+)
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
-from rl_fzerox.core.domain.shoulder_slide import SHOULDER_SLIDE_MODE_TIMER_ASSIST
+from rl_fzerox.core.domain.lean import LEAN_MODE_TIMER_ASSIST
 from rl_fzerox.core.envs.actions import (
     AIR_BRAKE_MASK,
     BOOST_MASK,
@@ -46,9 +51,11 @@ from .info import (
     telemetry_info,
 )
 from .masks import ActionMaskController
+from .tracks import SelectedTrack, TrackBaselineCache, select_reset_track
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
 _DOMAIN_REWARD_MILESTONE_PHASE = 0xA409_3822_299F_31D0
+_DOMAIN_TRACK_SAMPLING = 0x35E7_40D8_FF53_42B1
 
 
 class FZeroXEnvEngine:
@@ -69,6 +76,7 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
+        self._curriculum_config = curriculum_config
         self._action_adapter = build_action_adapter(config.action)
         self._observation_spec = backend.observation_spec(config.observation.preset)
         self._reward_tracker = build_reward_tracker(
@@ -82,6 +90,8 @@ class FZeroXEnvEngine:
             frame_stack=config.observation.frame_stack,
             mode=config.observation.mode,
             state_profile=config.observation.state_profile,
+            action_history_len=config.observation.action_history_len,
+            action_history_controls=config.observation.action_history_controls,
         )
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
@@ -90,12 +100,18 @@ class FZeroXEnvEngine:
             ),
             curriculum_config=curriculum_config,
             boost_unmask_max_speed_kph=config.action.boost_unmask_max_speed_kph,
-            shoulder_unmask_min_speed_kph=config.action.shoulder_unmask_min_speed_kph,
+            lean_unmask_min_speed_kph=config.action.lean_unmask_min_speed_kph,
         )
+        self._active_track_sampling = self._stage_track_sampling_config(
+            self._mask_controller.stage_index
+        )
+        self._track_baseline_cache = TrackBaselineCache()
         self._control_state = ControlStateTracker(
-            shoulder_slide_mode=config.action.shoulder_slide_mode,
+            lean_mode=config.action.lean_mode,
             boost_decision_interval_frames=config.action.boost_decision_interval_frames,
             boost_request_lockout_frames=config.action.boost_request_lockout_frames,
+            action_history_len=config.observation.action_history_len,
+            action_history_controls=config.observation.action_history_controls,
         )
         self._episode_done = False
         self._episode_return = 0.0
@@ -123,11 +139,17 @@ class FZeroXEnvEngine:
         """Switch the active curriculum stage for subsequent action masks."""
 
         self._mask_controller.set_curriculum_stage(stage_index)
+        self._active_track_sampling = self._stage_track_sampling_config(
+            self._mask_controller.stage_index
+        )
 
     def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
         """Align watch-time stage masks with the loaded checkpoint metadata."""
 
         self._mask_controller.sync_checkpoint_stage(stage_index)
+        self._active_track_sampling = self._stage_track_sampling_config(
+            self._mask_controller.stage_index
+        )
 
     @property
     def curriculum_stage_index(self) -> int | None:
@@ -147,9 +169,21 @@ class FZeroXEnvEngine:
         if seed is not None:
             self._rng_seed_base = seed
         if self.config.benchmark_noop_reset:
+            selected_track = None
             info, telemetry = self._benchmark_noop_reset_state()
         else:
+            selected_track = self._select_reset_track(seed)
+            if selected_track is not None:
+                if self.config.cache_track_baselines:
+                    self._track_baseline_cache.load_into_backend(
+                        self.backend,
+                        selected_track.baseline_state_path,
+                    )
+                else:
+                    self.backend.load_baseline(selected_track.baseline_state_path)
             _, info, telemetry = self._reset_race_state()
+            if selected_track is not None:
+                info.update(selected_track.info())
             telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
             telemetry = sync_camera_setting(
                 self.backend,
@@ -168,7 +202,7 @@ class FZeroXEnvEngine:
         self._held_controller_state = ControllerState()
         self.backend.set_controller_state(self._held_controller_state)
         self._control_state.reset()
-        self._mask_controller.set_shoulder_allowed_values(None)
+        self._mask_controller.set_lean_allowed_values(None)
         self._sync_dynamic_masks(telemetry)
         self._last_telemetry = telemetry
         self._reward_tracker.reset(
@@ -195,6 +229,8 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
+            action_history_len=self.config.observation.action_history_len,
+            action_history_controls=self.config.observation.action_history_controls,
         )
         self._last_info = dict(info)
         self._reset_count += 1
@@ -330,6 +366,25 @@ class FZeroXEnvEngine:
             return None
         return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
 
+    def _select_reset_track(self, seed: int | None) -> SelectedTrack | None:
+        seed_base = seed if seed is not None else self._rng_seed_base
+        sampling_seed = (
+            None
+            if seed_base is None
+            else derive_seed(seed_base, _DOMAIN_TRACK_SAMPLING, self._reset_count)
+        )
+        return select_reset_track(self._active_track_sampling, seed=sampling_seed)
+
+    def _stage_track_sampling_config(self, stage_index: int | None) -> TrackSamplingConfig:
+        if (
+            self._curriculum_config is None
+            or not self._curriculum_config.enabled
+            or stage_index is None
+        ):
+            return self.config.track_sampling
+        stage = self._curriculum_config.stages[stage_index]
+        return stage.track_sampling or self.config.track_sampling
+
     def _sync_dynamic_masks(self, telemetry: FZeroXTelemetry | None) -> None:
         if telemetry is None:
             self._manual_boost_allowed = None
@@ -385,8 +440,8 @@ class FZeroXEnvEngine:
             progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
-            shoulder_slide_timer_assist=(
-                self.config.action.shoulder_slide_mode == SHOULDER_SLIDE_MODE_TIMER_ASSIST
+            lean_timer_assist=(
+                self.config.action.lean_mode == LEAN_MODE_TIMER_ASSIST
             ),
         )
         info = backend_step_info(self.backend)
@@ -410,6 +465,7 @@ class FZeroXEnvEngine:
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
+        info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count
@@ -434,8 +490,8 @@ class FZeroXEnvEngine:
             control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
         )
-        self._mask_controller.set_shoulder_allowed_values(
-            self._control_state.shoulder_action_mask_override(),
+        self._mask_controller.set_lean_allowed_values(
+            self._control_state.lean_action_mask_override(),
         )
         self._sync_dynamic_masks(telemetry)
         image_observation = step_result.observation
@@ -452,14 +508,16 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
+            action_history_len=self.config.observation.action_history_len,
+            action_history_controls=self.config.observation.action_history_controls,
         )
         return observation, reward, terminated, truncated, info
 
     def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
-        """Apply telemetry gates and configured shoulder-slide semantics."""
+        """Apply telemetry gates and configured lean semantics."""
 
         gated_control_state = self._apply_dynamic_control_gates(control_state)
-        return self._control_state.apply_shoulder_semantics(gated_control_state)
+        return self._control_state.apply_lean_semantics(gated_control_state)
 
     def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
         """Suppress controls whose validity depends on the latest telemetry."""
@@ -494,6 +552,9 @@ class FZeroXEnvEngine:
             telemetry=telemetry,
             mode=self.config.observation.mode,
             state_profile=self.config.observation.state_profile,
+            action_history_len=self.config.observation.action_history_len,
+            action_history_controls=self.config.observation.action_history_controls,
+            action_history=self._control_state.action_history_fields(),
             **self._control_state.observation_fields(),
         )
 

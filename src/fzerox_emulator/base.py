@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -92,10 +93,14 @@ class EmulatorBackend(Protocol):
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
-        shoulder_slide_timer_assist: bool = False,
+        lean_timer_assist: bool = False,
     ) -> BackendStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...
+
+    def load_baseline(self, path: Path) -> None: ...
+
+    def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None: ...
 
     def render(self) -> np.ndarray: ...
 

@@ -34,6 +34,7 @@ class RecordAttemptResult:
     finish_rank: int | None
     episode_return: float
     episode_steps: int
+    race_time_ms: int
     termination_reason: str | None
     truncation_reason: str | None
 
@@ -48,6 +49,7 @@ class AttemptRunResult:
     finish_rank: int | None
     episode_return: float
     episode_steps: int
+    race_time_ms: int
     termination_reason: str | None
     truncation_reason: str | None
 
@@ -185,6 +187,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         "saved "
         f"{result.path} "
         f"(attempt={result.attempt}, rank={result.finish_rank}, "
+        f"time={_format_race_time_ms(result.race_time_ms)}, "
         f"return={result.episode_return:.3f}, steps={result.episode_steps})"
     )
 
@@ -364,6 +367,7 @@ def _run_attempt(
         finish_rank=finish_rank,
         episode_return=episode_return,
         episode_steps=_int_info(info, "episode_step"),
+        race_time_ms=_int_info(info, "race_time_ms"),
         termination_reason=_optional_str_info(info, "termination_reason"),
         truncation_reason=_optional_str_info(info, "truncation_reason"),
     )
@@ -383,6 +387,7 @@ def _move_result_to_output(
         finish_rank=result.finish_rank,
         episode_return=result.episode_return,
         episode_steps=result.episode_steps,
+        race_time_ms=result.race_time_ms,
         termination_reason=result.termination_reason,
         truncation_reason=result.truncation_reason,
     )
@@ -538,6 +543,7 @@ def _format_progress_line(
         f"step {_int_info(info, 'episode_step')} | "
         f"rank {_int_info(info, 'position')} | "
         f"lap {_int_info(info, 'lap')} | "
+        f"time {_format_race_time_ms(_int_info(info, 'race_time_ms'))} | "
         f"{_float_info(info, 'speed_kph'):.0f} km/h | "
         f"{_format_compact_number(_float_info(info, 'race_distance'))} prog | "
         f"{effective_fps:.1f} frames/s | "
@@ -691,6 +697,14 @@ def _format_target_rank(target_rank: int) -> str:
     return f"need rank <= {target_rank}"
 
 
+def _format_race_time_ms(milliseconds: int) -> str:
+    if milliseconds <= 0:
+        return "--:--.---"
+    minutes, remaining_ms = divmod(milliseconds, 60_000)
+    seconds, millis = divmod(remaining_ms, 1_000)
+    return f"{minutes}:{seconds:02d}.{millis:03d}"
+
+
 def _effective_fps(
     info: dict[str, object],
     *,
@@ -714,6 +728,7 @@ def _print_attempt_result(result: RecordAttemptResult | AttemptRunResult) -> Non
     status = "keep" if result.matched else "discard"
     print(
         f"attempt {result.attempt}: {status}, reason={reason}, rank={rank}, "
+        f"time={_format_race_time_ms(result.race_time_ms)}, "
         f"return={result.episode_return:.3f}, steps={result.episode_steps}"
     )
 

@@ -180,4 +180,8 @@ def _observation_state_feature_names(
         return tuple(names)
     if config.env.observation.mode != "image_state":
         return ()
-    return observation_utils.state_feature_names(config.env.observation.state_profile)
+    return observation_utils.state_feature_names(
+        config.env.observation.state_profile,
+        action_history_len=config.env.observation.action_history_len,
+        action_history_controls=config.env.observation.action_history_controls,
+    )

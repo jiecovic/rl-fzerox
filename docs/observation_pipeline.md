@@ -74,13 +74,13 @@ The state vector order is:
 - `airborne`: `1` when the game state flag is active, else `0`
 - `can_boost`: `1` when the game state flag is active, else `0`
 - `boost_active`: `1` when `boost_timer > 0`, else `0`
-- `left_shoulder_held`: `1` when the previous env step held the left shoulder
+- `left_lean_held`: `1` when the previous env step held the left lean
   input, else `0`
-- `right_shoulder_held`: `1` when the previous env step held the right shoulder
+- `right_lean_held`: `1` when the previous env step held the right lean
   input, else `0`
-- `left_press_age_norm`: frames since the last left-shoulder press edge,
+- `left_press_age_norm`: frames since the last left-lean press edge,
   normalized and clipped to the game's 15-frame double-tap window
-- `right_press_age_norm`: frames since the last right-shoulder press edge,
+- `right_press_age_norm`: frames since the last right-lean press edge,
   normalized and clipped to the game's 15-frame double-tap window
 - `recent_boost_pressure`: fraction of the recent 120 internal frames where the
   current action requested boost

@@ -1,0 +1,17 @@
+# Track registry entry for one concrete race-start baseline.
+#
+# The `track` section is metadata persisted into run manifests. The `emulator`
+# section is the actual config value consumed by training/watch.
+track:
+  id: devils_forest_time_attack_blue_falcon_balanced
+  display_name: "Devil's Forest Time Attack - Blue Falcon Balanced"
+  course_index: 3
+  mode: time_attack
+  vehicle: blue_falcon
+  engine_setting: balanced
+  ghost: none
+  baseline_state_path: checkpoints/baselines/jack/devils-forest-time-attack-blue-falcon-balanced-no-ghost-go-window.state
+  notes: "Devil's Forest time-attack baseline without ghost."
+
+emulator:
+  baseline_state_path: ${track.baseline_state_path}

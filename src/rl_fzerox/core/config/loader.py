@@ -35,6 +35,9 @@ def load_watch_app_config(
                 "runtime_dir",
                 "baseline_state_path",
             ),
+            "track": ("baseline_state_path",),
+            "env.track_sampling.entries": ("baseline_state_path",),
+            "curriculum.stages.track_sampling.entries": ("baseline_state_path",),
             "watch": ("policy_run_dir",),
         },
     )
@@ -58,6 +61,9 @@ def load_train_app_config(
                 "runtime_dir",
                 "baseline_state_path",
             ),
+            "track": ("baseline_state_path",),
+            "env.track_sampling.entries": ("baseline_state_path",),
+            "curriculum.stages.track_sampling.entries": ("baseline_state_path",),
             "train": (
                 "output_root",
                 "init_run_dir",

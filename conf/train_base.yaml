@@ -39,14 +39,17 @@ env:
   # When reset lands during the race intro, wait until this countdown timer.
   # 39 is the first gameplay-active GO frame; null keeps the raw baseline timing.
   race_intro_target_timer: 39
+  # For multi-track sampling, read each configured savestate once per worker and
+  # restore from memory on later resets. Disable only if baseline RAM becomes a problem.
+  cache_track_baselines: true
   action:
-    name: steer_drive_boost_shoulder
+    name: steer_drive_boost_lean
     steer_buckets: 5
-    # Shoulder slide/lean semantics:
-    # - minimum_hold: force a pressed shoulder to stay held through the tap window.
+    # Z/R lean semantics:
+    # - minimum_hold: force a pressed lean input to stay held through the tap window.
     # - release_cooldown: release immediately, then mask re-presses through the tap window.
-    # - timer_assist: allow arbitrary short taps by patching the game's shoulder timers.
-    shoulder_slide_mode: release_cooldown
+    # - timer_assist: allow arbitrary short taps by patching the game's lean timers.
+    lean_mode: release_cooldown
     # Optional live speed cap for manual boost.
     # Boost still requires can_boost, enough energy, grounded state, and no active boost.
     # null disables only this speed gate.
@@ -56,9 +59,9 @@ env:
     boost_decision_interval_frames: 1
     # Minimum internal-frame spacing between accepted manual boost requests.
     boost_request_lockout_frames: 5
-    # Optional live speed gate for shoulder actions.
-    # null disables it; 0 allows shoulder input immediately; e.g. 500 masks it below 500 km/h.
-    shoulder_unmask_min_speed_kph: null
+    # Optional live speed gate for lean actions.
+    # null disables it; 0 allows lean input immediately; e.g. 500 masks it below 500 km/h.
+    lean_unmask_min_speed_kph: null
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state

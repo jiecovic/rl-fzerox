@@ -8,9 +8,9 @@
 mod baseline;
 mod bootstrap;
 mod host;
+mod lean_slide;
 mod memory;
 mod rng;
-mod shoulder_slide;
 mod step;
 mod step_accumulator;
 

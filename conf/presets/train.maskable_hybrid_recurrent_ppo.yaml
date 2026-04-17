@@ -6,12 +6,12 @@ defaults:
 env:
   action:
     # Continuous-steering counterpart to the discrete full-gas recurrent setup:
-    # continuous steer plus discrete gas/air-brake/boost/shoulder heads.
-    name: hybrid_steer_gas_air_brake_boost_shoulder
+    # continuous steer plus discrete gas/air-brake/boost/lean heads.
+    name: hybrid_steer_gas_air_brake_boost_lean
     # <1.0 pushes moderate steering toward full lock; 1.0 is identity.
     steer_response_power: 1.0
     # Release immediately, then mask re-taps through the dash window.
-    shoulder_slide_mode: release_cooldown
+    lean_mode: release_cooldown
     # Masks list allowed action values, not blocked values.
     mask:
       # 0=coast, 1=press gas. Force full gas while preserving the policy head.
@@ -21,10 +21,10 @@ env:
       # 0=off, 1=press boost.
       boost: [0]
       # 0=off, 1=left slide, 2=right slide.
-      shoulder: [0]
-    # These gates only matter once the explicit shoulder mask above is relaxed.
+      lean: [0]
+    # These gates only matter once the explicit lean mask above is relaxed.
     boost_unmask_max_speed_kph: 820.0
-    shoulder_unmask_min_speed_kph: 730.0
+    lean_unmask_min_speed_kph: 730.0
   observation:
     # Match the digital full-gas experiment: smallest image preset and no frame stack.
     preset: native_crop_v1

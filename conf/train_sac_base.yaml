@@ -4,7 +4,7 @@ defaults:
 
 env:
   action:
-    # SAC uses continuous steering/accelerate axes; boost and shoulder stay disabled here.
+    # SAC uses continuous steering/accelerate axes; boost and lean stay disabled here.
     name: continuous_steer_drive
     # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
     continuous_drive_mode: pwm

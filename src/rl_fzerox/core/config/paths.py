@@ -53,17 +53,18 @@ def resolve_config_data_paths(
 ) -> None:
     """Resolve configured path fields in-place using project path rules."""
 
-    for section_name, field_names in path_fields.items():
-        section = config_data.get(section_name)
-        if not isinstance(section, dict):
-            continue
-
-        for field_name in field_names:
-            raw_value = section.get(field_name)
-            if not isinstance(raw_value, str):
+    for section_path, field_names in path_fields.items():
+        for section in _iter_config_sections(config_data, section_path.split(".")):
+            if not isinstance(section, dict):
                 continue
+            for field_name in field_names:
+                raw_value = section.get(field_name)
+                if not isinstance(raw_value, str):
+                    continue
 
-            section[field_name] = str(resolve_config_path_value(raw_value, config_dir=config_dir))
+                section[field_name] = str(
+                    resolve_config_path_value(raw_value, config_dir=config_dir)
+                )
 
 
 def _config_path_resolution_base_dir(config_dir: Path, *, path: Path | None) -> Path:
@@ -78,3 +79,33 @@ def _config_path_resolution_base_dir(config_dir: Path, *, path: Path | None) -> 
 def _is_repo_root_relative_path(path: Path) -> bool:
     parts = path.parts
     return bool(parts) and parts[0] in _REPO_ROOT_RELATIVE_PREFIXES
+
+
+def _iter_config_sections(
+    value: object,
+    path_parts: list[str],
+) -> list[dict[str, object]]:
+    if not path_parts:
+        if isinstance(value, dict):
+            return [value]
+        if isinstance(value, list | tuple):
+            sections: list[dict[str, object]] = []
+            for item in value:
+                if isinstance(item, dict):
+                    sections.append(item)
+            return sections
+        return []
+
+    if isinstance(value, dict):
+        child = value.get(path_parts[0])
+        if child is None:
+            return []
+        return _iter_config_sections(child, path_parts[1:])
+
+    if isinstance(value, list | tuple):
+        sections: list[dict[str, object]] = []
+        for item in value:
+            sections.extend(_iter_config_sections(item, path_parts))
+        return sections
+
+    return []

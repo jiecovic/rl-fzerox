@@ -20,17 +20,17 @@ env:
   camera_setting: close_behind
   reset_to_race: true
   action:
-    name: steer_gas_air_brake_boost_shoulder
+    name: steer_gas_air_brake_boost_lean
     steer_buckets: 3
     continuous_drive_mode: threshold
     continuous_drive_deadzone: 0.2
     continuous_air_brake_mode: always
-    continuous_shoulder_deadzone: 0.333333
-    shoulder_slide_mode: release_cooldown
+    continuous_lean_deadzone: 0.333333
+    lean_mode: release_cooldown
     boost_unmask_max_speed_kph: 835.0
     boost_decision_interval_frames: 1
     boost_request_lockout_frames: 5
-    shoulder_unmask_min_speed_kph: 880.0
+    lean_unmask_min_speed_kph: 880.0
     mask:
       gas:
       - 1
@@ -39,7 +39,7 @@ env:
       boost:
       - 0
       - 1
-      shoulder:
+      lean:
       - 0
       - 1
       - 2

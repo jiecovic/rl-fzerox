@@ -16,7 +16,7 @@ from rl_fzerox.core.envs.actions.base import (
     steer_values,
 )
 from rl_fzerox.core.envs.actions.steer_drive import DRIVE_MODES
-from rl_fzerox.core.envs.actions.steer_drive_boost_drift import BOOST_MASK
+from rl_fzerox.core.envs.actions.steer_drive_boost_lean import BOOST_MASK
 
 
 class SteerDriveBoostActionAdapter:

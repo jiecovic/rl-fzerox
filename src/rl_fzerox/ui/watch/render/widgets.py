@@ -100,27 +100,27 @@ def _draw_control_viz(
         48,
         width - drive_group_width - LAYOUT.control_drive_offset_x - LAYOUT.control_widget_gap,
     )
-    left_shoulder_width = _pill_width(fonts.small, "lean")
-    right_shoulder_width = _pill_width(fonts.small, "lean")
+    left_lean_width = _pill_width(fonts.small, "lean")
+    right_lean_width = _pill_width(fonts.small, "lean")
     max_steer_width = max(
         48,
         left_widget_width
-        - left_shoulder_width
-        - right_shoulder_width
+        - left_lean_width
+        - right_lean_width
         - (2 * LAYOUT.control_side_pill_gap),
     )
     steer_width = min(LAYOUT.control_steer_width, max_steer_width)
     steer_group_width = (
-        left_shoulder_width
+        left_lean_width
         + LAYOUT.control_side_pill_gap
         + steer_width
         + LAYOUT.control_side_pill_gap
-        + right_shoulder_width
+        + right_lean_width
     )
     steer_group_x = x + max(0, (left_widget_width - steer_group_width) // 2)
-    left_shoulder_x = steer_group_x
-    steer_x = left_shoulder_x + left_shoulder_width + LAYOUT.control_side_pill_gap
-    right_shoulder_x = steer_x + steer_width + LAYOUT.control_side_pill_gap
+    left_lean_x = steer_group_x
+    steer_x = left_lean_x + left_lean_width + LAYOUT.control_side_pill_gap
+    right_lean_x = steer_x + steer_width + LAYOUT.control_side_pill_gap
 
     screen.blit(steer_label, (x, y))
     if dual_drive_levers:
@@ -155,16 +155,16 @@ def _draw_control_viz(
     drive_y = y
     steer_y = drive_y + (LAYOUT.control_drive_height - LAYOUT.control_steer_height) // 2
     steer_mid_y = steer_y + LAYOUT.control_steer_height // 2
-    shoulder_pill_y = steer_mid_y - (_pill_height(fonts.small) // 2)
+    lean_pill_y = steer_mid_y - (_pill_height(fonts.small) // 2)
 
     _draw_pill(
         pygame=pygame,
         screen=screen,
         font=fonts.small,
-        x=left_shoulder_x,
-        y=shoulder_pill_y,
+        x=left_lean_x,
+        y=lean_pill_y,
         label="lean",
-        active=control_viz.shoulder_direction < 0,
+        active=control_viz.lean_direction < 0,
         active_text_color=PALETTE.text_primary,
         active_fill_color=PALETTE.flag_active_background,
         active_border_color=PALETTE.flag_active_border,
@@ -173,10 +173,10 @@ def _draw_control_viz(
         pygame=pygame,
         screen=screen,
         font=fonts.small,
-        x=right_shoulder_x,
-        y=shoulder_pill_y,
+        x=right_lean_x,
+        y=lean_pill_y,
         label="lean",
-        active=control_viz.shoulder_direction > 0,
+        active=control_viz.lean_direction > 0,
         active_text_color=PALETTE.text_primary,
         active_fill_color=PALETTE.flag_active_background,
         active_border_color=PALETTE.flag_active_border,

@@ -31,10 +31,12 @@ env:
   reset_to_race: true
   # 39 is the first gameplay-active GO frame; null keeps the raw baseline timing.
   race_intro_target_timer: 39
+  # For multi-track sampling, keep selected savestates in memory after first use.
+  cache_track_baselines: true
   action:
-    name: steer_drive_boost_shoulder
+    name: steer_drive_boost_lean
     steer_buckets: 7
-    shoulder_slide_mode: release_cooldown
+    lean_mode: release_cooldown
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state

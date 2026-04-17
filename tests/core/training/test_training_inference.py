@@ -365,7 +365,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
         json.dumps(
             {
                 "curriculum_stage_index": 1,
-                "curriculum_stage_name": "drift_enabled",
+                "curriculum_stage_name": "lean_enabled",
             }
         ),
         encoding="utf-8",
@@ -374,7 +374,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     runner.refresh()
 
     assert runner.checkpoint_curriculum_stage_index == 1
-    assert runner.checkpoint_curriculum_stage == "drift_enabled"
+    assert runner.checkpoint_curriculum_stage == "lean_enabled"
 
 
 def test_load_saved_policy_algorithm_rejects_auto_manifest(tmp_path: Path) -> None:
@@ -391,7 +391,7 @@ def test_load_saved_policy_algorithm_rejects_auto_manifest(tmp_path: Path) -> No
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "env": {"action": {"name": "steer_drive_boost_lean"}},
                 "policy": {},
                 "train": {"algorithm": "auto", "total_timesteps": 1000},
             }
@@ -417,7 +417,7 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "env": {"action": {"name": "steer_drive_boost_lean"}},
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -450,7 +450,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "env": {"action": {"name": "steer_drive_boost_lean"}},
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -482,7 +482,7 @@ def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "continuous_steer_drive_drift"}},
+                "env": {"action": {"name": "continuous_steer_drive_lean"}},
                 "policy": {},
                 "train": {
                     "algorithm": "sac",
@@ -513,7 +513,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_drift"}},
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -543,7 +543,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_drift"}},
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -578,7 +578,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_drift"}},
+                "env": {"action": {"name": "steer_drive_boost_lean"}},
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -644,7 +644,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_drift"}},
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -709,7 +709,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_drift"}},
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
                 "policy": {
                     "recurrent": {
                         "enabled": True,

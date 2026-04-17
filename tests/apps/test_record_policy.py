@@ -12,6 +12,7 @@ from rl_fzerox.apps.record_policy import (
     _ffmpeg_command,
     _finished_rank,
     _format_progress_line,
+    _format_race_time_ms,
     _format_target_rank,
     _resolve_ffmpeg_path,
     _resolve_video_fps,
@@ -126,6 +127,7 @@ def test_format_progress_line_shows_episode_state() -> None:
             "episode_step": 123,
             "position": 4,
             "lap": 2,
+            "race_time_ms": 83_456,
             "speed_kph": 987.6,
             "race_distance": 54321.0,
         },
@@ -136,9 +138,15 @@ def test_format_progress_line_shows_episode_state() -> None:
     )
 
     assert line == (
-        "try 03 | step 123 | rank 4 | lap 2 | 988 km/h | 54.3k prog | "
-        "123.4 frames/s | R 42.1 | need rank 1"
+        "try 03 | step 123 | rank 4 | lap 2 | time 1:23.456 | "
+        "988 km/h | 54.3k prog | 123.4 frames/s | R 42.1 | need rank 1"
     )
+
+
+def test_format_race_time_ms_handles_missing_and_regular_times() -> None:
+    assert _format_race_time_ms(0) == "--:--.---"
+    assert _format_race_time_ms(83_456) == "1:23.456"
+    assert _format_race_time_ms(4_001) == "0:04.001"
 
 
 def test_format_target_rank_special_cases_first_place() -> None:

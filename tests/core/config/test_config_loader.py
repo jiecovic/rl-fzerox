@@ -349,6 +349,84 @@ def test_load_watch_app_config_resolves_repo_relative_paths_from_project_root(
     assert config.emulator.runtime_dir == runtime_dir.resolve()
 
 
+def test_load_train_app_config_composes_track_registry_entry(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    runs_dir = project_root / "local" / "runs"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    baseline_path = artifacts_dir / "time-attack.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_path.write_bytes(b"baseline")
+
+    _write_yaml(
+        config_root / "tracks" / "mute_city_test.yaml",
+        [
+            "track:",
+            "  id: mute_city_test",
+            "  display_name: Mute City Test",
+            "  course_index: 0",
+            "  mode: time_attack",
+            "  vehicle: blue_falcon",
+            "  engine_setting: balanced",
+            "  ghost: none",
+            "  baseline_state_path: local/test-artifacts/time-attack.state",
+            "emulator:",
+            "  baseline_state_path: ${track.baseline_state_path}",
+        ],
+    )
+    config_path = config_root / "local" / "train.track.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "defaults:",
+            "  - /tracks/mute_city_test@_global_",
+            "  - _self_",
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "env:",
+            "  track_sampling:",
+            "    enabled: true",
+            "    entries:",
+            "      - id: mute_city_test",
+            "        baseline_state_path: local/test-artifacts/time-attack.state",
+            "        weight: 0.4",
+            "curriculum:",
+            "  enabled: true",
+            "  stages:",
+            "    - name: silence_bias",
+            "      track_sampling:",
+            "        enabled: true",
+            "        entries:",
+            "          - id: silence_test",
+            "            baseline_state_path: local/test-artifacts/time-attack.state",
+            "            weight: 0.6",
+            "train:",
+            "  output_root: local/runs",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.track.id == "mute_city_test"
+    assert config.track.baseline_state_path == baseline_path.resolve()
+    assert config.emulator.baseline_state_path == baseline_path.resolve()
+    assert config.env.track_sampling.enabled is True
+    assert config.env.track_sampling.entries[0].baseline_state_path == baseline_path.resolve()
+    assert config.env.track_sampling.entries[0].weight == 0.4
+    assert config.curriculum.stages[0].track_sampling is not None
+    assert config.curriculum.stages[0].track_sampling.entries[0].baseline_state_path == (
+        baseline_path.resolve()
+    )
+    assert config.curriculum.stages[0].track_sampling.entries[0].weight == 0.6
+    assert config.train.output_root == runs_dir.resolve()
+
+
 def test_load_watch_app_config_applies_hydra_overrides(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -532,7 +610,7 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "env:",
             "  action:",
             "    mask:",
-            "      shoulder: [0]",
+            "      lean: [0]",
             "curriculum:",
             "  enabled: true",
             "  smoothing_episodes: 4",
@@ -542,16 +620,16 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "      until:",
             "        race_laps_completed_mean_gte: 3.0",
             "      action_mask:",
-            "        shoulder: [0]",
+            "        lean: [0]",
             "      train:",
             "        learning_rate: 0.0001",
             "        n_epochs: 3",
             "        batch_size: 512",
             "        clip_range: 0.15",
             "        ent_coef: 0.01",
-            "    - name: drift_enabled",
+            "    - name: lean_enabled",
             "      action_mask:",
-            "        shoulder: [0, 1, 2]",
+            "        lean: [0, 1, 2]",
             "train:",
             "  algorithm: maskable_ppo",
             "  total_timesteps: 1000",
@@ -562,7 +640,7 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
 
     assert config.train.algorithm == "maskable_ppo"
     assert config.env.action.mask is not None
-    assert config.env.action.mask.shoulder == (0,)
+    assert config.env.action.mask.lean == (0,)
     assert config.curriculum.enabled is True
     assert config.curriculum.smoothing_episodes == 4
     assert config.curriculum.min_stage_episodes == 2
@@ -628,11 +706,11 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: continuous_steer_drive_shoulder",
+            "    name: continuous_steer_drive_lean",
             "    steer_response_power: 0.7",
             "    continuous_drive_mode: always_accelerate",
             "    continuous_drive_deadzone: 0.15",
-            "    continuous_shoulder_deadzone: 0.25",
+            "    continuous_lean_deadzone: 0.25",
             "train:",
             "  algorithm: sac",
             "  total_timesteps: 1000",
@@ -646,11 +724,11 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "continuous_steer_drive_shoulder"
+    assert config.env.action.name == "continuous_steer_drive_lean"
     assert config.env.action.steer_response_power == 0.7
     assert config.env.action.continuous_drive_mode == "always_accelerate"
     assert config.env.action.continuous_drive_deadzone == 0.15
-    assert config.env.action.continuous_shoulder_deadzone == 0.25
+    assert config.env.action.continuous_lean_deadzone == 0.25
     assert config.train.algorithm == "sac"
     assert config.train.buffer_size == 30_000
     assert config.train.learning_starts == 5_000
@@ -674,7 +752,7 @@ def test_load_train_app_config_reads_maskable_hybrid_action_ppo_fields(
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: hybrid_steer_drive_boost_shoulder_primitive",
+            "    name: hybrid_steer_drive_boost_lean_primitive",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
             "train:",
@@ -685,7 +763,7 @@ def test_load_train_app_config_reads_maskable_hybrid_action_ppo_fields(
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
+    assert config.env.action.name == "hybrid_steer_drive_boost_lean_primitive"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
     assert config.train.algorithm == "maskable_hybrid_action_ppo"
@@ -708,14 +786,14 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: hybrid_steer_drive_boost_shoulder_primitive",
+            "    name: hybrid_steer_drive_boost_lean_primitive",
             "    continuous_drive_mode: pwm",
             "    continuous_drive_deadzone: 0.0",
             "    continuous_air_brake_mode: disable_on_ground",
             "    boost_unmask_max_speed_kph: 700.0",
             "    boost_decision_interval_frames: 30",
             "    boost_request_lockout_frames: 45",
-            "    shoulder_unmask_min_speed_kph: 500.0",
+            "    lean_unmask_min_speed_kph: 500.0",
             "train:",
             "  algorithm: maskable_hybrid_recurrent_ppo",
             "  total_timesteps: 1000",
@@ -727,14 +805,14 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "hybrid_steer_drive_boost_shoulder_primitive"
+    assert config.env.action.name == "hybrid_steer_drive_boost_lean_primitive"
     assert config.env.action.continuous_drive_mode == "pwm"
     assert config.env.action.continuous_drive_deadzone == 0.0
     assert config.env.action.continuous_air_brake_mode == "disable_on_ground"
     assert config.env.action.boost_unmask_max_speed_kph == 700.0
     assert config.env.action.boost_decision_interval_frames == 30
     assert config.env.action.boost_request_lockout_frames == 45
-    assert config.env.action.shoulder_unmask_min_speed_kph == 500.0
+    assert config.env.action.lean_unmask_min_speed_kph == 500.0
     assert config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert config.policy.recurrent.enabled is True
 
@@ -803,7 +881,7 @@ def test_load_train_app_config_migrates_legacy_boost_speed_gate(tmp_path: Path) 
     assert config.env.action.boost_unmask_max_speed_kph == 800.0
 
 
-def test_load_train_app_config_migrates_legacy_shoulder_fields(tmp_path: Path) -> None:
+def test_load_train_app_config_accepts_lean_fields(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     config_path = tmp_path / "train.yaml"
@@ -818,8 +896,8 @@ def test_load_train_app_config_migrates_legacy_shoulder_fields(tmp_path: Path) -
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    continuous_drift_deadzone: 0.25",
-            "    drift_unmask_min_speed_kph: 500.0",
+            "    continuous_lean_deadzone: 0.25",
+            "    lean_unmask_min_speed_kph: 500.0",
             "train:",
             "  total_timesteps: 1000",
         ],
@@ -827,8 +905,8 @@ def test_load_train_app_config_migrates_legacy_shoulder_fields(tmp_path: Path) -
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.continuous_shoulder_deadzone == 0.25
-    assert config.env.action.shoulder_unmask_min_speed_kph == 500.0
+    assert config.env.action.continuous_lean_deadzone == 0.25
+    assert config.env.action.lean_unmask_min_speed_kph == 500.0
 
 
 def test_repo_watch_template_exists() -> None:

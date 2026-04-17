@@ -178,11 +178,11 @@ def test_watch_allows_run_dir_without_config(
                 CurriculumStageConfig(
                     name="basic_drive",
                     until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
-                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                    action_mask=ActionMaskConfig(lean=(0,)),
                 ),
                 CurriculumStageConfig(
-                    name="drift_enabled",
-                    action_mask=ActionMaskConfig(shoulder=(0, 1, 2)),
+                    name="lean_enabled",
+                    action_mask=ActionMaskConfig(lean=(0, 1, 2)),
                 ),
             ),
         ),

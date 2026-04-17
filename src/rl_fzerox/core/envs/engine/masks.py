@@ -21,10 +21,10 @@ class ActionMaskController:
     stage_overrides: tuple[ActionMaskOverrides | None, ...]
     stage_names: tuple[str, ...]
     boost_unmask_max_speed_kph: float | None
-    shoulder_unmask_min_speed_kph: float | None
+    lean_unmask_min_speed_kph: float | None
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
-    _shoulder_allowed_values: tuple[int, ...] | None = None
+    _lean_allowed_values: tuple[int, ...] | None = None
     _speed_kph: float | None = None
 
     @classmethod
@@ -35,7 +35,7 @@ class ActionMaskController:
         base_overrides: ActionMaskOverrides | None,
         curriculum_config: CurriculumConfig | None,
         boost_unmask_max_speed_kph: float | None = None,
-        shoulder_unmask_min_speed_kph: float | None = None,
+        lean_unmask_min_speed_kph: float | None = None,
     ) -> ActionMaskController:
         stage_overrides = _curriculum_stage_overrides(curriculum_config)
         _validate_configured_overrides(
@@ -49,7 +49,7 @@ class ActionMaskController:
             stage_overrides=stage_overrides,
             stage_names=_curriculum_stage_names(curriculum_config),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
-            shoulder_unmask_min_speed_kph=shoulder_unmask_min_speed_kph,
+            lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             _stage_index=0 if stage_overrides else None,
         )
 
@@ -64,10 +64,10 @@ class ActionMaskController:
             stage_overrides=stage_overrides,
             dynamic_overrides=_dynamic_action_mask_overrides(
                 boost_unlocked=self._boost_unlocked,
-                shoulder_allowed_values=self._shoulder_allowed_values,
+                lean_allowed_values=self._lean_allowed_values,
                 speed_kph=self._speed_kph,
                 boost_unmask_max_speed_kph=self.boost_unmask_max_speed_kph,
-                shoulder_unmask_min_speed_kph=self.shoulder_unmask_min_speed_kph,
+                lean_unmask_min_speed_kph=self.lean_unmask_min_speed_kph,
             ),
         )
 
@@ -100,10 +100,10 @@ class ActionMaskController:
 
         self._boost_unlocked = boost_unlocked
 
-    def set_shoulder_allowed_values(self, values: tuple[int, ...] | None) -> None:
-        """Update live shoulder restrictions used by slide primitive semantics."""
+    def set_lean_allowed_values(self, values: tuple[int, ...] | None) -> None:
+        """Update live lean restrictions used by lean primitive semantics."""
 
-        self._shoulder_allowed_values = values
+        self._lean_allowed_values = values
 
     def set_speed_kph(self, speed_kph: float | None) -> None:
         """Update the live speed used by dynamic speed-gated masks."""
@@ -188,10 +188,10 @@ def _validate_override_branches(
 def _dynamic_action_mask_overrides(
     *,
     boost_unlocked: bool | None,
-    shoulder_allowed_values: tuple[int, ...] | None = None,
+    lean_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
     boost_unmask_max_speed_kph: float | None = None,
-    shoulder_unmask_min_speed_kph: float | None = None,
+    lean_unmask_min_speed_kph: float | None = None,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
@@ -202,16 +202,16 @@ def _dynamic_action_mask_overrides(
         and speed_kph > boost_unmask_max_speed_kph
     ):
         overrides["boost"] = (0,)
-    shoulder_values = shoulder_allowed_values
-    if shoulder_values is None:
+    lean_values = lean_allowed_values
+    if lean_values is None:
         if (
-            shoulder_unmask_min_speed_kph is not None
+            lean_unmask_min_speed_kph is not None
             and speed_kph is not None
-            and speed_kph < shoulder_unmask_min_speed_kph
+            and speed_kph < lean_unmask_min_speed_kph
         ):
-            shoulder_values = (0,)
-    if shoulder_values is not None:
-        overrides["shoulder"] = shoulder_values
+            lean_values = (0,)
+    if lean_values is not None:
+        overrides["lean"] = lean_values
     if not overrides:
         return None
     return overrides

@@ -90,6 +90,7 @@ def test_race_v2_weight_fields_match_reward_config_schema() -> None:
     non_v2_fields = {
         "boost_pad_reward_progress_window",
         "failure_penalty",
+        "energy_full_refill_lap_bonus",
         "lap_completion_bonus",
         "progress_bucket_distance",
         "progress_bucket_reward",
@@ -1344,6 +1345,82 @@ def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
 
     assert step.reward == 1.0
     assert step.breakdown == {"frontier_progress": 1.0}
+
+
+def test_race_v3_rewards_full_energy_refill_once_per_lap() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_reward=0.0,
+            energy_gain_reward_scale=0.0,
+            energy_full_refill_lap_bonus=2.5,
+            lap_completion_bonus=0.0,
+            lap_position_scale=0.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=100.0))
+
+    first_full = tracker.step_summary(
+        _summary(max_race_distance=100.0, energy_gain_total=78.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=178.0),
+    )
+    tracker.step_summary(
+        _summary(max_race_distance=200.0),
+        _status(step_count=2),
+        _telemetry(race_distance=200.0, energy=100.0),
+    )
+    blocked_same_lap = tracker.step_summary(
+        _summary(max_race_distance=300.0, energy_gain_total=78.0),
+        _status(step_count=3),
+        _telemetry(race_distance=300.0, energy=178.0),
+    )
+    tracker.step_summary(
+        _summary(max_race_distance=400.0),
+        _status(step_count=4),
+        _telemetry(race_distance=400.0, energy=100.0, laps_completed=1),
+    )
+    next_lap_full = tracker.step_summary(
+        _summary(max_race_distance=500.0, energy_gain_total=78.0),
+        _status(step_count=5),
+        _telemetry(race_distance=500.0, energy=178.0, laps_completed=1),
+    )
+
+    assert first_full.breakdown == {"energy_full_refill_lap": 2.5}
+    assert blocked_same_lap.breakdown == {}
+    assert next_lap_full.breakdown == {"energy_full_refill_lap": 2.5}
+    assert tracker.info(_telemetry(race_distance=500.0))["rewarded_full_refill_laps"] == 2
+
+
+def test_race_v3_suppresses_full_energy_refill_while_reversing() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="race_v3",
+            progress_bucket_reward=0.0,
+            energy_gain_reward_scale=0.0,
+            energy_full_refill_lap_bonus=2.5,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=100.0))
+
+    step = tracker.step_summary(
+        _summary(
+            max_race_distance=100.0,
+            energy_gain_total=78.0,
+            reverse_active_frames=1,
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=178.0, reverse_timer=1),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
 
 
 def test_race_v3_rewards_dash_pad_boost_entries_once_per_progress_window() -> None:
