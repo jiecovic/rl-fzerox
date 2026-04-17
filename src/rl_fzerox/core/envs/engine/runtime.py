@@ -7,11 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.boot import (
-    boot_into_first_race,
-    continue_to_next_race,
-    sync_race_intro_target,
-)
+from rl_fzerox.core.boot import sync_race_intro_target
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -43,7 +39,6 @@ from .info import (
     backend_step_info,
     has_custom_baseline,
     read_live_telemetry,
-    reset_context_info,
     set_curriculum_info,
     set_observation_info,
     telemetry_can_boost,
@@ -114,6 +109,7 @@ class FZeroXEnvEngine:
             action_history_controls=config.observation.action_history_controls,
         )
         self._episode_done = False
+        self._episode_uses_custom_baseline = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
         self._last_info: dict[str, object] = {}
@@ -181,9 +177,14 @@ class FZeroXEnvEngine:
                     )
                 else:
                     self.backend.load_baseline(selected_track.baseline_state_path)
-            _, info, telemetry = self._reset_race_state()
+            _, info, telemetry = self._reset_race_state(
+                sampled_track_baseline=selected_track is not None,
+            )
             if selected_track is not None:
                 info.update(selected_track.info())
+            self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(
+                info
+            )
             telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
             telemetry = sync_camera_setting(
                 self.backend,
@@ -307,29 +308,23 @@ class FZeroXEnvEngine:
     def close(self) -> None:
         self.backend.close()
 
-    def _reset_race_state(self) -> tuple[np.ndarray, dict[str, object], FZeroXTelemetry | None]:
-        continue_error: str | None = None
-        if self.config.reset_to_race and not has_custom_baseline(self._last_info):
-            if self._episode_done:
-                try:
-                    frame, reset_info = continue_to_next_race(self.backend)
-                    info = reset_context_info(self._last_info)
-                    info.update(reset_info)
-                    return frame, info, read_live_telemetry(self.backend)
-                except RuntimeError as exc:
-                    continue_error = str(exc)
-
+    def _reset_race_state(
+        self,
+        *,
+        sampled_track_baseline: bool,
+    ) -> tuple[np.ndarray, dict[str, object], FZeroXTelemetry | None]:
         reset_state = self.backend.reset()
         info = dict(reset_state.info)
         frame = reset_state.frame
-        if continue_error is not None:
-            info["reset_fallback"] = "continue_to_next_race_failed"
-            info["continue_to_next_race_error"] = continue_error
-
-        if self.config.reset_to_race and not has_custom_baseline(info):
-            frame, boot_info = boot_into_first_race(self.backend)
-            info.update(boot_info)
-            return frame, info, read_live_telemetry(self.backend)
+        if (
+            self.config.reset_to_race
+            and not sampled_track_baseline
+            and not has_custom_baseline(info)
+        ):
+            raise RuntimeError(
+                "env.reset_to_race requires a custom baseline state. "
+                "Configure emulator.baseline_state_path or env.track_sampling.entries instead."
+            )
 
         return frame, info, read_live_telemetry(self.backend)
 
