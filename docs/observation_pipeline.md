@@ -5,6 +5,7 @@ The repo now uses native observation presets for policy inputs:
 - `native_crop_v1`
 - `native_crop_v2`
 - `native_crop_v3`
+- `native_crop_v4`
 
 Python no longer configures observation width, height, crop margins, or color
 mode directly. Rust owns the per-frame geometry so the env, watch UI, and any
@@ -33,23 +34,27 @@ That yields a cropped native frame of:
 
 ## Policy Observation
 
-For the policy path, all three presets first apply the same aspect correction used
+For the policy path, all four presets first apply the same aspect correction used
 by the human watch display, then downscale to:
 
 - `native_crop_v1`: `116 x 84 x 3`
 - `native_crop_v2`: `124 x 92 x 3`
 - `native_crop_v3`: `164 x 116 x 3`
+- `native_crop_v4`: `130 x 98 x 3`
 
-All three give the policy an approximately `4:3` view instead of the earlier
+All four give the policy an approximately `4:3` view instead of the earlier
 native-width-squashed observation. `native_crop_v1` and `native_crop_v2` use
 an exact NatureCNN-style conv stack; `native_crop_v3` is the current larger
-default and pairs with the older 4-layer `32,64,64,128` extractor shape.
+default and pairs with the older 4-layer `64,64,128,128` extractor shape.
+`native_crop_v4` is a compact-deep experiment sized for a clean `4 x 6`
+final CNN grid with the `64,64,128,128` stride-2 extractor.
 
 With `frame_stack: 4`, the env observation space becomes:
 
 - `native_crop_v1`: `84 x 116 x 12`
 - `native_crop_v2`: `92 x 124 x 12`
 - `native_crop_v3`: `116 x 164 x 12`
+- `native_crop_v4`: `98 x 130 x 12`
 
 ## Observation Modes
 
@@ -64,9 +69,11 @@ The mixed image plus scalar state path is:
 `image_state` returns a Gym `Dict` observation with:
 
 - `image`: the same stacked RGB image used by screen-only mode
-- `state`: a `float32[11]` vector appended by the policy feature extractor
+- `state`: a configurable scalar `float32` vector appended by the policy
+  feature extractor
 
-The state vector order is:
+`env.observation.state_profile` selects the base telemetry profile. The default
+profile keeps the original richer scalar set:
 
 - `speed_norm`: `speed_kph / 1500`, clamped to `[0, 2]`
 - `energy_frac`: `energy / max_energy`, clamped to `[0, 1]`
@@ -84,6 +91,34 @@ The state vector order is:
   normalized and clipped to the game's 15-frame double-tap window
 - `recent_boost_pressure`: fraction of the recent 120 internal frames where the
   current action requested boost
+
+`state_profile: race_core` is the current compact recurrent-training baseline.
+It keeps only:
+
+- `speed_norm`
+- `energy_frac`
+- `reverse_active`
+- `airborne`
+- `can_boost`
+- `boost_active`
+
+Previous controls are configured separately from the base telemetry profile.
+Set `env.observation.action_history_len: null` to disable action history. Set it
+to a positive integer to append fixed-width `prev_<control>_<age>` features for
+the configured `env.observation.action_history_controls`.
+
+For example, the active compact recurrent setup uses:
+
+```yaml
+env:
+  observation:
+    state_profile: race_core
+    action_history_len: 2
+    action_history_controls: [steer, gas, boost, lean]
+```
+
+That produces `6 + 2 * 4 = 14` scalar state features: six telemetry features
+plus the previous two values for steer, gas, boost, and lean.
 
 Training uses SB3 `CnnPolicy` for `image` mode and `MultiInputPolicy` for
 `image_state` mode. The custom mixed extractor keeps the same CNN image branch

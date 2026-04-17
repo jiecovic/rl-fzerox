@@ -55,11 +55,7 @@ def _control_viz(
         drive_axis_mode=drive_axis_mode,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
         lean_direction=(
-            -1
-            if joypad_mask & LEAN_LEFT_MASK
-            else 1
-            if joypad_mask & LEAN_RIGHT_MASK
-            else 0
+            -1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0
         ),
     )
 

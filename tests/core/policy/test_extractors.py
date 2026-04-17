@@ -104,6 +104,35 @@ def test_observation_extractor_auto_features_dim_uses_v3_legacy_deep_flatten() -
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
+def test_observation_extractor_auto_features_dim_uses_v4_compact_deep_flatten() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(98, 130, 9), dtype=np.uint8),
+        features_dim="auto",
+    )
+
+    observations = torch.zeros((2, 98, 130, 9), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor.features_dim == extractor._flatten_dim
+    assert isinstance(extractor._linear, torch.nn.Identity)
+    assert extractor._flatten_dim == 3_072
+    assert tuple(features.shape) == (2, extractor._flatten_dim)
+
+
+def test_observation_extractor_compact_deep_profile_can_override_v1_geometry() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(84, 116, 9), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="compact_deep",
+    )
+
+    observations = torch.zeros((2, 84, 116, 9), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 1_920
+    assert tuple(features.shape) == (2, 1_920)
+
+
 def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
     extractor = FZeroXImageStateExtractor(
         spaces.Dict(
@@ -173,3 +202,27 @@ def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_b
 
     assert extractor.features_dim == 3_648
     assert tuple(features.shape) == (2, 3_648)
+
+
+def test_image_state_extractor_auto_features_dim_respects_conv_profile() -> None:
+    extractor = FZeroXImageStateExtractor(
+        spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(98, 130, 9), dtype=np.uint8),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(14,), dtype=np.float32),
+            }
+        ),
+        features_dim="auto",
+        state_features_dim=32,
+        conv_profile="compact_deep",
+    )
+
+    features = extractor(
+        {
+            "image": torch.zeros((2, 98, 130, 9), dtype=torch.float32),
+            "state": torch.zeros((2, 14), dtype=torch.float32),
+        }
+    )
+
+    assert extractor.features_dim == 3_104
+    assert tuple(features.shape) == (2, 3_104)

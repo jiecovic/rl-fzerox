@@ -27,6 +27,7 @@ def build_policy_kwargs(
     if isinstance(train_env.observation_space, spaces.Dict):
         extractor_class = FZeroXImageStateExtractor
         extractor_kwargs = {
+            "conv_profile": policy_config.extractor.conv_profile,
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
@@ -34,6 +35,7 @@ def build_policy_kwargs(
     else:
         extractor_class = FZeroXObservationCnnExtractor
         extractor_kwargs = {
+            "conv_profile": policy_config.extractor.conv_profile,
             "features_dim": policy_config.extractor.features_dim,
         }
 

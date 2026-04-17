@@ -120,7 +120,7 @@ class SyntheticBackend:
         return self._last_frame.copy()
 
     def observation_spec(self, preset: str) -> ObservationSpec:
-        if preset not in {"native_crop_v1", "native_crop_v2", "native_crop_v3"}:
+        if preset not in {"native_crop_v1", "native_crop_v2", "native_crop_v3", "native_crop_v4"}:
             raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
         cropped = _crop_native_crop_v1(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
@@ -128,8 +128,10 @@ class SyntheticBackend:
             width, height = (116, 84)
         elif preset == "native_crop_v2":
             width, height = (124, 92)
-        else:
+        elif preset == "native_crop_v3":
             width, height = (164, 116)
+        else:
+            width, height = (130, 98)
         return ObservationSpec(
             preset=preset,
             width=width,

@@ -32,7 +32,7 @@ def set_observation_info(
     frame_stack: int,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
-    action_history_len: int,
+    action_history_len: int | None,
     action_history_controls: tuple[ActionHistoryControl, ...],
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""

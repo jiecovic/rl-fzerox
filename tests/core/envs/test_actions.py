@@ -147,9 +147,7 @@ def test_steer_gas_air_brake_boost_lean_adapter_masks_branches_separately() -> N
 
 
 def test_hybrid_steer_gas_boost_lean_adapter_uses_one_continuous_axis() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_boost_lean")
-    )
+    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
 
     assert isinstance(adapter.action_space, Dict)
     assert isinstance(adapter.action_space.spaces["continuous"], Box)
@@ -166,9 +164,7 @@ def test_hybrid_steer_gas_boost_lean_adapter_uses_one_continuous_axis() -> None:
 
 
 def test_hybrid_steer_gas_boost_lean_adapter_decodes_discrete_buttons() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_boost_lean")
-    )
+    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
 
     control_state = adapter.decode(
         {
@@ -184,9 +180,7 @@ def test_hybrid_steer_gas_boost_lean_adapter_decodes_discrete_buttons() -> None:
 
 
 def test_hybrid_steer_gas_boost_lean_adapter_masks_discrete_heads() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_boost_lean")
-    )
+    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
 
     mask = adapter.action_mask(
         base_overrides={

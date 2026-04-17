@@ -10,6 +10,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
 ConvSpec = tuple[tuple[int, tuple[int, int], tuple[int, int]], ...]
+ConvProfile = Literal["auto", "nature", "compact_deep"]
 NATURE_CNN_CONV_SPEC: ConvSpec = (
     (32, (8, 8), (4, 4)),
     (64, (4, 4), (2, 2)),
@@ -21,10 +22,17 @@ LEGACY_DEEP_CONV_SPEC: ConvSpec = (
     (128, (3, 3), (2, 2)),
     (128, (3, 3), (1, 1)),
 )
+COMPACT_DEEP_CONV_SPEC: ConvSpec = (
+    (64, (8, 8), (2, 2)),
+    (64, (4, 4), (2, 2)),
+    (128, (4, 4), (2, 2)),
+    (128, (4, 4), (2, 2)),
+)
 SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (84, 116): NATURE_CNN_CONV_SPEC,
     (92, 124): NATURE_CNN_CONV_SPEC,
     (116, 164): LEGACY_DEEP_CONV_SPEC,
+    (98, 130): COMPACT_DEEP_CONV_SPEC,
 }
 
 
@@ -35,10 +43,12 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         self,
         observation_space: spaces.Box,
         features_dim: int | Literal["auto"] = 512,
+        conv_profile: ConvProfile = "auto",
     ) -> None:
         image_geometry = _resolve_supported_image_geometry(
             observation_space,
             extractor_name=type(self).__name__,
+            conv_profile=conv_profile,
         )
         self._height = image_geometry.height
         self._width = image_geometry.width
@@ -118,6 +128,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         features_dim: int | Literal["auto"] = 512,
         state_features_dim: int = 64,
         fusion_features_dim: int | None = None,
+        conv_profile: ConvProfile = "auto",
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
             raise ValueError(
@@ -133,7 +144,9 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             raise ValueError(f"{type(self).__name__} requires 1D Box key 'state'")
 
         image_features_dim = (
-            _image_flatten_dim(image_space) if features_dim == "auto" else int(features_dim)
+            _image_flatten_dim(image_space, conv_profile=conv_profile)
+            if features_dim == "auto"
+            else int(features_dim)
         )
         resolved_state_features_dim = int(state_features_dim)
         combined_features_dim = image_features_dim + resolved_state_features_dim
@@ -151,6 +164,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         self._image_extractor = FZeroXObservationCnnExtractor(
             image_space,
             features_dim=features_dim,
+            conv_profile=conv_profile,
         )
         self._state_mlp = nn.Sequential(
             nn.Linear(self._state_dim, resolved_state_features_dim),
@@ -198,6 +212,7 @@ def _resolve_supported_image_geometry(
     observation_space: spaces.Box,
     *,
     extractor_name: str,
+    conv_profile: ConvProfile = "auto",
 ) -> _ImageGeometry:
     if len(observation_space.shape) != 3:
         raise ValueError(
@@ -214,7 +229,7 @@ def _resolve_supported_image_geometry(
     resolved_width = int(width)
     geometry = (resolved_height, resolved_width)
     try:
-        conv_spec = SUPPORTED_POLICY_GEOMETRIES[geometry]
+        conv_spec = _resolve_conv_spec(geometry, conv_profile=conv_profile)
     except KeyError as error:
         supported = ", ".join(f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES)
         raise ValueError(
@@ -230,10 +245,29 @@ def _resolve_supported_image_geometry(
     )
 
 
-def _image_flatten_dim(observation_space: spaces.Box) -> int:
+def _resolve_conv_spec(
+    geometry: tuple[int, int],
+    *,
+    conv_profile: ConvProfile,
+) -> ConvSpec:
+    if conv_profile == "auto":
+        return SUPPORTED_POLICY_GEOMETRIES[geometry]
+    if conv_profile == "nature":
+        return NATURE_CNN_CONV_SPEC
+    if conv_profile == "compact_deep":
+        return COMPACT_DEEP_CONV_SPEC
+    raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
+
+
+def _image_flatten_dim(
+    observation_space: spaces.Box,
+    *,
+    conv_profile: ConvProfile = "auto",
+) -> int:
     geometry = _resolve_supported_image_geometry(
         observation_space,
         extractor_name=FZeroXImageStateExtractor.__name__,
+        conv_profile=conv_profile,
     )
     height = geometry.height
     width = geometry.width

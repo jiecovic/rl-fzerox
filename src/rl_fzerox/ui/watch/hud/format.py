@@ -149,10 +149,7 @@ def _format_rate_pair(
     actual_key: str,
     target_key: str,
 ) -> str:
-    return (
-        f"{_float_info(info, actual_key):.1f} / "
-        f"{_format_rate_target(info, target_key)}"
-    )
+    return f"{_float_info(info, actual_key):.1f} / {_format_rate_target(info, target_key)}"
 
 
 def _format_rate_target(info: dict[str, object], key: str) -> str:

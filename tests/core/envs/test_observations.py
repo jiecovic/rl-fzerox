@@ -1,5 +1,6 @@
 # tests/core/envs/test_observations.py
 import numpy as np
+import pytest
 
 from rl_fzerox.core.envs.observations import (
     STATE_FEATURE_NAMES,
@@ -59,6 +60,15 @@ def test_native_observation_v3_uses_largest_default_aspect_correct_shape() -> No
     assert observation.shape == (116, 164, 12)
 
 
+def test_native_observation_v4_uses_compact_deep_aspect_correct_shape() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(preset="native_crop_v4", frame_stack=3)
+
+    assert observation.shape == (98, 130, 9)
+
+
 def test_state_vector_treats_dash_pad_boost_as_boost_active() -> None:
     vector = telemetry_state_vector(
         make_telemetry(state_labels=("active", "dash_pad_boost"), boost_timer=0)
@@ -105,15 +115,35 @@ def test_race_core_state_profile_keeps_minimal_race_context() -> None:
         "energy_frac",
         "reverse_active",
         "airborne",
+        "can_boost",
         "boost_active",
     )
-    assert vector.tolist() == [0.5, 0.5, 1.0, 1.0, 1.0]
+    assert vector.tolist() == [0.5, 0.5, 1.0, 1.0, 0.0, 1.0]
 
 
-def test_race_core_action_history_profile_appends_previous_actions() -> None:
+def test_action_history_len_none_disables_previous_actions() -> None:
     vector = telemetry_state_vector(
         make_telemetry(speed_kph=750.0),
-        state_profile="race_core_action_history",
+        state_profile="race_core",
+        action_history_len=None,
+        action_history={"prev_steer_1": -1.0},
+    )
+    feature_names = state_feature_names("race_core", action_history_len=None)
+
+    assert vector.shape == (6,)
+    assert all(not name.startswith("prev_") for name in feature_names)
+
+
+def test_action_history_len_zero_is_invalid() -> None:
+    with pytest.raises(ValueError, match="positive or None"):
+        state_feature_names("race_core", action_history_len=0)
+
+
+def test_action_history_len_appends_previous_actions_to_race_core() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(speed_kph=750.0),
+        state_profile="race_core",
+        action_history_len=2,
         action_history={
             "prev_steer_1": -0.75,
             "prev_steer_2": 0.25,
@@ -124,9 +154,9 @@ def test_race_core_action_history_profile_appends_previous_actions() -> None:
             "prev_lean_2": 1.0,
         },
     )
-    feature_names = state_feature_names("race_core_action_history")
+    feature_names = state_feature_names("race_core", action_history_len=2)
 
-    assert vector.shape == (13,)
+    assert vector.shape == (14,)
     assert feature_names[-8:] == (
         "prev_steer_1",
         "prev_steer_2",
@@ -147,10 +177,10 @@ def test_race_core_action_history_profile_appends_previous_actions() -> None:
     assert values["prev_lean_2"] == 1.0
 
 
-def test_race_core_action_history_profile_uses_configured_history_length() -> None:
+def test_action_history_len_uses_configured_history_length() -> None:
     vector = telemetry_state_vector(
         make_telemetry(speed_kph=750.0),
-        state_profile="race_core_action_history",
+        state_profile="race_core",
         action_history_len=3,
         action_history_controls=("steer", "gas", "air_brake", "boost", "lean"),
         action_history={
@@ -160,12 +190,12 @@ def test_race_core_action_history_profile_uses_configured_history_length() -> No
         },
     )
     feature_names = state_feature_names(
-        "race_core_action_history",
+        "race_core",
         action_history_len=3,
         action_history_controls=("steer", "gas", "air_brake", "boost", "lean"),
     )
 
-    assert vector.shape == (20,)
+    assert vector.shape == (21,)
     assert feature_names[-15:] == (
         "prev_steer_1",
         "prev_steer_2",

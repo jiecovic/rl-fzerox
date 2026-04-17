@@ -117,6 +117,7 @@ def _race_v3_weights(config: RewardConfig) -> RaceV3RewardWeights:
         energy_gain_reward_scale=config.energy_gain_reward_scale,
         energy_gain_collision_cooldown_frames=config.energy_gain_collision_cooldown_frames,
         energy_full_refill_lap_bonus=config.energy_full_refill_lap_bonus,
+        energy_full_refill_min_gain_fraction=config.energy_full_refill_min_gain_fraction,
         airborne_landing_reward=config.airborne_landing_reward,
         collision_recoil_penalty=config.collision_recoil_penalty,
         failure_penalty=config.failure_penalty,
