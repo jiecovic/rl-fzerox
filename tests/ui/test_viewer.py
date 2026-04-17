@@ -881,8 +881,8 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    obs_vector_section = next(section for section in columns.right if section.title == "Obs Vector")
-    values = {line.label: line.value for line in obs_vector_section.lines}
+    obs_state_section = next(section for section in columns.right if section.title == "Obs State")
+    values = {line.label: line.value for line in obs_state_section.lines}
 
     assert values == {
         "speed_norm": "0.500",
@@ -897,6 +897,55 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         "right_press_age_norm": "0.200",
         "recent_boost_pressure": "0.250",
     }
+
+
+def test_side_panel_splits_observation_action_buffer_from_state() -> None:
+    feature_names = state_feature_names("race_core", action_history_len=2)
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="exp_v3_cnn_0001",
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=0.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(98, 130, 9),
+        observation_state=np.arange(len(feature_names), dtype=np.float32),
+        observation_state_feature_names=feature_names,
+        telemetry=_sample_telemetry(),
+    )
+
+    obs_state_section = next(section for section in columns.right if section.title == "Obs State")
+    action_buffer_section = next(
+        section for section in columns.right if section.title == "Action Buffer"
+    )
+
+    assert [line.label for line in obs_state_section.lines] == [
+        "speed_norm",
+        "energy_frac",
+        "reverse_active",
+        "airborne",
+        "can_boost",
+        "boost_active",
+    ]
+    assert [line.label for line in action_buffer_section.lines] == [
+        "prev_steer_1",
+        "prev_steer_2",
+        "prev_gas_1",
+        "prev_gas_2",
+        "prev_boost_1",
+        "prev_boost_2",
+        "prev_lean_1",
+        "prev_lean_2",
+    ]
 
 
 def test_side_panel_fits_steer_history_observation_state_vector() -> None:
