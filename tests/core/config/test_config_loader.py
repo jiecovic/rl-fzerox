@@ -873,6 +873,8 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
             "        type: discrete",
             "        mask: [idle]",
             "        unmask_max_speed_kph: null",
+            "        decision_interval_frames: 7",
+            "        request_lockout_frames: 9",
             "      lean:",
             "        type: discrete",
             "        mask: [idle, left, right]",
@@ -892,6 +894,8 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     assert config.env.action.name == "hybrid_steer_gas_boost_lean"
     assert config.env.action.steer_response_power == 0.8
     assert config.env.action.boost_unmask_max_speed_kph is None
+    assert config.env.action.boost_decision_interval_frames == 7
+    assert config.env.action.boost_request_lockout_frames == 9
     assert config.env.action.lean_unmask_min_speed_kph is None
     assert config.env.action.lean_mode == "release_cooldown"
     assert config.env.action.mask is not None
@@ -903,6 +907,58 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     assert config.env.action.branches is not None
     assert config.env.action.branches.boost is not None
     assert config.env.action.branches.boost.mask == ("idle",)
+
+
+def test_load_train_app_config_prefers_action_branches_over_adapter_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: steer_drive",
+            "    mask:",
+            "      boost: [0]",
+            "    branches:",
+            "      steer:",
+            "        type: continuous",
+            "      gas:",
+            "        type: discrete",
+            "        mask: [idle, engaged]",
+            "      boost:",
+            "        type: discrete",
+            "        mask: [idle, engaged]",
+            "      lean:",
+            "        type: discrete",
+            "        mask: [idle]",
+            "train:",
+            "  algorithm: maskable_hybrid_recurrent_ppo",
+            "  total_timesteps: 1000",
+            "policy:",
+            "  recurrent:",
+            "    enabled: true",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_gas_boost_lean"
+    assert config.env.action.mask is not None
+    assert config.env.action.mask.branch_overrides() == {
+        "gas": (0, 1),
+        "boost": (0, 1),
+        "lean": (0,),
+    }
 
 
 def test_load_train_app_config_rejects_masked_continuous_action_branch(

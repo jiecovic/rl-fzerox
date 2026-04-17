@@ -119,14 +119,13 @@ class ActionConfig(BaseModel):
 
         branch_config = values.get("branches")
         if branch_config is not None:
-            # COMPAT SHIM: branch-style configs are compiled to the existing
-            # adapter fields so older run manifests and adapter classes keep
-            # loading until the legacy names can be removed.
+            # COMPAT SHIM: branch-style configs are the source of truth, but
+            # the env runtime still consumes adapter-era fields. Ignore old
+            # action fields merged from base YAMLs or saved manifests here.
+            # Delete this compile bridge when the runtime consumes branches
+            # directly.
             compiled = compile_action_branches(branch_config)
-            if compiled.values.get("mask") is not None and values.get("mask") is not None:
-                raise ValueError(
-                    "env.action.branches masks cannot be combined with env.action.mask"
-                )
+            values = {"branches": branch_config}
             values.update(compiled.values)
         return values
 
