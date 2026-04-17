@@ -1,5 +1,5 @@
 defaults:
-  - reward: race_v2
+  - reward: race_v3
   - _self_
 
 seed: 123

@@ -177,6 +177,7 @@ class TrackSamplingEntryConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
+    display_name: str | None = None
     baseline_state_path: Path
     weight: PositiveFloat = 1.0
     course_index: NonNegativeInt | None = None
@@ -232,81 +233,29 @@ class RewardConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["race_v2", "race_v3", "race_v4"] = "race_v2"
+    name: Literal["race_v3"] = "race_v3"
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
-    milestone_distance: PositiveFloat = 3_000.0
-    randomize_milestone_phase_on_reset: bool = False
-    milestone_bonus: NonNegativeFloat = 2.0
-    milestone_speed_scale: NonNegativeFloat = 0.0
-    milestone_speed_bonus_cap: NonNegativeFloat = 0.0
-    bootstrap_progress_scale: NonNegativeFloat = 0.001
-    bootstrap_regress_penalty_scale: NonNegativeFloat = 0.002
     progress_bucket_distance: PositiveFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
-    bootstrap_position_multiplier_scale: NonNegativeFloat = 0.0
-    bootstrap_lap_count: PositiveInt = 1
     lap_completion_bonus: NonNegativeFloat = 5.0
-    lap_1_completion_bonus: NonNegativeFloat = 20.0
-    lap_2_completion_bonus: NonNegativeFloat = 35.0
-    final_lap_completion_bonus: NonNegativeFloat = 60.0
     lap_position_scale: NonNegativeFloat = 1.0
-    remaining_step_penalty_per_frame: NonNegativeFloat = 0.01
-    remaining_lap_penalty: NonNegativeFloat = 50.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
-    energy_loss_penalty_scale: NonNegativeFloat = 0.05
-    energy_loss_safe_fraction: float = Field(default=0.9, ge=0.0, le=1.0)
-    energy_loss_danger_power: PositiveFloat = 2.0
     energy_gain_reward_scale: NonNegativeFloat = 0.02
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
-    energy_full_refill_bonus: NonNegativeFloat = 0.0
-    energy_full_refill_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
-    grounded_air_brake_penalty: float = 0.0
-    drive_axis_negative_penalty_scale: float = Field(default=0.0, le=0.0)
     boost_pad_reward: NonNegativeFloat = 0.0
-    boost_pad_reward_cooldown_frames: NonNegativeInt = 0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
-    manual_boost_request_reward: float = 0.0
     collision_recoil_penalty: float = -2.0
-    spinning_out_penalty: float = -4.0
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
-    terminal_failure_base_penalty: float = -120.0
-    stuck_truncation_base_penalty: float = -150.0
-    wrong_way_truncation_base_penalty: float = -170.0
-    progress_stalled_truncation_base_penalty: float = -150.0
-    timeout_truncation_base_penalty: float = -150.0
-    finish_position_scale: NonNegativeFloat = 4.0
-
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_reward_fields(cls, data: object) -> object:
-        # COMPAT SHIM: legacy reward config field names.
-        # Run manifests saved before `manual_boost_request_reward` still contain
-        # `reward.boost_press_penalty` or the older
-        # `reward.boost_redundant_press_penalty`. Watch loads those manifests to
-        # reconstruct policy metadata, so reject-free migration must live at the
-        # schema boundary. New YAML should only use `manual_boost_request_reward`.
-        if not isinstance(data, Mapping):
-            return data
-        values: dict[str, object] = {str(key): value for key, value in data.items()}
-        missing = object()
-        legacy_redundant_penalty = values.pop("boost_redundant_press_penalty", missing)
-        legacy_press_penalty = values.pop("boost_press_penalty", missing)
-        if "manual_boost_request_reward" not in values:
-            if legacy_press_penalty is not missing:
-                values["manual_boost_request_reward"] = legacy_press_penalty
-            elif legacy_redundant_penalty is not missing:
-                values["manual_boost_request_reward"] = legacy_redundant_penalty
-        return values
 
 
 class EmulatorConfig(BaseModel):
@@ -436,20 +385,11 @@ class CurriculumTriggerConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     race_laps_completed_mean_gte: NonNegativeFloat | None = None
-    milestones_completed_mean_gte: NonNegativeFloat | None = None
 
     @model_validator(mode="after")
     def _validate_exactly_one_trigger(self) -> CurriculumTriggerConfig:
-        configured = [
-            value
-            for value in (
-                self.race_laps_completed_mean_gte,
-                self.milestones_completed_mean_gte,
-            )
-            if value is not None
-        ]
-        if len(configured) != 1:
-            raise ValueError("Curriculum stage triggers must set exactly one condition")
+        if self.race_laps_completed_mean_gte is None:
+            raise ValueError("Curriculum stage triggers must set race_laps_completed_mean_gte")
         return self
 
 

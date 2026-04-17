@@ -72,7 +72,7 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
             runtime_dir=train_runtime_dir,
         ),
         env=EnvConfig(action_repeat=3),
-        reward=RewardConfig(milestone_bonus=9.0),
+        reward=RewardConfig(progress_bucket_reward=9.0),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
@@ -93,7 +93,7 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
             runtime_dir=watch_runtime_dir,
         ),
         env=EnvConfig(action_repeat=1),
-        reward=RewardConfig(milestone_bonus=1.0),
+        reward=RewardConfig(progress_bucket_reward=1.0),
         watch=WatchConfig(fps=30.0),
     )
     merged_watch_config = apply_train_run_to_watch_config(
@@ -107,7 +107,7 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert loaded_train_config.emulator.runtime_dir == train_runtime_dir.resolve()
     assert merged_watch_config.emulator.runtime_dir == watch_runtime_dir.resolve()
     assert merged_watch_config.env.action_repeat == 3
-    assert merged_watch_config.reward.milestone_bonus == 9.0
+    assert merged_watch_config.reward.progress_bucket_reward == 9.0
     assert merged_watch_config.watch.policy_run_dir == run_paths.run_dir
     assert merged_watch_config.watch.fps == 30.0
     assert merged_watch_config.watch.control_fps == 30.0

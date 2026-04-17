@@ -14,6 +14,7 @@ class SelectedTrack:
     """Reset-time track baseline selected for the current episode."""
 
     id: str
+    display_name: str | None
     baseline_state_path: Path
     weight: float
     course_index: int | None
@@ -22,6 +23,7 @@ class SelectedTrack:
         return {
             "track_sampling_enabled": True,
             "track_id": self.id,
+            "track_display_name": self.display_name,
             "track_baseline_state_path": str(self.baseline_state_path),
             "track_sampling_weight": self.weight,
             "track_course_index": self.course_index,
@@ -79,6 +81,7 @@ def _weighted_entry(
 def _selected_track_from_entry(entry: TrackSamplingEntryConfig) -> SelectedTrack:
     return SelectedTrack(
         id=entry.id,
+        display_name=entry.display_name,
         baseline_state_path=entry.baseline_state_path,
         weight=float(entry.weight),
         course_index=None if entry.course_index is None else int(entry.course_index),

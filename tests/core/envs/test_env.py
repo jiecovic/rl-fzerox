@@ -847,12 +847,7 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
                 continuous_air_brake_mode="disable_on_ground",
             ),
         ),
-        reward_config=RewardConfig(
-            time_penalty_per_frame=0.0,
-            milestone_bonus=0.0,
-            bootstrap_progress_scale=0.0,
-            grounded_air_brake_penalty=-0.5,
-        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
     air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
 
@@ -868,8 +863,8 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     )
     _, reward, _, _, info = env.step_control(air_brake_state)
     assert backend.last_controller_state == ControllerState()
-    assert reward == -0.5
-    assert info["reward_breakdown"] == {"grounded_air_brake": -0.5}
+    assert reward == 0.0
+    assert "reward_breakdown" not in info
 
     _, reward, _, _, info = env.step_control(air_brake_state)
     assert backend.last_controller_state == air_brake_state
@@ -877,7 +872,7 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     assert "reward_breakdown" not in info
 
 
-def test_step_penalizes_raw_negative_drive_axis_while_forcing_accelerate() -> None:
+def test_step_forces_accelerate_when_drive_mode_always_accelerate() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -898,12 +893,7 @@ def test_step_penalizes_raw_negative_drive_axis_while_forcing_accelerate() -> No
                 continuous_air_brake_mode="off",
             ),
         ),
-        reward_config=RewardConfig(
-            time_penalty_per_frame=0.0,
-            milestone_bonus=0.0,
-            bootstrap_progress_scale=0.0,
-            drive_axis_negative_penalty_scale=-0.02,
-        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
 
     env.reset(seed=21)
@@ -915,8 +905,8 @@ def test_step_penalizes_raw_negative_drive_axis_while_forcing_accelerate() -> No
     )
 
     assert backend.last_controller_state.joypad_mask & ACCELERATE_MASK
-    assert reward == pytest.approx(-0.005)
-    assert info["reward_breakdown"] == {"drive_axis_negative": pytest.approx(-0.005)}
+    assert reward == 0.0
+    assert "reward_breakdown" not in info
 
 
 def test_extended_action_env_exposes_four_head_action_space() -> None:
@@ -2115,15 +2105,15 @@ def test_step_truncates_when_speed_is_stuck() -> None:
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-300.99)
+    assert reward == pytest.approx(-20.01)
     assert info["truncation_reason"] == "stuck"
     assert info["stalled_steps"] == 2
-    assert info["step_reward"] == pytest.approx(-300.99)
+    assert info["step_reward"] == pytest.approx(-20.01)
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["time"] == -0.005
     assert reward_breakdown["low_speed_time"] == -0.005
-    assert reward_breakdown["stuck_truncation"] == pytest.approx(-300.98)
+    assert reward_breakdown["stuck_truncation"] == pytest.approx(-20.0)
 
 
 def test_stuck_truncation_can_be_disabled() -> None:
@@ -2205,21 +2195,21 @@ def test_step_truncates_when_driving_the_wrong_way() -> None:
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     assert not terminated
     assert not truncated
-    assert reward == pytest.approx(-0.016)
+    assert reward == pytest.approx(-0.010)
     assert info["reverse_timer"] == 80
 
     _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-320.997)
+    assert reward == pytest.approx(-20.010)
     assert info["truncation_reason"] == "wrong_way"
     assert info["reverse_timer"] == 100
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["time"] == pytest.approx(-0.005)
     assert reward_breakdown["reverse_time"] == -0.005
-    assert reward_breakdown["bootstrap_regress"] == pytest.approx(-0.007)
-    assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-320.98)
+    assert reward_breakdown["wrong_way_truncation"] == pytest.approx(-20.0)
 
 
 def test_step_disables_wrong_way_truncation_when_configured() -> None:
@@ -2308,12 +2298,13 @@ def test_step_truncates_when_progress_frontier_stalls() -> None:
 
     assert not terminated
     assert truncated
-    assert reward == pytest.approx(-300.945)
+    assert reward == pytest.approx(-20.005)
     assert info["truncation_reason"] == "progress_stalled"
     assert info["progress_frontier_stalled_frames"] == 5
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
-    assert reward_breakdown["progress_stalled_truncation"] == pytest.approx(-300.94)
+    assert reward_breakdown["time"] == pytest.approx(-0.005)
+    assert reward_breakdown["progress_stalled_truncation"] == pytest.approx(-20.0)
 
 
 def test_terminal_step_exposes_monitor_info_keys() -> None:

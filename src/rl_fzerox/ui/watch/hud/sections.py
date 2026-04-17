@@ -121,8 +121,8 @@ def _build_panel_columns(
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line(
-                        "Best rank",
-                        _format_best_finish_position(best_finish_position),
+                        "Best position",
+                        _format_best_position(best_finish_position),
                         PALETTE.text_primary
                         if best_finish_position is not None
                         else PALETTE.text_muted,
@@ -175,26 +175,6 @@ def _build_panel_columns(
                 ],
             ),
             PanelSection(
-                title="Reset",
-                lines=[
-                    _panel_line(
-                        "Mode",
-                        str(reset_info.get("reset_mode", "baseline")),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Baseline",
-                        str(reset_info.get("baseline_kind", "unknown")),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Boot",
-                        str(reset_info.get("boot_state", "-")),
-                        PALETTE.text_primary,
-                    ),
-                ],
-            ),
-            PanelSection(
                 title="Input",
                 lines=[],
                 control_viz=_control_viz(
@@ -240,16 +220,6 @@ def _build_panel_columns(
                     _panel_line(
                         "Render FPS",
                         _format_render_rate(info),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Milestones",
-                        _format_milestone_status(info),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Next milestone",
-                        _format_next_milestone(info),
                         PALETTE.text_primary,
                     ),
                 ],
@@ -315,22 +285,6 @@ def _column_content_height(
     return y
 
 
-def _format_milestone_status(info: dict[str, object]) -> str:
-    completed = _int_info(info, "milestones_completed")
-    next_index = _int_info(info, "next_milestone_index")
-    if info.get("bootstrap_progress_active"):
-        return f"{completed} done / next {next_index} / bootstrap"
-    return f"{completed} done / next {next_index}"
-
-
-def _format_next_milestone(info: dict[str, object]) -> str:
-    remaining = info.get("distance_to_next_milestone")
-    next_distance = info.get("next_milestone_distance")
-    if isinstance(remaining, int | float) and isinstance(next_distance, int | float):
-        return f"{remaining:,.1f} to {next_distance:,.0f}"
-    return "-"
-
-
 def _format_reward_value(value: float) -> str:
     return f"{value:.4f}"
 
@@ -341,7 +295,7 @@ def _format_policy_deterministic(value: bool | None) -> str:
     return "true" if value else "false"
 
 
-def _format_best_finish_position(value: int | None) -> str:
+def _format_best_position(value: int | None) -> str:
     return "n/a" if value is None else str(value)
 
 
@@ -386,15 +340,13 @@ def _game_section(
             _panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
             _panel_line("Difficulty", _format_difficulty(telemetry), PALETTE.text_primary),
             _panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
-            _panel_line("Intro", str(telemetry.race_intro_timer), PALETTE.text_primary),
-            _panel_line("Course", str(telemetry.course_index), PALETTE.text_primary),
+            _panel_line("Track", _format_track_name(info, telemetry), PALETTE.text_primary),
             _panel_line(
                 "Time",
                 _format_race_time_ms(telemetry.player.race_time_ms),
                 PALETTE.text_primary,
             ),
             _panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
-            _panel_line("Boost", str(telemetry.player.boost_timer), PALETTE.text_primary),
             _panel_line(
                 "Recoil",
                 f"{recoil_magnitude:.3f}",
@@ -406,7 +358,7 @@ def _game_section(
                 PALETTE.text_primary,
             ),
             _panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
-            _panel_line("Pos", str(telemetry.player.position), PALETTE.text_primary),
+            _panel_line("Position", _format_position(telemetry), PALETTE.text_primary),
             _panel_line(
                 "Progress",
                 _format_distance(telemetry.player.race_distance),
@@ -442,6 +394,28 @@ def _format_camera_setting(telemetry: FZeroXTelemetry) -> str:
     if camera_setting_name != "unknown":
         return _format_mode_name(camera_setting_name)
     return f"unknown ({telemetry.camera_setting_raw})"
+
+
+def _format_track_name(info: dict[str, object], telemetry: FZeroXTelemetry) -> str:
+    display_name = info.get("track_display_name")
+    if isinstance(display_name, str) and display_name:
+        return display_name
+
+    track_id = info.get("track_id")
+    if isinstance(track_id, str) and track_id:
+        return _format_mode_name(track_id)
+
+    course_index = info.get("track_course_index", telemetry.course_index)
+    if isinstance(course_index, int | float):
+        return f"course {int(course_index)}"
+    return "unknown"
+
+
+def _format_position(telemetry: FZeroXTelemetry) -> str:
+    total_racers = telemetry.total_racers
+    if total_racers > 0:
+        return f"{telemetry.player.position} / {total_racers}"
+    return str(telemetry.player.position)
 
 
 def _policy_state_sections(

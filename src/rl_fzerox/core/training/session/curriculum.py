@@ -17,7 +17,6 @@ class ActionMaskCurriculumController:
     def __init__(self, config: CurriculumConfig) -> None:
         self._config = config
         self._race_laps_completed_window: deque[float] = deque(maxlen=config.smoothing_episodes)
-        self._milestones_completed_window: deque[float] = deque(maxlen=config.smoothing_episodes)
         self._stage_episode_count = 0
         self._stage_index = 0 if config.enabled and config.stages else None
 
@@ -57,9 +56,6 @@ class ActionMaskCurriculumController:
 
         for episode in episodes:
             self._race_laps_completed_window.append(_episode_metric(episode, "race_laps_completed"))
-            self._milestones_completed_window.append(
-                _episode_metric(episode, "milestones_completed")
-            )
             self._stage_episode_count += 1
 
         stage = self._config.stages[self._stage_index]
@@ -84,16 +80,10 @@ class ActionMaskCurriculumController:
             return mean_value is not None and mean_value >= float(
                 trigger.race_laps_completed_mean_gte
             )
-        if trigger.milestones_completed_mean_gte is not None:
-            mean_value = _window_mean(self._milestones_completed_window)
-            return mean_value is not None and mean_value >= float(
-                trigger.milestones_completed_mean_gte
-            )
         return False
 
     def _clear_stage_windows(self) -> None:
         self._race_laps_completed_window.clear()
-        self._milestones_completed_window.clear()
         self._stage_episode_count = 0
 
 

@@ -199,6 +199,13 @@ def _draw_control_viz(
         screen=screen,
         track=steer_track,
     )
+    pygame.draw.rect(
+        screen,
+        PALETTE.control_lever_border,
+        steer_track,
+        width=PALETTE.control_lever_border_width,
+        border_radius=LAYOUT.control_steer_height // 2,
+    )
 
     steer_value = max(-1.0, min(1.0, control_viz.steer_x))
     steer_knob_x = _steer_track_x(track=steer_track, value=steer_value)
@@ -444,6 +451,13 @@ def _draw_unipolar_gas_lever(
             fill,
             border_radius=LAYOUT.control_gas_width // 2,
         )
+    pygame.draw.rect(
+        screen,
+        PALETTE.control_lever_border,
+        track,
+        width=PALETTE.control_lever_border_width,
+        border_radius=LAYOUT.control_gas_width // 2,
+    )
     _draw_round_marker(
         pygame=pygame,
         screen=screen,

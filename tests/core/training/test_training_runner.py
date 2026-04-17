@@ -350,9 +350,7 @@ def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> Non
         )
     )
 
-    promoted_stage = controller.record_episodes(
-        [{"race_laps_completed": 3, "milestones_completed": 10}]
-    )
+    promoted_stage = controller.record_episodes([{"race_laps_completed": 3}])
 
     assert promoted_stage == 1
     assert controller.stage_index == 1
@@ -398,9 +396,7 @@ def test_curriculum_controller_exposes_active_train_overrides() -> None:
     assert controller.stage_train_overrides.clip_range == 0.2
     assert controller.stage_train_overrides.ent_coef == 0.01
 
-    promoted_stage = controller.record_episodes(
-        [{"race_laps_completed": 1, "milestones_completed": 0}]
-    )
+    promoted_stage = controller.record_episodes([{"race_laps_completed": 1}])
 
     assert promoted_stage == 1
     assert controller.stage_train_overrides is not None
@@ -490,7 +486,6 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
                     {
                         "episode": {
                             "race_laps_completed": 1,
-                            "milestones_completed": 0,
                         }
                     }
                 ]
@@ -955,8 +950,9 @@ def test_maybe_preload_training_parameters_rejects_algorithm_mismatch(tmp_path: 
         )
 
 
-def test_monitor_info_keys_include_milestones_completed_for_curriculum() -> None:
-    assert "milestones_completed" in MONITOR_INFO_KEYS
+def test_monitor_info_keys_include_position_context() -> None:
+    assert "position" in MONITOR_INFO_KEYS
+    assert "total_racers" in MONITOR_INFO_KEYS
 
 
 def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> None:

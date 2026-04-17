@@ -88,6 +88,8 @@ class ViewerPalette:
     text_accent: Color = (126, 214, 170)
     text_warning: Color = (241, 206, 108)
     control_track: Color = (39, 46, 56)
+    control_lever_border: Color = (142, 153, 168)
+    control_lever_border_width: int = 1
     control_knob: Color = (238, 241, 245)
     control_knob_outline: Color = (20, 24, 30)
     control_coast: Color = (86, 97, 112)
