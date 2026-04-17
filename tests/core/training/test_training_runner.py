@@ -49,6 +49,14 @@ from rl_fzerox.core.training.session.model import (
 from tests.support.fakes import SyntheticBackend
 
 
+class _CapturingLogger:
+    def __init__(self) -> None:
+        self.records: dict[str, float] = {}
+
+    def record(self, key: str, value: float) -> None:
+        self.records[key] = value
+
+
 def test_validate_training_baseline_state_requires_existing_file(
     tmp_path: Path,
 ) -> None:
@@ -129,9 +137,13 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "position": 5,
             "lap": 1,
             "race_laps_completed": 0,
+            "damage_taken_frames": 0,
+            "collision_recoil_entered": False,
             "episode": {
                 "position": 2,
                 "race_laps_completed": 3,
+                "race_time_ms": 123_400,
+                "episode_step": 7_404,
                 "termination_reason": "finished",
                 "truncation_reason": None,
             },
@@ -142,9 +154,13 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "position": 7,
             "lap": 1,
             "race_laps_completed": 0,
+            "damage_taken_frames": 2,
+            "collision_recoil_entered": True,
             "episode": {
                 "position": 8,
                 "race_laps_completed": 1,
+                "race_time_ms": 40_000,
+                "episode_step": 2_400,
                 "termination_reason": None,
                 "truncation_reason": "progress_stalled",
             },
@@ -156,11 +172,25 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["race_distance"].mean() == 12.0
     assert accumulator.state_metrics["speed_kph"].mean() == 110.0
     assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
+    assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
+    assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
     assert accumulator.episode_metrics["position"].mean() == 5.0
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
+    assert accumulator.finished_episode_metrics["race_time_ms"].mean() == 123.4
+    assert accumulator.finished_episode_metrics["episode_step"].mean() == 7404.0
+    assert accumulator.finished_episode_metrics["position"].mean() == 2.0
     assert accumulator.episode_count == 2
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["progress_stalled"] == 1
+
+    logger = _CapturingLogger()
+    accumulator.record_to(logger)
+
+    assert logger.records["state/damage_taken_step_rate"] == 0.5
+    assert logger.records["state/collision_recoil_entry_rate"] == 0.5
+    assert logger.records["episode/finish_time_s_mean"] == 123.4
+    assert logger.records["episode/finish_steps_mean"] == 7404.0
+    assert logger.records["episode/finish_position_mean"] == 2.0
 
 
 def test_info_sequence_accepts_tuple_infos() -> None:
@@ -185,7 +215,7 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
         [
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
-                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
         ]
     )
@@ -252,7 +282,7 @@ def test_train_config_rejects_plain_ppo_algorithm(
     with pytest.raises(ValidationError, match="algorithm"):
         TrainAppConfig(
             emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-            env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+            env=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             policy=PolicyConfig(),
             curriculum=CurriculumConfig(),
             train=TrainConfig.model_validate({"algorithm": "ppo"}),
@@ -313,9 +343,9 @@ def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> Non
                 CurriculumStageConfig(
                     name="basic_drive",
                     until=CurriculumTriggerConfig(race_laps_completed_mean_gte=3.0),
-                    action_mask=ActionMaskConfig(shoulder=(0,)),
+                    action_mask=ActionMaskConfig(lean=(0,)),
                 ),
-                CurriculumStageConfig(name="drift_enabled"),
+                CurriculumStageConfig(name="lean_enabled"),
             ),
         )
     )
@@ -326,7 +356,7 @@ def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> Non
 
     assert promoted_stage == 1
     assert controller.stage_index == 1
-    assert controller.stage_name == "drift_enabled"
+    assert controller.stage_name == "lean_enabled"
 
 
 def test_curriculum_controller_exposes_active_train_overrides() -> None:
@@ -423,7 +453,7 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
         [
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
-                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
                 curriculum_config=curriculum,
             )
         ]
@@ -513,7 +543,7 @@ def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive_drift")),
+        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive_lean")),
         policy=PolicyConfig(),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="sac", ent_coef="auto"),
@@ -538,7 +568,7 @@ def test_training_requires_action_masks_for_maskable_hybrid_action_ppo(
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_lean")),
         policy=PolicyConfig(),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
@@ -563,7 +593,7 @@ def test_training_requires_action_masks_for_maskable_hybrid_recurrent_ppo(
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_drift")),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_lean")),
         policy=PolicyConfig(recurrent=PolicyRecurrentConfig(enabled=True)),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="maskable_hybrid_recurrent_ppo"),
@@ -626,7 +656,7 @@ def test_build_ppo_model_can_construct_maskable_ppo() -> None:
         [
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
-                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
         ]
     )
@@ -653,7 +683,7 @@ def test_build_training_model_can_construct_sac() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(name="continuous_steer_drive_drift"),
+                    action=ActionConfig(name="continuous_steer_drive_lean"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
@@ -688,7 +718,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(name="hybrid_steer_drive_boost_drift"),
+                    action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
@@ -722,7 +752,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(name="hybrid_steer_drive_boost_drift"),
+                    action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
@@ -761,7 +791,7 @@ def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -
         [
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
-                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,)))),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
         ]
     )
@@ -792,7 +822,7 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(mask=ActionMaskConfig(shoulder=(0,))),
+                    action=ActionConfig(mask=ActionMaskConfig(lean=(0,))),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
@@ -927,3 +957,9 @@ def test_maybe_preload_training_parameters_rejects_algorithm_mismatch(tmp_path: 
 
 def test_monitor_info_keys_include_milestones_completed_for_curriculum() -> None:
     assert "milestones_completed" in MONITOR_INFO_KEYS
+
+
+def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> None:
+    assert "race_time_ms" in MONITOR_INFO_KEYS
+    assert "damage_taken_frames" in MONITOR_INFO_KEYS
+    assert "collision_recoil_entered" in MONITOR_INFO_KEYS

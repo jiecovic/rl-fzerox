@@ -291,7 +291,7 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
         policy_path=run_paths.latest_policy_path,
         policy_metadata=PolicyArtifactMetadata(
             curriculum_stage_index=1,
-            curriculum_stage_name="drift_enabled",
+            curriculum_stage_name="lean_enabled",
         ),
     )
 
@@ -299,7 +299,7 @@ def test_save_artifacts_atomically_persists_policy_stage_metadata(tmp_path: Path
 
     assert metadata == PolicyArtifactMetadata(
         curriculum_stage_index=1,
-        curriculum_stage_name="drift_enabled",
+        curriculum_stage_name="lean_enabled",
     )
 
 

@@ -12,7 +12,7 @@ env:
   reset_to_race: true
   camera_setting: close_behind
   action:
-    name: steer_drive_boost_shoulder
+    name: steer_drive_boost_lean
 
 watch:
   control_fps: auto

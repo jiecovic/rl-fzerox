@@ -18,17 +18,24 @@ impl Host {
         &mut self,
         baseline_state_path: &Path,
     ) -> Result<(), CoreError> {
-        // A savestate restore does not always advance the video callback on its
-        // own, so we explicitly wait for a fresh frame before freezing the
-        // custom baseline metadata around it.
-        self.initialize_running_state()?;
         let baseline_state =
             std::fs::read(baseline_state_path).map_err(|error| CoreError::ReadFile {
                 path: baseline_state_path.to_path_buf(),
                 message: error.to_string(),
             })?;
+        self.load_baseline_from_state_bytes(&baseline_state)
+    }
+
+    pub(super) fn load_baseline_from_state_bytes(
+        &mut self,
+        baseline_state: &[u8],
+    ) -> Result<(), CoreError> {
+        // A savestate restore does not always advance the video callback on its
+        // own, so we explicitly wait for a fresh frame before freezing the
+        // custom baseline metadata around it.
+        self.initialize_running_state()?;
         let baseline_serial = self.callbacks.frame_serial();
-        self.restore_state_bytes(&baseline_state)?;
+        self.restore_state_bytes(baseline_state)?;
         if self.callbacks.frame_serial() == baseline_serial {
             self.run_until_frame(baseline_serial, FRAME_WAIT_LIMIT)?;
         }

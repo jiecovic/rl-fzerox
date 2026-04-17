@@ -17,7 +17,7 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
     BOOST_MASK,
-    DRIFT_LEFT_MASK,
+    LEAN_LEFT_MASK,
 )
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
 from rl_fzerox.ui.watch.hud.format import (
@@ -126,7 +126,7 @@ def test_input_section_includes_visualized_control_state() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(
-            joypad_mask=ACCELERATE_MASK | BOOST_MASK | DRIFT_LEFT_MASK,
+            joypad_mask=ACCELERATE_MASK | BOOST_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.5,
         ),
         policy_label=None,
@@ -147,7 +147,7 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz.drive_level == 1
     assert input_section.control_viz.steer_x == 0.5
     assert input_section.control_viz.boost_pressed
-    assert input_section.control_viz.shoulder_direction == -1
+    assert input_section.control_viz.lean_direction == -1
 
 
 def test_input_section_can_visualize_air_brake_control_state() -> None:
@@ -276,7 +276,7 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(
-            joypad_mask=ACCELERATE_MASK | DRIFT_LEFT_MASK,
+            joypad_mask=ACCELERATE_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.25,
         ),
         policy_label="hybrid_ppo_cnn_0001",
@@ -302,7 +302,7 @@ def test_input_section_visualizes_hybrid_policy_drive_axis() -> None:
     assert input_section.control_viz.drive_axis == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.drive_axis_mode == "accelerate"
-    assert input_section.control_viz.shoulder_direction == -1
+    assert input_section.control_viz.lean_direction == -1
 
 
 def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
@@ -891,8 +891,8 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         "airborne": "0.000",
         "can_boost": "1.000",
         "boost_active": "0.000",
-        "left_shoulder_held": "0.000",
-        "right_shoulder_held": "1.000",
+        "left_lean_held": "0.000",
+        "right_lean_held": "1.000",
         "left_press_age_norm": "1.000",
         "right_press_age_norm": "0.200",
         "recent_boost_pressure": "0.250",
@@ -950,7 +950,7 @@ def test_session_section_includes_stuck_counter() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0017",
-        policy_curriculum_stage="drift_enabled",
+        policy_curriculum_stage="lean_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -980,7 +980,7 @@ def test_session_section_shows_curriculum_stage_name() -> None:
         paused=False,
         control_state=ControllerState(),
         policy_label="ppo_cnn_0017",
-        policy_curriculum_stage="drift_enabled",
+        policy_curriculum_stage="lean_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -997,7 +997,7 @@ def test_session_section_shows_curriculum_stage_name() -> None:
         line for line in session_section.lines if line.label == "Checkpoint stage"
     )
 
-    assert curriculum_line.value == "drift_enabled"
+    assert curriculum_line.value == "lean_enabled"
 
 
 def test_session_section_shows_policy_deterministic_mode() -> None:

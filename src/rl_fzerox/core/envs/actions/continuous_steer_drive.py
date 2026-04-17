@@ -15,13 +15,13 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
     ContinuousDriveDecoder,
     continuous_action_array,
 )
-from rl_fzerox.core.envs.actions.steer_drive_boost_drift import (
-    SHOULDER_LEFT_MASK,
-    SHOULDER_RIGHT_MASK,
+from rl_fzerox.core.envs.actions.steer_drive_boost_lean import (
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
 )
 
 _STEER_DRIVE_ACTION_SIZE = 2
-_STEER_DRIVE_SHOULDER_ACTION_SIZE = 3
+_STEER_DRIVE_LEAN_ACTION_SIZE = 3
 
 
 class ContinuousSteerDriveActionAdapter:
@@ -90,8 +90,8 @@ class ContinuousSteerDriveActionAdapter:
         return np.ones(0, dtype=bool)
 
 
-class ContinuousSteerDriveShoulderActionAdapter:
-    """Map continuous steer/drive/shoulder intent to held controller inputs."""
+class ContinuousSteerDriveLeanActionAdapter:
+    """Map continuous steer/drive/lean intent to held controller inputs."""
 
     def __init__(self, config: ActionConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
@@ -99,13 +99,13 @@ class ContinuousSteerDriveShoulderActionAdapter:
             mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
         )
-        self._shoulder_deadzone = float(config.continuous_shoulder_deadzone)
+        self._lean_deadzone = float(config.continuous_lean_deadzone)
         self._action_space = spaces.Box(
             low=np.array([-1.0, -1.0, -1.0], dtype=np.float32),
             high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
             dtype=np.float32,
         )
-        self._idle_action = np.zeros(_STEER_DRIVE_SHOULDER_ACTION_SIZE, dtype=np.float32)
+        self._idle_action = np.zeros(_STEER_DRIVE_LEAN_ACTION_SIZE, dtype=np.float32)
 
     @property
     def action_space(self) -> spaces.Box:
@@ -126,14 +126,14 @@ class ContinuousSteerDriveShoulderActionAdapter:
         return ()
 
     def decode(self, action: ActionValue) -> ControllerState:
-        """Translate one continuous action into steering, drive, and shoulder lean."""
+        """Translate one continuous action into steering, drive, and lean."""
 
-        steer, drive, shoulder = _parse_continuous_triplet(action)
+        steer, drive, lean = _parse_continuous_triplet(action)
         joypad_mask = self._drive_decoder.decode(drive)
-        if shoulder > self._shoulder_deadzone:
-            joypad_mask |= SHOULDER_RIGHT_MASK
-        elif shoulder < -self._shoulder_deadzone:
-            joypad_mask |= SHOULDER_LEFT_MASK
+        if lean > self._lean_deadzone:
+            joypad_mask |= LEAN_RIGHT_MASK
+        elif lean < -self._lean_deadzone:
+            joypad_mask |= LEAN_LEFT_MASK
 
         return ControllerState(
             joypad_mask=joypad_mask,
@@ -176,17 +176,11 @@ def _parse_continuous_pair(action: ActionValue) -> tuple[float, float]:
 def _parse_continuous_triplet(action: ActionValue) -> tuple[float, float, float]:
     values = continuous_action_array(
         action,
-        expected_size=_STEER_DRIVE_SHOULDER_ACTION_SIZE,
-        action_label="Continuous steer-drive-shoulder",
-        field_labels=("steer", "drive", "shoulder"),
+        expected_size=_STEER_DRIVE_LEAN_ACTION_SIZE,
+        action_label="Continuous steer-drive-lean",
+        field_labels=("steer", "drive", "lean"),
     )
     steer = float(np.clip(values[0], -1.0, 1.0))
     drive = float(np.clip(values[1], -1.0, 1.0))
-    shoulder = float(np.clip(values[2], -1.0, 1.0))
-    return steer, drive, shoulder
-
-
-# COMPAT SHIM: legacy action adapter class name.
-# Old configs call this "continuous_steer_drive_drift"; the third axis still
-# maps to the same Z/R shoulder inputs.
-ContinuousSteerDriveDriftActionAdapter = ContinuousSteerDriveShoulderActionAdapter
+    lean = float(np.clip(values[2], -1.0, 1.0))
+    return steer, drive, lean

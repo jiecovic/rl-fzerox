@@ -24,6 +24,7 @@ class RaceV3RewardWeights:
     boost_pad_reward_progress_window: float = 1_000.0
     energy_gain_reward_scale: float = 2.0
     energy_gain_collision_cooldown_frames: int = 120
+    energy_full_refill_lap_bonus: float = 0.0
     airborne_landing_reward: float = 0.0
     collision_recoil_penalty: float = -0.25
     failure_penalty: float = -20.0

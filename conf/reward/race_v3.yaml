@@ -38,18 +38,21 @@ damage_taken_streak_ramp_penalty: -0.001
 damage_taken_streak_cap_frames: 120
 # Damage: small entry-only penalty for collision recoil. Kept mild because other
 # racers can also bump into the player.
-collision_recoil_penalty: -0.5
+collision_recoil_penalty: -2.0
 
 # Boost pads: small route incentive for entering dash-pad boost, guarded so
 # reversing or revisiting the same unwrapped progress region cannot farm it.
-boost_pad_reward: 15.0
+boost_pad_reward: 25.0
 boost_pad_reward_progress_window: 1000.0
 
 # Energy refill: multiplier scale applied only to actual frontier-progress reward.
 # No new progress means no refill reward, so recharge strips cannot be farmed by stalling.
-energy_gain_reward_scale: 2.0
+energy_gain_reward_scale: 8.0
 # Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
 energy_gain_collision_cooldown_frames: 240
+# Energy refill: once-per-lap bonus for reaching full energy from below while
+# actually gaining energy. Suppressed while reversing or in the damage cooldown.
+energy_full_refill_lap_bonus: 20.0
 
 # Airborne: event reward when an airborne machine lands back on the track.
 airborne_landing_reward: 10.0

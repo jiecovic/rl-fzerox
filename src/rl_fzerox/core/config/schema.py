@@ -20,10 +20,7 @@ from pydantic import (
 
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.domain.camera import CameraSettingName
-from rl_fzerox.core.domain.shoulder_slide import (
-    DEFAULT_SHOULDER_SLIDE_MODE,
-    ShoulderSlideMode,
-)
+from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.domain.training_algorithms import (
     DEFAULT_TRAIN_ALGORITHM,
     RECURRENT_TRAINING_ALGORITHMS,
@@ -32,6 +29,7 @@ from rl_fzerox.core.domain.training_algorithms import (
 )
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
+ActionHistoryControlName: TypeAlias = Literal["steer", "gas", "air_brake", "boost", "lean"]
 
 
 class ActionMaskConfig(BaseModel):
@@ -44,9 +42,9 @@ class ActionMaskConfig(BaseModel):
     gas: tuple[NonNegativeInt, ...] | None = None
     air_brake: tuple[NonNegativeInt, ...] | None = None
     boost: tuple[NonNegativeInt, ...] | None = None
-    shoulder: tuple[NonNegativeInt, ...] | None = None
+    lean: tuple[NonNegativeInt, ...] | None = None
 
-    @field_validator("steer", "drive", "gas", "air_brake", "boost", "shoulder")
+    @field_validator("steer", "drive", "gas", "air_brake", "boost", "lean")
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
@@ -60,7 +58,7 @@ class ActionMaskConfig(BaseModel):
         """Return the explicitly configured branch restrictions only."""
 
         overrides: dict[str, tuple[int, ...]] = {}
-        for branch_name in ("steer", "drive", "gas", "air_brake", "boost", "shoulder"):
+        for branch_name in ("steer", "drive", "gas", "air_brake", "boost", "lean"):
             values = getattr(self, branch_name)
             if values is not None:
                 overrides[branch_name] = tuple(int(value) for value in values)
@@ -78,12 +76,12 @@ class ActionConfig(BaseModel):
     continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"] = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
     continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
-    continuous_shoulder_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
-    shoulder_slide_mode: ShoulderSlideMode = DEFAULT_SHOULDER_SLIDE_MODE
+    continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
+    lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 0
-    shoulder_unmask_min_speed_kph: NonNegativeFloat | None = None
+    lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     mask: ActionMaskConfig | None = None
 
     @model_validator(mode="before")
@@ -92,9 +90,8 @@ class ActionConfig(BaseModel):
         # COMPAT SHIM: legacy action config field names.
         # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
         # boost gate is a max-speed cap: allow boost while slower, mask it when
-        # already fast. They also used "drift" for the Z/R shoulder inputs and
-        # older air-brake booleans before `continuous_air_brake_mode` existed.
-        # Keep these saved manifests loadable until old checkpoints are retired.
+        # already fast. Older air-brake booleans existed before
+        # `continuous_air_brake_mode`.
         if not isinstance(data, Mapping):
             return data
         values: dict[str, object] = {str(key): value for key, value in data.items()}
@@ -102,14 +99,6 @@ class ActionConfig(BaseModel):
         legacy_gate = values.pop("boost_unmask_min_speed_kph", missing)
         if legacy_gate is not missing and "boost_unmask_max_speed_kph" not in values:
             values["boost_unmask_max_speed_kph"] = legacy_gate
-
-        legacy_shoulder_deadzone = values.pop("continuous_drift_deadzone", missing)
-        if legacy_shoulder_deadzone is not missing and "continuous_shoulder_deadzone" not in values:
-            values["continuous_shoulder_deadzone"] = legacy_shoulder_deadzone
-
-        legacy_shoulder_speed = values.pop("drift_unmask_min_speed_kph", missing)
-        if legacy_shoulder_speed is not missing and "shoulder_unmask_min_speed_kph" not in values:
-            values["shoulder_unmask_min_speed_kph"] = legacy_shoulder_speed
 
         legacy_air_brake_enabled = values.pop("continuous_air_brake_enabled", missing)
         legacy_disable_on_ground = values.pop(
@@ -138,9 +127,57 @@ class ObservationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["image", "image_state"] = "image"
-    state_profile: Literal["default", "steer_history"] = "default"
+    state_profile: Literal[
+        "default",
+        "steer_history",
+        "race_core",
+        "race_core_action_history",
+    ] = "default"
     preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3"] = "native_crop_v3"
     frame_stack: PositiveInt = 4
+    action_history_len: NonNegativeInt = Field(default=2, le=16)
+    action_history_controls: tuple[ActionHistoryControlName, ...] = (
+        "steer",
+        "gas",
+        "boost",
+        "lean",
+    )
+
+    @field_validator("action_history_controls")
+    @classmethod
+    def _validate_unique_action_history_controls(
+        cls,
+        value: tuple[ActionHistoryControlName, ...],
+    ) -> tuple[ActionHistoryControlName, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("action_history_controls must not contain duplicates")
+        return value
+
+
+class TrackSamplingEntryConfig(BaseModel):
+    """One reset-time baseline candidate for multi-track training."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    baseline_state_path: Path
+    weight: PositiveFloat = 1.0
+    course_index: NonNegativeInt | None = None
+
+
+class TrackSamplingConfig(BaseModel):
+    """Optional weighted baseline sampling performed at episode reset."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    entries: tuple[TrackSamplingEntryConfig, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_entries_when_enabled(self) -> TrackSamplingConfig:
+        if self.enabled and not self.entries:
+            raise ValueError("env.track_sampling.entries must not be empty when enabled")
+        return self
 
 
 class EnvConfig(BaseModel):
@@ -167,6 +204,8 @@ class EnvConfig(BaseModel):
     camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
     race_intro_target_timer: int | None = Field(default=39, ge=0, le=460)
+    cache_track_baselines: bool = True
+    track_sampling: TrackSamplingConfig = Field(default_factory=TrackSamplingConfig)
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
 
@@ -207,6 +246,7 @@ class RewardConfig(BaseModel):
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_bonus: NonNegativeFloat = 0.0
     energy_full_refill_cooldown_frames: NonNegativeInt = 0
+    energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0
@@ -261,6 +301,22 @@ class EmulatorConfig(BaseModel):
     runtime_dir: Path | None = None
     baseline_state_path: Path | None = None
     renderer: Literal["angrylion", "gliden64"] = "angrylion"
+
+
+class TrackConfig(BaseModel):
+    """Metadata for a concrete track/mode baseline."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str | None = None
+    display_name: str | None = None
+    course_index: NonNegativeInt | None = None
+    mode: str | None = None
+    vehicle: str | None = None
+    engine_setting: str | None = None
+    ghost: str | None = None
+    baseline_state_path: Path | None = None
+    notes: str | None = None
 
 
 class WatchConfig(BaseModel):
@@ -386,6 +442,7 @@ class CurriculumStageConfig(BaseModel):
     name: str
     until: CurriculumTriggerConfig | None = None
     action_mask: ActionMaskConfig | None = None
+    track_sampling: TrackSamplingConfig | None = None
     train: CurriculumTrainOverridesConfig | None = None
 
 
@@ -455,6 +512,7 @@ class WatchAppConfig(BaseModel):
 
     seed: int | None = None
     emulator: EmulatorConfig
+    track: TrackConfig = Field(default_factory=TrackConfig)
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
     curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
@@ -468,6 +526,7 @@ class TrainAppConfig(BaseModel):
 
     seed: int | None = None
     emulator: EmulatorConfig
+    track: TrackConfig = Field(default_factory=TrackConfig)
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)

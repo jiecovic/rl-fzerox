@@ -136,6 +136,8 @@ def _run_simulation_loop(
                 )
                 if commands.quit_requested:
                     return
+                if commands.reset_requested:
+                    break
                 if commands.control_fps_delta:
                     target_control_fps = _adjust_control_fps(
                         target_control_fps,

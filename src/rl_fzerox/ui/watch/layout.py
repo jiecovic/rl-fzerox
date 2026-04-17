@@ -119,7 +119,7 @@ class ControlViz:
     air_brake_disabled: bool
     drive_axis_mode: Literal["signed", "accelerate"]
     boost_pressed: bool
-    shoulder_direction: int
+    lean_direction: int
 
 
 @dataclass(frozen=True)

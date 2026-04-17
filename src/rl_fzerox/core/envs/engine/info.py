@@ -4,6 +4,7 @@ from __future__ import annotations
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
+    ActionHistoryControl,
     ObservationStateProfile,
     image_observation_shape,
     state_feature_count,
@@ -31,6 +32,8 @@ def set_observation_info(
     frame_stack: int,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
+    action_history_len: int,
+    action_history_controls: tuple[ActionHistoryControl, ...],
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -51,8 +54,20 @@ def set_observation_info(
     info["observation_stack"] = frame_stack
     if observation_mode == "image_state":
         info["observation_state_profile"] = observation_state_profile
-        info["observation_state_shape"] = (state_feature_count(observation_state_profile),)
-        info["observation_state_features"] = state_feature_names(observation_state_profile)
+        info["observation_action_history_len"] = action_history_len
+        info["observation_action_history_controls"] = action_history_controls
+        info["observation_state_shape"] = (
+            state_feature_count(
+                observation_state_profile,
+                action_history_len=action_history_len,
+                action_history_controls=action_history_controls,
+            ),
+        )
+        info["observation_state_features"] = state_feature_names(
+            observation_state_profile,
+            action_history_len=action_history_len,
+            action_history_controls=action_history_controls,
+        )
 
 
 def reset_context_info(info: dict[str, object]) -> dict[str, object]:

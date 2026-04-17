@@ -24,9 +24,18 @@ _STATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("lap", "state/lap_mean"),
     ("race_laps_completed", "state/race_laps_completed_mean"),
 )
+_STEP_RATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
+    ("damage_taken_frames", "state/damage_taken_step_rate"),
+    ("collision_recoil_entered", "state/collision_recoil_entry_rate"),
+)
 _EPISODE_LOG_KEYS: tuple[tuple[str, str], ...] = (
     ("position", "episode/final_position_mean"),
     ("race_laps_completed", "episode/race_laps_completed_mean"),
+)
+_FINISHED_EPISODE_LOG_KEYS: tuple[tuple[str, str, float], ...] = (
+    ("race_time_ms", "episode/finish_time_s_mean", 0.001),
+    ("episode_step", "episode/finish_steps_mean", 1.0),
+    ("position", "episode/finish_position_mean", 1.0),
 )
 _TERMINATION_REASON_KEYS: tuple[str, ...] = (
     "finished",
@@ -81,12 +90,35 @@ class _MeanAccumulator:
 
 
 @dataclass
+class _RateAccumulator:
+    positive_count: int = 0
+    count: int = 0
+
+    def add_many(self, values: Sequence[bool]) -> None:
+        self.positive_count += sum(1 for value in values if value)
+        self.count += len(values)
+
+    def rate(self) -> float | None:
+        if self.count == 0:
+            return None
+        return self.positive_count / self.count
+
+
+@dataclass
 class RolloutInfoAccumulator:
     state_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {key: _MeanAccumulator() for key, _ in _STATE_LOG_KEYS}
     )
+    step_rates: dict[str, _RateAccumulator] = field(
+        default_factory=lambda: {key: _RateAccumulator() for key, _ in _STEP_RATE_LOG_KEYS}
+    )
     episode_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {key: _MeanAccumulator() for key, _ in _EPISODE_LOG_KEYS}
+    )
+    finished_episode_metrics: dict[str, _MeanAccumulator] = field(
+        default_factory=lambda: {
+            key: _MeanAccumulator() for key, _, _ in _FINISHED_EPISODE_LOG_KEYS
+        }
     )
     termination_counts: dict[str, int] = field(
         default_factory=lambda: {reason: 0 for reason in _TERMINATION_REASON_KEYS}
@@ -102,12 +134,24 @@ class RolloutInfoAccumulator:
             if values:
                 self.state_metrics[info_key].add_many(values)
 
+        for info_key, _ in _STEP_RATE_LOG_KEYS:
+            values = _positive_values(infos, info_key)
+            if values:
+                self.step_rates[info_key].add_many(values)
+
         episodes = _episode_dicts(infos)
         self.episode_count += len(episodes)
         for episode_key, _ in _EPISODE_LOG_KEYS:
             values = _numeric_episode_values(episodes, episode_key)
             if values:
                 self.episode_metrics[episode_key].add_many(values)
+
+        finished_episodes = _finished_episode_dicts(episodes)
+        for episode_key, _, scale in _FINISHED_EPISODE_LOG_KEYS:
+            values = _numeric_episode_values(finished_episodes, episode_key)
+            if values:
+                scaled_values = [value * scale for value in values]
+                self.finished_episode_metrics[episode_key].add_many(scaled_values)
 
         for episode in episodes:
             termination_reason = episode.get("termination_reason")
@@ -126,8 +170,18 @@ class RolloutInfoAccumulator:
             if mean is not None:
                 logger.record(log_key, mean)
 
+        for info_key, log_key in _STEP_RATE_LOG_KEYS:
+            rate = self.step_rates[info_key].rate()
+            if rate is not None:
+                logger.record(log_key, rate)
+
         for episode_key, log_key in _EPISODE_LOG_KEYS:
             mean = self.episode_metrics[episode_key].mean()
+            if mean is not None:
+                logger.record(log_key, mean)
+
+        for episode_key, log_key, _ in _FINISHED_EPISODE_LOG_KEYS:
+            mean = self.finished_episode_metrics[episode_key].mean()
             if mean is not None:
                 logger.record(log_key, mean)
 
@@ -303,6 +357,19 @@ def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
     return values
 
 
+def _positive_values(infos: Sequence[object], key: str) -> list[bool]:
+    values: list[bool] = []
+    for info in infos:
+        if not isinstance(info, dict):
+            continue
+        value = info.get(key)
+        if isinstance(value, bool):
+            values.append(value)
+        elif isinstance(value, int | float):
+            values.append(float(value) > 0.0)
+    return values
+
+
 def info_sequence(infos: object) -> Sequence[object] | None:
     if isinstance(infos, list | tuple):
         return infos
@@ -318,6 +385,10 @@ def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
         if isinstance(episode, dict):
             episodes.append(episode)
     return episodes
+
+
+def _finished_episode_dicts(episodes: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+    return [episode for episode in episodes if episode.get("termination_reason") == "finished"]
 
 
 def _apply_stage_train_overrides(

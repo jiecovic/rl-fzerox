@@ -113,7 +113,7 @@ impl PyEmulator {
         progress_frontier_stall_limit_frames=None,
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=true,
-        shoulder_slide_timer_assist=false,
+        lean_timer_assist=false,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -135,7 +135,7 @@ impl PyEmulator {
         progress_frontier_stall_limit_frames: Option<usize>,
         progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,
-        shoulder_slide_timer_assist: bool,
+        lean_timer_assist: bool,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -168,7 +168,7 @@ impl PyEmulator {
                     progress_frontier_stall_limit_frames,
                     progress_frontier_epsilon,
                     terminate_on_energy_depleted,
-                    shoulder_slide_timer_assist,
+                    lean_timer_assist,
                 })
             })
             .map_err(map_core_error)?;
@@ -222,6 +222,17 @@ impl PyEmulator {
 
     fn save_state(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
         py.detach(|| self.host.save_state(Path::new(path)))
+            .map_err(map_core_error)
+    }
+
+    fn load_baseline(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
+        py.detach(|| self.host.load_baseline(Path::new(path)))
+            .map_err(map_core_error)
+    }
+
+    fn load_baseline_bytes(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<()> {
+        self.host
+            .load_baseline_bytes(state.as_bytes())
             .map_err(map_core_error)
     }
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -47,6 +48,9 @@ class SyntheticBackend:
         self._capture_video_flags: list[bool] = []
         self._observation_stacks: dict[tuple[str, int], tuple[np.ndarray, int | None]] = {}
         self.randomized_rng_seeds: list[int] = []
+        self.loaded_baselines: list[Path] = []
+        self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
+        self._active_baseline_path: Path | None = None
 
     @property
     def name(self) -> str:
@@ -88,7 +92,10 @@ class SyntheticBackend:
                 "backend": self.name,
                 "native_fps": self.native_fps,
                 "frame_index": self._state.frame_index,
-                "baseline_kind": "startup",
+                "baseline_kind": "custom" if self._active_baseline_path is not None else "startup",
+                "baseline_state_path": (
+                    None if self._active_baseline_path is None else str(self._active_baseline_path)
+                ),
                 "progress": self._state.progress,
             },
         )
@@ -215,7 +222,7 @@ class SyntheticBackend:
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
-        shoulder_slide_timer_assist: bool = False,
+        lean_timer_assist: bool = False,
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -223,7 +230,7 @@ class SyntheticBackend:
             wrong_way_timer_limit,
             terminate_on_energy_depleted,
             stuck_step_limit,
-            shoulder_slide_timer_assist,
+            lean_timer_assist,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:
@@ -283,6 +290,14 @@ class SyntheticBackend:
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
         self._last_controller_state = controller_state
+
+    def load_baseline(self, path: Path) -> None:
+        self._active_baseline_path = path
+        self.loaded_baselines.append(path)
+
+    def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None:
+        self._active_baseline_path = source_path
+        self.loaded_baseline_bytes.append((source_path, len(state)))
 
     def close(self) -> None:
         return None

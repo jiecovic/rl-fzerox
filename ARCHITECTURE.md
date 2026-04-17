@@ -46,7 +46,7 @@ duplicate that geometry logic.
 
 - `src/rl_fzerox/core/domain/`
   Small string-backed domain constants such as training algorithm names, action
-  adapter names, camera settings, hybrid action keys, and shoulder-slide modes.
+  adapter names, camera settings, hybrid action keys, and lean-slide modes.
 
 - `src/rl_fzerox/core/envs/`
   Gymnasium env, telemetry conversion, observations, rewards, and the runtime
@@ -56,9 +56,8 @@ duplicate that geometry logic.
 - `src/rl_fzerox/core/envs/actions/`
   Action adapters from policy action spaces to controller state. Current
   adapters cover discrete steering, continuous steering/drive experiments, and
-  hybrid continuous-plus-discrete action spaces. The shoulder inputs are the Z/R
-  lean/slide buttons; legacy names containing `drift` remain only as checkpoint
-  compatibility shims.
+  hybrid continuous-plus-discrete action spaces. The lean inputs are the Z/R
+  lean/slide buttons.
 
 - `src/rl_fzerox/core/envs/rewards/race_v2/`
   Reward shaping for progress, milestones, lap/finish events, damage, energy,

@@ -25,6 +25,7 @@ class ViewerInput:
     toggle_pause: bool = False
     step_once: bool = False
     save_state: bool = False
+    force_reset: bool = False
     control_fps_delta: int = 0
     control_state: ControllerState = ControllerState()
 
@@ -34,6 +35,7 @@ def _poll_viewer_input(pygame) -> ViewerInput:
     toggle_pause = False
     step_once = False
     save_state = False
+    force_reset = False
     control_fps_delta = 0
 
     for event in pygame.event.get():
@@ -46,6 +48,8 @@ def _poll_viewer_input(pygame) -> ViewerInput:
                 step_once = True
             elif event.key == pygame.K_k:
                 save_state = True
+            elif event.key == pygame.K_r:
+                force_reset = True
             elif event.key in (pygame.K_PLUS, pygame.K_KP_PLUS):
                 control_fps_delta += 1
             elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
@@ -81,6 +85,7 @@ def _poll_viewer_input(pygame) -> ViewerInput:
         toggle_pause=toggle_pause,
         step_once=step_once,
         save_state=save_state,
+        force_reset=force_reset,
         control_fps_delta=control_fps_delta,
         control_state=ControllerState(
             joypad_mask=joypad_mask(*pressed_buttons),

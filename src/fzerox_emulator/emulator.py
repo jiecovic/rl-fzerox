@@ -128,7 +128,7 @@ class Emulator:
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
-        shoulder_slide_timer_assist: bool = False,
+        lean_timer_assist: bool = False,
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
@@ -145,7 +145,7 @@ class Emulator:
             progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
-            shoulder_slide_timer_assist=shoulder_slide_timer_assist,
+            lean_timer_assist=lean_timer_assist,
             joypad_mask=state.joypad_mask,
             left_stick_x=state.left_stick_x,
             left_stick_y=state.left_stick_y,
@@ -185,11 +185,27 @@ class Emulator:
 
         self._native.save_state(str(path.resolve()))
 
+    def load_baseline(self, path: Path) -> None:
+        """Replace the active reset baseline with a savestate file."""
+
+        resolved_path = path.resolve()
+        self._native.load_baseline(str(resolved_path))
+        self._baseline_state_path = resolved_path
+
+    def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None:
+        """Replace the active reset baseline from already-loaded savestate bytes."""
+
+        self._native.load_baseline_bytes(state)
+        if source_path is not None:
+            self._baseline_state_path = source_path.resolve()
+
     def capture_current_as_baseline(self, path: Path | None = None) -> None:
         """Promote the current state to the active reset baseline."""
 
         resolved_path = None if path is None else str(path.resolve())
         self._native.capture_current_as_baseline(resolved_path)
+        if path is not None:
+            self._baseline_state_path = path.resolve()
 
     def render(self) -> np.ndarray:
         """Return the latest raw RGB frame as a NumPy array."""
