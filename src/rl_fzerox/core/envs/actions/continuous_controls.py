@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 import numpy as np
 
+from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
 from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK
 
@@ -76,7 +77,7 @@ def continuous_action_array(
     expected_size: int,
     action_label: str,
     field_labels: tuple[str, ...],
-) -> np.ndarray:
+) -> ContinuousAction:
     if isinstance(action, Mapping):
         raise ValueError("Continuous steer-drive action must be a numeric sequence")
     if isinstance(action, np.ndarray):
@@ -104,7 +105,7 @@ def discrete_action_array(
     expected_size: int,
     action_label: str,
     field_labels: tuple[str, ...],
-) -> np.ndarray:
+) -> DiscreteAction:
     if isinstance(action, np.ndarray):
         values = action.astype(np.int64, copy=False).reshape(-1)
     elif isinstance(action, int | float | np.integer | np.floating):

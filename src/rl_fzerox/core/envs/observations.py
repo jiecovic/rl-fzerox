@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, TypedDict
 
 import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec
+from fzerox_emulator.arrays import Float32Array, ObservationFrame, StateVector
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
@@ -18,8 +19,14 @@ ObservationStateProfile: TypeAlias = Literal[
     "race_core",
 ]
 ActionHistoryControl: TypeAlias = Literal["steer", "gas", "air_brake", "boost", "lean"]
-ImageObservation: TypeAlias = np.ndarray
-ImageStateObservation: TypeAlias = dict[str, np.ndarray]
+ImageObservation: TypeAlias = ObservationFrame
+
+
+class ImageStateObservation(TypedDict):
+    image: ObservationFrame
+    state: StateVector
+
+
 ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
 DEFAULT_OBSERVATION_STATE_PROFILE: ObservationStateProfile = "default"
 DEFAULT_ACTION_HISTORY_LEN: int | None = None
@@ -58,10 +65,10 @@ class StateVectorSpec:
     def count(self) -> int:
         return len(self.features)
 
-    def high_array(self) -> np.ndarray:
+    def high_array(self) -> Float32Array:
         return np.array([feature.high for feature in self.features], dtype=np.float32)
 
-    def low_array(self) -> np.ndarray:
+    def low_array(self) -> Float32Array:
         return np.array([feature.low for feature in self.features], dtype=np.float32)
 
 
@@ -137,7 +144,7 @@ STATE_FEATURE_HIGH = STATE_VECTOR_SPEC.high_array()
 
 def build_observation(
     *,
-    image: np.ndarray,
+    image: ObservationFrame,
     telemetry: FZeroXTelemetry | None,
     mode: ObservationMode,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
@@ -192,7 +199,7 @@ def telemetry_state_vector(
     action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
     action_history: Mapping[str, float] | None = None,
-) -> np.ndarray:
+) -> StateVector:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
     spec = state_vector_spec(
@@ -331,7 +338,7 @@ def image_observation_shape(
     )
 
 
-def observation_image(observation: ObservationValue) -> np.ndarray:
+def observation_image(observation: ObservationValue) -> ObservationFrame:
     if isinstance(observation, dict):
         image = observation.get("image")
         if not isinstance(image, np.ndarray):
@@ -340,7 +347,7 @@ def observation_image(observation: ObservationValue) -> np.ndarray:
     return observation
 
 
-def observation_state(observation: ObservationValue) -> np.ndarray | None:
+def observation_state(observation: ObservationValue) -> StateVector | None:
     if not isinstance(observation, dict):
         return None
     state = observation.get("state")

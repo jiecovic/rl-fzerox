@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.hud.format import (
@@ -70,7 +71,7 @@ def _build_panel_columns(
     max_episode_steps: int = 50_000,
     wrong_way_timer_limit: int | None = 300,
     progress_frontier_stall_limit_frames: int | None = 900,
-    observation_state: np.ndarray | None = None,
+    observation_state: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
 ) -> PanelColumns:
     return PanelColumns(
@@ -420,7 +421,7 @@ def _format_position(telemetry: FZeroXTelemetry) -> str:
 
 def _policy_state_sections(
     *,
-    observation_state: np.ndarray | None,
+    observation_state: StateVector | None,
     feature_names: tuple[str, ...],
 ) -> list[PanelSection]:
     if observation_state is None:

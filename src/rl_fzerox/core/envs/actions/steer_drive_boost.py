@@ -5,6 +5,7 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import ActionMask, DiscreteAction
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
@@ -44,7 +45,7 @@ class SteerDriveBoostActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> np.ndarray:
+    def idle_action(self) -> DiscreteAction:
         """Return the neutral action value for this action space."""
 
         return np.array(self._idle_action, copy=True)
@@ -78,7 +79,7 @@ class SteerDriveBoostActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return one flattened boolean action mask for the current adapter."""
 
         return build_flat_action_mask(

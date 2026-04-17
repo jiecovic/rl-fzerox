@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import ActionMask, ContinuousAction, DiscreteAction, NumpyArray
 from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.domain.hybrid_action import (
     HYBRID_CONTINUOUS_ACTION_KEY,
@@ -90,7 +91,7 @@ class HybridSteerDriveLeanActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> dict[str, np.ndarray]:
+    def idle_action(self) -> dict[str, NumpyArray]:
         """Return a neutral hybrid action with no lean input held."""
 
         return {
@@ -139,7 +140,7 @@ class HybridSteerDriveLeanActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return the discrete-branch mask used by MaskableHybridActionPPO."""
 
         return build_flat_action_mask(
@@ -178,7 +179,7 @@ class HybridSteerDriveBoostLeanActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> dict[str, np.ndarray]:
+    def idle_action(self) -> dict[str, NumpyArray]:
         """Return a neutral hybrid action with no lean or boost held."""
 
         return {
@@ -229,7 +230,7 @@ class HybridSteerDriveBoostLeanActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return the discrete-branch mask used by MaskableHybridActionPPO."""
 
         return build_flat_action_mask(
@@ -263,7 +264,7 @@ class HybridSteerGasAirBrakeBoostLeanActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> dict[str, np.ndarray]:
+    def idle_action(self) -> dict[str, NumpyArray]:
         """Return a neutral hybrid action with no buttons held."""
 
         return {
@@ -313,7 +314,7 @@ class HybridSteerGasAirBrakeBoostLeanActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return the discrete-branch mask used by MaskableHybridActionPPO."""
 
         return build_flat_action_mask(
@@ -347,7 +348,7 @@ class HybridSteerGasBoostLeanActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> dict[str, np.ndarray]:
+    def idle_action(self) -> dict[str, NumpyArray]:
         """Return a neutral hybrid action with no buttons held."""
 
         return {
@@ -395,7 +396,7 @@ class HybridSteerGasBoostLeanActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return the discrete-branch mask used by MaskableHybridActionPPO."""
 
         return build_flat_action_mask(
@@ -444,7 +445,7 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
         return self._action_space
 
     @property
-    def idle_action(self) -> dict[str, np.ndarray]:
+    def idle_action(self) -> dict[str, NumpyArray]:
         """Return a neutral hybrid action with no lean primitive or boost."""
 
         return {
@@ -501,7 +502,7 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
         base_overrides: dict[str, tuple[int, ...]] | None = None,
         stage_overrides: dict[str, tuple[int, ...]] | None = None,
         dynamic_overrides: dict[str, tuple[int, ...]] | None = None,
-    ) -> np.ndarray:
+    ) -> ActionMask:
         """Return a mask that reserves future lean primitives by default."""
 
         return build_flat_action_mask(
@@ -644,7 +645,7 @@ def _parse_hybrid_branches(
     expected_size: int,
     action_label: str,
     field_labels: tuple[str, ...],
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[ContinuousAction, DiscreteAction]:
     if not isinstance(action, Mapping):
         raise ValueError(
             "Hybrid steer-drive actions must be a mapping with 'continuous' and 'discrete' branches"

@@ -10,6 +10,14 @@ import numpy as np
 import pytest
 from omegaconf import OmegaConf
 
+from fzerox_emulator.arrays import (
+    ActionMask,
+    BoolArray,
+    ContinuousAction,
+    DiscreteAction,
+    NumpyArray,
+    PolicyState,
+)
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.core.training.inference.loader import (
@@ -23,16 +31,16 @@ class _FakePolicy:
     def __init__(self, action: list[int]) -> None:
         self._action = np.array(action, dtype=np.int64)
         self.deterministic_calls: list[bool] = []
-        self.state_calls: list[tuple[np.ndarray, ...] | None] = []
-        self.episode_start_calls: list[np.ndarray | None] = []
+        self.state_calls: list[PolicyState] = []
+        self.episode_start_calls: list[BoolArray | None] = []
 
     def predict(
         self,
         observation: ObservationValue,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+    ) -> tuple[DiscreteAction, PolicyState]:
         _ = observation
         self.deterministic_calls.append(deterministic)
         self.state_calls.append(state)
@@ -45,16 +53,16 @@ class _FakePolicy:
 class _FakeMaskablePolicy(_FakePolicy):
     def __init__(self, action: list[int]) -> None:
         super().__init__(action)
-        self.action_masks_calls: list[np.ndarray | None] = []
+        self.action_masks_calls: list[ActionMask | None] = []
 
     def predict(
         self,
         observation: ObservationValue,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-        action_masks: np.ndarray | None = None,
-    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+        action_masks: ActionMask | None = None,
+    ) -> tuple[DiscreteAction, PolicyState]:
         _ = observation
         self.deterministic_calls.append(deterministic)
         self.state_calls.append(state)
@@ -69,10 +77,10 @@ class _FakeContinuousPolicy:
     def predict(
         self,
         observation: ObservationValue,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+    ) -> tuple[ContinuousAction, PolicyState]:
         _ = (observation, state, episode_start, deterministic)
         return np.array([0.25, -0.75], dtype=np.float32), None
 
@@ -81,10 +89,10 @@ class _FakeHybridPolicy:
     def predict(
         self,
         observation: ObservationValue,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-    ) -> tuple[dict[str, np.ndarray], tuple[np.ndarray, ...] | None]:
+    ) -> tuple[dict[str, NumpyArray], PolicyState]:
         _ = (observation, state, episode_start, deterministic)
         return {
             "continuous": np.array([0.25, 0.5], dtype=np.float32),
@@ -100,11 +108,11 @@ class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
     def predict(
         self,
         observation: ObservationValue,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         deterministic: bool = True,
-        action_masks: np.ndarray | None = None,
-    ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+        action_masks: ActionMask | None = None,
+    ) -> tuple[DiscreteAction, PolicyState]:
         action, _ = super().predict(
             observation,
             state=state,
@@ -120,7 +128,7 @@ class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
         return action, next_state
 
 
-def _array_action(action: object) -> np.ndarray:
+def _array_action(action: object) -> NumpyArray:
     assert isinstance(action, np.ndarray)
     return action
 
@@ -603,11 +611,11 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
         def predict(
             self,
             observation: ObservationValue,
-            state: tuple[np.ndarray, ...] | None = None,
-            episode_start: np.ndarray | None = None,
+            state: PolicyState = None,
+            episode_start: BoolArray | None = None,
             deterministic: bool = True,
-            action_masks: np.ndarray | None = None,
-        ) -> tuple[np.ndarray, tuple[np.ndarray, ...] | None]:
+            action_masks: ActionMask | None = None,
+        ) -> tuple[DiscreteAction, PolicyState]:
             _ = (observation, state, episode_start, deterministic, action_masks)
             return np.array([0], dtype=np.int64), None
 
@@ -665,11 +673,11 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
         def predict(
             self,
             observation: ObservationValue,
-            state: tuple[np.ndarray, ...] | None = None,
-            episode_start: np.ndarray | None = None,
+            state: PolicyState = None,
+            episode_start: BoolArray | None = None,
             deterministic: bool = True,
-            action_masks: np.ndarray | None = None,
-        ) -> tuple[dict[str, np.ndarray], tuple[np.ndarray, ...] | None]:
+            action_masks: ActionMask | None = None,
+        ) -> tuple[dict[str, NumpyArray], PolicyState]:
             _ = (observation, state, episode_start, deterministic, action_masks)
             return {
                 "continuous": np.array([0.0, 0.0], dtype=np.float32),
@@ -734,11 +742,11 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
         def predict(
             self,
             observation: ObservationValue,
-            state: tuple[np.ndarray, ...] | None = None,
-            episode_start: np.ndarray | None = None,
+            state: PolicyState = None,
+            episode_start: BoolArray | None = None,
             deterministic: bool = True,
-            action_masks: np.ndarray | None = None,
-        ) -> tuple[dict[str, np.ndarray], tuple[np.ndarray, ...] | None]:
+            action_masks: ActionMask | None = None,
+        ) -> tuple[dict[str, NumpyArray], PolicyState]:
             _ = (observation, state, episode_start, deterministic, action_masks)
             return {
                 "continuous": np.array([0.0, 0.0], dtype=np.float32),

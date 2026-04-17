@@ -5,6 +5,7 @@ import os
 
 import numpy as np
 
+from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.hud.draw import _draw_side_panel
 from rl_fzerox.ui.watch.hud.format import _format_observation_summary
@@ -67,9 +68,9 @@ def _draw_frame(
     pygame,
     screen,
     fonts,
-    raw_frame: np.ndarray,
-    observation: np.ndarray,
-    observation_state: np.ndarray | None,
+    raw_frame: RgbFrame,
+    observation: ObservationFrame,
+    observation_state: StateVector | None,
     observation_state_feature_names: tuple[str, ...],
     episode: int,
     info: dict[str, object],
@@ -173,7 +174,7 @@ def _draw_frame(
     pygame.display.flip()
 
 
-def _rgb_surface(pygame, frame: np.ndarray):
+def _rgb_surface(pygame, frame: RgbFrame):
     rgb_frame = np.ascontiguousarray(frame)
     height, width, channels = rgb_frame.shape
     if channels != 3:

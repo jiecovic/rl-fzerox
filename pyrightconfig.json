@@ -1,7 +1,9 @@
 {
   "typeCheckingMode": "standard",
   "pythonVersion": "3.11",
-  "include": ["src", "tests"],
+  "reportMissingParameterType": "warning",
+  "reportUnknownParameterType": "none",
+  "include": ["src", "tests", "scripts/check_numpy_typing.py"],
   "reportMissingImports": "none",
   "reportMissingModuleSource": "none",
   "venvPath": ".",

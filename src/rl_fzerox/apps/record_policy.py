@@ -12,16 +12,14 @@ from pathlib import Path
 from typing import IO
 
 import numpy as np
-from numpy.typing import NDArray
 
 from fzerox_emulator import Emulator
+from fzerox_emulator.arrays import NumpyArray, RgbFrame
 from rl_fzerox.apps.watch import resolve_watch_app_config
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
-
-RgbFrame = NDArray[np.uint8]
 
 
 @dataclass(frozen=True)
@@ -660,7 +658,7 @@ def _ensure_attempt_path_available(path: Path) -> None:
     raise FileExistsError(f"temporary recording artifact already exists: {path}")
 
 
-def _as_rgb_frame(frame: np.ndarray) -> RgbFrame:
+def _as_rgb_frame(frame: NumpyArray) -> RgbFrame:
     if frame.ndim != 3 or frame.shape[2] != 3:
         raise ValueError(f"expected RGB frame with shape HxWx3, got {frame.shape}")
     return np.ascontiguousarray(frame, dtype=np.uint8)

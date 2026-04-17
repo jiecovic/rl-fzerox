@@ -7,6 +7,7 @@ import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
+from fzerox_emulator.arrays import ActionMask, ObservationFrame, RgbFrame
 from rl_fzerox.core.boot import sync_race_intro_target
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
@@ -126,7 +127,7 @@ class FZeroXEnvEngine:
     def observation_space(self) -> spaces.Space:
         return self._observation_space
 
-    def action_masks(self) -> np.ndarray:
+    def action_masks(self) -> ActionMask:
         """Return the flattened boolean action mask for the current stage."""
 
         return self._mask_controller.action_mask()
@@ -302,7 +303,7 @@ class FZeroXEnvEngine:
             action_drive_axis=None,
         )
 
-    def render(self) -> np.ndarray:
+    def render(self) -> RgbFrame:
         return self.backend.render_display(preset=self.config.observation.preset)
 
     def close(self) -> None:
@@ -312,7 +313,7 @@ class FZeroXEnvEngine:
         self,
         *,
         sampled_track_baseline: bool,
-    ) -> tuple[np.ndarray, dict[str, object], FZeroXTelemetry | None]:
+    ) -> tuple[RgbFrame, dict[str, object], FZeroXTelemetry | None]:
         reset_state = self.backend.reset()
         info = dict(reset_state.info)
         frame = reset_state.frame
@@ -526,7 +527,7 @@ class FZeroXEnvEngine:
             return control_state
         return _without_joypad_mask(control_state, AIR_BRAKE_MASK)
 
-    def _render_observation_image(self) -> np.ndarray:
+    def _render_observation_image(self) -> ObservationFrame:
         return self.backend.render_observation(
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
@@ -535,7 +536,7 @@ class FZeroXEnvEngine:
     def _build_observation(
         self,
         *,
-        image: np.ndarray,
+        image: ObservationFrame,
         telemetry: FZeroXTelemetry | None,
     ) -> ObservationValue:
         """Build the policy observation from the rendered image plus control context."""

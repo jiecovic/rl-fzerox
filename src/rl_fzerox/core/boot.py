@@ -18,8 +18,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-import numpy as np
-
 from fzerox_emulator import (
     JOYPAD_START,
     ControllerState,
@@ -27,6 +25,7 @@ from fzerox_emulator import (
     FZeroXTelemetry,
     joypad_mask,
 )
+from fzerox_emulator.arrays import RgbFrame
 
 
 @dataclass(frozen=True)
@@ -105,7 +104,7 @@ BOOT_SEQUENCE: tuple[BootPhase, ...] = (
 )
 
 
-def boot_into_first_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str, object]]:
+def boot_into_first_race(backend: EmulatorBackend) -> tuple[RgbFrame, dict[str, object]]:
     """Drive the default USA boot path into the first Mute City grid.
 
     The input script still reflects the measured default menu path, but the
@@ -152,7 +151,7 @@ def _press_start(backend: EmulatorBackend) -> None:
     backend.set_controller_state(BOOT_CONFIG.neutral_control)
 
 
-def continue_to_next_race(backend: EmulatorBackend) -> tuple[np.ndarray, dict[str, object]]:
+def continue_to_next_race(backend: EmulatorBackend) -> tuple[RgbFrame, dict[str, object]]:
     """Advance the current session from a terminal state into the next race."""
 
     try:
@@ -296,7 +295,7 @@ def _race_reset_result(
     backend: EmulatorBackend,
     *,
     reset_mode: str,
-) -> tuple[np.ndarray, dict[str, object]]:
+) -> tuple[RgbFrame, dict[str, object]]:
     return backend.render(), {
         "boot_state": BootState.GP_RACE.value,
         "frame_index": backend.frame_index,

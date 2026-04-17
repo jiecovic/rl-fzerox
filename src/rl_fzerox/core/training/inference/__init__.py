@@ -7,6 +7,7 @@ from pathlib import Path
 
 import numpy as np
 
+from fzerox_emulator.arrays import ActionMask, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.inference.loader import (
@@ -46,7 +47,7 @@ class PolicyRunner:
         self._last_reload_monotonic = time.monotonic()
         self._reload_error: str | None = None
         self._last_reload_error: str | None = None
-        self._predict_state: tuple[np.ndarray, ...] | None = None
+        self._predict_state: PolicyState = None
         self._episode_start = np.array([True], dtype=bool)
 
     @property
@@ -101,7 +102,7 @@ class PolicyRunner:
         observation: ObservationValue,
         *,
         deterministic: bool = True,
-        action_masks: np.ndarray | None = None,
+        action_masks: ActionMask | None = None,
     ) -> ActionValue:
         """Predict one action for the current observation."""
 
