@@ -201,6 +201,21 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn course_effect_raw(&self) -> u32 {
+        self.inner.course_effect_raw()
+    }
+
+    #[getter]
+    fn course_effect_name(&self) -> &'static str {
+        self.inner.course_effect_name()
+    }
+
+    #[getter]
+    fn on_energy_refill(&self) -> bool {
+        self.inner.on_energy_refill()
+    }
+
+    #[getter]
     fn terminal_reason(&self) -> Option<&'static str> {
         self.inner.terminal_reason()
     }
@@ -221,6 +236,9 @@ impl PyPlayerTelemetry {
         dict.set_item("lap", self.lap())?;
         dict.set_item("laps_completed", self.laps_completed())?;
         dict.set_item("position", self.position())?;
+        dict.set_item("course_effect_raw", self.course_effect_raw())?;
+        dict.set_item("course_effect_name", self.course_effect_name())?;
+        dict.set_item("on_energy_refill", self.on_energy_refill())?;
         Ok(dict)
     }
 }

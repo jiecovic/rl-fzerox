@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainConfig
 from rl_fzerox.core.training.runs import (
-    load_train_run_config,
+    load_train_run_train_config,
     resolve_model_artifact_path,
 )
 
@@ -20,7 +20,7 @@ def maybe_preload_training_parameters(*, model, train_config: TrainConfig) -> No
         return
 
     init_run_dir = train_config.init_run_dir.resolve()
-    source_train_config = load_train_run_config(init_run_dir).train
+    source_train_config = load_train_run_train_config(init_run_dir)
     if source_train_config.algorithm != train_config.algorithm:
         raise RuntimeError(
             "Warm-start checkpoint algorithm mismatch: "

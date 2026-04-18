@@ -22,6 +22,7 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
         curriculum_config: CurriculumConfig | None = None,
+        env_index: int = 0,
     ) -> None:
         super().__init__()
         self._engine = FZeroXEnvEngine(
@@ -29,6 +30,7 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
             config=config,
             reward_config=reward_config,
             curriculum_config=curriculum_config,
+            env_index=env_index,
         )
         self.backend = self._engine.backend
         self.config = self._engine.config

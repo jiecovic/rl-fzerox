@@ -26,7 +26,6 @@ from rl_fzerox.ui.watch.hud.format import (
     _int_info,
 )
 from rl_fzerox.ui.watch.hud.viz import (
-    _control_viz,
     _control_viz_height,
     _flag_viz,
     _flag_viz_height,
@@ -51,7 +50,7 @@ def _build_panel_columns(
     episode_reward: float,
     paused: bool,
     control_state: ControllerState,
-    policy_label: str | None,
+    policy_label: str | None = None,
     policy_curriculum_stage: str | None,
     policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
@@ -177,21 +176,6 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                 ],
-            ),
-            PanelSection(
-                title="Input",
-                lines=[],
-                control_viz=_control_viz(
-                    control_state,
-                    gas_level=gas_level,
-                    thrust_warning_threshold=thrust_warning_threshold,
-                    boost_active=boost_active,
-                    boost_lamp_level=boost_lamp_level,
-                    policy_action=policy_action,
-                    continuous_drive_deadzone=continuous_drive_deadzone,
-                    continuous_air_brake_mode=continuous_air_brake_mode,
-                    continuous_air_brake_disabled=continuous_air_brake_disabled,
-                ),
             ),
         ],
         right=[
@@ -383,6 +367,7 @@ def _game_section(
             reverse_detected=telemetry.player.reverse_timer > 0,
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
             energy_depleted=info.get("termination_reason") == "energy_depleted",
+            energy_refill_detected=telemetry.player.on_energy_refill,
             energy_loss_detected=_float_info(info, "energy_loss_total") > 0.0,
             damage_taken_detected=_int_info(info, "damage_taken_frames") > 0,
         ),

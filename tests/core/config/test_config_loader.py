@@ -392,6 +392,7 @@ def test_load_train_app_config_composes_track_registry_entry(
             "env:",
             "  track_sampling:",
             "    enabled: true",
+            "    mode: balanced",
             "    entries:",
             "      - id: mute_city_test",
             "        baseline_state_path: local/test-artifacts/time-attack.state",
@@ -402,6 +403,7 @@ def test_load_train_app_config_composes_track_registry_entry(
             "    - name: silence_bias",
             "      track_sampling:",
             "        enabled: true",
+            "        mode: random",
             "        entries:",
             "          - id: silence_test",
             "            baseline_state_path: local/test-artifacts/time-attack.state",
@@ -417,9 +419,11 @@ def test_load_train_app_config_composes_track_registry_entry(
     assert config.track.baseline_state_path == baseline_path.resolve()
     assert config.emulator.baseline_state_path == baseline_path.resolve()
     assert config.env.track_sampling.enabled is True
+    assert config.env.track_sampling.mode == "balanced"
     assert config.env.track_sampling.entries[0].baseline_state_path == baseline_path.resolve()
     assert config.env.track_sampling.entries[0].weight == 0.4
     assert config.curriculum.stages[0].track_sampling is not None
+    assert config.curriculum.stages[0].track_sampling.mode == "random"
     assert config.curriculum.stages[0].track_sampling.entries[0].baseline_state_path == (
         baseline_path.resolve()
     )

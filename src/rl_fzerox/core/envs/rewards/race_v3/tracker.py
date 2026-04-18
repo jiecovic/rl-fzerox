@@ -40,7 +40,7 @@ class RaceV3RewardTracker:
         self._pending_progress_reward = 0.0
         self._pending_energy_refill_progress_bonus = 0.0
         self._pending_progress_frames = 0
-        self._energy_gain_cooldown_frames_remaining = 0
+        self._energy_refill_cooldown_frames_remaining = 0
         self._rewarded_boost_pad_progress_windows: set[int] = set()
         self._rewarded_full_refill_laps: set[int] = set()
         self._energy_refill_since_full_fraction = 0.0
@@ -64,7 +64,7 @@ class RaceV3RewardTracker:
         self._frontier_distance = 0.0
         self._frontier_bucket_index = 0
         self._clear_pending_progress()
-        self._energy_gain_cooldown_frames_remaining = 0
+        self._energy_refill_cooldown_frames_remaining = 0
         self._rewarded_boost_pad_progress_windows.clear()
         self._rewarded_full_refill_laps.clear()
         self._energy_refill_since_full_fraction = 0.0
@@ -97,7 +97,7 @@ class RaceV3RewardTracker:
             self._frontier_distance = 0.0
             self._frontier_bucket_index = 0
             self._clear_pending_progress()
-            self._energy_gain_cooldown_frames_remaining = 0
+            self._energy_refill_cooldown_frames_remaining = 0
             self._rewarded_boost_pad_progress_windows.clear()
             self._rewarded_full_refill_laps.clear()
             self._energy_refill_since_full_fraction = 0.0
@@ -108,7 +108,7 @@ class RaceV3RewardTracker:
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
-        self._start_energy_gain_cooldown(summary)
+        self._start_energy_refill_cooldown(summary)
         reward = summary.frames_run * self._weights.time_penalty_per_frame
         breakdown: dict[str, float] = {}
         if reward:
@@ -191,7 +191,7 @@ class RaceV3RewardTracker:
         if terminal_penalty:
             reward += terminal_penalty
 
-        self._advance_energy_gain_cooldown(summary.frames_run)
+        self._advance_energy_refill_cooldown(summary.frames_run)
         if _normalized_energy(telemetry) >= 1.0:
             self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = telemetry.player.airborne
@@ -210,7 +210,9 @@ class RaceV3RewardTracker:
             "progress_reward_interval_frames": self._weights.progress_reward_interval_frames,
             "pending_progress_reward_delta": self._pending_progress_delta,
             "pending_progress_reward_frames": self._pending_progress_frames,
-            "energy_gain_cooldown_frames_remaining": (self._energy_gain_cooldown_frames_remaining),
+            "energy_refill_cooldown_frames_remaining": (
+                self._energy_refill_cooldown_frames_remaining
+            ),
             "boost_pad_reward_progress_window": self._weights.boost_pad_reward_progress_window,
             "rewarded_boost_pad_progress_windows": len(self._rewarded_boost_pad_progress_windows),
             "rewarded_full_refill_laps": len(self._rewarded_full_refill_laps),
@@ -273,22 +275,18 @@ class RaceV3RewardTracker:
         summary: StepSummary,
         telemetry: FZeroXTelemetry,
     ) -> float:
-        scale = self._weights.energy_gain_reward_scale
+        multiplier = self._weights.energy_refill_progress_multiplier
         if (
             progress_reward <= 0.0
-            or scale <= 0.0
-            or summary.energy_gain_total <= 0.0
+            or multiplier <= 1.0
+            or not telemetry.player.on_energy_refill
             or summary.reverse_active_frames > 0
-            or self._energy_gain_cooldown_frames_remaining > 0
+            or telemetry.player.reverse_timer > 0
+            or self._energy_refill_cooldown_frames_remaining > 0
         ):
             return 0.0
 
-        max_energy = float(telemetry.player.max_energy)
-        if max_energy <= 0.0:
-            return 0.0
-        energy_gain_fraction = max(float(summary.energy_gain_total), 0.0) / max_energy
-        missing_energy_fraction = max(1.0 - self._previous_energy_fraction, 0.0)
-        return progress_reward * scale * energy_gain_fraction * missing_energy_fraction
+        return progress_reward * (multiplier - 1.0)
 
     def _clear_pending_progress(self) -> None:
         self._pending_progress_delta = 0.0
@@ -296,20 +294,20 @@ class RaceV3RewardTracker:
         self._pending_energy_refill_progress_bonus = 0.0
         self._pending_progress_frames = 0
 
-    def _start_energy_gain_cooldown(self, summary: StepSummary) -> None:
-        cooldown_frames = max(int(self._weights.energy_gain_collision_cooldown_frames), 0)
+    def _start_energy_refill_cooldown(self, summary: StepSummary) -> None:
+        cooldown_frames = max(int(self._weights.energy_refill_collision_cooldown_frames), 0)
         if cooldown_frames <= 0:
             return
         if not summary.entered_collision_recoil and summary.damage_taken_frames <= 0:
             return
-        self._energy_gain_cooldown_frames_remaining = max(
-            self._energy_gain_cooldown_frames_remaining,
+        self._energy_refill_cooldown_frames_remaining = max(
+            self._energy_refill_cooldown_frames_remaining,
             cooldown_frames,
         )
 
-    def _advance_energy_gain_cooldown(self, frames_run: int) -> None:
-        self._energy_gain_cooldown_frames_remaining = max(
-            self._energy_gain_cooldown_frames_remaining - max(int(frames_run), 0),
+    def _advance_energy_refill_cooldown(self, frames_run: int) -> None:
+        self._energy_refill_cooldown_frames_remaining = max(
+            self._energy_refill_cooldown_frames_remaining - max(int(frames_run), 0),
             0,
         )
 
@@ -356,7 +354,7 @@ class RaceV3RewardTracker:
             or summary.energy_gain_total <= 0.0
             or summary.reverse_active_frames > 0
             or telemetry.player.reverse_timer > 0
-            or self._energy_gain_cooldown_frames_remaining > 0
+            or self._energy_refill_cooldown_frames_remaining > 0
         ):
             return 0.0
         current_energy_fraction = _normalized_energy(telemetry)

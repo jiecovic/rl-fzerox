@@ -30,7 +30,55 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
     assert player.active is True
     assert player.finished is False
     assert player.recoil_tilt_magnitude == 0.5
+    assert player.course_effect_raw == 0
+    assert player.course_effect_name == "none"
+    assert player.on_energy_refill is False
     assert player.state_labels == ("can_boost", "active")
+
+
+def test_native_player_telemetry_decodes_course_effect_low_bits() -> None:
+    player = PlayerTelemetry(
+        state_flags=1 | (1 << 30),
+        speed_kph=123.5,
+        energy=92.25,
+        max_energy=100.0,
+        boost_timer=0,
+        recoil_tilt_magnitude=0.5,
+        reverse_timer=12,
+        race_distance=12_345.5,
+        lap_distance=2_345.5,
+        race_time_ms=12_345,
+        lap=2,
+        laps_completed=1,
+        position=3,
+    )
+
+    assert player.course_effect_raw == 1
+    assert player.course_effect_name == "pit"
+    assert player.on_energy_refill is True
+    assert player.state_labels == ("active",)
+
+
+def test_native_player_telemetry_ignores_refill_when_energy_is_full() -> None:
+    player = PlayerTelemetry(
+        state_flags=1 | (1 << 30),
+        speed_kph=123.5,
+        energy=100.0,
+        max_energy=100.0,
+        boost_timer=0,
+        recoil_tilt_magnitude=0.5,
+        reverse_timer=12,
+        race_distance=12_345.5,
+        lap_distance=2_345.5,
+        race_time_ms=12_345,
+        lap=2,
+        laps_completed=1,
+        position=3,
+    )
+
+    assert player.course_effect_raw == 1
+    assert player.course_effect_name == "pit"
+    assert player.on_energy_refill is False
 
 
 def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
@@ -76,6 +124,9 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
     assert player_payload["recoil_tilt_magnitude"] == 0.5
+    assert player_payload["course_effect_raw"] == 0
+    assert player_payload["course_effect_name"] == "none"
+    assert player_payload["on_energy_refill"] is False
     assert player_payload["state_labels"] == ("can_boost", "active")
 
 

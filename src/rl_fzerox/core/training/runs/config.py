@@ -7,7 +7,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 
 from rl_fzerox.core.config.paths import resolve_config_data_paths
-from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
+from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig, WatchAppConfig
 from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_AUTO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
@@ -106,6 +106,24 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     loaded = _load_train_config_mapping(config_path)
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
+
+
+def load_train_run_train_config(run_dir: Path) -> TrainConfig:
+    """Load only the train section from a saved run config."""
+
+    config_path = resolve_train_run_config_path(run_dir)
+    loaded = _load_train_config_mapping(config_path)
+    train_data = loaded.get("train")
+    if not isinstance(train_data, dict):
+        raise ValueError(f"Train run config is missing a train mapping: {config_path}")
+
+    train_section: dict[str, object] = {}
+    for key, value in train_data.items():
+        if not isinstance(key, str):
+            raise ValueError(f"Train run config train keys must be strings: {config_path}")
+        train_section[key] = value
+    _resolve_train_config_paths({"train": train_section}, config_dir=config_path.parent)
+    return TrainConfig.model_validate(train_section)
 
 
 def _load_train_config_mapping(config_path: Path) -> dict[str, object]:

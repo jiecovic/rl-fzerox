@@ -51,7 +51,8 @@ from .info import (
     telemetry_info,
 )
 from .masks import ActionMaskController
-from .tracks import SelectedTrack, TrackBaselineCache, select_reset_track
+from .reset import benchmark_noop_reset_state, load_track_baseline, reset_race_state
+from .tracks import SelectedTrack, TrackBaselineCache, TrackResetSelector
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
 _DOMAIN_REWARD_MILESTONE_PHASE = 0xA409_3822_299F_31D0
@@ -88,6 +89,7 @@ class FZeroXEnvEngine:
         config: EnvConfig,
         reward_config: RewardConfig | None = None,
         curriculum_config: CurriculumConfig | None = None,
+        env_index: int = 0,
     ) -> None:
         self.backend = backend
         self.config = config
@@ -121,6 +123,7 @@ class FZeroXEnvEngine:
         self._active_track_sampling = self._stage_track_sampling_config(
             self._mask_controller.stage_index
         )
+        self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
         self._control_state = ControlStateTracker(
             lean_mode=config.action.lean_mode,
@@ -197,18 +200,19 @@ class FZeroXEnvEngine:
             self._rng_seed_base = seed
         if self.config.benchmark_noop_reset:
             selected_track = None
-            info, telemetry = self._benchmark_noop_reset_state()
+            info, telemetry = benchmark_noop_reset_state(self.backend)
         else:
             selected_track = self._select_reset_track(seed)
             if selected_track is not None:
-                if self.config.cache_track_baselines:
-                    self._track_baseline_cache.load_into_backend(
-                        self.backend,
-                        selected_track.baseline_state_path,
-                    )
-                else:
-                    self.backend.load_baseline(selected_track.baseline_state_path)
-            _, info, telemetry = self._reset_race_state(
+                load_track_baseline(
+                    backend=self.backend,
+                    cache=self._track_baseline_cache,
+                    selected_track=selected_track,
+                    cache_enabled=self.config.cache_track_baselines,
+                )
+            _, info, telemetry = reset_race_state(
+                backend=self.backend,
+                config=self.config,
                 sampled_track_baseline=selected_track is not None,
             )
             if selected_track is not None:
@@ -270,18 +274,6 @@ class FZeroXEnvEngine:
         self._last_info = dict(info)
         self._reset_count += 1
         return observation, info
-
-    def _benchmark_noop_reset_state(self) -> tuple[dict[str, object], FZeroXTelemetry | None]:
-        """Reset Python episode bookkeeping without restoring emulator state.
-
-        This is only for throughput diagnostics. It preserves the live game
-        state, so it is not a valid training reset for real learning runs.
-        """
-
-        info = backend_step_info(self.backend)
-        info["reset_mode"] = "benchmark_noop_reset"
-        info["benchmark_noop_reset"] = True
-        return info, read_live_telemetry(self.backend)
 
     def step(
         self,
@@ -372,26 +364,6 @@ class FZeroXEnvEngine:
     def close(self) -> None:
         self.backend.close()
 
-    def _reset_race_state(
-        self,
-        *,
-        sampled_track_baseline: bool,
-    ) -> tuple[RgbFrame, dict[str, object], FZeroXTelemetry | None]:
-        reset_state = self.backend.reset()
-        info = dict(reset_state.info)
-        frame = reset_state.frame
-        if (
-            self.config.reset_to_race
-            and not sampled_track_baseline
-            and not has_custom_baseline(info)
-        ):
-            raise RuntimeError(
-                "env.reset_to_race requires a custom baseline state. "
-                "Configure emulator.baseline_state_path or env.track_sampling.entries instead."
-            )
-
-        return frame, info, read_live_telemetry(self.backend)
-
     def _maybe_randomize_game_rng(
         self,
         seed: int | None,
@@ -432,7 +404,7 @@ class FZeroXEnvEngine:
             if seed_base is None
             else derive_seed(seed_base, _DOMAIN_TRACK_SAMPLING, self._reset_count)
         )
-        return select_reset_track(self._active_track_sampling, seed=sampling_seed)
+        return self._track_selector.select(self._active_track_sampling, seed=sampling_seed)
 
     def _stage_track_sampling_config(self, stage_index: int | None) -> TrackSamplingConfig:
         if (

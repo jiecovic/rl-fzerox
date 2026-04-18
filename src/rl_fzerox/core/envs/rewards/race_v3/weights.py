@@ -22,8 +22,8 @@ class RaceV3RewardWeights:
     damage_taken_streak_cap_frames: int = 120
     boost_pad_reward: float = 0.0
     boost_pad_reward_progress_window: float = 1_000.0
-    energy_gain_reward_scale: float = 2.0
-    energy_gain_collision_cooldown_frames: int = 120
+    energy_refill_progress_multiplier: float = 1.0
+    energy_refill_collision_cooldown_frames: int = 120
     energy_full_refill_lap_bonus: float = 0.0
     energy_full_refill_min_gain_fraction: float = 0.0
     gas_underuse_penalty: float = 0.0
