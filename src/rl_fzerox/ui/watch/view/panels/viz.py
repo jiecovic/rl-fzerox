@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/hud/viz.py
+# src/rl_fzerox/ui/watch/view/panels/viz.py
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -14,7 +14,9 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
     ActionValue,
 )
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, FlagViz, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.types import ControlViz, FlagToken, FlagViz, ViewerFonts
 
 
 def _control_viz(

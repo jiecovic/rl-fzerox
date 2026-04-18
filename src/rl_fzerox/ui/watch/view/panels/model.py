@@ -1,9 +1,11 @@
-# src/rl_fzerox/ui/watch/hud/model.py
+# src/rl_fzerox/ui/watch/view/panels/model.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.hud import preview as _preview
-from rl_fzerox.ui.watch.hud import sections as _sections
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelColumns, ViewerFonts
+from rl_fzerox.ui.watch.view.panels import sections as _sections
+from rl_fzerox.ui.watch.view.screen import observation_preview as _preview
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.types import PanelColumns, ViewerFonts
 
 _build_panel_columns = _sections._build_panel_columns
 _column_content_height = _sections._column_content_height

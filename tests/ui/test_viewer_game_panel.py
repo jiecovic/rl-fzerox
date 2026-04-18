@@ -1,6 +1,6 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import ControllerState
-from rl_fzerox.ui.watch.hud.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
 from tests.support.native_objects import encode_state_flags
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 

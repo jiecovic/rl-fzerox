@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/hud/format.py
+# src/rl_fzerox/ui/watch/view/panels/format.py
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -10,7 +10,7 @@ from rl_fzerox.core.domain.hybrid_action import (
     HYBRID_DISCRETE_ACTION_KEY,
 )
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.ui.watch.layout import BUTTON_LABELS
+from rl_fzerox.ui.watch.view.panels.buttons import BUTTON_LABELS
 
 _RELOAD_ERROR_MAX_CHARS = 36
 

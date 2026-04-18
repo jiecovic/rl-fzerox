@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/hud/sections.py
+# src/rl_fzerox/ui/watch/view/panels/sections.py
 from __future__ import annotations
 
 import numpy as np
@@ -7,7 +7,7 @@ from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
-from rl_fzerox.ui.watch.hud.format import (
+from rl_fzerox.ui.watch.view.panels.format import (
     _float_info,
     _format_control_rate,
     _format_distance,
@@ -25,21 +25,15 @@ from rl_fzerox.ui.watch.hud.format import (
     _format_stuck_counter,
     _int_info,
 )
-from rl_fzerox.ui.watch.hud.viz import (
+from rl_fzerox.ui.watch.view.panels.viz import (
     _control_viz_height,
     _flag_viz,
     _flag_viz_height,
     _wrap_text,
 )
-from rl_fzerox.ui.watch.layout import (
-    LAYOUT,
-    PALETTE,
-    Color,
-    PanelColumns,
-    PanelLine,
-    PanelSection,
-    ViewerFonts,
-)
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import PanelColumns, PanelLine, PanelSection, ViewerFonts
 
 
 def _build_panel_columns(

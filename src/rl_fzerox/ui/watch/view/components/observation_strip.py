@@ -1,16 +1,21 @@
-# src/rl_fzerox/ui/watch/render/observation_strip.py
+# src/rl_fzerox/ui/watch/view/components/observation_strip.py
 from __future__ import annotations
 
 from typing import Protocol
 
-from rl_fzerox.ui.watch.hud.format import (
+from rl_fzerox.ui.watch.view.components.cockpit import (
+    _control_viz_panel_height,
+    _draw_control_viz,
+)
+from rl_fzerox.ui.watch.view.components.game_view import _glass_overlay_surface
+from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _observation_preview_grid,
     _observation_stack_size,
 )
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, Color, ControlViz, RenderFont, ViewerFonts
-from rl_fzerox.ui.watch.render.cockpit import _control_viz_panel_height, _draw_control_viz
-from rl_fzerox.ui.watch.render.game_view import _glass_overlay_surface
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import ControlViz, RenderFont, ViewerFonts
 
 _OBS_GLASS_SHADOW: Color = (2, 3, 4)
 _OBS_GLASS_EDGE: Color = (40, 50, 62)

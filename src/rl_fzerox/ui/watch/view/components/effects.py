@@ -1,7 +1,7 @@
-# src/rl_fzerox/ui/watch/render/effects.py
+# src/rl_fzerox/ui/watch/view/components/effects.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.layout import Color
+from rl_fzerox.ui.watch.view.screen.theme import Color
 
 GLASS_HIGHLIGHT: Color = (170, 190, 210)
 GLASS_LOWLIGHT: Color = (8, 11, 15)
