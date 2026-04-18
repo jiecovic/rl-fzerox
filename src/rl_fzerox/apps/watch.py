@@ -11,7 +11,7 @@ from rl_fzerox.core.config import load_watch_app_config
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
-    load_train_run_config,
+    load_train_run_config_for_watch,
     materialize_watch_session_config,
 )
 from rl_fzerox.ui.watch import run_viewer
@@ -68,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             policy_artifact=args.policy_artifact,
             overrides=args.overrides,
         )
-    except ValueError as exc:
+    except (RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
 
     run_viewer(config)
@@ -91,7 +91,7 @@ def resolve_watch_app_config(
             raise ValueError("--config is required unless --run-dir is provided")
         if normalized_overrides:
             raise ValueError("Hydra overrides require --config")
-        train_config = load_train_run_config(cli_run_dir)
+        train_config = load_train_run_config_for_watch(cli_run_dir)
         config = _default_watch_config_from_train_run(
             train_config,
             run_dir=cli_run_dir,
@@ -116,7 +116,7 @@ def resolve_watch_app_config(
     if policy_artifact is not None and policy_run_dir is None:
         raise ValueError("--artifact requires --run-dir or watch.policy_run_dir in the config")
     if policy_run_dir is not None:
-        train_config = load_train_run_config(policy_run_dir)
+        train_config = load_train_run_config_for_watch(policy_run_dir)
         config = apply_train_run_to_watch_config(
             config,
             run_dir=policy_run_dir,

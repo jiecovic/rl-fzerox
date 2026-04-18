@@ -31,6 +31,7 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
+from rl_fzerox.core.training.runs.migration import scrub_obsolete_train_run_config
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     load_policy_artifact_metadata,
@@ -183,6 +184,49 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
 
     assert loaded_config.env.action.name == "hybrid_steer_gas_boost_lean"
     assert loaded_config.env.action.boost_request_lockout_frames == 5
+
+
+def test_scrub_obsolete_train_run_config_rewrites_stale_manifest(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    config_path = run_dir / "train_config.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "seed: 7",
+                "emulator:",
+                f"  core_path: {core_path}",
+                f"  rom_path: {rom_path}",
+                "env: {}",
+                "reward:",
+                "  energy_gain_reward_scale: 12.0",
+                "  energy_gain_collision_cooldown_frames: 240",
+                "track:",
+                "  id: mute-city",
+                "  finish_time_target_ms: 68000",
+                "policy: {}",
+                "curriculum: {}",
+                "train:",
+                "  algorithm: maskable_ppo",
+                "  total_timesteps: 1000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = scrub_obsolete_train_run_config(run_dir, in_place=True)
+
+    assert result.output_path == config_path.resolve()
+    assert result.backup_path == config_path.with_suffix(".yaml.bak")
+    assert "reward.energy_gain_reward_scale" in result.removed_fields
+    assert "track.finish_time_target_ms" in result.removed_fields
+    loaded_config = load_train_run_config(run_dir)
+    assert loaded_config.reward.name == "race_v3"
+    assert loaded_config.track.id == "mute-city"
 
 
 def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(

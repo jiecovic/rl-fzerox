@@ -102,12 +102,48 @@ def test_watch_rejects_overrides_without_config(
     )
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.watch.load_train_run_config",
+        "rl_fzerox.apps.watch.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
     )
 
     with pytest.raises(SystemExit, match="Hydra overrides require --config"):
         main(["--run-dir", str(run_dir), "--", "watch.fps=30"])
+
+
+def test_watch_reports_stale_saved_manifest_scrub_command(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    (run_dir / "train_config.yaml").write_text(
+        "\n".join(
+            [
+                "seed: 7",
+                "emulator:",
+                f"  core_path: {core_path}",
+                f"  rom_path: {rom_path}",
+                "env: {}",
+                "reward:",
+                "  energy_gain_reward_scale: 12.0",
+                "policy: {}",
+                "curriculum: {}",
+                "train:",
+                "  algorithm: maskable_ppo",
+                "  total_timesteps: 1000",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="scrub_train_config"):
+        resolve_watch_app_config(
+            config_path=None,
+            policy_run_dir=run_dir,
+            policy_artifact="latest",
+            overrides=[],
+        )
 
 
 def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
@@ -132,7 +168,7 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     )
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.watch.load_train_run_config",
+        "rl_fzerox.apps.watch.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
     )
     monkeypatch.setattr(
@@ -192,7 +228,7 @@ def test_watch_allows_run_dir_without_config(
     captured: dict[str, WatchAppConfig] = {}
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.watch.load_train_run_config",
+        "rl_fzerox.apps.watch.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
     )
     monkeypatch.setattr(
@@ -267,7 +303,7 @@ def test_watch_cli_overrides_apply_after_run_manifest(
 
     monkeypatch.setattr("rl_fzerox.apps.watch.load_watch_app_config", _load_watch_config)
     monkeypatch.setattr(
-        "rl_fzerox.apps.watch.load_train_run_config",
+        "rl_fzerox.apps.watch.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
     )
     monkeypatch.setattr(

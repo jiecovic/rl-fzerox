@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/render/widgets.py
+# src/rl_fzerox/ui/watch/render/cockpit.py
 from __future__ import annotations
 
 from dataclasses import dataclass

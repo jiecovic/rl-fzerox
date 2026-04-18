@@ -143,6 +143,18 @@ def test_parse_args_can_disable_live_progress() -> None:
     assert args.progress_interval == 0.0
 
 
+def test_parse_args_defaults_to_stream_all_record_mode() -> None:
+    args = parse_args(["--out", "race.mp4"])
+
+    assert args.record_mode == "stream-all"
+
+
+def test_parse_args_accepts_probe_then_record_mode() -> None:
+    args = parse_args(["--out", "race.mp4", "--record-mode", "probe-then-record"])
+
+    assert args.record_mode == "probe-then-record"
+
+
 def test_format_progress_line_shows_episode_state() -> None:
     line = _format_progress_line(
         {
