@@ -39,6 +39,11 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
+from rl_fzerox.ui.watch.runtime.worker import (
+    BOOST_ACTIVE_LAMP_LEVEL,
+    BOOST_MANUAL_LAMP_LEVEL,
+    _next_boost_lamp_level,
+)
 from rl_fzerox.ui.watch.session import _persist_reload_error
 from tests.support.native_objects import make_telemetry
 
@@ -148,7 +153,73 @@ def test_input_section_includes_visualized_control_state() -> None:
     assert input_section.control_viz.gas_level == 1.0
     assert input_section.control_viz.steer_x == 0.5
     assert input_section.control_viz.boost_pressed
+    assert input_section.control_viz.boost_lamp_level == 1.0
     assert input_section.control_viz.lean_direction == -1
+
+
+def test_input_section_lights_boost_lamp_from_boost_active() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        gas_level=1.0,
+        policy_label=None,
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        boost_active=True,
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert not input_section.control_viz.boost_pressed
+    assert input_section.control_viz.boost_active
+    assert input_section.control_viz.boost_lamp_level == 0.55
+
+
+def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
+    lamp_level = _next_boost_lamp_level(
+        previous=0.0,
+        control_state=ControllerState(joypad_mask=BOOST_MASK),
+        boost_active=False,
+        action_repeat=1,
+    )
+    assert lamp_level == BOOST_MANUAL_LAMP_LEVEL
+
+    lamp_level = _next_boost_lamp_level(
+        previous=lamp_level,
+        control_state=ControllerState(),
+        boost_active=True,
+        action_repeat=1,
+    )
+    assert BOOST_ACTIVE_LAMP_LEVEL < lamp_level < BOOST_MANUAL_LAMP_LEVEL
+
+    for _ in range(20):
+        lamp_level = _next_boost_lamp_level(
+            previous=lamp_level,
+            control_state=ControllerState(),
+            boost_active=True,
+            action_repeat=1,
+        )
+    assert lamp_level == pytest.approx(BOOST_ACTIVE_LAMP_LEVEL)
+
+    lamp_level = _next_boost_lamp_level(
+        previous=lamp_level,
+        control_state=ControllerState(),
+        boost_active=False,
+        action_repeat=1,
+    )
+    assert 0.0 < lamp_level < BOOST_ACTIVE_LAMP_LEVEL
 
 
 def test_input_section_ignores_air_brake_button_without_air_brake_axis() -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import observations as observation_utils
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.input import _poll_viewer_input
 from rl_fzerox.ui.watch.render.frame import (
     _create_fonts,
@@ -139,6 +140,8 @@ def _draw_snapshot(
         control_state=snapshot.control_state,
         gas_level=snapshot.gas_level,
         thrust_warning_threshold=_thrust_warning_threshold(config),
+        boost_active=telemetry_boost_active(telemetry),
+        boost_lamp_level=snapshot.boost_lamp_level,
         policy_label=snapshot.policy_label,
         policy_curriculum_stage=snapshot.policy_curriculum_stage,
         policy_deterministic=snapshot.policy_deterministic,

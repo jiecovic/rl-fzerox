@@ -63,7 +63,7 @@ class ViewerLayout:
     control_track_gap: int = 4
     control_side_pill_gap: int = 8
     control_steer_width: int = 116
-    control_steer_height: int = 10
+    control_steer_height: int = 14
     control_gas_width: int = 16
     control_gas_height: int = 72
     control_gas_pair_gap: int = 48
@@ -120,6 +120,8 @@ class ControlViz:
     air_brake_axis: float | None
     air_brake_disabled: bool
     boost_pressed: bool
+    boost_active: bool
+    boost_lamp_level: float
     lean_direction: int
 
 
