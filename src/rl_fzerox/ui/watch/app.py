@@ -138,6 +138,7 @@ def _draw_snapshot(
         paused=paused,
         control_state=snapshot.control_state,
         gas_level=snapshot.gas_level,
+        thrust_warning_threshold=_thrust_warning_threshold(config),
         policy_label=snapshot.policy_label,
         policy_curriculum_stage=snapshot.policy_curriculum_stage,
         policy_deterministic=snapshot.policy_deterministic,
@@ -168,6 +169,12 @@ def _display_stuck_step_limit(config: WatchAppConfig) -> int | None:
     if not config.env.stuck_truncation_enabled:
         return None
     return config.env.stuck_step_limit
+
+
+def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
+    if config.reward.gas_underuse_penalty >= 0.0:
+        return None
+    return float(config.reward.gas_underuse_threshold)
 
 
 def _add_config_track_info(info: dict[str, object], config: WatchAppConfig) -> None:

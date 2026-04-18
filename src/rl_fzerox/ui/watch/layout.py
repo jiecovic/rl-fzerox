@@ -64,8 +64,8 @@ class ViewerLayout:
     control_side_pill_gap: int = 8
     control_steer_width: int = 116
     control_steer_height: int = 10
-    control_gas_width: int = 12
-    control_gas_height: int = 56
+    control_gas_width: int = 16
+    control_gas_height: int = 72
     control_gas_pair_gap: int = 48
     control_gas_offset_x: int = 20
     control_marker_radius: int = 6
@@ -116,6 +116,7 @@ class ControlViz:
 
     steer_x: float
     gas_level: float
+    thrust_warning_threshold: float | None
     air_brake_axis: float | None
     air_brake_disabled: bool
     boost_pressed: bool
