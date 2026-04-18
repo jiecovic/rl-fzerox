@@ -557,6 +557,7 @@ class FZeroXEnvEngine:
         self._control_state.record_step(
             control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
+            gas_level=gas_level,
         )
         self._mask_controller.set_lean_allowed_values(
             self._control_state.lean_action_mask_override(),

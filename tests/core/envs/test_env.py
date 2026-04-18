@@ -530,16 +530,28 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
                 continuous_drive_mode="pwm",
                 continuous_drive_deadzone=0.0,
             ),
+            observation=ObservationConfig(
+                mode="image_state",
+                state_profile="race_core",
+                action_history_len=1,
+            ),
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
 
     env.reset(seed=21)
-    _, reward, _, _, info = env.step(np.array([0.0, -0.5], dtype=np.float32))
+    obs, reward, _, _, info = env.step(np.array([0.0, -0.5], dtype=np.float32))
 
     assert env.last_gas_level == pytest.approx(0.5)
     assert env.last_requested_control_state == ControllerState()
     assert backend.last_controller_state == ControllerState()
+    assert isinstance(obs, dict)
+    raw_feature_names = info["observation_state_features"]
+    assert isinstance(raw_feature_names, tuple)
+    values = {
+        name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
+    }
+    assert values["prev_gas_1"] == pytest.approx(0.5)
     assert reward == 0.0
     assert "reward_breakdown" not in info
 
