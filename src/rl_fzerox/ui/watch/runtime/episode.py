@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/runtime/episode_result.py
+# src/rl_fzerox/ui/watch/runtime/episode.py
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry

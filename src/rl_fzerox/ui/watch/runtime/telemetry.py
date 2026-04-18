@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry
+from fzerox_emulator import Emulator, FZeroXTelemetry, PlayerTelemetry
+
+
+def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
+    return emulator.try_read_telemetry()
 
 
 def _telemetry_to_data(telemetry: FZeroXTelemetry | None) -> dict[str, object] | None:

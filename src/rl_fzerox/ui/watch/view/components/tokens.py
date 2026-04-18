@@ -1,7 +1,9 @@
-# src/rl_fzerox/ui/watch/render/tokens.py
+# src/rl_fzerox/ui/watch/view/components/tokens.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, FlagViz, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.types import FlagViz, ViewerFonts
 
 
 def _draw_flag_viz(

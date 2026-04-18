@@ -1,17 +1,19 @@
-# src/rl_fzerox/ui/watch/hud/preview.py
+# src/rl_fzerox/ui/watch/view/screen/observation_preview.py
 from __future__ import annotations
 
 import numpy as np
 
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from rl_fzerox.ui.watch.hud.format import (
+from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _observation_preview_grid,
     _observation_stack_mode,
     _observation_stack_size,
     _preview_frame_shape,
 )
-from rl_fzerox.ui.watch.layout import FONT_SIZES, LAYOUT, PALETTE, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
+from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 
 
 def _window_size(

@@ -13,28 +13,28 @@ from fzerox_emulator import (
     display_size,
 )
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
-from rl_fzerox.ui.watch.hud.format import (
+from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
+from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
+from rl_fzerox.ui.watch.runtime.timing import (
+    _adjust_control_fps,
+    _resolve_control_fps,
+    _resolve_render_fps,
+)
+from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _format_policy_action,
     _format_reload_age,
     _format_reload_error,
     _pressed_button_labels,
 )
-from rl_fzerox.ui.watch.hud.model import (
+from rl_fzerox.ui.watch.view.panels.model import (
     _build_panel_columns,
     _observation_preview_size,
     _panel_content_height,
     _preview_frame,
     _window_size,
 )
-from rl_fzerox.ui.watch.render.frame import _create_fonts
-from rl_fzerox.ui.watch.runtime.episode_result import _update_best_finish_position
-from rl_fzerox.ui.watch.runtime.timing import (
-    _adjust_control_fps,
-    _resolve_control_fps,
-    _resolve_render_fps,
-)
-from rl_fzerox.ui.watch.session import _persist_reload_error
+from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 

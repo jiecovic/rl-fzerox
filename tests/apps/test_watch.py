@@ -21,7 +21,7 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
     WatchConfig,
 )
-from rl_fzerox.ui.watch.session import _load_policy_runner, _sync_policy_curriculum_stage
+from rl_fzerox.ui.watch.runtime.policy import _load_policy_runner, _sync_policy_curriculum_stage
 
 
 class _FakePolicyRunner:

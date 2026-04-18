@@ -9,12 +9,12 @@ from rl_fzerox.core.envs.actions import (
     BOOST_MASK,
     LEAN_LEFT_MASK,
 )
-from rl_fzerox.ui.watch.hud.viz import _control_viz
-from rl_fzerox.ui.watch.runtime.worker import (
+from rl_fzerox.ui.watch.runtime.snapshots import (
     BOOST_ACTIVE_LAMP_LEVEL,
     BOOST_MANUAL_LAMP_LEVEL,
     _next_boost_lamp_level,
 )
+from rl_fzerox.ui.watch.view.panels.viz import _control_viz
 
 
 def test_control_viz_includes_visualized_control_state() -> None:

@@ -1,9 +1,9 @@
-# src/rl_fzerox/ui/watch/render/game_view.py
+# src/rl_fzerox/ui/watch/view/components/game_view.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.layout import Color
+from rl_fzerox.ui.watch.view.screen.theme import Color
 
 
 @dataclass(frozen=True)

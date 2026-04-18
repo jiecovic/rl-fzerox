@@ -1,4 +1,4 @@
-# src/rl_fzerox/ui/watch/render/frame.py
+# src/rl_fzerox/ui/watch/view/screen/frame.py
 from __future__ import annotations
 
 import os
@@ -7,21 +7,20 @@ import numpy as np
 
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.ui.watch.hud.draw import _draw_side_panel
-from rl_fzerox.ui.watch.hud.model import (
+from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
+from rl_fzerox.ui.watch.view.components.observation_strip import (
+    _draw_observation_preview_below_game,
+)
+from rl_fzerox.ui.watch.view.panels.draw import _draw_side_panel
+from rl_fzerox.ui.watch.view.panels.model import (
     _observation_preview_size,
     _preview_frame,
     _window_size,
 )
-from rl_fzerox.ui.watch.hud.viz import _control_viz
-from rl_fzerox.ui.watch.layout import (
-    FONT_SIZES,
-    LAYOUT,
-    PALETTE,
-    ViewerFonts,
-)
-from rl_fzerox.ui.watch.render.game_view import _draw_glass_game_view
-from rl_fzerox.ui.watch.render.observation_strip import _draw_observation_preview_below_game
+from rl_fzerox.ui.watch.view.panels.viz import _control_viz
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
+from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 
 
 def _create_fonts(pygame) -> ViewerFonts:

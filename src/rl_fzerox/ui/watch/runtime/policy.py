@@ -1,10 +1,8 @@
-# src/rl_fzerox/ui/watch/session.py
+# src/rl_fzerox/ui/watch/runtime/policy.py
 from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
-
-from fzerox_emulator import Emulator, FZeroXTelemetry
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner
@@ -20,10 +18,6 @@ class _CurriculumStagePolicyRunner(Protocol):
 
 class _CheckpointStageSyncEnv(Protocol):
     def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None: ...
-
-
-def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
-    return emulator.try_read_telemetry()
 
 
 def _load_policy_runner(
@@ -98,31 +92,3 @@ def _persist_reload_error(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(reload_error + "\n", encoding="utf-8")
     return reload_error
-
-
-def _save_baseline_state(*, emulator: Emulator, baseline_state_path: Path | None) -> None:
-    emulator.capture_current_as_baseline(baseline_state_path)
-
-
-def _with_viewer_rates(
-    info: dict[str, object],
-    *,
-    action_repeat: int,
-    current_control_fps: float,
-    current_render_fps: float,
-    target_control_fps: float | None = None,
-    target_render_fps: float | None = None,
-) -> dict[str, object]:
-    draw_info = dict(info)
-    draw_info["viewer_fps"] = current_render_fps
-    draw_info["render_fps"] = current_render_fps
-    draw_info["control_fps"] = current_control_fps
-    draw_info["game_fps"] = current_control_fps * float(action_repeat)
-    draw_info["control_fps_target"] = (
-        "unlimited" if target_control_fps is None else target_control_fps
-    )
-    draw_info["game_fps_target"] = (
-        "unlimited" if target_control_fps is None else target_control_fps * float(action_repeat)
-    )
-    draw_info["render_fps_target"] = "unlimited" if target_render_fps is None else target_render_fps
-    return draw_info

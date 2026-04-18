@@ -1,10 +1,10 @@
-# tests/ui/test_watch_runtime_process.py
+# tests/ui/test_watch_runtime_ipc.py
 from __future__ import annotations
 
 from queue import Empty
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.ui.watch.runtime.process import (
+from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
     drain_worker_commands,
 )

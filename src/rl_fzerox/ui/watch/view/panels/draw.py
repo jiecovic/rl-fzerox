@@ -1,11 +1,13 @@
-# src/rl_fzerox/ui/watch/hud/draw.py
+# src/rl_fzerox/ui/watch/view/panels/draw.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.hud.model import _build_panel_columns
-from rl_fzerox.ui.watch.hud.viz import _wrap_text
-from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelLine, PanelSection, ViewerFonts
-from rl_fzerox.ui.watch.render.cockpit import _draw_control_viz
-from rl_fzerox.ui.watch.render.tokens import _draw_flag_viz
+from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
+from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.viz import _wrap_text
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, ViewerFonts
 
 
 def _draw_side_panel(
