@@ -10,6 +10,7 @@ from rl_fzerox.core.training.runs.artifacts import (
 from rl_fzerox.core.training.runs.config import (
     apply_train_run_to_watch_config,
     load_train_run_config,
+    load_train_run_train_config,
     materialize_train_run_config,
     materialize_watch_session_config,
     save_train_run_config,
@@ -35,6 +36,7 @@ __all__ = [
     "ensure_run_dirs",
     "ensure_watch_session_dirs",
     "load_train_run_config",
+    "load_train_run_train_config",
     "materialize_train_run_config",
     "materialize_watch_session_config",
     "resolve_latest_model_path",

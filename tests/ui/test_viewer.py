@@ -34,6 +34,7 @@ from rl_fzerox.ui.watch.hud.model import (
     _preview_frame,
     _window_size,
 )
+from rl_fzerox.ui.watch.hud.viz import _control_viz
 from rl_fzerox.ui.watch.render.frame import _create_fonts
 from rl_fzerox.ui.watch.runtime.episode_result import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.timing import (
@@ -47,7 +48,7 @@ from rl_fzerox.ui.watch.runtime.worker import (
     _next_boost_lamp_level,
 )
 from rl_fzerox.ui.watch.session import _persist_reload_error
-from tests.support.native_objects import make_telemetry
+from tests.support.native_objects import encode_state_flags, make_telemetry
 
 
 def test_target_display_size_applies_aspect_correction() -> None:
@@ -100,7 +101,6 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             episode_reward=0.0,
             paused=False,
             control_state=ControllerState(),
-            policy_label=None,
             policy_curriculum_stage=None,
             policy_action=None,
             policy_reload_age_seconds=None,
@@ -125,68 +125,34 @@ def test_side_panel_fits_default_watch_window_height() -> None:
         pygame.quit()
 
 
-def test_input_section_includes_visualized_control_state() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(
+def test_control_viz_includes_visualized_control_state() -> None:
+    control_viz = _control_viz(
+        ControllerState(
             joypad_mask=ACCELERATE_MASK | BOOST_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.5,
         ),
         gas_level=1.0,
-        policy_label=None,
-        policy_curriculum_stage=None,
         policy_action=None,
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=3,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 1.0
-    assert input_section.control_viz.steer_x == 0.5
-    assert input_section.control_viz.boost_pressed
-    assert input_section.control_viz.boost_lamp_level == 1.0
-    assert input_section.control_viz.lean_direction == -1
+    assert control_viz.gas_level == 1.0
+    assert control_viz.steer_x == 0.5
+    assert control_viz.boost_pressed
+    assert control_viz.boost_lamp_level == 1.0
+    assert control_viz.lean_direction == -1
 
 
-def test_input_section_lights_boost_lamp_from_boost_active() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
+def test_control_viz_lights_boost_lamp_from_boost_active() -> None:
+    control_viz = _control_viz(
+        ControllerState(),
         gas_level=1.0,
-        policy_label=None,
-        policy_curriculum_stage=None,
         policy_action=None,
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=3,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
         boost_active=True,
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert not input_section.control_viz.boost_pressed
-    assert input_section.control_viz.boost_active
-    assert input_section.control_viz.boost_lamp_level == 0.55
+    assert not control_viz.boost_pressed
+    assert control_viz.boost_active
+    assert control_viz.boost_lamp_level == 0.55
 
 
 def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
@@ -224,315 +190,146 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
     assert 0.0 < lamp_level < BOOST_ACTIVE_LAMP_LEVEL
 
 
-def test_input_section_ignores_air_brake_button_without_air_brake_axis() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
-        policy_label=None,
-        policy_curriculum_stage=None,
+def test_control_viz_ignores_air_brake_button_without_air_brake_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
+        gas_level=0.0,
         policy_action=None,
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=3,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 0
-    assert input_section.control_viz.air_brake_axis is None
+    assert control_viz.gas_level == 0
+    assert control_viz.air_brake_axis is None
 
 
-def test_input_section_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+def test_control_viz_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
         gas_level=1.0,
-        policy_label=None,
-        policy_curriculum_stage=None,
         policy_action=np.array([1, 1, 1], dtype=np.int64),
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 1.0
-    assert input_section.control_viz.air_brake_axis is None
+    assert control_viz.gas_level == 1.0
+    assert control_viz.air_brake_axis is None
 
 
-def test_input_section_visualizes_canonical_gas_level() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(left_stick_x=0.25),
+def test_control_viz_visualizes_canonical_gas_level() -> None:
+    control_viz = _control_viz(
+        ControllerState(left_stick_x=0.25),
         gas_level=0.5,
-        policy_label="sac_cnn_0013",
-        policy_curriculum_stage=None,
         policy_action=np.array([0.25, -0.5], dtype=np.float32),
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(0.5)
-    assert input_section.control_viz.air_brake_axis is None
+    assert control_viz.gas_level == pytest.approx(0.5)
+    assert control_viz.air_brake_axis is None
 
 
-def test_input_section_visualizes_thrust_warning_threshold() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
+def test_control_viz_visualizes_thrust_warning_threshold() -> None:
+    control_viz = _control_viz(
+        ControllerState(),
         gas_level=0.25,
         thrust_warning_threshold=0.5,
-        policy_label="exp_v3_cnn_0001",
-        policy_curriculum_stage=None,
         policy_action=None,
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(0.25)
-    assert input_section.control_viz.thrust_warning_threshold == pytest.approx(0.5)
+    assert control_viz.gas_level == pytest.approx(0.25)
+    assert control_viz.thrust_warning_threshold == pytest.approx(0.5)
 
 
-def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
+def test_control_viz_visualizes_forced_full_accelerate_drive_mode() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
         gas_level=1.0,
-        policy_label="maskable_hybrid_recurrent_ppo_cnn_0015",
-        policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.25, -1.0, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
+    assert control_viz.gas_level == pytest.approx(1.0)
+    assert control_viz.air_brake_axis == pytest.approx(0.5)
 
 
-def test_input_section_visualizes_hybrid_canonical_gas_level() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(
+def test_control_viz_visualizes_hybrid_canonical_gas_level() -> None:
+    control_viz = _control_viz(
+        ControllerState(
             joypad_mask=ACCELERATE_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.25,
         ),
         gas_level=1.0,
-        policy_label="hybrid_ppo_cnn_0001",
-        policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.25, 0.5], dtype=np.float32),
             "discrete": np.array([1], dtype=np.int64),
         },
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis is None
-    assert input_section.control_viz.lean_direction == -1
+    assert control_viz.gas_level == pytest.approx(1.0)
+    assert control_viz.air_brake_axis is None
+    assert control_viz.lean_direction == -1
 
 
-def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+def test_control_viz_visualizes_hybrid_policy_air_brake_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
         gas_level=1.0,
-        policy_label="hybrid_ppo_cnn_0002",
-        policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
+    assert control_viz.gas_level == pytest.approx(1.0)
+    assert control_viz.air_brake_axis == pytest.approx(0.5)
 
 
-def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+def test_control_viz_hides_disabled_hybrid_policy_air_brake_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK),
         gas_level=1.0,
-        policy_label="hybrid_ppo_cnn_0002",
-        policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
         continuous_air_brake_mode="off",
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis is None
+    assert control_viz.gas_level == pytest.approx(1.0)
+    assert control_viz.air_brake_axis is None
 
 
-def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+def test_control_viz_grays_disabled_ground_air_brake_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK),
         gas_level=1.0,
-        policy_label="hybrid_ppo_cnn_0002",
-        policy_curriculum_stage=None,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
         continuous_drive_deadzone=0.0,
         continuous_air_brake_mode="disable_on_ground",
         continuous_air_brake_disabled=True,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
-    assert input_section.control_viz.air_brake_disabled is True
+    assert control_viz.air_brake_axis == pytest.approx(0.5)
+    assert control_viz.air_brake_disabled is True
 
 
-def test_input_section_uses_canonical_gas_level_for_discrete_policy_action() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.0),
+def test_control_viz_uses_canonical_gas_level_for_discrete_policy_action() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.0),
         gas_level=1.0,
-        policy_label="ppo_cnn_0013",
-        policy_curriculum_stage=None,
         policy_action=np.array([4, 1], dtype=np.int64),
-        policy_reload_age_seconds=None,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
     )
 
-    input_section = next(section for section in columns.left if section.title == "Input")
-    assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == pytest.approx(1.0)
-    assert input_section.control_viz.air_brake_axis is None
+    assert control_viz.gas_level == pytest.approx(1.0)
+    assert control_viz.air_brake_axis is None
 
 
-def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
+def test_side_panel_drops_cockpit_control_section() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -540,7 +337,6 @@ def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -553,7 +349,7 @@ def test_side_panel_keeps_input_and_drops_controls_text_section() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    assert [section.title for section in columns.left] == ["Session", "Input"]
+    assert [section.title for section in columns.left] == ["Session"]
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -570,7 +366,6 @@ def test_session_section_shows_episode_step_counter() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -603,7 +398,6 @@ def test_session_section_marks_reverse_truncation_as_off() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -637,7 +431,6 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -665,6 +458,70 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
     assert "dash" not in active_labels
 
 
+def test_energy_refill_course_effect_lights_refill_flag() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            state_flags=encode_state_flags(("active",)) | 1,
+            energy=150.0,
+            max_energy=178.0,
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "refill" in active_labels
+
+
+def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            state_flags=encode_state_flags(("active",)) | 1,
+            energy=178.0,
+            max_energy=178.0,
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "refill" not in active_labels
+
+
 def test_game_section_shows_race_difficulty() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -673,7 +530,6 @@ def test_game_section_shows_race_difficulty() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -699,7 +555,6 @@ def test_game_section_shows_unknown_difficulty_raw_value() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -725,7 +580,6 @@ def test_game_section_shows_camera_setting() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -751,7 +605,6 @@ def test_game_section_shows_unknown_camera_setting_raw_value() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -777,7 +630,6 @@ def test_game_section_shows_position_out_of_total_racers() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -803,7 +655,6 @@ def test_dash_pad_boost_lights_single_boost_pill() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -833,7 +684,6 @@ def test_manual_boost_timer_lights_boost_pill() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -862,7 +712,6 @@ def test_signed_boost_timer_lights_generic_boost_pill() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -955,7 +804,6 @@ def test_display_section_includes_action_repeat() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0013",
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1004,7 +852,6 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1049,7 +896,6 @@ def test_side_panel_splits_observation_action_buffer_from_state() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="exp_v3_cnn_0001",
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
@@ -1104,7 +950,6 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
             episode_reward=0.0,
             paused=False,
             control_state=ControllerState(),
-            policy_label="ppo_discrete_full_gas_recurrent_cnn_0001",
             policy_curriculum_stage=None,
             policy_action=np.array([1, 1, 0, 0, 0], dtype=np.int64),
             policy_reload_age_seconds=0.0,
@@ -1139,7 +984,6 @@ def test_session_section_includes_stuck_counter() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage="lean_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1169,7 +1013,6 @@ def test_session_section_shows_curriculum_stage_name() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage="lean_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1198,7 +1041,6 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
@@ -1228,7 +1070,6 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action={
@@ -1263,7 +1104,6 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         episode_reward=-12.34567,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1292,7 +1132,6 @@ def test_session_section_shows_best_finish_position() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1322,7 +1161,6 @@ def test_session_section_shows_na_before_successful_finish() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(),
-        policy_label="ppo_cnn_0017",
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -1407,17 +1245,21 @@ def test_persist_reload_error_writes_full_message_once(tmp_path) -> None:
 def _sample_telemetry(
     *,
     state_labels: tuple[str, ...] = ("active",),
+    state_flags: int | None = None,
     reverse_timer: int = 0,
     boost_timer: int = 0,
     difficulty_raw: int = 0,
     difficulty_name: str = "novice",
     camera_setting_raw: int = 2,
     camera_setting_name: str = "regular",
+    energy: float = 178.0,
+    max_energy: float = 178.0,
     position: int = 30,
     total_racers: int = 30,
 ) -> FZeroXTelemetry:
     return make_telemetry(
         state_labels=state_labels,
+        state_flags=state_flags,
         speed_kph=0.0,
         reverse_timer=reverse_timer,
         boost_timer=boost_timer,
@@ -1425,6 +1267,8 @@ def _sample_telemetry(
         difficulty_name=difficulty_name,
         camera_setting_raw=camera_setting_raw,
         camera_setting_name=camera_setting_name,
+        energy=energy,
+        max_energy=max_energy,
         race_distance=-3040.8,
         lap_distance=75987.2,
         race_time_ms=116,

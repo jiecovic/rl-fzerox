@@ -8,9 +8,33 @@ from rl_fzerox.ui.watch.layout import (
     PALETTE,
     Color,
     ControlViz,
-    FlagViz,
     ViewerFonts,
 )
+from rl_fzerox.ui.watch.render.effects import (
+    BOOST_EDGE_GLOW,
+    GLASS_EDGE_GLOW,
+    GLASS_SHADOW,
+    GLASS_SHEEN,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    blend_color as _blend_color,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    draw_alpha_circle as _draw_alpha_circle,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    draw_alpha_polygon as _draw_alpha_polygon,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    draw_glass_column_overlay as _draw_glass_column_overlay,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    draw_glass_track_overlay as _draw_glass_track_overlay,
+)
+from rl_fzerox.ui.watch.render.effects import (
+    offset_points as _offset_points,
+)
+from rl_fzerox.ui.watch.render.tokens import _pill_height
 
 
 @dataclass(frozen=True)
@@ -36,12 +60,7 @@ BUTTON_FACE_FILL: Color = (24, 31, 39)
 BUTTON_FACE_HIGHLIGHT: Color = (62, 76, 92)
 BUTTON_FACE_INNER: Color = (17, 23, 30)
 BUTTON_ACTIVE_TEXT: Color = (232, 255, 246)
-GLASS_HIGHLIGHT: Color = (170, 190, 210)
-GLASS_LOWLIGHT: Color = (8, 11, 15)
-GLASS_SHEEN: tuple[int, int, int, int] = (238, 248, 255, 82)
-GLASS_SHADOW: tuple[int, int, int, int] = (0, 0, 0, 44)
-GLASS_EDGE_GLOW: tuple[int, int, int, int] = (126, 214, 170, 48)
-BOOST_EDGE_GLOW: tuple[int, int, int, int] = (126, 214, 170, 52)
+_WIDE_CONTROL_MIN_WIDTH = 420
 
 
 def _draw_round_marker(*, pygame, screen, color, center, radius: int, outline_color) -> None:
@@ -58,42 +77,6 @@ def _draw_round_marker(*, pygame, screen, color, center, radius: int, outline_co
         pygame.draw.circle(screen, outline_color, center, radius, width=1)
 
 
-def _draw_flag_viz(
-    *,
-    pygame,
-    screen,
-    fonts: ViewerFonts,
-    x: int,
-    y: int,
-    flag_viz: FlagViz,
-) -> int:
-    label_surface = fonts.small.render("Flags", True, PALETTE.text_muted)
-    screen.blit(label_surface, (x, y))
-    y += label_surface.get_height() + LAYOUT.line_gap
-
-    pill_height = 0
-    for row in flag_viz.rows:
-        row_x = x
-        for token in row:
-            pill_rect = _draw_pill(
-                pygame=pygame,
-                screen=screen,
-                font=fonts.small,
-                x=row_x,
-                y=y,
-                label=token.label,
-                active=token.active,
-                active_text_color=PALETTE.text_primary,
-                active_fill_color=PALETTE.flag_active_background,
-                active_border_color=PALETTE.flag_active_border,
-            )
-            pill_height = pill_rect.height
-            row_x += pill_rect.width + LAYOUT.flag_token_gap
-        y += pill_height + LAYOUT.line_gap
-
-    return y
-
-
 def _draw_control_viz(
     *,
     pygame,
@@ -104,29 +87,32 @@ def _draw_control_viz(
     width: int,
     control_viz: ControlViz,
 ) -> int:
-    panel_height = 118
+    wide = width >= _WIDE_CONTROL_MIN_WIDTH
+    panel_height = _control_viz_panel_height(width)
     panel = pygame.Rect(x, y, width, panel_height)
     _draw_cockpit_panel(pygame=pygame, screen=screen, rect=panel)
 
     header = fonts.small.render("COCKPIT CONTROL", True, PALETTE.text_muted)
-    screen.blit(header, (panel.x + 12, panel.y + 7))
+    screen.blit(header, (panel.x + 16, panel.y + 9))
 
     dual_gas_levers = control_viz.air_brake_axis is not None
-    thrust_gap = 22 if dual_gas_levers else 0
-    thrust_group_width = (
-        (2 * LAYOUT.control_gas_width) + thrust_gap if dual_gas_levers else LAYOUT.control_gas_width
-    )
-    thrust_x = panel.right - 28 - thrust_group_width
-    air_brake_x = thrust_x + LAYOUT.control_gas_width + thrust_gap
-    thrust_y = panel.y + 28
+    gas_width = 24 if wide else LAYOUT.control_gas_width
+    gas_height = 102 if wide else LAYOUT.control_gas_height
+    steer_height = 20 if wide else LAYOUT.control_steer_height
+    marker_radius = 8 if wide else LAYOUT.control_marker_radius
+    thrust_gap = 28 if wide and dual_gas_levers else 22 if dual_gas_levers else 0
+    thrust_group_width = (2 * gas_width) + thrust_gap if dual_gas_levers else gas_width
+    thrust_x = panel.right - (34 if wide else 28) - thrust_group_width
+    air_brake_x = thrust_x + gas_width + thrust_gap
+    thrust_y = panel.y + (38 if wide else 28)
 
     _draw_centered_label(
         screen=screen,
         font=fonts.small,
         label="THR" if dual_gas_levers else "THRUST",
         color=PALETTE.text_muted,
-        center_x=thrust_x + (LAYOUT.control_gas_width // 2),
-        y=panel.y + 8,
+        center_x=thrust_x + (gas_width // 2),
+        y=panel.y + (16 if wide else 8),
     )
     if dual_gas_levers:
         _draw_centered_label(
@@ -134,29 +120,30 @@ def _draw_control_viz(
             font=fonts.small,
             label="BRK",
             color=PALETTE.text_muted,
-            center_x=air_brake_x + (LAYOUT.control_gas_width // 2),
-            y=panel.y + 8,
+            center_x=air_brake_x + (gas_width // 2),
+            y=panel.y + (16 if wide else 8),
         )
 
-    steer_x = panel.x + 14
-    steer_width = max(84, thrust_x - steer_x - 22)
+    steer_x = panel.x + (20 if wide else 14)
+    steer_width = max(190 if wide else 84, thrust_x - steer_x - (28 if wide else 22))
     steer_track = pygame.Rect(
         steer_x,
-        panel.y + 42,
+        panel.y + (58 if wide else 42),
         steer_width,
-        LAYOUT.control_steer_height,
+        steer_height,
     )
     _draw_steer_instrument(
         pygame=pygame,
         screen=screen,
         track=steer_track,
         value=control_viz.steer_x,
+        marker_radius=marker_radius,
     )
 
-    lean_y = panel.y + 76
-    lean_width = 48 if dual_gas_levers else 56
-    lean_gap = 6 if dual_gas_levers else 8
-    boost_radius = 11 if dual_gas_levers else 13
+    lean_y = panel.y + (108 if wide else 76)
+    lean_width = 74 if wide else 48 if dual_gas_levers else 56
+    lean_gap = 12 if wide else 6 if dual_gas_levers else 8
+    boost_radius = 17 if wide else 11 if dual_gas_levers else 13
     boost_center_x = steer_x + lean_width + lean_gap + boost_radius
     right_lean_x = boost_center_x + boost_radius + lean_gap
     boost_center_y = lean_y + ((_pill_height(fonts.small) + 2) // 2)
@@ -205,6 +192,8 @@ def _draw_control_viz(
         level=gas_level,
         threshold=control_viz.thrust_warning_threshold,
         fill_color=thrust_color,
+        width=gas_width,
+        height=gas_height,
     )
     if dual_gas_levers:
         air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis or 0.0))
@@ -219,6 +208,8 @@ def _draw_control_viz(
             level=air_brake_level,
             threshold=None,
             fill_color=air_brake_color,
+            width=gas_width,
+            height=gas_height,
         )
 
     percent = fonts.body.render(
@@ -227,8 +218,12 @@ def _draw_control_viz(
         thrust_color if gas_level > 0.0 else PALETTE.text_muted,
     )
     percent_x = thrust_x + (thrust_group_width // 2) - (percent.get_width() // 2)
-    screen.blit(percent, (percent_x, thrust_y + LAYOUT.control_gas_height + 4))
+    screen.blit(percent, (percent_x, thrust_y + gas_height + 4))
     return panel.bottom
+
+
+def _control_viz_panel_height(width: int) -> int:
+    return 160 if width >= _WIDE_CONTROL_MIN_WIDTH else 118
 
 
 def _draw_cockpit_panel(*, pygame, screen, rect) -> None:
@@ -254,7 +249,14 @@ def _draw_cockpit_panel(*, pygame, screen, rect) -> None:
     pygame.draw.polygon(screen, COCKPIT_PANEL_BORDER, points, width=1)
 
 
-def _draw_steer_instrument(*, pygame, screen, track, value: float) -> None:
+def _draw_steer_instrument(
+    *,
+    pygame,
+    screen,
+    track,
+    value: float,
+    marker_radius: int,
+) -> None:
     pygame.draw.rect(
         screen,
         PALETTE.control_track,
@@ -276,7 +278,7 @@ def _draw_steer_instrument(*, pygame, screen, track, value: float) -> None:
         screen=screen,
         color=_steer_indicator_color(value),
         center=(_steer_track_x(track=track, value=value), track.centery),
-        radius=LAYOUT.control_marker_radius,
+        radius=marker_radius,
         outline_color=PALETTE.control_knob_outline,
     )
 
@@ -290,13 +292,15 @@ def _draw_thrust_column(
     level: float,
     threshold: float | None,
     fill_color,
+    width: int,
+    height: int,
 ) -> None:
     level = max(0.0, min(1.0, level))
     track = pygame.Rect(
         x,
         y,
-        LAYOUT.control_gas_width,
-        LAYOUT.control_gas_height,
+        width,
+        height,
     )
     pygame.draw.rect(
         screen,
@@ -311,9 +315,9 @@ def _draw_thrust_column(
         border_radius=track.width // 2,
     )
 
-    segment_count = 7
-    segment_gap = 1
-    segment_height = 8
+    segment_count = 9 if height >= 96 else 7
+    segment_gap = 2 if height >= 96 else 1
+    segment_height = 9 if height >= 96 else 8
     stack_height = (segment_count * segment_height) + ((segment_count - 1) * segment_gap)
     stack_top = track.top + ((track.height - stack_height) // 2)
     lit_segments = round(level * segment_count)
@@ -595,55 +599,6 @@ def _draw_boost_button(
     )
 
 
-def _blend_color(start: Color, end: Color, weight: float) -> Color:
-    weight = max(0.0, min(1.0, weight))
-    return (
-        round(start[0] + ((end[0] - start[0]) * weight)),
-        round(start[1] + ((end[1] - start[1]) * weight)),
-        round(start[2] + ((end[2] - start[2]) * weight)),
-    )
-
-
-def _offset_points(
-    points: tuple[tuple[int, int], ...],
-    *,
-    dx: int,
-    dy: int,
-) -> tuple[tuple[int, int], ...]:
-    return tuple((x + dx, y + dy) for x, y in points)
-
-
-def _draw_alpha_polygon(
-    *,
-    pygame,
-    screen,
-    points: tuple[tuple[int, int], ...],
-    color: tuple[int, int, int, int],
-) -> None:
-    min_x = min(x for x, _ in points)
-    max_x = max(x for x, _ in points)
-    min_y = min(y for _, y in points)
-    max_y = max(y for _, y in points)
-    surface = pygame.Surface((max_x - min_x + 1, max_y - min_y + 1), pygame.SRCALPHA)
-    local_points = tuple((x - min_x, y - min_y) for x, y in points)
-    pygame.draw.polygon(surface, color, local_points)
-    screen.blit(surface, (min_x, min_y))
-
-
-def _draw_alpha_circle(
-    *,
-    pygame,
-    screen,
-    center: tuple[int, int],
-    radius: int,
-    color: tuple[int, int, int, int],
-) -> None:
-    size = (radius * 2) + 1
-    surface = pygame.Surface((size, size), pygame.SRCALPHA)
-    pygame.draw.circle(surface, color, (radius, radius), radius)
-    screen.blit(surface, (center[0] - radius, center[1] - radius))
-
-
 def _draw_steer_fill(*, pygame, screen, track, value: float) -> None:
     value = max(-1.0, min(1.0, value))
     magnitude = abs(value)
@@ -717,148 +672,6 @@ def _steer_track_x(*, track, value: float) -> int:
     return track.centerx + round((track.width // 2) * value)
 
 
-def _draw_glass_track_overlay(*, pygame, screen, track) -> None:
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(track.left + 4, track.top + 2, max(1, track.width - 8), 3),
-        color=(255, 255, 255, 46),
-    )
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(
-            track.left + 4,
-            track.top + 3,
-            max(1, track.width - 8),
-            max(1, track.height // 2),
-        ),
-        color=(255, 255, 255, 24),
-    )
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(
-            track.left + 4,
-            track.centery,
-            max(1, track.width - 8),
-            max(1, (track.height // 2) - 2),
-        ),
-        color=(0, 0, 0, 26),
-    )
-    pygame.draw.line(
-        screen,
-        GLASS_HIGHLIGHT,
-        (track.left + 4, track.top + 2),
-        (track.right - 4, track.top + 2),
-        width=1,
-    )
-    pygame.draw.line(
-        screen,
-        GLASS_LOWLIGHT,
-        (track.left + 4, track.bottom - 2),
-        (track.right - 4, track.bottom - 2),
-        width=1,
-    )
-
-
-def _draw_glass_column_overlay(*, pygame, screen, track) -> None:
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(track.left + 3, track.top + 4, 4, max(1, track.height - 8)),
-        color=(255, 255, 255, 78),
-    )
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(track.left + 4, track.top + 3, max(1, track.width - 8), track.height // 2),
-        color=(255, 255, 255, 38),
-    )
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(track.centerx, track.top + 5, 2, max(1, track.height - 10)),
-        color=(255, 255, 255, 34),
-    )
-    _draw_alpha_rect(
-        pygame=pygame,
-        screen=screen,
-        rect=pygame.Rect(
-            track.left + 4, track.centery, max(1, track.width - 8), track.height // 2 - 4
-        ),
-        color=(0, 0, 0, 34),
-    )
-    pygame.draw.line(
-        screen,
-        GLASS_LOWLIGHT,
-        (track.left + 4, track.bottom - 3),
-        (track.right - 4, track.bottom - 3),
-        width=1,
-    )
-
-
-def _draw_alpha_rect(*, pygame, screen, rect, color: tuple[int, int, int, int]) -> None:
-    surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-    surface.fill(color)
-    screen.blit(surface, rect.topleft)
-
-
 def _draw_centered_label(*, screen, font, label: str, color, center_x: int, y: int) -> None:
     surface = font.render(label, True, color)
     screen.blit(surface, (center_x - (surface.get_width() // 2), y))
-
-
-def _pill_width(font, label: str) -> int:
-    return font.render(label, True, PALETTE.text_primary).get_width() + (
-        2 * LAYOUT.flag_token_pad_x
-    )
-
-
-def _pill_height(font) -> int:
-    return font.render("Ag", True, PALETTE.text_primary).get_height() + (
-        2 * LAYOUT.flag_token_pad_y
-    )
-
-
-def _draw_pill(
-    *,
-    pygame,
-    screen,
-    font,
-    x: int,
-    y: int,
-    label: str,
-    active: bool,
-    active_text_color,
-    active_fill_color,
-    active_border_color,
-):
-    text_color = active_text_color if active else PALETTE.text_muted
-    fill_color = active_fill_color if active else PALETTE.flag_inactive_background
-    border_color = active_border_color if active else PALETTE.flag_inactive_border
-    text_surface = font.render(label, True, text_color)
-    pill_rect = pygame.Rect(
-        x,
-        y,
-        text_surface.get_width() + (2 * LAYOUT.flag_token_pad_x),
-        text_surface.get_height() + (2 * LAYOUT.flag_token_pad_y),
-    )
-    pygame.draw.rect(
-        screen,
-        fill_color,
-        pill_rect,
-        border_radius=pill_rect.height // 2,
-    )
-    pygame.draw.rect(
-        screen,
-        border_color,
-        pill_rect,
-        width=1,
-        border_radius=pill_rect.height // 2,
-    )
-    screen.blit(
-        text_surface,
-        (x + LAYOUT.flag_token_pad_x, y + LAYOUT.flag_token_pad_y),
-    )
-    return pill_rect

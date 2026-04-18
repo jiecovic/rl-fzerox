@@ -135,6 +135,7 @@ _FLAG_DISPLAY_LABELS = {
     "low_speed_detected": "slow",
     "can_boost": "can boost",
     "boost_active": "boost",
+    "energy_refill": "refill",
     "energy_loss": "energy loss",
     "damage_taken": "damage taken",
     "airborne": "airborne",
@@ -150,7 +151,7 @@ _FLAG_DISPLAY_LABELS = {
 _FLAG_ROWS = (
     ("reverse_detected", "low_speed_detected"),
     ("can_boost", "boost_active", "airborne"),
-    ("energy_loss", "damage_taken"),
+    ("energy_refill", "energy_loss", "damage_taken"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
     ("energy_depleted", "retired", "finished"),
 )
@@ -163,6 +164,7 @@ def _flag_viz(
     reverse_detected: bool,
     low_speed_detected: bool,
     energy_depleted: bool,
+    energy_refill_detected: bool = False,
     energy_loss_detected: bool = False,
     damage_taken_detected: bool = False,
 ) -> FlagViz:
@@ -175,6 +177,8 @@ def _flag_viz(
         active_flags.add("low_speed_detected")
     if energy_depleted:
         active_flags.add("energy_depleted")
+    if energy_refill_detected:
+        active_flags.add("energy_refill")
     if energy_loss_detected:
         active_flags.add("energy_loss")
     if damage_taken_detected:

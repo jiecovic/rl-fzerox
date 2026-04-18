@@ -34,6 +34,7 @@ from rl_fzerox.core.domain.training_algorithms import (
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
 ActionHistoryControlName: TypeAlias = Literal["steer", "gas", "air_brake", "boost", "lean"]
+TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
 
 
 class ActionMaskConfig(BaseModel):
@@ -190,6 +191,7 @@ class TrackSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
+    mode: TrackSamplingMode = "random"
     entries: tuple[TrackSamplingEntryConfig, ...] = ()
 
     @model_validator(mode="after")
@@ -244,8 +246,8 @@ class RewardConfig(BaseModel):
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
-    energy_gain_reward_scale: NonNegativeFloat = 0.02
-    energy_gain_collision_cooldown_frames: NonNegativeInt = 0
+    energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
+    energy_refill_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
     gas_underuse_penalty: float = Field(default=0.0, le=0.0)

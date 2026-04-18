@@ -73,6 +73,7 @@ def _make_env_factory(
             config=config.env,
             reward_config=config.reward,
             curriculum_config=config.curriculum,
+            env_index=env_index,
         )
         wrapped = monitor_cls(env, info_keywords=MONITOR_INFO_KEYS)
         initial_seed = derive_seed(

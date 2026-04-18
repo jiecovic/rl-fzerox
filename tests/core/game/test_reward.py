@@ -17,7 +17,9 @@ from rl_fzerox.core.envs.rewards import (
     build_reward_tracker,
     reward_tracker_names,
 )
-from tests.support.native_objects import make_step_summary, make_telemetry
+from tests.support.native_objects import encode_state_flags, make_step_summary, make_telemetry
+
+_COURSE_EFFECT_PIT = 1
 
 
 def test_reward_yamls_use_known_reward_config_keys() -> None:
@@ -57,8 +59,8 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "damage_taken_streak_cap_frames": 120,
         "boost_pad_reward": 10.0,
         "boost_pad_reward_progress_window": 800.0,
-        "energy_gain_reward_scale": 3.0,
-        "energy_gain_collision_cooldown_frames": 17,
+        "energy_refill_progress_multiplier": 3.0,
+        "energy_refill_collision_cooldown_frames": 17,
         "energy_full_refill_lap_bonus": 4.0,
         "energy_full_refill_min_gain_fraction": 0.12,
         "gas_underuse_penalty": -0.03,
@@ -154,7 +156,7 @@ def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            energy_gain_reward_scale=2.0,
+            energy_refill_progress_multiplier=2.0,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
@@ -165,10 +167,10 @@ def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:
     step = tracker.step_summary(
         _summary(max_race_distance=100.0, energy_gain_total=10.0),
         _status(step_count=1),
-        _telemetry(race_distance=100.0, energy=99.0),
+        _telemetry(race_distance=100.0, energy=99.0, on_energy_refill=True),
     )
 
-    refill_bonus = 1.0 * 2.0 * (10.0 / 178.0) * 0.5
+    refill_bonus = 1.0
     assert step.reward == pytest.approx(1.0 + refill_bonus)
     assert step.breakdown["frontier_progress"] == 1.0
     assert step.breakdown["energy_refill_progress"] == pytest.approx(refill_bonus)
@@ -179,7 +181,7 @@ def test_race_v3_does_not_reward_refill_without_new_frontier_progress() -> None:
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            energy_gain_reward_scale=2.0,
+            energy_refill_progress_multiplier=2.0,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
@@ -190,7 +192,7 @@ def test_race_v3_does_not_reward_refill_without_new_frontier_progress() -> None:
     step = tracker.step_summary(
         _summary(max_race_distance=0.0, energy_gain_total=10.0),
         _status(step_count=1),
-        _telemetry(race_distance=0.0, energy=99.0),
+        _telemetry(race_distance=0.0, energy=99.0, on_energy_refill=True),
     )
 
     assert step.reward == 0.0
@@ -202,7 +204,7 @@ def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            energy_gain_reward_scale=2.0,
+            energy_refill_progress_multiplier=2.0,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
@@ -217,7 +219,7 @@ def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
             reverse_active_frames=1,
         ),
         _status(step_count=1),
-        _telemetry(race_distance=100.0, energy=99.0),
+        _telemetry(race_distance=100.0, energy=99.0, on_energy_refill=True),
     )
 
     assert step.reward == 1.0
@@ -228,7 +230,7 @@ def test_race_v3_rewards_full_energy_refill_once_per_lap() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            energy_gain_reward_scale=0.0,
+            energy_refill_progress_multiplier=1.0,
             energy_full_refill_lap_bonus=2.5,
             energy_full_refill_min_gain_fraction=0.1,
             lap_completion_bonus=0.0,
@@ -276,7 +278,7 @@ def test_race_v3_scales_full_refill_bonus_by_recovered_energy_fraction() -> None
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            energy_gain_reward_scale=0.0,
+            energy_refill_progress_multiplier=1.0,
             energy_full_refill_lap_bonus=20.0,
             energy_full_refill_min_gain_fraction=0.1,
             lap_completion_bonus=0.0,
@@ -307,7 +309,7 @@ def test_race_v3_suppresses_tiny_full_refill_bonus() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            energy_gain_reward_scale=0.0,
+            energy_refill_progress_multiplier=1.0,
             energy_full_refill_lap_bonus=20.0,
             energy_full_refill_min_gain_fraction=0.1,
             lap_completion_bonus=0.0,
@@ -332,7 +334,7 @@ def test_race_v3_suppresses_full_energy_refill_while_reversing() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            energy_gain_reward_scale=0.0,
+            energy_refill_progress_multiplier=1.0,
             energy_full_refill_lap_bonus=2.5,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
@@ -764,10 +766,15 @@ def _telemetry(
     laps_completed: int = 0,
     lap: int | None = None,
     reverse_timer: int = 0,
+    on_energy_refill: bool = False,
 ) -> FZeroXTelemetry:
+    state_flags = encode_state_flags(state_labels)
+    if on_energy_refill:
+        state_flags |= _COURSE_EFFECT_PIT
     return make_telemetry(
         race_distance=race_distance,
         state_labels=state_labels,
+        state_flags=state_flags,
         speed_kph=speed_kph,
         energy=energy,
         boost_timer=boost_timer,
