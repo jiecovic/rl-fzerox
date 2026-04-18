@@ -9,7 +9,6 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
     BOOST_MASK,
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
@@ -21,25 +20,21 @@ from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, ControlViz, FlagToken, Fl
 def _control_viz(
     control_state: ControllerState,
     *,
+    gas_level: float,
     policy_action: ActionValue | None = None,
-    continuous_drive_mode: str = "threshold",
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
-    accelerate_pressed = bool(joypad_mask & ACCELERATE_MASK)
-    gas_level = 1 if accelerate_pressed else 0
-    gas_axis, air_brake_axis = _continuous_gas_axes(
+    air_brake_axis = _continuous_air_brake_axis_from_action(
         policy_action,
-        continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
-        gas_level=gas_level,
-        gas_axis=gas_axis,
+        gas_level=max(0.0, min(1.0, gas_level)),
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
@@ -49,17 +44,16 @@ def _control_viz(
     )
 
 
-def _continuous_gas_axes(
+def _continuous_air_brake_axis_from_action(
     policy_action: ActionValue | None,
     *,
-    continuous_drive_mode: str,
     continuous_drive_deadzone: float,
     continuous_air_brake_enabled: bool,
-) -> tuple[float | None, float | None]:
-    """Return HUD gas/air-brake values when the policy action exposes those axes."""
+) -> float | None:
+    """Return HUD air-brake value when the policy action exposes that axis."""
 
     if policy_action is None:
-        return None, None
+        return None
     source = (
         policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
         if isinstance(policy_action, Mapping)
@@ -67,38 +61,14 @@ def _continuous_gas_axes(
     )
     action = np.asarray(source)
     if not np.issubdtype(action.dtype, np.floating):
-        return None, None
+        return None
     values = action.reshape(-1)
-    if values.size < 2:
-        return None, None
-    if continuous_drive_mode == "always_accelerate":
-        air_brake = (
-            _continuous_air_brake_axis(
-                values,
-                continuous_drive_deadzone=continuous_drive_deadzone,
-            )
-            if continuous_air_brake_enabled
-            else None
-        )
-        return 1.0, air_brake
-    drive = float(values[1])
-    if not np.isfinite(drive):
-        return None, None
-    drive = max(-1.0, min(1.0, drive))
-    air_brake = (
-        _continuous_air_brake_axis(
-            values,
-            continuous_drive_deadzone=continuous_drive_deadzone,
-        )
-        if continuous_air_brake_enabled
-        else None
+    if values.size < 3 or not continuous_air_brake_enabled:
+        return None
+    return _continuous_air_brake_axis(
+        values,
+        continuous_drive_deadzone=continuous_drive_deadzone,
     )
-    if continuous_drive_mode == "pwm":
-        return _continuous_gas_level(
-            drive,
-            deadzone=continuous_drive_deadzone,
-        ), air_brake
-    return (1.0 if drive > continuous_drive_deadzone else 0.0), air_brake
 
 
 def _continuous_air_brake_axis(
@@ -116,13 +86,6 @@ def _continuous_air_brake_axis(
         air_brake,
         deadzone=continuous_drive_deadzone,
     )
-
-
-def _continuous_gas_level(drive: float, *, deadzone: float) -> float:
-    duty = min(max(drive + 1.0, 0.0), 1.0)
-    if duty <= deadzone:
-        return 0.0
-    return (duty - deadzone) / (1.0 - deadzone)
 
 
 def _continuous_positive_button_level(value: float, *, deadzone: float) -> float:

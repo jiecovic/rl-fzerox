@@ -115,8 +115,7 @@ class ControlViz:
     """Compact control-state visualization for the watch panel."""
 
     steer_x: float
-    gas_level: int
-    gas_axis: float | None
+    gas_level: float
     air_brake_axis: float | None
     air_brake_disabled: bool
     boost_pressed: bool

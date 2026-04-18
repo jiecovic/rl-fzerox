@@ -43,20 +43,37 @@ collision_recoil_penalty: -2.0
 # Boost pads: small route incentive for entering dash-pad boost, guarded so
 # reversing or revisiting the same unwrapped progress region cannot farm it.
 boost_pad_reward: 25.0
-boost_pad_reward_progress_window: 1000.0
+boost_pad_reward_progress_window: 800.0
 
 # Energy refill: multiplier scale applied only to actual frontier-progress reward.
 # No new progress means no refill reward, so recharge strips cannot be farmed by stalling.
-energy_gain_reward_scale: 8.0
+energy_gain_reward_scale: 12.0
 # Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
 energy_gain_collision_cooldown_frames: 240
 # Energy refill: max once-per-lap bonus for reaching full energy from below.
 # The payout is scaled by the recovered energy fraction since the last full
 # state, so a tiny scratch/refill cannot collect the full bonus.
-energy_full_refill_lap_bonus: 20.0
+energy_full_refill_lap_bonus: 10.0
 # Energy refill: require at least this much recovered energy before the flat
-# full-refill bonus can fire. At 0.10 and bonus 20, the threshold payout is 2.
+# full-refill bonus can fire. At 0.10 and bonus 10, the threshold payout is 1.
 energy_full_refill_min_gain_fraction: 0.10
 
+# Gas: optional per-frame penalty for requesting less than the threshold.
+# Disabled at 0.0; with threshold 0.5, discrete idle gas gets the full penalty.
+gas_underuse_penalty: -0.005
+gas_underuse_threshold: 0.5
+
+# Steering: small MPC-style acceleration penalty for high-frequency chatter.
+# This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
+# Smooth ramps and steady cornering are near zero; rapid left-right flips hit the cap.
+steer_oscillation_penalty: -0.001
+steer_oscillation_deadzone: 0.0
+steer_oscillation_cap: 2.0
+steer_oscillation_power: 2.0
+
+# Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
+lean_low_speed_penalty: -0.005
+lean_low_speed_penalty_max_speed_kph: 790.0
+
 # Airborne: event reward when an airborne machine lands back on the track.
-airborne_landing_reward: 10.0
+airborne_landing_reward: 0.0

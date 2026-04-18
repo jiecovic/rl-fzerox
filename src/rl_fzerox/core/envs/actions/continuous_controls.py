@@ -4,8 +4,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import numpy as np
+from gymnasium import spaces
 
+from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
+from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
 from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK
 
@@ -27,9 +30,24 @@ class ContinuousDriveDecoder:
         if self._mode == "always_accelerate":
             return ACCELERATE_MASK
         if self._mode == "threshold":
-            return _threshold_drive_mask(drive, deadzone=self._deadzone)
+            return (
+                ACCELERATE_MASK
+                if continuous_drive_gas_level(
+                    drive,
+                    mode=self._mode,
+                    deadzone=self._deadzone,
+                )
+                > 0.0
+                else 0
+            )
         if self._mode == "pwm":
-            return self._pwm_drive_mask(_pwm_duty_cycle(drive, deadzone=self._deadzone))
+            return self._pwm_drive_mask(
+                continuous_drive_gas_level(
+                    drive,
+                    mode=self._mode,
+                    deadzone=self._deadzone,
+                )
+            )
         raise ValueError(f"Unsupported continuous drive mode: {self._mode!r}")
 
     def _pwm_drive_mask(self, duty: float) -> int:
@@ -133,9 +151,57 @@ def hybrid_branch(
         raise ValueError(f"Hybrid action is missing {branch_name!r} branch") from exc
 
 
-def _threshold_drive_mask(drive: float, *, deadzone: float) -> int:
-    # The SAC experiment keeps air brake out of the action space: negative drive coasts.
-    return ACCELERATE_MASK if drive > deadzone else 0
+def continuous_drive_gas_level(drive: float, *, mode: str, deadzone: float) -> float:
+    """Return normalized gas intent for one continuous drive axis."""
+
+    if mode == "always_accelerate":
+        return 1.0
+    if mode == "threshold":
+        return 1.0 if drive > deadzone else 0.0
+    if mode == "pwm":
+        return _pwm_duty_cycle(drive, deadzone=deadzone)
+    raise ValueError(f"Unsupported continuous drive mode: {mode!r}")
+
+
+def requested_gas_level(
+    *,
+    control_state: ControllerState,
+    drive_axis: float | None,
+    continuous_drive_mode: str,
+    continuous_drive_deadzone: float,
+) -> float:
+    """Return one canonical 0..1 gas intent for reward and HUD consumers."""
+
+    if drive_axis is not None:
+        return continuous_drive_gas_level(
+            drive_axis,
+            mode=continuous_drive_mode,
+            deadzone=continuous_drive_deadzone,
+        )
+    return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
+
+
+def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float | None:
+    """Extract the raw continuous drive axis when the action space exposes one."""
+
+    source: object
+    if isinstance(action_space, spaces.Dict):
+        if not isinstance(action, Mapping):
+            return None
+        source = action.get(HYBRID_CONTINUOUS_ACTION_KEY)
+    elif isinstance(action_space, spaces.Box):
+        source = action
+    else:
+        return None
+    if source is None or isinstance(source, str | bytes):
+        return None
+    try:
+        values = np.asarray(source, dtype=np.float32).reshape(-1)
+    except (TypeError, ValueError):
+        return None
+    if values.size < 2 or not np.isfinite(values[1]):
+        return None
+    return float(np.clip(values[1], -1.0, 1.0))
 
 
 def _pwm_duty_cycle(drive: float, *, deadzone: float) -> float:

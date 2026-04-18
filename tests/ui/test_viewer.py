@@ -129,6 +129,7 @@ def test_input_section_includes_visualized_control_state() -> None:
             joypad_mask=ACCELERATE_MASK | BOOST_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.5,
         ),
+        gas_level=1.0,
         policy_label=None,
         policy_curriculum_stage=None,
         policy_action=None,
@@ -144,7 +145,7 @@ def test_input_section_includes_visualized_control_state() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 1
+    assert input_section.control_viz.gas_level == 1.0
     assert input_section.control_viz.steer_x == 0.5
     assert input_section.control_viz.boost_pressed
     assert input_section.control_viz.lean_direction == -1
@@ -185,6 +186,7 @@ def test_input_section_keeps_gas_unipolar_with_air_brake_button_pressed() -> Non
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+        gas_level=1.0,
         policy_label=None,
         policy_curriculum_stage=None,
         policy_action=np.array([1, 1, 1], dtype=np.int64),
@@ -200,12 +202,11 @@ def test_input_section_keeps_gas_unipolar_with_air_brake_button_pressed() -> Non
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 1
-    assert input_section.control_viz.gas_axis is None
+    assert input_section.control_viz.gas_level == 1.0
     assert input_section.control_viz.air_brake_axis is None
 
 
-def test_input_section_visualizes_continuous_policy_gas_axis() -> None:
+def test_input_section_visualizes_canonical_gas_level() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -213,12 +214,12 @@ def test_input_section_visualizes_continuous_policy_gas_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(left_stick_x=0.25),
+        gas_level=0.5,
         policy_label="sac_cnn_0013",
         policy_curriculum_stage=None,
         policy_action=np.array([0.25, -0.5], dtype=np.float32),
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="pwm",
         continuous_drive_deadzone=0.0,
         action_repeat=1,
         stuck_step_limit=240,
@@ -230,8 +231,7 @@ def test_input_section_visualizes_continuous_policy_gas_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_level == 0
-    assert input_section.control_viz.gas_axis == pytest.approx(0.5)
+    assert input_section.control_viz.gas_level == pytest.approx(0.5)
     assert input_section.control_viz.air_brake_axis is None
 
 
@@ -243,6 +243,7 @@ def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
+        gas_level=1.0,
         policy_label="maskable_hybrid_recurrent_ppo_cnn_0015",
         policy_curriculum_stage=None,
         policy_action={
@@ -251,7 +252,6 @@ def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
         },
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="always_accelerate",
         continuous_drive_deadzone=0.0,
         action_repeat=1,
         stuck_step_limit=240,
@@ -263,11 +263,11 @@ def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_level == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
 
 
-def test_input_section_visualizes_hybrid_policy_gas_axis() -> None:
+def test_input_section_visualizes_hybrid_canonical_gas_level() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -278,6 +278,7 @@ def test_input_section_visualizes_hybrid_policy_gas_axis() -> None:
             joypad_mask=ACCELERATE_MASK | LEAN_LEFT_MASK,
             left_stick_x=0.25,
         ),
+        gas_level=1.0,
         policy_label="hybrid_ppo_cnn_0001",
         policy_curriculum_stage=None,
         policy_action={
@@ -286,7 +287,6 @@ def test_input_section_visualizes_hybrid_policy_gas_axis() -> None:
         },
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="pwm",
         continuous_drive_deadzone=0.0,
         action_repeat=1,
         stuck_step_limit=240,
@@ -298,7 +298,7 @@ def test_input_section_visualizes_hybrid_policy_gas_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_level == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
     assert input_section.control_viz.lean_direction == -1
 
@@ -311,6 +311,7 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+        gas_level=1.0,
         policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_action={
@@ -319,7 +320,6 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
         },
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="pwm",
         continuous_drive_deadzone=0.0,
         action_repeat=1,
         stuck_step_limit=240,
@@ -331,7 +331,7 @@ def test_input_section_visualizes_hybrid_policy_air_brake_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_level == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis == pytest.approx(0.5)
 
 
@@ -343,6 +343,7 @@ def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+        gas_level=1.0,
         policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_action={
@@ -351,7 +352,6 @@ def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
         },
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="pwm",
         continuous_drive_deadzone=0.0,
         continuous_air_brake_mode="off",
         action_repeat=1,
@@ -364,7 +364,7 @@ def test_input_section_hides_disabled_hybrid_policy_air_brake_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_axis == pytest.approx(1.0)
+    assert input_section.control_viz.gas_level == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
 
 
@@ -376,6 +376,7 @@ def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK),
+        gas_level=1.0,
         policy_label="hybrid_ppo_cnn_0002",
         policy_curriculum_stage=None,
         policy_action={
@@ -384,7 +385,6 @@ def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
         },
         policy_reload_age_seconds=None,
         policy_reload_error=None,
-        continuous_drive_mode="pwm",
         continuous_drive_deadzone=0.0,
         continuous_air_brake_mode="disable_on_ground",
         continuous_air_brake_disabled=True,
@@ -402,7 +402,7 @@ def test_input_section_grays_disabled_ground_air_brake_axis() -> None:
     assert input_section.control_viz.air_brake_disabled is True
 
 
-def test_input_section_ignores_discrete_policy_action_as_gas_axis() -> None:
+def test_input_section_uses_canonical_gas_level_for_discrete_policy_action() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -410,6 +410,7 @@ def test_input_section_ignores_discrete_policy_action_as_gas_axis() -> None:
         episode_reward=0.0,
         paused=False,
         control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.0),
+        gas_level=1.0,
         policy_label="ppo_cnn_0013",
         policy_curriculum_stage=None,
         policy_action=np.array([4, 1], dtype=np.int64),
@@ -425,7 +426,7 @@ def test_input_section_ignores_discrete_policy_action_as_gas_axis() -> None:
 
     input_section = next(section for section in columns.left if section.title == "Input")
     assert input_section.control_viz is not None
-    assert input_section.control_viz.gas_axis is None
+    assert input_section.control_viz.gas_level == pytest.approx(1.0)
     assert input_section.control_viz.air_brake_axis is None
 
 

@@ -99,7 +99,8 @@ def _run_simulation_loop(
             observation, info = env.reset(seed=reset_seed)
             _reset_policy_runner(policy_runner)
             reset_info = dict(info)
-            current_control_state = ControllerState()
+            current_control_state = env.last_requested_control_state
+            current_gas_level = env.last_gas_level
             current_policy_action: ActionValue | None = None
             terminated = False
             truncated = False
@@ -121,6 +122,7 @@ def _run_simulation_loop(
                     control_fps=control_rate.rate_hz(),
                     target_control_fps=target_control_fps,
                     control_state=current_control_state,
+                    gas_level=current_gas_level,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     policy_reload_error=policy_reload_error,
@@ -182,6 +184,8 @@ def _run_simulation_loop(
                             current_control_state
                         )
                     current_policy_action = None
+                    current_control_state = env.last_requested_control_state
+                    current_gas_level = env.last_gas_level
                 else:
                     _sync_policy_curriculum_stage(policy_runner, env)
                     action = policy_runner.predict(
@@ -190,10 +194,9 @@ def _run_simulation_loop(
                         action_masks=env.action_masks(),
                     )
                     current_policy_action = action
-                    current_control_state = env.action_to_control_state(action)
-                    observation, reward, terminated, truncated, info = env.step_control(
-                        current_control_state
-                    )
+                    observation, reward, terminated, truncated, info = env.step(action)
+                    current_control_state = env.last_requested_control_state
+                    current_gas_level = env.last_gas_level
                 control_rate.tick()
                 episode_reward += reward
                 best_finish_position = _update_best_finish_position(
@@ -215,6 +218,7 @@ def _run_simulation_loop(
                         control_fps=control_rate.rate_hz(),
                         target_control_fps=target_control_fps,
                         control_state=current_control_state,
+                        gas_level=current_gas_level,
                         policy_action=current_policy_action,
                         policy_runner=policy_runner,
                         policy_reload_error=policy_reload_error,
@@ -242,6 +246,7 @@ def _build_snapshot(
     control_fps: float,
     target_control_fps: float | None,
     control_state: ControllerState,
+    gas_level: float,
     policy_action: ActionValue | None,
     policy_runner,
     policy_reload_error: str | None,
@@ -261,6 +266,7 @@ def _build_snapshot(
         target_control_fps=target_control_fps,
         native_fps=float(env.backend.native_fps),
         control_state=control_state,
+        gas_level=gas_level,
         policy_action=policy_action,
         policy_label=_policy_label(policy_runner),
         policy_curriculum_stage=_policy_curriculum_stage(policy_runner),

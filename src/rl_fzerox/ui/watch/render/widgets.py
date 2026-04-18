@@ -226,10 +226,7 @@ def _draw_control_viz(
     )
 
     gas_group_center_x = gas_x + gas_group_width // 2
-    gas_level = (
-        control_viz.gas_axis if control_viz.gas_axis is not None else float(control_viz.gas_level)
-    )
-    gas_level = max(0.0, min(1.0, gas_level))
+    gas_level = max(0.0, min(1.0, control_viz.gas_level))
     if dual_gas_levers:
         air_brake_level = max(0.0, min(1.0, control_viz.air_brake_axis or 0.0))
         air_brake_color = (
