@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.rewards import (
     DEFAULT_REWARD_NAME,
     RaceV3RewardTracker,
     RaceV3RewardWeights,
+    RewardActionContext,
     build_reward_tracker,
     reward_tracker_names,
 )
@@ -60,6 +61,14 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "energy_gain_collision_cooldown_frames": 17,
         "energy_full_refill_lap_bonus": 4.0,
         "energy_full_refill_min_gain_fraction": 0.12,
+        "gas_underuse_penalty": -0.03,
+        "gas_underuse_threshold": 0.25,
+        "steer_oscillation_penalty": -0.004,
+        "steer_oscillation_deadzone": 0.05,
+        "steer_oscillation_cap": 1.5,
+        "steer_oscillation_power": 1.5,
+        "lean_low_speed_penalty": -0.01,
+        "lean_low_speed_penalty_max_speed_kph": 800.0,
         "airborne_landing_reward": 5.0,
         "collision_recoil_penalty": -0.25,
         "failure_penalty": -30.0,
@@ -560,6 +569,187 @@ def test_race_v3_multiplies_time_penalty_by_frames_run() -> None:
 
     assert step.reward == pytest.approx(-0.03)
     assert step.breakdown == {"time": -0.03}
+
+
+def test_race_v3_penalizes_lean_request_below_speed_threshold() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            lean_low_speed_penalty=-0.01,
+            lean_low_speed_penalty_max_speed_kph=800.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0, speed_kph=799.0),
+        RewardActionContext(lean_requested=True),
+    )
+
+    assert step.reward == pytest.approx(-0.03)
+    assert step.breakdown == {"lean_low_speed": -0.03}
+
+
+def test_race_v3_penalizes_missing_discrete_gas_request() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            gas_underuse_penalty=-0.02,
+            gas_underuse_threshold=0.5,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(gas_level=0.0),
+    )
+
+    assert step.reward == pytest.approx(-0.06)
+    assert step.breakdown == {"gas_underuse": -0.06}
+
+
+def test_race_v3_scales_gas_underuse_penalty_below_threshold() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            gas_underuse_penalty=-0.02,
+            gas_underuse_threshold=0.5,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    under_threshold = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=2),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(gas_level=0.25),
+    )
+    at_threshold = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=2),
+        _status(step_count=4),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(gas_level=0.5),
+    )
+
+    assert under_threshold.reward == pytest.approx(-0.02)
+    assert under_threshold.breakdown == {"gas_underuse": -0.02}
+    assert at_threshold.reward == 0.0
+    assert at_threshold.breakdown == {}
+
+
+def test_race_v3_penalizes_steering_oscillation_acceleration() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            steer_oscillation_penalty=-0.001,
+            steer_oscillation_deadzone=0.0,
+            steer_oscillation_cap=2.0,
+            steer_oscillation_power=2.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(steer_level=-1.0),
+    )
+    second = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(steer_level=1.0),
+    )
+    third = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(steer_level=-1.0),
+    )
+
+    assert first.reward == 0.0
+    assert second.reward == 0.0
+    assert third.reward == pytest.approx(-0.001)
+    assert third.breakdown == {"steer_oscillation": pytest.approx(-0.001)}
+
+
+def test_race_v3_does_not_penalize_smooth_steering_ramp() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            steer_oscillation_penalty=-0.001,
+            steer_oscillation_deadzone=0.0,
+            steer_oscillation_cap=2.0,
+            steer_oscillation_power=2.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+    step = None
+
+    for step_count, steer_level in enumerate((0.0, 0.2, 0.4), start=1):
+        step = tracker.step_summary(
+            _summary(max_race_distance=0.0),
+            _status(step_count=step_count),
+            _telemetry(race_distance=0.0),
+            RewardActionContext(steer_level=steer_level),
+        )
+
+    assert step is not None
+    assert step.reward == 0.0
+    assert step.breakdown == {}
+
+
+def test_race_v3_does_not_penalize_idle_or_high_speed_lean() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            lean_low_speed_penalty=-0.01,
+            lean_low_speed_penalty_max_speed_kph=800.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    idle_step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, speed_kph=700.0),
+        RewardActionContext(lean_requested=False),
+    )
+    fast_step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0, speed_kph=800.0),
+        RewardActionContext(lean_requested=True),
+    )
+
+    assert idle_step.reward == 0.0
+    assert idle_step.breakdown == {}
+    assert fast_step.reward == 0.0
+    assert fast_step.breakdown == {}
 
 
 def _telemetry(

@@ -26,6 +26,14 @@ class RaceV3RewardWeights:
     energy_gain_collision_cooldown_frames: int = 120
     energy_full_refill_lap_bonus: float = 0.0
     energy_full_refill_min_gain_fraction: float = 0.0
+    gas_underuse_penalty: float = 0.0
+    gas_underuse_threshold: float = 0.5
+    steer_oscillation_penalty: float = 0.0
+    steer_oscillation_deadzone: float = 0.0
+    steer_oscillation_cap: float = 2.0
+    steer_oscillation_power: float = 2.0
+    lean_low_speed_penalty: float = 0.0
+    lean_low_speed_penalty_max_speed_kph: float = 800.0
     airborne_landing_reward: float = 0.0
     collision_recoil_penalty: float = -0.25
     failure_penalty: float = -20.0

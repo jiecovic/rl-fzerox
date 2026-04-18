@@ -1,9 +1,6 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
-from collections.abc import Mapping
-
-import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
@@ -15,14 +12,19 @@ from rl_fzerox.core.config.schema import (
     RewardConfig,
     TrackSamplingConfig,
 )
-from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.domain.lean import LEAN_MODE_TIMER_ASSIST
 from rl_fzerox.core.envs.actions import (
     AIR_BRAKE_MASK,
     BOOST_MASK,
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
     ActionValue,
     ResettableActionAdapter,
     build_action_adapter,
+)
+from rl_fzerox.core.envs.actions.continuous_controls import (
+    action_drive_axis,
+    requested_gas_level,
 )
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.observations import (
@@ -113,6 +115,8 @@ class FZeroXEnvEngine:
         self._episode_uses_custom_baseline = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
+        self._last_requested_control_state = ControllerState()
+        self._last_gas_level = 0.0
         self._last_info: dict[str, object] = {}
         self._last_telemetry: FZeroXTelemetry | None = None
         self._manual_boost_allowed: bool | None = None
@@ -126,6 +130,14 @@ class FZeroXEnvEngine:
     @property
     def observation_space(self) -> spaces.Space:
         return self._observation_space
+
+    @property
+    def last_requested_control_state(self) -> ControllerState:
+        return self._last_requested_control_state
+
+    @property
+    def last_gas_level(self) -> float:
+        return self._last_gas_level
 
     def action_masks(self) -> ActionMask:
         """Return the flattened boolean action mask for the current stage."""
@@ -202,6 +214,8 @@ class FZeroXEnvEngine:
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
+        self._last_requested_control_state = ControllerState()
+        self._last_gas_level = 0.0
         self.backend.set_controller_state(self._held_controller_state)
         self._control_state.reset()
         self._mask_controller.set_lean_allowed_values(None)
@@ -256,7 +270,7 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._step_control_state(
             self._action_adapter.decode(action),
-            action_drive_axis=_action_drive_axis(action, self._action_space),
+            action_drive_axis=action_drive_axis(action, self._action_space),
         )
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
@@ -441,6 +455,14 @@ class FZeroXEnvEngine:
         info = backend_step_info(self.backend)
         telemetry = step_result.telemetry
         self._last_telemetry = telemetry
+        gas_level = requested_gas_level(
+            control_state=requested_control_state,
+            drive_axis=action_drive_axis,
+            continuous_drive_mode=self.config.action.continuous_drive_mode,
+            continuous_drive_deadzone=float(self.config.action.continuous_drive_deadzone),
+        )
+        self._last_requested_control_state = requested_control_state
+        self._last_gas_level = gas_level
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
@@ -448,6 +470,14 @@ class FZeroXEnvEngine:
             RewardActionContext(
                 air_brake_requested=bool(requested_control_state.joypad_mask & AIR_BRAKE_MASK),
                 boost_requested=bool(applied_control_state.joypad_mask & BOOST_MASK),
+                lean_requested=bool(
+                    requested_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK)
+                ),
+                gas_level=gas_level,
+                steer_level=max(
+                    -1.0,
+                    min(1.0, float(requested_control_state.left_stick_x)),
+                ),
                 drive_axis=action_drive_axis,
             ),
         )
@@ -563,26 +593,3 @@ def _without_joypad_mask(control_state: ControllerState, joypad_mask: int) -> Co
         right_stick_x=control_state.right_stick_x,
         right_stick_y=control_state.right_stick_y,
     )
-
-
-def _action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float | None:
-    """Extract the raw continuous drive axis when the active action space has one."""
-
-    source: object
-    if isinstance(action_space, spaces.Dict):
-        if not isinstance(action, Mapping):
-            return None
-        source = action.get(HYBRID_CONTINUOUS_ACTION_KEY)
-    elif isinstance(action_space, spaces.Box):
-        source = action
-    else:
-        return None
-    if source is None or isinstance(source, str | bytes):
-        return None
-    try:
-        values = np.asarray(source, dtype=np.float32).reshape(-1)
-    except (TypeError, ValueError):
-        return None
-    if values.size < 2 or not np.isfinite(values[1]):
-        return None
-    return float(np.clip(values[1], -1.0, 1.0))

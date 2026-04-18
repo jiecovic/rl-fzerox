@@ -28,7 +28,10 @@ class RewardActionContext:
     """Action bits the reward function may need for context-dependent shaping."""
 
     boost_requested: bool = False
+    lean_requested: bool = False
     air_brake_requested: bool = False
+    gas_level: float | None = None
+    steer_level: float | None = None
     drive_axis: float | None = None
 
 

@@ -53,6 +53,14 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         return self._engine.action_to_control_state(action)
 
+    @property
+    def last_requested_control_state(self) -> ControllerState:
+        return self._engine.last_requested_control_state
+
+    @property
+    def last_gas_level(self) -> float:
+        return self._engine.last_gas_level
+
     def action_masks(self) -> ActionMask:
         """Return the flattened boolean action mask for maskable PPO."""
 

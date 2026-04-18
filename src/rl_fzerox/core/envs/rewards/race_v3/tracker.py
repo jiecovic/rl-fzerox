@@ -46,6 +46,8 @@ class RaceV3RewardTracker:
         self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = False
         self._previous_energy_fraction = 0.0
+        self._previous_steer_level: float | None = None
+        self._penultimate_steer_level: float | None = None
         self._awarded_laps_completed = 0
 
     def reset(
@@ -68,6 +70,8 @@ class RaceV3RewardTracker:
         self._energy_refill_since_full_fraction = 0.0
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
         self._previous_energy_fraction = _normalized_energy(telemetry)
+        self._previous_steer_level = None
+        self._penultimate_steer_level = None
         if telemetry is None or not telemetry.in_race_mode:
             self._awarded_laps_completed = 0
             return
@@ -87,7 +91,6 @@ class RaceV3RewardTracker:
     ) -> RewardStep:
         """Compute frontier-progress reward from one repeated env step."""
 
-        del action_context
         if telemetry is None or not telemetry.in_race_mode:
             self._progress.reset(None)
             self._damage.reset()
@@ -100,6 +103,8 @@ class RaceV3RewardTracker:
             self._energy_refill_since_full_fraction = 0.0
             self._previous_airborne = False
             self._previous_energy_fraction = 0.0
+            self._previous_steer_level = None
+            self._penultimate_steer_level = None
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
@@ -144,6 +149,21 @@ class RaceV3RewardTracker:
         if full_refill_reward:
             reward += full_refill_reward
             breakdown["energy_full_refill_lap"] = full_refill_reward
+
+        gas_penalty = self._gas_underuse_penalty(summary, action_context)
+        if gas_penalty:
+            reward += gas_penalty
+            breakdown["gas_underuse"] = gas_penalty
+
+        steer_oscillation_penalty = self._steer_oscillation_penalty(action_context)
+        if steer_oscillation_penalty:
+            reward += steer_oscillation_penalty
+            breakdown["steer_oscillation"] = steer_oscillation_penalty
+
+        lean_penalty = self._lean_low_speed_penalty(summary, telemetry, action_context)
+        if lean_penalty:
+            reward += lean_penalty
+            breakdown["lean_low_speed"] = lean_penalty
 
         landing_reward = self._landing_reward(telemetry)
         if landing_reward:
@@ -360,6 +380,86 @@ class RaceV3RewardTracker:
             return 0.0
         return reward
 
+    def _lean_low_speed_penalty(
+        self,
+        summary: StepSummary,
+        telemetry: FZeroXTelemetry,
+        action_context: RewardActionContext | None,
+    ) -> float:
+        penalty = self._weights.lean_low_speed_penalty
+        if (
+            penalty >= 0.0
+            or action_context is None
+            or not action_context.lean_requested
+            or telemetry.player.speed_kph >= self._weights.lean_low_speed_penalty_max_speed_kph
+        ):
+            return 0.0
+        return max(int(summary.frames_run), 0) * penalty
+
+    def _gas_underuse_penalty(
+        self,
+        summary: StepSummary,
+        action_context: RewardActionContext | None,
+    ) -> float:
+        penalty = self._weights.gas_underuse_penalty
+        threshold = self._weights.gas_underuse_threshold
+        if (
+            penalty >= 0.0
+            or threshold <= 0.0
+            or action_context is None
+            or action_context.gas_level is None
+        ):
+            return 0.0
+
+        gas_level = min(max(float(action_context.gas_level), 0.0), 1.0)
+        if gas_level >= threshold:
+            return 0.0
+
+        deficit_scale = (threshold - gas_level) / threshold
+        return max(int(summary.frames_run), 0) * penalty * deficit_scale
+
+    def _steer_oscillation_penalty(
+        self,
+        action_context: RewardActionContext | None,
+    ) -> float:
+        steer_level = _normalized_steer_level(action_context)
+        if steer_level is None:
+            self._penultimate_steer_level = None
+            self._previous_steer_level = None
+            return 0.0
+
+        penalty = 0.0
+        if self._penultimate_steer_level is not None and self._previous_steer_level is not None:
+            penalty = self._steer_oscillation_penalty_for(
+                steer_level,
+                previous=self._previous_steer_level,
+                penultimate=self._penultimate_steer_level,
+            )
+
+        self._penultimate_steer_level = self._previous_steer_level
+        self._previous_steer_level = steer_level
+        return penalty
+
+    def _steer_oscillation_penalty_for(
+        self,
+        steer_level: float,
+        *,
+        previous: float,
+        penultimate: float,
+    ) -> float:
+        penalty = self._weights.steer_oscillation_penalty
+        cap = self._weights.steer_oscillation_cap
+        if penalty >= 0.0 or cap <= 0.0:
+            return 0.0
+
+        acceleration = steer_level - (2.0 * previous) + penultimate
+        magnitude = max(abs(acceleration) - self._weights.steer_oscillation_deadzone, 0.0)
+        if magnitude <= 0.0:
+            return 0.0
+
+        normalized = min(magnitude / cap, 1.0)
+        return penalty * (normalized**self._weights.steer_oscillation_power)
+
     def _lap_rewards(
         self,
         telemetry: FZeroXTelemetry,
@@ -423,3 +523,9 @@ def _normalized_energy(telemetry: FZeroXTelemetry | None) -> float:
     if max_energy <= 0.0:
         return 0.0
     return max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
+
+
+def _normalized_steer_level(action_context: RewardActionContext | None) -> float | None:
+    if action_context is None or action_context.steer_level is None:
+        return None
+    return max(-1.0, min(1.0, float(action_context.steer_level)))

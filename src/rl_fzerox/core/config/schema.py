@@ -247,6 +247,14 @@ class RewardConfig(BaseModel):
     energy_gain_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
+    gas_underuse_penalty: float = Field(default=0.0, le=0.0)
+    gas_underuse_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    steer_oscillation_penalty: float = Field(default=0.0, le=0.0)
+    steer_oscillation_deadzone: NonNegativeFloat = 0.0
+    steer_oscillation_cap: PositiveFloat = 2.0
+    steer_oscillation_power: PositiveFloat = 2.0
+    lean_low_speed_penalty: float = Field(default=0.0, le=0.0)
+    lean_low_speed_penalty_max_speed_kph: NonNegativeFloat = 800.0
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0

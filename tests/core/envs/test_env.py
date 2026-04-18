@@ -910,6 +910,40 @@ def test_step_forces_accelerate_when_drive_mode_always_accelerate() -> None:
     assert "reward_breakdown" not in info
 
 
+def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=5.0),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="continuous_steer_drive",
+                continuous_drive_mode="pwm",
+                continuous_drive_deadzone=0.0,
+            ),
+        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
+    )
+
+    env.reset(seed=21)
+    _, reward, _, _, info = env.step(np.array([0.0, -0.5], dtype=np.float32))
+
+    assert env.last_gas_level == pytest.approx(0.5)
+    assert env.last_requested_control_state == ControllerState()
+    assert backend.last_controller_state == ControllerState()
+    assert reward == 0.0
+    assert "reward_breakdown" not in info
+
+
 def test_extended_action_env_exposes_four_head_action_space() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),

@@ -70,6 +70,7 @@ class WatchSnapshot:
     target_control_fps: float | None
     native_fps: float
     control_state: ControllerState
+    gas_level: float
     policy_action: ActionValue | None
     policy_label: str | None
     policy_curriculum_stage: str | None
