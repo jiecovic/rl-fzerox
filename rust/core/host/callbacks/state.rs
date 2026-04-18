@@ -23,6 +23,7 @@ use super::util::{
 use crate::core::error::CoreError;
 use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
+use crate::core::observation::ObservationStackMode;
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
     PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame, VideoCrop, VideoFrame,
@@ -67,16 +68,28 @@ struct RenderRequest {
     crop: VideoCrop,
 }
 
+pub(crate) struct StackedObservationRequest {
+    pub aspect_ratio: f64,
+    pub target_width: usize,
+    pub target_height: usize,
+    pub rgb: bool,
+    pub crop: VideoCrop,
+    pub frame_stack: usize,
+    pub stack_mode: ObservationStackMode,
+}
+
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct StackedObservationKey {
     render_plan: ProcessedFramePlanKey,
     frame_stack: usize,
+    stack_mode: ObservationStackMode,
 }
 
 struct StackedObservationBuffer {
     frame_len: usize,
     channels_per_pixel: usize,
     frame_stack: usize,
+    stack_mode: ObservationStackMode,
     frames: Vec<u8>,
     bytes: Vec<u8>,
     next_slot: usize,
@@ -207,14 +220,9 @@ impl CallbackState {
 
     pub fn stacked_observation_frame(
         &mut self,
-        aspect_ratio: f64,
-        target_width: usize,
-        target_height: usize,
-        rgb: bool,
-        crop: VideoCrop,
-        frame_stack: usize,
+        request: StackedObservationRequest,
     ) -> Result<&[u8], CoreError> {
-        let request = RenderRequest {
+        let render_request = RenderRequest {
             source_width: self
                 .raw_frame
                 .as_ref()
@@ -227,18 +235,19 @@ impl CallbackState {
                 .map(|raw_frame| raw_frame.height)
                 .or_else(|| self.frame.as_ref().map(|frame| frame.height))
                 .ok_or(CoreError::NoFrameAvailable)?,
-            aspect_ratio,
-            target_width,
-            target_height,
-            rgb,
-            crop,
+            aspect_ratio: request.aspect_ratio,
+            target_width: request.target_width,
+            target_height: request.target_height,
+            rgb: request.rgb,
+            crop: request.crop,
         };
         let frame_serial = self.frame_serial;
         let stack_key = StackedObservationKey {
-            render_plan: request.plan_key(),
-            frame_stack,
+            render_plan: render_request.plan_key(),
+            frame_stack: request.frame_stack,
+            stack_mode: request.stack_mode,
         };
-        self.render_observation_into_buffer(request)?;
+        self.render_observation_into_buffer(render_request)?;
 
         let observation_buffer = self.observation_buffer.as_slice();
         let stack_buffer = self
@@ -247,8 +256,9 @@ impl CallbackState {
             .or_insert_with(|| {
                 StackedObservationBuffer::new(
                     observation_buffer.len(),
-                    frame_stack,
+                    request.frame_stack,
                     if request.rgb { 3 } else { 1 },
+                    request.stack_mode,
                 )
             });
         stack_buffer.update(observation_buffer, frame_serial)?;
@@ -555,16 +565,24 @@ impl RenderRequest {
 }
 
 impl StackedObservationBuffer {
-    fn new(frame_len: usize, frame_stack: usize, channels_per_pixel: usize) -> Self {
+    fn new(
+        frame_len: usize,
+        frame_stack: usize,
+        channels_per_pixel: usize,
+        stack_mode: ObservationStackMode,
+    ) -> Self {
         debug_assert!(frame_stack > 0);
         debug_assert!(channels_per_pixel > 0);
         debug_assert_eq!(frame_len % channels_per_pixel, 0);
+        let pixel_count = frame_len / channels_per_pixel;
+        let output_channels = stack_mode.stacked_channels(channels_per_pixel, frame_stack);
         Self {
             frame_len,
             channels_per_pixel,
             frame_stack,
+            stack_mode,
             frames: vec![0_u8; frame_len * frame_stack],
-            bytes: vec![0_u8; frame_len * frame_stack],
+            bytes: vec![0_u8; pixel_count * output_channels],
             next_slot: 0,
             last_frame_serial: None,
         }
@@ -605,7 +623,7 @@ impl StackedObservationBuffer {
     fn materialize(&mut self) {
         let pixel_count = self.frame_len / self.channels_per_pixel;
 
-        if self.channels_per_pixel == 3 {
+        if self.stack_mode == ObservationStackMode::Rgb && self.channels_per_pixel == 3 {
             for pixel_index in 0..pixel_count {
                 let pixel_src = pixel_index * 3;
                 let pixel_dst = pixel_index * 3 * self.frame_stack;
@@ -621,6 +639,31 @@ impl StackedObservationBuffer {
             return;
         }
 
+        if self.stack_mode == ObservationStackMode::RgbGray && self.channels_per_pixel == 3 {
+            let output_channels = self.stack_mode.stacked_channels(3, self.frame_stack);
+            for pixel_index in 0..pixel_count {
+                let pixel_src = pixel_index * 3;
+                let pixel_dst = pixel_index * output_channels;
+                for stack_index in 0..self.frame_stack {
+                    let slot = (self.next_slot + stack_index) % self.frame_stack;
+                    let src = (slot * self.frame_len) + pixel_src;
+                    let dst = pixel_dst + stack_index;
+                    if stack_index + 1 == self.frame_stack {
+                        self.bytes[dst] = self.frames[src];
+                        self.bytes[dst + 1] = self.frames[src + 1];
+                        self.bytes[dst + 2] = self.frames[src + 2];
+                    } else {
+                        self.bytes[dst] = rgb_to_luma(
+                            self.frames[src],
+                            self.frames[src + 1],
+                            self.frames[src + 2],
+                        );
+                    }
+                }
+            }
+            return;
+        }
+
         for pixel_index in 0..pixel_count {
             let pixel_dst = pixel_index * self.frame_stack;
             for stack_index in 0..self.frame_stack {
@@ -630,4 +673,9 @@ impl StackedObservationBuffer {
             }
         }
     }
+}
+
+fn rgb_to_luma(red: u8, green: u8, blue: u8) -> u8 {
+    let weighted = (77 * u16::from(red)) + (150 * u16::from(green)) + (29 * u16::from(blue)) + 128;
+    (weighted >> 8) as u8
 }

@@ -2,7 +2,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use super::{CallbackState, runtime_root_for_core};
+use super::{CallbackState, StackedObservationRequest, runtime_root_for_core};
+use crate::core::observation::ObservationStackMode;
 use crate::core::video::{VideoCrop, VideoFrame};
 
 static NEXT_RUNTIME_DIR_ID: AtomicUsize = AtomicUsize::new(0);
@@ -89,7 +90,12 @@ fn stacked_observation_interleaves_frames_per_pixel_for_multi_pixel_images() {
     state.set_frame(rgb_row_frame([[1, 2, 3], [4, 5, 6]]));
 
     let stacked = state
-        .stacked_observation_frame(0.0, 2, 1, true, VideoCrop::default(), 2)
+        .stacked_observation_frame(stacked_observation_request(
+            2,
+            1,
+            2,
+            ObservationStackMode::Rgb,
+        ))
         .expect("stacked observation should render")
         .to_vec();
 
@@ -98,11 +104,46 @@ fn stacked_observation_interleaves_frames_per_pixel_for_multi_pixel_images() {
     state.set_frame_for_test_without_reset(rgb_row_frame([[10, 11, 12], [13, 14, 15]]));
 
     let stacked = state
-        .stacked_observation_frame(0.0, 2, 1, true, VideoCrop::default(), 2)
+        .stacked_observation_frame(stacked_observation_request(
+            2,
+            1,
+            2,
+            ObservationStackMode::Rgb,
+        ))
         .expect("stacked observation should render")
         .to_vec();
 
     assert_eq!(stacked, vec![1, 2, 3, 10, 11, 12, 4, 5, 6, 13, 14, 15,]);
+}
+
+#[test]
+fn rgb_gray_stack_encodes_history_as_luma_and_latest_as_rgb() {
+    let mut state = callback_state();
+    state.set_frame(rgb_row_frame([[10, 20, 30], [40, 50, 60]]));
+    let _ = state
+        .stacked_observation_frame(stacked_observation_request(
+            2,
+            1,
+            4,
+            ObservationStackMode::RgbGray,
+        ))
+        .expect("initial stacked observation should render");
+
+    state.set_frame_for_test_without_reset(rgb_row_frame([[70, 80, 90], [100, 110, 120]]));
+    let stacked = state
+        .stacked_observation_frame(stacked_observation_request(
+            2,
+            1,
+            4,
+            ObservationStackMode::RgbGray,
+        ))
+        .expect("stacked observation should render")
+        .to_vec();
+
+    assert_eq!(
+        stacked,
+        vec![18, 18, 18, 70, 80, 90, 48, 48, 48, 100, 110, 120,]
+    );
 }
 
 fn callback_state() -> CallbackState {
@@ -138,7 +179,29 @@ fn rgb_row_frame(pixels: [[u8; 3]; 2]) -> VideoFrame {
 
 fn stacked_observation_bytes(state: &mut CallbackState) -> Vec<u8> {
     state
-        .stacked_observation_frame(0.0, 1, 1, true, VideoCrop::default(), 4)
+        .stacked_observation_frame(stacked_observation_request(
+            1,
+            1,
+            4,
+            ObservationStackMode::Rgb,
+        ))
         .expect("stacked observation should render")
         .to_vec()
+}
+
+fn stacked_observation_request(
+    target_width: usize,
+    target_height: usize,
+    frame_stack: usize,
+    stack_mode: ObservationStackMode,
+) -> StackedObservationRequest {
+    StackedObservationRequest {
+        aspect_ratio: 0.0,
+        target_width,
+        target_height,
+        rgb: true,
+        crop: VideoCrop::default(),
+        frame_stack,
+        stack_mode,
+    }
 }

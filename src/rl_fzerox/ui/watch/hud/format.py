@@ -75,14 +75,19 @@ def _display_aspect_ratio(info: dict[str, object]) -> float:
     return 0.0
 
 
-def _format_observation_summary(observation_shape: tuple[int, ...]) -> str:
-    preview_shape = _preview_frame_shape(observation_shape)
-    stack_size = _observation_stack_size(observation_shape)
-    return (
-        f"{preview_shape[1]}x{preview_shape[0]} "
-        f"{'rgb' if preview_shape[2] == 3 else 'gray'} "
-        f"x{stack_size}"
-    )
+def _format_observation_summary(
+    observation_shape: tuple[int, ...],
+    info: Mapping[str, object] | None = None,
+) -> str:
+    if len(observation_shape) != 3:
+        raise ValueError(f"Expected an HxWxC observation shape, got {observation_shape!r}")
+    height, width, channels = observation_shape
+    stack_size = _observation_stack_size(observation_shape, info=info)
+    stack_mode = _observation_stack_mode(info)
+    color_mode = "rgb+gray" if stack_mode == "rgb_gray" else "rgb"
+    if channels == 1:
+        color_mode = "gray"
+    return f"{width}x{height} {color_mode} x{stack_size} strip"
 
 
 def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
@@ -189,16 +194,39 @@ def _format_distance(distance: float) -> str:
     return f"{distance:,.1f}"
 
 
-def _preview_frame_shape(observation_shape: tuple[int, ...]) -> tuple[int, int, int]:
+def _preview_frame_shape(
+    observation_shape: tuple[int, ...],
+    info: Mapping[str, object] | None = None,
+) -> tuple[int, int, int]:
     if len(observation_shape) != 3:
         raise ValueError(f"Expected an HxWxC observation shape, got {observation_shape!r}")
-    height, width, channels = observation_shape
-    preview_channels = 3 if channels % 3 == 0 else 1
-    return height, width, preview_channels
+    height, width, _ = observation_shape
+    stack_size = max(1, _observation_stack_size(observation_shape, info=info))
+    columns, rows = _observation_preview_grid(stack_size)
+    return height * rows, width * columns, 3
 
 
-def _observation_stack_size(observation_shape: tuple[int, ...]) -> int:
+def _observation_stack_size(
+    observation_shape: tuple[int, ...],
+    *,
+    info: Mapping[str, object] | None = None,
+) -> int:
+    if info is not None:
+        stack_size = info.get("observation_stack")
+        if isinstance(stack_size, int):
+            return stack_size
     channels = observation_shape[2]
     if channels % 3 == 0:
         return channels // 3
     return channels
+
+
+def _observation_stack_mode(info: Mapping[str, object] | None) -> str:
+    if info is None:
+        return "rgb"
+    value = info.get("observation_stack_mode")
+    return value if isinstance(value, str) else "rgb"
+
+
+def _observation_preview_grid(stack_size: int) -> tuple[int, int]:
+    return stack_size, 1

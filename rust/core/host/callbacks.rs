@@ -16,6 +16,7 @@ pub use io::{
     input_poll_callback, input_state_callback, video_refresh_callback,
 };
 pub use state::CallbackState;
+pub(crate) use state::StackedObservationRequest;
 
 #[cfg(test)]
 use util::runtime_root_for_core;

@@ -1,5 +1,5 @@
 # src/fzerox_emulator/_native.pyi
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 import numpy as np
 import numpy.typing as npt
@@ -244,6 +244,7 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
+        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -264,6 +265,7 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
+        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -290,7 +292,12 @@ class Emulator:
     def capture_current_as_baseline(self, path: str | None = None) -> None: ...
     def frame_rgb(self) -> bytes: ...
     def observation_spec(self, preset: str) -> ObservationSpecDict: ...
-    def frame_observation(self, preset: str, frame_stack: int) -> npt.NDArray[np.uint8]: ...
+    def frame_observation(
+        self,
+        preset: str,
+        frame_stack: int,
+        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+    ) -> npt.NDArray[np.uint8]: ...
     def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...

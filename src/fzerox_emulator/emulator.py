@@ -12,7 +12,9 @@ from fzerox_emulator.base import (
     BackendStepResult,
     FrameStep,
     ObservationSpec,
+    ObservationStackMode,
     ResetState,
+    stacked_observation_channels,
 )
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.video import display_size
@@ -121,6 +123,7 @@ class Emulator:
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -138,6 +141,7 @@ class Emulator:
             action_repeat=action_repeat,
             preset=preset,
             frame_stack=frame_stack,
+            stack_mode=stack_mode,
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
@@ -155,7 +159,11 @@ class Emulator:
         )
         frame = np.asarray(observation, dtype=np.uint8)
         spec = self.observation_spec(preset)
-        stacked_channels = spec.channels * frame_stack
+        stacked_channels = stacked_observation_channels(
+            spec.channels,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
         expected_shape = (spec.height, spec.width, stacked_channels)
         if tuple(int(value) for value in frame.shape) != expected_shape:
             raise RuntimeError(
@@ -176,6 +184,7 @@ class Emulator:
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -194,6 +203,7 @@ class Emulator:
                 action_repeat=action_repeat,
                 preset=preset,
                 frame_stack=frame_stack,
+                stack_mode=stack_mode,
                 stuck_min_speed_kph=stuck_min_speed_kph,
                 energy_loss_epsilon=energy_loss_epsilon,
                 max_episode_steps=max_episode_steps,
@@ -212,7 +222,11 @@ class Emulator:
         )
         frame = np.asarray(observation, dtype=np.uint8)
         spec = self.observation_spec(preset)
-        stacked_channels = spec.channels * frame_stack
+        stacked_channels = stacked_observation_channels(
+            spec.channels,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
         expected_observation_shape = (spec.height, spec.width, stacked_channels)
         if tuple(int(value) for value in frame.shape) != expected_observation_shape:
             raise RuntimeError(
@@ -332,12 +346,25 @@ class Emulator:
         self._observation_specs[preset] = spec
         return spec
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
+    def render_observation(
+        self,
+        *,
+        preset: str,
+        frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
+    ) -> ObservationFrame:
         """Return one native stacked observation tensor for the requested preset."""
 
         spec = self.observation_spec(preset)
-        frame = np.asarray(self._native.frame_observation(preset, frame_stack), dtype=np.uint8)
-        stacked_channels = spec.channels * frame_stack
+        frame = np.asarray(
+            self._native.frame_observation(preset, frame_stack, stack_mode),
+            dtype=np.uint8,
+        )
+        stacked_channels = stacked_observation_channels(
+            spec.channels,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
         expected_size = spec.height * spec.width * stacked_channels
         if frame.size != expected_size:
             raise RuntimeError(

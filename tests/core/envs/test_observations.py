@@ -5,6 +5,8 @@ import pytest
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.envs.observations import (
     STATE_FEATURE_NAMES,
+    build_image_observation_space,
+    stacked_observation_channels,
     state_feature_names,
     telemetry_state_vector,
 )
@@ -68,6 +70,35 @@ def test_native_observation_v4_uses_compact_deep_aspect_correct_shape() -> None:
     observation = backend.render_observation(preset="native_crop_v4", frame_stack=3)
 
     assert observation.shape == (98, 130, 9)
+
+
+def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="native_crop_v4",
+        frame_stack=4,
+        stack_mode="rgb_gray",
+    )
+    spec = backend.observation_spec("native_crop_v4")
+    image_space = build_image_observation_space(
+        spec,
+        frame_stack=4,
+        stack_mode="rgb_gray",
+    )
+    current_frame = backend.render_observation(
+        preset="native_crop_v4",
+        frame_stack=1,
+        stack_mode="rgb",
+    )
+
+    assert observation.shape == (98, 130, 6)
+    assert image_space.shape == (98, 130, 6)
+    assert stacked_observation_channels(3, frame_stack=4, stack_mode="rgb_gray") == 6
+    assert np.array_equal(observation[:, :, 0], observation[:, :, 1])
+    assert np.array_equal(observation[:, :, 1], observation[:, :, 2])
+    assert np.array_equal(observation[:, :, -3:], current_frame)
 
 
 def test_state_vector_treats_dash_pad_boost_as_boost_active() -> None:

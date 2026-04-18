@@ -38,7 +38,9 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.core.envs.engine.tracks import TrackBaselineCache
 from rl_fzerox.core.envs.observations import (
     LEAN_DOUBLE_TAP_WINDOW_FRAMES,
+    ObservationStackMode,
     ObservationValue,
+    stacked_observation_channels,
 )
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import (
@@ -69,6 +71,7 @@ class ScriptedStepBackend(SyntheticBackend):
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -101,7 +104,12 @@ class ScriptedStepBackend(SyntheticBackend):
         self._state.frame_index = result.summary.final_frame_index
         self._state.progress = result.summary.max_race_distance
         self._last_frame = self._build_frame()
-        if result.observation.shape[2] != frame_stack * 3:
+        expected_channels = stacked_observation_channels(
+            3,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
+        if result.observation.shape[2] != expected_channels:
             raise AssertionError("Scripted observation stack does not match frame_stack")
         if preset != "native_crop_v3":
             raise AssertionError(f"Unexpected preset {preset!r}")
@@ -788,11 +796,21 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     class ObservationPresetBackend(SyntheticBackend):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__(*args, **kwargs)
-            self.render_observation_calls: list[tuple[str, int]] = []
+            self.render_observation_calls: list[tuple[str, int, str]] = []
 
-        def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
-            self.render_observation_calls.append((preset, frame_stack))
-            return super().render_observation(preset=preset, frame_stack=frame_stack)
+        def render_observation(
+            self,
+            *,
+            preset: str,
+            frame_stack: int,
+            stack_mode: ObservationStackMode = "rgb",
+        ) -> ObservationFrame:
+            self.render_observation_calls.append((preset, frame_stack, stack_mode))
+            return super().render_observation(
+                preset=preset,
+                frame_stack=frame_stack,
+                stack_mode=stack_mode,
+            )
 
     backend = ObservationPresetBackend()
 
@@ -803,7 +821,29 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
 
     assert obs.shape == (116, 164, 12)
     assert info["observation_frame_shape"] == (116, 164, 3)
-    assert backend.render_observation_calls == [("native_crop_v3", 4)]
+    assert backend.render_observation_calls == [("native_crop_v3", 4, "rgb")]
+
+
+def test_env_reset_uses_rgb_gray_stack_shape() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            observation=ObservationConfig(
+                preset="native_crop_v4",
+                frame_stack=4,
+                stack_mode="rgb_gray",
+            ),
+        ),
+    )
+
+    obs, info = env.reset(seed=13)
+    obs = _image_obs(obs)
+
+    assert obs.shape == (98, 130, 6)
+    assert isinstance(env.observation_space, Box)
+    assert env.observation_space.shape == (98, 130, 6)
+    assert info["observation_stack"] == 4
+    assert info["observation_stack_mode"] == "rgb_gray"
 
 
 def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:

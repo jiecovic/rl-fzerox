@@ -9,7 +9,7 @@ use pyo3::types::{PyBytes, PyDict, PyTuple};
 use crate::bindings::error::map_core_error;
 use crate::core::host::{Host, RepeatedStepConfig};
 use crate::core::input::ControllerState;
-use crate::core::observation::ObservationPreset;
+use crate::core::observation::{ObservationPreset, ObservationStackMode};
 
 mod frame;
 mod state;
@@ -114,6 +114,7 @@ impl PyEmulator {
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=true,
         lean_timer_assist=false,
+        stack_mode="rgb",
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -136,6 +137,7 @@ impl PyEmulator {
         progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool,
+        stack_mode: &str,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -143,6 +145,7 @@ impl PyEmulator {
         right_stick_y: f32,
     ) -> PyResult<Bound<'py, PyTuple>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
@@ -160,6 +163,7 @@ impl PyEmulator {
                     action_repeat,
                     preset,
                     frame_stack,
+                    stack_mode,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -177,7 +181,7 @@ impl PyEmulator {
             result.observation,
             spec.frame_height,
             spec.frame_width,
-            spec.channels * frame_stack,
+            stack_mode.stacked_channels(spec.channels, frame_stack),
         )?;
         let summary = step_summary_to_py(py, &result.summary)?;
         let status = step_status_to_py(py, &result.status)?;
@@ -206,6 +210,7 @@ impl PyEmulator {
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=true,
         lean_timer_assist=false,
+        stack_mode="rgb",
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -228,6 +233,7 @@ impl PyEmulator {
         progress_frontier_epsilon: f32,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool,
+        stack_mode: &str,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -235,6 +241,7 @@ impl PyEmulator {
         right_stick_y: f32,
     ) -> PyResult<Bound<'py, PyTuple>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
@@ -252,6 +259,7 @@ impl PyEmulator {
                     action_repeat,
                     preset,
                     frame_stack,
+                    stack_mode,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -269,7 +277,7 @@ impl PyEmulator {
             result.observation,
             spec.frame_height,
             spec.frame_width,
-            spec.channels * frame_stack,
+            stack_mode.stacked_channels(spec.channels, frame_stack),
         )?;
         let display_frames = frames_to_pylist(
             py,
@@ -366,26 +374,28 @@ impl PyEmulator {
         Ok(dict)
     }
 
-    #[pyo3(signature = (preset, frame_stack))]
+    #[pyo3(signature = (preset, frame_stack, stack_mode="rgb"))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
         frame_stack: usize,
+        stack_mode: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
         let frame = py
-            .detach(|| self.host.observation_frame(preset, frame_stack))
+            .detach(|| self.host.observation_frame(preset, frame_stack, stack_mode))
             .map_err(map_core_error)?;
         frame_to_pyarray(
             py,
             frame,
             spec.frame_height,
             spec.frame_width,
-            spec.channels * frame_stack,
+            stack_mode.stacked_channels(spec.channels, frame_stack),
         )
     }
 

@@ -36,6 +36,15 @@ pub enum ObservationPreset {
     NativeCropV4,
 }
 
+/// How repeated observation frames are encoded along the channel axis.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ObservationStackMode {
+    /// Keep every stacked frame as RGB: `3 * frame_stack` channels.
+    Rgb,
+    /// Encode history as grayscale and keep the latest frame RGB.
+    RgbGray,
+}
+
 /// Resolved spatial spec for one observation frame plus the matching display
 /// size used by the watch UI.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -131,9 +140,34 @@ impl ObservationPreset {
     }
 }
 
+impl ObservationStackMode {
+    pub fn parse(name: &str) -> Result<Self, CoreError> {
+        match name {
+            "rgb" => Ok(Self::Rgb),
+            "rgb_gray" => Ok(Self::RgbGray),
+            _ => Err(CoreError::InvalidObservationPreset {
+                name: name.to_owned(),
+            }),
+        }
+    }
+
+    pub fn stacked_channels(self, single_frame_channels: usize, frame_stack: usize) -> usize {
+        match self {
+            Self::Rgb => single_frame_channels * frame_stack,
+            Self::RgbGray => {
+                if frame_stack <= 1 {
+                    single_frame_channels
+                } else {
+                    (frame_stack - 1) + single_frame_channels
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ObservationCropProfile, ObservationPreset};
+    use super::{ObservationCropProfile, ObservationPreset, ObservationStackMode};
     use crate::core::video::VideoCrop;
 
     #[test]
@@ -180,5 +214,12 @@ mod tests {
 
         assert_eq!(spec.preset_name, "native_crop_v4");
         assert_eq!((spec.frame_width, spec.frame_height), (130, 98));
+    }
+
+    #[test]
+    fn rgb_gray_stack_keeps_latest_rgb_and_grays_history() {
+        assert_eq!(ObservationStackMode::Rgb.stacked_channels(3, 4), 12);
+        assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 4), 6);
+        assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 1), 3);
     }
 }
