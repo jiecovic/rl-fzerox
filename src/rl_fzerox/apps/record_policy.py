@@ -5,6 +5,7 @@ import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from fzerox_emulator import Emulator
 from rl_fzerox.apps.recording.progress import (
@@ -29,6 +30,8 @@ from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.inference import PolicyRunner, load_policy_runner
+
+RecordMode = Literal["stream-all", "probe-then-record"]
 
 
 @dataclass(frozen=True)
@@ -148,6 +151,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Keep temporary MP4s for attempts that do not match the condition.",
     )
     parser.add_argument(
+        "--record-mode",
+        choices=("stream-all", "probe-then-record"),
+        default="stream-all",
+        help=(
+            "stream-all records every attempt as it runs; probe-then-record skips "
+            "failed video encoding and replays the first matching attempt."
+        ),
+    )
+    parser.add_argument(
         "overrides",
         nargs=argparse.REMAINDER,
         help="Hydra watch overrides. Use `-- key=value` to separate them from CLI flags.",
@@ -177,6 +189,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             progress_interval_seconds=args.progress_interval,
             overwrite=args.overwrite,
             keep_failed=args.keep_failed,
+            record_mode=args.record_mode,
         )
     except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
@@ -200,6 +213,7 @@ def record_policy_episode(
     progress_interval_seconds: float = 2.0,
     overwrite: bool = False,
     keep_failed: bool = False,
+    record_mode: RecordMode = "stream-all",
 ) -> RecordAttemptResult:
     """Record attempts until a finished episode satisfies the target rank."""
 
@@ -211,6 +225,8 @@ def record_policy_episode(
         raise FileExistsError(f"Output already exists: {output_path}")
     if config.watch.policy_run_dir is None:
         raise ValueError("--run-dir or watch.policy_run_dir is required for policy recording")
+    if keep_failed and record_mode != "stream-all":
+        raise ValueError("--keep-failed requires --record-mode stream-all")
 
     ffmpeg_path = resolve_ffmpeg_path()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -224,6 +240,7 @@ def record_policy_episode(
         fps=fps,
         progress_interval_seconds=progress_interval_seconds,
         keep_failed=keep_failed,
+        record_mode=record_mode,
     )
 
 
@@ -237,6 +254,7 @@ def _record_attempts(
     fps: float | None,
     progress_interval_seconds: float,
     keep_failed: bool,
+    record_mode: RecordMode,
 ) -> RecordAttemptResult:
     session = _open_recording_session(config, fps=fps)
     session_id = temp_session_id()
@@ -260,11 +278,28 @@ def _record_attempts(
                     path=attempt_path,
                     ffmpeg_path=ffmpeg_path,
                     fps=session.output_fps,
-                ),
+                )
+                if record_mode == "stream-all"
+                else None,
                 progress_interval_seconds=progress_interval_seconds,
             )
             _print_attempt_result(result)
             if result.matched:
+                if record_mode == "probe-then-record":
+                    result = _record_matched_attempt(
+                        session,
+                        attempt_path=attempt_path,
+                        attempt=attempt,
+                        seed=_attempt_seed(config.seed, attempt),
+                        deterministic=config.watch.deterministic_policy,
+                        target_rank=target_rank,
+                        video=VideoSettings(
+                            path=attempt_path,
+                            ffmpeg_path=ffmpeg_path,
+                            fps=session.output_fps,
+                        ),
+                        progress_interval_seconds=progress_interval_seconds,
+                    )
                 return _move_result_to_output(result, output_path)
             if not keep_failed:
                 discard_attempt_video(result.path)
@@ -320,7 +355,7 @@ def _run_attempt(
     seed: int | None,
     deterministic: bool,
     target_rank: int,
-    video: VideoSettings,
+    video: VideoSettings | None,
     progress_interval_seconds: float,
 ) -> AttemptRunResult:
     observation, info = env.reset(seed=seed)
@@ -336,13 +371,7 @@ def _run_attempt(
     )
     progress.print(info, episode_return=episode_return, force=True)
 
-    with FfmpegRgbWriter(
-        path=video.path,
-        ffmpeg_path=video.ffmpeg_path,
-        fps=video.fps,
-    ) as writer:
-        initial_frame = as_rgb_frame(env.render())
-        writer.write(initial_frame)
+    if video is None:
         while not (terminated or truncated):
             action = policy_runner.predict(
                 observation,
@@ -352,7 +381,24 @@ def _run_attempt(
             observation, reward, terminated, truncated, info = env.step(action)
             episode_return += reward
             progress.print(info, episode_return=episode_return)
-            writer.write(as_rgb_frame(env.render()))
+    else:
+        with FfmpegRgbWriter(
+            path=video.path,
+            ffmpeg_path=video.ffmpeg_path,
+            fps=video.fps,
+        ) as writer:
+            initial_frame = as_rgb_frame(env.render())
+            writer.write(initial_frame)
+            while not (terminated or truncated):
+                action = policy_runner.predict(
+                    observation,
+                    deterministic=deterministic,
+                    action_masks=env.action_masks(),
+                )
+                observation, reward, terminated, truncated, info = env.step(action)
+                episode_return += reward
+                progress.print(info, episode_return=episode_return)
+                writer.write(as_rgb_frame(env.render()))
 
     progress.finish()
     finish_rank = _finished_rank(info)
@@ -368,6 +414,36 @@ def _run_attempt(
         termination_reason=optional_str_info(info, "termination_reason"),
         truncation_reason=optional_str_info(info, "truncation_reason"),
     )
+
+
+def _record_matched_attempt(
+    session: RecordingSession,
+    *,
+    attempt_path: Path,
+    attempt: int,
+    seed: int | None,
+    deterministic: bool,
+    target_rank: int,
+    video: VideoSettings,
+    progress_interval_seconds: float,
+) -> AttemptRunResult:
+    result = _run_attempt(
+        session.env,
+        policy_runner=session.policy_runner,
+        path=attempt_path,
+        attempt=attempt,
+        seed=seed,
+        deterministic=deterministic,
+        target_rank=target_rank,
+        video=video,
+        progress_interval_seconds=progress_interval_seconds,
+    )
+    if not result.matched:
+        raise RuntimeError(
+            "Matched probe attempt did not reproduce while recording. "
+            "Use --record-mode stream-all for non-deterministic runs."
+        )
+    return result
 
 
 def _move_result_to_output(

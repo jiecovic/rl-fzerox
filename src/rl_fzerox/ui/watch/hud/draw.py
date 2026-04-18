@@ -4,8 +4,8 @@ from __future__ import annotations
 from rl_fzerox.ui.watch.hud.model import _build_panel_columns
 from rl_fzerox.ui.watch.hud.viz import _wrap_text
 from rl_fzerox.ui.watch.layout import LAYOUT, PALETTE, PanelLine, PanelSection, ViewerFonts
+from rl_fzerox.ui.watch.render.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.render.tokens import _draw_flag_viz
-from rl_fzerox.ui.watch.render.widgets import _draw_control_viz
 
 
 def _draw_side_panel(

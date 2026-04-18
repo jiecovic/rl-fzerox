@@ -1,0 +1,319 @@
+# tests/ui/test_viewer_game_panel.py
+from fzerox_emulator import ControllerState
+from rl_fzerox.ui.watch.hud.model import _build_panel_columns
+from tests.support.native_objects import encode_state_flags
+from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+def test_game_flags_are_rendered_in_fixed_rows() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "energy_loss_total": 0.25,
+            "damage_taken_frames": 1,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            state_labels=("active", "dash_pad_boost", "collision_recoil"),
+            reverse_timer=40,
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    assert len(game_section.flag_viz.rows) == 5
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert {"boost", "energy loss", "damage taken", "recoil", "reverse", "slow"}.issubset(
+        active_labels
+    )
+    assert "dash" not in active_labels
+
+
+def test_energy_refill_course_effect_lights_refill_flag() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            state_flags=encode_state_flags(("active",)) | 1,
+            energy=150.0,
+            max_energy=178.0,
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "refill" in active_labels
+
+
+def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            state_flags=encode_state_flags(("active",)) | 1,
+            energy=178.0,
+            max_energy=178.0,
+        ),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "refill" not in active_labels
+
+
+def test_game_section_shows_race_difficulty() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(difficulty_raw=2, difficulty_name="expert"),
+    )
+
+    game_section = columns.right[0]
+    difficulty_line = next(line for line in game_section.lines if line.label == "Difficulty")
+    assert difficulty_line.value == "expert"
+
+
+def test_game_section_shows_unknown_difficulty_raw_value() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(difficulty_raw=99, difficulty_name="unknown"),
+    )
+
+    game_section = columns.right[0]
+    difficulty_line = next(line for line in game_section.lines if line.label == "Difficulty")
+    assert difficulty_line.value == "unknown (99)"
+
+
+def test_game_section_shows_camera_setting() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(camera_setting_raw=1, camera_setting_name="close_behind"),
+    )
+
+    game_section = columns.right[0]
+    camera_line = next(line for line in game_section.lines if line.label == "Camera")
+    assert camera_line.value == "close behind"
+
+
+def test_game_section_shows_unknown_camera_setting_raw_value() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(camera_setting_raw=99, camera_setting_name="unknown"),
+    )
+
+    game_section = columns.right[0]
+    camera_line = next(line for line in game_section.lines if line.label == "Camera")
+    assert camera_line.value == "unknown (99)"
+
+
+def test_game_section_shows_position_out_of_total_racers() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(position=1, total_racers=30),
+    )
+
+    game_section = columns.right[0]
+    position_line = next(line for line in game_section.lines if line.label == "Position")
+    assert position_line.value == "1 / 30"
+
+
+def test_dash_pad_boost_lights_single_boost_pill() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(state_labels=("active", "dash_pad_boost"), boost_timer=12),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "boost" in active_labels
+    assert "dash" not in active_labels
+
+
+def test_manual_boost_timer_lights_boost_pill() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(boost_timer=12),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "boost" in active_labels
+
+
+def test_signed_boost_timer_lights_generic_boost_pill() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(boost_timer=-1),
+    )
+
+    game_section = columns.right[0]
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "boost" in active_labels

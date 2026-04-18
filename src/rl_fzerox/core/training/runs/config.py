@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 
 from omegaconf import OmegaConf
+from pydantic import ValidationError
 
 from rl_fzerox.core.config.paths import resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig, WatchAppConfig
@@ -106,6 +107,22 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     loaded = _load_train_config_mapping(config_path)
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
+
+
+def load_train_run_config_for_watch(run_dir: Path) -> TrainAppConfig:
+    """Load a saved train config for watch and explain stale-manifest failures."""
+
+    try:
+        return load_train_run_config(run_dir)
+    except ValidationError as exc:
+        resolved_run_dir = run_dir.expanduser().resolve()
+        raise RuntimeError(
+            "Saved train config is not compatible with the current schema: "
+            f"{resolved_run_dir}. Run "
+            "`python -m rl_fzerox.apps.scrub_train_config --run-dir "
+            f"{resolved_run_dir} --in-place` to rewrite a stale local manifest, "
+            "or restart the run with the current config schema."
+        ) from exc
 
 
 def load_train_run_train_config(run_dir: Path) -> TrainConfig:
