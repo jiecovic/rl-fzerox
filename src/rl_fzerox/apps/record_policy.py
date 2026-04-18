@@ -450,8 +450,6 @@ def _move_result_to_output(
     result: AttemptRunResult,
     output_path: Path,
 ) -> RecordAttemptResult:
-    if output_path.exists():
-        output_path.unlink()
     result.path.replace(output_path)
     return RecordAttemptResult(
         attempt=result.attempt,
