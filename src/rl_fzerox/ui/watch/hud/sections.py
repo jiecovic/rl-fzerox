@@ -57,6 +57,7 @@ def _build_panel_columns(
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
     gas_level: float = 0.0,
+    thrust_warning_threshold: float | None = None,
     best_finish_position: int | None = None,
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -181,6 +182,7 @@ def _build_panel_columns(
                 control_viz=_control_viz(
                     control_state,
                     gas_level=gas_level,
+                    thrust_warning_threshold=thrust_warning_threshold,
                     policy_action=policy_action,
                     continuous_drive_deadzone=continuous_drive_deadzone,
                     continuous_air_brake_mode=continuous_air_brake_mode,

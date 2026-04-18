@@ -235,6 +235,35 @@ def test_input_section_visualizes_canonical_gas_level() -> None:
     assert input_section.control_viz.air_brake_axis is None
 
 
+def test_input_section_visualizes_thrust_warning_threshold() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        gas_level=0.25,
+        thrust_warning_threshold=0.5,
+        policy_label="exp_v3_cnn_0001",
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    input_section = next(section for section in columns.left if section.title == "Input")
+    assert input_section.control_viz is not None
+    assert input_section.control_viz.gas_level == pytest.approx(0.25)
+    assert input_section.control_viz.thrust_warning_threshold == pytest.approx(0.5)
+
+
 def test_input_section_visualizes_forced_full_accelerate_drive_mode() -> None:
     columns = _build_panel_columns(
         episode=0,

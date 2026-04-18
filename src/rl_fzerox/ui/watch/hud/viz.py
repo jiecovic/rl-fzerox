@@ -21,6 +21,7 @@ def _control_viz(
     control_state: ControllerState,
     *,
     gas_level: float,
+    thrust_warning_threshold: float | None = None,
     policy_action: ActionValue | None = None,
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -35,6 +36,7 @@ def _control_viz(
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         gas_level=max(0.0, min(1.0, gas_level)),
+        thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
         boost_pressed=bool(joypad_mask & BOOST_MASK),
@@ -94,16 +96,20 @@ def _continuous_positive_button_level(value: float, *, deadzone: float) -> float
     return (value - deadzone) / (1.0 - deadzone)
 
 
+def _normalize_optional_level(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return max(0.0, min(1.0, float(value)))
+
+
 def _control_viz_height(fonts: ViewerFonts) -> int:
-    small_height = fonts.small.render("Gas", True, PALETTE.text_primary).get_height()
+    small_height = fonts.small.render("Thrust", True, PALETTE.text_primary).get_height()
     return (
         small_height
         + LAYOUT.control_track_gap
         + LAYOUT.control_gas_height
-        + LAYOUT.control_caption_gap
-        + small_height
-        + LAYOUT.control_boost_gap
-        + small_height
+        + (2 * LAYOUT.control_caption_gap)
+        + (2 * small_height)
         + (2 * LAYOUT.flag_token_pad_y)
     )
 
