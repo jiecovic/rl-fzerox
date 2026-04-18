@@ -108,7 +108,13 @@ class ControlStateTracker:
             return self._apply_release_cooldown(control_state)
         return control_state
 
-    def record_step(self, *, control_state: ControllerState, frames_run: int) -> None:
+    def record_step(
+        self,
+        *,
+        control_state: ControllerState,
+        frames_run: int,
+        gas_level: float | None = None,
+    ) -> None:
         """Advance tracked control history by one env step."""
 
         frames_elapsed = max(int(frames_run), 0)
@@ -155,7 +161,7 @@ class ControlStateTracker:
         self._right_lean_held = right_held
         self._left_steer_held = steer_axis < -1.0e-6
         self._right_steer_held = steer_axis > 1.0e-6
-        self._record_action_history(control_state)
+        self._record_action_history(control_state, gas_level=gas_level)
 
     def observation_fields(self) -> dict[str, float]:
         """Return control-history features passed into observation building."""
@@ -260,12 +266,22 @@ class ControlStateTracker:
             return 0.0
         return self._recent_steer_frame_sum / window_size
 
-    def _record_action_history(self, control_state: ControllerState) -> None:
+    def _record_action_history(
+        self,
+        control_state: ControllerState,
+        *,
+        gas_level: float | None,
+    ) -> None:
         joypad = control_state.joypad_mask
+        normalized_gas = (
+            (1.0 if joypad & ACCELERATE_MASK else 0.0)
+            if gas_level is None
+            else _clamp(float(gas_level), 0.0, 1.0)
+        )
         self._action_history.append(
             _ActionHistorySample(
                 steer=_clamp(float(control_state.left_stick_x), -1.0, 1.0),
-                gas=1.0 if joypad & ACCELERATE_MASK else 0.0,
+                gas=normalized_gas,
                 air_brake=1.0 if joypad & AIR_BRAKE_MASK else 0.0,
                 boost=1.0 if joypad & BOOST_MASK else 0.0,
                 lean=_signed_lean(_lean_index_from_mask(joypad)),
