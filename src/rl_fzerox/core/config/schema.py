@@ -152,6 +152,7 @@ class ObservationConfig(BaseModel):
         "native_crop_v3"
     )
     frame_stack: PositiveInt = 4
+    stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
     action_history_len: PositiveInt | None = Field(default=None, le=16)
     action_history_controls: tuple[ActionHistoryControlName, ...] = (
         "steer",

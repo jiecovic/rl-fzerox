@@ -7,6 +7,7 @@ from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
     ActionHistoryControl,
+    ObservationStackMode,
     ObservationStateProfile,
     image_observation_shape,
     state_feature_count,
@@ -32,6 +33,7 @@ def set_observation_info(
     observation_shape: tuple[int, ...],
     observation_spec: ObservationSpec,
     frame_stack: int,
+    observation_stack_mode: ObservationStackMode,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
     action_history_len: int | None,
@@ -39,7 +41,11 @@ def set_observation_info(
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
-    expected_image_shape = image_observation_shape(observation_spec, frame_stack=frame_stack)
+    expected_image_shape = image_observation_shape(
+        observation_spec,
+        frame_stack=frame_stack,
+        stack_mode=observation_stack_mode,
+    )
     if observation_shape != expected_image_shape:
         raise ValueError(
             "Rendered observation shape did not match native observation spec: "
@@ -54,6 +60,7 @@ def set_observation_info(
         observation_spec.channels,
     )
     info["observation_stack"] = frame_stack
+    info["observation_stack_mode"] = observation_stack_mode
     if observation_mode == "image_state":
         info["observation_state_profile"] = observation_state_profile
         info["observation_action_history_len"] = action_history_len

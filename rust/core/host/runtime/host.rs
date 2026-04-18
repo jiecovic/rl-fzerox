@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::api::LoadedCore;
-use crate::core::callbacks::{CallbackGuard, CallbackState};
+use crate::core::callbacks::{CallbackGuard, CallbackState, StackedObservationRequest};
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
@@ -232,7 +232,8 @@ impl Host {
         let final_telemetry = self.telemetry()?;
         let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
         self.step_counters = status.counters;
-        let observation = self.observation_frame(config.preset, config.frame_stack)?;
+        let observation =
+            self.observation_frame(config.preset, config.frame_stack, config.stack_mode)?;
         Ok(NativeStepResult {
             observation,
             summary,
@@ -292,7 +293,8 @@ impl Host {
         let final_telemetry = self.telemetry()?;
         let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
         self.step_counters = status.counters;
-        let observation = self.observation_frame(config.preset, config.frame_stack)?;
+        let observation =
+            self.observation_frame(config.preset, config.frame_stack, config.stack_mode)?;
         Ok(NativeWatchStepResult {
             observation,
             display_frames,
@@ -362,16 +364,19 @@ impl Host {
         &mut self,
         preset: ObservationPreset,
         frame_stack: usize,
+        stack_mode: crate::core::observation::ObservationStackMode,
     ) -> Result<&[u8], CoreError> {
         let spec = self.observation_spec(preset)?;
-        self.callbacks.stacked_observation_frame(
-            preset.observation_aspect_ratio(self.display_aspect_ratio),
-            spec.frame_width,
-            spec.frame_height,
-            spec.channels == 3,
-            preset.crop(self.observation_crop_profile),
-            frame_stack,
-        )
+        self.callbacks
+            .stacked_observation_frame(StackedObservationRequest {
+                aspect_ratio: preset.observation_aspect_ratio(self.display_aspect_ratio),
+                target_width: spec.frame_width,
+                target_height: spec.frame_height,
+                rgb: spec.channels == 3,
+                crop: preset.crop(self.observation_crop_profile),
+                frame_stack,
+                stack_mode,
+            })
     }
 
     pub fn display_frame(&mut self, preset: ObservationPreset) -> Result<&[u8], CoreError> {

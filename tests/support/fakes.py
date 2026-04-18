@@ -12,6 +12,7 @@ from fzerox_emulator import (
     FrameStep,
     FZeroXTelemetry,
     ObservationSpec,
+    ObservationStackMode,
     ResetState,
     StepStatus,
     StepSummary,
@@ -47,7 +48,10 @@ class SyntheticBackend:
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
         self._capture_video_flags: list[bool] = []
-        self._observation_stacks: dict[tuple[str, int], tuple[ObservationFrame, int | None]] = {}
+        self._observation_stacks: dict[
+            tuple[str, int, str],
+            tuple[list[RgbFrame], int | None],
+        ] = {}
         self.randomized_rng_seeds: list[int] = []
         self.loaded_baselines: list[Path] = []
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
@@ -152,7 +156,13 @@ class SyntheticBackend:
         )
         return aspect_corrected
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame:
+    def render_observation(
+        self,
+        *,
+        preset: str,
+        frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
+    ) -> ObservationFrame:
         spec = self.observation_spec(preset)
         cropped = _crop_native_crop_v1(self._last_frame)
         aspect_corrected = _resize_frame(
@@ -161,20 +171,18 @@ class SyntheticBackend:
             height=spec.display_height,
         )
         frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
-        stack_key = (preset, frame_stack)
+        stack_key = (preset, frame_stack, stack_mode)
         stacked_entry = self._observation_stacks.get(stack_key)
         if stacked_entry is None or stacked_entry[1] is None:
-            stacked = np.concatenate([frame] * frame_stack, axis=2)
-            self._observation_stacks[stack_key] = (stacked, self.frame_index)
-            return np.array(stacked, copy=True)
+            frames = [np.array(frame, copy=True) for _ in range(frame_stack)]
+            self._observation_stacks[stack_key] = (frames, self.frame_index)
+            return _materialize_observation_stack(frames, stack_mode=stack_mode)
 
-        stacked, last_frame_index = stacked_entry
+        frames, last_frame_index = stacked_entry
         if last_frame_index != self.frame_index:
-            channels = spec.channels
-            stacked[:, :, :-channels] = stacked[:, :, channels:]
-            stacked[:, :, -channels:] = frame
-            self._observation_stacks[stack_key] = (stacked, self.frame_index)
-        return np.array(self._observation_stacks[stack_key][0], copy=True)
+            frames = [*frames[1:], np.array(frame, copy=True)]
+            self._observation_stacks[stack_key] = (frames, self.frame_index)
+        return _materialize_observation_stack(self._observation_stacks[stack_key][0], stack_mode)
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         if self.frame_index < 240:
@@ -217,6 +225,7 @@ class SyntheticBackend:
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -258,7 +267,11 @@ class SyntheticBackend:
             self._state.progress_frontier_distance = self._state.progress
             self._state.progress_frontier_initialized = True
             self._state.progress_frontier_stalled_frames = 0
-        observation = self.render_observation(preset=preset, frame_stack=frame_stack)
+        observation = self.render_observation(
+            preset=preset,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
             truncation_reason = "timeout"
@@ -298,6 +311,7 @@ class SyntheticBackend:
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -340,7 +354,11 @@ class SyntheticBackend:
             self._state.progress_frontier_distance = self._state.progress
             self._state.progress_frontier_initialized = True
             self._state.progress_frontier_stalled_frames = 0
-        observation = self.render_observation(preset=preset, frame_stack=frame_stack)
+        observation = self.render_observation(
+            preset=preset,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
             truncation_reason = "timeout"
@@ -419,3 +437,25 @@ def _resize_frame(frame: RgbFrame, *, width: int, height: int) -> RgbFrame:
     y_index = np.rint(np.linspace(0, input_height - 1, num=height)).astype(np.intp)
     x_index = np.rint(np.linspace(0, input_width - 1, num=width)).astype(np.intp)
     return np.ascontiguousarray(frame[y_index][:, x_index])
+
+
+def _materialize_observation_stack(
+    frames: list[RgbFrame],
+    stack_mode: ObservationStackMode,
+) -> ObservationFrame:
+    if not frames:
+        raise ValueError("observation frame stack must not be empty")
+    if stack_mode == "rgb":
+        return np.ascontiguousarray(np.concatenate(frames, axis=2))
+    if stack_mode == "rgb_gray":
+        grayscale_history = [_rgb_luma(frame) for frame in frames[:-1]]
+        return np.ascontiguousarray(np.concatenate([*grayscale_history, frames[-1]], axis=2))
+    raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
+
+
+def _rgb_luma(frame: RgbFrame) -> ObservationFrame:
+    red = frame[:, :, 0].astype(np.uint16)
+    green = frame[:, :, 1].astype(np.uint16)
+    blue = frame[:, :, 2].astype(np.uint16)
+    luma = ((77 * red) + (150 * green) + (29 * blue) + 128) >> 8
+    return luma.astype(np.uint8)[:, :, None]

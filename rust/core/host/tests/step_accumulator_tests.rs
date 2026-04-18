@@ -2,7 +2,7 @@
 use super::step_accumulator::StepAccumulator;
 use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
-use crate::core::observation::ObservationPreset;
+use crate::core::observation::{ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::StepTelemetrySample;
 
 #[test]
@@ -117,6 +117,7 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         action_repeat: 1,
         preset: ObservationPreset::NativeCropV1,
         frame_stack: 4,
+        stack_mode: ObservationStackMode::Rgb,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,

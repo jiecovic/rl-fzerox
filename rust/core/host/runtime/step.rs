@@ -6,7 +6,10 @@
 //! reward tracker and env limits need.
 
 use crate::core::telemetry::TelemetrySnapshot;
-use crate::core::{input::ControllerState, observation::ObservationPreset};
+use crate::core::{
+    input::ControllerState,
+    observation::{ObservationPreset, ObservationStackMode},
+};
 
 /// Aggregated per-step features collected across repeated internal frames.
 ///
@@ -242,6 +245,8 @@ pub struct RepeatedStepConfig {
     pub preset: ObservationPreset,
     /// Number of observation frames stacked in the returned tensor.
     pub frame_stack: usize,
+    /// Channel encoding used for stacked observation frames.
+    pub stack_mode: ObservationStackMode,
     /// Speed threshold used by the stuck limit tracker.
     pub stuck_min_speed_kph: f32,
     /// Epsilon used for reward-side energy-loss aggregation.

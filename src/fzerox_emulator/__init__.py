@@ -25,7 +25,9 @@ from fzerox_emulator.base import (
     EmulatorBackend,
     FrameStep,
     ObservationSpec,
+    ObservationStackMode,
     ResetState,
+    stacked_observation_channels,
 )
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.emulator import Emulator
@@ -52,6 +54,7 @@ __all__ = [
     "JOYPAD_UP",
     "JOYPAD_Y",
     "ObservationSpec",
+    "ObservationStackMode",
     "PlayerTelemetry",
     "ResetState",
     "StepSummary",
@@ -59,4 +62,5 @@ __all__ = [
     "display_size",
     "joypad_mask",
     "probe_core",
+    "stacked_observation_channels",
 ]

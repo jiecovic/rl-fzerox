@@ -103,6 +103,7 @@ class FZeroXEnvEngine:
         self._observation_space = build_observation_space(
             self._observation_spec,
             frame_stack=config.observation.frame_stack,
+            stack_mode=config.observation.stack_mode,
             mode=config.observation.mode,
             state_profile=config.observation.state_profile,
             action_history_len=config.observation.action_history_len,
@@ -260,6 +261,7 @@ class FZeroXEnvEngine:
             observation_shape=tuple(int(value) for value in image_observation.shape),
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
+            observation_stack_mode=self.config.observation.stack_mode,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
             action_history_len=self.config.observation.action_history_len,
@@ -507,6 +509,7 @@ class FZeroXEnvEngine:
             action_repeat=action_repeat,
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
+            stack_mode=self.config.observation.stack_mode,
             stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
             max_episode_steps=self.config.max_episode_steps,
@@ -599,6 +602,7 @@ class FZeroXEnvEngine:
             observation_shape=tuple(int(value) for value in image_observation.shape),
             observation_spec=self._observation_spec,
             frame_stack=self.config.observation.frame_stack,
+            observation_stack_mode=self.config.observation.stack_mode,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
             action_history_len=self.config.observation.action_history_len,
@@ -637,6 +641,7 @@ class FZeroXEnvEngine:
         return self.backend.render_observation(
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
+            stack_mode=self.config.observation.stack_mode,
         )
 
     def _build_observation(

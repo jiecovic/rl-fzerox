@@ -4,7 +4,7 @@ use super::{
     step::{RepeatedStepConfig, StepCounters, StepStatus, StepSummary},
 };
 use crate::core::input::ControllerState;
-use crate::core::observation::ObservationPreset;
+use crate::core::observation::{ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
 
 #[test]
@@ -277,6 +277,7 @@ fn repeated_step_config(
         action_repeat: 1,
         preset: ObservationPreset::NativeCropV1,
         frame_stack: 4,
+        stack_mode: ObservationStackMode::Rgb,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,

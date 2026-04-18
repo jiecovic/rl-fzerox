@@ -8,7 +8,12 @@ from typing import Literal, TypeAlias, TypedDict
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import FZeroXTelemetry, ObservationSpec
+from fzerox_emulator import (
+    FZeroXTelemetry,
+    ObservationSpec,
+    ObservationStackMode,
+    stacked_observation_channels,
+)
 from fzerox_emulator.arrays import Float32Array, ObservationFrame, StateVector
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 
@@ -285,12 +290,17 @@ def build_observation_space(
     observation_spec: ObservationSpec,
     *,
     frame_stack: int,
+    stack_mode: ObservationStackMode = "rgb",
     mode: ObservationMode,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
     action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
 ) -> spaces.Box | spaces.Dict:
-    image_space = build_image_observation_space(observation_spec, frame_stack=frame_stack)
+    image_space = build_image_observation_space(
+        observation_spec,
+        frame_stack=frame_stack,
+        stack_mode=stack_mode,
+    )
     if mode == "image":
         return image_space
     if mode == "image_state":
@@ -317,11 +327,16 @@ def build_image_observation_space(
     observation_spec: ObservationSpec,
     *,
     frame_stack: int,
+    stack_mode: ObservationStackMode = "rgb",
 ) -> spaces.Box:
     return spaces.Box(
         low=0,
         high=255,
-        shape=image_observation_shape(observation_spec, frame_stack=frame_stack),
+        shape=image_observation_shape(
+            observation_spec,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        ),
         dtype=np.uint8,
     )
 
@@ -330,11 +345,16 @@ def image_observation_shape(
     observation_spec: ObservationSpec,
     *,
     frame_stack: int,
+    stack_mode: ObservationStackMode = "rgb",
 ) -> tuple[int, int, int]:
     return (
         observation_spec.height,
         observation_spec.width,
-        observation_spec.channels * frame_stack,
+        stacked_observation_channels(
+            observation_spec.channels,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+        ),
     )
 
 

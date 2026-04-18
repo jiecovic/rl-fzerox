@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol, TypeAlias
 
 from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
@@ -39,6 +39,28 @@ class ObservationSpec:
     channels: int
     display_width: int
     display_height: int
+
+
+ObservationStackMode: TypeAlias = Literal["rgb", "rgb_gray"]
+
+
+def stacked_observation_channels(
+    single_frame_channels: int,
+    *,
+    frame_stack: int,
+    stack_mode: ObservationStackMode,
+) -> int:
+    """Return channel count after temporal frame-stack encoding."""
+
+    if frame_stack <= 0:
+        raise ValueError("frame_stack must be positive")
+    if stack_mode == "rgb":
+        return single_frame_channels * frame_stack
+    if stack_mode == "rgb_gray":
+        if frame_stack == 1:
+            return single_frame_channels
+        return (frame_stack - 1) + single_frame_channels
+    raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
 
 
 @dataclass(frozen=True)
@@ -85,6 +107,7 @@ class EmulatorBackend(Protocol):
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -103,6 +126,7 @@ class EmulatorBackend(Protocol):
         action_repeat: int,
         preset: str,
         frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -126,7 +150,13 @@ class EmulatorBackend(Protocol):
 
     def render_display(self, *, preset: str) -> RgbFrame: ...
 
-    def render_observation(self, *, preset: str, frame_stack: int) -> ObservationFrame: ...
+    def render_observation(
+        self,
+        *,
+        preset: str,
+        frame_stack: int,
+        stack_mode: ObservationStackMode = "rgb",
+    ) -> ObservationFrame: ...
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
 
