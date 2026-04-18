@@ -22,6 +22,8 @@ def _control_viz(
     *,
     gas_level: float,
     thrust_warning_threshold: float | None = None,
+    boost_active: bool = False,
+    boost_lamp_level: float = 0.0,
     policy_action: ActionValue | None = None,
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -33,13 +35,27 @@ def _control_viz(
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
+    boost_pressed = bool(joypad_mask & BOOST_MASK)
+    normalized_boost_lamp_level = max(
+        0.0,
+        min(
+            1.0,
+            max(
+                boost_lamp_level,
+                1.0 if boost_pressed else 0.0,
+                0.55 if boost_active else 0.0,
+            ),
+        ),
+    )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         gas_level=max(0.0, min(1.0, gas_level)),
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
-        boost_pressed=bool(joypad_mask & BOOST_MASK),
+        boost_pressed=boost_pressed,
+        boost_active=boost_active,
+        boost_lamp_level=normalized_boost_lamp_level,
         lean_direction=(
             -1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0
         ),

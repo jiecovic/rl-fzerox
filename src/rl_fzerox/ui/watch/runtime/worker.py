@@ -8,7 +8,8 @@ from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs import observations as observation_utils
-from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.episode_result import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.process import (
@@ -38,6 +39,10 @@ from rl_fzerox.ui.watch.session import (
     _save_baseline_state,
     _sync_policy_curriculum_stage,
 )
+
+BOOST_ACTIVE_LAMP_LEVEL = 0.55
+BOOST_MANUAL_LAMP_LEVEL = 1.0
+BOOST_LAMP_FADE_FRAMES = 18
 
 
 def run_simulation_worker(
@@ -101,6 +106,7 @@ def _run_simulation_loop(
             reset_info = dict(info)
             current_control_state = env.last_requested_control_state
             current_gas_level = env.last_gas_level
+            boost_lamp_level = 0.0
             current_policy_action: ActionValue | None = None
             terminated = False
             truncated = False
@@ -123,6 +129,7 @@ def _run_simulation_loop(
                     target_control_fps=target_control_fps,
                     control_state=current_control_state,
                     gas_level=current_gas_level,
+                    boost_lamp_level=boost_lamp_level,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     policy_reload_error=policy_reload_error,
@@ -197,6 +204,13 @@ def _run_simulation_loop(
                     observation, reward, terminated, truncated, info = env.step(action)
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
+                live_telemetry = _read_live_telemetry(emulator)
+                boost_lamp_level = _next_boost_lamp_level(
+                    previous=boost_lamp_level,
+                    control_state=current_control_state,
+                    boost_active=telemetry_boost_active(live_telemetry),
+                    action_repeat=config.env.action_repeat,
+                )
                 control_rate.tick()
                 episode_reward += reward
                 best_finish_position = _update_best_finish_position(
@@ -219,6 +233,8 @@ def _run_simulation_loop(
                         target_control_fps=target_control_fps,
                         control_state=current_control_state,
                         gas_level=current_gas_level,
+                        boost_lamp_level=boost_lamp_level,
+                        telemetry=live_telemetry,
                         policy_action=current_policy_action,
                         policy_runner=policy_runner,
                         policy_reload_error=policy_reload_error,
@@ -247,12 +263,15 @@ def _build_snapshot(
     target_control_fps: float | None,
     control_state: ControllerState,
     gas_level: float,
+    boost_lamp_level: float,
     policy_action: ActionValue | None,
     policy_runner,
     policy_reload_error: str | None,
     best_finish_position: int | None,
+    telemetry: FZeroXTelemetry | None = None,
 ) -> WatchSnapshot:
-    telemetry = _read_live_telemetry(emulator)
+    if telemetry is None:
+        telemetry = _read_live_telemetry(emulator)
     best_finish_position = _update_best_finish_position(best_finish_position, info, telemetry)
     return WatchSnapshot(
         raw_frame=env.render(),
@@ -267,6 +286,7 @@ def _build_snapshot(
         native_fps=float(env.backend.native_fps),
         control_state=control_state,
         gas_level=gas_level,
+        boost_lamp_level=max(0.0, min(1.0, boost_lamp_level)),
         policy_action=policy_action,
         policy_label=_policy_label(policy_runner),
         policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
@@ -289,3 +309,21 @@ def _continuous_air_brake_disabled(
     if config.env.action.continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
+
+
+def _next_boost_lamp_level(
+    *,
+    previous: float,
+    control_state: ControllerState,
+    boost_active: bool,
+    action_repeat: int,
+) -> float:
+    if control_state.joypad_mask & BOOST_MASK:
+        return BOOST_MANUAL_LAMP_LEVEL
+
+    target = BOOST_ACTIVE_LAMP_LEVEL if boost_active else 0.0
+    if previous <= target:
+        return target
+
+    decay = max(1, action_repeat) / BOOST_LAMP_FADE_FRAMES
+    return max(target, previous - decay)
