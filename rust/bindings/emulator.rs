@@ -16,7 +16,7 @@ mod state;
 mod step;
 mod telemetry;
 
-use frame::frame_to_pyarray;
+use frame::{frame_to_pyarray, frames_to_pylist};
 pub use state::encode_state_flags;
 pub use step::{PyStepStatus, PyStepSummary};
 use step::{step_status_to_py, step_summary_to_py};
@@ -186,6 +186,106 @@ impl PyEmulator {
             py,
             [
                 observation,
+                summary.into_bound(py).into_any(),
+                status.into_bound(py).into_any(),
+                telemetry.into_bound(py).into_any(),
+            ],
+        )
+    }
+
+    #[pyo3(signature = (
+        action_repeat,
+        preset,
+        frame_stack,
+        stuck_min_speed_kph,
+        energy_loss_epsilon,
+        max_episode_steps,
+        stuck_step_limit,
+        wrong_way_timer_limit,
+        progress_frontier_stall_limit_frames=None,
+        progress_frontier_epsilon=100.0,
+        terminate_on_energy_depleted=true,
+        lean_timer_assist=false,
+        joypad_mask=0,
+        left_stick_x=0.0,
+        left_stick_y=0.0,
+        right_stick_x=0.0,
+        right_stick_y=0.0,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn step_repeat_watch_raw<'py>(
+        &mut self,
+        py: Python<'py>,
+        action_repeat: usize,
+        preset: &str,
+        frame_stack: usize,
+        stuck_min_speed_kph: f32,
+        energy_loss_epsilon: f32,
+        max_episode_steps: usize,
+        stuck_step_limit: usize,
+        wrong_way_timer_limit: Option<usize>,
+        progress_frontier_stall_limit_frames: Option<usize>,
+        progress_frontier_epsilon: f32,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool,
+        joypad_mask: u16,
+        left_stick_x: f32,
+        left_stick_y: f32,
+        right_stick_x: f32,
+        right_stick_y: f32,
+    ) -> PyResult<Bound<'py, PyTuple>> {
+        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
+        let spec = py
+            .detach(|| self.host.observation_spec(preset))
+            .map_err(map_core_error)?;
+        let controller_state = ControllerState::from_normalized(
+            joypad_mask,
+            left_stick_x,
+            left_stick_y,
+            right_stick_x,
+            right_stick_y,
+        );
+        let result = py
+            .detach(|| {
+                self.host.step_repeat_watch_raw(RepeatedStepConfig {
+                    controller_state,
+                    action_repeat,
+                    preset,
+                    frame_stack,
+                    stuck_min_speed_kph,
+                    energy_loss_epsilon,
+                    max_episode_steps,
+                    stuck_step_limit,
+                    wrong_way_timer_limit,
+                    progress_frontier_stall_limit_frames,
+                    progress_frontier_epsilon,
+                    terminate_on_energy_depleted,
+                    lean_timer_assist,
+                })
+            })
+            .map_err(map_core_error)?;
+        let observation = frame_to_pyarray(
+            py,
+            result.observation,
+            spec.frame_height,
+            spec.frame_width,
+            spec.channels * frame_stack,
+        )?;
+        let display_frames = frames_to_pylist(
+            py,
+            &result.display_frames,
+            spec.display_height,
+            spec.display_width,
+            3,
+        )?;
+        let summary = step_summary_to_py(py, &result.summary)?;
+        let status = step_status_to_py(py, &result.status)?;
+        let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
+        PyTuple::new(
+            py,
+            [
+                observation,
+                display_frames.into_any(),
                 summary.into_bound(py).into_any(),
                 status.into_bound(py).into_any(),
                 telemetry.into_bound(py).into_any(),

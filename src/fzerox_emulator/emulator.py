@@ -169,6 +169,75 @@ class Emulator:
             telemetry=telemetry,
         )
 
+    def step_repeat_watch_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_timer_limit: int | None,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendStepResult:
+        """Execute one repeated watch step and return per-frame display images."""
+
+        state = controller_state.clamped()
+        observation, display_frames, summary, status, telemetry = (
+            self._native.step_repeat_watch_raw(
+                action_repeat=action_repeat,
+                preset=preset,
+                frame_stack=frame_stack,
+                stuck_min_speed_kph=stuck_min_speed_kph,
+                energy_loss_epsilon=energy_loss_epsilon,
+                max_episode_steps=max_episode_steps,
+                stuck_step_limit=stuck_step_limit,
+                wrong_way_timer_limit=wrong_way_timer_limit,
+                progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+                progress_frontier_epsilon=progress_frontier_epsilon,
+                terminate_on_energy_depleted=terminate_on_energy_depleted,
+                lean_timer_assist=lean_timer_assist,
+                joypad_mask=state.joypad_mask,
+                left_stick_x=state.left_stick_x,
+                left_stick_y=state.left_stick_y,
+                right_stick_x=state.right_stick_x,
+                right_stick_y=state.right_stick_y,
+            )
+        )
+        frame = np.asarray(observation, dtype=np.uint8)
+        spec = self.observation_spec(preset)
+        stacked_channels = spec.channels * frame_stack
+        expected_observation_shape = (spec.height, spec.width, stacked_channels)
+        if tuple(int(value) for value in frame.shape) != expected_observation_shape:
+            raise RuntimeError(
+                "Unexpected repeated-step observation shape from native emulator: "
+                f"expected {expected_observation_shape!r}, got {tuple(frame.shape)!r}"
+            )
+
+        expected_display_shape = (spec.display_height, spec.display_width, 3)
+        validated_display_frames = tuple(
+            _validated_display_frame(display_frame, expected_shape=expected_display_shape)
+            for display_frame in display_frames
+        )
+        if len(validated_display_frames) != action_repeat:
+            raise RuntimeError(
+                "Unexpected display frame count from native watch step: "
+                f"expected {action_repeat}, got {len(validated_display_frames)}"
+            )
+        return BackendStepResult(
+            observation=np.ascontiguousarray(frame),
+            summary=summary,
+            status=status,
+            telemetry=telemetry,
+            display_frames=validated_display_frames,
+        )
+
     def set_controller_state(self, controller_state: ControllerState) -> None:
         """Set the held controller state used for subsequent frame stepping."""
 
@@ -307,3 +376,13 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
+
+
+def _validated_display_frame(frame: object, *, expected_shape: tuple[int, int, int]) -> RgbFrame:
+    display_frame = np.asarray(frame, dtype=np.uint8)
+    if tuple(int(value) for value in display_frame.shape) != expected_shape:
+        raise RuntimeError(
+            "Unexpected display frame shape from native watch step: "
+            f"expected {expected_shape!r}, got {tuple(display_frame.shape)!r}"
+        )
+    return np.ascontiguousarray(display_frame)

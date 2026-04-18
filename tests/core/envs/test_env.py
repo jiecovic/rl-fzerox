@@ -517,6 +517,24 @@ def test_step_advances_backend_by_action_repeat():
     )
 
 
+def test_watch_step_captures_each_repeated_display_frame():
+    backend = SyntheticBackend()
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
+    )
+
+    env.reset(seed=7)
+    watch_step = env.step_watch(np.array([3, 1], dtype=np.int64))
+
+    assert backend.frame_index == 3
+    assert backend.capture_video_flags == [True, True, True]
+    assert len(watch_step.display_frames) == 3
+    assert watch_step.display_frames[0].shape == (444, 592, 3)
+    assert _image_obs(watch_step.observation).shape == (116, 164, 12)
+    assert watch_step.info["repeat_index"] == 2
+
+
 def test_reset_resets_continuous_drive_pwm_phase() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(

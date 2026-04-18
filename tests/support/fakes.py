@@ -291,6 +291,89 @@ class SyntheticBackend:
             telemetry=None,
         )
 
+    def step_repeat_watch_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_timer_limit: int | None,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendStepResult:
+        _ = (
+            stuck_min_speed_kph,
+            energy_loss_epsilon,
+            wrong_way_timer_limit,
+            terminate_on_energy_depleted,
+            stuck_step_limit,
+            lean_timer_assist,
+        )
+        self.set_controller_state(controller_state)
+        if action_repeat <= 0:
+            raise ValueError("action_repeat must be positive")
+
+        display_frames: list[RgbFrame] = []
+        self._capture_video_flags.extend([True] * action_repeat)
+        for _ in range(action_repeat):
+            self.step_frame()
+            display_frames.append(self.render_display(preset=preset))
+        self._state.step_count += action_repeat
+        if self._state.progress_frontier_initialized:
+            frontier_reached = (
+                self._state.progress
+                >= self._state.progress_frontier_distance + progress_frontier_epsilon
+            )
+            if frontier_reached:
+                self._state.progress_frontier_distance = self._state.progress
+                self._state.progress_frontier_stalled_frames = 0
+            else:
+                self._state.progress_frontier_stalled_frames += action_repeat
+        else:
+            self._state.progress_frontier_distance = self._state.progress
+            self._state.progress_frontier_initialized = True
+            self._state.progress_frontier_stalled_frames = 0
+        observation = self.render_observation(preset=preset, frame_stack=frame_stack)
+        truncation_reason = None
+        if self._state.step_count >= max_episode_steps:
+            truncation_reason = "timeout"
+        elif (
+            progress_frontier_stall_limit_frames is not None
+            and self._state.progress_frontier_stalled_frames >= progress_frontier_stall_limit_frames
+        ):
+            truncation_reason = "progress_stalled"
+        return BackendStepResult(
+            observation=observation,
+            summary=StepSummary(
+                frames_run=action_repeat,
+                max_race_distance=self._state.progress,
+                reverse_active_frames=0,
+                low_speed_frames=0,
+                energy_loss_total=0.0,
+                energy_gain_total=0.0,
+                damage_taken_frames=0,
+                consecutive_low_speed_frames=0,
+                entered_state_flags=0,
+                final_frame_index=self._state.frame_index,
+            ),
+            status=StepStatus(
+                step_count=self._state.step_count,
+                stalled_steps=self._state.stalled_steps,
+                reverse_timer=self._state.reverse_timer,
+                progress_frontier_stalled_frames=self._state.progress_frontier_stalled_frames,
+                truncation_reason=truncation_reason,
+            ),
+            telemetry=None,
+            display_frames=tuple(display_frames),
+        )
+
     def set_controller_state(self, controller_state: ControllerState) -> None:
         self._last_controller_state = controller_state
 

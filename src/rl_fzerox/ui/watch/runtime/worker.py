@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import time
 from multiprocessing.queues import Queue as ProcessQueue
+from typing import TYPE_CHECKING
 
 from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
+from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
+from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.episode_result import _update_best_finish_position
@@ -39,6 +42,9 @@ from rl_fzerox.ui.watch.session import (
     _save_baseline_state,
     _sync_policy_curriculum_stage,
 )
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.training.inference import PolicyRunner
 
 BOOST_ACTIVE_LAMP_LEVEL = 0.55
 BOOST_MANUAL_LAMP_LEVEL = 1.0
@@ -181,15 +187,20 @@ def _run_simulation_loop(
                         continue
 
                 single_frame_manual = commands.paused and commands.step_requests > 0
+                previous_observation = observation
+                previous_info = dict(info)
+                previous_episode_reward = episode_reward
+                previous_telemetry = _read_live_telemetry(emulator)
                 if policy_runner is None:
                     if single_frame_manual:
                         observation, reward, terminated, truncated, info = env.step_frame(
                             current_control_state
                         )
+                        display_frames = (env.render(),)
                     else:
-                        observation, reward, terminated, truncated, info = env.step_control(
-                            current_control_state
-                        )
+                        watch_step = env.step_control_watch(current_control_state)
+                        observation, reward, terminated, truncated, info = watch_step.gym_result()
+                        display_frames = watch_step.display_frames
                     current_policy_action = None
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
@@ -201,7 +212,9 @@ def _run_simulation_loop(
                         action_masks=env.action_masks(),
                     )
                     current_policy_action = action
-                    observation, reward, terminated, truncated, info = env.step(action)
+                    watch_step = env.step_watch(action)
+                    observation, reward, terminated, truncated, info = watch_step.gym_result()
+                    display_frames = watch_step.display_frames
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
                 live_telemetry = _read_live_telemetry(emulator)
@@ -218,28 +231,32 @@ def _run_simulation_loop(
                     info,
                     None,
                 )
-                publish_worker_message(
-                    snapshot_queue,
-                    _build_snapshot(
-                        config=config,
-                        env=env,
-                        emulator=emulator,
-                        observation=observation,
-                        info=info,
-                        reset_info=reset_info,
-                        episode=episode,
-                        episode_reward=episode_reward,
-                        control_fps=control_rate.rate_hz(),
-                        target_control_fps=target_control_fps,
-                        control_state=current_control_state,
-                        gas_level=current_gas_level,
-                        boost_lamp_level=boost_lamp_level,
-                        telemetry=live_telemetry,
-                        policy_action=current_policy_action,
-                        policy_runner=policy_runner,
-                        policy_reload_error=policy_reload_error,
-                        best_finish_position=best_finish_position,
-                    ),
+                _publish_step_snapshots(
+                    config=config,
+                    env=env,
+                    emulator=emulator,
+                    snapshot_queue=snapshot_queue,
+                    display_frames=display_frames,
+                    previous_observation=previous_observation,
+                    previous_info=previous_info,
+                    previous_episode_reward=previous_episode_reward,
+                    previous_telemetry=previous_telemetry,
+                    final_observation=observation,
+                    final_info=info,
+                    final_episode_reward=episode_reward,
+                    final_telemetry=live_telemetry,
+                    reset_info=reset_info,
+                    episode=episode,
+                    control_fps=control_rate.rate_hz(),
+                    target_control_fps=target_control_fps,
+                    target_control_seconds=target_control_seconds,
+                    control_state=current_control_state,
+                    gas_level=current_gas_level,
+                    boost_lamp_level=boost_lamp_level,
+                    policy_action=current_policy_action,
+                    policy_runner=policy_runner,
+                    policy_reload_error=policy_reload_error,
+                    best_finish_position=best_finish_position,
                 )
                 if target_control_seconds is not None:
                     now = time.perf_counter()
@@ -249,12 +266,77 @@ def _run_simulation_loop(
         env.close()
 
 
+def _publish_step_snapshots(
+    *,
+    config: WatchAppConfig,
+    env: FZeroXEnv,
+    emulator: Emulator,
+    snapshot_queue: ProcessQueue,
+    display_frames: tuple[RgbFrame, ...],
+    previous_observation: ObservationValue,
+    previous_info: dict[str, object],
+    previous_episode_reward: float,
+    previous_telemetry: FZeroXTelemetry | None,
+    final_observation: ObservationValue,
+    final_info: dict[str, object],
+    final_episode_reward: float,
+    final_telemetry: FZeroXTelemetry | None,
+    reset_info: dict[str, object],
+    episode: int,
+    control_fps: float,
+    target_control_fps: float | None,
+    target_control_seconds: float | None,
+    control_state: ControllerState,
+    gas_level: float,
+    boost_lamp_level: float,
+    policy_action: ActionValue | None,
+    policy_runner: PolicyRunner | None,
+    policy_reload_error: str | None,
+    best_finish_position: int | None,
+) -> None:
+    frames = display_frames or (env.render(),)
+    frame_interval_seconds = (
+        None if target_control_seconds is None else target_control_seconds / len(frames)
+    )
+    for index, frame in enumerate(frames):
+        is_final_frame = index == len(frames) - 1
+        publish_worker_message(
+            snapshot_queue,
+            _build_snapshot(
+                config=config,
+                env=env,
+                emulator=emulator,
+                raw_frame=frame,
+                observation=final_observation if is_final_frame else previous_observation,
+                info=final_info if is_final_frame else previous_info,
+                reset_info=reset_info,
+                episode=episode,
+                episode_reward=(
+                    final_episode_reward if is_final_frame else previous_episode_reward
+                ),
+                control_fps=control_fps,
+                target_control_fps=target_control_fps,
+                control_state=control_state,
+                gas_level=gas_level,
+                boost_lamp_level=boost_lamp_level,
+                telemetry=final_telemetry if is_final_frame else previous_telemetry,
+                policy_action=policy_action,
+                policy_runner=policy_runner,
+                policy_reload_error=policy_reload_error,
+                best_finish_position=best_finish_position,
+            ),
+        )
+        if frame_interval_seconds is not None and not is_final_frame:
+            time.sleep(frame_interval_seconds)
+
+
 def _build_snapshot(
     *,
     config: WatchAppConfig,
     env: FZeroXEnv,
     emulator: Emulator,
-    observation,
+    raw_frame: RgbFrame | None = None,
+    observation: ObservationValue,
     info: dict[str, object],
     reset_info: dict[str, object],
     episode: int,
@@ -265,7 +347,7 @@ def _build_snapshot(
     gas_level: float,
     boost_lamp_level: float,
     policy_action: ActionValue | None,
-    policy_runner,
+    policy_runner: PolicyRunner | None,
     policy_reload_error: str | None,
     best_finish_position: int | None,
     telemetry: FZeroXTelemetry | None = None,
@@ -274,7 +356,7 @@ def _build_snapshot(
         telemetry = _read_live_telemetry(emulator)
     best_finish_position = _update_best_finish_position(best_finish_position, info, telemetry)
     return WatchSnapshot(
-        raw_frame=env.render(),
+        raw_frame=env.render() if raw_frame is None else raw_frame,
         observation_image=observation_utils.observation_image(observation),
         observation_state=observation_utils.observation_state(observation),
         info=dict(info),

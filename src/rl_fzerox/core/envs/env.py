@@ -50,6 +50,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
     def step(self, action: ActionValue):
         return self._engine.step(action)
 
+    def step_watch(self, action: ActionValue):
+        """Step a policy action and include watch-only intermediate display frames."""
+
+        return self._engine.step_watch(action)
+
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         return self._engine.action_to_control_state(action)
 
@@ -90,6 +95,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
     def step_control(self, control_state: ControllerState):
         return self._engine.step_control(control_state)
+
+    def step_control_watch(self, control_state: ControllerState):
+        """Step manual controls and include watch-only intermediate display frames."""
+
+        return self._engine.step_control_watch(control_state)
 
     def step_frame(self, control_state: ControllerState | None = None):
         return self._engine.step_frame(control_state)

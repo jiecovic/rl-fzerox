@@ -3,6 +3,7 @@
 
 use numpy::{PyArray1, PyArrayMethods};
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 
 /// Materialize a Python-owned NumPy array view of a frame buffer.
 ///
@@ -17,4 +18,18 @@ pub(super) fn frame_to_pyarray<'py>(
 ) -> PyResult<Bound<'py, PyAny>> {
     let array = PyArray1::<u8>::from_vec(py, frame.to_vec());
     Ok(array.reshape([height, width, channels])?.into_any())
+}
+
+pub(super) fn frames_to_pylist<'py>(
+    py: Python<'py>,
+    frames: &[Vec<u8>],
+    height: usize,
+    width: usize,
+    channels: usize,
+) -> PyResult<Bound<'py, PyList>> {
+    let list = PyList::empty(py);
+    for frame in frames {
+        list.append(frame_to_pyarray(py, frame, height, width, channels)?)?;
+    }
+    Ok(list)
 }

@@ -250,6 +250,32 @@ class Emulator:
         right_stick_x: float = 0.0,
         right_stick_y: float = 0.0,
     ) -> tuple[npt.NDArray[np.uint8], StepSummary, StepStatus, FZeroXTelemetry]: ...
+    def step_repeat_watch_raw(
+        self,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_timer_limit: int | None,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool = True,
+        lean_timer_assist: bool = False,
+        joypad_mask: int = 0,
+        left_stick_x: float = 0.0,
+        left_stick_y: float = 0.0,
+        right_stick_x: float = 0.0,
+        right_stick_y: float = 0.0,
+    ) -> tuple[
+        npt.NDArray[np.uint8],
+        list[npt.NDArray[np.uint8]],
+        StepSummary,
+        StepStatus,
+        FZeroXTelemetry,
+    ]: ...
     def set_controller_state(
         self,
         joypad_mask: int = 0,

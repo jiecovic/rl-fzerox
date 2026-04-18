@@ -15,7 +15,9 @@ use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
 use crate::core::video::VideoFrame;
 
-use super::step::{NativeStepResult, RepeatedStepConfig, StepCounters, StepStatus};
+use super::step::{
+    NativeStepResult, NativeWatchStepResult, RepeatedStepConfig, StepCounters, StepStatus,
+};
 use super::step_accumulator::StepAccumulator;
 
 // Maximum number of `core.run()` calls we allow while waiting for a reset/load
@@ -233,6 +235,67 @@ impl Host {
         let observation = self.observation_frame(config.preset, config.frame_stack)?;
         Ok(NativeStepResult {
             observation,
+            summary,
+            status,
+            final_telemetry,
+        })
+    }
+
+    /// Execute one repeated step and capture a display frame after each inner frame.
+    ///
+    /// This is intentionally separate from `step_repeat_raw`: watch mode needs
+    /// smooth visual playback when actions are held for multiple frames, while
+    /// training and benchmarks should avoid those extra frame copies.
+    #[allow(dead_code)]
+    pub fn step_repeat_watch_raw(
+        &mut self,
+        config: RepeatedStepConfig,
+    ) -> Result<NativeWatchStepResult<'_>, CoreError> {
+        self.ensure_open()?;
+        if config.action_repeat == 0 {
+            return Err(CoreError::InvalidStepRepeatCount {
+                count: config.action_repeat,
+            });
+        }
+
+        let initial_sample = self.telemetry_sample()?;
+        self.callbacks.set_controller_state(config.controller_state);
+        let step_result = with_silenced_stdio(|| {
+            let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
+            let mut display_frames = Vec::with_capacity(config.action_repeat);
+
+            for _ in 0..config.action_repeat {
+                self.callbacks.set_capture_video(true);
+                if config.lean_timer_assist {
+                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
+                }
+                self.call_core(|core| unsafe {
+                    core.run();
+                });
+                self.frame_index += 1;
+
+                let telemetry = self.telemetry_sample()?;
+                accumulator.observe(&telemetry, self.frame_index);
+                display_frames.push(self.display_frame(config.preset)?.to_vec());
+            }
+
+            Ok((accumulator.finish(), display_frames))
+        });
+        self.callbacks.set_capture_video(true);
+        self.refresh_shape_from_frame();
+
+        let (summary, display_frames) = step_result?;
+        if !self.callbacks.has_frame() {
+            return Err(CoreError::NoFrameAvailable);
+        }
+
+        let final_telemetry = self.telemetry()?;
+        let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
+        self.step_counters = status.counters;
+        let observation = self.observation_frame(config.preset, config.frame_stack)?;
+        Ok(NativeWatchStepResult {
+            observation,
+            display_frames,
             summary,
             status,
             final_telemetry,

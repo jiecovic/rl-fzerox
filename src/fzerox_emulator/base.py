@@ -49,6 +49,7 @@ class BackendStepResult:
     summary: StepSummary
     status: StepStatus
     telemetry: FZeroXTelemetry | None
+    display_frames: tuple[RgbFrame, ...] = ()
 
 
 class EmulatorBackend(Protocol):
@@ -78,6 +79,24 @@ class EmulatorBackend(Protocol):
     def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
 
     def step_repeat_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        preset: str,
+        frame_stack: int,
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        stuck_step_limit: int,
+        wrong_way_timer_limit: int | None,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendStepResult: ...
+
+    def step_repeat_watch_raw(
         self,
         controller_state: ControllerState,
         *,
