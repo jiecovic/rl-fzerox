@@ -10,8 +10,10 @@ import pytest
 
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.apps.record_policy import (
+    AttemptRunResult,
     _attempt_seed,
     _finished_rank,
+    _move_result_to_output,
     _run_attempt,
     parse_args,
 )
@@ -192,6 +194,40 @@ def test_attempt_seed_is_stable_per_attempt() -> None:
     assert _attempt_seed(100, 1) == 100
     assert _attempt_seed(100, 3) == 102
     assert _attempt_seed(None, 3) is None
+
+
+def test_move_result_to_output_keeps_existing_file_if_replace_fails(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    attempt_path = tmp_path / "attempt.mp4"
+    output_path = tmp_path / "race.mp4"
+    attempt_path.write_bytes(b"attempt")
+    output_path.write_bytes(b"previous")
+
+    def fail_replace(self: Path, target: Path) -> Path:
+        del self, target
+        raise OSError("simulated replace failure")
+
+    monkeypatch.setattr(Path, "replace", fail_replace)
+
+    with pytest.raises(OSError, match="simulated replace failure"):
+        _move_result_to_output(
+            AttemptRunResult(
+                attempt=1,
+                path=attempt_path,
+                matched=True,
+                finish_rank=1,
+                episode_return=123.0,
+                episode_steps=456,
+                race_time_ms=78_900,
+                termination_reason="finished",
+                truncation_reason=None,
+            ),
+            output_path,
+        )
+
+    assert output_path.read_bytes() == b"previous"
 
 
 def test_run_attempt_steps_policy_action_not_decoded_control(
