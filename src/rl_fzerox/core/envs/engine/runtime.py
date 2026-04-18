@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
@@ -54,6 +56,21 @@ from .tracks import SelectedTrack, TrackBaselineCache, select_reset_track
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
 _DOMAIN_REWARD_MILESTONE_PHASE = 0xA409_3822_299F_31D0
 _DOMAIN_TRACK_SAMPLING = 0x35E7_40D8_FF53_42B1
+
+
+@dataclass(frozen=True)
+class WatchEnvStep:
+    """Gym step result plus watch-only display frames from repeated inner frames."""
+
+    observation: ObservationValue
+    reward: float
+    terminated: bool
+    truncated: bool
+    info: dict[str, object]
+    display_frames: tuple[RgbFrame, ...]
+
+    def gym_result(self) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        return self.observation, self.reward, self.terminated, self.truncated, self.info
 
 
 class FZeroXEnvEngine:
@@ -273,6 +290,14 @@ class FZeroXEnvEngine:
             action_drive_axis=action_drive_axis(action, self._action_space),
         )
 
+    def step_watch(self, action: ActionValue) -> WatchEnvStep:
+        """Step a policy action while collecting watch-only intermediate frames."""
+
+        return self._step_control_state_watch(
+            self._action_adapter.decode(action),
+            action_drive_axis=action_drive_axis(action, self._action_space),
+        )
+
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
         """Decode one policy action into the held controller state it represents."""
 
@@ -283,6 +308,11 @@ class FZeroXEnvEngine:
         control_state: ControllerState,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._step_control_state(control_state, action_drive_axis=None)
+
+    def step_control_watch(self, control_state: ControllerState) -> WatchEnvStep:
+        """Step manual controls while collecting watch-only intermediate frames."""
+
+        return self._step_control_state_watch(control_state, action_drive_axis=None)
 
     def _step_control_state(
         self,
@@ -298,6 +328,23 @@ class FZeroXEnvEngine:
             action_repeat=self.config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
+        )
+
+    def _step_control_state_watch(
+        self,
+        control_state: ControllerState,
+        *,
+        action_drive_axis: float | None,
+    ) -> WatchEnvStep:
+        requested_control_state = control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        self._held_controller_state = applied_control_state
+        return self._run_env_step_result(
+            applied_control_state,
+            action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            capture_display_frames=True,
         )
 
     def step_frame(
@@ -426,6 +473,23 @@ class FZeroXEnvEngine:
         requested_control_state: ControllerState | None = None,
         action_drive_axis: float | None = None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        return self._run_env_step_result(
+            control_state,
+            action_repeat=action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            capture_display_frames=False,
+        ).gym_result()
+
+    def _run_env_step_result(
+        self,
+        control_state: ControllerState,
+        *,
+        action_repeat: int,
+        requested_control_state: ControllerState | None,
+        action_drive_axis: float | None,
+        capture_display_frames: bool,
+    ) -> WatchEnvStep:
         requested_control_state = requested_control_state or control_state
         applied_control_state = control_state
         stuck_step_limit = (
@@ -433,7 +497,12 @@ class FZeroXEnvEngine:
             if self.config.stuck_truncation_enabled
             else self.config.max_episode_steps + 1
         )
-        step_result = self.backend.step_repeat_raw(
+        step_function = (
+            self.backend.step_repeat_watch_raw
+            if capture_display_frames
+            else self.backend.step_repeat_raw
+        )
+        step_result = step_function(
             applied_control_state,
             action_repeat=action_repeat,
             preset=self.config.observation.preset,
@@ -535,7 +604,14 @@ class FZeroXEnvEngine:
             action_history_len=self.config.observation.action_history_len,
             action_history_controls=self.config.observation.action_history_controls,
         )
-        return observation, reward, terminated, truncated, info
+        return WatchEnvStep(
+            observation=observation,
+            reward=reward,
+            terminated=terminated,
+            truncated=truncated,
+            info=info,
+            display_frames=step_result.display_frames,
+        )
 
     def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
         """Apply telemetry gates and configured lean semantics."""

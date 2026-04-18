@@ -210,6 +210,27 @@ pub struct NativeStepResult<'a> {
     pub final_telemetry: TelemetrySnapshot,
 }
 
+/// Watch-mode repeated-step payload.
+///
+/// This extends the normal repeated-step result with display frames captured
+/// during each internal emulator frame. The training path intentionally does
+/// not use this payload because those per-frame copies are only useful for UI
+/// playback.
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+pub struct NativeWatchStepResult<'a> {
+    /// Final stacked observation tensor for this outer env step.
+    pub observation: &'a [u8],
+    /// Display-sized RGB frames captured after each internal repeated frame.
+    pub display_frames: Vec<Vec<u8>>,
+    /// Aggregated step features spanning the internal repeated frames.
+    pub summary: StepSummary,
+    /// Native counter/stop state after the repeated env step completed.
+    pub status: StepStatus,
+    /// Final telemetry snapshot after the repeated step completed.
+    pub final_telemetry: TelemetrySnapshot,
+}
+
 /// Native repeated-step request parameters.
 #[derive(Clone, Copy, Debug)]
 pub struct RepeatedStepConfig {

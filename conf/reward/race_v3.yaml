@@ -7,9 +7,9 @@
 name: race_v3
 
 # Spline coverage: distance between equally spaced reward points on the game spline.
-progress_bucket_distance: 100.0
+progress_bucket_distance: 25.0
 # Spline coverage: reward for each newly covered point.
-progress_bucket_reward: 0.2
+progress_bucket_reward: 0.05
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
 
@@ -63,17 +63,17 @@ energy_full_refill_min_gain_fraction: 0.10
 gas_underuse_penalty: -0.005
 gas_underuse_threshold: 0.5
 
-# Steering: small MPC-style acceleration penalty for high-frequency chatter.
+# Steering: acceleration penalty for rapid direction changes.
 # This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
-# Smooth ramps and steady cornering are near zero; rapid left-right flips hit the cap.
-steer_oscillation_penalty: -0.001
-steer_oscillation_deadzone: 0.0
+# Smooth ramps and steady cornering are near zero; left-right flips hit the cap.
+steer_oscillation_penalty: -0.0
+steer_oscillation_deadzone: 0.07
 steer_oscillation_cap: 2.0
 steer_oscillation_power: 2.0
 
 # Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
-lean_low_speed_penalty: -0.005
-lean_low_speed_penalty_max_speed_kph: 790.0
+lean_low_speed_penalty: -0.01
+lean_low_speed_penalty_max_speed_kph: 990.0
 
 # Airborne: event reward when an airborne machine lands back on the track.
 airborne_landing_reward: 0.0
