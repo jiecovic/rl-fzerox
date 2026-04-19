@@ -1,14 +1,26 @@
 # src/rl_fzerox/ui/watch/view/components/effects.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rl_fzerox.ui.watch.view.screen.theme import Color
 
-GLASS_HIGHLIGHT: Color = (170, 190, 210)
-GLASS_LOWLIGHT: Color = (8, 11, 15)
-GLASS_SHEEN: tuple[int, int, int, int] = (238, 248, 255, 82)
-GLASS_SHADOW: tuple[int, int, int, int] = (0, 0, 0, 44)
-GLASS_EDGE_GLOW: tuple[int, int, int, int] = (126, 214, 170, 48)
-BOOST_EDGE_GLOW: tuple[int, int, int, int] = (126, 214, 170, 52)
+AlphaColor = tuple[int, int, int, int]
+
+
+@dataclass(frozen=True)
+class GlassEffectStyle:
+    """Shared translucent overlay colors for cockpit glass effects."""
+
+    highlight: Color = (170, 190, 210)
+    lowlight: Color = (8, 11, 15)
+    sheen: AlphaColor = (238, 248, 255, 82)
+    shadow: AlphaColor = (0, 0, 0, 44)
+    edge_glow: AlphaColor = (126, 214, 170, 48)
+    boost_edge_glow: AlphaColor = (126, 214, 170, 52)
+
+
+GLASS_EFFECT_STYLE = GlassEffectStyle()
 
 
 def blend_color(start: Color, end: Color, weight: float) -> Color:
@@ -67,6 +79,7 @@ def draw_alpha_rect(*, pygame, screen, rect, color: tuple[int, int, int, int]) -
 
 
 def draw_glass_track_overlay(*, pygame, screen, track) -> None:
+    style = GLASS_EFFECT_STYLE
     draw_alpha_rect(
         pygame=pygame,
         screen=screen,
@@ -97,14 +110,14 @@ def draw_glass_track_overlay(*, pygame, screen, track) -> None:
     )
     pygame.draw.line(
         screen,
-        GLASS_HIGHLIGHT,
+        style.highlight,
         (track.left + 4, track.top + 2),
         (track.right - 4, track.top + 2),
         width=1,
     )
     pygame.draw.line(
         screen,
-        GLASS_LOWLIGHT,
+        style.lowlight,
         (track.left + 4, track.bottom - 2),
         (track.right - 4, track.bottom - 2),
         width=1,
@@ -112,6 +125,7 @@ def draw_glass_track_overlay(*, pygame, screen, track) -> None:
 
 
 def draw_glass_column_overlay(*, pygame, screen, track) -> None:
+    style = GLASS_EFFECT_STYLE
     draw_alpha_rect(
         pygame=pygame,
         screen=screen,
@@ -140,7 +154,7 @@ def draw_glass_column_overlay(*, pygame, screen, track) -> None:
     )
     pygame.draw.line(
         screen,
-        GLASS_LOWLIGHT,
+        style.lowlight,
         (track.left + 4, track.bottom - 3),
         (track.right - 4, track.bottom - 3),
         width=1,
