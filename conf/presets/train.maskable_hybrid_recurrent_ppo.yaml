@@ -24,7 +24,7 @@ env:
     lean_unmask_min_speed_kph: 730.0
   observation:
     # Match the digital full-gas experiment: smallest image preset and no frame stack.
-    preset: native_crop_v1
+    preset: crop_84x116
     frame_stack: 1
     state_profile: steer_history
   boost_min_energy_fraction: 0.30

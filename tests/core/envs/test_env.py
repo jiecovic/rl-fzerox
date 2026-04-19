@@ -363,7 +363,7 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
 
     assert obs.shape == (116, 164, 12)
     assert info["observation_frame_shape"] == (116, 164, 3)
-    assert backend.render_observation_calls == [("native_crop_v3", 4, "rgb")]
+    assert backend.render_observation_calls == [("crop_116x164", 4, "rgb")]
 
 
 def test_env_reset_uses_rgb_gray_stack_shape() -> None:
@@ -371,7 +371,7 @@ def test_env_reset_uses_rgb_gray_stack_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                preset="native_crop_v4",
+                preset="crop_98x130",
                 frame_stack=4,
                 stack_mode="rgb_gray",
             ),

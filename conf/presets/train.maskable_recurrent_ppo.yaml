@@ -36,7 +36,7 @@ env:
     lean_unmask_min_speed_kph: 880.0
   observation:
     # Lightweight recurrent experiment: smallest image preset and no frame stack.
-    preset: native_crop_v1
+    preset: crop_84x116
     frame_stack: 1
     # Adds current left/right steer flags plus signed recent steer pressure.
     state_profile: steer_history

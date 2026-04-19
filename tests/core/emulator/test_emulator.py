@@ -84,7 +84,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
 
     class NativeStub:
         def observation_spec(self, preset: str) -> dict[str, object]:
-            assert preset == "native_crop_v1"
+            assert preset == "crop_84x116"
             return {
                 "preset": preset,
                 "width": 116,
@@ -122,7 +122,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     result = emulator.step_repeat_raw(
         controller_state=ControllerState(),
         action_repeat=2,
-        preset="native_crop_v1",
+        preset="crop_84x116",
         frame_stack=2,
         stuck_min_speed_kph=50.0,
         energy_loss_epsilon=0.1,
@@ -156,7 +156,7 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
 
     class NativeStub:
         def observation_spec(self, preset: str) -> dict[str, object]:
-            assert preset == "native_crop_v1"
+            assert preset == "crop_84x116"
             return {
                 "preset": preset,
                 "width": 116,
@@ -183,7 +183,7 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     result = emulator.step_repeat_watch_raw(
         controller_state=ControllerState(),
         action_repeat=2,
-        preset="native_crop_v1",
+        preset="crop_84x116",
         frame_stack=2,
         stuck_min_speed_kph=50.0,
         energy_loss_epsilon=0.1,

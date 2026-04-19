@@ -2,10 +2,11 @@
 
 The repo now uses native observation presets for policy inputs:
 
-- `native_crop_v1`
-- `native_crop_v2`
-- `native_crop_v3`
-- `native_crop_v4`
+- `crop_84x116`
+- `crop_92x124`
+- `crop_116x164`
+- `crop_98x130`
+- `crop_66x82`
 
 Python no longer configures observation width, height, crop margins, or color
 mode directly. Rust owns the per-frame geometry so the env, watch UI, and any
@@ -21,7 +22,7 @@ That raw buffer includes dark overscan margins.
 
 ## Native Crop
 
-`native_crop_v1` first crops the raw frame by:
+Each crop preset first crops the raw frame by:
 
 - top: `16`
 - bottom: `16`
@@ -34,27 +35,29 @@ That yields a cropped native frame of:
 
 ## Policy Observation
 
-For the policy path, all four presets first apply the same aspect correction used
+For the policy path, all presets first apply the same aspect correction used
 by the human watch display, then downscale to:
 
-- `native_crop_v1`: `116 x 84 x 3`
-- `native_crop_v2`: `124 x 92 x 3`
-- `native_crop_v3`: `164 x 116 x 3`
-- `native_crop_v4`: `130 x 98 x 3`
+- `crop_84x116`: `116 x 84 x 3`
+- `crop_92x124`: `124 x 92 x 3`
+- `crop_116x164`: `164 x 116 x 3`
+- `crop_98x130`: `130 x 98 x 3`
+- `crop_66x82`: `82 x 66 x 3`
 
-All four give the policy an approximately `4:3` view instead of the earlier
-native-width-squashed observation. `native_crop_v1` and `native_crop_v2` use
-an exact NatureCNN-style conv stack; `native_crop_v3` is the current larger
-default and pairs with the older 4-layer `64,64,128,128` extractor shape.
-`native_crop_v4` is a compact-deep experiment sized for a clean `4 x 6`
-final CNN grid with the `64,64,128,128` stride-2 extractor.
+All presets give the policy an approximately `4:3` view instead of the earlier
+native-width-squashed observation. `crop_84x116` and `crop_92x124` use
+an exact NatureCNN-style conv stack; `crop_116x164` pairs with the older
+4-layer `64,64,128,128` extractor shape. `crop_98x130` is sized for a clean
+`4 x 6` final CNN grid with the compact-deep stride-2 extractor. `crop_66x82`
+is the smallest current experiment.
 
 With `frame_stack: 4`, the env observation space becomes:
 
-- `native_crop_v1`: `84 x 116 x 12`
-- `native_crop_v2`: `92 x 124 x 12`
-- `native_crop_v3`: `116 x 164 x 12`
-- `native_crop_v4`: `98 x 130 x 12`
+- `crop_84x116`: `84 x 116 x 12`
+- `crop_92x124`: `92 x 124 x 12`
+- `crop_116x164`: `116 x 164 x 12`
+- `crop_98x130`: `98 x 130 x 12`
+- `crop_66x82`: `66 x 82 x 12`
 
 ## Observation Modes
 
