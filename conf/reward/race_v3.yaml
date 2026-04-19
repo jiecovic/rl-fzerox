@@ -42,11 +42,11 @@ damage_taken_streak_ramp_penalty: -0.001
 damage_taken_streak_cap_frames: 120
 # Damage: small entry-only penalty for collision recoil. Kept mild because other
 # racers can also bump into the player.
-collision_recoil_penalty: -2.0
+collision_recoil_penalty: -1.0
 
 # Boost pads: small route incentive for entering dash-pad boost, guarded so
 # reversing or revisiting the same unwrapped progress region cannot farm it.
-boost_pad_reward: 25.0
+boost_pad_reward: 15.0
 boost_pad_reward_progress_window: 800.0
 
 # Energy refill: multiplier scale applied only to actual frontier-progress reward.
