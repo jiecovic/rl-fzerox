@@ -30,11 +30,11 @@ impl ObservationCropProfile {
 /// Named single-frame observation layouts exposed to Python.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ObservationPreset {
-    NativeCropV1,
-    NativeCropV2,
-    NativeCropV3,
-    NativeCropV4,
-    NativeCropV6,
+    Crop84x116,
+    Crop92x124,
+    Crop116x164,
+    Crop98x130,
+    Crop66x82,
 }
 
 /// How repeated observation frames are encoded along the channel axis.
@@ -62,11 +62,17 @@ impl ObservationPreset {
     /// Parse the stable string name recorded in YAML configs and run metadata.
     pub fn parse(name: &str) -> Result<Self, CoreError> {
         match name {
-            "native_crop_v1" => Ok(Self::NativeCropV1),
-            "native_crop_v2" => Ok(Self::NativeCropV2),
-            "native_crop_v3" => Ok(Self::NativeCropV3),
-            "native_crop_v4" => Ok(Self::NativeCropV4),
-            "native_crop_v6" => Ok(Self::NativeCropV6),
+            "crop_84x116" => Ok(Self::Crop84x116),
+            "crop_92x124" => Ok(Self::Crop92x124),
+            "crop_116x164" => Ok(Self::Crop116x164),
+            "crop_98x130" => Ok(Self::Crop98x130),
+            "crop_66x82" => Ok(Self::Crop66x82),
+            // V4 LEGACY SHIM: accept old saved run manifests and CLI overrides.
+            "native_crop_v1" => Ok(Self::Crop84x116),
+            "native_crop_v2" => Ok(Self::Crop92x124),
+            "native_crop_v3" => Ok(Self::Crop116x164),
+            "native_crop_v4" => Ok(Self::Crop98x130),
+            "native_crop_v6" => Ok(Self::Crop66x82),
             _ => Err(CoreError::InvalidObservationPreset {
                 name: name.to_owned(),
             }),
@@ -75,22 +81,22 @@ impl ObservationPreset {
 
     pub fn name(self) -> &'static str {
         match self {
-            Self::NativeCropV1 => "native_crop_v1",
-            Self::NativeCropV2 => "native_crop_v2",
-            Self::NativeCropV3 => "native_crop_v3",
-            Self::NativeCropV4 => "native_crop_v4",
-            Self::NativeCropV6 => "native_crop_v6",
+            Self::Crop84x116 => "crop_84x116",
+            Self::Crop92x124 => "crop_92x124",
+            Self::Crop116x164 => "crop_116x164",
+            Self::Crop98x130 => "crop_98x130",
+            Self::Crop66x82 => "crop_66x82",
         }
     }
 
     pub fn crop(self, crop_profile: ObservationCropProfile) -> VideoCrop {
         match (self, crop_profile) {
             (
-                Self::NativeCropV1
-                | Self::NativeCropV2
-                | Self::NativeCropV3
-                | Self::NativeCropV4
-                | Self::NativeCropV6,
+                Self::Crop84x116
+                | Self::Crop92x124
+                | Self::Crop116x164
+                | Self::Crop98x130
+                | Self::Crop66x82,
                 ObservationCropProfile::Angrylion,
             ) => VideoCrop {
                 top: 16,
@@ -99,11 +105,11 @@ impl ObservationPreset {
                 right: 24,
             },
             (
-                Self::NativeCropV1
-                | Self::NativeCropV2
-                | Self::NativeCropV3
-                | Self::NativeCropV4
-                | Self::NativeCropV6,
+                Self::Crop84x116
+                | Self::Crop92x124
+                | Self::Crop116x164
+                | Self::Crop98x130
+                | Self::Crop66x82,
                 ObservationCropProfile::Gliden64,
             ) => VideoCrop {
                 top: 15,
@@ -127,11 +133,11 @@ impl ObservationPreset {
         let (display_width, display_height) =
             display_size(cropped_width, cropped_height, display_aspect_ratio);
         let (frame_width, frame_height, channels) = match self {
-            Self::NativeCropV1 => (116, 84, 3),
-            Self::NativeCropV2 => (124, 92, 3),
-            Self::NativeCropV3 => (164, 116, 3),
-            Self::NativeCropV4 => (130, 98, 3),
-            Self::NativeCropV6 => (82, 66, 3),
+            Self::Crop84x116 => (116, 84, 3),
+            Self::Crop92x124 => (124, 92, 3),
+            Self::Crop116x164 => (164, 116, 3),
+            Self::Crop98x130 => (130, 98, 3),
+            Self::Crop66x82 => (82, 66, 3),
         };
         Ok(ObservationSpec {
             preset_name: self.name(),
@@ -145,11 +151,11 @@ impl ObservationPreset {
 
     pub fn observation_aspect_ratio(self, display_aspect_ratio: f64) -> f64 {
         match self {
-            Self::NativeCropV1
-            | Self::NativeCropV2
-            | Self::NativeCropV3
-            | Self::NativeCropV4
-            | Self::NativeCropV6 => display_aspect_ratio,
+            Self::Crop84x116
+            | Self::Crop92x124
+            | Self::Crop116x164
+            | Self::Crop98x130
+            | Self::Crop66x82 => display_aspect_ratio,
         }
     }
 }
@@ -187,7 +193,7 @@ mod tests {
     #[test]
     fn crop_profile_keeps_existing_angrylion_crop() {
         assert_eq!(
-            ObservationPreset::NativeCropV1.crop(ObservationCropProfile::Angrylion),
+            ObservationPreset::Crop84x116.crop(ObservationCropProfile::Angrylion),
             VideoCrop {
                 top: 16,
                 bottom: 16,
@@ -200,7 +206,7 @@ mod tests {
     #[test]
     fn crop_profile_uses_measured_gliden64_borders() {
         assert_eq!(
-            ObservationPreset::NativeCropV1.crop(ObservationCropProfile::Gliden64),
+            ObservationPreset::Crop84x116.crop(ObservationCropProfile::Gliden64),
             VideoCrop {
                 top: 15,
                 bottom: 17,
@@ -212,7 +218,7 @@ mod tests {
 
     #[test]
     fn gliden64_crop_resolves_to_half_size_watch_display() {
-        let spec = ObservationPreset::NativeCropV1
+        let spec = ObservationPreset::Crop84x116
             .resolve(320, 240, 4.0 / 3.0, ObservationCropProfile::Gliden64)
             .expect("gliden64 crop should resolve");
 
@@ -221,23 +227,31 @@ mod tests {
     }
 
     #[test]
-    fn native_crop_v4_resolves_to_compact_deep_geometry() {
-        let spec = ObservationPreset::NativeCropV4
+    fn crop_98x130_resolves_to_compact_deep_geometry() {
+        let spec = ObservationPreset::Crop98x130
             .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-            .expect("native_crop_v4 should resolve");
+            .expect("crop_98x130 should resolve");
 
-        assert_eq!(spec.preset_name, "native_crop_v4");
+        assert_eq!(spec.preset_name, "crop_98x130");
         assert_eq!((spec.frame_width, spec.frame_height), (130, 98));
     }
 
     #[test]
-    fn native_crop_v6_resolves_to_small_racing_geometry() {
-        let spec = ObservationPreset::NativeCropV6
+    fn crop_66x82_resolves_to_small_racing_geometry() {
+        let spec = ObservationPreset::Crop66x82
             .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-            .expect("native_crop_v6 should resolve");
+            .expect("crop_66x82 should resolve");
 
-        assert_eq!(spec.preset_name, "native_crop_v6");
+        assert_eq!(spec.preset_name, "crop_66x82");
         assert_eq!((spec.frame_width, spec.frame_height), (82, 66));
+    }
+
+    #[test]
+    fn legacy_native_crop_name_aliases_to_canonical_name() {
+        let preset = ObservationPreset::parse("native_crop_v4").expect("legacy name resolves");
+
+        assert_eq!(preset, ObservationPreset::Crop98x130);
+        assert_eq!(preset.name(), "crop_98x130");
     }
 
     #[test]

@@ -115,7 +115,7 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
-        preset: ObservationPreset::NativeCropV1,
+        preset: ObservationPreset::Crop84x116,
         frame_stack: 4,
         stack_mode: ObservationStackMode::Rgb,
         stuck_min_speed_kph: 50.0,

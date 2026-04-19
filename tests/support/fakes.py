@@ -126,28 +126,23 @@ class SyntheticBackend:
         return self._last_frame.copy()
 
     def observation_spec(self, preset: str) -> ObservationSpec:
-        if preset not in {
-            "native_crop_v1",
-            "native_crop_v2",
-            "native_crop_v3",
-            "native_crop_v4",
-            "native_crop_v6",
-        }:
+        canonical_preset = _canonical_observation_preset(preset)
+        if canonical_preset is None:
             raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
-        cropped = _crop_native_crop_v1(self._last_frame)
+        cropped = _crop_visible_game_area(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
-        if preset == "native_crop_v1":
+        if canonical_preset == "crop_84x116":
             width, height = (116, 84)
-        elif preset == "native_crop_v2":
+        elif canonical_preset == "crop_92x124":
             width, height = (124, 92)
-        elif preset == "native_crop_v3":
+        elif canonical_preset == "crop_116x164":
             width, height = (164, 116)
-        elif preset == "native_crop_v4":
+        elif canonical_preset == "crop_98x130":
             width, height = (130, 98)
         else:
             width, height = (82, 66)
         return ObservationSpec(
-            preset=preset,
+            preset=canonical_preset,
             width=width,
             height=height,
             channels=3,
@@ -157,7 +152,7 @@ class SyntheticBackend:
 
     def render_display(self, *, preset: str) -> RgbFrame:
         spec = self.observation_spec(preset)
-        cropped = _crop_native_crop_v1(self._last_frame)
+        cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
             cropped,
             width=spec.display_width,
@@ -173,14 +168,14 @@ class SyntheticBackend:
         stack_mode: ObservationStackMode = "rgb",
     ) -> ObservationFrame:
         spec = self.observation_spec(preset)
-        cropped = _crop_native_crop_v1(self._last_frame)
+        cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
             cropped,
             width=spec.display_width,
             height=spec.display_height,
         )
         frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
-        stack_key = (preset, frame_stack, stack_mode)
+        stack_key = (spec.preset, frame_stack, stack_mode)
         stacked_entry = self._observation_stacks.get(stack_key)
         if stacked_entry is None or stacked_entry[1] is None:
             frames = [np.array(frame, copy=True) for _ in range(frame_stack)]
@@ -438,9 +433,26 @@ class SyntheticBackend:
         return frame
 
 
-def _crop_native_crop_v1(frame: RgbFrame) -> RgbFrame:
+def _canonical_observation_preset(preset: str) -> str | None:
+    aliases = {
+        "crop_84x116": "crop_84x116",
+        "crop_92x124": "crop_92x124",
+        "crop_116x164": "crop_116x164",
+        "crop_98x130": "crop_98x130",
+        "crop_66x82": "crop_66x82",
+        # V4 LEGACY SHIM: tests can still load stale run manifests.
+        "native_crop_v1": "crop_84x116",
+        "native_crop_v2": "crop_92x124",
+        "native_crop_v3": "crop_116x164",
+        "native_crop_v4": "crop_98x130",
+        "native_crop_v6": "crop_66x82",
+    }
+    return aliases.get(preset)
+
+
+def _crop_visible_game_area(frame: RgbFrame) -> RgbFrame:
     if frame.shape[0] <= 32 or frame.shape[1] <= 48:
-        raise ValueError(f"Frame too small for native_crop_v1: {frame.shape!r}")
+        raise ValueError(f"Frame too small for visible game crop: {frame.shape!r}")
     return np.ascontiguousarray(frame[16:-16, 24:-24])
 
 

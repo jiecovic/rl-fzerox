@@ -65,7 +65,7 @@ env:
   observation:
     # image keeps screen-only obs; image_state adds the scalar telemetry vector.
     mode: image_state
-    preset: native_crop_v3
+    preset: crop_116x164
     frame_stack: 4
 
 train:

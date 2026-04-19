@@ -22,7 +22,7 @@ def test_native_observation_stack_repeats_the_first_frame() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
-    observation = backend.render_observation(preset="native_crop_v1", frame_stack=4)
+    observation = backend.render_observation(preset="crop_84x116", frame_stack=4)
 
     assert observation.shape == (84, 116, 12)
     assert np.array_equal(observation[:, :, 0:3], observation[:, :, 3:6])
@@ -39,49 +39,49 @@ def test_native_observation_stack_shifts_forward_on_new_frames() -> None:
     backend = DistinctFrameBackend()
     backend.reset()
 
-    initial = backend.render_observation(preset="native_crop_v1", frame_stack=4)
+    initial = backend.render_observation(preset="crop_84x116", frame_stack=4)
     backend.step_frames(1)
-    next_observation = backend.render_observation(preset="native_crop_v1", frame_stack=4)
+    next_observation = backend.render_observation(preset="crop_84x116", frame_stack=4)
     backend.step_frames(1)
-    later_observation = backend.render_observation(preset="native_crop_v1", frame_stack=4)
+    later_observation = backend.render_observation(preset="crop_84x116", frame_stack=4)
 
     assert not np.array_equal(initial, next_observation)
     assert np.array_equal(later_observation[:, :, 0:9], next_observation[:, :, 3:12])
 
 
-def test_native_observation_v2_uses_larger_aspect_correct_shape() -> None:
+def test_crop_92x124_uses_larger_aspect_correct_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
-    observation = backend.render_observation(preset="native_crop_v2", frame_stack=4)
+    observation = backend.render_observation(preset="crop_92x124", frame_stack=4)
 
     assert observation.shape == (92, 124, 12)
 
 
-def test_native_observation_v3_uses_largest_default_aspect_correct_shape() -> None:
+def test_crop_116x164_uses_largest_default_aspect_correct_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
-    observation = backend.render_observation(preset="native_crop_v3", frame_stack=4)
+    observation = backend.render_observation(preset="crop_116x164", frame_stack=4)
 
     assert observation.shape == (116, 164, 12)
 
 
-def test_native_observation_v4_uses_compact_deep_aspect_correct_shape() -> None:
+def test_crop_98x130_uses_compact_deep_aspect_correct_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
-    observation = backend.render_observation(preset="native_crop_v4", frame_stack=3)
+    observation = backend.render_observation(preset="crop_98x130", frame_stack=3)
 
     assert observation.shape == (98, 130, 9)
 
 
-def test_native_observation_v6_uses_small_aspect_correct_shape() -> None:
+def test_crop_66x82_uses_small_aspect_correct_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
     observation = backend.render_observation(
-        preset="native_crop_v6",
+        preset="crop_66x82",
         frame_stack=4,
         stack_mode="rgb_gray",
     )
@@ -94,18 +94,18 @@ def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
     backend.reset()
 
     observation = backend.render_observation(
-        preset="native_crop_v4",
+        preset="crop_98x130",
         frame_stack=4,
         stack_mode="rgb_gray",
     )
-    spec = backend.observation_spec("native_crop_v4")
+    spec = backend.observation_spec("crop_98x130")
     image_space = build_image_observation_space(
         spec,
         frame_stack=4,
         stack_mode="rgb_gray",
     )
     current_frame = backend.render_observation(
-        preset="native_crop_v4",
+        preset="crop_98x130",
         frame_stack=1,
         stack_mode="rgb",
     )
@@ -442,7 +442,7 @@ def test_state_components_can_disable_control_history() -> None:
 def test_state_components_define_observation_space_shape_and_bounds() -> None:
     components = _clean_state_components()
     backend = SyntheticBackend()
-    spec = backend.observation_spec("native_crop_v6")
+    spec = backend.observation_spec("crop_66x82")
 
     observation_space = build_observation_space(
         spec,

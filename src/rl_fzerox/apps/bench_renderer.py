@@ -68,7 +68,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--frames", type=int, default=1_000, help="Measured env steps.")
     parser.add_argument("--warmup", type=int, default=120, help="Warmup env steps.")
-    parser.add_argument("--preset", default="native_crop_v3", help="Observation preset.")
+    parser.add_argument("--preset", default="crop_116x164", help="Observation preset.")
     parser.add_argument("--frame-stack", type=int, default=4, help="Observation frame stack.")
     parser.add_argument("--action-repeat", type=int, default=1, help="Internal frames per step.")
     parser.add_argument(

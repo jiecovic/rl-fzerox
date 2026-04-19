@@ -81,7 +81,7 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         if result.observation.shape[2] != expected_channels:
             raise AssertionError("Scripted observation stack does not match frame_stack")
-        if preset != "native_crop_v3":
+        if preset != "crop_116x164":
             raise AssertionError(f"Unexpected preset {preset!r}")
         return result
 

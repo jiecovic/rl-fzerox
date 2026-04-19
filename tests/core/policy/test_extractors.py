@@ -62,7 +62,7 @@ def test_observation_extractor_accepts_larger_aspect_correct_preset() -> None:
     assert tuple(features.shape) == (2, 512)
 
 
-def test_observation_extractor_auto_features_dim_uses_richer_v2_flatten() -> None:
+def test_observation_extractor_auto_features_dim_uses_medium_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(92, 124, 12), dtype=np.uint8),
         features_dim="auto",
@@ -77,7 +77,7 @@ def test_observation_extractor_auto_features_dim_uses_richer_v2_flatten() -> Non
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
-def test_observation_extractor_accepts_larger_default_v3_preset() -> None:
+def test_observation_extractor_accepts_large_preset() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
         features_dim=512,
@@ -89,7 +89,7 @@ def test_observation_extractor_accepts_larger_default_v3_preset() -> None:
     assert tuple(features.shape) == (2, 512)
 
 
-def test_observation_extractor_auto_features_dim_uses_v3_legacy_deep_flatten() -> None:
+def test_observation_extractor_auto_features_dim_uses_large_deep_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
         features_dim="auto",
@@ -104,7 +104,7 @@ def test_observation_extractor_auto_features_dim_uses_v3_legacy_deep_flatten() -
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
-def test_observation_extractor_auto_features_dim_uses_v4_compact_deep_flatten() -> None:
+def test_observation_extractor_auto_features_dim_uses_compact_deep_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(98, 130, 9), dtype=np.uint8),
         features_dim="auto",
@@ -119,7 +119,7 @@ def test_observation_extractor_auto_features_dim_uses_v4_compact_deep_flatten() 
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
-def test_observation_extractor_compact_deep_profile_can_override_v1_geometry() -> None:
+def test_observation_extractor_compact_deep_profile_can_override_small_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(84, 116, 9), dtype=np.uint8),
         features_dim="auto",
@@ -133,7 +133,7 @@ def test_observation_extractor_compact_deep_profile_can_override_v1_geometry() -
     assert tuple(features.shape) == (2, 1_920)
 
 
-def test_observation_extractor_compact_bottleneck_profile_uses_v4_input() -> None:
+def test_observation_extractor_compact_bottleneck_profile_uses_compact_input() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(98, 130, 6), dtype=np.uint8),
         features_dim="auto",
@@ -147,7 +147,7 @@ def test_observation_extractor_compact_bottleneck_profile_uses_v4_input() -> Non
     assert tuple(features.shape) == (2, 768)
 
 
-def test_observation_extractor_compact_deep_supports_small_v6_geometry() -> None:
+def test_observation_extractor_compact_deep_supports_tiny_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(66, 82, 6), dtype=np.uint8),
         features_dim="auto",

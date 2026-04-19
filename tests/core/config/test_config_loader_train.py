@@ -330,7 +330,7 @@ def test_load_train_app_config_reads_compact_deep_extractor_profile(tmp_path: Pa
             f"  rom_path: {rom_path}",
             "env:",
             "  observation:",
-            "    preset: native_crop_v4",
+            "    preset: crop_98x130",
             "policy:",
             "  extractor:",
             "    conv_profile: compact_deep",
@@ -341,7 +341,7 @@ def test_load_train_app_config_reads_compact_deep_extractor_profile(tmp_path: Pa
 
     config = load_train_app_config(config_path)
 
-    assert config.env.observation.preset == "native_crop_v4"
+    assert config.env.observation.preset == "crop_98x130"
     assert config.policy.extractor.conv_profile == "compact_deep"
 
 

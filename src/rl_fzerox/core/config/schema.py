@@ -50,6 +50,13 @@ ActionHistoryControlName: TypeAlias = Literal[
 TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
 ObservationCourseContext: TypeAlias = Literal["none", "one_hot_builtin"]
 ObservationGroundEffectContext: TypeAlias = Literal["none", "effect_flags"]
+ObservationPresetName: TypeAlias = Literal[
+    "crop_84x116",
+    "crop_92x124",
+    "crop_116x164",
+    "crop_98x130",
+    "crop_66x82",
+]
 ObservationStateComponentName: TypeAlias = Literal[
     "vehicle_state",
     "track_position",
@@ -58,6 +65,13 @@ ObservationStateComponentName: TypeAlias = Literal[
     "legacy_state",
     "control_history",
 ]
+_LEGACY_OBSERVATION_PRESET_ALIASES: dict[str, ObservationPresetName] = {
+    "native_crop_v1": "crop_84x116",
+    "native_crop_v2": "crop_92x124",
+    "native_crop_v3": "crop_116x164",
+    "native_crop_v4": "crop_98x130",
+    "native_crop_v6": "crop_66x82",
+}
 
 
 class ActionMaskConfig(BaseModel):
@@ -303,13 +317,7 @@ class ObservationConfig(BaseModel):
         "steer_history",
         "race_core",
     ] = "default"
-    preset: Literal[
-        "native_crop_v1",
-        "native_crop_v2",
-        "native_crop_v3",
-        "native_crop_v4",
-        "native_crop_v6",
-    ] = "native_crop_v3"
+    preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
     course_context: ObservationCourseContext = "none"
@@ -322,6 +330,14 @@ class ObservationConfig(BaseModel):
         "lean",
     )
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
+
+    @field_validator("preset", mode="before")
+    @classmethod
+    def _migrate_legacy_observation_preset(cls, value: object) -> object:
+        # V4 LEGACY SHIM: old run manifests used native_crop_v* names.
+        if isinstance(value, str):
+            return _LEGACY_OBSERVATION_PRESET_ALIASES.get(value, value)
+        return value
 
     @field_validator("action_history_controls")
     @classmethod
