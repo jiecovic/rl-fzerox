@@ -52,6 +52,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         observation_space: spaces.Box,
         features_dim: int | Literal["auto"] = 512,
         conv_profile: ConvProfile = "auto",
+        layer_norm: bool = False,
     ) -> None:
         image_geometry = _resolve_supported_image_geometry(
             observation_space,
@@ -86,6 +87,9 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
                 nn.Linear(n_flatten, resolved_features_dim),
                 nn.ReLU(),
             )
+        self._layer_norm: nn.Module = (
+            nn.LayerNorm(resolved_features_dim) if layer_norm else nn.Identity()
+        )
 
     def _build_conv_layers(
         self,
@@ -124,7 +128,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
                 f"{tuple(observations.shape)!r}"
             )
 
-        return self._linear(self._cnn(channels_first))
+        return self._layer_norm(self._linear(self._cnn(channels_first)))
 
 
 class FZeroXImageStateExtractor(BaseFeaturesExtractor):
@@ -137,6 +141,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         state_features_dim: int = 64,
         fusion_features_dim: int | None = None,
         conv_profile: ConvProfile = "auto",
+        layer_norm: bool = False,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
             raise ValueError(
@@ -173,6 +178,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             image_space,
             features_dim=features_dim,
             conv_profile=conv_profile,
+            layer_norm=False,
         )
         self._state_mlp = nn.Sequential(
             nn.Linear(self._state_dim, resolved_state_features_dim),
@@ -187,6 +193,9 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
                 nn.Linear(combined_features_dim, resolved_fusion_features_dim),
                 nn.ReLU(),
             )
+        self._layer_norm: nn.Module = (
+            nn.LayerNorm(output_features_dim) if layer_norm else nn.Identity()
+        )
 
     def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
         image = observations.get("image")
@@ -205,7 +214,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             [self._image_extractor(image), self._state_mlp(state_flat)],
             dim=1,
         )
-        return self._fusion_mlp(combined_features)
+        return self._layer_norm(self._fusion_mlp(combined_features))
 
 
 class _ImageGeometry:

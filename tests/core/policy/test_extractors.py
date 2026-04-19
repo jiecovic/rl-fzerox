@@ -208,6 +208,32 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
     assert isinstance(extractor._fusion_mlp, torch.nn.Sequential)
 
 
+def test_image_state_extractor_can_layer_norm_fused_features() -> None:
+    extractor = FZeroXImageStateExtractor(
+        spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(66, 82, 6), dtype=np.uint8),
+                "state": spaces.Box(low=0.0, high=1.0, shape=(11,), dtype=np.float32),
+            }
+        ),
+        features_dim="auto",
+        state_features_dim=64,
+        conv_profile="compact_deep",
+        layer_norm=True,
+    )
+
+    features = extractor(
+        {
+            "image": torch.ones((2, 66, 82, 6), dtype=torch.float32),
+            "state": torch.ones((2, 11), dtype=torch.float32),
+        }
+    )
+
+    assert extractor.features_dim == 832
+    assert tuple(features.shape) == (2, 832)
+    assert isinstance(extractor._layer_norm, torch.nn.LayerNorm)
+
+
 def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_branch() -> None:
     extractor = FZeroXImageStateExtractor(
         spaces.Dict(
