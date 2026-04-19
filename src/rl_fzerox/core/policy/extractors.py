@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/policy/extractors.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Literal
 
 import torch
@@ -9,31 +10,52 @@ from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
-ConvSpec = tuple[tuple[int, tuple[int, int], tuple[int, int]], ...]
 ConvProfile = Literal["auto", "nature", "compact_deep", "compact_bottleneck"]
+
+
+@dataclass(frozen=True, slots=True)
+class ConvLayerSpec:
+    """One CNN convolution layer in a supported policy image profile."""
+
+    out_channels: int
+    kernel_size: tuple[int, int]
+    stride: tuple[int, int]
+
+
+ConvSpec = tuple[ConvLayerSpec, ...]
+
+
+def _conv_layer(out_channels: int, *, kernel_size: int, stride: int) -> ConvLayerSpec:
+    return ConvLayerSpec(
+        out_channels=out_channels,
+        kernel_size=(kernel_size, kernel_size),
+        stride=(stride, stride),
+    )
+
+
 NATURE_CNN_CONV_SPEC: ConvSpec = (
-    (32, (8, 8), (4, 4)),
-    (64, (4, 4), (2, 2)),
-    (64, (3, 3), (1, 1)),
+    _conv_layer(32, kernel_size=8, stride=4),
+    _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(64, kernel_size=3, stride=1),
 )
 LEGACY_DEEP_CONV_SPEC: ConvSpec = (
-    (64, (8, 8), (4, 4)),
-    (64, (4, 4), (2, 2)),
-    (128, (3, 3), (2, 2)),
-    (128, (3, 3), (1, 1)),
+    _conv_layer(64, kernel_size=8, stride=4),
+    _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=3, stride=2),
+    _conv_layer(128, kernel_size=3, stride=1),
 )
 COMPACT_DEEP_CONV_SPEC: ConvSpec = (
-    (64, (8, 8), (2, 2)),
-    (64, (4, 4), (2, 2)),
-    (128, (4, 4), (2, 2)),
-    (128, (4, 4), (2, 2)),
+    _conv_layer(64, kernel_size=8, stride=2),
+    _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=4, stride=2),
 )
 COMPACT_BOTTLENECK_CONV_SPEC: ConvSpec = (
-    (64, (8, 8), (2, 2)),
-    (64, (8, 8), (2, 2)),
-    (64, (4, 4), (2, 2)),
-    (128, (3, 3), (2, 2)),
-    (256, (4, 4), (1, 1)),
+    _conv_layer(64, kernel_size=8, stride=2),
+    _conv_layer(64, kernel_size=8, stride=2),
+    _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=3, stride=2),
+    _conv_layer(256, kernel_size=4, stride=1),
 )
 SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (84, 116): NATURE_CNN_CONV_SPEC,
@@ -99,17 +121,17 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
     ) -> list[nn.Module]:
         layers: list[nn.Module] = []
         in_channels = input_channels
-        for out_channels, kernel_size, stride in conv_spec:
+        for layer_spec in conv_spec:
             layers.append(
                 nn.Conv2d(
                     in_channels,
-                    out_channels,
-                    kernel_size=kernel_size,
-                    stride=stride,
+                    layer_spec.out_channels,
+                    kernel_size=layer_spec.kernel_size,
+                    stride=layer_spec.stride,
                 )
             )
             layers.append(nn.ReLU())
-            in_channels = out_channels
+            in_channels = layer_spec.out_channels
         return layers
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
@@ -217,12 +239,12 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         return self._layer_norm(self._fusion_mlp(combined_features))
 
 
+@dataclass(frozen=True, slots=True)
 class _ImageGeometry:
-    def __init__(self, *, height: int, width: int, channels: int, conv_spec: ConvSpec) -> None:
-        self.height = height
-        self.width = width
-        self.channels = channels
-        self.conv_spec = conv_spec
+    height: int
+    width: int
+    channels: int
+    conv_spec: ConvSpec
 
 
 def _resolve_supported_image_geometry(
@@ -291,10 +313,10 @@ def _image_flatten_dim(
     height = geometry.height
     width = geometry.width
     output_channels = geometry.channels
-    for out_channels, kernel_size, stride in geometry.conv_spec:
-        output_channels = out_channels
-        height = _conv_output_size(height, kernel_size[0], stride[0])
-        width = _conv_output_size(width, kernel_size[1], stride[1])
+    for layer_spec in geometry.conv_spec:
+        output_channels = layer_spec.out_channels
+        height = _conv_output_size(height, layer_spec.kernel_size[0], layer_spec.stride[0])
+        width = _conv_output_size(width, layer_spec.kernel_size[1], layer_spec.stride[1])
     return output_channels * height * width
 
 

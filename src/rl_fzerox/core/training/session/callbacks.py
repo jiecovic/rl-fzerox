@@ -17,39 +17,66 @@ from rl_fzerox.core.training.session.artifacts import (
 )
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 
-_STATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
-    ("race_distance", "state/race_distance_mean"),
-    ("speed_kph", "state/speed_kph_mean"),
-    ("position", "state/position_mean"),
-    ("lap", "state/lap_mean"),
-    ("race_laps_completed", "state/race_laps_completed_mean"),
-)
-_STEP_RATE_LOG_KEYS: tuple[tuple[str, str], ...] = (
-    ("damage_taken_frames", "state/damage_taken_step_rate"),
-    ("collision_recoil_entered", "state/collision_recoil_entry_rate"),
-)
-_EPISODE_LOG_KEYS: tuple[tuple[str, str], ...] = (
-    ("position", "episode/final_position_mean"),
-    ("race_laps_completed", "episode/race_laps_completed_mean"),
-)
-_FINISHED_EPISODE_LOG_KEYS: tuple[tuple[str, str, float], ...] = (
-    ("race_time_ms", "episode/finish_time_s_mean", 0.001),
-    ("episode_step", "episode/finish_steps_mean", 1.0),
-    ("position", "episode/finish_position_mean", 1.0),
-)
-_TERMINATION_REASON_KEYS: tuple[str, ...] = (
-    "finished",
-    "spinning_out",
-    "crashed",
-    "retired",
-    "falling_off_track",
-    "energy_depleted",
-)
-_TRUNCATION_REASON_KEYS: tuple[str, ...] = (
-    "stuck",
-    "wrong_way",
-    "progress_stalled",
-    "timeout",
+
+@dataclass(frozen=True, slots=True)
+class _MetricLogSpec:
+    info_key: str
+    log_key: str
+    scale: float = 1.0
+
+
+@dataclass(frozen=True, slots=True)
+class _EpisodeReasonSpecs:
+    termination: tuple[str, ...]
+    truncation: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _RolloutInfoLogSpecs:
+    state_metrics: tuple[_MetricLogSpec, ...]
+    step_rates: tuple[_MetricLogSpec, ...]
+    episode_metrics: tuple[_MetricLogSpec, ...]
+    finished_episode_metrics: tuple[_MetricLogSpec, ...]
+    episode_reasons: _EpisodeReasonSpecs
+
+
+ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
+    state_metrics=(
+        _MetricLogSpec("race_distance", "state/race_distance_mean"),
+        _MetricLogSpec("speed_kph", "state/speed_kph_mean"),
+        _MetricLogSpec("position", "state/position_mean"),
+        _MetricLogSpec("lap", "state/lap_mean"),
+        _MetricLogSpec("race_laps_completed", "state/race_laps_completed_mean"),
+    ),
+    step_rates=(
+        _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
+        _MetricLogSpec("collision_recoil_entered", "state/collision_recoil_entry_rate"),
+    ),
+    episode_metrics=(
+        _MetricLogSpec("position", "episode/final_position_mean"),
+        _MetricLogSpec("race_laps_completed", "episode/race_laps_completed_mean"),
+    ),
+    finished_episode_metrics=(
+        _MetricLogSpec("race_time_ms", "episode/finish_time_s_mean", scale=0.001),
+        _MetricLogSpec("episode_step", "episode/finish_steps_mean"),
+        _MetricLogSpec("position", "episode/finish_position_mean"),
+    ),
+    episode_reasons=_EpisodeReasonSpecs(
+        termination=(
+            "finished",
+            "spinning_out",
+            "crashed",
+            "retired",
+            "falling_off_track",
+            "energy_depleted",
+        ),
+        truncation=(
+            "stuck",
+            "wrong_way",
+            "progress_stalled",
+            "timeout",
+        ),
+    ),
 )
 
 
@@ -72,6 +99,10 @@ class _OptimizerLike(Protocol):
 @runtime_checkable
 class _PolicyWithOptimizer(Protocol):
     optimizer: _OptimizerLike
+
+
+class _LoggerLike(Protocol):
+    def record(self, key: str, value: object) -> None: ...
 
 
 @dataclass
@@ -107,51 +138,62 @@ class _RateAccumulator:
 @dataclass
 class RolloutInfoAccumulator:
     state_metrics: dict[str, _MeanAccumulator] = field(
-        default_factory=lambda: {key: _MeanAccumulator() for key, _ in _STATE_LOG_KEYS}
+        default_factory=lambda: {
+            spec.info_key: _MeanAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics
+        }
     )
     step_rates: dict[str, _RateAccumulator] = field(
-        default_factory=lambda: {key: _RateAccumulator() for key, _ in _STEP_RATE_LOG_KEYS}
+        default_factory=lambda: {
+            spec.info_key: _RateAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.step_rates
+        }
     )
     episode_metrics: dict[str, _MeanAccumulator] = field(
-        default_factory=lambda: {key: _MeanAccumulator() for key, _ in _EPISODE_LOG_KEYS}
+        default_factory=lambda: {
+            spec.info_key: _MeanAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.episode_metrics
+        }
     )
     finished_episode_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {
-            key: _MeanAccumulator() for key, _, _ in _FINISHED_EPISODE_LOG_KEYS
+            spec.info_key: _MeanAccumulator()
+            for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics
         }
     )
     termination_counts: dict[str, int] = field(
-        default_factory=lambda: {reason: 0 for reason in _TERMINATION_REASON_KEYS}
+        default_factory=lambda: {
+            reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination
+        }
     )
     truncation_counts: dict[str, int] = field(
-        default_factory=lambda: {reason: 0 for reason in _TRUNCATION_REASON_KEYS}
+        default_factory=lambda: {
+            reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.truncation
+        }
     )
     episode_count: int = 0
 
     def add_infos(self, infos: Sequence[object]) -> None:
-        for info_key, _ in _STATE_LOG_KEYS:
-            values = _numeric_values(infos, info_key)
+        for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics:
+            values = _numeric_values(infos, spec.info_key)
             if values:
-                self.state_metrics[info_key].add_many(values)
+                self.state_metrics[spec.info_key].add_many(values)
 
-        for info_key, _ in _STEP_RATE_LOG_KEYS:
-            values = _positive_values(infos, info_key)
+        for spec in ROLLOUT_INFO_LOG_SPECS.step_rates:
+            values = _positive_values(infos, spec.info_key)
             if values:
-                self.step_rates[info_key].add_many(values)
+                self.step_rates[spec.info_key].add_many(values)
 
         episodes = _episode_dicts(infos)
         self.episode_count += len(episodes)
-        for episode_key, _ in _EPISODE_LOG_KEYS:
-            values = _numeric_episode_values(episodes, episode_key)
+        for spec in ROLLOUT_INFO_LOG_SPECS.episode_metrics:
+            values = _numeric_episode_values(episodes, spec.info_key)
             if values:
-                self.episode_metrics[episode_key].add_many(values)
+                self.episode_metrics[spec.info_key].add_many(values)
 
         finished_episodes = _finished_episode_dicts(episodes)
-        for episode_key, _, scale in _FINISHED_EPISODE_LOG_KEYS:
-            values = _numeric_episode_values(finished_episodes, episode_key)
+        for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics:
+            values = _numeric_episode_values(finished_episodes, spec.info_key)
             if values:
-                scaled_values = [value * scale for value in values]
-                self.finished_episode_metrics[episode_key].add_many(scaled_values)
+                scaled_values = [value * spec.scale for value in values]
+                self.finished_episode_metrics[spec.info_key].add_many(scaled_values)
 
         for episode in episodes:
             termination_reason = episode.get("termination_reason")
@@ -164,36 +206,36 @@ class RolloutInfoAccumulator:
             if isinstance(truncation_reason, str) and truncation_reason in self.truncation_counts:
                 self.truncation_counts[truncation_reason] += 1
 
-    def record_to(self, logger) -> None:
-        for info_key, log_key in _STATE_LOG_KEYS:
-            mean = self.state_metrics[info_key].mean()
+    def record_to(self, logger: _LoggerLike) -> None:
+        for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics:
+            mean = self.state_metrics[spec.info_key].mean()
             if mean is not None:
-                logger.record(log_key, mean)
+                logger.record(spec.log_key, mean)
 
-        for info_key, log_key in _STEP_RATE_LOG_KEYS:
-            rate = self.step_rates[info_key].rate()
+        for spec in ROLLOUT_INFO_LOG_SPECS.step_rates:
+            rate = self.step_rates[spec.info_key].rate()
             if rate is not None:
-                logger.record(log_key, rate)
+                logger.record(spec.log_key, rate)
 
-        for episode_key, log_key in _EPISODE_LOG_KEYS:
-            mean = self.episode_metrics[episode_key].mean()
+        for spec in ROLLOUT_INFO_LOG_SPECS.episode_metrics:
+            mean = self.episode_metrics[spec.info_key].mean()
             if mean is not None:
-                logger.record(log_key, mean)
+                logger.record(spec.log_key, mean)
 
-        for episode_key, log_key, _ in _FINISHED_EPISODE_LOG_KEYS:
-            mean = self.finished_episode_metrics[episode_key].mean()
+        for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics:
+            mean = self.finished_episode_metrics[spec.info_key].mean()
             if mean is not None:
-                logger.record(log_key, mean)
+                logger.record(spec.log_key, mean)
 
         if self.episode_count == 0:
             return
 
-        for reason in _TERMINATION_REASON_KEYS:
+        for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination:
             logger.record(
                 f"episode/{reason}_rate",
                 self.termination_counts[reason] / self.episode_count,
             )
-        for reason in _TRUNCATION_REASON_KEYS:
+        for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.truncation:
             logger.record(
                 f"episode/{reason}_rate",
                 self.truncation_counts[reason] / self.episode_count,
@@ -431,7 +473,7 @@ def _constant_schedule(value: float) -> Callable[[float], float]:
 
 def _record_stage_train_overrides(
     *,
-    logger,
+    logger: _LoggerLike,
     overrides: CurriculumTrainOverridesConfig | None,
 ) -> None:
     if overrides is None:

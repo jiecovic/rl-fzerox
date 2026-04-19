@@ -34,19 +34,28 @@ from rl_fzerox.core.envs.course_effects import (
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
-DEFAULT_OBSERVATION_STATE_PROFILE: ObservationStateProfile = "default"
-DEFAULT_OBSERVATION_COURSE_CONTEXT: ObservationCourseContext = "none"
-DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT: ObservationGroundEffectContext = "none"
-DEFAULT_ACTION_HISTORY_LEN: int | None = None
-DEFAULT_ACTION_HISTORY_CONTROLS: tuple[ActionHistoryControl, ...] = (
-    "steer",
-    "gas",
-    "boost",
-    "lean",
-)
-BUILTIN_COURSE_COUNT = 24
-DEFAULT_LATERAL_VELOCITY_NORMALIZER = 32.0
-DEFAULT_SLIDING_LATERAL_VELOCITY_THRESHOLD = 8.0
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationStateDefaults:
+    """Default scalar-observation settings shared by env, watch, and tests."""
+
+    state_profile: ObservationStateProfile = "default"
+    course_context: ObservationCourseContext = "none"
+    ground_effect_context: ObservationGroundEffectContext = "none"
+    action_history_len: int | None = None
+    action_history_controls: tuple[ActionHistoryControl, ...] = (
+        "steer",
+        "gas",
+        "boost",
+        "lean",
+    )
+    builtin_course_count: int = 24
+    lateral_velocity_normalizer: float = 32.0
+    sliding_lateral_velocity_threshold: float = 8.0
+
+
+OBSERVATION_STATE_DEFAULTS = ObservationStateDefaults()
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +106,21 @@ class StateComponentDefinition:
         ],
         list[float],
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class LegacyStateVectorExports:
+    """Derived names for the original scalar-state profile API."""
+
+    spec: StateVectorSpec
+    names: tuple[str, ...]
+    count: int
+    speed_normalizer_kph: float
+    lean_tap_guard_frames: int
+    recent_boost_window_frames: int
+    recent_steer_window_frames: int
+    low: Float32Array
+    high: Float32Array
 
 
 DEFAULT_STATE_VECTOR_SPEC = StateVectorSpec(
@@ -159,24 +183,43 @@ STATE_VECTOR_SPECS: dict[ObservationStateProfile, StateVectorSpec] = {
     "steer_history": STEER_HISTORY_STATE_VECTOR_SPEC,
     "race_core": RACE_CORE_STATE_VECTOR_SPEC,
 }
-STATE_VECTOR_SPEC = DEFAULT_STATE_VECTOR_SPEC
-STATE_FEATURE_NAMES = STATE_VECTOR_SPEC.names
-STATE_FEATURE_COUNT = STATE_VECTOR_SPEC.count
-STATE_SPEED_NORMALIZER_KPH = STATE_VECTOR_SPEC.speed_normalizer_kph
-LEAN_DOUBLE_TAP_WINDOW_FRAMES = STATE_VECTOR_SPEC.lean_tap_guard_frames
-RECENT_BOOST_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_boost_window_frames
-RECENT_STEER_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_steer_window_frames
-STATE_FEATURE_LOW = STATE_VECTOR_SPEC.low_array()
-STATE_FEATURE_HIGH = STATE_VECTOR_SPEC.high_array()
+
+# Legacy exports kept for older call sites and run-manifest loading. New code
+# should depend on OBSERVATION_STATE_DEFAULTS or explicit StateVectorSpec values.
+DEFAULT_OBSERVATION_STATE_PROFILE = OBSERVATION_STATE_DEFAULTS.state_profile
+DEFAULT_OBSERVATION_COURSE_CONTEXT = OBSERVATION_STATE_DEFAULTS.course_context
+DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT = OBSERVATION_STATE_DEFAULTS.ground_effect_context
+DEFAULT_ACTION_HISTORY_LEN = OBSERVATION_STATE_DEFAULTS.action_history_len
+DEFAULT_ACTION_HISTORY_CONTROLS = OBSERVATION_STATE_DEFAULTS.action_history_controls
+LEGACY_STATE_VECTOR_EXPORTS = LegacyStateVectorExports(
+    spec=DEFAULT_STATE_VECTOR_SPEC,
+    names=DEFAULT_STATE_VECTOR_SPEC.names,
+    count=DEFAULT_STATE_VECTOR_SPEC.count,
+    speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
+    lean_tap_guard_frames=DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
+    recent_boost_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames,
+    recent_steer_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames,
+    low=DEFAULT_STATE_VECTOR_SPEC.low_array(),
+    high=DEFAULT_STATE_VECTOR_SPEC.high_array(),
+)
+STATE_VECTOR_SPEC = LEGACY_STATE_VECTOR_EXPORTS.spec
+STATE_FEATURE_NAMES = LEGACY_STATE_VECTOR_EXPORTS.names
+STATE_FEATURE_COUNT = LEGACY_STATE_VECTOR_EXPORTS.count
+STATE_SPEED_NORMALIZER_KPH = LEGACY_STATE_VECTOR_EXPORTS.speed_normalizer_kph
+LEAN_DOUBLE_TAP_WINDOW_FRAMES = LEGACY_STATE_VECTOR_EXPORTS.lean_tap_guard_frames
+RECENT_BOOST_PRESSURE_WINDOW_FRAMES = LEGACY_STATE_VECTOR_EXPORTS.recent_boost_window_frames
+RECENT_STEER_PRESSURE_WINDOW_FRAMES = LEGACY_STATE_VECTOR_EXPORTS.recent_steer_window_frames
+STATE_FEATURE_LOW = LEGACY_STATE_VECTOR_EXPORTS.low
+STATE_FEATURE_HIGH = LEGACY_STATE_VECTOR_EXPORTS.high
 
 
 def telemetry_state_vector(
     telemetry: FZeroXTelemetry | None,
     *,
-    state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
     left_lean_held: float = 0.0,
     right_lean_held: float = 0.0,
@@ -186,8 +229,10 @@ def telemetry_state_vector(
     steer_left_held: float = 0.0,
     steer_right_held: float = 0.0,
     recent_steer_pressure: float = 0.0,
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
 ) -> StateVector:
@@ -309,12 +354,14 @@ def telemetry_state_vector(
 def state_vector_spec(
     state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
 ) -> StateVectorSpec:
     """Return the scalar-state schema selected by config."""
@@ -343,12 +390,14 @@ def state_vector_spec(
 def state_feature_names(
     state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
 ) -> tuple[str, ...]:
     """Return ordered scalar-state feature names for one profile."""
@@ -366,12 +415,14 @@ def state_feature_names(
 def state_feature_count(
     state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
 ) -> int:
     """Return scalar-state width for one profile."""
@@ -389,7 +440,9 @@ def state_feature_count(
 def action_history_feature_names(
     action_history_len: int | None,
     *,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
 ) -> tuple[str, ...]:
     """Return ordered feature names for the configured previous-action buffer."""
 
@@ -648,11 +701,16 @@ def _vehicle_state_values(
         1.0 if player.airborne else 0.0,
         1.0 if player.can_boost else 0.0,
         1.0 if telemetry_boost_active(telemetry) else 0.0,
-        _clamp(lateral_velocity / DEFAULT_LATERAL_VELOCITY_NORMALIZER, -1.0, 1.0),
+        _clamp(
+            lateral_velocity / OBSERVATION_STATE_DEFAULTS.lateral_velocity_normalizer,
+            -1.0,
+            1.0,
+        ),
         1.0
         if (
             not player.airborne
-            and abs(lateral_velocity) > DEFAULT_SLIDING_LATERAL_VELOCITY_THRESHOLD
+            and abs(lateral_velocity)
+            > OBSERVATION_STATE_DEFAULTS.sliding_lateral_velocity_threshold
         )
         else 0.0,
     ]
@@ -711,7 +769,7 @@ def _course_component_features(encoding: str) -> tuple[StateFeature, ...]:
     if encoding == "one_hot_builtin":
         return tuple(
             StateFeature(f"course_context.course_builtin_{index:02d}", 1.0)
-            for index in range(BUILTIN_COURSE_COUNT)
+            for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
         )
     raise ValueError(f"Unsupported course-context encoding: {encoding!r}")
 
@@ -725,11 +783,11 @@ def _course_component_values(
         return []
     if encoding != "one_hot_builtin":
         raise ValueError(f"Unsupported course-context encoding: {encoding!r}")
-    values = [0.0] * BUILTIN_COURSE_COUNT
+    values = [0.0] * OBSERVATION_STATE_DEFAULTS.builtin_course_count
     if telemetry is None:
         return values
     course_index = int(telemetry.course_index)
-    if 0 <= course_index < BUILTIN_COURSE_COUNT:
+    if 0 <= course_index < OBSERVATION_STATE_DEFAULTS.builtin_course_count:
         values[course_index] = 1.0
     return values
 
@@ -949,7 +1007,7 @@ def _course_context_features(
     if course_context == "one_hot_builtin":
         return tuple(
             StateFeature(f"course_builtin_{index:02d}", 1.0)
-            for index in range(BUILTIN_COURSE_COUNT)
+            for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
         )
     raise ValueError(f"Unsupported observation course context: {course_context!r}")
 
@@ -963,11 +1021,11 @@ def _course_context_values(
         return []
     if course_context != "one_hot_builtin":
         raise ValueError(f"Unsupported observation course context: {course_context!r}")
-    values = [0.0] * BUILTIN_COURSE_COUNT
+    values = [0.0] * OBSERVATION_STATE_DEFAULTS.builtin_course_count
     if telemetry is None:
         return values
     course_index = int(telemetry.course_index)
-    if 0 <= course_index < BUILTIN_COURSE_COUNT:
+    if 0 <= course_index < OBSERVATION_STATE_DEFAULTS.builtin_course_count:
         values[course_index] = 1.0
     return values
 

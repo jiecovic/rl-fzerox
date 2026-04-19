@@ -15,7 +15,15 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
 )
 
-_MAX_BALANCED_CYCLE_SLOTS = 128
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingLimits:
+    """Limits that keep deterministic balanced sampling cycles bounded."""
+
+    max_balanced_cycle_slots: int = 128
+
+
+TRACK_SAMPLING_LIMITS = TrackSamplingLimits()
 
 
 @dataclass(frozen=True)
@@ -206,8 +214,8 @@ def _balanced_repetition_counts(entries: tuple[TrackSamplingEntryConfig, ...]) -
     common_divisor = reduce(gcd, counts)
     counts = [count // common_divisor for count in counts]
     total = sum(counts)
-    if total > _MAX_BALANCED_CYCLE_SLOTS:
-        scale = _MAX_BALANCED_CYCLE_SLOTS / total
+    if total > TRACK_SAMPLING_LIMITS.max_balanced_cycle_slots:
+        scale = TRACK_SAMPLING_LIMITS.max_balanced_cycle_slots / total
         counts = [max(1, round(count * scale)) for count in counts]
     return tuple(counts)
 

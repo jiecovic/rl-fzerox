@@ -16,6 +16,8 @@ use libretro_sys::{
 
 use crate::core::video::VideoFrame;
 
+// EGL/GL enum values mirror the external C headers. Keep those as constants;
+// only project-owned settings should be grouped into local structs.
 const EGL_FALSE: EglBoolean = 0;
 const EGL_NONE: EglInt = 0x3038;
 const EGL_RED_SIZE: EglInt = 0x3024;
@@ -39,8 +41,16 @@ const GL_RGB: GlEnum = 0x1907;
 const GL_UNSIGNED_BYTE: GlEnum = 0x1401;
 const GL_PACK_ALIGNMENT: GlEnum = 0x0D05;
 
-const PBUFFER_WIDTH: EglInt = 1024;
-const PBUFFER_HEIGHT: EglInt = 1024;
+const PBUFFER_SIZE: PbufferSize = PbufferSize {
+    width: 1024,
+    height: 1024,
+};
+
+#[derive(Clone, Copy)]
+struct PbufferSize {
+    width: EglInt,
+    height: EglInt,
+}
 
 type EglBoolean = libc::c_uint;
 type EglEnum = libc::c_uint;
@@ -353,9 +363,9 @@ fn create_surface(
 ) -> Result<EglSurface, String> {
     let attributes = [
         EGL_WIDTH,
-        PBUFFER_WIDTH,
+        PBUFFER_SIZE.width,
         EGL_HEIGHT,
-        PBUFFER_HEIGHT,
+        PBUFFER_SIZE.height,
         EGL_NONE,
     ];
     let surface = unsafe { (egl.create_pbuffer_surface)(display, config, attributes.as_ptr()) };
