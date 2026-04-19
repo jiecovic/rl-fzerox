@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/view/components/observation_strip.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 from rl_fzerox.ui.watch.view.components.cockpit import (
@@ -17,9 +18,16 @@ from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import ControlViz, RenderFont, ViewerFonts
 
-_OBS_GLASS_SHADOW: Color = (2, 3, 4)
-_OBS_GLASS_EDGE: Color = (40, 50, 62)
-_OBS_GLASS_HIGHLIGHT: Color = (86, 101, 116)
+
+@dataclass(frozen=True)
+class _ObservationGlassStyle:
+    shadow: Color = (2, 3, 4)
+    fill: Color = (7, 10, 12)
+    edge: Color = (40, 50, 62)
+    highlight: Color = (86, 101, 116)
+
+
+_OBSERVATION_GLASS_STYLE = _ObservationGlassStyle()
 
 
 class _RectLike(Protocol):
@@ -168,12 +176,13 @@ def _draw_observation_glass_box(
     screen: _ScreenLike,
     rect: _RectLike,
 ) -> None:
-    pygame.draw.rect(screen, _OBS_GLASS_SHADOW, rect.move(0, 3), border_radius=13)
-    pygame.draw.rect(screen, (7, 10, 12), rect, border_radius=13)
-    pygame.draw.rect(screen, _OBS_GLASS_HIGHLIGHT, rect, width=1, border_radius=13)
+    style = _OBSERVATION_GLASS_STYLE
+    pygame.draw.rect(screen, style.shadow, rect.move(0, 3), border_radius=13)
+    pygame.draw.rect(screen, style.fill, rect, border_radius=13)
+    pygame.draw.rect(screen, style.highlight, rect, width=1, border_radius=13)
     pygame.draw.rect(
         screen,
-        _OBS_GLASS_EDGE,
+        style.edge,
         rect.inflate(-4, -4),
         width=1,
         border_radius=10,

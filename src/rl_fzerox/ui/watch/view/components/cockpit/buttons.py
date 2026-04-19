@@ -4,16 +4,11 @@ from __future__ import annotations
 import math
 
 from rl_fzerox.ui.watch.view.components.cockpit.style import (
-    BUTTON_FACE_FILL,
-    BUTTON_SHADOW,
-    LEAN_ACTIVE_BORDER,
-    LEAN_ACTIVE_FILL,
+    BUTTON_FACE_STYLE,
     LEAN_CONTROL_STYLE,
 )
 from rl_fzerox.ui.watch.view.components.effects import (
-    BOOST_EDGE_GLOW,
-    GLASS_SHADOW,
-    GLASS_SHEEN,
+    GLASS_EFFECT_STYLE,
 )
 from rl_fzerox.ui.watch.view.components.effects import (
     blend_color as _blend_color,
@@ -48,13 +43,14 @@ def _draw_lean_button(
         rect.inflate(-style.inner_inset, -style.inner_inset),
         direction=direction,
     )
-    fill_color = LEAN_ACTIVE_FILL if active else BUTTON_FACE_FILL
-    border_color = style.inactive_border if not active else LEAN_ACTIVE_BORDER
-    text_color = LEAN_ACTIVE_BORDER if active else style.inactive_text
+    button_style = BUTTON_FACE_STYLE
+    fill_color = style.active_fill if active else button_style.fill
+    border_color = style.inactive_border if not active else style.active_border
+    text_color = style.active_border if active else style.inactive_text
 
     pygame.draw.polygon(
         screen,
-        BUTTON_SHADOW,
+        button_style.shadow,
         tuple(
             (point_x + style.shadow_offset[0], point_y + style.shadow_offset[1])
             for point_x, point_y in face
@@ -69,9 +65,9 @@ def _draw_lean_button(
                 direction=direction,
             ),
             color=(
-                LEAN_ACTIVE_BORDER[0],
-                LEAN_ACTIVE_BORDER[1],
-                LEAN_ACTIVE_BORDER[2],
+                style.active_border[0],
+                style.active_border[1],
+                style.active_border[2],
                 style.active_glow_alpha,
             ),
         )
@@ -156,7 +152,9 @@ def _draw_boost_button(
     manual_intensity = max(0.0, min(1.0, (level - 0.55) / 0.45))
     normal_intensity = max(0.0, min(1.0, level / 0.55))
     manual_dominance = manual_intensity**0.45
-    pygame.draw.circle(screen, BUTTON_SHADOW, (center[0] + 1, center[1] + 2), radius)
+    button_style = BUTTON_FACE_STYLE
+    glass_style = GLASS_EFFECT_STYLE
+    pygame.draw.circle(screen, button_style.shadow, (center[0] + 1, center[1] + 2), radius)
     if active:
         _draw_alpha_circle(
             pygame=pygame,
@@ -178,7 +176,7 @@ def _draw_boost_button(
             radius=radius + 9,
             color=(78, 255, 64, round(78 * manual_intensity)),
         )
-    bezel_color = _blend_color(BUTTON_FACE_FILL, (29, 58, 46), normal_intensity)
+    bezel_color = _blend_color(button_style.fill, (29, 58, 46), normal_intensity)
     border_color = _blend_color(
         PALETTE.flag_inactive_border,
         (132, 214, 172),
@@ -199,14 +197,14 @@ def _draw_boost_button(
         screen=screen,
         center=(center[0] - max(2, radius // 4), center[1] - max(2, radius // 4)),
         radius=max(3, radius // 2),
-        color=GLASS_SHEEN,
+        color=glass_style.sheen,
     )
     _draw_alpha_circle(
         pygame=pygame,
         screen=screen,
         center=(center[0] + 1, center[1] + max(3, radius // 3)),
         radius=max(3, radius // 2),
-        color=GLASS_SHADOW,
+        color=glass_style.shadow,
     )
     if active:
         _draw_alpha_circle(
@@ -215,9 +213,9 @@ def _draw_boost_button(
             center=center,
             radius=radius + 2,
             color=(
-                BOOST_EDGE_GLOW[0],
-                BOOST_EDGE_GLOW[1],
-                BOOST_EDGE_GLOW[2],
+                glass_style.boost_edge_glow[0],
+                glass_style.boost_edge_glow[1],
+                glass_style.boost_edge_glow[2],
                 round(24 + (58 * level) + (68 * manual_intensity)),
             ),
         )
@@ -228,7 +226,7 @@ def _draw_boost_button(
             screen=screen,
             center=(center[0] - max(2, radius // 4), center[1] - max(2, radius // 4)),
             radius=max(3, radius // 2),
-            color=GLASS_SHEEN,
+            color=glass_style.sheen,
         )
     pygame.draw.circle(screen, border_color, center, radius, width=2 if level >= 0.75 else 1)
     _draw_alpha_circle(

@@ -3,9 +3,16 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from dataclasses import dataclass
 
-_CONTROL_FPS_ADJUST_STEP = 15.0
-_MIN_FPS = 1.0
+
+@dataclass(frozen=True)
+class _TimingLimits:
+    min_fps: float = 1.0
+    control_fps_adjust_step: float = 15.0
+
+
+_TIMING_LIMITS = _TimingLimits()
 
 
 class RateMeter:
@@ -42,11 +49,11 @@ def _resolve_control_fps(
     """Resolve configured env-step FPS; `None` means uncapped fast-forward."""
 
     if setting in (None, "auto"):
-        return max(native_control_fps, _MIN_FPS)
+        return max(native_control_fps, _TIMING_LIMITS.min_fps)
     if setting == "unlimited":
         return None
     if isinstance(setting, int | float):
-        return max(float(setting), _MIN_FPS)
+        return max(float(setting), _TIMING_LIMITS.min_fps)
     raise ValueError(f"Unsupported watch control_fps value: {setting!r}")
 
 
@@ -56,18 +63,18 @@ def _resolve_render_fps(setting: object, *, native_fps: float) -> float | None:
     if setting is None:
         return 60.0
     if setting == "auto":
-        return max(native_fps, _MIN_FPS)
+        return max(native_fps, _TIMING_LIMITS.min_fps)
     if setting == "unlimited":
         return None
     if isinstance(setting, int | float):
-        return max(float(setting), _MIN_FPS)
+        return max(float(setting), _TIMING_LIMITS.min_fps)
     raise ValueError(f"Unsupported watch render_fps value: {setting!r}")
 
 
 def _target_seconds(target_fps: float | None) -> float | None:
     if target_fps is None:
         return None
-    return 1.0 / max(target_fps, _MIN_FPS)
+    return 1.0 / max(target_fps, _TIMING_LIMITS.min_fps)
 
 
 def _adjust_control_fps(
@@ -84,5 +91,8 @@ def _adjust_control_fps(
         else target_control_fps
     )
     if base_fps is None:
-        base_fps = _MIN_FPS
-    return max(_MIN_FPS, base_fps + (delta * _CONTROL_FPS_ADJUST_STEP))
+        base_fps = _TIMING_LIMITS.min_fps
+    return max(
+        _TIMING_LIMITS.min_fps,
+        base_fps + (delta * _TIMING_LIMITS.control_fps_adjust_step),
+    )

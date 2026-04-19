@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -12,7 +13,13 @@ from rl_fzerox.core.domain.hybrid_action import (
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.view.panels.buttons import BUTTON_LABELS
 
-_RELOAD_ERROR_MAX_CHARS = 36
+
+@dataclass(frozen=True)
+class _PanelFormatLimits:
+    reload_error_max_chars: int = 36
+
+
+_PANEL_FORMAT_LIMITS = _PanelFormatLimits()
 
 
 def _pressed_button_labels(joypad_mask_value: int) -> str:
@@ -63,9 +70,10 @@ def _format_reload_error(reload_error: str | None) -> str:
     if reload_error is None:
         return "-"
     normalized = " ".join(reload_error.split())
-    if len(normalized) <= _RELOAD_ERROR_MAX_CHARS:
+    max_chars = _PANEL_FORMAT_LIMITS.reload_error_max_chars
+    if len(normalized) <= max_chars:
         return normalized
-    return normalized[: _RELOAD_ERROR_MAX_CHARS - 1] + "…"
+    return normalized[: max_chars - 1] + "…"
 
 
 def _display_aspect_ratio(info: dict[str, object]) -> float:

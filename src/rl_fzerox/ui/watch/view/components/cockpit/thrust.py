@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 from rl_fzerox.ui.watch.view.components.cockpit.style import (
-    BUTTON_SHADOW,
-    COCKPIT_GRID,
-    THRUST_COLUMN_BORDER_WIDTH,
-    THRUST_WARNING_FILL,
+    BUTTON_FACE_STYLE,
+    THRUST_COLUMN_STYLE,
 )
 from rl_fzerox.ui.watch.view.components.effects import (
     draw_glass_column_overlay as _draw_glass_column_overlay,
@@ -34,7 +32,7 @@ def _draw_thrust_column(
     )
     pygame.draw.rect(
         screen,
-        BUTTON_SHADOW,
+        BUTTON_FACE_STYLE.shadow,
         track.move(1, 2),
         border_radius=track.width // 2,
     )
@@ -58,7 +56,7 @@ def _draw_thrust_column(
         if segment_index < lit_segments:
             pygame.draw.rect(screen, fill_color, segment, border_radius=1)
             continue
-        pygame.draw.rect(screen, COCKPIT_GRID, segment, border_radius=1)
+        pygame.draw.rect(screen, THRUST_COLUMN_STYLE.unlit_segment_fill, segment, border_radius=1)
 
     _draw_glass_column_overlay(pygame=pygame, screen=screen, track=track)
 
@@ -67,7 +65,7 @@ def _draw_thrust_column(
         threshold_y = track.bottom - round(track.height * threshold)
         pygame.draw.line(
             screen,
-            THRUST_WARNING_FILL,
+            THRUST_COLUMN_STYLE.warning_fill,
             (track.left - 5, threshold_y),
             (track.right + 5, threshold_y),
             width=2,
@@ -77,6 +75,6 @@ def _draw_thrust_column(
         screen,
         PALETTE.control_lever_border,
         track,
-        width=THRUST_COLUMN_BORDER_WIDTH,
+        width=THRUST_COLUMN_STYLE.border_width,
         border_radius=3,
     )
