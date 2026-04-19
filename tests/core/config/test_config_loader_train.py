@@ -724,6 +724,32 @@ def test_load_train_app_config_reads_fusion_extractor_features_dim(tmp_path: Pat
     assert config.policy.extractor.fusion_features_dim == 512
 
 
+def test_load_train_app_config_reads_extractor_layer_norm(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "policy:",
+            "  extractor:",
+            "    layer_norm: true",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.policy.extractor.layer_norm is True
+
+
 def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"

@@ -31,12 +31,14 @@ def build_policy_kwargs(
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
+            "layer_norm": policy_config.extractor.layer_norm,
         }
     else:
         extractor_class = FZeroXObservationCnnExtractor
         extractor_kwargs = {
             "conv_profile": policy_config.extractor.conv_profile,
             "features_dim": policy_config.extractor.features_dim,
+            "layer_norm": policy_config.extractor.layer_norm,
         }
 
     return {

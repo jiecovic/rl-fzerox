@@ -678,6 +678,7 @@ class ExtractorConfig(BaseModel):
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     fusion_features_dim: PositiveInt | None = None
+    layer_norm: bool = False
 
 
 class PolicyRecurrentConfig(BaseModel):
