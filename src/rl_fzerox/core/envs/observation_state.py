@@ -765,7 +765,7 @@ def _component_action_history_features(
     length = _validate_action_history_len(action_history_len)
     return tuple(
         StateFeature(
-            f"control_history.{_control_history_feature_name(control)}_t_minus_{age}",
+            f"control_history.prev_{_control_history_feature_name(control)}_{age}",
             _control_history_feature_bound(control).high,
             low=_control_history_feature_bound(control).low,
         )
