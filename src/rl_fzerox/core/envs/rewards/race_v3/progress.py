@@ -14,6 +14,7 @@ class FrontierReward:
     """Progress and refill bonus paid from newly crossed spline buckets."""
 
     progress: float
+    ground_effect_adjustment: float
     energy_refill_bonus: float
 
 
@@ -26,6 +27,7 @@ class FrontierProgressRewardTracker:
         self._frontier_bucket_index = 0
         self._pending_delta = 0.0
         self._pending_reward = 0.0
+        self._pending_ground_effect_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
         self._pending_frames = 0
 
@@ -66,30 +68,42 @@ class FrontierProgressRewardTracker:
         status: StepStatus,
         *,
         weights: RaceV3RewardWeights,
+        progress_multiplier: float,
         energy_refill_bonus_for_progress: Callable[[float], float],
     ) -> FrontierReward:
         max_relative_progress = self._progress.relative_distance(summary.max_race_distance)
         bucket_distance = weights.progress_bucket_distance
         if bucket_distance <= 0.0:
-            return FrontierReward(progress=0.0, energy_refill_bonus=0.0)
+            return FrontierReward(
+                progress=0.0,
+                ground_effect_adjustment=0.0,
+                energy_refill_bonus=0.0,
+            )
         current_bucket_index = int(max_relative_progress // bucket_distance)
         crossed_bucket_count = current_bucket_index - self._frontier_bucket_index
         if crossed_bucket_count <= 0:
-            return FrontierReward(progress=0.0, energy_refill_bonus=0.0)
+            return FrontierReward(
+                progress=0.0,
+                ground_effect_adjustment=0.0,
+                energy_refill_bonus=0.0,
+            )
 
         self._frontier_bucket_index = current_bucket_index
         self._frontier_distance = current_bucket_index * bucket_distance
         progress_reward = crossed_bucket_count * weights.progress_bucket_reward
+        ground_effect_adjustment = progress_reward * (max(float(progress_multiplier), 0.0) - 1.0)
         energy_refill_bonus = energy_refill_bonus_for_progress(progress_reward)
         interval_frames = max(int(weights.progress_reward_interval_frames), 1)
         if interval_frames <= 1:
             return FrontierReward(
                 progress=progress_reward,
+                ground_effect_adjustment=ground_effect_adjustment,
                 energy_refill_bonus=energy_refill_bonus,
             )
 
         self._pending_delta += crossed_bucket_count * bucket_distance
         self._pending_reward += progress_reward
+        self._pending_ground_effect_adjustment += ground_effect_adjustment
         self._pending_energy_refill_bonus += energy_refill_bonus
         self._pending_frames += max(int(summary.frames_run), 0)
         if (
@@ -97,13 +111,19 @@ class FrontierProgressRewardTracker:
             and status.termination_reason is None
             and status.truncation_reason is None
         ):
-            return FrontierReward(progress=0.0, energy_refill_bonus=0.0)
+            return FrontierReward(
+                progress=0.0,
+                ground_effect_adjustment=0.0,
+                energy_refill_bonus=0.0,
+            )
 
         pending_reward = self._pending_reward
+        pending_ground_effect_adjustment = self._pending_ground_effect_adjustment
         pending_refill_bonus = self._pending_energy_refill_bonus
         self._clear_pending()
         return FrontierReward(
             progress=pending_reward,
+            ground_effect_adjustment=pending_ground_effect_adjustment,
             energy_refill_bonus=pending_refill_bonus,
         )
 
@@ -131,5 +151,6 @@ class FrontierProgressRewardTracker:
     def _clear_pending(self) -> None:
         self._pending_delta = 0.0
         self._pending_reward = 0.0
+        self._pending_ground_effect_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
         self._pending_frames = 0

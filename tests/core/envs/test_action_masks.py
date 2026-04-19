@@ -111,6 +111,44 @@ def test_env_action_masks_update_with_curriculum_stage_changes() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2 + 3))
 
 
+def test_hybrid_curriculum_stage_can_speed_gate_lean_temporarily() -> None:
+    backend = ScriptedStepBackend(
+        [],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            speed_kph=800.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_lean")),
+        curriculum_config=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(
+                    name="high_speed_lean",
+                    until=CurriculumTriggerConfig(race_laps_completed_mean_gte=1.0),
+                    action_mask=ActionMaskConfig(boost=(0,), lean=(0, 1, 2)),
+                    lean_unmask_min_speed_kph=900.0,
+                ),
+                CurriculumStageConfig(
+                    name="full_controls",
+                    action_mask=ActionMaskConfig(boost=(0, 1), lean=(0, 1, 2)),
+                ),
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == [True, False, False, True, False]
+
+    env.set_curriculum_stage(1)
+
+    assert env.action_masks().tolist() == [True, True, True, True, True]
+
+
 def test_env_sync_checkpoint_curriculum_stage_resets_to_default_stage() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),

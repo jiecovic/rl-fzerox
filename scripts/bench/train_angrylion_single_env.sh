@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/bench/train_gliden64_4_env_noop_reset.sh
+# scripts/bench/train_angrylion_single_env.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -7,8 +7,7 @@ cd "$(dirname "$0")/../.."
 .venv/bin/python -m rl_fzerox.apps.train \
   --config conf/local/archive/train.local.ppo_hybrid_full_gas_v3_stack4.yaml \
   -- \
-  emulator.renderer=gliden64 \
-  train.num_envs=4 \
-  train.vec_env=subproc \
-  env.benchmark_noop_reset=true \
+  emulator.renderer=angrylion \
+  train.num_envs=1 \
+  train.vec_env=dummy \
   train.total_timesteps=200000

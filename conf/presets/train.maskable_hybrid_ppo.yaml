@@ -5,11 +5,16 @@ defaults:
 
 env:
   action:
-    # Hybrid maskable PPO gets continuous steer/drive plus discrete lean and boost heads.
-    name: hybrid_steer_drive_boost_lean
-    # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
-    continuous_drive_mode: pwm
-    continuous_drive_deadzone: 0.0
+    # Continuous steer and PWM gas plus discrete lean/boost heads.
+    branches:
+      steer:
+        type: continuous
+      gas:
+        type: continuous
+      boost:
+        type: discrete
+      lean:
+        type: discrete
 
 train:
   algorithm: maskable_hybrid_action_ppo

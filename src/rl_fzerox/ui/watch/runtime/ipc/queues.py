@@ -24,6 +24,12 @@ class _ReadableCommandQueue(Protocol):
     def get_nowait(self) -> object: ...
 
 
+class WorkerMessageQueue(Protocol):
+    def put_nowait(self, obj: object) -> None: ...
+
+    def get_nowait(self) -> object: ...
+
+
 @dataclass
 class WatchWorker:
     """Process handle plus queues used by the watch UI."""
@@ -186,7 +192,7 @@ def drain_snapshot_queue(
 
 
 def publish_worker_message(
-    snapshot_queue: ProcessQueue,
+    snapshot_queue: WorkerMessageQueue,
     message: WatchSnapshot | WorkerError | WorkerClosed,
 ) -> None:
     while True:

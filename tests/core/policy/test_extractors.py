@@ -133,6 +133,33 @@ def test_observation_extractor_compact_deep_profile_can_override_v1_geometry() -
     assert tuple(features.shape) == (2, 1_920)
 
 
+def test_observation_extractor_compact_bottleneck_profile_uses_v4_input() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(98, 130, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="compact_bottleneck",
+    )
+
+    observations = torch.zeros((2, 98, 130, 6), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 768
+    assert tuple(features.shape) == (2, 768)
+
+
+def test_observation_extractor_compact_deep_supports_small_v6_geometry() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(66, 82, 6), dtype=np.uint8),
+        features_dim="auto",
+    )
+
+    observations = torch.zeros((2, 66, 82, 6), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 768
+    assert tuple(features.shape) == (2, 768)
+
+
 def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
     extractor = FZeroXImageStateExtractor(
         spaces.Dict(

@@ -1,5 +1,7 @@
 // Covers decoding a representative player-one race telemetry snapshot.
-use super::layout::{CAMERA, GLOBALS, RACER, TELEMETRY_CONFIG};
+use super::layout::{
+    CAMERA, COURSE_SEGMENT, GLOBALS, RACER, RACER_SEGMENT_POSITION_INFO, TELEMETRY_CONFIG,
+};
 use super::{read_snapshot, read_step_sample};
 
 #[test]
@@ -32,6 +34,8 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&0.3_f32.to_le_bytes());
     memory[player_base + RACER.recoil_tilt + 4..player_base + RACER.recoil_tilt + 8]
         .copy_from_slice(&0.4_f32.to_le_bytes());
+    memory[GLOBALS.damage_rumble_counters..GLOBALS.damage_rumble_counters + 4]
+        .copy_from_slice(&1_i32.to_le_bytes());
     memory[player_base + RACER.race_distance..player_base + RACER.race_distance + 4]
         .copy_from_slice(&12_345.5_f32.to_le_bytes());
     memory[player_base + RACER.race_time..player_base + RACER.race_time + 4]
@@ -42,6 +46,56 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&1_i16.to_le_bytes());
     memory[player_base + RACER.position..player_base + RACER.position + 4]
         .copy_from_slice(&3_i32.to_le_bytes());
+    let segment_address = 0x802C_2020_u32;
+    let segment_offset = (segment_address as usize) - TELEMETRY_CONFIG.kseg0_base;
+    let segment_info_base = player_base + RACER.segment_position_info;
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.course_segment
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.course_segment + 4]
+        .copy_from_slice(&segment_address.to_le_bytes());
+    memory[segment_offset + COURSE_SEGMENT.segment_index
+        ..segment_offset + COURSE_SEGMENT.segment_index + 4]
+        .copy_from_slice(&12_i32.to_le_bytes());
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_t_value
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_t_value + 4]
+        .copy_from_slice(&0.25_f32.to_le_bytes());
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_length_proportion
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_length_proportion + 4]
+        .copy_from_slice(&0.75_f32.to_le_bytes());
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 4]
+        .copy_from_slice(&3.0_f32.to_le_bytes());
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 4
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 8]
+        .copy_from_slice(&4.0_f32.to_le_bytes());
+    memory[player_base + RACER.local_velocity..player_base + RACER.local_velocity + 4]
+        .copy_from_slice(&(-9.5_f32).to_le_bytes());
+    memory[player_base + RACER.segment_basis + 0x18..player_base + RACER.segment_basis + 0x1C]
+        .copy_from_slice(&1.0_f32.to_le_bytes());
+    memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.distance_from_segment
+        ..segment_info_base + RACER_SEGMENT_POSITION_INFO.distance_from_segment + 4]
+        .copy_from_slice(&5.0_f32.to_le_bytes());
+    memory[player_base + RACER.current_radius_left..player_base + RACER.current_radius_left + 4]
+        .copy_from_slice(&100.0_f32.to_le_bytes());
+    memory[player_base + RACER.current_radius_right..player_base + RACER.current_radius_right + 4]
+        .copy_from_slice(&120.0_f32.to_le_bytes());
+    memory[player_base + RACER.height_above_ground..player_base + RACER.height_above_ground + 4]
+        .copy_from_slice(&7.0_f32.to_le_bytes());
+    memory[player_base + RACER.velocity..player_base + RACER.velocity + 4]
+        .copy_from_slice(&6.0_f32.to_le_bytes());
+    memory[player_base + RACER.velocity + 8..player_base + RACER.velocity + 12]
+        .copy_from_slice(&8.0_f32.to_le_bytes());
+    memory[player_base + RACER.acceleration..player_base + RACER.acceleration + 4]
+        .copy_from_slice(&1.0_f32.to_le_bytes());
+    memory[player_base + RACER.acceleration + 4..player_base + RACER.acceleration + 8]
+        .copy_from_slice(&2.0_f32.to_le_bytes());
+    memory[player_base + RACER.acceleration + 8..player_base + RACER.acceleration + 12]
+        .copy_from_slice(&2.0_f32.to_le_bytes());
+    memory[player_base + RACER.acceleration_force..player_base + RACER.acceleration_force + 4]
+        .copy_from_slice(&9.0_f32.to_le_bytes());
+    memory[player_base + RACER.drift_attack_force..player_base + RACER.drift_attack_force + 4]
+        .copy_from_slice(&10.0_f32.to_le_bytes());
+    memory[player_base + RACER.colliding_strength..player_base + RACER.colliding_strength + 4]
+        .copy_from_slice(&0.5_f32.to_le_bytes());
 
     let telemetry = read_snapshot(&memory).expect("telemetry should decode");
 
@@ -61,6 +115,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!((telemetry.player.max_energy - 100.0).abs() < f32::EPSILON);
     assert_eq!(telemetry.player.boost_timer, 77);
     assert!((telemetry.player.recoil_tilt_magnitude - 0.5).abs() < f32::EPSILON);
+    assert_eq!(telemetry.player.damage_rumble_counter, 1);
     assert!((telemetry.player.race_distance - 12_345.5).abs() < f32::EPSILON);
     assert!((telemetry.player.lap_distance - 0.0).abs() < f32::EPSILON);
     assert_eq!(telemetry.player.race_time_ms, 12_345);
@@ -68,6 +123,21 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.laps_completed, 1);
     assert_eq!(telemetry.player.position, 3);
     assert_eq!(telemetry.player.state_flags, (1_u32 << 20) | (1_u32 << 30));
+    assert_eq!(telemetry.player.geometry.segment_index, Some(12));
+    assert!((telemetry.player.geometry.segment_t - 0.25).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.segment_length_proportion - 0.75).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.local_lateral_velocity + 9.5).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.signed_lateral_offset - 3.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.lateral_distance - 5.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.lateral_displacement_magnitude - 5.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.current_radius_left - 100.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.current_radius_right - 120.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.height_above_ground - 7.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.velocity_magnitude - 10.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.acceleration_magnitude - 3.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.acceleration_force - 9.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.drift_attack_force - 10.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.collision_mass - 0.5).abs() < f32::EPSILON);
 }
 
 #[test]

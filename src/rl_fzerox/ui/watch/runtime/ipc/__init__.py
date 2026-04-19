@@ -10,6 +10,7 @@ from rl_fzerox.ui.watch.runtime.ipc.messages import (
 )
 from rl_fzerox.ui.watch.runtime.ipc.queues import (
     WatchWorker,
+    WorkerMessageQueue,
     apply_viewer_input,
     drain_snapshot_queue,
     drain_worker_commands,
@@ -26,6 +27,7 @@ __all__ = [
     "WorkerClosed",
     "WorkerCommandBatch",
     "WorkerError",
+    "WorkerMessageQueue",
     "apply_viewer_input",
     "drain_snapshot_queue",
     "drain_worker_commands",

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
-from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_column_widths
 from rl_fzerox.ui.watch.view.panels.viz import _wrap_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
@@ -33,6 +33,8 @@ def _draw_side_panel(
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
     best_finish_position: int | None,
+    best_finish_times: dict[str, int],
+    track_pool_records: tuple[dict[str, object], ...],
     continuous_drive_deadzone: float,
     continuous_air_brake_mode: str,
     continuous_air_brake_disabled: bool,
@@ -78,6 +80,8 @@ def _draw_side_panel(
         policy_reload_age_seconds=policy_reload_age_seconds,
         policy_reload_error=policy_reload_error,
         best_finish_position=best_finish_position,
+        best_finish_times=best_finish_times,
+        track_pool_records=track_pool_records,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_mode=continuous_air_brake_mode,
         continuous_air_brake_disabled=continuous_air_brake_disabled,
@@ -105,10 +109,26 @@ def _draw_side_panel(
     y += LAYOUT.title_section_gap
 
     content_width = panel_width
-    left_column_width = (content_width - LAYOUT.column_gap) // 2
-    right_column_width = content_width - LAYOUT.column_gap - left_column_width
+    left_column_width, middle_column_width, stats_column_width = _panel_column_widths(
+        content_width
+    )
     left_x = x
-    right_x = x + left_column_width + LAYOUT.column_gap
+    middle_x = x + left_column_width + LAYOUT.column_gap
+    stats_x = middle_x + middle_column_width + LAYOUT.column_gap
+    _draw_column_separator(
+        pygame=pygame,
+        screen=screen,
+        x=middle_x - (LAYOUT.column_gap // 2),
+        y=y,
+        bottom=panel_rect.bottom - LAYOUT.panel_padding,
+    )
+    _draw_column_separator(
+        pygame=pygame,
+        screen=screen,
+        x=stats_x - (LAYOUT.column_gap // 2),
+        y=y,
+        bottom=panel_rect.bottom - LAYOUT.panel_padding,
+    )
 
     _draw_column(
         pygame=pygame,
@@ -123,11 +143,24 @@ def _draw_side_panel(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        x=right_x,
+        x=middle_x,
         y=y,
-        width=right_column_width,
-        sections=columns.right,
+        width=middle_column_width,
+        sections=columns.middle,
     )
+    _draw_column(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=stats_x,
+        y=y,
+        width=stats_column_width,
+        sections=columns.stats,
+    )
+
+
+def _draw_column_separator(*, pygame, screen, x: int, y: int, bottom: int) -> None:
+    pygame.draw.line(screen, PALETTE.panel_border, (x, y), (x, bottom), width=1)
 
 
 def _draw_column(
@@ -182,6 +215,9 @@ def _draw_section(
     y += LAYOUT.section_rule_gap
 
     for line in section.lines:
+        if line.divider:
+            y = _draw_panel_divider(pygame=pygame, screen=screen, x=x, y=y, width=width)
+            continue
         if line.label and line.wrap:
             y = _draw_wrapped_line(
                 screen=screen,
@@ -197,6 +233,7 @@ def _draw_section(
             continue
         if line.label:
             y = _draw_labeled_value_line(
+                pygame=pygame,
                 screen=screen,
                 fonts=fonts,
                 x=x,
@@ -235,6 +272,12 @@ def _draw_section(
     return y
 
 
+def _draw_panel_divider(*, pygame, screen, x: int, y: int, width: int) -> int:
+    line_y = y + max(1, LAYOUT.line_gap // 2)
+    pygame.draw.line(screen, PALETTE.panel_border, (x, line_y), (x + width, line_y), width=1)
+    return line_y + LAYOUT.line_gap + 1
+
+
 def _draw_wrapped_line(
     *,
     screen,
@@ -270,6 +313,7 @@ def _draw_wrapped_line(
 
 def _draw_labeled_value_line(
     *,
+    pygame,
     screen,
     fonts: ViewerFonts,
     x: int,
@@ -277,21 +321,96 @@ def _draw_labeled_value_line(
     width: int,
     line: PanelLine,
 ) -> int:
-    label_surface = fonts.small.render(line.label, True, PALETTE.text_muted)
-    value_surface = fonts.body.render(line.value, True, line.color)
+    label_font = fonts.record_header if line.heading else fonts.small
+    label_color = PALETTE.text_primary if line.heading else PALETTE.text_muted
+    label_surface = label_font.render(line.label, True, label_color)
+
+    value_font = fonts.small if line.heading else fonts.body
+    value_surface = value_font.render(line.value, True, line.color)
+    status_text_surface = fonts.small.render(line.status_text, True, line.color)
+    value_width = (
+        value_surface.get_width()
+        if line.status_icon is None
+        else value_surface.get_height() + status_text_surface.get_width()
+    )
     inline_value_space = width - label_surface.get_width() - LAYOUT.inline_value_gap
-    if value_surface.get_width() <= inline_value_space:
+    if value_width <= inline_value_space:
         screen.blit(label_surface, (x, y))
-        value_x = x + width - value_surface.get_width()
-        screen.blit(value_surface, (value_x, y - 1))
+        if line.status_icon is None:
+            value_x = x + width - value_surface.get_width()
+            screen.blit(value_surface, (value_x, y - 1))
+        else:
+            center = (
+                x + width - (value_surface.get_height() // 2),
+                y + (max(label_surface.get_height(), value_surface.get_height()) // 2),
+            )
+            if line.status_text:
+                text_x = center[0] - (value_surface.get_height() // 2) - 4
+                screen.blit(
+                    status_text_surface,
+                    (
+                        text_x - status_text_surface.get_width(),
+                        y + (label_surface.get_height() - status_text_surface.get_height()) // 2,
+                    ),
+                )
+            _draw_status_icon(
+                pygame,
+                screen,
+                icon=line.status_icon,
+                color=line.color,
+                center=center,
+            )
         return y + max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
 
     screen.blit(label_surface, (x, y))
     y += label_surface.get_height() + LAYOUT.line_gap
-    fitted_value = _fit_text(fonts.body, line.value, width)
-    value_surface = fonts.body.render(fitted_value, True, line.color)
+    if line.status_icon is not None:
+        center = (
+            x + width - (value_surface.get_height() // 2),
+            y + (value_surface.get_height() // 2),
+        )
+        if line.status_text:
+            text_x = center[0] - (value_surface.get_height() // 2) - 4
+            screen.blit(
+                status_text_surface,
+                (text_x - status_text_surface.get_width(), y),
+            )
+        _draw_status_icon(
+            pygame,
+            screen,
+            icon=line.status_icon,
+            color=line.color,
+            center=center,
+        )
+        return y + value_surface.get_height() + LAYOUT.line_gap
+
+    fitted_value = _fit_text(value_font, line.value, width)
+    value_surface = value_font.render(fitted_value, True, line.color)
     screen.blit(value_surface, (x, y - 1))
     return y + value_surface.get_height() + LAYOUT.line_gap
+
+
+def _draw_status_icon(
+    pygame,
+    screen,
+    *,
+    icon: str,
+    color,
+    center: tuple[int, int],
+) -> None:
+    x, y = center
+    if icon == "none":
+        pygame.draw.circle(screen, color, center, 4, width=1)
+        return
+    if icon == "in_range":
+        pygame.draw.line(screen, color, (x - 5, y), (x - 2, y + 3), width=2)
+        pygame.draw.line(screen, color, (x - 2, y + 3), (x + 5, y - 4), width=2)
+        return
+    if icon == "outside":
+        triangle = ((x, y - 5), (x - 5, y + 4), (x + 5, y + 4))
+        pygame.draw.polygon(screen, color, triangle, width=1)
+        pygame.draw.line(screen, color, (x, y - 2), (x, y + 1), width=1)
+        pygame.draw.circle(screen, color, (x, y + 3), 1)
 
 
 def _fit_text(font, text: str, max_width: int) -> str:

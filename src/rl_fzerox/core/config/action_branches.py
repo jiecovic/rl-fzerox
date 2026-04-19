@@ -15,18 +15,14 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.action_adapters import (
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
 )
+from rl_fzerox.core.domain.action_values import ActionMaskValue, compile_action_mask_values
 from rl_fzerox.core.domain.lean import LeanMode
 
 ActionBranchType: TypeAlias = Literal["continuous", "discrete"]
-ActionBranchValue: TypeAlias = Literal[
-    "idle",
-    "engaged",
-    "left",
-    "right",
-]
 
 _STEER_GAS_BOOST_LEAN_BRANCHES = ("steer", "gas", "boost", "lean")
 _STEER_GAS_AIR_BRAKE_BOOST_LEAN_BRANCHES = (
@@ -36,12 +32,6 @@ _STEER_GAS_AIR_BRAKE_BOOST_LEAN_BRANCHES = (
     "boost",
     "lean",
 )
-_DISCRETE_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
-    "gas": ("idle", "engaged"),
-    "air_brake": ("idle", "engaged"),
-    "boost": ("idle", "engaged"),
-    "lean": ("idle", "left", "right"),
-}
 
 
 class ActionBranchConfig(BaseModel):
@@ -50,7 +40,9 @@ class ActionBranchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: ActionBranchType
-    mask: tuple[ActionBranchValue, ...] | None = None
+    # COMPAT SHIM: integer masks are accepted for old manifests; new branch
+    # YAML should use named values such as idle/engaged/left/right.
+    mask: tuple[ActionMaskValue, ...] | None = None
     response_power: PositiveFloat | None = None
     mode: LeanMode | None = None
     unmask_max_speed_kph: NonNegativeFloat | None = None
@@ -62,8 +54,8 @@ class ActionBranchConfig(BaseModel):
     @classmethod
     def _validate_unique_values(
         cls,
-        value: tuple[ActionBranchValue, ...] | None,
-    ) -> tuple[ActionBranchValue, ...] | None:
+        value: tuple[ActionMaskValue, ...] | None,
+    ) -> tuple[ActionMaskValue, ...] | None:
         if value is not None and len(set(value)) != len(value):
             raise ValueError("action branch mask must not contain duplicates")
         return value
@@ -94,14 +86,28 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
     branches = ActionBranchesConfig.model_validate(raw_branches)
     branch_names = _configured_branch_names(branches)
     if branch_names == _STEER_GAS_BOOST_LEAN_BRANCHES:
-        adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN
+        gas_branch = _required_branch(branches, "gas")
+        if gas_branch.type == "continuous":
+            _validate_continuous_branch("gas", gas_branch)
+            adapter_name = ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN
+            continuous_gas = True
+        else:
+            _validate_discrete_branch("gas", gas_branch)
+            adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN
+            continuous_gas = False
     elif branch_names == _STEER_GAS_AIR_BRAKE_BOOST_LEAN_BRANCHES:
+        _validate_discrete_branch("gas", _required_branch(branches, "gas"))
+        _validate_discrete_branch("air_brake", _required_branch(branches, "air_brake"))
         adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN
+        continuous_gas = False
     else:
         names = ", ".join(branch_names) or "none"
         raise ValueError(f"Unsupported action branch combination: {names}")
 
     compiled: dict[str, object] = {"name": adapter_name}
+    if continuous_gas:
+        compiled["continuous_drive_mode"] = "pwm"
+        compiled["continuous_drive_deadzone"] = 0.0
     steer_branch = _required_branch(branches, "steer")
     _validate_continuous_branch("steer", steer_branch)
     if steer_branch.response_power is not None:
@@ -159,6 +165,9 @@ def _compile_action_mask(branches: ActionBranchesConfig) -> dict[str, tuple[int,
         branch = getattr(branches, branch_name)
         if branch is None:
             continue
+        if branch.type == "continuous":
+            _validate_continuous_branch(branch_name, branch)
+            continue
         _validate_discrete_branch(branch_name, branch)
         mask_indices = _branch_mask_indices(branch_name, branch)
         if mask_indices is not None:
@@ -193,13 +202,4 @@ def _branch_mask_indices(
 ) -> tuple[int, ...] | None:
     if branch.mask is None:
         return None
-    expected_values = _DISCRETE_BRANCH_VALUES[branch_name]
-    indices: list[int] = []
-    for mask_value in branch.mask:
-        try:
-            indices.append(expected_values.index(mask_value))
-        except ValueError as exc:
-            raise ValueError(
-                f"Unknown mask value {mask_value!r} for action branch {branch_name!r}"
-            ) from exc
-    return tuple(indices)
+    return compile_action_mask_values(branch_name, branch.mask)

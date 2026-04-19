@@ -9,7 +9,7 @@ use crate::bindings::emulator::state::{
     FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK, FLAG_FINISHED, FLAG_RETIRED,
     FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
 };
-use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
+use crate::core::telemetry::{PlayerTelemetry, RacerGeometryTelemetry, TelemetrySnapshot};
 
 #[pyclass(
     name = "PlayerTelemetry",
@@ -39,6 +39,22 @@ impl PyPlayerTelemetry {
         lap,
         laps_completed,
         position,
+        damage_rumble_counter = 0,
+        segment_index = None,
+        segment_t = 0.0,
+        segment_length_proportion = 0.0,
+        local_lateral_velocity = 0.0,
+        signed_lateral_offset = 0.0,
+        lateral_distance = 0.0,
+        lateral_displacement_magnitude = 0.0,
+        current_radius_left = 0.0,
+        current_radius_right = 0.0,
+        height_above_ground = 0.0,
+        velocity_magnitude = 0.0,
+        acceleration_magnitude = 0.0,
+        acceleration_force = 0.0,
+        drift_attack_force = 0.0,
+        collision_mass = 0.0,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -55,6 +71,22 @@ impl PyPlayerTelemetry {
         lap: i16,
         laps_completed: i16,
         position: i32,
+        damage_rumble_counter: i32,
+        segment_index: Option<i32>,
+        segment_t: f32,
+        segment_length_proportion: f32,
+        local_lateral_velocity: f32,
+        signed_lateral_offset: f32,
+        lateral_distance: f32,
+        lateral_displacement_magnitude: f32,
+        current_radius_left: f32,
+        current_radius_right: f32,
+        height_above_ground: f32,
+        velocity_magnitude: f32,
+        acceleration_magnitude: f32,
+        acceleration_force: f32,
+        drift_attack_force: f32,
+        collision_mass: f32,
     ) -> Self {
         Self {
             inner: PlayerTelemetry {
@@ -64,6 +96,7 @@ impl PyPlayerTelemetry {
                 max_energy,
                 boost_timer,
                 recoil_tilt_magnitude,
+                damage_rumble_counter,
                 reverse_timer,
                 race_distance,
                 lap_distance,
@@ -71,6 +104,23 @@ impl PyPlayerTelemetry {
                 lap,
                 laps_completed,
                 position,
+                geometry: RacerGeometryTelemetry {
+                    segment_index,
+                    segment_t,
+                    segment_length_proportion,
+                    local_lateral_velocity,
+                    signed_lateral_offset,
+                    lateral_distance,
+                    lateral_displacement_magnitude,
+                    current_radius_left,
+                    current_radius_right,
+                    height_above_ground,
+                    velocity_magnitude,
+                    acceleration_magnitude,
+                    acceleration_force,
+                    drift_attack_force,
+                    collision_mass,
+                },
             },
         }
     }
@@ -111,6 +161,11 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn damage_rumble_counter(&self) -> i32 {
+        self.inner.damage_rumble_counter
+    }
+
+    #[getter]
     fn reverse_timer(&self) -> i32 {
         self.inner.reverse_timer
     }
@@ -143,6 +198,81 @@ impl PyPlayerTelemetry {
     #[getter]
     fn position(&self) -> i32 {
         self.inner.position
+    }
+
+    #[getter]
+    fn segment_index(&self) -> Option<i32> {
+        self.inner.geometry.segment_index
+    }
+
+    #[getter]
+    fn segment_t(&self) -> f32 {
+        self.inner.geometry.segment_t
+    }
+
+    #[getter]
+    fn segment_length_proportion(&self) -> f32 {
+        self.inner.geometry.segment_length_proportion
+    }
+
+    #[getter]
+    fn local_lateral_velocity(&self) -> f32 {
+        self.inner.geometry.local_lateral_velocity
+    }
+
+    #[getter]
+    fn signed_lateral_offset(&self) -> f32 {
+        self.inner.geometry.signed_lateral_offset
+    }
+
+    #[getter]
+    fn lateral_distance(&self) -> f32 {
+        self.inner.geometry.lateral_distance
+    }
+
+    #[getter]
+    fn lateral_displacement_magnitude(&self) -> f32 {
+        self.inner.geometry.lateral_displacement_magnitude
+    }
+
+    #[getter]
+    fn current_radius_left(&self) -> f32 {
+        self.inner.geometry.current_radius_left
+    }
+
+    #[getter]
+    fn current_radius_right(&self) -> f32 {
+        self.inner.geometry.current_radius_right
+    }
+
+    #[getter]
+    fn height_above_ground(&self) -> f32 {
+        self.inner.geometry.height_above_ground
+    }
+
+    #[getter]
+    fn velocity_magnitude(&self) -> f32 {
+        self.inner.geometry.velocity_magnitude
+    }
+
+    #[getter]
+    fn acceleration_magnitude(&self) -> f32 {
+        self.inner.geometry.acceleration_magnitude
+    }
+
+    #[getter]
+    fn acceleration_force(&self) -> f32 {
+        self.inner.geometry.acceleration_force
+    }
+
+    #[getter]
+    fn drift_attack_force(&self) -> f32 {
+        self.inner.geometry.drift_attack_force
+    }
+
+    #[getter]
+    fn collision_mass(&self) -> f32 {
+        self.inner.geometry.collision_mass
     }
 
     #[getter]
@@ -229,6 +359,7 @@ impl PyPlayerTelemetry {
         dict.set_item("max_energy", self.max_energy())?;
         dict.set_item("boost_timer", self.boost_timer())?;
         dict.set_item("recoil_tilt_magnitude", self.recoil_tilt_magnitude())?;
+        dict.set_item("damage_rumble_counter", self.damage_rumble_counter())?;
         dict.set_item("reverse_timer", self.reverse_timer())?;
         dict.set_item("race_distance", self.race_distance())?;
         dict.set_item("lap_distance", self.lap_distance())?;
@@ -236,6 +367,27 @@ impl PyPlayerTelemetry {
         dict.set_item("lap", self.lap())?;
         dict.set_item("laps_completed", self.laps_completed())?;
         dict.set_item("position", self.position())?;
+        dict.set_item("segment_index", self.segment_index())?;
+        dict.set_item("segment_t", self.segment_t())?;
+        dict.set_item(
+            "segment_length_proportion",
+            self.segment_length_proportion(),
+        )?;
+        dict.set_item("local_lateral_velocity", self.local_lateral_velocity())?;
+        dict.set_item("signed_lateral_offset", self.signed_lateral_offset())?;
+        dict.set_item("lateral_distance", self.lateral_distance())?;
+        dict.set_item(
+            "lateral_displacement_magnitude",
+            self.lateral_displacement_magnitude(),
+        )?;
+        dict.set_item("current_radius_left", self.current_radius_left())?;
+        dict.set_item("current_radius_right", self.current_radius_right())?;
+        dict.set_item("height_above_ground", self.height_above_ground())?;
+        dict.set_item("velocity_magnitude", self.velocity_magnitude())?;
+        dict.set_item("acceleration_magnitude", self.acceleration_magnitude())?;
+        dict.set_item("acceleration_force", self.acceleration_force())?;
+        dict.set_item("drift_attack_force", self.drift_attack_force())?;
+        dict.set_item("collision_mass", self.collision_mass())?;
         dict.set_item("course_effect_raw", self.course_effect_raw())?;
         dict.set_item("course_effect_name", self.course_effect_name())?;
         dict.set_item("on_energy_refill", self.on_energy_refill())?;

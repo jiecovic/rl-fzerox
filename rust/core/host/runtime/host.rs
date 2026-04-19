@@ -337,6 +337,10 @@ impl Host {
         self.read_memory(MEMORY_SYSTEM_RAM, offset, length)
     }
 
+    pub fn write_system_ram(&mut self, offset: usize, bytes: &[u8]) -> Result<(), CoreError> {
+        self.write_memory(MEMORY_SYSTEM_RAM, offset, bytes)
+    }
+
     pub fn telemetry(&mut self) -> Result<TelemetrySnapshot, CoreError> {
         let system_ram = self.system_ram_slice()?;
         crate::core::telemetry::read_snapshot(system_ram)

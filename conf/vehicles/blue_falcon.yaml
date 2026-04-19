@@ -1,0 +1,10 @@
+# Vehicle-level metadata shared by baseline variants.
+vehicle:
+  id: blue_falcon
+  display_name: "Blue Falcon"
+  # Human-facing engine setting names. Raw menu/RAM values can be added here
+  # once baseline generation patches machine setup directly.
+  engine_settings:
+    balanced:
+      display_name: Balanced
+      raw_value: 50

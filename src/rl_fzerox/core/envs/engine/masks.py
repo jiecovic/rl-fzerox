@@ -19,6 +19,7 @@ class ActionMaskController:
     base_overrides: ActionMaskOverrides | None
     stage_overrides: tuple[ActionMaskOverrides | None, ...]
     stage_names: tuple[str, ...]
+    stage_lean_unmask_min_speed_kph: tuple[float | None, ...]
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
     _stage_index: int | None = None
@@ -47,6 +48,7 @@ class ActionMaskController:
             base_overrides=base_overrides,
             stage_overrides=stage_overrides,
             stage_names=_curriculum_stage_names(curriculum_config),
+            stage_lean_unmask_min_speed_kph=_curriculum_stage_lean_gates(curriculum_config),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             _stage_index=0 if stage_overrides else None,
@@ -58,6 +60,11 @@ class ActionMaskController:
         stage_overrides = None
         if self._stage_index is not None:
             stage_overrides = self.stage_overrides[self._stage_index]
+        lean_unmask_min_speed_kph = self.lean_unmask_min_speed_kph
+        if self._stage_index is not None:
+            stage_lean_gate = self.stage_lean_unmask_min_speed_kph[self._stage_index]
+            if stage_lean_gate is not None:
+                lean_unmask_min_speed_kph = stage_lean_gate
         return self.adapter.action_mask(
             base_overrides=self.base_overrides,
             stage_overrides=stage_overrides,
@@ -66,7 +73,7 @@ class ActionMaskController:
                 lean_allowed_values=self._lean_allowed_values,
                 speed_kph=self._speed_kph,
                 boost_unmask_max_speed_kph=self.boost_unmask_max_speed_kph,
-                lean_unmask_min_speed_kph=self.lean_unmask_min_speed_kph,
+                lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             ),
         )
 
@@ -139,6 +146,14 @@ def _curriculum_stage_names(curriculum_config: CurriculumConfig | None) -> tuple
     if curriculum_config is None or not curriculum_config.enabled:
         return ()
     return tuple(stage.name for stage in curriculum_config.stages)
+
+
+def _curriculum_stage_lean_gates(
+    curriculum_config: CurriculumConfig | None,
+) -> tuple[float | None, ...]:
+    if curriculum_config is None or not curriculum_config.enabled:
+        return ()
+    return tuple(stage.lean_unmask_min_speed_kph for stage in curriculum_config.stages)
 
 
 def _validate_configured_overrides(

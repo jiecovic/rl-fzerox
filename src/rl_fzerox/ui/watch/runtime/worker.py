@@ -11,7 +11,10 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
-from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
+from rl_fzerox.ui.watch.runtime.episode import (
+    _update_best_finish_position,
+    _update_best_finish_times,
+)
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
     WorkerError,
@@ -90,6 +93,7 @@ def _run_simulation_loop(
         last_logged_reload_error: str | None = None
         episode = 0
         best_finish_position: int | None = None
+        best_finish_times: dict[str, int] = {}
         paused = False
         manual_control_state = ControllerState()
 
@@ -128,6 +132,7 @@ def _run_simulation_loop(
                     policy_runner=policy_runner,
                     policy_reload_error=policy_reload_error,
                     best_finish_position=best_finish_position,
+                    best_finish_times=best_finish_times,
                 ),
             )
 
@@ -219,6 +224,11 @@ def _run_simulation_loop(
                     info,
                     None,
                 )
+                best_finish_times = _update_best_finish_times(
+                    best_finish_times,
+                    info,
+                    live_telemetry,
+                )
                 _publish_step_snapshots(
                     config=config,
                     env=env,
@@ -245,6 +255,7 @@ def _run_simulation_loop(
                     policy_runner=policy_runner,
                     policy_reload_error=policy_reload_error,
                     best_finish_position=best_finish_position,
+                    best_finish_times=best_finish_times,
                 )
                 if target_control_seconds is not None:
                     now = time.perf_counter()

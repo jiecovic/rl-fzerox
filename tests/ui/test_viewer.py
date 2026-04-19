@@ -12,8 +12,18 @@ from fzerox_emulator import (
     ControllerState,
     display_size,
 )
+from rl_fzerox.core.config.schema import (
+    EmulatorConfig,
+    EnvConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+    WatchAppConfig,
+)
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
-from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
+from rl_fzerox.ui.watch.runtime.episode import (
+    _update_best_finish_position,
+    _update_best_finish_times,
+)
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
 from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
@@ -35,7 +45,45 @@ from rl_fzerox.ui.watch.view.panels.model import (
     _window_size,
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
+from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info
+from rl_fzerox.ui.watch.view.screen.types import PanelSection
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+def _panel_group_labels(section: PanelSection, heading: str) -> list[str]:
+    labels: list[str] = []
+    in_group = False
+    for line in section.lines:
+        if line.divider:
+            if in_group:
+                break
+            continue
+        if line.heading:
+            if in_group:
+                break
+            in_group = line.label == heading
+            continue
+        if in_group and line.label:
+            labels.append(line.label)
+    return labels
+
+
+def _panel_group_values(section: PanelSection, heading: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    in_group = False
+    for line in section.lines:
+        if line.divider:
+            if in_group:
+                break
+            continue
+        if line.heading:
+            if in_group:
+                break
+            in_group = line.label == heading
+            continue
+        if in_group and line.label:
+            values[line.label] = line.value
+    return values
 
 
 def test_target_display_size_applies_aspect_correction() -> None:
@@ -55,7 +103,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1204, 880)
+    assert _window_size((592, 444), (84, 116, 12)) == (1504, 880)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -132,7 +180,13 @@ def test_side_panel_drops_cockpit_control_section() -> None:
         telemetry=_sample_telemetry(),
     )
 
+    assert "Cockpit Control" not in [section.title for section in columns.left]
     assert [section.title for section in columns.left] == ["Session"]
+    assert [section.title for section in columns.middle] == [
+        "Game",
+        "Display",
+        "Track Geometry",
+    ]
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -165,10 +219,14 @@ def test_session_section_shows_episode_step_counter() -> None:
     )
 
     session_section = columns.left[0]
-    steps_line = next(line for line in session_section.lines if line.label == "Steps")
-    reverse_line = next(line for line in session_section.lines if line.label == "Reverse")
-    frontier_line = next(line for line in session_section.lines if line.label == "Frontier")
-    assert steps_line.value == "123 / 50000"
+    episode_frame_line = next(
+        line for line in session_section.lines if line.label == "Episode frame"
+    )
+    env_step_line = next(line for line in session_section.lines if line.label == "Env step")
+    reverse_line = next(line for line in session_section.lines if line.label == "Reverse frames")
+    frontier_line = next(line for line in session_section.lines if line.label == "Frontier frames")
+    assert episode_frame_line.value == "123 / 50000"
+    assert env_step_line.value == "41 / 16667"
     assert reverse_line.value == "45 / 120"
     assert frontier_line.value == "300 / 900"
 
@@ -197,7 +255,7 @@ def test_session_section_marks_reverse_truncation_as_off() -> None:
     )
 
     session_section = columns.left[0]
-    reverse_line = next(line for line in session_section.lines if line.label == "Reverse")
+    reverse_line = next(line for line in session_section.lines if line.label == "Reverse frames")
     assert reverse_line.value == "45 / off"
 
 
@@ -285,8 +343,8 @@ def test_display_section_includes_action_repeat() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    display_section = next(section for section in columns.right if section.title == "Display")
-    repeat_line = next(line for line in display_section.lines if line.label == "Frame skip")
+    display_section = next(section for section in columns.middle if section.title == "Display")
+    repeat_line = next(line for line in display_section.lines if line.label == "Action repeat")
     control_rate_line = next(line for line in display_section.lines if line.label == "Control FPS")
     game_rate_line = next(line for line in display_section.lines if line.label == "Game FPS")
     render_rate_line = next(line for line in display_section.lines if line.label == "Render FPS")
@@ -338,8 +396,10 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    obs_state_section = next(section for section in columns.right if section.title == "Obs State")
-    values = {line.label: line.value for line in obs_state_section.lines}
+    state_vector_section = next(
+        section for section in columns.stats if section.title == "State Vector"
+    )
+    values = _panel_group_values(state_vector_section, "Legacy")
 
     assert values == {
         "speed_norm": "0.500",
@@ -356,7 +416,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
     }
 
 
-def test_side_panel_splits_observation_action_buffer_from_state() -> None:
+def test_side_panel_splits_legacy_action_history_from_state_vector() -> None:
     feature_names = state_feature_names("race_core", action_history_len=2)
     columns = _build_panel_columns(
         episode=0,
@@ -379,12 +439,11 @@ def test_side_panel_splits_observation_action_buffer_from_state() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    obs_state_section = next(section for section in columns.right if section.title == "Obs State")
-    action_buffer_section = next(
-        section for section in columns.right if section.title == "Action Buffer"
+    state_vector_section = next(
+        section for section in columns.stats if section.title == "State Vector"
     )
 
-    assert [line.label for line in obs_state_section.lines] == [
+    assert _panel_group_labels(state_vector_section, "Legacy") == [
         "speed_norm",
         "energy_frac",
         "reverse_active",
@@ -392,7 +451,7 @@ def test_side_panel_splits_observation_action_buffer_from_state() -> None:
         "can_boost",
         "boost_active",
     ]
-    assert [line.label for line in action_buffer_section.lines] == [
+    assert _panel_group_labels(state_vector_section, "Control History") == [
         "prev_steer_1",
         "prev_steer_2",
         "prev_gas_1",
@@ -401,6 +460,53 @@ def test_side_panel_splits_observation_action_buffer_from_state() -> None:
         "prev_boost_2",
         "prev_lean_1",
         "prev_lean_2",
+    ]
+
+
+def test_side_panel_groups_component_state_vector_by_component() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "surface_state.on_dirt_surface",
+        "course_context.course_builtin_00",
+        "course_context.course_builtin_01",
+        "course_context.course_builtin_02",
+        "control_history.steer_t_minus_1",
+        "control_history.thrust_t_minus_1",
+    )
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=0.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(98, 130, 9),
+        observation_state=np.array([0.5, 1.0, 0.0, 1.0, 0.0, -1.0, 1.0], dtype=np.float32),
+        observation_state_feature_names=feature_names,
+        telemetry=_sample_telemetry(),
+    )
+
+    state_vector_section = next(
+        section for section in columns.stats if section.title == "State Vector"
+    )
+
+    assert _panel_group_labels(state_vector_section, "Vehicle") == ["speed_norm"]
+    assert _panel_group_labels(state_vector_section, "Surface") == ["on_dirt_surface"]
+    assert _panel_group_values(state_vector_section, "Course") == {
+        "categorical": "1",
+        "one hot": "010",
+    }
+    assert _panel_group_labels(state_vector_section, "Control History") == [
+        "steer_t_minus_1",
+        "thrust_t_minus_1",
     ]
 
 
@@ -466,7 +572,7 @@ def test_session_section_includes_stuck_counter() -> None:
     )
 
     session_section = next(section for section in columns.left if section.title == "Session")
-    stuck_line = next(line for line in session_section.lines if line.label == "Stuck")
+    stuck_line = next(line for line in session_section.lines if line.label == "Stuck frames")
 
     assert stuck_line.value == "17 / 240"
 
@@ -678,6 +784,69 @@ def test_best_finish_position_tracks_only_finished_episodes() -> None:
         _sample_telemetry(position=3),
     )
     assert best_position == 3
+
+
+def test_best_finish_times_track_successful_finishes_per_track() -> None:
+    best_times = _update_best_finish_times(
+        {},
+        {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    assert best_times == {}
+
+    best_times = _update_best_finish_times(
+        best_times,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=101_000),
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        {"termination_reason": "finished", "track_id": "silence"},
+        _sample_telemetry(race_time_ms=105_000),
+    )
+    best_times = _update_best_finish_times(
+        best_times,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=95_000),
+    )
+
+    assert best_times == {"mute": 95_000, "silence": 105_000}
+
+
+def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    baseline_path = tmp_path / "mute.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_path.write_bytes(b"baseline")
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city",
+                        display_name="Mute City Time Attack - Blue Falcon Balanced",
+                        baseline_state_path=baseline_path,
+                        course_index=0,
+                    ),
+                ),
+            )
+        ),
+    )
+    info: dict[str, object] = {"course_index": 0}
+
+    _add_config_track_info(info, config)
+
+    assert info["track_id"] == "mute_city"
+    assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Balanced"
 
 
 def test_format_reload_age_is_human_readable() -> None:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/bench/train_angrylion_4_env_noop_reset.sh
+# scripts/bench/train_angrylion_4_env.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -10,5 +10,4 @@ cd "$(dirname "$0")/../.."
   emulator.renderer=angrylion \
   train.num_envs=4 \
   train.vec_env=subproc \
-  env.benchmark_noop_reset=true \
   train.total_timesteps=200000

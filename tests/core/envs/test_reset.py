@@ -6,17 +6,18 @@ import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
-from fzerox_emulator import ControllerState, ResetState
+from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
     EnvConfig,
     ObservationConfig,
+    TrackRecordEntryConfig,
+    TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import BOOST_MASK
 from rl_fzerox.core.envs.engine.tracks import TrackBaselineCache
 from tests.core.envs.helpers import (
     CameraSyncBackend,
@@ -117,36 +118,6 @@ def test_reset_info_is_pickle_safe_with_live_telemetry() -> None:
     pickle.dumps(info)
 
 
-def test_benchmark_noop_reset_skips_backend_reset() -> None:
-    class ResetCountingBackend(SyntheticBackend):
-        def __init__(self) -> None:
-            super().__init__()
-            self.reset_calls = 0
-
-        def reset(self) -> ResetState:
-            self.reset_calls += 1
-            return super().reset()
-
-    backend = ResetCountingBackend()
-    backend.step_frames(5)
-    backend.set_controller_state(ControllerState(joypad_mask=BOOST_MASK))
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(action_repeat=1, benchmark_noop_reset=True),
-    )
-
-    obs, info = env.reset(seed=123)
-    obs = image_obs(obs)
-
-    assert backend.reset_calls == 0
-    assert backend.frame_index == 5
-    assert backend.last_controller_state == ControllerState()
-    assert info["reset_mode"] == "benchmark_noop_reset"
-    assert info["benchmark_noop_reset"] is True
-    assert info["frame_index"] == 5
-    assert obs.shape == (116, 164, 12)
-
-
 def test_reset_loads_sampled_track_baseline(tmp_path: Path) -> None:
     baseline_path = tmp_path / "silence.state"
     baseline_path.write_bytes(b"state")
@@ -163,6 +134,15 @@ def test_reset_loads_sampled_track_baseline(tmp_path: Path) -> None:
                         baseline_state_path=baseline_path,
                         weight=1.0,
                         course_index=1,
+                        records=TrackRecordsConfig(
+                            non_agg_best=TrackRecordEntryConfig(
+                                time_ms=60638,
+                                player="Daniel",
+                                date="2012-04-10",
+                                mode="PAL",
+                            ),
+                            non_agg_worst=TrackRecordEntryConfig(time_ms=63279),
+                        ),
                     ),
                 ),
             ),
@@ -178,8 +158,47 @@ def test_reset_loads_sampled_track_baseline(tmp_path: Path) -> None:
     assert info["track_baseline_state_path"] == str(baseline_path)
     assert info["track_sampling_weight"] == 1.0
     assert info["track_course_index"] == 1
+    assert info["track_non_agg_best_time_ms"] == 60638
+    assert info["track_non_agg_best_player"] == "Daniel"
+    assert info["track_non_agg_best_mode"] == "PAL"
+    assert info["track_non_agg_worst_time_ms"] == 63279
     assert info["baseline_kind"] == "custom"
     assert info["baseline_state_path"] == str(baseline_path)
+
+
+def test_step_info_keeps_sampled_track_metadata(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "silence.state"
+    baseline_path.write_bytes(b"state")
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        display_name="Silence Time Attack - Blue Falcon Balanced",
+                        baseline_state_path=baseline_path,
+                        weight=1.0,
+                        course_index=1,
+                        records=TrackRecordsConfig(
+                            non_agg_best=TrackRecordEntryConfig(time_ms=60638),
+                            non_agg_worst=TrackRecordEntryConfig(time_ms=63279),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    env.reset(seed=123)
+
+    _, _, _, _, step_info = env.step(env.action_space.sample())
+
+    assert step_info["track_id"] == "silence"
+    assert step_info["track_display_name"] == "Silence Time Attack - Blue Falcon Balanced"
+    assert step_info["track_course_index"] == 1
+    assert step_info["track_non_agg_worst_time_ms"] == 63279
 
 
 def test_reset_can_disable_sampled_track_baseline_cache(tmp_path: Path) -> None:
@@ -267,7 +286,7 @@ def test_balanced_track_sampling_cycles_with_env_index_offset(tmp_path: Path) ->
         action_repeat=1,
         track_sampling=TrackSamplingConfig(
             enabled=True,
-            mode="balanced",
+            sampling_mode="balanced",
             entries=tuple(
                 TrackSamplingEntryConfig(id=track_id, baseline_state_path=baseline_path)
                 for track_id, baseline_path in baseline_paths.items()
@@ -294,7 +313,7 @@ def test_balanced_track_sampling_respects_weights(tmp_path: Path) -> None:
             action_repeat=1,
             track_sampling=TrackSamplingConfig(
                 enabled=True,
-                mode="balanced",
+                sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",

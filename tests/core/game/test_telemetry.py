@@ -103,6 +103,8 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             lap=2,
             laps_completed=1,
             position=3,
+            local_lateral_velocity=-9.5,
+            signed_lateral_offset=42.0,
         ),
         difficulty_raw=2,
         difficulty_name="expert",
@@ -124,6 +126,8 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
     assert player_payload["recoil_tilt_magnitude"] == 0.5
+    assert player_payload["local_lateral_velocity"] == -9.5
+    assert player_payload["signed_lateral_offset"] == 42.0
     assert player_payload["course_effect_raw"] == 0
     assert player_payload["course_effect_name"] == "none"
     assert player_payload["on_energy_refill"] is False

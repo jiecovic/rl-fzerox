@@ -9,7 +9,11 @@ from pathlib import Path
 from random import Random, random
 
 from fzerox_emulator import EmulatorBackend
-from rl_fzerox.core.config.schema import TrackSamplingConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.config.schema import (
+    TrackRecordsConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
+)
 
 _MAX_BALANCED_CYCLE_SLOTS = 128
 
@@ -20,23 +24,41 @@ class SelectedTrack:
 
     id: str
     display_name: str | None
+    course_ref: str | None
+    course_id: str | None
+    course_name: str | None
     baseline_state_path: Path
     weight: float
     course_index: int | None
+    mode: str | None
+    vehicle: str | None
+    vehicle_name: str | None
+    engine_setting: str | None
+    records: TrackRecordsConfig | None
     sampling_mode: str
     cycle_position: int | None = None
 
     def info(self) -> dict[str, object]:
-        return {
+        info = {
             "track_sampling_enabled": True,
             "track_sampling_mode": self.sampling_mode,
             "track_id": self.id,
             "track_display_name": self.display_name,
+            "track_course_ref": self.course_ref,
+            "track_course_id": self.course_id,
+            "track_course_name": self.course_name,
             "track_baseline_state_path": str(self.baseline_state_path),
             "track_sampling_weight": self.weight,
             "track_course_index": self.course_index,
+            "track_mode": self.mode,
+            "track_vehicle": self.vehicle,
+            "track_vehicle_name": self.vehicle_name,
+            "track_engine_setting": self.engine_setting,
             "track_sampling_cycle_position": self.cycle_position,
         }
+        if self.records is not None:
+            info.update(self.records.info())
+        return info
 
 
 class TrackBaselineCache:
@@ -67,11 +89,11 @@ class TrackResetSelector:
         self._cursor = 0
 
     def select(self, config: TrackSamplingConfig, *, seed: int | None) -> SelectedTrack | None:
-        if config.mode == "random":
+        if config.sampling_mode == "random":
             return select_reset_track(config, seed=seed)
-        if config.mode == "balanced":
+        if config.sampling_mode == "balanced":
             return self._select_balanced(config)
-        raise ValueError(f"Unsupported track sampling mode: {config.mode!r}")
+        raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
     def _select_balanced(self, config: TrackSamplingConfig) -> SelectedTrack | None:
         if not config.enabled:
@@ -139,9 +161,17 @@ def _selected_track_from_entry(
     return SelectedTrack(
         id=entry.id,
         display_name=entry.display_name,
+        course_ref=entry.course_ref,
+        course_id=entry.course_id,
+        course_name=entry.course_name,
         baseline_state_path=entry.baseline_state_path,
         weight=float(entry.weight),
         course_index=None if entry.course_index is None else int(entry.course_index),
+        mode=entry.mode,
+        vehicle=entry.vehicle,
+        vehicle_name=entry.vehicle_name,
+        engine_setting=entry.engine_setting,
+        records=entry.records,
         sampling_mode=sampling_mode,
         cycle_position=cycle_position,
     )
@@ -180,14 +210,21 @@ def _balanced_repetition_counts(entries: tuple[TrackSamplingEntryConfig, ...]) -
 
 def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
     return (
-        config.mode,
+        config.sampling_mode,
         tuple(
             (
                 entry.id,
                 entry.display_name,
+                entry.course_ref,
+                entry.course_id,
+                entry.course_name,
                 entry.baseline_state_path,
                 float(entry.weight),
                 entry.course_index,
+                entry.mode,
+                entry.vehicle,
+                entry.vehicle_name,
+                entry.engine_setting,
             )
             for entry in config.entries
         ),

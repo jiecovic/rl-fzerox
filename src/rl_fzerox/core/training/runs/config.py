@@ -7,12 +7,14 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.paths import resolve_config_data_paths
+from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig, WatchAppConfig
+from rl_fzerox.core.config.track_registry import expand_track_sampling_registry_refs
 from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_AUTO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
 )
+from rl_fzerox.core.training.runs.baseline_factory import materialize_run_baselines
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -57,33 +59,25 @@ def materialize_train_run_config(
     config: TrainAppConfig,
     *,
     run_paths: RunPaths,
+    baseline_cache_root: Path | None = None,
 ) -> TrainAppConfig:
     """Rewrite one train config to use run-local runtime and baseline files."""
 
-    baseline_state_path = config.emulator.baseline_state_path
-    if baseline_state_path is not None:
-        _copy_state_file(
-            source=baseline_state_path,
-            destination=run_paths.baseline_state_path,
-        )
-    return config.model_copy(
+    materialized_config = materialize_run_baselines(
+        config,
+        run_paths=run_paths,
+        cache_root=baseline_cache_root,
+    )
+    return materialized_config.model_copy(
         update={
-            "emulator": config.emulator.model_copy(
-                update={
-                    "runtime_dir": run_paths.runtime_root,
-                    "baseline_state_path": (
-                        None if baseline_state_path is None else run_paths.baseline_state_path
-                    ),
-                }
-            ),
             # Persist the concrete training algorithm so future watch/inference
             # does not need to guess what one historical `auto` meant.
-            "train": config.train.model_copy(
+            "train": materialized_config.train.model_copy(
                 update={
                     "algorithm": (
                         TRAIN_ALGORITHM_MASKABLE_PPO
-                        if config.train.algorithm == TRAIN_ALGORITHM_AUTO
-                        else config.train.algorithm
+                        if materialized_config.train.algorithm == TRAIN_ALGORITHM_AUTO
+                        else materialized_config.train.algorithm
                     )
                 }
             ),
@@ -105,6 +99,10 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
 
     config_path = resolve_train_run_config_path(run_dir)
     loaded = _load_train_config_mapping(config_path)
+    expand_track_sampling_registry_refs(
+        loaded,
+        config_root=config_root_dir().resolve(),
+    )
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
 
@@ -161,6 +159,7 @@ def _train_config_snapshot_data(config: TrainAppConfig) -> dict[str, object]:
         str(key): value for key, value in config.model_dump(mode="json", exclude_none=True).items()
     }
     _prefer_action_branch_snapshot(data)
+    _prefer_observation_component_snapshot(data)
     return data
 
 
@@ -182,6 +181,28 @@ def _prefer_action_branch_snapshot(config_data: dict[str, object]) -> None:
     # branch declaration as the only saved source makes this bridge removable.
     action_data.clear()
     action_data["branches"] = branches_data
+
+
+def _prefer_observation_component_snapshot(config_data: dict[str, object]) -> None:
+    env_data = config_data.get("env")
+    if not isinstance(env_data, dict):
+        return
+
+    observation_data = env_data.get("observation")
+    if not isinstance(observation_data, dict):
+        return
+
+    if observation_data.get("state_components") is None:
+        return
+
+    for key in (
+        "state_profile",
+        "course_context",
+        "ground_effect_context",
+        "action_history_len",
+        "action_history_controls",
+    ):
+        observation_data.pop(key, None)
 
 
 def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:

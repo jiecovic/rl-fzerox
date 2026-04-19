@@ -23,6 +23,8 @@ class RaceV3RewardWeights:
     boost_pad_reward: float = 0.0
     boost_pad_reward_progress_window: float = 1_000.0
     energy_refill_progress_multiplier: float = 1.0
+    dirt_progress_multiplier: float = 1.0
+    ice_progress_multiplier: float = 1.0
     energy_refill_collision_cooldown_frames: int = 120
     energy_full_refill_lap_bonus: float = 0.0
     energy_full_refill_min_gain_fraction: float = 0.0

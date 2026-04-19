@@ -12,7 +12,7 @@ mod read;
 
 pub(crate) use layout::{player_r_button_timer_offset, player_z_button_timer_offset};
 pub(crate) use model::StepTelemetrySample;
-pub use model::{PlayerTelemetry, TelemetrySnapshot};
+pub use model::{PlayerTelemetry, RacerGeometryTelemetry, TelemetrySnapshot};
 pub use read::read_snapshot;
 pub(crate) use read::read_step_sample;
 

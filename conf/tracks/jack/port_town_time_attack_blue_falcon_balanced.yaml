@@ -5,13 +5,12 @@
 track:
   id: port_town_time_attack_blue_falcon_balanced
   display_name: "Port Town Time Attack - Blue Falcon Balanced"
-  course_index: 5
+  course_ref: jack/port_town
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/port-town-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Port Town time-attack baseline without ghost."
+  notes: "Port Town time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

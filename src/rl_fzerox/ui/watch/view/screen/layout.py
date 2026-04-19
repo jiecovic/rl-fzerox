@@ -9,7 +9,7 @@ class ViewerLayout:
     """Spacing and sizing used by the watch window layout."""
 
     game_display_size: tuple[int, int] = (592, 444)
-    panel_width: int = 600
+    panel_width: int = 900
     panel_min_height: int = 880
     panel_padding: int = 12
     preview_gap: int = 12

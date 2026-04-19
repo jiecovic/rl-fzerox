@@ -34,16 +34,34 @@ def resolve_train_run_config(
 def validate_training_baseline_state(config: TrainAppConfig) -> None:
     """Fail clearly when a configured local training baseline is missing."""
 
-    baseline_state_path = config.emulator.baseline_state_path
-    if baseline_state_path is None:
+    missing_paths = [
+        baseline_state_path
+        for baseline_state_path in _configured_baseline_state_paths(config)
+        if not baseline_state_path.exists()
+    ]
+    if not missing_paths:
         return
-    if baseline_state_path.exists():
-        return
+    formatted_paths = ", ".join(str(path) for path in missing_paths)
     raise RuntimeError(
         "Configured training baseline state does not exist: "
-        f"{baseline_state_path}. Create it from watch with "
-        "`emulator.baseline_state_path` set and press `K` at race start."
+        f"{formatted_paths}. Create or materialize the required reset state before training."
     )
+
+
+def _configured_baseline_state_paths(config: TrainAppConfig) -> tuple[Path, ...]:
+    paths: list[Path] = []
+    if config.emulator.baseline_state_path is not None:
+        paths.append(config.emulator.baseline_state_path)
+    if config.track.baseline_state_path is not None:
+        paths.append(config.track.baseline_state_path)
+    for entry in config.env.track_sampling.entries:
+        paths.append(entry.baseline_state_path)
+    for stage in config.curriculum.stages:
+        if stage.track_sampling is None:
+            continue
+        for entry in stage.track_sampling.entries:
+            paths.append(entry.baseline_state_path)
+    return tuple(dict.fromkeys(paths))
 
 
 def save_latest_artifacts(
