@@ -12,11 +12,17 @@ local/roms/F-Zero X (USA).n64
 checkpoints/mute-city-3steer-recurrent-ppo-v1/baseline.state
 ```
 
-Reusable reset baselines:
+Legacy concrete reset-state sources:
 
 ```text
-checkpoints/baselines/mute-city-novice-blue-falcon-balanced-go-window.state
+checkpoints/source_states/legacy_go_window/mute-city-novice-blue-falcon-balanced-go-window.state
+checkpoints/source_states/legacy_go_window/jack/*.state
 ```
+
+These are already-initialized race-start states for specific course/vehicle/
+engine combinations. Training and watch runs materialize run-local reset states
+under `local/cache/baseline_materializer/` and copy them into the run folder.
+Do not treat these checked-in states as neutral sources for arbitrary vehicles.
 
 Current checkpoint:
 

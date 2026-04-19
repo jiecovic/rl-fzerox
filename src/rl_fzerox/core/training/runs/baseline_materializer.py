@@ -9,6 +9,7 @@ import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from fzerox_emulator import Emulator
 from rl_fzerox.core.config.paths import project_root_dir
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
@@ -17,27 +18,43 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     TrainAppConfig,
+    VehicleMachineConfig,
+)
+from rl_fzerox.core.training.runs.baseline_race_start import (
+    RaceStartVariant,
+    materialize_time_attack_race_start_from_boot,
 )
 from rl_fzerox.core.training.runs.paths import RunPaths
+from rl_fzerox.core.training.runs.track_baselines import (
+    single_active_track_entry,
+    track_config_from_sampling_entry,
+)
 
-BASELINE_MATERIALIZER_SCHEMA_VERSION = 1
+BASELINE_MATERIALIZER_SCHEMA_VERSION = 7
+BOOT_MENU_TIME_ATTACK_MODE = "boot_menu_time_attack"
 _CACHE_ROOT = project_root_dir() / "local" / "cache" / "baseline_materializer"
 _SAFE_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 
 @dataclass(frozen=True, slots=True)
 class BaselineRequest:
-    """Resolved input needed to materialize one run-local reset state."""
+    """Resolved input needed to generate one run-local reset state."""
 
     label: str
-    source_state_path: Path
+    source_state_path: Path | None = None
     course_id: str | None = None
     course_name: str | None = None
     course_index: int | None = None
     mode: str | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
+    source_vehicle: str | None = None
     engine_setting: str | None = None
+    engine_setting_raw_value: int | None = None
+    source_course_index: int | None = None
+    source_engine_setting: str | None = None
+    source_engine_setting_raw_value: int | None = None
+    vehicle_machine: dict[str, object] | None = None
     camera_setting: str | None = None
 
 
@@ -50,18 +67,35 @@ class BaselineArtifact:
     cache_key: str
 
 
+@dataclass(frozen=True, slots=True)
+class BaselineMaterializerContext:
+    """Runtime dependencies needed when a materialized state must be generated."""
+
+    core_path: Path
+    rom_path: Path
+    renderer: str
+    race_intro_target_timer: int | None
+
+
 def materialize_run_baselines(
     config: TrainAppConfig,
     *,
     run_paths: RunPaths,
     cache_root: Path | None = None,
 ) -> TrainAppConfig:
-    """Materialize run-local baseline state artifacts from existing source states."""
+    """Generate run-local baseline state artifacts for the current run."""
 
     resolved_cache_root = (cache_root or _CACHE_ROOT).expanduser().resolve()
-    materialized_track_path: Path | None = None
+    context = BaselineMaterializerContext(
+        core_path=config.emulator.core_path,
+        rom_path=config.emulator.rom_path,
+        renderer=config.emulator.renderer,
+        race_intro_target_timer=config.env.race_intro_target_timer,
+    )
     track_config = config.track
-    if track_config.baseline_state_path is not None:
+    emulator_baseline_path = config.emulator.baseline_state_path
+    generated_emulator_baseline = False
+    if not config.env.track_sampling.enabled and _can_generate_track_config(track_config):
         artifact = materialize_baseline(
             _request_from_track_config(
                 track_config,
@@ -70,47 +104,49 @@ def materialize_run_baselines(
             ),
             run_paths=run_paths,
             cache_root=resolved_cache_root,
+            context=context,
         )
-        materialized_track_path = artifact.state_path
-        track_config = track_config.model_copy(
-            update={"baseline_state_path": artifact.state_path}
-        )
-
-    emulator_baseline_path = config.emulator.baseline_state_path
-    if emulator_baseline_path is not None:
-        if (
-            config.track.baseline_state_path is not None
-            and emulator_baseline_path.resolve() == config.track.baseline_state_path.resolve()
-            and materialized_track_path is not None
-        ):
-            emulator_baseline_path = materialized_track_path
-        else:
-            artifact = materialize_baseline(
-                _request_from_track_config(
-                    config.track.model_copy(update={"baseline_state_path": emulator_baseline_path}),
-                    camera_setting=config.env.camera_setting,
-                    fallback_label="baseline",
-                ),
-                run_paths=run_paths,
-                cache_root=resolved_cache_root,
-            )
-            emulator_baseline_path = artifact.state_path
-
-    env_config = config.env.model_copy(
-        update={
-            "track_sampling": _materialize_track_sampling(
-                config.env.track_sampling,
-                run_paths=run_paths,
-                cache_root=resolved_cache_root,
+        emulator_baseline_path = artifact.state_path
+        generated_emulator_baseline = True
+        track_config = track_config.model_copy(update={"baseline_state_path": artifact.state_path})
+    elif track_config.baseline_state_path is not None:
+        materialize_baseline(
+            _request_from_track_config(
+                track_config,
                 camera_setting=config.env.camera_setting,
-            )
-        }
+                fallback_label="track",
+            ),
+            run_paths=run_paths,
+            cache_root=resolved_cache_root,
+            context=context,
+        )
+    if emulator_baseline_path is not None and not generated_emulator_baseline:
+        raise ValueError(
+            "Fresh training baselines must be generated by the materializer, not copied "
+            f"from existing state files: {emulator_baseline_path}"
+        )
+
+    track_sampling_config = _materialize_track_sampling(
+        config.env.track_sampling,
+        run_paths=run_paths,
+        cache_root=resolved_cache_root,
+        camera_setting=config.env.camera_setting,
+        context=context,
     )
+    single_track_entry = single_active_track_entry(track_sampling_config)
+    if single_track_entry is not None:
+        track_config = track_config_from_sampling_entry(
+            single_track_entry,
+            fallback=track_config,
+        )
+
+    env_config = config.env.model_copy(update={"track_sampling": track_sampling_config})
     curriculum_config = _materialize_curriculum(
         config.curriculum,
         run_paths=run_paths,
         cache_root=resolved_cache_root,
         camera_setting=config.env.camera_setting,
+        context=context,
     )
 
     return config.model_copy(
@@ -133,33 +169,49 @@ def materialize_baseline(
     *,
     run_paths: RunPaths,
     cache_root: Path,
+    context: BaselineMaterializerContext,
 ) -> BaselineArtifact:
-    """Ensure one materialized baseline exists in cache and copy it into the run."""
+    """Ensure one generated baseline exists in cache and copy it into the run."""
 
-    source_path = request.source_state_path.expanduser().resolve()
-    if not source_path.is_file():
-        raise FileNotFoundError(f"Baseline source state not found: {source_path}")
-
-    source_bytes = source_path.read_bytes()
-    source_sha256 = _sha256_bytes(source_bytes)
-    cache_payload = _cache_payload(request, source_sha256=source_sha256)
+    materializer_mode = _materializer_mode(request)
+    cache_payload = _cache_payload(
+        request,
+        materializer_mode=materializer_mode,
+        context=context,
+    )
     cache_key = _sha256_json(cache_payload)
     cache_state_path = cache_root / f"{cache_key}.state"
     cache_metadata_path = cache_root / f"{cache_key}.json"
-    cache_metadata = {
-        **cache_payload,
-        "cache_key": cache_key,
-        "materialized_state_sha256": source_sha256,
-        "materializer_mode": "source_state_copy",
-        "source_state_path": str(source_path),
-    }
     if not cache_state_path.is_file():
         cache_root.mkdir(parents=True, exist_ok=True)
-        _atomic_write_bytes(cache_state_path, source_bytes)
-        _atomic_write_json(cache_metadata_path, cache_metadata)
+        materialized_sha256 = _generate_race_start_variant_state(
+            request,
+            cache_state_path=cache_state_path,
+            cache_root=cache_root,
+            context=context,
+        )
+        _atomic_write_json(
+            cache_metadata_path,
+            _cache_metadata(
+                request,
+                cache_payload=cache_payload,
+                cache_key=cache_key,
+                materializer_mode=materializer_mode,
+                materialized_state_sha256=materialized_sha256,
+            ),
+        )
     elif not cache_metadata_path.is_file():
         cache_root.mkdir(parents=True, exist_ok=True)
-        _atomic_write_json(cache_metadata_path, cache_metadata)
+        _atomic_write_json(
+            cache_metadata_path,
+            _cache_metadata(
+                request,
+                cache_payload=cache_payload,
+                cache_key=cache_key,
+                materializer_mode=materializer_mode,
+                materialized_state_sha256=_sha256_bytes(cache_state_path.read_bytes()),
+            ),
+        )
 
     run_state_path = _run_state_path(run_paths, label=request.label, cache_key=cache_key)
     run_metadata_path = run_state_path.with_suffix(".json")
@@ -179,6 +231,7 @@ def _materialize_curriculum(
     run_paths: RunPaths,
     cache_root: Path,
     camera_setting: str | None,
+    context: BaselineMaterializerContext,
 ) -> CurriculumConfig:
     stages: list[CurriculumStageConfig] = []
     changed = False
@@ -195,6 +248,7 @@ def _materialize_curriculum(
                         run_paths=run_paths,
                         cache_root=cache_root,
                         camera_setting=camera_setting,
+                        context=context,
                     )
                 }
             )
@@ -210,6 +264,7 @@ def _materialize_track_sampling(
     run_paths: RunPaths,
     cache_root: Path,
     camera_setting: str | None,
+    context: BaselineMaterializerContext,
 ) -> TrackSamplingConfig:
     if not config.entries:
         return config
@@ -220,6 +275,7 @@ def _materialize_track_sampling(
                     _request_from_track_entry(entry, camera_setting=camera_setting),
                     run_paths=run_paths,
                     cache_root=cache_root,
+                    context=context,
                 ).state_path
             }
         )
@@ -234,8 +290,6 @@ def _request_from_track_config(
     camera_setting: str | None,
     fallback_label: str,
 ) -> BaselineRequest:
-    if track.baseline_state_path is None:
-        raise ValueError("track baseline_state_path is required")
     return BaselineRequest(
         label=track.id or track.course_id or fallback_label,
         source_state_path=track.baseline_state_path,
@@ -245,8 +299,24 @@ def _request_from_track_config(
         mode=track.mode,
         vehicle=track.vehicle,
         vehicle_name=track.vehicle_name,
+        source_vehicle=track.source_vehicle,
         engine_setting=track.engine_setting,
+        engine_setting_raw_value=track.engine_setting_raw_value,
+        source_course_index=track.source_course_index,
+        source_engine_setting=track.source_engine_setting,
+        source_engine_setting_raw_value=track.source_engine_setting_raw_value,
+        vehicle_machine=_vehicle_machine_data(track.vehicle_machine),
         camera_setting=camera_setting,
+    )
+
+
+def _can_generate_track_config(track: TrackConfig) -> bool:
+    return (
+        track.course_index is not None
+        and track.mode is not None
+        and track.vehicle is not None
+        and track.engine_setting_raw_value is not None
+        and track.vehicle_machine is not None
     )
 
 
@@ -264,23 +334,152 @@ def _request_from_track_entry(
         mode=entry.mode,
         vehicle=entry.vehicle,
         vehicle_name=entry.vehicle_name,
+        source_vehicle=entry.source_vehicle,
         engine_setting=entry.engine_setting,
+        engine_setting_raw_value=entry.engine_setting_raw_value,
+        source_course_index=entry.source_course_index,
+        source_engine_setting=entry.source_engine_setting,
+        source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
+        vehicle_machine=_vehicle_machine_data(entry.vehicle_machine),
         camera_setting=camera_setting,
     )
+
+
+def _materializer_mode(request: BaselineRequest) -> str:
+    if request.source_state_path is not None:
+        raise ValueError(
+            "Fresh training baselines must be generated by the materializer, not copied "
+            f"from existing state files: {request.source_state_path}"
+        )
+    return BOOT_MENU_TIME_ATTACK_MODE
+
+
+def _generate_race_start_variant_state(
+    request: BaselineRequest,
+    *,
+    cache_state_path: Path,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+) -> str:
+    if request.engine_setting_raw_value is None:
+        raise ValueError("engine_setting_raw_value is required for race-start generation")
+    if request.course_index is None:
+        raise ValueError("course_index is required for race-start generation")
+    if request.mode is None:
+        raise ValueError("mode is required for race-start generation")
+    if request.vehicle_machine is None:
+        raise ValueError("vehicle_machine is required for race-start generation")
+
+    runtime_dir = cache_root / "runtime" / cache_state_path.stem
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    tmp_state_path = cache_state_path.with_name(
+        f".{cache_state_path.stem}.tmp{cache_state_path.suffix}"
+    )
+    emulator = Emulator(
+        core_path=context.core_path,
+        rom_path=context.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=None,
+        renderer=context.renderer,
+    )
+    try:
+        materialize_time_attack_race_start_from_boot(
+            emulator=emulator,
+            variant=RaceStartVariant(
+                course_index=request.course_index,
+                mode=request.mode,
+                character_index=_required_int(request.vehicle_machine, "character_index"),
+                machine_select_slot=_optional_int(
+                    request.vehicle_machine,
+                    "machine_select_slot",
+                ),
+                engine_setting_raw_value=request.engine_setting_raw_value,
+                race_intro_target_timer=context.race_intro_target_timer,
+            ),
+        )
+        emulator.save_state(tmp_state_path)
+    finally:
+        emulator.close()
+    os.replace(tmp_state_path, cache_state_path)
+    return _sha256_bytes(cache_state_path.read_bytes())
+
+
+def _vehicle_machine_data(machine: VehicleMachineConfig | None) -> dict[str, object] | None:
+    if machine is None:
+        return None
+    return machine.model_dump(mode="json")
+
+
+def _required_int(data: dict[str, object], key: str) -> int:
+    value = data.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"vehicle_machine.{key} must be numeric")
+    return int(value)
+
+
+def _optional_int(data: dict[str, object], key: str) -> int | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float | str):
+        raise ValueError(f"vehicle_machine.{key} must be numeric when set")
+    return int(value)
 
 
 def _cache_payload(
     request: BaselineRequest,
     *,
-    source_sha256: str,
+    materializer_mode: str,
+    context: BaselineMaterializerContext,
 ) -> dict[str, object]:
-    request_data = asdict(request)
-    request_data.pop("source_state_path", None)
     return {
         "schema_version": BASELINE_MATERIALIZER_SCHEMA_VERSION,
-        "source_state_sha256": source_sha256,
-        "request": request_data,
+        "materializer_mode": materializer_mode,
+        "target": _target_variant_cache_data(request, context=context),
     }
+
+
+def _target_variant_cache_data(
+    request: BaselineRequest,
+    *,
+    context: BaselineMaterializerContext,
+) -> dict[str, object]:
+    return {
+        "camera_setting": request.camera_setting,
+        "course_id": request.course_id,
+        "course_index": request.course_index,
+        "engine_setting": request.engine_setting,
+        "engine_setting_raw_value": request.engine_setting_raw_value,
+        "mode": request.mode,
+        "race_intro_target_timer": context.race_intro_target_timer,
+        "renderer": context.renderer,
+        "vehicle": request.vehicle,
+        "vehicle_machine": request.vehicle_machine,
+    }
+
+
+def _cache_metadata(
+    request: BaselineRequest,
+    *,
+    cache_payload: dict[str, object],
+    cache_key: str,
+    materializer_mode: str,
+    materialized_state_sha256: str,
+) -> dict[str, object]:
+    return {
+        **cache_payload,
+        "cache_key": cache_key,
+        "materializer_mode": materializer_mode,
+        "materialized_state_sha256": materialized_state_sha256,
+        "request": _request_metadata(request),
+    }
+
+
+def _request_metadata(request: BaselineRequest) -> dict[str, object]:
+    request_data = asdict(request)
+    if request.source_state_path is not None:
+        request_data["source_state_path"] = str(request.source_state_path)
+    return request_data
 
 
 def _run_state_path(run_paths: RunPaths, *, label: str, cache_key: str) -> Path:
@@ -300,12 +499,6 @@ def _sha256_bytes(data: bytes) -> str:
 def _sha256_json(data: dict[str, object]) -> str:
     encoded = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return _sha256_bytes(encoded)
-
-
-def _atomic_write_bytes(target_path: Path, data: bytes) -> None:
-    tmp_path = target_path.with_name(f".{target_path.stem}.tmp{target_path.suffix}")
-    tmp_path.write_bytes(data)
-    os.replace(tmp_path, target_path)
 
 
 def _atomic_write_json(target_path: Path, data: dict[str, object]) -> None:

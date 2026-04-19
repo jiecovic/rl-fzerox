@@ -53,7 +53,7 @@ def _validate_sac_training_config(config: TrainAppConfig) -> None:
         raise RuntimeError(
             "SAC requires a continuous steer-drive action adapter so the action space is Box"
         )
-    if action_config.mask is not None:
+    if action_config.mask_overrides is not None:
         raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
     if config.curriculum.enabled:
         raise RuntimeError("SAC does not support curriculum stages")

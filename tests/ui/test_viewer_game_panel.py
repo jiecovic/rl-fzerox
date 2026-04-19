@@ -203,6 +203,8 @@ def test_track_geometry_section_shows_racer_geometry() -> None:
             drift_attack_force=0.25,
             damage_rumble_counter=1,
             recoil_tilt_magnitude=0.5,
+            lap_distance=20_000.0,
+            course_length=80_000.0,
         ),
     )
 
@@ -212,6 +214,7 @@ def test_track_geometry_section_shows_racer_geometry() -> None:
     values = {line.label: line.value for line in geometry_section.lines}
     assert values["Segment"] == "8"
     assert values["Spline t"] == "0.250"
+    assert values["Lap progress"] == "25.0%"
     assert values["Center dist"] == "90.0"
     assert values["Lat vel"] == "-9.50"
     assert values["Sliding"] == "yes"

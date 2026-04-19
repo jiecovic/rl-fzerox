@@ -158,6 +158,10 @@ def _selected_track_from_entry(
     sampling_mode: str,
     cycle_position: int | None = None,
 ) -> SelectedTrack:
+    if entry.baseline_state_path is None:
+        raise ValueError(
+            f"track sampling entry {entry.id!r} has no materialized baseline_state_path"
+        )
     return SelectedTrack(
         id=entry.id,
         display_name=entry.display_name,

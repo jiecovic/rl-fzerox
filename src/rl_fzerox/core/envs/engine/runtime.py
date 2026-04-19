@@ -55,9 +55,17 @@ from .masks import ActionMaskController
 from .reset import load_track_baseline, reset_race_state
 from .tracks import SelectedTrack, TrackBaselineCache, TrackResetSelector
 
-_DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
-_DOMAIN_REWARD_MILESTONE_PHASE = 0xA409_3822_299F_31D0
-_DOMAIN_TRACK_SAMPLING = 0x35E7_40D8_FF53_42B1
+
+@dataclass(frozen=True, slots=True)
+class _EngineSeedDomains:
+    """Domain separators for independent per-env RNG streams."""
+
+    reset_rng: int = 0xD6E8_2BC9_2A5F_1873
+    reward_milestone_phase: int = 0xA409_3822_299F_31D0
+    track_sampling: int = 0x35E7_40D8_FF53_42B1
+
+
+_ENGINE_SEED_DOMAINS = _EngineSeedDomains()
 
 
 @dataclass(frozen=True)
@@ -127,11 +135,7 @@ class FZeroXEnvEngine:
         )
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
-            base_overrides=(
-                self._action_config.mask.branch_overrides()
-                if self._action_config.mask is not None
-                else None
-            ),
+            base_overrides=self._action_config.mask_overrides,
             curriculum_config=curriculum_config,
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
@@ -231,9 +235,7 @@ class FZeroXEnvEngine:
         )
         if selected_track is not None:
             info.update(selected_track.info())
-        self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(
-            info
-        )
+        self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
         telemetry = sync_camera_setting(
             self.backend,
@@ -399,7 +401,7 @@ class FZeroXEnvEngine:
             info["rng_randomization_skip_reason"] = "not_in_race"
             return telemetry
 
-        rng_seed = derive_seed(seed_base, _DOMAIN_RESET_RNG, self._reset_count)
+        rng_seed = derive_seed(seed_base, _ENGINE_SEED_DOMAINS.reset_rng, self._reset_count)
         if rng_seed is None:
             return telemetry
         rng_state = self.backend.randomize_game_rng(rng_seed)
@@ -412,14 +414,18 @@ class FZeroXEnvEngine:
         seed_base = seed if seed is not None else self._rng_seed_base
         if seed_base is None:
             return None
-        return derive_seed(seed_base, _DOMAIN_REWARD_MILESTONE_PHASE, self._reset_count)
+        return derive_seed(
+            seed_base,
+            _ENGINE_SEED_DOMAINS.reward_milestone_phase,
+            self._reset_count,
+        )
 
     def _select_reset_track(self, seed: int | None) -> SelectedTrack | None:
         seed_base = seed if seed is not None else self._rng_seed_base
         sampling_seed = (
             None
             if seed_base is None
-            else derive_seed(seed_base, _DOMAIN_TRACK_SAMPLING, self._reset_count)
+            else derive_seed(seed_base, _ENGINE_SEED_DOMAINS.track_sampling, self._reset_count)
         )
         return self._track_selector.select(self._active_track_sampling, seed=sampling_seed)
 

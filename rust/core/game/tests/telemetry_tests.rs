@@ -1,6 +1,7 @@
 // Covers decoding a representative player-one race telemetry snapshot.
 use super::layout::{
-    CAMERA, COURSE_SEGMENT, GLOBALS, RACER, RACER_SEGMENT_POSITION_INFO, TELEMETRY_CONFIG,
+    CAMERA, COURSE_INFO, COURSE_SEGMENT, GLOBALS, RACER, RACER_SEGMENT_POSITION_INFO,
+    TELEMETRY_CONFIG,
 };
 use super::{read_snapshot, read_step_sample};
 
@@ -16,6 +17,12 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
     memory[GLOBALS.course_index..GLOBALS.course_index + 4].copy_from_slice(&0_u32.to_le_bytes());
+    let course_info_address = 0x802A_6B40_u32;
+    let course_info_offset = (course_info_address as usize) - TELEMETRY_CONFIG.kseg0_base;
+    memory[GLOBALS.current_course_info..GLOBALS.current_course_info + 4]
+        .copy_from_slice(&course_info_address.to_le_bytes());
+    memory[course_info_offset + COURSE_INFO.length..course_info_offset + COURSE_INFO.length + 4]
+        .copy_from_slice(&80_000.0_f32.to_le_bytes());
     memory[GLOBALS.cameras + CAMERA.race_setting..GLOBALS.cameras + CAMERA.race_setting + 4]
         .copy_from_slice(&3_i32.to_le_bytes());
     memory[player_base + RACER.state_flags..player_base + RACER.state_flags + 4]
@@ -108,6 +115,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.camera_setting_name, "wide");
     assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.course_index, 0);
+    assert!((telemetry.course_length - 80_000.0).abs() < f32::EPSILON);
     assert!(
         (telemetry.player.speed_kph - (123.5 * TELEMETRY_CONFIG.speed_to_kph)).abs() < f32::EPSILON
     );

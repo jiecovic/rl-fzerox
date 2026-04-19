@@ -24,6 +24,7 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
+from rl_fzerox.core.training import runner
 from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
@@ -153,6 +154,33 @@ def test_resolve_train_run_config_sets_run_local_runtime_root(tmp_path: Path) ->
     resolved_config = resolve_train_run_config(config=config, run_paths=run_paths)
 
     assert resolved_config.emulator.runtime_dir == run_paths.runtime_root
+
+
+def test_run_training_removes_empty_run_dir_when_config_resolution_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="cleanup_probe"),
+    )
+
+    def fail_config_resolution(**_: object) -> TrainAppConfig:
+        raise RuntimeError("materialization failed")
+
+    monkeypatch.setattr(runner, "resolve_train_run_config", fail_config_resolution)
+
+    with pytest.raises(RuntimeError, match="materialization failed"):
+        runner.run_training(config)
+
+    assert not (tmp_path / "runs" / "cleanup_probe_0001").exists()
 
 
 def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None:

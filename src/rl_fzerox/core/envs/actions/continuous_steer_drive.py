@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/actions/continuous_steer_drive.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 from gymnasium import spaces
 
@@ -21,8 +23,14 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_lean import (
     LEAN_RIGHT_MASK,
 )
 
-_STEER_DRIVE_ACTION_SIZE = 2
-_STEER_DRIVE_LEAN_ACTION_SIZE = 3
+
+@dataclass(frozen=True, slots=True)
+class _ContinuousActionSizes:
+    steer_drive: int = 2
+    steer_drive_lean: int = 3
+
+
+_CONTINUOUS_ACTION_SIZES = _ContinuousActionSizes()
 
 
 class ContinuousSteerDriveActionAdapter:
@@ -39,7 +47,7 @@ class ContinuousSteerDriveActionAdapter:
             high=np.array([1.0, 1.0], dtype=np.float32),
             dtype=np.float32,
         )
-        self._idle_action = np.zeros(_STEER_DRIVE_ACTION_SIZE, dtype=np.float32)
+        self._idle_action = np.zeros(_CONTINUOUS_ACTION_SIZES.steer_drive, dtype=np.float32)
 
     @property
     def action_space(self) -> spaces.Box:
@@ -106,7 +114,7 @@ class ContinuousSteerDriveLeanActionAdapter:
             high=np.array([1.0, 1.0, 1.0], dtype=np.float32),
             dtype=np.float32,
         )
-        self._idle_action = np.zeros(_STEER_DRIVE_LEAN_ACTION_SIZE, dtype=np.float32)
+        self._idle_action = np.zeros(_CONTINUOUS_ACTION_SIZES.steer_drive_lean, dtype=np.float32)
 
     @property
     def action_space(self) -> spaces.Box:
@@ -165,7 +173,7 @@ class ContinuousSteerDriveLeanActionAdapter:
 def _parse_continuous_pair(action: ActionValue) -> tuple[float, float]:
     values = continuous_action_array(
         action,
-        expected_size=_STEER_DRIVE_ACTION_SIZE,
+        expected_size=_CONTINUOUS_ACTION_SIZES.steer_drive,
         action_label="Continuous steer-drive",
         field_labels=("steer", "drive"),
     )
@@ -177,7 +185,7 @@ def _parse_continuous_pair(action: ActionValue) -> tuple[float, float]:
 def _parse_continuous_triplet(action: ActionValue) -> tuple[float, float, float]:
     values = continuous_action_array(
         action,
-        expected_size=_STEER_DRIVE_LEAN_ACTION_SIZE,
+        expected_size=_CONTINUOUS_ACTION_SIZES.steer_drive_lean,
         action_label="Continuous steer-drive-lean",
         field_labels=("steer", "drive", "lean"),
     )

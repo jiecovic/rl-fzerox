@@ -126,7 +126,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--fps",
         type=_positive_float,
         default=None,
-        help="Output video FPS. Defaults to native_fps / action_repeat.",
+        help="Output video FPS. Defaults to the emulator native FPS.",
     )
     parser.add_argument(
         "--progress-interval",
@@ -338,11 +338,7 @@ def _open_recording_session(
         device=config.watch.device,
     )
     env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
-    output_fps = resolve_video_fps(
-        native_fps=env.backend.native_fps,
-        action_repeat=config.env.action_repeat,
-        override=fps,
-    )
+    output_fps = resolve_video_fps(native_fps=env.backend.native_fps, override=fps)
     return RecordingSession(env=env, policy_runner=policy_runner, output_fps=output_fps)
 
 
@@ -395,10 +391,17 @@ def _run_attempt(
                     deterministic=deterministic,
                     action_masks=env.action_masks(),
                 )
-                observation, reward, terminated, truncated, info = env.step(action)
+                watch_step = env.step_watch(action)
+                observation = watch_step.observation
+                reward = watch_step.reward
+                terminated = watch_step.terminated
+                truncated = watch_step.truncated
+                info = watch_step.info
                 episode_return += reward
                 progress.print(info, episode_return=episode_return)
-                writer.write(as_rgb_frame(env.render()))
+                display_frames = watch_step.display_frames or (env.render(),)
+                for display_frame in display_frames:
+                    writer.write(as_rgb_frame(display_frame))
 
     progress.finish()
     finish_rank = _finished_rank(info)

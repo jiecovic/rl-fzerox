@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from types import TracebackType
+from types import SimpleNamespace, TracebackType
 from typing import Any
 
 import numpy as np
@@ -61,12 +61,12 @@ def test_finished_rank_rejects_non_matching_episode(info: dict[str, object]) -> 
     assert _finished_rank(info) is None
 
 
-def test_resolve_video_fps_defaults_to_native_fps_per_action_repeat() -> None:
-    assert _resolve_video_fps(native_fps=60.0, action_repeat=2, override=None) == 30.0
+def test_resolve_video_fps_defaults_to_native_fps() -> None:
+    assert _resolve_video_fps(native_fps=60.0, override=None) == 60.0
 
 
 def test_resolve_video_fps_prefers_explicit_override() -> None:
-    assert _resolve_video_fps(native_fps=60.0, action_repeat=2, override=120.0) == 120.0
+    assert _resolve_video_fps(native_fps=60.0, override=120.0) == 120.0
 
 
 def test_attempt_output_path_keeps_attempts_next_to_final_output() -> None:
@@ -287,19 +287,20 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
         def action_masks(self) -> None:
             return None
 
-        def step(self, action: object) -> tuple[object, float, bool, bool, dict[str, object]]:
+        def step_watch(self, action: object) -> SimpleNamespace:
             self.stepped_action = action
-            return (
-                object(),
-                1.5,
-                True,
-                False,
-                {
+            return SimpleNamespace(
+                observation=object(),
+                reward=1.5,
+                terminated=True,
+                truncated=False,
+                info={
                     "termination_reason": "finished",
                     "position": 1,
                     "episode_step": 1,
                     "race_time_ms": 1234,
                 },
+                display_frames=(self.render(),),
             )
 
         def step_control(

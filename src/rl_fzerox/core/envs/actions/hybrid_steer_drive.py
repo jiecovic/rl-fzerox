@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import numpy as np
 from gymnasium import spaces
@@ -33,35 +34,63 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_lean import (
     LEAN_RIGHT_MASK,
 )
 
-_HYBRID_STEER_DRIVE_CONTINUOUS_SIZE = 2
-_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE = 3
-_HYBRID_STEER_CONTINUOUS_SIZE = 1
-_HYBRID_LEAN_DISCRETE_SIZE = 1
-_HYBRID_BOOST_LEAN_DISCRETE_SIZE = 2
-_HYBRID_GAS_BOOST_LEAN_DISCRETE_SIZE = 3
-_HYBRID_GAS_AIR_BRAKE_BOOST_LEAN_DISCRETE_SIZE = 4
-_HYBRID_LEAN_PRIMITIVE_SIZE = 7
-_HYBRID_ACTION_DIMENSIONS = (DiscreteActionDimension("lean", 3),)
-_HYBRID_BOOST_ACTION_DIMENSIONS = (
-    DiscreteActionDimension("lean", 3),
-    DiscreteActionDimension("boost", 2),
+
+@dataclass(frozen=True, slots=True)
+class HybridActionLayout:
+    """Shape metadata for one hybrid continuous/discrete action adapter."""
+
+    continuous_size: int
+    dimensions: tuple[DiscreteActionDimension, ...]
+
+    @property
+    def discrete_size(self) -> int:
+        return len(self.dimensions)
+
+
+@dataclass(frozen=True, slots=True)
+class LeanPrimitiveValues:
+    """Reserved lean primitive branch values and the currently enabled subset."""
+
+    count: int = 7
+    enabled_default: tuple[int, ...] = (0, 1, 2)
+
+
+LEAN_PRIMITIVES = LeanPrimitiveValues()
+STEER_DRIVE_LEAN_LAYOUT = HybridActionLayout(
+    continuous_size=2,
+    dimensions=(DiscreteActionDimension("lean", 3),),
 )
-_HYBRID_STEER_GAS_BOOST_LEAN_ACTION_DIMENSIONS = (
-    DiscreteActionDimension("gas", 2),
-    DiscreteActionDimension("boost", 2),
-    DiscreteActionDimension("lean", 3),
+STEER_DRIVE_BOOST_LEAN_LAYOUT = HybridActionLayout(
+    continuous_size=2,
+    dimensions=(
+        DiscreteActionDimension("lean", 3),
+        DiscreteActionDimension("boost", 2),
+    ),
 )
-_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_ACTION_DIMENSIONS = (
-    DiscreteActionDimension("gas", 2),
-    DiscreteActionDimension("air_brake", 2),
-    DiscreteActionDimension("boost", 2),
-    DiscreteActionDimension("lean", 3),
+STEER_GAS_BOOST_LEAN_LAYOUT = HybridActionLayout(
+    continuous_size=1,
+    dimensions=(
+        DiscreteActionDimension("gas", 2),
+        DiscreteActionDimension("boost", 2),
+        DiscreteActionDimension("lean", 3),
+    ),
 )
-_HYBRID_LEAN_PRIMITIVE_ACTION_DIMENSIONS = (
-    DiscreteActionDimension("lean", _HYBRID_LEAN_PRIMITIVE_SIZE),
-    DiscreteActionDimension("boost", 2),
+STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT = HybridActionLayout(
+    continuous_size=1,
+    dimensions=(
+        DiscreteActionDimension("gas", 2),
+        DiscreteActionDimension("air_brake", 2),
+        DiscreteActionDimension("boost", 2),
+        DiscreteActionDimension("lean", 3),
+    ),
 )
-_HYBRID_ENABLED_LEAN_PRIMITIVES = (0, 1, 2)
+STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT = HybridActionLayout(
+    continuous_size=3,
+    dimensions=(
+        DiscreteActionDimension("lean", LEAN_PRIMITIVES.count),
+        DiscreteActionDimension("boost", 2),
+    ),
+)
 
 
 def _hybrid_action_space(
@@ -115,8 +144,8 @@ class HybridSteerDriveLeanActionAdapter:
             deadzone=float(config.continuous_drive_deadzone),
         )
         self._action_space = _hybrid_action_space(
-            continuous_size=_HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
-            dimensions=_HYBRID_ACTION_DIMENSIONS,
+            continuous_size=STEER_DRIVE_LEAN_LAYOUT.continuous_size,
+            dimensions=STEER_DRIVE_LEAN_LAYOUT.dimensions,
         )
 
     @property
@@ -130,15 +159,15 @@ class HybridSteerDriveLeanActionAdapter:
         """Return a neutral hybrid action with no lean input held."""
 
         return _hybrid_idle_action(
-            continuous_size=_HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
-            discrete_size=_HYBRID_LEAN_DISCRETE_SIZE,
+            continuous_size=STEER_DRIVE_LEAN_LAYOUT.continuous_size,
+            discrete_size=STEER_DRIVE_LEAN_LAYOUT.discrete_size,
         )
 
     @property
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         """Return the discrete lean branch maskable by hybrid PPO."""
 
-        return _HYBRID_ACTION_DIMENSIONS
+        return STEER_DRIVE_LEAN_LAYOUT.dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering, drive, and lean buttons."""
@@ -190,8 +219,8 @@ class HybridSteerDriveBoostLeanActionAdapter:
             deadzone=float(config.continuous_drive_deadzone),
         )
         self._action_space = _hybrid_action_space(
-            continuous_size=_HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
-            dimensions=_HYBRID_BOOST_ACTION_DIMENSIONS,
+            continuous_size=STEER_DRIVE_BOOST_LEAN_LAYOUT.continuous_size,
+            dimensions=STEER_DRIVE_BOOST_LEAN_LAYOUT.dimensions,
         )
 
     @property
@@ -205,15 +234,15 @@ class HybridSteerDriveBoostLeanActionAdapter:
         """Return a neutral hybrid action with no lean or boost held."""
 
         return _hybrid_idle_action(
-            continuous_size=_HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
-            discrete_size=_HYBRID_BOOST_LEAN_DISCRETE_SIZE,
+            continuous_size=STEER_DRIVE_BOOST_LEAN_LAYOUT.continuous_size,
+            discrete_size=STEER_DRIVE_BOOST_LEAN_LAYOUT.discrete_size,
         )
 
     @property
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         """Return the discrete branches maskable by maskable hybrid PPO."""
 
-        return _HYBRID_BOOST_ACTION_DIMENSIONS
+        return STEER_DRIVE_BOOST_LEAN_LAYOUT.dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering, drive, lean, and boost."""
@@ -263,8 +292,8 @@ class HybridSteerGasAirBrakeBoostLeanActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._action_space = _hybrid_action_space(
-            continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
-            dimensions=_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_ACTION_DIMENSIONS,
+            continuous_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.continuous_size,
+            dimensions=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.dimensions,
         )
 
     @property
@@ -278,15 +307,15 @@ class HybridSteerGasAirBrakeBoostLeanActionAdapter:
         """Return a neutral hybrid action with no buttons held."""
 
         return _hybrid_idle_action(
-            continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
-            discrete_size=_HYBRID_GAS_AIR_BRAKE_BOOST_LEAN_DISCRETE_SIZE,
+            continuous_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.continuous_size,
+            discrete_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.discrete_size,
         )
 
     @property
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         """Return the discrete branches maskable by maskable hybrid PPO."""
 
-        return _HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_ACTION_DIMENSIONS
+        return STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering and independent button heads."""
@@ -335,8 +364,8 @@ class HybridSteerGasBoostLeanActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._action_space = _hybrid_action_space(
-            continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
-            dimensions=_HYBRID_STEER_GAS_BOOST_LEAN_ACTION_DIMENSIONS,
+            continuous_size=STEER_GAS_BOOST_LEAN_LAYOUT.continuous_size,
+            dimensions=STEER_GAS_BOOST_LEAN_LAYOUT.dimensions,
         )
 
     @property
@@ -350,15 +379,15 @@ class HybridSteerGasBoostLeanActionAdapter:
         """Return a neutral hybrid action with no buttons held."""
 
         return _hybrid_idle_action(
-            continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
-            discrete_size=_HYBRID_GAS_BOOST_LEAN_DISCRETE_SIZE,
+            continuous_size=STEER_GAS_BOOST_LEAN_LAYOUT.continuous_size,
+            discrete_size=STEER_GAS_BOOST_LEAN_LAYOUT.discrete_size,
         )
 
     @property
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         """Return the discrete branches maskable by maskable hybrid PPO."""
 
-        return _HYBRID_STEER_GAS_BOOST_LEAN_ACTION_DIMENSIONS
+        return STEER_GAS_BOOST_LEAN_LAYOUT.dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering and independent button heads."""
@@ -419,8 +448,8 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
         )
         self._air_brake_enabled = config.continuous_air_brake_mode != "off"
         self._action_space = _hybrid_action_space(
-            continuous_size=_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
-            dimensions=_HYBRID_LEAN_PRIMITIVE_ACTION_DIMENSIONS,
+            continuous_size=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.continuous_size,
+            dimensions=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.dimensions,
         )
 
     @property
@@ -434,15 +463,15 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
         """Return a neutral hybrid action with no lean primitive or boost."""
 
         return _hybrid_idle_action(
-            continuous_size=_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
-            discrete_size=_HYBRID_BOOST_LEAN_DISCRETE_SIZE,
+            continuous_size=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.continuous_size,
+            discrete_size=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.discrete_size,
         )
 
     @property
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         """Return the discrete branches maskable by maskable hybrid PPO."""
 
-        return _HYBRID_LEAN_PRIMITIVE_ACTION_DIMENSIONS
+        return STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one hybrid action into steering, drive, lean, and boost."""
@@ -495,7 +524,7 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
 def _parse_hybrid_steer_drive_lean(action: ActionValue) -> tuple[float, float, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        expected_size=_HYBRID_LEAN_DISCRETE_SIZE,
+        expected_size=STEER_DRIVE_LEAN_LAYOUT.discrete_size,
         action_label="Hybrid steer-drive-lean discrete",
         field_labels=("lean",),
     )
@@ -513,7 +542,7 @@ def _parse_hybrid_steer_drive_boost_lean_pair(
 ) -> tuple[float, float, int, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        expected_size=_HYBRID_BOOST_LEAN_DISCRETE_SIZE,
+        expected_size=STEER_DRIVE_BOOST_LEAN_LAYOUT.discrete_size,
         action_label="Hybrid steer-drive-boost-lean discrete",
         field_labels=("lean", "boost"),
     )
@@ -534,9 +563,9 @@ def _parse_hybrid_steer_gas_air_brake_boost_lean(
 ) -> tuple[float, int, int, int, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
+        continuous_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.continuous_size,
         continuous_field_labels=("steer",),
-        expected_size=_HYBRID_GAS_AIR_BRAKE_BOOST_LEAN_DISCRETE_SIZE,
+        expected_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT.discrete_size,
         action_label="Hybrid steer-gas-air-brake-boost-lean discrete",
         field_labels=("gas", "air_brake", "boost", "lean"),
     )
@@ -562,9 +591,9 @@ def _parse_hybrid_steer_gas_boost_lean(
 ) -> tuple[float, int, int, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        continuous_size=_HYBRID_STEER_CONTINUOUS_SIZE,
+        continuous_size=STEER_GAS_BOOST_LEAN_LAYOUT.continuous_size,
         continuous_field_labels=("steer",),
-        expected_size=_HYBRID_GAS_BOOST_LEAN_DISCRETE_SIZE,
+        expected_size=STEER_GAS_BOOST_LEAN_LAYOUT.discrete_size,
         action_label="Hybrid steer-gas-boost-lean discrete",
         field_labels=("gas", "boost", "lean"),
     )
@@ -587,15 +616,15 @@ def _parse_hybrid_steer_drive_boost_lean(
 ) -> tuple[float, float, float, int, int]:
     continuous_values, discrete_values = _parse_hybrid_branches(
         action,
-        continuous_size=_HYBRID_STEER_DRIVE_AIR_BRAKE_CONTINUOUS_SIZE,
+        continuous_size=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.continuous_size,
         continuous_field_labels=("steer", "drive", "air_brake"),
-        expected_size=_HYBRID_BOOST_LEAN_DISCRETE_SIZE,
+        expected_size=STEER_DRIVE_AIR_BRAKE_PRIMITIVE_LAYOUT.discrete_size,
         action_label="Hybrid steer-drive-boost-lean discrete",
         field_labels=("lean", "boost"),
     )
     lean = int(discrete_values[0])
     boost = int(discrete_values[1])
-    if not 0 <= lean < _HYBRID_LEAN_PRIMITIVE_SIZE:
+    if not 0 <= lean < LEAN_PRIMITIVES.count:
         raise ValueError(f"Invalid hybrid lean index {lean}")
     if not 0 <= boost < 2:
         raise ValueError(f"Invalid hybrid boost index {boost}")
@@ -612,14 +641,14 @@ def _with_default_lean_primitive_mask(
     if base_overrides is not None and "lean" in base_overrides:
         return base_overrides
     overrides = dict(base_overrides or {})
-    overrides["lean"] = _HYBRID_ENABLED_LEAN_PRIMITIVES
+    overrides["lean"] = LEAN_PRIMITIVES.enabled_default
     return overrides
 
 
 def _parse_hybrid_branches(
     action: ActionValue,
     *,
-    continuous_size: int = _HYBRID_STEER_DRIVE_CONTINUOUS_SIZE,
+    continuous_size: int = STEER_DRIVE_LEAN_LAYOUT.continuous_size,
     continuous_field_labels: tuple[str, ...] = ("steer", "drive"),
     expected_size: int,
     action_label: str,

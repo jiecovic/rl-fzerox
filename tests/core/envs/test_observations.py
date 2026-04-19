@@ -5,6 +5,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import RgbFrame
+from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 from rl_fzerox.core.envs.course_effects import CourseEffect
 from rl_fzerox.core.envs.observation_image import build_image_observation_space
 from rl_fzerox.core.envs.observations import (
@@ -469,19 +470,22 @@ def test_state_components_define_observation_space_shape_and_bounds() -> None:
 def _clean_state_components(
     *,
     control_history_enabled: bool = True,
-) -> tuple[dict[str, object], ...]:
-    components: list[dict[str, object]] = [
-        {"name": "vehicle_state"},
-        {"name": "track_position"},
-        {"name": "surface_state"},
-        {"name": "course_context", "encoding": "one_hot_builtin"},
+) -> tuple[ObservationStateComponentSettings, ...]:
+    components: list[ObservationStateComponentSettings] = [
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="track_position"),
+        ObservationStateComponentSettings(name="surface_state"),
+        ObservationStateComponentSettings(
+            name="course_context",
+            encoding="one_hot_builtin",
+        ),
     ]
     if control_history_enabled:
         components.append(
-            {
-                "name": "control_history",
-                "length": 2,
-                "controls": ("steer", "thrust", "boost", "lean"),
-            }
+            ObservationStateComponentSettings(
+                name="control_history",
+                length=2,
+                controls=("steer", "thrust", "boost", "lean"),
+            )
         )
     return tuple(components)

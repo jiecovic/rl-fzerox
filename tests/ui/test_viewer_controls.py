@@ -10,8 +10,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_LEFT_MASK,
 )
 from rl_fzerox.ui.watch.runtime.snapshots import (
-    BOOST_ACTIVE_LAMP_LEVEL,
-    BOOST_MANUAL_LAMP_LEVEL,
+    BOOST_LAMP_CONFIG,
     _next_boost_lamp_level,
 )
 from rl_fzerox.ui.watch.view.panels.viz import _control_viz
@@ -54,7 +53,7 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
         boost_active=False,
         action_repeat=1,
     )
-    assert lamp_level == BOOST_MANUAL_LAMP_LEVEL
+    assert lamp_level == BOOST_LAMP_CONFIG.manual_level
 
     lamp_level = _next_boost_lamp_level(
         previous=lamp_level,
@@ -62,7 +61,7 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
         boost_active=True,
         action_repeat=1,
     )
-    assert BOOST_ACTIVE_LAMP_LEVEL < lamp_level < BOOST_MANUAL_LAMP_LEVEL
+    assert BOOST_LAMP_CONFIG.active_level < lamp_level < BOOST_LAMP_CONFIG.manual_level
 
     for _ in range(20):
         lamp_level = _next_boost_lamp_level(
@@ -71,7 +70,7 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
             boost_active=True,
             action_repeat=1,
         )
-    assert lamp_level == pytest.approx(BOOST_ACTIVE_LAMP_LEVEL)
+    assert lamp_level == pytest.approx(BOOST_LAMP_CONFIG.active_level)
 
     lamp_level = _next_boost_lamp_level(
         previous=lamp_level,
@@ -79,7 +78,7 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
         boost_active=False,
         action_repeat=1,
     )
-    assert 0.0 < lamp_level < BOOST_ACTIVE_LAMP_LEVEL
+    assert 0.0 < lamp_level < BOOST_LAMP_CONFIG.active_level
 
 
 def test_control_viz_ignores_air_brake_button_without_air_brake_axis() -> None:

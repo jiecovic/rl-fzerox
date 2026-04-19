@@ -123,12 +123,11 @@ def resolve_ffmpeg_path() -> str:
 def resolve_video_fps(
     *,
     native_fps: float,
-    action_repeat: int,
     override: float | None,
 ) -> float:
     if override is not None:
         return override
-    return max(float(native_fps) / float(action_repeat), 1.0)
+    return max(float(native_fps), 1.0)
 
 
 def attempt_output_path(

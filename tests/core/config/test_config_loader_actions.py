@@ -148,8 +148,7 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     assert action_config.boost_request_lockout_frames == 9
     assert action_config.lean_unmask_min_speed_kph is None
     assert action_config.lean_mode == "release_cooldown"
-    assert action_config.mask is not None
-    assert action_config.mask.branch_overrides() == {
+    assert action_config.mask_overrides == {
         "gas": (0, 1),
         "boost": (0,),
         "lean": (0, 1, 2),
@@ -197,8 +196,7 @@ def test_load_train_app_config_compiles_continuous_gas_branch(tmp_path: Path) ->
     assert action_config.name == "hybrid_steer_drive_boost_lean"
     assert action_config.continuous_drive_mode == "pwm"
     assert action_config.continuous_drive_deadzone == 0.0
-    assert action_config.mask is not None
-    assert action_config.mask.branch_overrides() == {
+    assert action_config.mask_overrides == {
         "boost": (0,),
         "lean": (0, 1, 2),
     }
@@ -249,8 +247,7 @@ def test_load_train_app_config_prefers_action_branches_over_adapter_fields(
     action_config = config.env.action.runtime()
 
     assert action_config.name == "hybrid_steer_gas_boost_lean"
-    assert action_config.mask is not None
-    assert action_config.mask.branch_overrides() == {
+    assert action_config.mask_overrides == {
         "gas": (0, 1),
         "boost": (0, 1),
         "lean": (0,),

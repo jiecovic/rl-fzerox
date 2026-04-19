@@ -421,6 +421,7 @@ pub struct PyTelemetry {
     in_race_mode: bool,
     total_racers: i32,
     course_index: u32,
+    course_length: f32,
     player: Py<PyPlayerTelemetry>,
 }
 
@@ -435,6 +436,7 @@ impl PyTelemetry {
         total_racers,
         course_index,
         player,
+        course_length = 0.0,
         difficulty_raw = 0,
         difficulty_name = None,
         camera_setting_raw = 2,
@@ -450,6 +452,7 @@ impl PyTelemetry {
         total_racers: i32,
         course_index: u32,
         player: Py<PyPlayerTelemetry>,
+        course_length: f32,
         difficulty_raw: i32,
         difficulty_name: Option<String>,
         camera_setting_raw: i32,
@@ -468,6 +471,7 @@ impl PyTelemetry {
             in_race_mode,
             total_racers,
             course_index,
+            course_length,
             player,
         }
     }
@@ -528,6 +532,11 @@ impl PyTelemetry {
     }
 
     #[getter]
+    fn course_length(&self) -> f32 {
+        self.course_length
+    }
+
+    #[getter]
     fn player(&self, py: Python<'_>) -> Py<PyPlayerTelemetry> {
         self.player.clone_ref(py)
     }
@@ -545,6 +554,7 @@ impl PyTelemetry {
         dict.set_item("in_race_mode", self.in_race_mode())?;
         dict.set_item("total_racers", self.total_racers())?;
         dict.set_item("course_index", self.course_index())?;
+        dict.set_item("course_length", self.course_length())?;
         let player_handle = self.player(py);
         let player = player_handle.bind(py);
         dict.set_item("player", player.call_method0("to_dict")?)?;
@@ -571,6 +581,7 @@ pub(super) fn telemetry_to_py(
             in_race_mode: telemetry.in_race_mode,
             total_racers: telemetry.total_racers,
             course_index: telemetry.course_index,
+            course_length: telemetry.course_length,
             player,
         },
     )

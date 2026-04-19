@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from omegaconf import OmegaConf
+from pytest import MonkeyPatch, raises
 
 from rl_fzerox.core.config.schema import (
     ActionConfig,
@@ -14,15 +15,18 @@ from rl_fzerox.core.config.schema import (
     EnvConfig,
     PolicyConfig,
     RewardConfig,
+    TrackConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
+    VehicleMachineConfig,
     WatchAppConfig,
     WatchConfig,
 )
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
+    baseline_materializer,
     build_run_paths,
     build_watch_session_paths,
     ensure_run_dirs,
@@ -36,6 +40,7 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
+from rl_fzerox.core.training.runs.baseline_race_start import RaceStartVariant
 from rl_fzerox.core.training.runs.migration import scrub_obsolete_train_run_config
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
@@ -58,6 +63,45 @@ class _FakeModel:
 
     def save(self, path: str) -> None:
         Path(path).write_bytes(b"model")
+
+
+def _patch_fake_boot_materializer(
+    monkeypatch: MonkeyPatch,
+    *,
+    payload: bytes = b"generated",
+) -> list[RaceStartVariant]:
+    captured_variants: list[RaceStartVariant] = []
+
+    class FakeEmulator:
+        def __init__(self, **_: object) -> None:
+            pass
+
+        def save_state(self, path: Path) -> None:
+            path.write_bytes(payload)
+
+        def close(self) -> None:
+            pass
+
+    def fake_materialize_time_attack_race_start_from_boot(
+        *,
+        emulator: object,
+        variant: RaceStartVariant,
+    ) -> None:
+        del emulator
+        captured_variants.append(variant)
+
+    monkeypatch.setattr(baseline_materializer, "Emulator", FakeEmulator)
+    monkeypatch.setattr(
+        baseline_materializer,
+        "materialize_time_attack_race_start_from_boot",
+        fake_materialize_time_attack_race_start_from_boot,
+    )
+    return captured_variants
+
+
+def _required_baseline_path(entry: TrackSamplingEntryConfig) -> Path:
+    assert entry.baseline_state_path is not None
+    return entry.baseline_state_path
 
 
 def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> None:
@@ -422,6 +466,79 @@ def test_materialize_train_run_config_preserves_init_artifact_source(tmp_path: P
     assert materialized.train.init_artifact == "latest"
 
 
+def test_materialize_train_run_config_does_not_copy_init_run_baseline(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    init_baseline_path = tmp_path / "runs" / "source_0001" / "baselines" / "baseline.state"
+    core_path.touch()
+    rom_path.touch()
+    init_baseline_path.parent.mkdir(parents=True)
+    init_baseline_path.write_bytes(b"init-run-baseline")
+    (init_baseline_path.parent.parent / "train_config.yaml").write_text(
+        "\n".join(
+            [
+                "seed: 7",
+                "emulator:",
+                f"  core_path: {core_path}",
+                f"  rom_path: {rom_path}",
+                f"  baseline_state_path: {init_baseline_path}",
+                "env: {}",
+                "reward: {}",
+                "policy: {}",
+                "curriculum: {}",
+                "train:",
+                "  algorithm: maskable_ppo",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(),
+        track=TrackConfig(
+            id="mute_city_time_attack_blue_falcon_balanced",
+            course_index=0,
+            mode="time_attack",
+            vehicle="blue_falcon",
+            engine_setting="balanced",
+            engine_setting_raw_value=50,
+            vehicle_machine=VehicleMachineConfig(character_index=0),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(
+            output_root=tmp_path / "runs",
+            run_name="target",
+            init_run_dir=init_baseline_path.parent.parent,
+            init_artifact="latest",
+        ),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+    _patch_fake_boot_materializer(monkeypatch, payload=b"current-baseline")
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    assert materialized.emulator.baseline_state_path is not None
+    assert materialized.emulator.baseline_state_path.parent == run_paths.baselines_dir
+    assert materialized.emulator.baseline_state_path.read_bytes() == b"current-baseline"
+    assert materialized.train.init_run_dir == init_baseline_path.parent.parent.resolve()
+
+
 def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)
@@ -513,7 +630,7 @@ def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> N
     assert first.baseline_state_path == first.run_dir / "baselines" / "baseline.state"
 
 
-def test_materialize_train_run_config_copies_baseline_into_run_dir(tmp_path: Path) -> None:
+def test_materialize_train_run_config_rejects_source_state_copy(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     source_baseline_path = tmp_path / "shared.state"
@@ -538,38 +655,38 @@ def test_materialize_train_run_config_copies_baseline_into_run_dir(tmp_path: Pat
     )
 
     ensure_run_dirs(run_paths)
-    materialized = materialize_train_run_config(
-        config,
-        run_paths=run_paths,
-        baseline_cache_root=tmp_path / "cache",
-    )
-
-    assert materialized.emulator.runtime_dir == run_paths.runtime_root
-    assert materialized.emulator.baseline_state_path is not None
-    assert materialized.emulator.baseline_state_path.parent == run_paths.baselines_dir
-    assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
-    assert materialized.emulator.baseline_state_path.with_suffix(".json").is_file()
+    with raises(ValueError, match="must be generated by the materializer"):
+        materialize_train_run_config(
+            config,
+            run_paths=run_paths,
+            baseline_cache_root=tmp_path / "cache",
+        )
 
 
 def test_materialize_train_run_config_reuses_baseline_materializer_cache(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
-    source_baseline_path = tmp_path / "shared.state"
     cache_root = tmp_path / "cache"
     core_path.touch()
     rom_path.touch()
-    source_baseline_path.write_bytes(b"baseline")
+    captured_variants = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-            baseline_state_path=source_baseline_path,
-        ),
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
         env=EnvConfig(camera_setting="close_behind"),
+        track=TrackConfig(
+            id="mute_city_time_attack_blue_falcon_balanced",
+            course_index=0,
+            mode="time_attack",
+            vehicle="blue_falcon",
+            engine_setting="balanced",
+            engine_setting_raw_value=50,
+            vehicle_machine=VehicleMachineConfig(character_index=0),
+        ),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
@@ -607,21 +724,20 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
         )
     )
     assert first_metadata["cache_key"] == second_metadata["cache_key"]
-    assert first_metadata["materializer_mode"] == "source_state_copy"
+    assert first_metadata["materializer_mode"] == "boot_menu_time_attack"
+    assert len(captured_variants) == 1
     assert len(list(cache_root.glob("*.state"))) == 1
 
 
 def test_materialize_train_run_config_rewrites_track_sampling_baselines(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
-    mute_state_path = tmp_path / "mute.state"
-    silence_state_path = tmp_path / "silence.state"
     core_path.touch()
     rom_path.touch()
-    mute_state_path.write_bytes(b"mute")
-    silence_state_path.write_bytes(b"silence")
+    captured_variants = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
@@ -630,16 +746,84 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
                 sampling_mode="balanced",
+                    entries=(
+                        TrackSamplingEntryConfig(
+                            id="mute_city_time_attack_blue_falcon_balanced",
+                            course_id="mute_city",
+                            course_index=0,
+                            mode="time_attack",
+                            vehicle="blue_falcon",
+                            engine_setting="balanced",
+                            engine_setting_raw_value=50,
+                            vehicle_machine=VehicleMachineConfig(character_index=0),
+                        ),
+                        TrackSamplingEntryConfig(
+                            id="silence_time_attack_blue_falcon_balanced",
+                            course_id="silence",
+                            course_index=1,
+                            mode="time_attack",
+                            vehicle="blue_falcon",
+                            engine_setting="balanced",
+                            engine_setting_raw_value=50,
+                            vehicle_machine=VehicleMachineConfig(character_index=0),
+                        ),
+                    ),
+                ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    entries = materialized.env.track_sampling.entries
+    first_baseline_path = _required_baseline_path(entries[0])
+    second_baseline_path = _required_baseline_path(entries[1])
+    assert first_baseline_path.parent == run_paths.baselines_dir
+    assert second_baseline_path.parent == run_paths.baselines_dir
+    assert first_baseline_path.read_bytes() == b"generated"
+    assert second_baseline_path.read_bytes() == b"generated"
+    assert first_baseline_path.with_suffix(".json").is_file()
+    assert second_baseline_path.with_suffix(".json").is_file()
+    assert [variant.course_index for variant in captured_variants] == [0, 1]
+
+
+def test_materialize_train_run_config_generates_race_start_engine_variant(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            race_intro_target_timer=38,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
                 entries=(
                     TrackSamplingEntryConfig(
-                        id="mute_city",
-                        course_id="mute_city",
-                        baseline_state_path=mute_state_path,
-                    ),
-                    TrackSamplingEntryConfig(
-                        id="silence",
-                        course_id="silence",
-                        baseline_state_path=silence_state_path,
+                        id="silence_time_attack_blue_falcon_max_speed",
+                        course_index=1,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting="max_speed",
+                        engine_setting_raw_value=100,
+                        vehicle_machine=VehicleMachineConfig(character_index=0),
                     ),
                 ),
             ),
@@ -659,24 +843,161 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
         baseline_cache_root=tmp_path / "cache",
     )
 
-    entries = materialized.env.track_sampling.entries
-    assert entries[0].baseline_state_path.parent == run_paths.baselines_dir
-    assert entries[1].baseline_state_path.parent == run_paths.baselines_dir
-    assert entries[0].baseline_state_path.read_bytes() == b"mute"
-    assert entries[1].baseline_state_path.read_bytes() == b"silence"
-    assert entries[0].baseline_state_path.with_suffix(".json").is_file()
-    assert entries[1].baseline_state_path.with_suffix(".json").is_file()
+    entry = materialized.env.track_sampling.entries[0]
+    baseline_path = _required_baseline_path(entry)
+    assert baseline_path.read_bytes() == b"generated"
+    metadata = json.loads(baseline_path.with_suffix(".json").read_text())
+    assert metadata["materializer_mode"] == "boot_menu_time_attack"
+    assert len(captured_variants) == 1
+    variant = captured_variants[0]
+    assert variant.course_index == 1
+    assert variant.mode == "time_attack"
+    assert variant.character_index == 0
+    assert variant.engine_setting_raw_value == 100
+    assert variant.race_intro_target_timer == 38
+
+
+def test_materialize_train_run_config_reuses_target_variant_cache_without_source(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    cache_root = tmp_path / "cache"
+    core_path.touch()
+    rom_path.touch()
+    captured_variants = _patch_fake_boot_materializer(monkeypatch, payload=b"generated-target")
+
+    def build_config() -> TrainAppConfig:
+        return TrainAppConfig(
+            seed=123,
+            emulator=EmulatorConfig(
+                core_path=core_path,
+                rom_path=rom_path,
+                renderer="angrylion",
+            ),
+            env=EnvConfig(
+                race_intro_target_timer=38,
+                track_sampling=TrackSamplingConfig(
+                    enabled=True,
+                    sampling_mode="balanced",
+                    entries=(
+                        TrackSamplingEntryConfig(
+                            id="silence_time_attack_blue_falcon_max_speed",
+                            course_id="silence",
+                            course_index=1,
+                            mode="time_attack",
+                            vehicle="blue_falcon",
+                            engine_setting="max_speed",
+                            engine_setting_raw_value=100,
+                            vehicle_machine=VehicleMachineConfig(character_index=0),
+                        ),
+                    ),
+                ),
+            ),
+            policy=PolicyConfig(),
+            train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+        )
+
+    first_run = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(first_run)
+    first_materialized = materialize_train_run_config(
+        build_config(),
+        run_paths=first_run,
+        baseline_cache_root=cache_root,
+    )
+    second_run = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(second_run)
+    second_materialized = materialize_train_run_config(
+        build_config(),
+        run_paths=second_run,
+        baseline_cache_root=cache_root,
+    )
+
+    first_entry = first_materialized.env.track_sampling.entries[0]
+    second_entry = second_materialized.env.track_sampling.entries[0]
+    first_baseline_path = _required_baseline_path(first_entry)
+    second_baseline_path = _required_baseline_path(second_entry)
+    assert first_baseline_path.read_bytes() == b"generated-target"
+    assert second_baseline_path.read_bytes() == b"generated-target"
+    assert captured_variants == [
+        RaceStartVariant(
+            course_index=1,
+            mode="time_attack",
+            character_index=0,
+            engine_setting_raw_value=100,
+            race_intro_target_timer=38,
+        )
+    ]
+    assert first_baseline_path.with_suffix(".json").is_file()
+    assert second_baseline_path.with_suffix(".json").is_file()
+
+
+def test_materialize_train_run_config_generates_vehicle_variant(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="silence_time_attack_white_cat_engine_70",
+                        course_index=1,
+                        mode="time_attack",
+                        vehicle="white_cat",
+                        engine_setting="engine_70",
+                        engine_setting_raw_value=70,
+                        vehicle_machine=VehicleMachineConfig(
+                            character_index=4,
+                            machine_select_slot=4,
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    entry = materialized.env.track_sampling.entries[0]
+    assert entry.baseline_state_path is not None
+    assert entry.baseline_state_path.read_bytes() == b"generated"
+    assert captured_variants[0].character_index == 4
+    assert captured_variants[0].machine_select_slot == 4
+    assert captured_variants[0].engine_setting_raw_value == 70
 
 
 def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
     tmp_path: Path,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
-    stage_state_path = tmp_path / "stage.state"
     core_path.touch()
     rom_path.touch()
-    stage_state_path.write_bytes(b"stage")
+    _patch_fake_boot_materializer(monkeypatch, payload=b"stage")
 
     config = TrainAppConfig(
         seed=123,
@@ -692,7 +1013,12 @@ def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
                         entries=(
                             TrackSamplingEntryConfig(
                                 id="stage_track",
-                                baseline_state_path=stage_state_path,
+                                course_index=0,
+                                mode="time_attack",
+                                vehicle="blue_falcon",
+                                engine_setting="balanced",
+                                engine_setting_raw_value=50,
+                                vehicle_machine=VehicleMachineConfig(character_index=0),
                             ),
                         ),
                     ),
@@ -717,8 +1043,9 @@ def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
     stage = materialized.curriculum.stages[0]
     assert stage.track_sampling is not None
     entry = stage.track_sampling.entries[0]
-    assert entry.baseline_state_path.parent == run_paths.baselines_dir
-    assert entry.baseline_state_path.read_bytes() == b"stage"
+    baseline_path = _required_baseline_path(entry)
+    assert baseline_path.parent == run_paths.baselines_dir
+    assert baseline_path.read_bytes() == b"stage"
 
 
 def test_build_watch_session_paths_uses_run_local_watch_root(tmp_path: Path) -> None:

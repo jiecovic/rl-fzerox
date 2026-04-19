@@ -1,15 +1,34 @@
 // rust/core/game/telemetry/model.rs
 //! Public telemetry data structures.
 
-const FLAG_RETIRED: u32 = 1 << 18;
-const FLAG_FALLING_OFF_TRACK: u32 = 1 << 19;
-const FLAG_FINISHED: u32 = 1 << 25;
-const FLAG_CRASHED: u32 = 1 << 27;
-const FLAG_ACTIVE: u32 = 1 << 30;
-const FLAG_RECEIVED_DAMAGE: u32 = 1 << 17;
-const FLAG_SPINNING_OUT: u32 = 1 << 14;
-const COURSE_EFFECT_MASK: u32 = 0xF;
-const COURSE_EFFECT_PIT: u32 = 1;
+#[derive(Clone, Copy, Debug)]
+struct RacerStateFlags {
+    retired: u32,
+    falling_off_track: u32,
+    finished: u32,
+    crashed: u32,
+    active: u32,
+    received_damage: u32,
+    spinning_out: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct CourseEffectBits {
+    mask: u32,
+    pit: u32,
+}
+
+const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
+    retired: 1 << 18,
+    falling_off_track: 1 << 19,
+    finished: 1 << 25,
+    crashed: 1 << 27,
+    active: 1 << 30,
+    received_damage: 1 << 17,
+    spinning_out: 1 << 14,
+};
+
+const COURSE_EFFECT_BITS: CourseEffectBits = CourseEffectBits { mask: 0xF, pit: 1 };
 
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -49,7 +68,7 @@ impl TryFrom<u32> for CourseEffect {
 }
 
 pub fn course_effect_raw_from_state_flags(state_flags: u32) -> u32 {
-    state_flags & COURSE_EFFECT_MASK
+    state_flags & COURSE_EFFECT_BITS.mask
 }
 
 pub fn course_effect_name_from_state_flags(state_flags: u32) -> &'static str {
@@ -60,7 +79,7 @@ pub fn course_effect_name_from_state_flags(state_flags: u32) -> &'static str {
 pub fn on_energy_refill(state_flags: u32, energy: f32, max_energy: f32) -> bool {
     max_energy > 0.0
         && energy < max_energy
-        && course_effect_raw_from_state_flags(state_flags) == COURSE_EFFECT_PIT
+        && course_effect_raw_from_state_flags(state_flags) == COURSE_EFFECT_BITS.pit
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -75,24 +94,25 @@ pub(crate) struct StepTelemetrySample {
 
 impl StepTelemetrySample {
     pub(crate) fn damage_taken(&self) -> bool {
-        (self.state_flags & FLAG_RECEIVED_DAMAGE) != 0 || self.damage_rumble_counter > 0
+        (self.state_flags & RACER_STATE_FLAGS.received_damage) != 0
+            || self.damage_rumble_counter > 0
     }
 }
 
 pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'static str> {
-    if (state_flags & FLAG_FINISHED) != 0 {
+    if (state_flags & RACER_STATE_FLAGS.finished) != 0 {
         return Some("finished");
     }
-    if (state_flags & FLAG_SPINNING_OUT) != 0 {
+    if (state_flags & RACER_STATE_FLAGS.spinning_out) != 0 {
         return Some("spinning_out");
     }
-    if (state_flags & FLAG_CRASHED) != 0 {
+    if (state_flags & RACER_STATE_FLAGS.crashed) != 0 {
         return Some("crashed");
     }
-    if (state_flags & FLAG_RETIRED) != 0 {
+    if (state_flags & RACER_STATE_FLAGS.retired) != 0 {
         return Some("retired");
     }
-    if (state_flags & FLAG_FALLING_OFF_TRACK) != 0 {
+    if (state_flags & RACER_STATE_FLAGS.falling_off_track) != 0 {
         return Some("falling_off_track");
     }
     None
@@ -164,7 +184,7 @@ impl PlayerTelemetry {
     }
 
     pub fn active(&self) -> bool {
-        (self.state_flags & FLAG_ACTIVE) != 0
+        (self.state_flags & RACER_STATE_FLAGS.active) != 0
     }
 
     pub fn course_effect_raw(&self) -> u32 {
@@ -194,5 +214,6 @@ pub struct TelemetrySnapshot {
     pub in_race_mode: bool,
     pub total_racers: i32,
     pub course_index: u32,
+    pub course_length: f32,
     pub player: PlayerTelemetry,
 }

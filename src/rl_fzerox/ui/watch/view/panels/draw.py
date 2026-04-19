@@ -109,9 +109,7 @@ def _draw_side_panel(
     y += LAYOUT.title_section_gap
 
     content_width = panel_width
-    left_column_width, middle_column_width, stats_column_width = _panel_column_widths(
-        content_width
-    )
+    left_column_width, middle_column_width, stats_column_width = _panel_column_widths(content_width)
     left_x = x
     middle_x = x + left_column_width + LAYOUT.column_gap
     stats_x = middle_x + middle_column_width + LAYOUT.column_gap

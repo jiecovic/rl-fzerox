@@ -21,8 +21,9 @@ env:
   progress_frontier_epsilon: 100.0
   # Mask manual boost below this normalized energy fraction, even after boost unlocks.
   boost_min_energy_fraction: 0.10
-  # End the episode immediately when race telemetry shows player energy <= 0.
-  terminate_on_energy_depleted: true
+  # Optional fallback for old experiments; normal terminal detection uses game state
+  # such as spinning out, crashing, retiring, or falling off track.
+  terminate_on_energy_depleted: false
   randomize_game_rng_on_reset: true
   randomize_game_rng_requires_race_mode: true
   # Optional race camera target applied after reset via in-game C-Right taps.
