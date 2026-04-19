@@ -184,7 +184,7 @@ def _continuous_air_brake_disabled(
     config: WatchAppConfig,
     telemetry: FZeroXTelemetry | None,
 ) -> bool:
-    if config.env.action.continuous_air_brake_mode != "disable_on_ground":
+    if config.env.action.runtime().continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
 

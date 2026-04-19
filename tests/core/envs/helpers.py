@@ -7,14 +7,14 @@ from fzerox_emulator import (
     BackendStepResult,
     ControllerState,
     FZeroXTelemetry,
+    ObservationStackMode,
     StepStatus,
     StepSummary,
+    stacked_observation_channels,
 )
 from fzerox_emulator.arrays import ObservationFrame
 from rl_fzerox.core.envs.observations import (
-    ObservationStackMode,
     ObservationValue,
-    stacked_observation_channels,
 )
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry

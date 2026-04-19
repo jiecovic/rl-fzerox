@@ -3,14 +3,14 @@ import numpy as np
 import pytest
 from gymnasium import spaces
 
+from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.envs.course_effects import CourseEffect
+from rl_fzerox.core.envs.observation_image import build_image_observation_space
 from rl_fzerox.core.envs.observations import (
     STATE_FEATURE_NAMES,
     action_history_settings_for_observation,
-    build_image_observation_space,
     build_observation_space,
-    stacked_observation_channels,
     state_feature_names,
     telemetry_state_vector,
 )
@@ -471,12 +471,7 @@ def _clean_state_components(
     control_history_enabled: bool = True,
 ) -> tuple[dict[str, object], ...]:
     components: list[dict[str, object]] = [
-        {
-            "name": "vehicle_state",
-            "speed_normalizer_kph": 1_500.0,
-            "lateral_velocity_normalizer": 32.0,
-            "sliding_lateral_velocity_threshold": 8.0,
-        },
+        {"name": "vehicle_state"},
         {"name": "track_position"},
         {"name": "surface_state"},
         {"name": "course_context", "encoding": "one_hot_builtin"},

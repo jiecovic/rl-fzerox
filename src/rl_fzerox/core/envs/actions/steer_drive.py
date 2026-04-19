@@ -8,7 +8,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import JOYPAD_A, JOYPAD_B, ControllerState, joypad_mask
 from fzerox_emulator.arrays import ActionMask, DiscreteAction
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
@@ -47,7 +47,7 @@ DRIVE_MODES: tuple[DriveMode, ...] = (
 class SteerDriveActionAdapter:
     """Map MultiDiscrete steering and drive-mode actions to controls."""
 
-    def __init__(self, config: ActionConfig) -> None:
+    def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_values = steer_values(
             config.steer_buckets,
             response_power=float(config.steer_response_power),

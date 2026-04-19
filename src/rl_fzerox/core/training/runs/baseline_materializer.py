@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/training/runs/baseline_factory.py
+# src/rl_fzerox/core/training/runs/baseline_materializer.py
 from __future__ import annotations
 
 import hashlib
@@ -20,8 +20,8 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.training.runs.paths import RunPaths
 
-BASELINE_FACTORY_SCHEMA_VERSION = 1
-_CACHE_ROOT = project_root_dir() / "local" / "cache" / "baseline_factory"
+BASELINE_MATERIALIZER_SCHEMA_VERSION = 1
+_CACHE_ROOT = project_root_dir() / "local" / "cache" / "baseline_materializer"
 _SAFE_NAME_PATTERN = re.compile(r"[^a-zA-Z0-9_.-]+")
 
 
@@ -56,7 +56,7 @@ def materialize_run_baselines(
     run_paths: RunPaths,
     cache_root: Path | None = None,
 ) -> TrainAppConfig:
-    """Factory entry point for run-local baseline state artifacts."""
+    """Materialize run-local baseline state artifacts from existing source states."""
 
     resolved_cache_root = (cache_root or _CACHE_ROOT).expanduser().resolve()
     materialized_track_path: Path | None = None
@@ -150,7 +150,7 @@ def materialize_baseline(
         **cache_payload,
         "cache_key": cache_key,
         "materialized_state_sha256": source_sha256,
-        "factory_mode": "source_state_copy",
+        "materializer_mode": "source_state_copy",
         "source_state_path": str(source_path),
     }
     if not cache_state_path.is_file():
@@ -277,7 +277,7 @@ def _cache_payload(
     request_data = asdict(request)
     request_data.pop("source_state_path", None)
     return {
-        "schema_version": BASELINE_FACTORY_SCHEMA_VERSION,
+        "schema_version": BASELINE_MATERIALIZER_SCHEMA_VERSION,
         "source_state_sha256": source_sha256,
         "request": request_data,
     }

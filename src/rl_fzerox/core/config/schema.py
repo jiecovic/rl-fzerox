@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -95,6 +96,51 @@ class ActionMaskConfig(BaseModel):
         return overrides
 
 
+@dataclass(frozen=True, slots=True)
+class ActionRuntimeConfig:
+    """Concrete action adapter settings consumed by env/runtime code."""
+
+    name: ActionAdapterName
+    steer_buckets: int
+    steer_response_power: float
+    continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"]
+    continuous_drive_deadzone: float
+    continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"]
+    continuous_lean_deadzone: float
+    lean_mode: LeanMode
+    boost_unmask_max_speed_kph: float | None
+    boost_decision_interval_frames: int
+    boost_request_lockout_frames: int
+    lean_unmask_min_speed_kph: float | None
+    mask: ActionMaskConfig | None
+
+    @classmethod
+    def from_config(cls, config: ActionConfig) -> ActionRuntimeConfig:
+        return cls(
+            name=config.name,
+            steer_buckets=int(config.steer_buckets),
+            steer_response_power=float(config.steer_response_power),
+            continuous_drive_mode=config.continuous_drive_mode,
+            continuous_drive_deadzone=float(config.continuous_drive_deadzone),
+            continuous_air_brake_mode=config.continuous_air_brake_mode,
+            continuous_lean_deadzone=float(config.continuous_lean_deadzone),
+            lean_mode=config.lean_mode,
+            boost_unmask_max_speed_kph=(
+                None
+                if config.boost_unmask_max_speed_kph is None
+                else float(config.boost_unmask_max_speed_kph)
+            ),
+            boost_decision_interval_frames=int(config.boost_decision_interval_frames),
+            boost_request_lockout_frames=int(config.boost_request_lockout_frames),
+            lean_unmask_min_speed_kph=(
+                None
+                if config.lean_unmask_min_speed_kph is None
+                else float(config.lean_unmask_min_speed_kph)
+            ),
+            mask=config.mask,
+        )
+
+
 class ActionConfig(BaseModel):
     """Policy action adapter settings for the current env."""
 
@@ -118,7 +164,7 @@ class ActionConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_action_fields(cls, data: object) -> object:
-        # COMPAT SHIM: legacy action config field names.
+        # V4 LEGACY SHIM: legacy action config field names.
         # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
         # boost gate is a max-speed cap: allow boost while slower, mask it when
         # already fast. Older air-brake booleans existed before
@@ -143,25 +189,22 @@ class ActionConfig(BaseModel):
             elif legacy_disable_on_ground is True or legacy_airborne_only is True:
                 values["continuous_air_brake_mode"] = "disable_on_ground"
 
-        branch_config = values.get("branches")
-        if branch_config is not None:
-            # COMPAT SHIM: branch-style configs are the source of truth, but
-            # the env runtime still consumes adapter-era fields. Ignore old
-            # action fields merged from base YAMLs or saved manifests here.
-            # Delete this compile bridge when the runtime consumes branches
-            # directly.
-            compiled = compile_action_branches(branch_config)
-            preserved_branch_fields = {
-                field_name: values[field_name]
-                for field_name in (
-                    "continuous_drive_mode",
-                    "continuous_drive_deadzone",
-                )
-                if field_name in values
-            }
-            values = {"branches": branch_config, **preserved_branch_fields}
-            values.update(compiled.values)
         return values
+
+    def runtime(self) -> ActionRuntimeConfig:
+        """Return the concrete adapter config consumed by env/runtime code.
+
+        Branch-style YAML is the canonical user-facing config for new runs. Old
+        adapter fields remain on this model only so v4 manifests can still load.
+        """
+
+        if self.branches is None:
+            return ActionRuntimeConfig.from_config(self)
+        compiled = compile_action_branches(self.branches)
+        data = self.model_dump(mode="python")
+        data["branches"] = None
+        data.update(compiled.values)
+        return ActionRuntimeConfig.from_config(type(self).model_validate(data))
 
     @field_validator("steer_buckets")
     @classmethod
@@ -170,6 +213,12 @@ class ActionConfig(BaseModel):
             raise ValueError("steer_buckets must be odd so one bucket maps to straight")
         return value
 
+    @model_validator(mode="after")
+    def _validate_branch_runtime_config(self) -> ActionConfig:
+        if self.branches is not None:
+            compile_action_branches(self.branches)
+        return self
+
 
 class ObservationStateComponentConfig(BaseModel):
     """One ordered scalar-state component in the image-state observation."""
@@ -177,9 +226,6 @@ class ObservationStateComponentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: ObservationStateComponentName
-    speed_normalizer_kph: PositiveFloat | None = None
-    lateral_velocity_normalizer: PositiveFloat | None = None
-    sliding_lateral_velocity_threshold: PositiveFloat | None = None
     encoding: ObservationCourseContext | None = None
     state_profile: Literal[
         "default",
@@ -209,9 +255,6 @@ class ObservationStateComponentConfig(BaseModel):
         configured_fields = {
             name
             for name in (
-                "speed_normalizer_kph",
-                "lateral_velocity_normalizer",
-                "sliding_lateral_velocity_threshold",
                 "encoding",
                 "state_profile",
                 "length",
@@ -234,21 +277,13 @@ class ObservationStateComponentConfig(BaseModel):
 
     def _allowed_fields(self) -> frozenset[str]:
         match self.name:
-            case "vehicle_state":
-                return frozenset(
-                    {
-                        "speed_normalizer_kph",
-                        "lateral_velocity_normalizer",
-                        "sliding_lateral_velocity_threshold",
-                    }
-                )
             case "course_context":
                 return frozenset({"encoding"})
             case "legacy_state":
                 return frozenset({"state_profile"})
             case "control_history":
                 return frozenset({"length", "controls"})
-            case "track_position" | "surface_state":
+            case "vehicle_state" | "track_position" | "surface_state":
                 return frozenset()
 
     def data(self) -> dict[str, object]:

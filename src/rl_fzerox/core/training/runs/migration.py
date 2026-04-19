@@ -78,6 +78,16 @@ class TrainConfigScrubResult:
     removed_fields: tuple[str, ...]
 
 
+def scrub_obsolete_train_config_data(config_data: dict[str, object]) -> tuple[str, ...]:
+    """Drop known stale saved-run fields before validating old local manifests.
+
+    V4 LEGACY SHIM: this is intentionally narrow and should disappear once
+    `exp_v4_*` runs are no longer worth loading.
+    """
+
+    return tuple(_scrub_obsolete_fields(config_data))
+
+
 def scrub_obsolete_train_run_config(
     run_dir: Path,
     *,

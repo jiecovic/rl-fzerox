@@ -225,9 +225,10 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
     assert boost_data["request_lockout_frames"] == 5
 
     loaded_config = load_train_run_config(run_paths.run_dir)
+    action_config = loaded_config.env.action.runtime()
 
-    assert loaded_config.env.action.name == "hybrid_steer_gas_boost_lean"
-    assert loaded_config.env.action.boost_request_lockout_frames == 5
+    assert action_config.name == "hybrid_steer_gas_boost_lean"
+    assert action_config.boost_request_lockout_frames == 5
 
 
 def test_scrub_obsolete_train_run_config_rewrites_stale_manifest(tmp_path: Path) -> None:
@@ -550,7 +551,7 @@ def test_materialize_train_run_config_copies_baseline_into_run_dir(tmp_path: Pat
     assert materialized.emulator.baseline_state_path.with_suffix(".json").is_file()
 
 
-def test_materialize_train_run_config_reuses_baseline_factory_cache(
+def test_materialize_train_run_config_reuses_baseline_materializer_cache(
     tmp_path: Path,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
@@ -606,7 +607,7 @@ def test_materialize_train_run_config_reuses_baseline_factory_cache(
         )
     )
     assert first_metadata["cache_key"] == second_metadata["cache_key"]
-    assert first_metadata["factory_mode"] == "source_state_copy"
+    assert first_metadata["materializer_mode"] == "source_state_copy"
     assert len(list(cache_root.glob("*.state"))) == 1
 
 
