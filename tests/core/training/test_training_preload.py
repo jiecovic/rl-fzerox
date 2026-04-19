@@ -210,5 +210,3 @@ def test_maybe_preload_training_parameters_rejects_algorithm_mismatch(tmp_path: 
                 init_artifact="latest",
             ),
         )
-
-

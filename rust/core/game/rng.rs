@@ -7,10 +7,20 @@ use crate::core::error::CoreError;
 
 const KSEG0_BASE: usize = 0x8000_0000;
 
-const RAND_SEED1: usize = rdram_offset(0x800C_D170);
-const RAND_MASK1: usize = rdram_offset(0x800C_D174);
-const RAND_SEED2: usize = rdram_offset(0x800C_D178);
-const RAND_MASK2: usize = rdram_offset(0x800C_D17C);
+#[derive(Clone, Copy, Debug)]
+struct GameRngRamLayout {
+    seed1: usize,
+    mask1: usize,
+    seed2: usize,
+    mask2: usize,
+}
+
+const RNG_RAM: GameRngRamLayout = GameRngRamLayout {
+    seed1: rdram_offset(0x800C_D170),
+    mask1: rdram_offset(0x800C_D174),
+    seed2: rdram_offset(0x800C_D178),
+    mask2: rdram_offset(0x800C_D17C),
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct GameRngState {
@@ -38,18 +48,18 @@ pub fn state_from_seed(seed: u64) -> GameRngState {
 
 pub fn read_state(memory: &[u8]) -> Result<GameRngState, CoreError> {
     Ok(GameRngState {
-        seed1: read_u32(memory, RAND_SEED1)?,
-        mask1: read_u32(memory, RAND_MASK1)?,
-        seed2: read_u32(memory, RAND_SEED2)?,
-        mask2: read_u32(memory, RAND_MASK2)?,
+        seed1: read_u32(memory, RNG_RAM.seed1)?,
+        mask1: read_u32(memory, RNG_RAM.mask1)?,
+        seed2: read_u32(memory, RNG_RAM.seed2)?,
+        mask2: read_u32(memory, RNG_RAM.mask2)?,
     })
 }
 
 pub fn write_state(memory: &mut [u8], state: GameRngState) -> Result<(), CoreError> {
-    write_u32(memory, RAND_SEED1, state.seed1)?;
-    write_u32(memory, RAND_MASK1, state.mask1)?;
-    write_u32(memory, RAND_SEED2, state.seed2)?;
-    write_u32(memory, RAND_MASK2, state.mask2)?;
+    write_u32(memory, RNG_RAM.seed1, state.seed1)?;
+    write_u32(memory, RNG_RAM.mask1, state.mask1)?;
+    write_u32(memory, RNG_RAM.seed2, state.seed2)?;
+    write_u32(memory, RNG_RAM.mask2, state.mask2)?;
     Ok(())
 }
 

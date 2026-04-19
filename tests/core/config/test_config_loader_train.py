@@ -5,6 +5,7 @@ from pathlib import Path
 
 from rl_fzerox.core.config import load_train_app_config
 from rl_fzerox.core.config.schema import ObservationConfig
+from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 
 
 def _write_yaml(path: Path, lines: list[str]) -> None:
@@ -27,11 +28,18 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
     )
 
     assert config.state_components_data() == (
-        {"name": "vehicle_state"},
-        {"name": "track_position"},
-        {"name": "surface_state"},
-        {"name": "course_context", "encoding": "one_hot_builtin"},
-        {"name": "control_history", "length": 2, "controls": ("steer", "thrust")},
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="track_position"),
+        ObservationStateComponentSettings(name="surface_state"),
+        ObservationStateComponentSettings(
+            name="course_context",
+            encoding="one_hot_builtin",
+        ),
+        ObservationStateComponentSettings(
+            name="control_history",
+            length=2,
+            controls=("steer", "thrust"),
+        ),
     )
 
 
@@ -56,8 +64,16 @@ def test_load_train_app_config_composes_track_registry_entry(
             "  id: blue_falcon",
             "  display_name: Blue Falcon",
             "  engine_settings:",
+            "    max_speed:",
+            "      raw_value: 100",
             "    balanced:",
             "      raw_value: 50",
+            "  machine:",
+            "    character_index: 0",
+            "    body_stat: 1",
+            "    boost_stat: 2",
+            "    grip_stat: 1",
+            "    weight: 1260",
         ],
     )
     _write_yaml(
@@ -171,8 +187,16 @@ def test_load_train_app_config_expands_course_registry_selection(
             "  id: blue_falcon",
             "  display_name: Blue Falcon",
             "  engine_settings:",
+            "    max_speed:",
+            "      raw_value: 100",
             "    balanced:",
             "      raw_value: 50",
+            "  machine:",
+            "    character_index: 0",
+            "    body_stat: 1",
+            "    boost_stat: 2",
+            "    grip_stat: 1",
+            "    weight: 1260",
         ],
     )
     _write_yaml(
@@ -229,7 +253,282 @@ def test_load_train_app_config_expands_course_registry_selection(
     assert entry.vehicle == "blue_falcon"
     assert entry.vehicle_name == "Blue Falcon"
     assert entry.engine_setting == "balanced"
-    assert entry.baseline_state_path == baseline_path.resolve()
+    assert entry.engine_setting_raw_value == 50
+    assert entry.source_engine_setting is None
+    assert entry.source_engine_setting_raw_value is None
+    assert entry.vehicle_machine is not None
+    assert entry.vehicle_machine.weight == 1260
+    assert entry.baseline_state_path is None
+
+
+def test_load_train_app_config_derives_engine_variant_from_source_baseline(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    baseline_path = artifacts_dir / "silence-balanced.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_path.write_bytes(b"baseline")
+
+    _write_yaml(
+        config_root / "vehicles" / "blue_falcon.yaml",
+        [
+            "vehicle:",
+            "  id: blue_falcon",
+            "  display_name: Blue Falcon",
+            "  engine_settings:",
+            "    balanced:",
+            "      raw_value: 50",
+            "    max_speed:",
+            "      raw_value: 100",
+            "  machine:",
+            "    character_index: 0",
+            "    body_stat: 1",
+            "    boost_stat: 2",
+            "    grip_stat: 1",
+            "    weight: 1260",
+        ],
+    )
+    _write_yaml(
+        config_root / "courses" / "jack" / "silence_test.yaml",
+        [
+            "course:",
+            "  id: silence_test",
+            "  display_name: Silence Test",
+            "  course_index: 1",
+        ],
+    )
+    _write_yaml(
+        config_root / "tracks" / "jack" / "silence_balanced.yaml",
+        [
+            "track:",
+            "  id: silence_test_time_attack_blue_falcon_balanced",
+            "  display_name: Silence Test Time Attack - Blue Falcon Balanced",
+            "  course_ref: jack/silence_test",
+            "  mode: time_attack",
+            "  vehicle: blue_falcon",
+            "  engine_setting: balanced",
+            "  baseline_state_path: local/test-artifacts/silence-balanced.state",
+        ],
+    )
+    config_path = config_root / "local" / "train.derived-engine.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "env:",
+            "  track_sampling:",
+            "    enabled: true",
+            "    sampling_mode: balanced",
+            "    courses: [silence_test]",
+            "    baseline:",
+            "      mode: time_attack",
+            "      vehicle: blue_falcon",
+            "      engine_setting: max_speed",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    entry = config.env.track_sampling.entries[0]
+    assert entry.id == "silence_test_time_attack_blue_falcon_max_speed"
+    assert entry.baseline_state_path is None
+    assert entry.engine_setting == "max_speed"
+    assert entry.engine_setting_raw_value == 100
+    assert entry.source_engine_setting is None
+    assert entry.source_engine_setting_raw_value is None
+
+
+def test_load_train_app_config_generates_vehicle_variant_without_source_baseline(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    baseline_path = artifacts_dir / "silence-blue-falcon-balanced.state"
+    core_path.touch()
+    rom_path.touch()
+    baseline_path.write_bytes(b"baseline")
+
+    _write_yaml(
+        config_root / "vehicles" / "blue_falcon.yaml",
+        [
+            "vehicle:",
+            "  id: blue_falcon",
+            "  display_name: Blue Falcon",
+            "  machine:",
+            "    character_index: 0",
+        ],
+    )
+    _write_yaml(
+        config_root / "vehicles" / "golden_fox.yaml",
+        [
+            "vehicle:",
+            "  id: golden_fox",
+            "  display_name: Golden Fox",
+            "  machine:",
+            "    character_index: 1",
+        ],
+    )
+    _write_yaml(
+        config_root / "courses" / "jack" / "silence_test.yaml",
+        [
+            "course:",
+            "  id: silence_test",
+            "  display_name: Silence Test",
+            "  course_index: 1",
+        ],
+    )
+    _write_yaml(
+        config_root / "tracks" / "jack" / "silence_blue_falcon_balanced.yaml",
+        [
+            "track:",
+            "  id: silence_test_time_attack_blue_falcon_balanced",
+            "  display_name: Silence Test Time Attack - Blue Falcon Balanced",
+            "  course_ref: jack/silence_test",
+            "  mode: time_attack",
+            "  vehicle: blue_falcon",
+            "  engine_setting: balanced",
+            "  baseline_state_path: local/test-artifacts/silence-blue-falcon-balanced.state",
+        ],
+    )
+    config_path = config_root / "local" / "train.derived-vehicle.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "env:",
+            "  track_sampling:",
+            "    enabled: true",
+            "    sampling_mode: balanced",
+            "    courses: [silence_test]",
+            "    baseline:",
+            "      mode: time_attack",
+            "      vehicle: golden_fox",
+            "      engine_setting: max_speed",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    entry = config.env.track_sampling.entries[0]
+    assert entry.id == "silence_test_time_attack_golden_fox_max_speed"
+    assert entry.baseline_state_path is None
+    assert entry.vehicle == "golden_fox"
+    assert entry.engine_setting == "max_speed"
+    assert entry.engine_setting_raw_value == 100
+    assert entry.vehicle_machine is not None
+    assert entry.vehicle_machine.character_index == 1
+
+
+def test_load_train_app_config_uses_builtin_vehicle_registry_for_raw_engine(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    _write_yaml(
+        config_root / "courses" / "jack" / "silence_test.yaml",
+        [
+            "course:",
+            "  id: silence_test",
+            "  display_name: Silence Test",
+            "  course_index: 1",
+        ],
+    )
+    config_path = config_root / "local" / "train.builtin-vehicle.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "env:",
+            "  track_sampling:",
+            "    enabled: true",
+            "    sampling_mode: balanced",
+            "    courses: [silence_test]",
+            "    baseline:",
+            "      mode: time_attack",
+            "      vehicle: white_cat",
+            "      engine_setting: 70",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    entry = config.env.track_sampling.entries[0]
+    assert entry.id == "silence_test_time_attack_white_cat_engine_70"
+    assert entry.course_ref == "jack/silence_test"
+    assert entry.vehicle == "white_cat"
+    assert entry.vehicle_name == "White Cat"
+    assert entry.engine_setting == "engine_70"
+    assert entry.engine_setting_raw_value == 70
+    assert entry.baseline_state_path is None
+    assert entry.vehicle_machine is not None
+    assert entry.vehicle_machine.character_index == 4
+    assert entry.vehicle_machine.machine_select_slot == 4
+
+
+def test_load_train_app_config_round_trips_generated_engine_id(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    _write_yaml(
+        config_root / "courses" / "jack" / "silence_test.yaml",
+        [
+            "course:",
+            "  id: silence_test",
+            "  display_name: Silence Test",
+            "  course_index: 1",
+        ],
+    )
+    config_path = config_root / "local" / "train.generated-engine-id.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "track:",
+            "  id: silence_test_time_attack_fire_stingray_engine_70",
+            "  course_ref: jack/silence_test",
+            "  mode: time_attack",
+            "  vehicle: fire_stingray",
+            "  engine_setting: engine_70",
+            "  engine_setting_raw_value: 70",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.track.engine_setting == "engine_70"
+    assert config.track.engine_setting_raw_value == 70
+    assert config.track.vehicle == "fire_stingray"
+    assert config.track.vehicle_machine is not None
+    assert config.track.vehicle_machine.character_index == 3
 
 
 def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:

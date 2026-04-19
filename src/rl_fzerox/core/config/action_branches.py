@@ -18,20 +18,31 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
+    ActionAdapterName,
 )
 from rl_fzerox.core.domain.action_values import ActionMaskValue, compile_action_mask_values
 from rl_fzerox.core.domain.lean import LeanMode
 
 ActionBranchType: TypeAlias = Literal["continuous", "discrete"]
+ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
+CompiledDriveMode: TypeAlias = Literal["threshold", "pwm", "always_accelerate"]
 
-_STEER_GAS_BOOST_LEAN_BRANCHES = ("steer", "gas", "boost", "lean")
-_STEER_GAS_AIR_BRAKE_BOOST_LEAN_BRANCHES = (
-    "steer",
-    "gas",
-    "air_brake",
-    "boost",
-    "lean",
-)
+
+@dataclass(frozen=True, slots=True)
+class _SupportedBranchShapes:
+    """Branch combinations that can be compiled to the current adapters."""
+
+    steer_gas_boost_lean: tuple[str, ...] = ("steer", "gas", "boost", "lean")
+    steer_gas_air_brake_boost_lean: tuple[str, ...] = (
+        "steer",
+        "gas",
+        "air_brake",
+        "boost",
+        "lean",
+    )
+
+
+_SUPPORTED_BRANCH_SHAPES = _SupportedBranchShapes()
 
 
 class ActionBranchConfig(BaseModel):
@@ -75,17 +86,26 @@ class ActionBranchesConfig(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class ActionBranchCompilation:
-    """Legacy adapter fields derived from a composable branch declaration."""
+    """Concrete runtime settings derived from a composable branch declaration."""
 
-    values: dict[str, object]
+    name: ActionAdapterName
+    steer_response_power: float | None = None
+    continuous_drive_mode: CompiledDriveMode | None = None
+    continuous_drive_deadzone: float | None = None
+    mask_overrides: ActionMaskOverrides | None = None
+    boost_unmask_max_speed_kph: float | None = None
+    boost_decision_interval_frames: int | None = None
+    boost_request_lockout_frames: int | None = None
+    lean_unmask_min_speed_kph: float | None = None
+    lean_mode: LeanMode | None = None
 
 
 def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
-    """Compile branch-style YAML into existing adapter config fields."""
+    """Compile branch-style YAML into concrete runtime action settings."""
 
     branches = ActionBranchesConfig.model_validate(raw_branches)
     branch_names = _configured_branch_names(branches)
-    if branch_names == _STEER_GAS_BOOST_LEAN_BRANCHES:
+    if branch_names == _SUPPORTED_BRANCH_SHAPES.steer_gas_boost_lean:
         gas_branch = _required_branch(branches, "gas")
         if gas_branch.type == "continuous":
             _validate_continuous_branch("gas", gas_branch)
@@ -95,7 +115,7 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
             _validate_discrete_branch("gas", gas_branch)
             adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN
             continuous_gas = False
-    elif branch_names == _STEER_GAS_AIR_BRAKE_BOOST_LEAN_BRANCHES:
+    elif branch_names == _SUPPORTED_BRANCH_SHAPES.steer_gas_air_brake_boost_lean:
         _validate_discrete_branch("gas", _required_branch(branches, "gas"))
         _validate_discrete_branch("air_brake", _required_branch(branches, "air_brake"))
         adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN
@@ -104,34 +124,46 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         names = ", ".join(branch_names) or "none"
         raise ValueError(f"Unsupported action branch combination: {names}")
 
-    compiled: dict[str, object] = {"name": adapter_name}
+    continuous_drive_mode: CompiledDriveMode | None = None
+    continuous_drive_deadzone: float | None = None
     if continuous_gas:
-        compiled["continuous_drive_mode"] = "pwm"
-        compiled["continuous_drive_deadzone"] = 0.0
+        continuous_drive_mode = "pwm"
+        continuous_drive_deadzone = 0.0
     steer_branch = _required_branch(branches, "steer")
     _validate_continuous_branch("steer", steer_branch)
-    if steer_branch.response_power is not None:
-        compiled["steer_response_power"] = steer_branch.response_power
 
     mask = _compile_action_mask(branches)
-    if mask:
-        compiled["mask"] = mask
 
+    boost_unmask_max_speed_kph: float | None = None
+    boost_decision_interval_frames: int | None = None
+    boost_request_lockout_frames: int | None = None
     boost_branch = branches.boost
     if boost_branch is not None:
-        compiled["boost_unmask_max_speed_kph"] = boost_branch.unmask_max_speed_kph
-        if boost_branch.decision_interval_frames is not None:
-            compiled["boost_decision_interval_frames"] = boost_branch.decision_interval_frames
-        if boost_branch.request_lockout_frames is not None:
-            compiled["boost_request_lockout_frames"] = boost_branch.request_lockout_frames
+        boost_unmask_max_speed_kph = boost_branch.unmask_max_speed_kph
+        boost_decision_interval_frames = boost_branch.decision_interval_frames
+        boost_request_lockout_frames = boost_branch.request_lockout_frames
 
+    lean_unmask_min_speed_kph: float | None = None
+    lean_mode: LeanMode | None = None
     lean_branch = branches.lean
     if lean_branch is not None:
-        compiled["lean_unmask_min_speed_kph"] = lean_branch.unmask_min_speed_kph
-        if lean_branch.mode is not None:
-            compiled["lean_mode"] = lean_branch.mode
+        lean_unmask_min_speed_kph = lean_branch.unmask_min_speed_kph
+        lean_mode = lean_branch.mode
 
-    return ActionBranchCompilation(values=compiled)
+    return ActionBranchCompilation(
+        name=adapter_name,
+        steer_response_power=(
+            None if steer_branch.response_power is None else float(steer_branch.response_power)
+        ),
+        continuous_drive_mode=continuous_drive_mode,
+        continuous_drive_deadzone=continuous_drive_deadzone,
+        mask_overrides=mask or None,
+        boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
+        boost_decision_interval_frames=boost_decision_interval_frames,
+        boost_request_lockout_frames=boost_request_lockout_frames,
+        lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+        lean_mode=lean_mode,
+    )
 
 
 def _configured_branch_names(branches: ActionBranchesConfig) -> tuple[str, ...]:

@@ -35,6 +35,13 @@ def track_geometry_sections(
                     PALETTE.text_primary,
                 ),
                 panel_line(
+                    "Lap progress",
+                    _format_lap_progress(telemetry),
+                    PALETTE.text_primary
+                    if _lap_progress_fraction(telemetry) is not None
+                    else PALETTE.text_muted,
+                ),
+                panel_line(
                     "Center dist",
                     f"{player.lateral_distance:.1f}",
                     _center_distance_warning_color(player),
@@ -103,6 +110,19 @@ def _format_optional_int(value: int | None) -> str:
     return "--" if value is None else str(value)
 
 
+def _format_lap_progress(telemetry: FZeroXTelemetry) -> str:
+    progress = _lap_progress_fraction(telemetry)
+    if progress is None:
+        return "--"
+    return f"{progress * 100.0:.1f}%"
+
+
+def _lap_progress_fraction(telemetry: FZeroXTelemetry) -> float | None:
+    if telemetry.course_length <= 0.0:
+        return None
+    return max(0.0, min(1.0, telemetry.player.lap_distance / telemetry.course_length))
+
+
 def _center_distance_warning_color(player: PlayerTelemetry) -> Color:
     track_half_width = max(player.current_radius_left, player.current_radius_right)
     if track_half_width <= 0.0:
@@ -154,11 +174,7 @@ def _near_edge_side(
 
 
 def _edge_warning_color(edge_ratio: float | None) -> Color:
-    return (
-        PALETTE.text_warning
-        if _near_edge_side(edge_ratio) is not None
-        else PALETTE.text_primary
-    )
+    return PALETTE.text_warning if _near_edge_side(edge_ratio) is not None else PALETTE.text_primary
 
 
 def _format_impact_debug(player: PlayerTelemetry) -> str:

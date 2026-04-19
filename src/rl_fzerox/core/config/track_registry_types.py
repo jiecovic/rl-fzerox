@@ -10,7 +10,6 @@ class RegistryRoots:
 
     courses: str = "courses"
     tracks: str = "tracks"
-    vehicles: str = "vehicles"
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +48,7 @@ class BaselineVariant:
     mode: str
     vehicle: str
     engine_setting: str
+    engine_setting_raw_value: int | None
 
 
 REGISTRY = RegistrySchema()

@@ -5,7 +5,7 @@ defaults:
 seed: 123
 
 emulator:
-  baseline_state_path: checkpoints/baselines/mute-city-novice-blue-falcon-balanced-go-window.state
+  baseline_state_path: null
   renderer: angrylion
 
 env:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import asdict
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
@@ -75,7 +76,7 @@ def set_observation_info(
         info["observation_action_history_controls"] = action_history_controls
         if observation_state_components is not None:
             info["observation_state_components"] = tuple(
-                dict(component) for component in observation_state_components
+                asdict(component) for component in observation_state_components
             )
         info["observation_state_shape"] = (
             state_feature_count(

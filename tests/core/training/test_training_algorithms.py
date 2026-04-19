@@ -365,5 +365,3 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
 
     assert isinstance(model, MaskableRecurrentPPO)
     assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
-
-

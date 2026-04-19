@@ -21,6 +21,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.config.action_branches import (
+    ActionBranchCompilation,
     ActionBranchesConfig,
     compile_action_branches,
 )
@@ -31,6 +32,14 @@ from rl_fzerox.core.domain.action_values import (
 )
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
+from rl_fzerox.core.domain.observation_components import (
+    ActionHistoryControlName,
+    ObservationCourseContextName,
+    ObservationGroundEffectContextName,
+    ObservationStateComponentName,
+    ObservationStateComponentSettings,
+    ObservationStateProfileName,
+)
 from rl_fzerox.core.domain.training_algorithms import (
     DEFAULT_TRAIN_ALGORITHM,
     RECURRENT_TRAINING_ALGORITHMS,
@@ -39,17 +48,7 @@ from rl_fzerox.core.domain.training_algorithms import (
 )
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
-ActionHistoryControlName: TypeAlias = Literal[
-    "steer",
-    "gas",
-    "thrust",
-    "air_brake",
-    "boost",
-    "lean",
-]
 TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
-ObservationCourseContext: TypeAlias = Literal["none", "one_hot_builtin"]
-ObservationGroundEffectContext: TypeAlias = Literal["none", "effect_flags"]
 ObservationPresetName: TypeAlias = Literal[
     "crop_84x116",
     "crop_92x124",
@@ -57,14 +56,9 @@ ObservationPresetName: TypeAlias = Literal[
     "crop_98x130",
     "crop_66x82",
 ]
-ObservationStateComponentName: TypeAlias = Literal[
-    "vehicle_state",
-    "track_position",
-    "surface_state",
-    "course_context",
-    "legacy_state",
-    "control_history",
-]
+ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
+ContinuousDriveMode: TypeAlias = Literal["threshold", "pwm", "always_accelerate"]
+ContinuousAirBrakeMode: TypeAlias = Literal["always", "disable_on_ground", "off"]
 _LEGACY_OBSERVATION_PRESET_ALIASES: dict[str, ObservationPresetName] = {
     "native_crop_v1": "crop_84x116",
     "native_crop_v2": "crop_92x124",
@@ -117,16 +111,16 @@ class ActionRuntimeConfig:
     name: ActionAdapterName
     steer_buckets: int
     steer_response_power: float
-    continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"]
+    continuous_drive_mode: ContinuousDriveMode
     continuous_drive_deadzone: float
-    continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"]
+    continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
     boost_unmask_max_speed_kph: float | None
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
     lean_unmask_min_speed_kph: float | None
-    mask: ActionMaskConfig | None
+    mask_overrides: ActionMaskOverrides | None
 
     @classmethod
     def from_config(cls, config: ActionConfig) -> ActionRuntimeConfig:
@@ -151,7 +145,53 @@ class ActionRuntimeConfig:
                 if config.lean_unmask_min_speed_kph is None
                 else float(config.lean_unmask_min_speed_kph)
             ),
-            mask=config.mask,
+            mask_overrides=(
+                config.mask.branch_overrides() if config.mask is not None else None
+            ),
+        )
+
+    @classmethod
+    def from_branch_config(
+        cls,
+        config: ActionConfig,
+        compilation: ActionBranchCompilation,
+    ) -> ActionRuntimeConfig:
+        return cls(
+            name=compilation.name,
+            steer_buckets=int(config.steer_buckets),
+            steer_response_power=float(
+                config.steer_response_power
+                if compilation.steer_response_power is None
+                else compilation.steer_response_power
+            ),
+            continuous_drive_mode=(
+                config.continuous_drive_mode
+                if compilation.continuous_drive_mode is None
+                else compilation.continuous_drive_mode
+            ),
+            continuous_drive_deadzone=float(
+                config.continuous_drive_deadzone
+                if compilation.continuous_drive_deadzone is None
+                else compilation.continuous_drive_deadzone
+            ),
+            continuous_air_brake_mode=config.continuous_air_brake_mode,
+            continuous_lean_deadzone=float(config.continuous_lean_deadzone),
+            lean_mode=(
+                config.lean_mode if compilation.lean_mode is None else compilation.lean_mode
+            ),
+            boost_unmask_max_speed_kph=compilation.boost_unmask_max_speed_kph,
+            boost_decision_interval_frames=int(
+                config.boost_decision_interval_frames
+                if compilation.boost_decision_interval_frames is None
+                else compilation.boost_decision_interval_frames
+            ),
+            boost_request_lockout_frames=int(
+                config.boost_request_lockout_frames
+                if compilation.boost_request_lockout_frames is None
+                else compilation.boost_request_lockout_frames
+            ),
+            lean_unmask_min_speed_kph=compilation.lean_unmask_min_speed_kph,
+            mask_overrides=compilation.mask_overrides,
         )
 
 
@@ -163,9 +203,9 @@ class ActionConfig(BaseModel):
     name: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
     steer_buckets: int = Field(default=7, ge=3)
     steer_response_power: PositiveFloat = 1.0
-    continuous_drive_mode: Literal["threshold", "pwm", "always_accelerate"] = "threshold"
+    continuous_drive_mode: ContinuousDriveMode = "threshold"
     continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
-    continuous_air_brake_mode: Literal["always", "disable_on_ground", "off"] = "always"
+    continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
@@ -215,10 +255,7 @@ class ActionConfig(BaseModel):
         if self.branches is None:
             return ActionRuntimeConfig.from_config(self)
         compiled = compile_action_branches(self.branches)
-        data = self.model_dump(mode="python")
-        data["branches"] = None
-        data.update(compiled.values)
-        return ActionRuntimeConfig.from_config(type(self).model_validate(data))
+        return ActionRuntimeConfig.from_branch_config(self, compiled)
 
     @field_validator("steer_buckets")
     @classmethod
@@ -240,12 +277,10 @@ class ObservationStateComponentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: ObservationStateComponentName
-    encoding: ObservationCourseContext | None = None
-    state_profile: Literal[
-        "default",
-        "steer_history",
-        "race_core",
-    ] | None = None
+    encoding: ObservationCourseContextName | None = None
+    state_profile: (
+        ObservationStateProfileName | None
+    ) = None
     length: PositiveInt | None = Field(default=None, le=16)
     controls: tuple[ActionHistoryControlName, ...] | None = None
 
@@ -300,10 +335,16 @@ class ObservationStateComponentConfig(BaseModel):
             case "vehicle_state" | "track_position" | "surface_state":
                 return frozenset()
 
-    def data(self) -> dict[str, object]:
+    def data(self) -> ObservationStateComponentSettings:
         """Return the compact ordered form consumed by env code."""
 
-        return self.model_dump(mode="python", exclude_none=True)
+        return ObservationStateComponentSettings(
+            name=self.name,
+            encoding=self.encoding,
+            state_profile=self.state_profile,
+            length=None if self.length is None else int(self.length),
+            controls=self.controls,
+        )
 
 
 class ObservationConfig(BaseModel):
@@ -320,8 +361,8 @@ class ObservationConfig(BaseModel):
     preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
-    course_context: ObservationCourseContext = "none"
-    ground_effect_context: ObservationGroundEffectContext = "none"
+    course_context: ObservationCourseContextName = "none"
+    ground_effect_context: ObservationGroundEffectContextName = "none"
     action_history_len: PositiveInt | None = Field(default=None, le=16)
     action_history_controls: tuple[ActionHistoryControlName, ...] = (
         "steer",
@@ -365,7 +406,7 @@ class ObservationConfig(BaseModel):
             raise ValueError("observation.state_components must not contain duplicates")
         return value
 
-    def state_components_data(self) -> tuple[dict[str, object], ...] | None:
+    def state_components_data(self) -> tuple[ObservationStateComponentSettings, ...] | None:
         """Return state-component settings in the plain form consumed by env code."""
 
         if self.state_components is None:
@@ -419,6 +460,19 @@ class TrackRecordsConfig(BaseModel):
         return info
 
 
+class VehicleMachineConfig(BaseModel):
+    """Machine identity and optional metadata for race-start materialization."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    character_index: NonNegativeInt
+    machine_select_slot: NonNegativeInt | None = None
+    body_stat: int | None = Field(default=None, ge=0, le=4)
+    boost_stat: int | None = Field(default=None, ge=0, le=4)
+    grip_stat: int | None = Field(default=None, ge=0, le=4)
+    weight: PositiveFloat | None = None
+
+
 class TrackSamplingEntryConfig(BaseModel):
     """One reset-time baseline candidate for multi-track training."""
 
@@ -429,13 +483,19 @@ class TrackSamplingEntryConfig(BaseModel):
     course_ref: str | None = None
     course_id: str | None = None
     course_name: str | None = None
-    baseline_state_path: Path
+    baseline_state_path: Path | None = None
     weight: PositiveFloat = 1.0
     course_index: NonNegativeInt | None = None
     mode: str | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
+    source_vehicle: str | None = None
     engine_setting: str | None = None
+    engine_setting_raw_value: NonNegativeInt | None = None
+    source_course_index: NonNegativeInt | None = None
+    source_engine_setting: str | None = None
+    source_engine_setting_raw_value: NonNegativeInt | None = None
+    vehicle_machine: VehicleMachineConfig | None = None
     records: TrackRecordsConfig | None = None
 
 
@@ -472,7 +532,7 @@ class EnvConfig(BaseModel):
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
     boost_min_energy_fraction: float = Field(default=0.1, ge=0.0, le=1.0)
-    terminate_on_energy_depleted: bool = True
+    terminate_on_energy_depleted: bool = False
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
     camera_setting: CameraSettingName | None = None
@@ -550,7 +610,13 @@ class TrackConfig(BaseModel):
     mode: str | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
+    source_vehicle: str | None = None
     engine_setting: str | None = None
+    engine_setting_raw_value: NonNegativeInt | None = None
+    source_course_index: NonNegativeInt | None = None
+    source_engine_setting: str | None = None
+    source_engine_setting_raw_value: NonNegativeInt | None = None
+    vehicle_machine: VehicleMachineConfig | None = None
     baseline_state_path: Path | None = None
     records: TrackRecordsConfig | None = None
     notes: str | None = None

@@ -9,6 +9,22 @@ import numpy as np
 
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import Float32Array, StateVector
+from rl_fzerox.core.domain.observation_components import (
+    ActionHistoryControlName as ActionHistoryControl,
+)
+from rl_fzerox.core.domain.observation_components import (
+    ObservationCourseContextName as ObservationCourseContext,
+)
+from rl_fzerox.core.domain.observation_components import (
+    ObservationGroundEffectContextName as ObservationGroundEffectContext,
+)
+from rl_fzerox.core.domain.observation_components import (
+    ObservationStateComponentSettings,
+    StateComponentsSettings,
+)
+from rl_fzerox.core.domain.observation_components import (
+    ObservationStateProfileName as ObservationStateProfile,
+)
 from rl_fzerox.core.envs.course_effects import (
     GROUND_EFFECT_FEATURES,
     CourseEffect,
@@ -18,23 +34,6 @@ from rl_fzerox.core.envs.course_effects import (
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
-ObservationStateProfile: TypeAlias = Literal[
-    "default",
-    "steer_history",
-    "race_core",
-]
-ObservationCourseContext: TypeAlias = Literal["none", "one_hot_builtin"]
-ObservationGroundEffectContext: TypeAlias = Literal["none", "effect_flags"]
-ActionHistoryControl: TypeAlias = Literal[
-    "steer",
-    "gas",
-    "thrust",
-    "air_brake",
-    "boost",
-    "lean",
-]
-StateComponentsSettings: TypeAlias = tuple[Mapping[str, object], ...]
-
 DEFAULT_OBSERVATION_STATE_PROFILE: ObservationStateProfile = "default"
 DEFAULT_OBSERVATION_COURSE_CONTEXT: ObservationCourseContext = "none"
 DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT: ObservationGroundEffectContext = "none"
@@ -88,9 +87,14 @@ class StateVectorSpec:
 class StateComponentDefinition:
     """One scalar-state component with schema and value builders kept together."""
 
-    features: Callable[[Mapping[str, object]], tuple[StateFeature, ...]]
+    features: Callable[[ObservationStateComponentSettings], tuple[StateFeature, ...]]
     values: Callable[
-        [FZeroXTelemetry | None, Mapping[str, object], Mapping[str, float], Mapping[str, float]],
+        [
+            FZeroXTelemetry | None,
+            ObservationStateComponentSettings,
+            Mapping[str, float],
+            Mapping[str, float],
+        ],
         list[float],
     ]
 
@@ -164,6 +168,7 @@ RECENT_BOOST_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_boost_window_fram
 RECENT_STEER_PRESSURE_WINDOW_FRAMES = STATE_VECTOR_SPEC.recent_steer_window_frames
 STATE_FEATURE_LOW = STATE_VECTOR_SPEC.low_array()
 STATE_FEATURE_HIGH = STATE_VECTOR_SPEC.high_array()
+
 
 def telemetry_state_vector(
     telemetry: FZeroXTelemetry | None,
@@ -410,7 +415,7 @@ def action_history_settings_for_observation(
     if state_components is None:
         return fallback_len, fallback_controls
     control_config = _component_by_name(state_components, "control_history")
-    if not control_config:
+    if control_config is None:
         return None, ()
     length = _component_int(control_config, "length", default=2)
     controls = _component_controls(control_config, default=("steer", "thrust", "boost", "lean"))
@@ -454,7 +459,9 @@ def _component_state_values(
     return values
 
 
-def _state_component_definition(component: Mapping[str, object]) -> StateComponentDefinition:
+def _state_component_definition(
+    component: ObservationStateComponentSettings,
+) -> StateComponentDefinition:
     component_name = _component_name(component)
     try:
         return STATE_COMPONENT_DEFINITIONS[component_name]
@@ -463,7 +470,7 @@ def _state_component_definition(component: Mapping[str, object]) -> StateCompone
 
 
 def _vehicle_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     del component
     return _vehicle_state_features()
@@ -471,7 +478,7 @@ def _vehicle_component_features(
 
 def _vehicle_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -480,7 +487,7 @@ def _vehicle_component_values(
 
 
 def _track_position_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     del component
     return _track_position_features()
@@ -488,7 +495,7 @@ def _track_position_component_features(
 
 def _track_position_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -497,7 +504,7 @@ def _track_position_component_values(
 
 
 def _surface_state_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     del component
     return _surface_state_features()
@@ -505,7 +512,7 @@ def _surface_state_component_features(
 
 def _surface_state_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -514,7 +521,7 @@ def _surface_state_component_values(
 
 
 def _course_context_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     encoding = _component_str(component, "encoding", default="one_hot_builtin")
     return _course_component_features(encoding)
@@ -522,7 +529,7 @@ def _course_context_component_features(
 
 def _course_context_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -532,7 +539,7 @@ def _course_context_component_values(
 
 
 def _legacy_state_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     # V4 LEGACY SHIM: old runs can still request compact legacy state profiles.
     profile = _component_str(component, "state_profile", default="race_core")
@@ -541,7 +548,7 @@ def _legacy_state_component_features(
 
 def _legacy_state_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -556,7 +563,7 @@ def _legacy_state_component_values(
 
 
 def _control_history_component_features(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
     length = _component_int(component, "length", default=2)
     controls = _component_controls(
@@ -568,7 +575,7 @@ def _control_history_component_features(
 
 def _control_history_component_values(
     telemetry: FZeroXTelemetry | None,
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
@@ -674,9 +681,7 @@ def _raw_edge_ratio(telemetry: FZeroXTelemetry | None) -> float | None:
     player = telemetry.player
     offset = float(player.signed_lateral_offset)
     radius = (
-        float(player.current_radius_left)
-        if offset >= 0.0
-        else float(player.current_radius_right)
+        float(player.current_radius_left) if offset >= 0.0 else float(player.current_radius_right)
     )
     if radius <= 0.0:
         return None
@@ -807,20 +812,24 @@ def _control_history_feature_bound(control: ActionHistoryControl) -> StateFeatur
 def _component_by_name(
     state_components: StateComponentsSettings,
     component_name: str,
-) -> Mapping[str, object]:
+) -> ObservationStateComponentSettings | None:
     for component in state_components:
         if _component_name(component) == component_name:
             return component
-    return {}
+    return None
 
 
-def _component_name(component: Mapping[str, object]) -> str:
-    value = component.get("name")
-    return value if isinstance(value, str) else ""
+def _component_name(component: ObservationStateComponentSettings) -> str:
+    return component.name
 
 
-def _component_int(component: Mapping[str, object], key: str, *, default: int) -> int:
-    value = component.get(key)
+def _component_int(
+    component: ObservationStateComponentSettings,
+    key: str,
+    *,
+    default: int,
+) -> int:
+    value = getattr(component, key)
     if isinstance(value, bool):
         return default
     if isinstance(value, int | float):
@@ -828,17 +837,22 @@ def _component_int(component: Mapping[str, object], key: str, *, default: int) -
     return default
 
 
-def _component_str(component: Mapping[str, object], key: str, *, default: str) -> str:
-    value = component.get(key)
+def _component_str(
+    component: ObservationStateComponentSettings,
+    key: str,
+    *,
+    default: str,
+) -> str:
+    value = getattr(component, key)
     return value if isinstance(value, str) else default
 
 
 def _component_controls(
-    component: Mapping[str, object],
+    component: ObservationStateComponentSettings,
     *,
     default: tuple[ActionHistoryControl, ...],
 ) -> tuple[ActionHistoryControl, ...]:
-    value = component.get("controls")
+    value = component.controls
     if not isinstance(value, list | tuple):
         return default
     return _validate_action_history_controls(

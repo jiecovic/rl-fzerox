@@ -8,7 +8,11 @@ from omegaconf import OmegaConf
 from pydantic import ValidationError
 
 from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
-from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig, WatchAppConfig
+from rl_fzerox.core.config.schema import (
+    TrainAppConfig,
+    TrainConfig,
+    WatchAppConfig,
+)
 from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
 from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_AUTO,
@@ -33,15 +37,20 @@ def materialize_watch_session_config(
 ) -> WatchAppConfig:
     """Rewrite one watch config to use isolated per-session scratch paths."""
 
+    baseline_source_path = (
+        None
+        if watch_config.env.track_sampling.enabled
+        else watch_config.emulator.baseline_state_path
+    )
     paths = build_watch_session_paths(
         run_dir=run_dir,
         runtime_dir=watch_config.emulator.runtime_dir,
-        baseline_state_path=watch_config.emulator.baseline_state_path,
+        baseline_state_path=baseline_source_path,
         session_name=session_name,
     )
     ensure_watch_session_dirs(paths)
     _copy_state_file(
-        source=watch_config.emulator.baseline_state_path,
+        source=baseline_source_path,
         destination=paths.baseline_state_path,
     )
     return watch_config.model_copy(
@@ -238,6 +247,10 @@ def apply_train_run_to_watch_config(
     """Inherit emulator/env settings from a training run for policy watch mode."""
 
     merged_emulator_config = train_config.emulator
+    if train_config.env.track_sampling.enabled:
+        merged_emulator_config = merged_emulator_config.model_copy(
+            update={"baseline_state_path": None}
+        )
     if (
         watch_config.emulator.runtime_dir is not None
         and merged_emulator_config.runtime_dir != watch_config.emulator.runtime_dir
@@ -249,7 +262,8 @@ def apply_train_run_to_watch_config(
         )
 
     if (
-        merged_emulator_config.baseline_state_path is None
+        not train_config.env.track_sampling.enabled
+        and merged_emulator_config.baseline_state_path is None
         and watch_config.emulator.baseline_state_path is not None
     ):
         merged_emulator_config = merged_emulator_config.model_copy(

@@ -24,6 +24,7 @@ pub(super) struct GlobalOffsets {
     pub race_intro_timer: usize,
     pub game_mode: usize,
     pub total_racers: usize,
+    pub current_course_info: usize,
     pub course_index: usize,
     pub cameras: usize,
     pub damage_rumble_counters: usize,
@@ -80,6 +81,11 @@ pub(super) struct CourseSegmentOffsets {
     pub segment_index: usize,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct CourseInfoOffsets {
+    pub length: usize,
+}
+
 // Global RDRAM addresses derived from the F-Zero X USA decomp / symbol dumps.
 // We keep them grouped here so the reverse-engineered memory layout is easy to
 // audit and update as field semantics are validated.
@@ -89,6 +95,7 @@ pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     race_intro_timer: rdram_offset(0x800F_5E98),
     game_mode: rdram_offset(0x800DCE44),
     total_racers: rdram_offset(0x800E5EC0),
+    current_course_info: rdram_offset(0x800F8510),
     course_index: rdram_offset(0x800F8514),
     cameras: rdram_offset(0x800E5220),
     damage_rumble_counters: rdram_offset(0x800E5F20),
@@ -145,6 +152,10 @@ pub(super) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
 pub(super) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
     segment_index: 0x030,
 };
+
+// Byte offsets within `struct CourseInfo`, derived from the decomp's
+// `include/course.h`. `length` is the summed spline length for one lap.
+pub(super) const COURSE_INFO: CourseInfoOffsets = CourseInfoOffsets { length: 0x00C };
 
 pub(crate) const fn player_z_button_timer_offset() -> usize {
     player_racer_field_offset(RACER.z_button_timer)

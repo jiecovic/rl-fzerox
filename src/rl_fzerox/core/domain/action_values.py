@@ -33,13 +33,11 @@ def compile_action_mask_values(
         if isinstance(mask_value, int):
             if mask_value < 0:
                 raise ValueError(
-                    f"Mask index {mask_value!r} is out of range for action branch "
-                    f"{branch_name!r}"
+                    f"Mask index {mask_value!r} is out of range for action branch {branch_name!r}"
                 )
             if expected_values is not None and mask_value >= len(expected_values):
                 raise ValueError(
-                    f"Mask index {mask_value!r} is out of range for action branch "
-                    f"{branch_name!r}"
+                    f"Mask index {mask_value!r} is out of range for action branch {branch_name!r}"
                 )
             indices.append(mask_value)
             continue
@@ -48,9 +46,7 @@ def compile_action_mask_values(
                 f"Named mask values are not supported for action branch {branch_name!r}"
             )
         if mask_value not in expected_values:
-            raise ValueError(
-                f"Unknown mask value {mask_value!r} for action branch {branch_name!r}"
-            )
+            raise ValueError(f"Unknown mask value {mask_value!r} for action branch {branch_name!r}")
         indices.append(expected_values.index(mask_value))
     if len(set(indices)) != len(indices):
         raise ValueError(f"Action mask for branch {branch_name!r} contains duplicates")

@@ -11,6 +11,14 @@ from rl_fzerox.core.config.track_registry_types import (
     BaselineVariant,
     CourseSelection,
 )
+from rl_fzerox.core.config.vehicle_registry import (
+    engine_setting_display_name,
+    known_vehicle_ids,
+    resolve_engine_setting,
+    try_resolve_engine_setting_id,
+    vehicle_config_by_id,
+    vehicle_machine_config,
+)
 
 
 def expand_track_registry_metadata(
@@ -79,14 +87,10 @@ def _entries_from_courses(
     entries: list[dict[str, object]] = []
     for raw_course in raw_courses:
         selection = _course_selection(raw_course, config_root=config_root)
-        track_ref = _track_ref_for_course_variant(
-            course_ref=selection.ref,
-            variant=baseline_variant,
-            config_root=config_root,
-        )
         entries.append(
-            _entry_from_track_ref(
-                track_ref,
+            _entry_from_course_variant(
+                course_ref=selection.ref,
+                variant=baseline_variant,
                 weight=selection.weight,
                 config_root=config_root,
             )
@@ -94,33 +98,45 @@ def _entries_from_courses(
     return entries
 
 
-def _track_ref_for_course_variant(
+def _entry_from_course_variant(
     *,
     course_ref: str,
     variant: BaselineVariant,
+    weight: float | None,
     config_root: Path,
-) -> str:
-    matches = [
-        ref
-        for ref, track in _iter_track_configs(config_root=config_root)
-        if track.get("course_ref") == course_ref
-        and track.get("mode") == variant.mode
-        and track.get("vehicle") == variant.vehicle
-        and track.get("engine_setting") == variant.engine_setting
-    ]
-    if not matches:
-        raise FileNotFoundError(
-            "Track registry entry not found for "
-            f"course={course_ref!r}, mode={variant.mode!r}, "
-            f"vehicle={variant.vehicle!r}, engine_setting={variant.engine_setting!r}"
-        )
-    if len(matches) > 1:
-        raise ValueError(
-            "Track registry selection is ambiguous for "
-            f"course={course_ref!r}, mode={variant.mode!r}, "
-            f"vehicle={variant.vehicle!r}, engine_setting={variant.engine_setting!r}"
-        )
-    return matches[0]
+) -> dict[str, object]:
+    course = _load_course_config(course_ref, config_root=config_root)
+    vehicle_config = vehicle_config_by_id(variant.vehicle, config_root=config_root)
+    vehicle_name = _optional_str(vehicle_config.get("display_name")) or variant.vehicle
+    engine_display_name = engine_setting_display_name(vehicle_config, variant.engine_setting)
+    course_id = _optional_str(course.get("id")) or _safe_id(course_ref)
+    mode_id = _safe_id(variant.mode)
+
+    entry: dict[str, object] = {
+        "id": f"{course_id}_{mode_id}_{variant.vehicle}_{variant.engine_setting}",
+        "display_name": (
+            f"{course.get('display_name', course_id)} "
+            f"{variant.mode.replace('_', ' ').title()} - "
+            f"{vehicle_name} {engine_display_name}"
+        ),
+        "course_ref": course_ref,
+        "course_id": course_id,
+        "course_name": course.get("display_name"),
+        "course_index": course.get("course_index"),
+        "mode": variant.mode,
+        "vehicle": variant.vehicle,
+        "vehicle_name": vehicle_name,
+        "engine_setting": variant.engine_setting,
+        "engine_setting_raw_value": variant.engine_setting_raw_value,
+    }
+    machine = vehicle_machine_config(vehicle_config)
+    if machine is not None:
+        entry["vehicle_machine"] = machine
+    if "records" in course:
+        entry["records"] = course["records"]
+    if weight is not None:
+        entry["weight"] = weight
+    return entry
 
 
 def _course_selection(raw_course: object, *, config_root: Path) -> CourseSelection:
@@ -157,9 +173,7 @@ def _course_ref_by_id(
         qualifier = f" in cup {cup!r}" if cup is not None else ""
         raise FileNotFoundError(f"Course registry id not found{qualifier}: {course_id!r}")
     if len(matches) > 1:
-        raise ValueError(
-            f"Course id {course_id!r} is ambiguous; use a mapping with id and cup"
-        )
+        raise ValueError(f"Course id {course_id!r} is ambiguous; use a mapping with id and cup")
     return matches[0]
 
 
@@ -172,8 +186,8 @@ def _baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> Baseli
         raise ValueError(
             "track_sampling.baseline.ghost is not configurable; use no-ghost baselines"
         )
-    vehicle_config = _vehicle_config_by_id(vehicle, config_root=config_root)
-    engine_setting = _engine_setting_id(
+    vehicle_config = vehicle_config_by_id(vehicle, config_root=config_root)
+    engine_setting = resolve_engine_setting(
         vehicle_config,
         raw_baseline_spec.get("engine_setting"),
         context=f"track_sampling.baseline.vehicle={vehicle!r}",
@@ -181,7 +195,8 @@ def _baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> Baseli
     return BaselineVariant(
         mode=mode,
         vehicle=vehicle,
-        engine_setting=engine_setting,
+        engine_setting=engine_setting.id,
+        engine_setting_raw_value=engine_setting.raw_value,
     )
 
 
@@ -190,43 +205,6 @@ def _required_baseline_field(raw_baseline_spec: Mapping[object, object], key: st
     if not isinstance(value, str) or not value:
         raise ValueError(f"track_sampling.baseline.{key} must be a non-empty string")
     return value
-
-
-def _entry_from_track_ref(
-    ref: str,
-    *,
-    weight: float | None = None,
-    config_root: Path,
-) -> dict[str, object]:
-    track_config = _load_track_config(ref, config_root=config_root)
-    track = track_config.get("track")
-    if not isinstance(track, dict):
-        raise ValueError(f"Track registry entry {ref!r} does not define a track section")
-    track = _track_with_registry_metadata(track, config_root=config_root)
-
-    entry = {
-        key: track[key]
-        for key in (
-            "id",
-            "display_name",
-            "course_ref",
-            "course_id",
-            "course_name",
-            "baseline_state_path",
-            "course_index",
-            "mode",
-            "vehicle",
-            "vehicle_name",
-            "engine_setting",
-            "records",
-        )
-        if key in track
-    }
-    if "id" not in entry or "baseline_state_path" not in entry:
-        raise ValueError(f"Track registry entry {ref!r} must define id and baseline_state_path")
-    if weight is not None:
-        entry["weight"] = weight
-    return entry
 
 
 def _entry_with_registry_metadata(
@@ -251,11 +229,104 @@ def _entry_with_registry_metadata(
                 "mode",
                 "vehicle",
                 "vehicle_name",
+                "source_vehicle",
                 "engine_setting",
+                "engine_setting_raw_value",
+                "source_course_index",
+                "source_engine_setting",
+                "source_engine_setting_raw_value",
+                "vehicle_machine",
                 "records",
             }:
                 enriched.setdefault(key, value)
+    elif _looks_like_legacy_generated_entry(enriched):
+        legacy_metadata = _legacy_generated_entry_metadata_from_id(
+            enriched,
+            config_root=config_root,
+        )
+        if legacy_metadata is not None:
+            for key, value in legacy_metadata.items():
+                enriched.setdefault(key, value)
     return enriched
+
+
+def _looks_like_legacy_generated_entry(entry: Mapping[str, object]) -> bool:
+    """Return true for old run manifests that persisted only generated IDs."""
+
+    return (
+        entry.get("baseline_state_path") is not None
+        and entry.get("course_index") is None
+        and entry.get("mode") is None
+        and entry.get("vehicle") is None
+        and entry.get("engine_setting") is None
+    )
+
+
+def _legacy_generated_entry_metadata_from_id(
+    entry: dict[str, object],
+    *,
+    config_root: Path,
+) -> dict[str, object] | None:
+    """Recover metadata from old generated IDs.
+
+    Fresh configs and manifests should carry explicit course/vehicle/engine
+    fields. This fallback only keeps older v4 run manifests watchable.
+    """
+
+    raw_id = entry.get("id")
+    if not isinstance(raw_id, str) or not raw_id:
+        return None
+
+    for course_ref, course in _iter_course_configs(config_root=config_root):
+        course_id = _optional_str(course.get("id")) or _safe_id(course_ref)
+        prefix = f"{course_id}_"
+        if not raw_id.startswith(prefix):
+            continue
+        variant = _baseline_variant_from_generated_entry_id(
+            raw_id.removeprefix(prefix),
+            config_root=config_root,
+        )
+        if variant is None:
+            continue
+        return _entry_from_course_variant(
+            course_ref=course_ref,
+            variant=variant,
+            weight=_optional_weight(entry.get("weight"), label="entry weight"),
+            config_root=config_root,
+        )
+    return None
+
+
+def _baseline_variant_from_generated_entry_id(
+    suffix: str,
+    *,
+    config_root: Path,
+) -> BaselineVariant | None:
+    mode = "time_attack"
+    mode_prefix = f"{_safe_id(mode)}_"
+    if not suffix.startswith(mode_prefix):
+        return None
+    vehicle_and_engine = suffix.removeprefix(mode_prefix)
+    for vehicle_id in sorted(known_vehicle_ids(config_root=config_root), key=len, reverse=True):
+        vehicle_prefix = f"{vehicle_id}_"
+        if not vehicle_and_engine.startswith(vehicle_prefix):
+            continue
+        engine_setting = vehicle_and_engine.removeprefix(vehicle_prefix)
+        vehicle_config = vehicle_config_by_id(vehicle_id, config_root=config_root)
+        resolved_engine_setting = try_resolve_engine_setting_id(
+            vehicle_config,
+            engine_setting,
+            context=f"track_sampling.entries.id={suffix!r}",
+        )
+        if resolved_engine_setting is None:
+            continue
+        return BaselineVariant(
+            mode=mode,
+            vehicle=vehicle_id,
+            engine_setting=resolved_engine_setting.id,
+            engine_setting_raw_value=resolved_engine_setting.raw_value,
+        )
+    return None
 
 
 def _expand_track_course_metadata(
@@ -286,20 +357,36 @@ def _track_with_registry_metadata(
         ):
             if source_key in course:
                 enriched.setdefault(target_key, course[source_key])
+        if "course_index" in enriched:
+            enriched.setdefault("source_course_index", enriched["course_index"])
 
     vehicle = enriched.get("vehicle")
     if isinstance(vehicle, str) and vehicle:
-        vehicle_config = _vehicle_config_by_id(vehicle, config_root=config_root)
+        vehicle_config = vehicle_config_by_id(vehicle, config_root=config_root)
         engine_setting = enriched.get("engine_setting")
-        if isinstance(engine_setting, str) and engine_setting:
-            _engine_setting_id(
+        if (isinstance(engine_setting, str) and engine_setting) or (
+            isinstance(engine_setting, int) and not isinstance(engine_setting, bool)
+        ):
+            resolved_engine_setting = resolve_engine_setting(
                 vehicle_config,
                 engine_setting,
                 context=f"track vehicle={vehicle!r}",
             )
+            enriched["engine_setting"] = resolved_engine_setting.id
+            if resolved_engine_setting.raw_value is not None:
+                enriched.setdefault("engine_setting_raw_value", resolved_engine_setting.raw_value)
+                enriched.setdefault("source_engine_setting", resolved_engine_setting.id)
+                enriched.setdefault(
+                    "source_engine_setting_raw_value",
+                    resolved_engine_setting.raw_value,
+                )
         vehicle_name = _optional_str(vehicle_config.get("display_name"))
         if vehicle_name is not None:
             enriched.setdefault("vehicle_name", vehicle_name)
+        enriched.setdefault("source_vehicle", vehicle)
+        machine = vehicle_machine_config(vehicle_config)
+        if machine is not None:
+            enriched.setdefault("vehicle_machine", machine)
     return enriched
 
 
@@ -354,85 +441,8 @@ def _load_course_config(ref: str, *, config_root: Path) -> dict[str, object]:
     return {str(key): value for key, value in course.items() if isinstance(key, str)}
 
 
-def _vehicle_config_by_id(vehicle_id: str, *, config_root: Path) -> dict[str, object]:
-    registry_root = (config_root / REGISTRY.roots.vehicles).resolve()
-    direct_path = (registry_root / vehicle_id).with_suffix(".yaml").resolve()
-    if direct_path.is_relative_to(registry_root) and direct_path.is_file():
-        return _load_vehicle_config(direct_path, ref=vehicle_id)
-
-    matches: list[dict[str, object]] = []
-    if registry_root.is_dir():
-        for path in sorted(registry_root.rglob("*.yaml")):
-            vehicle = _load_vehicle_config(path, ref=path.stem)
-            if vehicle.get("id") == vehicle_id:
-                matches.append(vehicle)
-    if not matches:
-        raise FileNotFoundError(f"Vehicle registry id not found: {vehicle_id!r}")
-    if len(matches) > 1:
-        raise ValueError(f"Vehicle id {vehicle_id!r} is ambiguous")
-    return matches[0]
-
-
-def _load_vehicle_config(path: Path, *, ref: str) -> dict[str, object]:
-    loaded = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-    if not isinstance(loaded, dict):
-        raise TypeError(f"Vehicle registry entry {ref!r} must resolve to a mapping")
-    vehicle = loaded.get("vehicle")
-    if not isinstance(vehicle, dict):
-        raise ValueError(f"Vehicle registry entry {ref!r} does not define a vehicle section")
-    return {str(key): value for key, value in vehicle.items() if isinstance(key, str)}
-
-
-def _engine_setting_id(
-    vehicle_config: dict[str, object],
-    raw_engine_setting: object,
-    *,
-    context: str,
-) -> str:
-    engine_settings = vehicle_config.get("engine_settings")
-    if isinstance(raw_engine_setting, str) and raw_engine_setting:
-        if engine_settings is None:
-            return raw_engine_setting
-        if not isinstance(engine_settings, Mapping):
-            raise TypeError(f"{context} vehicle engine_settings must be a mapping")
-        if raw_engine_setting in engine_settings:
-            return raw_engine_setting
-        known = ", ".join(sorted(str(key) for key in engine_settings))
-        raise ValueError(
-            f"{context} unknown engine_setting {raw_engine_setting!r}; known: {known}"
-        )
-
-    if isinstance(raw_engine_setting, bool) or not isinstance(raw_engine_setting, int):
-        raise ValueError(
-            "track_sampling.baseline.engine_setting must be a string id or raw integer"
-        )
-    if engine_settings is None:
-        raise ValueError(f"{context} cannot resolve raw engine_setting without engine_settings")
-    if not isinstance(engine_settings, Mapping):
-        raise TypeError(f"{context} vehicle engine_settings must be a mapping")
-    for setting_id, setting_data in engine_settings.items():
-        if (
-            isinstance(setting_id, str)
-            and _engine_setting_raw_value(setting_data) == raw_engine_setting
-        ):
-            return setting_id
-    known = ", ".join(
-        f"{setting_id}={_engine_setting_raw_value(setting_data)}"
-        for setting_id, setting_data in engine_settings.items()
-        if _engine_setting_raw_value(setting_data) is not None
-    )
-    raise ValueError(
-        f"{context} unknown raw engine_setting {raw_engine_setting!r}; known: {known}"
-    )
-
-
-def _engine_setting_raw_value(setting_data: object) -> int | None:
-    if not isinstance(setting_data, Mapping):
-        return None
-    raw_value = setting_data.get("raw_value")
-    if isinstance(raw_value, bool):
-        return None
-    return raw_value if isinstance(raw_value, int) else None
+def _safe_id(value: str) -> str:
+    return value.replace("/", "_").replace("-", "_")
 
 
 def _optional_weight(raw_weight: object, *, label: str) -> float | None:
@@ -444,18 +454,6 @@ def _optional_weight(raw_weight: object, *, label: str) -> float | None:
     if weight <= 0.0:
         raise ValueError(f"{label} must be greater than zero")
     return weight
-
-
-def _load_track_config(ref: str, *, config_root: Path) -> dict[str, object]:
-    path = _registry_path(
-        root=config_root / REGISTRY.roots.tracks,
-        ref=ref,
-        label="Track registry entry",
-    )
-    loaded = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-    if not isinstance(loaded, dict):
-        raise TypeError(f"Track registry entry {ref!r} must resolve to a mapping")
-    return {str(key): value for key, value in loaded.items() if isinstance(key, str)}
 
 
 def _registry_path(*, root: Path, ref: str, label: str) -> Path:

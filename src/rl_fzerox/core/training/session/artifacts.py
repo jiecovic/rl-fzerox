@@ -55,12 +55,14 @@ def _configured_baseline_state_paths(config: TrainAppConfig) -> tuple[Path, ...]
     if config.track.baseline_state_path is not None:
         paths.append(config.track.baseline_state_path)
     for entry in config.env.track_sampling.entries:
-        paths.append(entry.baseline_state_path)
+        if entry.baseline_state_path is not None:
+            paths.append(entry.baseline_state_path)
     for stage in config.curriculum.stages:
         if stage.track_sampling is None:
             continue
         for entry in stage.track_sampling.entries:
-            paths.append(entry.baseline_state_path)
+            if entry.baseline_state_path is not None:
+                paths.append(entry.baseline_state_path)
     return tuple(dict.fromkeys(paths))
 
 

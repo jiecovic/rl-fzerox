@@ -30,15 +30,14 @@ def run_training(config: TrainAppConfig) -> None:
         output_root=config.train.output_root,
         run_name=config.train.run_name,
     )
-    validate_training_baseline_state(config)
     validate_training_algorithm_config(config)
-
-    ensure_run_dirs(run_paths)
-    run_config = resolve_train_run_config(config=config, run_paths=run_paths)
     train_env = None
     model = None
 
     try:
+        ensure_run_dirs(run_paths)
+        run_config = resolve_train_run_config(config=config, run_paths=run_paths)
+        validate_training_baseline_state(run_config)
         train_env = build_training_env(run_config, run_paths)
         model = build_training_model(
             train_env=train_env,

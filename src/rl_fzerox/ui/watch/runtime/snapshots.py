@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
@@ -44,9 +45,14 @@ class _SnapshotEnv(Protocol):
     def render(self) -> RgbFrame: ...
 
 
-BOOST_ACTIVE_LAMP_LEVEL = 0.55
-BOOST_MANUAL_LAMP_LEVEL = 1.0
-BOOST_LAMP_FADE_FRAMES = 18
+@dataclass(frozen=True, slots=True)
+class _BoostLampConfig:
+    active_level: float = 0.55
+    manual_level: float = 1.0
+    fade_frames: int = 18
+
+
+BOOST_LAMP_CONFIG = _BoostLampConfig()
 
 
 def _publish_step_snapshots(
@@ -197,11 +203,11 @@ def _next_boost_lamp_level(
     action_repeat: int,
 ) -> float:
     if control_state.joypad_mask & BOOST_MASK:
-        return BOOST_MANUAL_LAMP_LEVEL
+        return BOOST_LAMP_CONFIG.manual_level
 
-    target = BOOST_ACTIVE_LAMP_LEVEL if boost_active else 0.0
+    target = BOOST_LAMP_CONFIG.active_level if boost_active else 0.0
     if previous <= target:
         return target
 
-    decay = max(1, action_repeat) / BOOST_LAMP_FADE_FRAMES
+    decay = max(1, action_repeat) / BOOST_LAMP_CONFIG.fade_frames
     return max(target, previous - decay)
