@@ -407,10 +407,10 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["track_position.outside_track_bounds"] == 0.0
     assert values["surface_state.on_dirt_surface"] == 1.0
     assert values["course_context.course_builtin_02"] == 1.0
-    assert values["control_history.steer_t_minus_1"] == -0.5
-    assert values["control_history.thrust_t_minus_1"] == 1.0
-    assert values["control_history.boost_t_minus_2"] == 1.0
-    assert values["control_history.lean_t_minus_1"] == -1.0
+    assert values["control_history.prev_steer_1"] == -0.5
+    assert values["control_history.prev_thrust_1"] == 1.0
+    assert values["control_history.prev_boost_2"] == 1.0
+    assert values["control_history.prev_lean_1"] == -1.0
 
 
 def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:

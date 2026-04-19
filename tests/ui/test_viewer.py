@@ -470,8 +470,8 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         "course_context.course_builtin_00",
         "course_context.course_builtin_01",
         "course_context.course_builtin_02",
-        "control_history.steer_t_minus_1",
-        "control_history.thrust_t_minus_1",
+        "control_history.prev_steer_1",
+        "control_history.prev_thrust_1",
     )
     columns = _build_panel_columns(
         episode=0,
@@ -505,8 +505,8 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         "one hot": "010",
     }
     assert _panel_group_labels(state_vector_section, "Control History") == [
-        "steer_t_minus_1",
-        "thrust_t_minus_1",
+        "prev_steer_1",
+        "prev_thrust_1",
     ]
 
 
