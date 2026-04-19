@@ -7,9 +7,12 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
 use crate::core::telemetry::layout::{
-    CAMERA, CameraRaceSetting, GLOBALS, GameMode, RACER, RaceDifficulty, TELEMETRY_CONFIG,
+    CAMERA, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, RACER,
+    RACER_SEGMENT_POSITION_INFO, RaceDifficulty, TELEMETRY_CONFIG,
 };
-use crate::core::telemetry::model::{PlayerTelemetry, StepTelemetrySample, TelemetrySnapshot};
+use crate::core::telemetry::model::{
+    PlayerTelemetry, RacerGeometryTelemetry, StepTelemetrySample, TelemetrySnapshot,
+};
 
 /// Decode a typed telemetry snapshot from a full system RAM view.
 pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> {
@@ -30,6 +33,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         max_energy: read_f32(system_ram, player_base + RACER.max_energy)?,
         boost_timer: read_i32(system_ram, player_base + RACER.boost_timer)?,
         recoil_tilt_magnitude: read_vec3_magnitude(system_ram, player_base + RACER.recoil_tilt)?,
+        damage_rumble_counter: read_i32(system_ram, player_damage_rumble_counter_offset())?,
         reverse_timer: read_i32(system_ram, reverse_timer_offset)?,
         race_distance: read_f32(system_ram, player_base + RACER.race_distance)?,
         lap_distance: read_f32(system_ram, player_base + RACER.lap_distance)?,
@@ -37,6 +41,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         lap: read_i16(system_ram, player_base + RACER.lap)?,
         laps_completed: read_i16(system_ram, player_base + RACER.laps_completed)?,
         position: read_i32(system_ram, player_base + RACER.position)?,
+        geometry: read_racer_geometry(system_ram, player_base)?,
     };
 
     Ok(TelemetrySnapshot {
@@ -106,6 +111,87 @@ fn player_camera_setting_offset() -> usize {
     GLOBALS.cameras + CAMERA.race_setting
 }
 
+fn read_racer_geometry(
+    system_ram: &[u8],
+    player_base: usize,
+) -> Result<RacerGeometryTelemetry, CoreError> {
+    let segment_info_base = player_base + RACER.segment_position_info;
+    Ok(RacerGeometryTelemetry {
+        segment_index: read_current_segment_index(system_ram, segment_info_base)?,
+        segment_t: read_f32(
+            system_ram,
+            segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_t_value,
+        )?,
+        segment_length_proportion: read_f32(
+            system_ram,
+            segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_length_proportion,
+        )?,
+        local_lateral_velocity: read_f32(system_ram, player_base + RACER.local_velocity)?,
+        signed_lateral_offset: read_signed_lateral_offset(
+            system_ram,
+            player_base,
+            segment_info_base,
+        )?,
+        lateral_distance: read_f32(
+            system_ram,
+            segment_info_base + RACER_SEGMENT_POSITION_INFO.distance_from_segment,
+        )?,
+        lateral_displacement_magnitude: read_vec3_magnitude(
+            system_ram,
+            segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement,
+        )?,
+        current_radius_left: read_f32(system_ram, player_base + RACER.current_radius_left)?,
+        current_radius_right: read_f32(system_ram, player_base + RACER.current_radius_right)?,
+        height_above_ground: read_f32(system_ram, player_base + RACER.height_above_ground)?,
+        velocity_magnitude: read_vec3_magnitude(system_ram, player_base + RACER.velocity)?,
+        acceleration_magnitude: read_vec3_magnitude(system_ram, player_base + RACER.acceleration)?,
+        acceleration_force: read_f32(system_ram, player_base + RACER.acceleration_force)?,
+        drift_attack_force: read_f32(system_ram, player_base + RACER.drift_attack_force)?,
+        collision_mass: read_f32(system_ram, player_base + RACER.colliding_strength)?,
+    })
+}
+
+fn read_signed_lateral_offset(
+    system_ram: &[u8],
+    player_base: usize,
+    segment_info_base: usize,
+) -> Result<f32, CoreError> {
+    // The decomp's edge checks project segment displacement onto segmentBasis.z.
+    // Positive is left of the spline centerline; negative is right.
+    dot_vec3(
+        system_ram,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement,
+        player_base + RACER.segment_basis + 0x18,
+    )
+}
+
+fn read_current_segment_index(
+    system_ram: &[u8],
+    segment_info_base: usize,
+) -> Result<Option<i32>, CoreError> {
+    let pointer = read_u32(
+        system_ram,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.course_segment,
+    )?;
+    let Some(segment_offset) = kseg0_pointer_to_offset(pointer, system_ram.len()) else {
+        return Ok(None);
+    };
+    let segment_index_offset = segment_offset + COURSE_SEGMENT.segment_index;
+    if segment_index_offset + size_of::<i32>() > system_ram.len() {
+        return Ok(None);
+    }
+    Ok(Some(read_i32(system_ram, segment_index_offset)?))
+}
+
+fn kseg0_pointer_to_offset(pointer: u32, memory_len: usize) -> Option<usize> {
+    let address = pointer as usize;
+    if address < TELEMETRY_CONFIG.kseg0_base {
+        return None;
+    }
+    let offset = address - TELEMETRY_CONFIG.kseg0_base;
+    (offset < memory_len).then_some(offset)
+}
+
 fn resolve_game_mode(game_mode_raw: u32) -> Option<GameMode> {
     GameMode::try_from(game_mode_raw & 0x1F).ok()
 }
@@ -139,6 +225,15 @@ fn read_vec3_magnitude(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
     let y = read_f32(memory, offset + size_of::<f32>())?;
     let z = read_f32(memory, offset + (2 * size_of::<f32>()))?;
     Ok((x.mul_add(x, y.mul_add(y, z * z))).sqrt())
+}
+
+fn dot_vec3(memory: &[u8], lhs_offset: usize, rhs_offset: usize) -> Result<f32, CoreError> {
+    let x = read_f32(memory, lhs_offset)? * read_f32(memory, rhs_offset)?;
+    let y = read_f32(memory, lhs_offset + size_of::<f32>())?
+        * read_f32(memory, rhs_offset + size_of::<f32>())?;
+    let z = read_f32(memory, lhs_offset + (2 * size_of::<f32>()))?
+        * read_f32(memory, rhs_offset + (2 * size_of::<f32>()))?;
+    Ok(x + y + z)
 }
 
 fn read_array<const N: usize>(memory: &[u8], offset: usize) -> Result<[u8; N], CoreError> {

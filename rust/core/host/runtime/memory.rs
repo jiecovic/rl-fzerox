@@ -80,4 +80,40 @@ impl Host {
         let bytes = unsafe { slice::from_raw_parts(data.cast::<u8>().add(offset), length) };
         Ok(bytes.to_vec())
     }
+
+    pub(super) fn write_memory(
+        &mut self,
+        memory_id: u32,
+        offset: usize,
+        bytes: &[u8],
+    ) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        let available = self.memory_size(memory_id)?;
+        let length = bytes.len();
+        let end = offset
+            .checked_add(length)
+            .ok_or(CoreError::MemoryOutOfRange {
+                memory_id,
+                offset,
+                length,
+                available,
+            })?;
+        if end > available {
+            return Err(CoreError::MemoryOutOfRange {
+                memory_id,
+                offset,
+                length,
+                available,
+            });
+        }
+
+        let data = self.call_core(|core| unsafe { core.memory_data(memory_id) });
+        if data.is_null() {
+            return Err(CoreError::MemoryUnavailable { memory_id });
+        }
+
+        let target = unsafe { slice::from_raw_parts_mut(data.cast::<u8>().add(offset), length) };
+        target.copy_from_slice(bytes);
+        Ok(())
+    }
 }

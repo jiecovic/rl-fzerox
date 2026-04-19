@@ -13,10 +13,14 @@ progress_bucket_reward: 0.05
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
 
-# Time pressure: off by default for this frontier-progress profile.
-time_penalty_per_frame: 0.0
-reverse_time_penalty_scale: 1.0
-low_speed_time_penalty_scale: 1.0
+# Time pressure: optional per-internal-frame penalty. Negative values make
+# elapsed game time costly. The tracker multiplies this by the native
+# `frames_run` count, so action_repeat does not change the cost per game frame.
+time_penalty_per_frame: -0.001
+# Extra time-pressure multipliers for frames spent reversing or below the
+# low-speed guard. These only matter when time_penalty_per_frame is non-zero.
+reverse_time_penalty_scale: 2.0
+low_speed_time_penalty_scale: 2.0
 
 # Lap rewards: flat per-lap marker plus small position pressure. The finish line is
 # just the final lap completion, not a separate bonus event.
@@ -48,6 +52,10 @@ boost_pad_reward_progress_window: 800.0
 # Energy refill: multiplier scale applied only to actual frontier-progress reward.
 # No new progress means no refill reward, so recharge strips cannot be farmed by stalling.
 energy_refill_progress_multiplier: 3.0
+# Bad ground effects: scale only newly covered frontier progress. Values below
+# 1.0 still reward forward motion, but make routes over dirt/ice less attractive.
+dirt_progress_multiplier: 0.50
+ice_progress_multiplier: 0.70
 # Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
 energy_refill_collision_cooldown_frames: 240
 # Energy refill: max once-per-lap bonus for reaching full energy from below.
@@ -61,18 +69,18 @@ energy_full_refill_min_gain_fraction: 0.10
 # Gas: optional per-frame penalty for requesting less than the threshold.
 # Disabled at 0.0; with threshold 0.5, discrete idle gas gets the full penalty.
 gas_underuse_penalty: -0.1
-gas_underuse_threshold: 0.5
+gas_underuse_threshold: 0.9
 
 # Steering: acceleration penalty for rapid direction changes.
 # This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
 # Smooth ramps and steady cornering are near zero; left-right flips hit the cap.
-steer_oscillation_penalty: -0.001
+steer_oscillation_penalty: -0.0
 steer_oscillation_deadzone: 0.07
 steer_oscillation_cap: 2.0
 steer_oscillation_power: 2.0
 
 # Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
-lean_low_speed_penalty: -0.03
+lean_low_speed_penalty: -0.02
 lean_low_speed_penalty_max_speed_kph: 990.0
 
 # Airborne: event reward when an airborne machine lands back on the track.

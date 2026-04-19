@@ -99,6 +99,47 @@ pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'sta
 }
 
 #[derive(Clone, Debug)]
+pub struct RacerGeometryTelemetry {
+    pub segment_index: Option<i32>,
+    pub segment_t: f32,
+    pub segment_length_proportion: f32,
+    pub local_lateral_velocity: f32,
+    pub signed_lateral_offset: f32,
+    pub lateral_distance: f32,
+    pub lateral_displacement_magnitude: f32,
+    pub current_radius_left: f32,
+    pub current_radius_right: f32,
+    pub height_above_ground: f32,
+    pub velocity_magnitude: f32,
+    pub acceleration_magnitude: f32,
+    pub acceleration_force: f32,
+    pub drift_attack_force: f32,
+    pub collision_mass: f32,
+}
+
+impl Default for RacerGeometryTelemetry {
+    fn default() -> Self {
+        Self {
+            segment_index: None,
+            segment_t: 0.0,
+            segment_length_proportion: 0.0,
+            local_lateral_velocity: 0.0,
+            signed_lateral_offset: 0.0,
+            lateral_distance: 0.0,
+            lateral_displacement_magnitude: 0.0,
+            current_radius_left: 0.0,
+            current_radius_right: 0.0,
+            height_above_ground: 0.0,
+            velocity_magnitude: 0.0,
+            acceleration_magnitude: 0.0,
+            acceleration_force: 0.0,
+            drift_attack_force: 0.0,
+            collision_mass: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PlayerTelemetry {
     pub state_flags: u32,
     pub speed_kph: f32,
@@ -106,6 +147,7 @@ pub struct PlayerTelemetry {
     pub max_energy: f32,
     pub boost_timer: i32,
     pub recoil_tilt_magnitude: f32,
+    pub damage_rumble_counter: i32,
     pub reverse_timer: i32,
     pub race_distance: f32,
     pub lap_distance: f32,
@@ -113,6 +155,7 @@ pub struct PlayerTelemetry {
     pub lap: i16,
     pub laps_completed: i16,
     pub position: i32,
+    pub geometry: RacerGeometryTelemetry,
 }
 
 impl PlayerTelemetry {

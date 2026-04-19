@@ -68,5 +68,9 @@ class WatchSnapshot:
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
     best_finish_position: int | None
+    best_finish_times: dict[str, int]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
+    action_hold_frame: int = 1
+    action_hold_frames: int = 1
+    policy_decision_frame: bool = True

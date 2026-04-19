@@ -31,8 +31,20 @@ def _panel_content_height(
     y += LAYOUT.title_section_gap
 
     content_width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
-    left_width = (content_width - LAYOUT.column_gap) // 2
-    right_width = content_width - LAYOUT.column_gap - left_width
+    left_width, middle_width, stats_width = _panel_column_widths(content_width)
     left_height = _column_content_height(fonts, columns.left, width=left_width)
-    right_height = _column_content_height(fonts, columns.right, width=right_width)
-    return y + max(left_height, right_height) + LAYOUT.panel_padding
+    middle_height = _column_content_height(fonts, columns.middle, width=middle_width)
+    stats_height = _column_content_height(fonts, columns.stats, width=stats_width)
+    return y + max(left_height, middle_height, stats_height) + LAYOUT.panel_padding
+
+
+def _panel_column_widths(content_width: int) -> tuple[int, int, int]:
+    """Return balanced widths for the three watch side-panel columns."""
+
+    available_width = content_width - (2 * LAYOUT.column_gap)
+    base_width, remainder = divmod(available_width, 3)
+    return (
+        base_width,
+        base_width + (1 if remainder >= 1 else 0),
+        base_width + (1 if remainder >= 2 else 0),
+    )

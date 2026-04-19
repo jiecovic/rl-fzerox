@@ -34,6 +34,7 @@ pub enum ObservationPreset {
     NativeCropV2,
     NativeCropV3,
     NativeCropV4,
+    NativeCropV6,
 }
 
 /// How repeated observation frames are encoded along the channel axis.
@@ -65,6 +66,7 @@ impl ObservationPreset {
             "native_crop_v2" => Ok(Self::NativeCropV2),
             "native_crop_v3" => Ok(Self::NativeCropV3),
             "native_crop_v4" => Ok(Self::NativeCropV4),
+            "native_crop_v6" => Ok(Self::NativeCropV6),
             _ => Err(CoreError::InvalidObservationPreset {
                 name: name.to_owned(),
             }),
@@ -77,13 +79,18 @@ impl ObservationPreset {
             Self::NativeCropV2 => "native_crop_v2",
             Self::NativeCropV3 => "native_crop_v3",
             Self::NativeCropV4 => "native_crop_v4",
+            Self::NativeCropV6 => "native_crop_v6",
         }
     }
 
     pub fn crop(self, crop_profile: ObservationCropProfile) -> VideoCrop {
         match (self, crop_profile) {
             (
-                Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 | Self::NativeCropV4,
+                Self::NativeCropV1
+                | Self::NativeCropV2
+                | Self::NativeCropV3
+                | Self::NativeCropV4
+                | Self::NativeCropV6,
                 ObservationCropProfile::Angrylion,
             ) => VideoCrop {
                 top: 16,
@@ -92,7 +99,11 @@ impl ObservationPreset {
                 right: 24,
             },
             (
-                Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 | Self::NativeCropV4,
+                Self::NativeCropV1
+                | Self::NativeCropV2
+                | Self::NativeCropV3
+                | Self::NativeCropV4
+                | Self::NativeCropV6,
                 ObservationCropProfile::Gliden64,
             ) => VideoCrop {
                 top: 15,
@@ -120,6 +131,7 @@ impl ObservationPreset {
             Self::NativeCropV2 => (124, 92, 3),
             Self::NativeCropV3 => (164, 116, 3),
             Self::NativeCropV4 => (130, 98, 3),
+            Self::NativeCropV6 => (82, 66, 3),
         };
         Ok(ObservationSpec {
             preset_name: self.name(),
@@ -133,9 +145,11 @@ impl ObservationPreset {
 
     pub fn observation_aspect_ratio(self, display_aspect_ratio: f64) -> f64 {
         match self {
-            Self::NativeCropV1 | Self::NativeCropV2 | Self::NativeCropV3 | Self::NativeCropV4 => {
-                display_aspect_ratio
-            }
+            Self::NativeCropV1
+            | Self::NativeCropV2
+            | Self::NativeCropV3
+            | Self::NativeCropV4
+            | Self::NativeCropV6 => display_aspect_ratio,
         }
     }
 }
@@ -214,6 +228,16 @@ mod tests {
 
         assert_eq!(spec.preset_name, "native_crop_v4");
         assert_eq!((spec.frame_width, spec.frame_height), (130, 98));
+    }
+
+    #[test]
+    fn native_crop_v6_resolves_to_small_racing_geometry() {
+        let spec = ObservationPreset::NativeCropV6
+            .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+            .expect("native_crop_v6 should resolve");
+
+        assert_eq!(spec.preset_name, "native_crop_v6");
+        assert_eq!((spec.frame_width, spec.frame_height), (82, 66));
     }
 
     #[test]

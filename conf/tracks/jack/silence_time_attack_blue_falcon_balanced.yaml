@@ -5,13 +5,12 @@
 track:
   id: silence_time_attack_blue_falcon_balanced
   display_name: "Silence Time Attack - Blue Falcon Balanced"
-  course_index: 1
+  course_ref: jack/silence
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/silence-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Silence time-attack baseline without ghost."
+  notes: "Silence time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

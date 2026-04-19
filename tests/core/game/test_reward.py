@@ -19,6 +19,8 @@ from rl_fzerox.core.envs.rewards import (
 from tests.support.native_objects import encode_state_flags, make_step_summary, make_telemetry
 
 _COURSE_EFFECT_PIT = 1
+_COURSE_EFFECT_DIRT = 2
+_COURSE_EFFECT_ICE = 4
 
 
 def test_reward_yamls_use_known_reward_config_keys() -> None:
@@ -59,6 +61,8 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "boost_pad_reward": 10.0,
         "boost_pad_reward_progress_window": 800.0,
         "energy_refill_progress_multiplier": 3.0,
+        "dirt_progress_multiplier": 0.5,
+        "ice_progress_multiplier": 0.75,
         "energy_refill_collision_cooldown_frames": 17,
         "energy_full_refill_lap_bonus": 4.0,
         "energy_full_refill_min_gain_fraction": 0.12,
@@ -223,6 +227,82 @@ def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
 
     assert step.reward == 1.0
     assert step.breakdown == {"frontier_progress": 1.0}
+
+
+def test_race_v3_scales_frontier_progress_on_dirt() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            dirt_progress_multiplier=0.5,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, course_effect_raw=_COURSE_EFFECT_DIRT),
+    )
+
+    assert step.reward == pytest.approx(0.5)
+    assert step.breakdown == {
+        "frontier_progress": 1.0,
+        "dirt_progress": -0.5,
+    }
+
+
+def test_race_v3_scales_frontier_progress_on_ice() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            ice_progress_multiplier=0.7,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, course_effect_raw=_COURSE_EFFECT_ICE),
+    )
+
+    assert step.reward == pytest.approx(0.7)
+    assert step.breakdown == {
+        "frontier_progress": 1.0,
+        "ice_progress": pytest.approx(-0.3),
+    }
+
+
+def test_race_v3_does_not_penalize_bad_ground_without_new_progress() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            dirt_progress_multiplier=0.5,
+            ice_progress_multiplier=0.7,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, course_effect_raw=_COURSE_EFFECT_DIRT),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
 
 
 def test_race_v3_rewards_full_energy_refill_once_per_lap() -> None:
@@ -470,8 +550,10 @@ def _telemetry(
     lap: int | None = None,
     reverse_timer: int = 0,
     on_energy_refill: bool = False,
+    course_effect_raw: int = 0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
+    state_flags |= course_effect_raw
     if on_energy_refill:
         state_flags |= _COURSE_EFFECT_PIT
     return make_telemetry(

@@ -24,9 +24,12 @@ from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 
 
 def _create_fonts(pygame) -> ViewerFonts:
+    record_header = pygame.font.Font(None, FONT_SIZES.small)
+    record_header.set_bold(True)
     return ViewerFonts(
         title=pygame.font.Font(None, FONT_SIZES.title),
         section=pygame.font.Font(None, FONT_SIZES.section),
+        record_header=record_header,
         body=_create_mono_font(pygame, FONT_SIZES.body),
         small=pygame.font.Font(None, FONT_SIZES.small),
     )
@@ -95,6 +98,8 @@ def _draw_frame(
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
     best_finish_position: int | None,
+    best_finish_times: dict[str, int],
+    track_pool_records: tuple[dict[str, object], ...],
     continuous_drive_deadzone: float,
     continuous_air_brake_mode: str,
     continuous_air_brake_disabled: bool,
@@ -173,6 +178,8 @@ def _draw_frame(
         policy_reload_age_seconds=policy_reload_age_seconds,
         policy_reload_error=policy_reload_error,
         best_finish_position=best_finish_position,
+        best_finish_times=best_finish_times,
+        track_pool_records=track_pool_records,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_mode=continuous_air_brake_mode,
         continuous_air_brake_disabled=continuous_air_brake_disabled,

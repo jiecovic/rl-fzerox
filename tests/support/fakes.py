@@ -56,6 +56,7 @@ class SyntheticBackend:
         self.loaded_baselines: list[Path] = []
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
         self._active_baseline_path: Path | None = None
+        self._system_ram = bytearray(0x0030_0000)
 
     @property
     def name(self) -> str:
@@ -125,7 +126,13 @@ class SyntheticBackend:
         return self._last_frame.copy()
 
     def observation_spec(self, preset: str) -> ObservationSpec:
-        if preset not in {"native_crop_v1", "native_crop_v2", "native_crop_v3", "native_crop_v4"}:
+        if preset not in {
+            "native_crop_v1",
+            "native_crop_v2",
+            "native_crop_v3",
+            "native_crop_v4",
+            "native_crop_v6",
+        }:
             raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
         cropped = _crop_native_crop_v1(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
@@ -135,8 +142,10 @@ class SyntheticBackend:
             width, height = (124, 92)
         elif preset == "native_crop_v3":
             width, height = (164, 116)
-        else:
+        elif preset == "native_crop_v4":
             width, height = (130, 98)
+        else:
+            width, height = (82, 66)
         return ObservationSpec(
             preset=preset,
             width=width,
@@ -217,6 +226,12 @@ class SyntheticBackend:
             (seed ^ 0xA5A5_A5A5) & 0xFFFF_FFFF,
             ((seed >> 32) ^ 0x5A5A_5A5A) & 0xFFFF_FFFF,
         )
+
+    def read_system_ram(self, offset: int, length: int) -> bytes:
+        return bytes(self._system_ram[offset : offset + length])
+
+    def write_system_ram(self, offset: int, data: bytes) -> None:
+        self._system_ram[offset : offset + len(data)] = data
 
     def step_repeat_raw(
         self,

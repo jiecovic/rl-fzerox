@@ -5,7 +5,7 @@ from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import EnvConfig
 
-from .info import backend_step_info, has_custom_baseline, read_live_telemetry
+from .info import has_custom_baseline, read_live_telemetry
 from .tracks import SelectedTrack, TrackBaselineCache
 
 
@@ -37,14 +37,3 @@ def reset_race_state(
             "Configure emulator.baseline_state_path or env.track_sampling.entries instead."
         )
     return frame, info, read_live_telemetry(backend)
-
-
-def benchmark_noop_reset_state(
-    backend: EmulatorBackend,
-) -> tuple[dict[str, object], FZeroXTelemetry | None]:
-    """Reset Python episode bookkeeping without restoring emulator state."""
-
-    info = backend_step_info(backend)
-    info["reset_mode"] = "benchmark_noop_reset"
-    info["benchmark_noop_reset"] = True
-    return info, read_live_telemetry(backend)

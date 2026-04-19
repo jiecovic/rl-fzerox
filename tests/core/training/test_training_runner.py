@@ -17,6 +17,8 @@ from rl_fzerox.core.config.schema import (
     EnvConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
 )
@@ -97,6 +99,37 @@ def test_validate_training_baseline_state_accepts_existing_file(tmp_path: Path) 
     )
 
     validate_training_baseline_state(config)
+
+
+def test_validate_training_baseline_state_checks_track_sampling_entries(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    missing_baseline_path = tmp_path / "missing.state"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="missing",
+                        baseline_state_path=missing_baseline_path,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+
+    with pytest.raises(RuntimeError, match="missing.state"):
+        validate_training_baseline_state(config)
 
 
 def test_resolve_train_run_config_sets_run_local_runtime_root(tmp_path: Path) -> None:

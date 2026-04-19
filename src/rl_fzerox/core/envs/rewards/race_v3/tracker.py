@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
+from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.rewards.common import (
     RewardActionContext,
@@ -106,10 +107,15 @@ class RaceV3RewardTracker:
             reward += low_speed_time_penalty
             breakdown["low_speed_time"] = low_speed_time_penalty
 
+        ground_effect_key, progress_multiplier = _ground_effect_progress_modifier(
+            telemetry,
+            weights=self._weights,
+        )
         frontier_reward = self._progress.step(
             summary,
             status,
             weights=self._weights,
+            progress_multiplier=progress_multiplier,
             energy_refill_bonus_for_progress=lambda progress_reward: (
                 self._energy.progress_bonus(
                     progress_reward,
@@ -122,6 +128,9 @@ class RaceV3RewardTracker:
         if frontier_reward.progress:
             reward += frontier_reward.progress
             breakdown["frontier_progress"] = frontier_reward.progress
+        if frontier_reward.ground_effect_adjustment:
+            reward += frontier_reward.ground_effect_adjustment
+            breakdown[f"{ground_effect_key}_progress"] = frontier_reward.ground_effect_adjustment
         if frontier_reward.energy_refill_bonus:
             reward += frontier_reward.energy_refill_bonus
             breakdown["energy_refill_progress"] = frontier_reward.energy_refill_bonus
@@ -248,3 +257,16 @@ class RaceV3RewardTracker:
         if summary.low_speed_frames <= 0 or extra_scale == 0.0:
             return 0.0
         return summary.low_speed_frames * self._weights.time_penalty_per_frame * extra_scale
+
+
+def _ground_effect_progress_modifier(
+    telemetry: FZeroXTelemetry,
+    *,
+    weights: RaceV3RewardWeights,
+) -> tuple[str, float]:
+    raw_effect = course_effect_raw(telemetry)
+    if raw_effect == CourseEffect.DIRT:
+        return "dirt", weights.dirt_progress_multiplier
+    if raw_effect == CourseEffect.ICE:
+        return "ice", weights.ice_progress_multiplier
+    return "ground_effect", 1.0

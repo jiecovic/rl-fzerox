@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Protocol
 
-from fzerox_emulator import Emulator, FZeroXTelemetry, PlayerTelemetry
+from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry
 
 
-def _read_live_telemetry(emulator: Emulator) -> FZeroXTelemetry | None:
+class TelemetryReader(Protocol):
+    def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
+
+
+def _read_live_telemetry(emulator: TelemetryReader) -> FZeroXTelemetry | None:
     return emulator.try_read_telemetry()
 
 
@@ -29,6 +34,7 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
         max_energy=_mapping_float(player_value, "max_energy"),
         boost_timer=_mapping_int(player_value, "boost_timer"),
         recoil_tilt_magnitude=_mapping_float(player_value, "recoil_tilt_magnitude"),
+        damage_rumble_counter=_mapping_int(player_value, "damage_rumble_counter"),
         reverse_timer=_mapping_int(player_value, "reverse_timer"),
         race_distance=_mapping_float(player_value, "race_distance"),
         lap_distance=_mapping_float(player_value, "lap_distance"),
@@ -36,6 +42,24 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
         lap=_mapping_int(player_value, "lap"),
         laps_completed=_mapping_int(player_value, "laps_completed"),
         position=_mapping_int(player_value, "position"),
+        segment_index=_mapping_optional_int(player_value, "segment_index"),
+        segment_t=_mapping_float(player_value, "segment_t"),
+        segment_length_proportion=_mapping_float(player_value, "segment_length_proportion"),
+        local_lateral_velocity=_mapping_float(player_value, "local_lateral_velocity"),
+        signed_lateral_offset=_mapping_float(player_value, "signed_lateral_offset"),
+        lateral_distance=_mapping_float(player_value, "lateral_distance"),
+        lateral_displacement_magnitude=_mapping_float(
+            player_value,
+            "lateral_displacement_magnitude",
+        ),
+        current_radius_left=_mapping_float(player_value, "current_radius_left"),
+        current_radius_right=_mapping_float(player_value, "current_radius_right"),
+        height_above_ground=_mapping_float(player_value, "height_above_ground"),
+        velocity_magnitude=_mapping_float(player_value, "velocity_magnitude"),
+        acceleration_magnitude=_mapping_float(player_value, "acceleration_magnitude"),
+        acceleration_force=_mapping_float(player_value, "acceleration_force"),
+        drift_attack_force=_mapping_float(player_value, "drift_attack_force"),
+        collision_mass=_mapping_float(player_value, "collision_mass"),
     )
     return FZeroXTelemetry(
         total_lap_count=_mapping_int(data, "total_lap_count"),
@@ -60,6 +84,17 @@ def _mapping_int(data: Mapping[str, object], key: str) -> int:
     if isinstance(value, int | float):
         return int(value)
     return 0
+
+
+def _mapping_optional_int(data: Mapping[str, object], key: str) -> int | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int | float):
+        return int(value)
+    return None
 
 
 def _mapping_float(data: Mapping[str, object], key: str) -> float:

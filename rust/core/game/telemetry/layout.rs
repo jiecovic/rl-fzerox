@@ -40,19 +40,44 @@ pub(super) struct CameraOffsets {
 pub(super) struct RacerOffsets {
     pub size: usize,
     pub state_flags: usize,
+    pub segment_position_info: usize,
+    pub local_velocity: usize,
+    pub velocity: usize,
+    pub acceleration: usize,
     pub speed: usize,
+    pub height_above_ground: usize,
+    pub acceleration_force: usize,
+    pub drift_attack_force: usize,
+    pub colliding_strength: usize,
     pub boost_timer: usize,
     pub recoil_tilt: usize,
     pub energy: usize,
     pub max_energy: usize,
     pub race_distance: usize,
     pub lap_distance: usize,
+    pub segment_basis: usize,
+    pub current_radius_left: usize,
+    pub current_radius_right: usize,
     pub z_button_timer: usize,
     pub r_button_timer: usize,
     pub race_time: usize,
     pub lap: usize,
     pub laps_completed: usize,
     pub position: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct RacerSegmentPositionInfoOffsets {
+    pub course_segment: usize,
+    pub segment_t_value: usize,
+    pub segment_length_proportion: usize,
+    pub segment_displacement: usize,
+    pub distance_from_segment: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct CourseSegmentOffsets {
+    pub segment_index: usize,
 }
 
 // Global RDRAM addresses derived from the F-Zero X USA decomp / symbol dumps.
@@ -82,19 +107,43 @@ pub(super) const CAMERA: CameraOffsets = CameraOffsets {
 pub(super) const RACER: RacerOffsets = RacerOffsets {
     size: 0x3A8,
     state_flags: 0x004,
+    segment_position_info: 0x00C,
+    local_velocity: 0x05C,
+    velocity: 0x074,
+    acceleration: 0x08C,
     speed: 0x098,
+    height_above_ground: 0x0A0,
+    acceleration_force: 0x1D4,
+    drift_attack_force: 0x1D8,
+    colliding_strength: 0x1F4,
     boost_timer: 0x218,
     recoil_tilt: 0x118,
     energy: 0x228,
     max_energy: 0x22C,
     race_distance: 0x23C,
     lap_distance: 0x244,
+    segment_basis: 0x24C,
+    current_radius_left: 0x270,
+    current_radius_right: 0x274,
     z_button_timer: 0x278,
     r_button_timer: 0x27A,
     race_time: 0x2A0,
     lap: 0x2A8,
     laps_completed: 0x2AA,
     position: 0x2AC,
+};
+
+pub(super) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
+    RacerSegmentPositionInfoOffsets {
+        course_segment: 0x000,
+        segment_t_value: 0x004,
+        segment_length_proportion: 0x008,
+        segment_displacement: 0x028,
+        distance_from_segment: 0x040,
+    };
+
+pub(super) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
+    segment_index: 0x030,
 };
 
 pub(crate) const fn player_z_button_timer_offset() -> usize {

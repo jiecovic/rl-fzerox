@@ -31,6 +31,7 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
+    action_history_settings_for_observation,
     build_observation,
     build_observation_space,
 )
@@ -51,7 +52,7 @@ from .info import (
     telemetry_info,
 )
 from .masks import ActionMaskController
-from .reset import benchmark_noop_reset_state, load_track_baseline, reset_race_state
+from .reset import load_track_baseline, reset_race_state
 from .tracks import SelectedTrack, TrackBaselineCache, TrackResetSelector
 
 _DOMAIN_RESET_RNG = 0xD6E8_2BC9_2A5F_1873
@@ -96,6 +97,15 @@ class FZeroXEnvEngine:
         self._curriculum_config = curriculum_config
         self._action_adapter = build_action_adapter(config.action)
         self._observation_spec = backend.observation_spec(config.observation.preset)
+        self._observation_state_components = config.observation.state_components_data()
+        (
+            self._observation_action_history_len,
+            self._observation_action_history_controls,
+        ) = action_history_settings_for_observation(
+            state_components=self._observation_state_components,
+            fallback_len=config.observation.action_history_len,
+            fallback_controls=config.observation.action_history_controls,
+        )
         self._reward_tracker = build_reward_tracker(
             config=reward_config,
             max_episode_steps=config.max_episode_steps,
@@ -108,8 +118,11 @@ class FZeroXEnvEngine:
             stack_mode=config.observation.stack_mode,
             mode=config.observation.mode,
             state_profile=config.observation.state_profile,
-            action_history_len=config.observation.action_history_len,
-            action_history_controls=config.observation.action_history_controls,
+            course_context=config.observation.course_context,
+            ground_effect_context=config.observation.ground_effect_context,
+            action_history_len=self._observation_action_history_len,
+            action_history_controls=self._observation_action_history_controls,
+            state_components=self._observation_state_components,
         )
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
@@ -125,12 +138,13 @@ class FZeroXEnvEngine:
         )
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
+        self._active_track: SelectedTrack | None = None
         self._control_state = ControlStateTracker(
             lean_mode=config.action.lean_mode,
             boost_decision_interval_frames=config.action.boost_decision_interval_frames,
             boost_request_lockout_frames=config.action.boost_request_lockout_frames,
-            action_history_len=config.observation.action_history_len,
-            action_history_controls=config.observation.action_history_controls,
+            action_history_len=self._observation_action_history_len,
+            action_history_controls=self._observation_action_history_controls,
         )
         self._episode_done = False
         self._episode_uses_custom_baseline = False
@@ -198,41 +212,38 @@ class FZeroXEnvEngine:
 
         if seed is not None:
             self._rng_seed_base = seed
-        if self.config.benchmark_noop_reset:
-            selected_track = None
-            info, telemetry = benchmark_noop_reset_state(self.backend)
-        else:
-            selected_track = self._select_reset_track(seed)
-            if selected_track is not None:
-                load_track_baseline(
-                    backend=self.backend,
-                    cache=self._track_baseline_cache,
-                    selected_track=selected_track,
-                    cache_enabled=self.config.cache_track_baselines,
-                )
-            _, info, telemetry = reset_race_state(
+        selected_track = self._select_reset_track(seed)
+        self._active_track = selected_track
+        if selected_track is not None:
+            load_track_baseline(
                 backend=self.backend,
-                config=self.config,
-                sampled_track_baseline=selected_track is not None,
+                cache=self._track_baseline_cache,
+                selected_track=selected_track,
+                cache_enabled=self.config.cache_track_baselines,
             )
-            if selected_track is not None:
-                info.update(selected_track.info())
-            self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(
-                info
-            )
-            telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-            telemetry = sync_camera_setting(
-                self.backend,
-                target_name=self.config.camera_setting,
-                telemetry=telemetry,
-                info=info,
-            )
-            race_intro_info, telemetry = sync_race_intro_target(
-                self.backend,
-                target_timer=self.config.race_intro_target_timer,
-            )
-            info.update(race_intro_info)
-            info.update(backend_step_info(self.backend))
+        _, info, telemetry = reset_race_state(
+            backend=self.backend,
+            config=self.config,
+            sampled_track_baseline=selected_track is not None,
+        )
+        if selected_track is not None:
+            info.update(selected_track.info())
+        self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(
+            info
+        )
+        telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
+        telemetry = sync_camera_setting(
+            self.backend,
+            target_name=self.config.camera_setting,
+            telemetry=telemetry,
+            info=info,
+        )
+        race_intro_info, telemetry = sync_race_intro_target(
+            self.backend,
+            target_timer=self.config.race_intro_target_timer,
+        )
+        info.update(race_intro_info)
+        info.update(backend_step_info(self.backend))
         self._episode_done = False
         self._episode_return = 0.0
         self._held_controller_state = ControllerState()
@@ -268,8 +279,11 @@ class FZeroXEnvEngine:
             observation_stack_mode=self.config.observation.stack_mode,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
-            action_history_len=self.config.observation.action_history_len,
-            action_history_controls=self.config.observation.action_history_controls,
+            observation_course_context=self.config.observation.course_context,
+            observation_ground_effect_context=self.config.observation.ground_effect_context,
+            action_history_len=self._observation_action_history_len,
+            action_history_controls=self._observation_action_history_controls,
+            observation_state_components=self._observation_state_components,
         )
         self._last_info = dict(info)
         self._reset_count += 1
@@ -497,6 +511,8 @@ class FZeroXEnvEngine:
             lean_timer_assist=(self.config.action.lean_mode == LEAN_MODE_TIMER_ASSIST),
         )
         info = backend_step_info(self.backend)
+        if self._active_track is not None:
+            info.update(self._active_track.info())
         telemetry = step_result.telemetry
         self._last_telemetry = telemetry
         gas_level = requested_gas_level(
@@ -578,8 +594,11 @@ class FZeroXEnvEngine:
             observation_stack_mode=self.config.observation.stack_mode,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
-            action_history_len=self.config.observation.action_history_len,
-            action_history_controls=self.config.observation.action_history_controls,
+            observation_course_context=self.config.observation.course_context,
+            observation_ground_effect_context=self.config.observation.ground_effect_context,
+            action_history_len=self._observation_action_history_len,
+            action_history_controls=self._observation_action_history_controls,
+            observation_state_components=self._observation_state_components,
         )
         return WatchEnvStep(
             observation=observation,
@@ -630,9 +649,12 @@ class FZeroXEnvEngine:
             telemetry=telemetry,
             mode=self.config.observation.mode,
             state_profile=self.config.observation.state_profile,
-            action_history_len=self.config.observation.action_history_len,
-            action_history_controls=self.config.observation.action_history_controls,
+            course_context=self.config.observation.course_context,
+            ground_effect_context=self.config.observation.ground_effect_context,
+            action_history_len=self._observation_action_history_len,
+            action_history_controls=self._observation_action_history_controls,
             action_history=self._control_state.action_history_fields(),
+            state_components=self._observation_state_components,
             **self._control_state.observation_fields(),
         )
 

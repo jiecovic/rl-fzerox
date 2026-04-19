@@ -116,6 +116,16 @@ class Emulator:
         seed1, mask1, seed2, mask2 = self._native.randomize_game_rng(normalized_seed)
         return int(seed1), int(mask1), int(seed2), int(mask2)
 
+    def read_system_ram(self, offset: int, length: int) -> bytes:
+        """Read raw N64 system RAM bytes for reverse-engineering probes."""
+
+        return bytes(self._native.read_system_ram(offset, length))
+
+    def write_system_ram(self, offset: int, data: bytes) -> None:
+        """Write raw N64 system RAM bytes for controlled reverse-engineering probes."""
+
+        self._native.write_system_ram(offset, data)
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,

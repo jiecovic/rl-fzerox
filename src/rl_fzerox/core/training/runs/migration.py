@@ -61,9 +61,11 @@ _OBSOLETE_TRACK_FIELDS = frozenset(
         "human_reference_lap_time_ms",
         "reference_source",
         "reference_url",
+        "ghost",
     )
 )
-_OBSOLETE_TRACK_SAMPLING_ENTRY_FIELDS = frozenset(("finish_time_target_ms",))
+_OBSOLETE_TRACK_SAMPLING_ENTRY_FIELDS = frozenset(("finish_time_target_ms", "ghost"))
+_OBSOLETE_ENV_FIELDS = frozenset(("benchmark_noop_reset",))
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,9 +128,10 @@ def _load_mapping(config_path: Path) -> dict[str, object]:
 
 def _scrub_obsolete_fields(config_data: dict[str, object]) -> list[str]:
     removed: list[str] = []
+    _remove_mapping_keys(config_data.get("env"), "env", _OBSOLETE_ENV_FIELDS, removed)
     _remove_mapping_keys(config_data.get("reward"), "reward", _OBSOLETE_REWARD_FIELDS, removed)
     _remove_mapping_keys(config_data.get("track"), "track", _OBSOLETE_TRACK_FIELDS, removed)
-    _scrub_track_sampling_entries(config_data, removed)
+    _scrub_track_sampling_sections(config_data, removed)
     return removed
 
 
@@ -151,23 +154,66 @@ def _resolve_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
     )
 
 
-def _scrub_track_sampling_entries(config_data: dict[str, object], removed: list[str]) -> None:
+def _scrub_track_sampling_sections(config_data: dict[str, object], removed: list[str]) -> None:
     env_data = config_data.get("env")
-    if not isinstance(env_data, dict):
+    if isinstance(env_data, dict):
+        _scrub_track_sampling_section(env_data.get("track_sampling"), "env.track_sampling", removed)
+
+    curriculum_data = config_data.get("curriculum")
+    if not isinstance(curriculum_data, dict):
         return
-    track_sampling_data = env_data.get("track_sampling")
+    stages = curriculum_data.get("stages")
+    if not isinstance(stages, list):
+        return
+    for stage_index, stage in enumerate(stages):
+        if isinstance(stage, dict):
+            _scrub_track_sampling_section(
+                stage.get("track_sampling"),
+                f"curriculum.stages.{stage_index}.track_sampling",
+                removed,
+            )
+
+
+def _scrub_track_sampling_section(
+    track_sampling_data: object,
+    prefix: str,
+    removed: list[str],
+) -> None:
     if not isinstance(track_sampling_data, dict):
         return
+    _rename_mapping_key(
+        track_sampling_data,
+        prefix,
+        old_key="mode",
+        new_key="sampling_mode",
+        removed=removed,
+    )
     entries = track_sampling_data.get("entries")
     if not isinstance(entries, list):
         return
     for index, entry in enumerate(entries):
         _remove_mapping_keys(
             entry,
-            f"env.track_sampling.entries.{index}",
+            f"{prefix}.entries.{index}",
             _OBSOLETE_TRACK_SAMPLING_ENTRY_FIELDS,
             removed,
         )
+
+
+def _rename_mapping_key(
+    mapping: dict[object, object],
+    prefix: str,
+    *,
+    old_key: str,
+    new_key: str,
+    removed: list[str],
+) -> None:
+    if old_key not in mapping:
+        return
+    if new_key not in mapping:
+        mapping[new_key] = mapping[old_key]
+    del mapping[old_key]
+    removed.append(f"{prefix}.{old_key}")
 
 
 def _remove_mapping_keys(

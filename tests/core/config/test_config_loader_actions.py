@@ -157,6 +157,50 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     assert config.env.action.branches.boost.mask == ("idle",)
 
 
+def test_load_train_app_config_compiles_continuous_gas_branch(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    branches:",
+            "      steer:",
+            "        type: continuous",
+            "      gas:",
+            "        type: continuous",
+            "      boost:",
+            "        type: discrete",
+            "        mask: [idle]",
+            "      lean:",
+            "        type: discrete",
+            "        mask: [idle, left, right]",
+            "train:",
+            "  algorithm: maskable_hybrid_action_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_boost_lean"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.0
+    assert config.env.action.mask is not None
+    assert config.env.action.mask.branch_overrides() == {
+        "boost": (0,),
+        "lean": (0, 1, 2),
+    }
+
+
 def test_load_train_app_config_prefers_action_branches_over_adapter_fields(
     tmp_path: Path,
 ) -> None:
@@ -176,7 +220,7 @@ def test_load_train_app_config_prefers_action_branches_over_adapter_fields(
             "  action:",
             "    name: steer_drive",
             "    mask:",
-            "      boost: [0]",
+            "      boost: [idle]",
             "    branches:",
             "      steer:",
             "        type: continuous",
@@ -335,4 +379,3 @@ def test_load_train_app_config_accepts_lean_fields(tmp_path: Path) -> None:
 
     assert config.env.action.continuous_lean_deadzone == 0.25
     assert config.env.action.lean_unmask_min_speed_kph == 500.0
-

@@ -1,0 +1,20 @@
+# Course-level metadata shared by all Big Blue baselines.
+course:
+  id: big_blue
+  display_name: "Big Blue"
+  cup: jack
+  course_index: 4
+  # Non-AGG course WR history from fzerowrs.com, using the NTSC-normalized column.
+  records:
+    source_label: "F-Zero X WR History"
+    source_url: https://www.fzerowrs.com/x/display.php?track=Big+Blue
+    non_agg_best:
+      time_ms: 48035
+      player: Daniel
+      date: "2015-08-26"
+      mode: PAL
+    non_agg_worst:
+      time_ms: 75846
+      player: FTQ
+      date: "1998-11-xx"
+      mode: NTSC

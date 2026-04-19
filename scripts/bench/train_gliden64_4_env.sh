@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/bench/train_gliden64_single_env_noop_reset.sh
+# scripts/bench/train_gliden64_4_env.sh
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
@@ -8,7 +8,6 @@ cd "$(dirname "$0")/../.."
   --config conf/local/archive/train.local.ppo_hybrid_full_gas_v3_stack4.yaml \
   -- \
   emulator.renderer=gliden64 \
-  train.num_envs=1 \
-  train.vec_env=dummy \
-  env.benchmark_noop_reset=true \
+  train.num_envs=4 \
+  train.vec_env=subproc \
   train.total_timesteps=200000

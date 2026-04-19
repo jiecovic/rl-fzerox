@@ -5,13 +5,12 @@
 track:
   id: devils_forest_time_attack_blue_falcon_balanced
   display_name: "Devil's Forest Time Attack - Blue Falcon Balanced"
-  course_index: 3
+  course_ref: jack/devils_forest
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/devils-forest-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Devil's Forest time-attack baseline without ghost."
+  notes: "Devil's Forest time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

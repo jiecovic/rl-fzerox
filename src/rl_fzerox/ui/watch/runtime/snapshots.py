@@ -2,28 +2,47 @@
 from __future__ import annotations
 
 import time
-from multiprocessing.queues import Queue as ProcessQueue
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
+from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import WatchAppConfig
-from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
-from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot, publish_worker_message
+from rl_fzerox.ui.watch.runtime.ipc import (
+    WatchSnapshot,
+    WorkerMessageQueue,
+    publish_worker_message,
+)
 from rl_fzerox.ui.watch.runtime.policy import (
     _policy_curriculum_stage,
     _policy_deterministic,
     _policy_label,
     _policy_reload_age_seconds,
 )
-from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
+from rl_fzerox.ui.watch.runtime.telemetry import (
+    TelemetryReader,
+    _read_live_telemetry,
+    _telemetry_to_data,
+)
 
 if TYPE_CHECKING:
     from rl_fzerox.core.training.inference import PolicyRunner
+
+
+class _SnapshotBackend(Protocol):
+    @property
+    def native_fps(self) -> float: ...
+
+
+class _SnapshotEnv(Protocol):
+    @property
+    def backend(self) -> _SnapshotBackend: ...
+
+    def render(self) -> RgbFrame: ...
+
 
 BOOST_ACTIVE_LAMP_LEVEL = 0.55
 BOOST_MANUAL_LAMP_LEVEL = 1.0
@@ -33,9 +52,9 @@ BOOST_LAMP_FADE_FRAMES = 18
 def _publish_step_snapshots(
     *,
     config: WatchAppConfig,
-    env: FZeroXEnv,
-    emulator: Emulator,
-    snapshot_queue: ProcessQueue,
+    env: _SnapshotEnv,
+    emulator: TelemetryReader,
+    snapshot_queue: WorkerMessageQueue,
     display_frames: tuple[RgbFrame, ...],
     previous_observation: ObservationValue,
     previous_info: dict[str, object],
@@ -57,6 +76,7 @@ def _publish_step_snapshots(
     policy_runner: PolicyRunner | None,
     policy_reload_error: str | None,
     best_finish_position: int | None,
+    best_finish_times: dict[str, int],
 ) -> None:
     frames = display_frames or (env.render(),)
     frame_interval_seconds = (
@@ -88,6 +108,10 @@ def _publish_step_snapshots(
                 policy_runner=policy_runner,
                 policy_reload_error=policy_reload_error,
                 best_finish_position=best_finish_position,
+                best_finish_times=best_finish_times,
+                action_hold_frame=index + 1,
+                action_hold_frames=len(frames),
+                policy_decision_frame=is_final_frame,
             ),
         )
         if frame_interval_seconds is not None and not is_final_frame:
@@ -97,8 +121,8 @@ def _publish_step_snapshots(
 def _build_snapshot(
     *,
     config: WatchAppConfig,
-    env: FZeroXEnv,
-    emulator: Emulator,
+    env: _SnapshotEnv,
+    emulator: TelemetryReader,
     raw_frame: RgbFrame | None = None,
     observation: ObservationValue,
     info: dict[str, object],
@@ -114,7 +138,11 @@ def _build_snapshot(
     policy_runner: PolicyRunner | None,
     policy_reload_error: str | None,
     best_finish_position: int | None,
+    best_finish_times: dict[str, int],
     telemetry: FZeroXTelemetry | None = None,
+    action_hold_frame: int = 1,
+    action_hold_frames: int = 1,
+    policy_decision_frame: bool = True,
 ) -> WatchSnapshot:
     if telemetry is None:
         telemetry = _read_live_telemetry(emulator)
@@ -143,8 +171,12 @@ def _build_snapshot(
         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
         policy_reload_error=policy_reload_error,
         best_finish_position=best_finish_position,
+        best_finish_times=dict(best_finish_times),
         continuous_air_brake_disabled=_continuous_air_brake_disabled(config, telemetry),
         telemetry_data=_telemetry_to_data(telemetry),
+        action_hold_frame=max(1, int(action_hold_frame)),
+        action_hold_frames=max(1, int(action_hold_frames)),
+        policy_decision_frame=bool(policy_decision_frame),
     )
 
 

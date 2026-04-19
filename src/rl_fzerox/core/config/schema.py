@@ -14,6 +14,7 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -23,6 +24,10 @@ from rl_fzerox.core.config.action_branches import (
     compile_action_branches,
 )
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
+from rl_fzerox.core.domain.action_values import (
+    ActionMaskValue,
+    compile_action_mask_values,
+)
 from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.domain.training_algorithms import (
@@ -33,8 +38,25 @@ from rl_fzerox.core.domain.training_algorithms import (
 )
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
-ActionHistoryControlName: TypeAlias = Literal["steer", "gas", "air_brake", "boost", "lean"]
+ActionHistoryControlName: TypeAlias = Literal[
+    "steer",
+    "gas",
+    "thrust",
+    "air_brake",
+    "boost",
+    "lean",
+]
 TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
+ObservationCourseContext: TypeAlias = Literal["none", "one_hot_builtin"]
+ObservationGroundEffectContext: TypeAlias = Literal["none", "effect_flags"]
+ObservationStateComponentName: TypeAlias = Literal[
+    "vehicle_state",
+    "track_position",
+    "surface_state",
+    "course_context",
+    "legacy_state",
+    "control_history",
+]
 
 
 class ActionMaskConfig(BaseModel):
@@ -42,21 +64,24 @@ class ActionMaskConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    steer: tuple[NonNegativeInt, ...] | None = None
-    drive: tuple[NonNegativeInt, ...] | None = None
-    gas: tuple[NonNegativeInt, ...] | None = None
-    air_brake: tuple[NonNegativeInt, ...] | None = None
-    boost: tuple[NonNegativeInt, ...] | None = None
-    lean: tuple[NonNegativeInt, ...] | None = None
+    steer: tuple[ActionMaskValue, ...] | None = None
+    drive: tuple[ActionMaskValue, ...] | None = None
+    gas: tuple[ActionMaskValue, ...] | None = None
+    air_brake: tuple[ActionMaskValue, ...] | None = None
+    boost: tuple[ActionMaskValue, ...] | None = None
+    lean: tuple[ActionMaskValue, ...] | None = None
 
     @field_validator("steer", "drive", "gas", "air_brake", "boost", "lean")
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
-        value: tuple[int, ...] | None,
-    ) -> tuple[int, ...] | None:
+        value: tuple[ActionMaskValue, ...] | None,
+        info: ValidationInfo,
+    ) -> tuple[ActionMaskValue, ...] | None:
         if value is not None and len(value) == 0:
             raise ValueError("Action mask branches must not be empty")
+        if value is not None:
+            compile_action_mask_values(str(info.field_name), value)
         return value
 
     def branch_overrides(self) -> dict[str, tuple[int, ...]]:
@@ -66,7 +91,7 @@ class ActionMaskConfig(BaseModel):
         for branch_name in ("steer", "drive", "gas", "air_brake", "boost", "lean"):
             values = getattr(self, branch_name)
             if values is not None:
-                overrides[branch_name] = tuple(int(value) for value in values)
+                overrides[branch_name] = compile_action_mask_values(branch_name, values)
         return overrides
 
 
@@ -126,7 +151,15 @@ class ActionConfig(BaseModel):
             # Delete this compile bridge when the runtime consumes branches
             # directly.
             compiled = compile_action_branches(branch_config)
-            values = {"branches": branch_config}
+            preserved_branch_fields = {
+                field_name: values[field_name]
+                for field_name in (
+                    "continuous_drive_mode",
+                    "continuous_drive_deadzone",
+                )
+                if field_name in values
+            }
+            values = {"branches": branch_config, **preserved_branch_fields}
             values.update(compiled.values)
         return values
 
@@ -136,6 +169,92 @@ class ActionConfig(BaseModel):
         if value % 2 == 0:
             raise ValueError("steer_buckets must be odd so one bucket maps to straight")
         return value
+
+
+class ObservationStateComponentConfig(BaseModel):
+    """One ordered scalar-state component in the image-state observation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: ObservationStateComponentName
+    speed_normalizer_kph: PositiveFloat | None = None
+    lateral_velocity_normalizer: PositiveFloat | None = None
+    sliding_lateral_velocity_threshold: PositiveFloat | None = None
+    encoding: ObservationCourseContext | None = None
+    state_profile: Literal[
+        "default",
+        "steer_history",
+        "race_core",
+    ] | None = None
+    length: PositiveInt | None = Field(default=None, le=16)
+    controls: tuple[ActionHistoryControlName, ...] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse_lego_component(cls, data: object) -> object:
+        if isinstance(data, str):
+            return {"name": data}
+        if not isinstance(data, Mapping) or "name" in data or len(data) != 1:
+            return data
+
+        name, settings = next(iter(data.items()))
+        if settings is None:
+            return {"name": name}
+        if isinstance(settings, Mapping):
+            return {"name": name, **settings}
+        return data
+
+    @model_validator(mode="after")
+    def _validate_component_settings(self) -> ObservationStateComponentConfig:
+        configured_fields = {
+            name
+            for name in (
+                "speed_normalizer_kph",
+                "lateral_velocity_normalizer",
+                "sliding_lateral_velocity_threshold",
+                "encoding",
+                "state_profile",
+                "length",
+                "controls",
+            )
+            if getattr(self, name) is not None
+        }
+        invalid_fields = configured_fields - self._allowed_fields()
+        if invalid_fields:
+            joined = ", ".join(sorted(invalid_fields))
+            raise ValueError(f"{self.name} does not accept setting(s): {joined}")
+
+        if self.controls is not None:
+            if len(set(self.controls)) != len(self.controls):
+                raise ValueError("control_history.controls must not contain duplicates")
+            normalized = {"gas" if control == "thrust" else control for control in self.controls}
+            if len(normalized) != len(self.controls):
+                raise ValueError("control_history.controls cannot contain both gas and thrust")
+        return self
+
+    def _allowed_fields(self) -> frozenset[str]:
+        match self.name:
+            case "vehicle_state":
+                return frozenset(
+                    {
+                        "speed_normalizer_kph",
+                        "lateral_velocity_normalizer",
+                        "sliding_lateral_velocity_threshold",
+                    }
+                )
+            case "course_context":
+                return frozenset({"encoding"})
+            case "legacy_state":
+                return frozenset({"state_profile"})
+            case "control_history":
+                return frozenset({"length", "controls"})
+            case "track_position" | "surface_state":
+                return frozenset()
+
+    def data(self) -> dict[str, object]:
+        """Return the compact ordered form consumed by env code."""
+
+        return self.model_dump(mode="python", exclude_none=True)
 
 
 class ObservationConfig(BaseModel):
@@ -149,11 +268,17 @@ class ObservationConfig(BaseModel):
         "steer_history",
         "race_core",
     ] = "default"
-    preset: Literal["native_crop_v1", "native_crop_v2", "native_crop_v3", "native_crop_v4"] = (
-        "native_crop_v3"
-    )
+    preset: Literal[
+        "native_crop_v1",
+        "native_crop_v2",
+        "native_crop_v3",
+        "native_crop_v4",
+        "native_crop_v6",
+    ] = "native_crop_v3"
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
+    course_context: ObservationCourseContext = "none"
+    ground_effect_context: ObservationGroundEffectContext = "none"
     action_history_len: PositiveInt | None = Field(default=None, le=16)
     action_history_controls: tuple[ActionHistoryControlName, ...] = (
         "steer",
@@ -161,6 +286,7 @@ class ObservationConfig(BaseModel):
         "boost",
         "lean",
     )
+    state_components: tuple[ObservationStateComponentConfig, ...] | None = None
 
     @field_validator("action_history_controls")
     @classmethod
@@ -170,7 +296,76 @@ class ObservationConfig(BaseModel):
     ) -> tuple[ActionHistoryControlName, ...]:
         if len(set(value)) != len(value):
             raise ValueError("action_history_controls must not contain duplicates")
+        normalized = {"gas" if control == "thrust" else control for control in value}
+        if len(normalized) != len(value):
+            raise ValueError("action_history_controls cannot contain both gas and thrust")
         return value
+
+    @field_validator("state_components")
+    @classmethod
+    def _validate_unique_state_components(
+        cls,
+        value: tuple[ObservationStateComponentConfig, ...] | None,
+    ) -> tuple[ObservationStateComponentConfig, ...] | None:
+        if value is None:
+            return None
+        names = [component.name for component in value]
+        if len(set(names)) != len(names):
+            raise ValueError("observation.state_components must not contain duplicates")
+        return value
+
+    def state_components_data(self) -> tuple[dict[str, object], ...] | None:
+        """Return state-component settings in the plain form consumed by env code."""
+
+        if self.state_components is None:
+            return None
+        return tuple(component.data() for component in self.state_components)
+
+
+class TrackRecordEntryConfig(BaseModel):
+    """One human reference time for a track."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    time_ms: PositiveInt
+    player: str | None = None
+    date: str | None = None
+    mode: Literal["NTSC", "PAL"] | None = None
+
+    def info(self, prefix: str) -> dict[str, object]:
+        """Return flat, pickle-safe info fields for HUD/runtime payloads."""
+
+        info: dict[str, object] = {f"{prefix}_time_ms": int(self.time_ms)}
+        if self.player is not None:
+            info[f"{prefix}_player"] = self.player
+        if self.date is not None:
+            info[f"{prefix}_date"] = self.date
+        if self.mode is not None:
+            info[f"{prefix}_mode"] = self.mode
+        return info
+
+
+class TrackRecordsConfig(BaseModel):
+    """External reference records for a track."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_label: str = "F-Zero X WR History"
+    source_url: str | None = None
+    non_agg_best: TrackRecordEntryConfig | None = None
+    non_agg_worst: TrackRecordEntryConfig | None = None
+
+    def info(self) -> dict[str, object]:
+        """Return flat, pickle-safe info fields for HUD/runtime payloads."""
+
+        info: dict[str, object] = {"track_record_source_label": self.source_label}
+        if self.source_url is not None:
+            info["track_record_source_url"] = self.source_url
+        if self.non_agg_best is not None:
+            info.update(self.non_agg_best.info("track_non_agg_best"))
+        if self.non_agg_worst is not None:
+            info.update(self.non_agg_worst.info("track_non_agg_worst"))
+        return info
 
 
 class TrackSamplingEntryConfig(BaseModel):
@@ -180,9 +375,17 @@ class TrackSamplingEntryConfig(BaseModel):
 
     id: str
     display_name: str | None = None
+    course_ref: str | None = None
+    course_id: str | None = None
+    course_name: str | None = None
     baseline_state_path: Path
     weight: PositiveFloat = 1.0
     course_index: NonNegativeInt | None = None
+    mode: str | None = None
+    vehicle: str | None = None
+    vehicle_name: str | None = None
+    engine_setting: str | None = None
+    records: TrackRecordsConfig | None = None
 
 
 class TrackSamplingConfig(BaseModel):
@@ -191,7 +394,7 @@ class TrackSamplingConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     enabled: bool = False
-    mode: TrackSamplingMode = "random"
+    sampling_mode: TrackSamplingMode = "random"
     entries: tuple[TrackSamplingEntryConfig, ...] = ()
 
     @model_validator(mode="after")
@@ -221,7 +424,6 @@ class EnvConfig(BaseModel):
     terminate_on_energy_depleted: bool = True
     randomize_game_rng_on_reset: bool = False
     randomize_game_rng_requires_race_mode: bool = True
-    benchmark_noop_reset: bool = False
     camera_setting: CameraSettingName | None = None
     reset_to_race: bool = False
     race_intro_target_timer: int | None = Field(default=39, ge=0, le=460)
@@ -247,6 +449,8 @@ class RewardConfig(BaseModel):
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
+    dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)
+    ice_progress_multiplier: float = Field(default=1.0, ge=0.0)
     energy_refill_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -288,12 +492,16 @@ class TrackConfig(BaseModel):
 
     id: str | None = None
     display_name: str | None = None
+    course_ref: str | None = None
+    course_id: str | None = None
+    course_name: str | None = None
     course_index: NonNegativeInt | None = None
     mode: str | None = None
     vehicle: str | None = None
+    vehicle_name: str | None = None
     engine_setting: str | None = None
-    ghost: str | None = None
     baseline_state_path: Path | None = None
+    records: TrackRecordsConfig | None = None
     notes: str | None = None
 
 
@@ -349,7 +557,7 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    conv_profile: Literal["auto", "nature", "compact_deep"] = "auto"
+    conv_profile: Literal["auto", "nature", "compact_deep", "compact_bottleneck"] = "auto"
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     fusion_features_dim: PositiveInt | None = None
@@ -412,6 +620,7 @@ class CurriculumStageConfig(BaseModel):
     name: str
     until: CurriculumTriggerConfig | None = None
     action_mask: ActionMaskConfig | None = None
+    lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     track_sampling: TrackSamplingConfig | None = None
     train: CurriculumTrainOverridesConfig | None = None
 

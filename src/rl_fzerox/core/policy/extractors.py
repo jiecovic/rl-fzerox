@@ -10,7 +10,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
 ConvSpec = tuple[tuple[int, tuple[int, int], tuple[int, int]], ...]
-ConvProfile = Literal["auto", "nature", "compact_deep"]
+ConvProfile = Literal["auto", "nature", "compact_deep", "compact_bottleneck"]
 NATURE_CNN_CONV_SPEC: ConvSpec = (
     (32, (8, 8), (4, 4)),
     (64, (4, 4), (2, 2)),
@@ -28,11 +28,19 @@ COMPACT_DEEP_CONV_SPEC: ConvSpec = (
     (128, (4, 4), (2, 2)),
     (128, (4, 4), (2, 2)),
 )
+COMPACT_BOTTLENECK_CONV_SPEC: ConvSpec = (
+    (64, (8, 8), (2, 2)),
+    (64, (8, 8), (2, 2)),
+    (64, (4, 4), (2, 2)),
+    (128, (3, 3), (2, 2)),
+    (256, (4, 4), (1, 1)),
+)
 SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (84, 116): NATURE_CNN_CONV_SPEC,
     (92, 124): NATURE_CNN_CONV_SPEC,
     (116, 164): LEGACY_DEEP_CONV_SPEC,
     (98, 130): COMPACT_DEEP_CONV_SPEC,
+    (66, 82): COMPACT_DEEP_CONV_SPEC,
 }
 
 
@@ -256,6 +264,8 @@ def _resolve_conv_spec(
         return NATURE_CNN_CONV_SPEC
     if conv_profile == "compact_deep":
         return COMPACT_DEEP_CONV_SPEC
+    if conv_profile == "compact_bottleneck":
+        return COMPACT_BOTTLENECK_CONV_SPEC
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
 
 

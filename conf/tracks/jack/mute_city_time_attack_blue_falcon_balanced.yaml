@@ -5,13 +5,12 @@
 track:
   id: mute_city_time_attack_blue_falcon_balanced
   display_name: "Mute City Time Attack - Blue Falcon Balanced"
-  course_index: 0
+  course_ref: jack/mute_city
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/mute-city-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Mute City time-attack baseline without ghost."
+  notes: "Mute City time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

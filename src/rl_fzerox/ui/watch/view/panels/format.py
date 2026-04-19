@@ -128,12 +128,31 @@ def _format_progress_frontier_counter(
     )
 
 
-def _format_episode_step(
+def _format_episode_frames(
     info: dict[str, object],
     *,
     max_episode_steps: int,
 ) -> str:
     return f"{_int_info(info, 'episode_step')} / {max_episode_steps}"
+
+
+def _format_env_step(
+    info: dict[str, object],
+    *,
+    action_repeat: int,
+    max_episode_steps: int,
+) -> str:
+    repeat = max(1, int(action_repeat))
+    episode_frames = _int_info(info, "episode_step")
+    env_steps = _ceil_div(episode_frames, repeat)
+    max_env_steps = _ceil_div(max_episode_steps, repeat)
+    return f"{env_steps} / {max_env_steps}"
+
+
+def _ceil_div(value: int, divisor: int) -> int:
+    if value <= 0:
+        return 0
+    return (value + divisor - 1) // divisor
 
 
 def _format_control_rate(info: dict[str, object]) -> str:

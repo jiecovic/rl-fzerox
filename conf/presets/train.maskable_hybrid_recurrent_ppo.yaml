@@ -14,14 +14,11 @@ env:
     lean_mode: release_cooldown
     # Masks list allowed action values, not blocked values.
     mask:
-      # 0=coast, 1=press gas. Force full gas while preserving the policy head.
-      gas: [1]
-      # 0=off, 1=press air brake.
-      air_brake: [0]
-      # 0=off, 1=press boost.
-      boost: [0]
-      # 0=off, 1=left slide, 2=right slide.
-      lean: [0]
+      # Force full gas while preserving the policy head.
+      gas: [engaged]
+      air_brake: [idle]
+      boost: [idle]
+      lean: [idle]
     # These gates only matter once the explicit lean mask above is relaxed.
     boost_unmask_max_speed_kph: 820.0
     lean_unmask_min_speed_kph: 730.0

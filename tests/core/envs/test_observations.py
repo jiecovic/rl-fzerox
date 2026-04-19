@@ -1,17 +1,21 @@
 # tests/core/envs/test_observations.py
 import numpy as np
 import pytest
+from gymnasium import spaces
 
 from fzerox_emulator.arrays import RgbFrame
+from rl_fzerox.core.envs.course_effects import CourseEffect
 from rl_fzerox.core.envs.observations import (
     STATE_FEATURE_NAMES,
+    action_history_settings_for_observation,
     build_image_observation_space,
+    build_observation_space,
     stacked_observation_channels,
     state_feature_names,
     telemetry_state_vector,
 )
 from tests.support.fakes import SyntheticBackend
-from tests.support.native_objects import make_telemetry
+from tests.support.native_objects import encode_state_flags, make_telemetry
 
 
 def test_native_observation_stack_repeats_the_first_frame() -> None:
@@ -70,6 +74,19 @@ def test_native_observation_v4_uses_compact_deep_aspect_correct_shape() -> None:
     observation = backend.render_observation(preset="native_crop_v4", frame_stack=3)
 
     assert observation.shape == (98, 130, 9)
+
+
+def test_native_observation_v6_uses_small_aspect_correct_shape() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="native_crop_v6",
+        frame_stack=4,
+        stack_mode="rgb_gray",
+    )
+
+    assert observation.shape == (66, 82, 6)
 
 
 def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
@@ -151,6 +168,93 @@ def test_race_core_state_profile_keeps_minimal_race_context() -> None:
         "boost_active",
     )
     assert vector.tolist() == [0.5, 0.5, 1.0, 1.0, 0.0, 1.0]
+
+
+def test_builtin_course_context_adds_course_one_hot() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(course_index=3, speed_kph=750.0),
+        state_profile="race_core",
+        course_context="one_hot_builtin",
+    )
+    feature_names = state_feature_names(
+        "race_core",
+        course_context="one_hot_builtin",
+    )
+
+    assert vector.shape == (30,)
+    assert feature_names[6:30] == tuple(f"course_builtin_{index:02d}" for index in range(24))
+    assert vector[feature_names.index("course_builtin_03")] == 1.0
+    assert float(sum(vector[6:30])) == 1.0
+
+
+def test_builtin_course_context_ignores_non_builtin_course_index() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(course_index=48),
+        state_profile="race_core",
+        course_context="one_hot_builtin",
+    )
+
+    assert vector.shape == (30,)
+    assert float(sum(vector[6:30])) == 0.0
+
+
+def test_ground_effect_context_adds_course_effect_flags() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(state_flags=2),
+        state_profile="race_core",
+        ground_effect_context="effect_flags",
+    )
+    feature_names = state_feature_names(
+        "race_core",
+        ground_effect_context="effect_flags",
+    )
+
+    assert vector.shape == (10,)
+    assert feature_names[6:10] == (
+        "ground_pit",
+        "ground_dash",
+        "ground_dirt",
+        "ground_ice",
+    )
+    assert vector[feature_names.index("ground_pit")] == 0.0
+    assert vector[feature_names.index("ground_dash")] == 0.0
+    assert vector[feature_names.index("ground_dirt")] == 1.0
+    assert vector[feature_names.index("ground_ice")] == 0.0
+
+
+def test_observation_contexts_precede_action_history() -> None:
+    vector = telemetry_state_vector(
+        make_telemetry(course_index=1, state_flags=4),
+        state_profile="race_core",
+        course_context="one_hot_builtin",
+        ground_effect_context="effect_flags",
+        action_history_len=1,
+        action_history={"prev_steer_1": 0.5},
+    )
+    feature_names = state_feature_names(
+        "race_core",
+        course_context="one_hot_builtin",
+        ground_effect_context="effect_flags",
+        action_history_len=1,
+    )
+
+    assert vector.shape == (38,)
+    assert feature_names[6:30] == tuple(f"course_builtin_{index:02d}" for index in range(24))
+    assert feature_names[30:34] == (
+        "ground_pit",
+        "ground_dash",
+        "ground_dirt",
+        "ground_ice",
+    )
+    assert feature_names[34:] == (
+        "prev_steer_1",
+        "prev_gas_1",
+        "prev_boost_1",
+        "prev_lean_1",
+    )
+    assert vector[feature_names.index("course_builtin_01")] == 1.0
+    assert vector[feature_names.index("ground_ice")] == 1.0
+    assert vector[feature_names.index("prev_steer_1")] == 0.5
 
 
 def test_action_history_len_none_disables_previous_actions() -> None:
@@ -249,3 +353,140 @@ def test_action_history_len_uses_configured_history_length() -> None:
     assert values["prev_steer_3"] == -1.0
     assert values["prev_gas_3"] == 1.0
     assert values["prev_boost_2"] == 1.0
+
+
+def test_state_components_build_clean_prefixed_state_vector() -> None:
+    components = _clean_state_components()
+    telemetry = make_telemetry(
+        course_index=2,
+        speed_kph=750.0,
+        energy=89.0,
+        max_energy=178.0,
+        reverse_timer=1,
+        state_flags=encode_state_flags(("active", "can_boost")) | int(CourseEffect.DIRT),
+        local_lateral_velocity=16.0,
+        signed_lateral_offset=-90.0,
+        current_radius_left=120.0,
+        current_radius_right=100.0,
+    )
+
+    vector = telemetry_state_vector(
+        telemetry,
+        state_components=components,
+        action_history={
+            "prev_steer_1": -0.5,
+            "prev_gas_1": 1.0,
+            "prev_boost_2": 1.0,
+            "prev_lean_1": -1.0,
+        },
+    )
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert vector.shape == (45,)
+    assert feature_names[:10] == (
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_ready",
+        "vehicle_state.boost_active",
+        "vehicle_state.lateral_velocity_norm",
+        "vehicle_state.sliding_active",
+        "track_position.edge_ratio",
+        "track_position.outside_track_bounds",
+    )
+    assert values["vehicle_state.speed_norm"] == 0.5
+    assert values["vehicle_state.energy_frac"] == 0.5
+    assert values["vehicle_state.reverse_active"] == 1.0
+    assert values["vehicle_state.boost_ready"] == 1.0
+    assert values["vehicle_state.lateral_velocity_norm"] == 0.5
+    assert values["vehicle_state.sliding_active"] == 1.0
+    assert values["track_position.edge_ratio"] == pytest.approx(-0.9)
+    assert values["track_position.outside_track_bounds"] == 0.0
+    assert values["surface_state.on_dirt_surface"] == 1.0
+    assert values["course_context.course_builtin_02"] == 1.0
+    assert values["control_history.steer_t_minus_1"] == -0.5
+    assert values["control_history.thrust_t_minus_1"] == 1.0
+    assert values["control_history.boost_t_minus_2"] == 1.0
+    assert values["control_history.lean_t_minus_1"] == -1.0
+
+
+def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:
+    components = _clean_state_components(control_history_enabled=False)
+    telemetry = make_telemetry(
+        signed_lateral_offset=150.0,
+        current_radius_left=100.0,
+    )
+
+    vector = telemetry_state_vector(telemetry, state_components=components)
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert values["track_position.edge_ratio"] == 1.0
+    assert values["track_position.outside_track_bounds"] == 1.0
+
+
+def test_state_components_can_disable_control_history() -> None:
+    components = _clean_state_components(control_history_enabled=False)
+    feature_names = state_feature_names("race_core", state_components=components)
+
+    assert all(not name.startswith("control_history.") for name in feature_names)
+    assert action_history_settings_for_observation(
+        state_components=components,
+        fallback_len=2,
+        fallback_controls=("steer", "gas"),
+    ) == (None, ())
+
+
+def test_state_components_define_observation_space_shape_and_bounds() -> None:
+    components = _clean_state_components()
+    backend = SyntheticBackend()
+    spec = backend.observation_spec("native_crop_v6")
+
+    observation_space = build_observation_space(
+        spec,
+        frame_stack=4,
+        stack_mode="rgb_gray",
+        mode="image_state",
+        state_components=components,
+    )
+    assert isinstance(observation_space, spaces.Dict)
+    image_space = observation_space.spaces["image"]
+    state_space = observation_space.spaces["state"]
+    assert isinstance(image_space, spaces.Box)
+    assert isinstance(state_space, spaces.Box)
+
+    assert image_space.shape == (66, 82, 6)
+    assert state_space.shape == (45,)
+    feature_names = state_feature_names("race_core", state_components=components)
+    lateral_index = feature_names.index("vehicle_state.lateral_velocity_norm")
+    edge_index = feature_names.index("track_position.edge_ratio")
+    assert state_space.low[lateral_index] == -1.0
+    assert state_space.low[edge_index] == -1.0
+
+
+def _clean_state_components(
+    *,
+    control_history_enabled: bool = True,
+) -> tuple[dict[str, object], ...]:
+    components: list[dict[str, object]] = [
+        {
+            "name": "vehicle_state",
+            "speed_normalizer_kph": 1_500.0,
+            "lateral_velocity_normalizer": 32.0,
+            "sliding_lateral_velocity_threshold": 8.0,
+        },
+        {"name": "track_position"},
+        {"name": "surface_state"},
+        {"name": "course_context", "encoding": "one_hot_builtin"},
+    ]
+    if control_history_enabled:
+        components.append(
+            {
+                "name": "control_history",
+                "length": 2,
+                "controls": ("steer", "thrust", "boost", "lean"),
+            }
+        )
+    return tuple(components)

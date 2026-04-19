@@ -7,8 +7,11 @@ from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
     ActionHistoryControl,
+    ObservationCourseContext,
+    ObservationGroundEffectContext,
     ObservationStackMode,
     ObservationStateProfile,
+    StateComponentsSettings,
     image_observation_shape,
     state_feature_count,
     state_feature_names,
@@ -36,8 +39,11 @@ def set_observation_info(
     observation_stack_mode: ObservationStackMode,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
+    observation_course_context: ObservationCourseContext,
+    observation_ground_effect_context: ObservationGroundEffectContext,
     action_history_len: int | None,
     action_history_controls: tuple[ActionHistoryControl, ...],
+    observation_state_components: StateComponentsSettings | None,
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -63,19 +69,31 @@ def set_observation_info(
     info["observation_stack_mode"] = observation_stack_mode
     if observation_mode == "image_state":
         info["observation_state_profile"] = observation_state_profile
+        info["observation_course_context"] = observation_course_context
+        info["observation_ground_effect_context"] = observation_ground_effect_context
         info["observation_action_history_len"] = action_history_len
         info["observation_action_history_controls"] = action_history_controls
+        if observation_state_components is not None:
+            info["observation_state_components"] = tuple(
+                dict(component) for component in observation_state_components
+            )
         info["observation_state_shape"] = (
             state_feature_count(
                 observation_state_profile,
+                course_context=observation_course_context,
+                ground_effect_context=observation_ground_effect_context,
                 action_history_len=action_history_len,
                 action_history_controls=action_history_controls,
+                state_components=observation_state_components,
             ),
         )
         info["observation_state_features"] = state_feature_names(
             observation_state_profile,
+            course_context=observation_course_context,
+            ground_effect_context=observation_ground_effect_context,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
+            state_components=observation_state_components,
         )
 
 

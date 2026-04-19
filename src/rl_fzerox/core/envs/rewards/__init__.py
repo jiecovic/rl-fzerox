@@ -46,6 +46,8 @@ def _race_v3_weights(config: RewardConfig) -> RaceV3RewardWeights:
         boost_pad_reward=config.boost_pad_reward,
         boost_pad_reward_progress_window=config.boost_pad_reward_progress_window,
         energy_refill_progress_multiplier=config.energy_refill_progress_multiplier,
+        dirt_progress_multiplier=config.dirt_progress_multiplier,
+        ice_progress_multiplier=config.ice_progress_multiplier,
         energy_refill_collision_cooldown_frames=config.energy_refill_collision_cooldown_frames,
         energy_full_refill_lap_bonus=config.energy_full_refill_lap_bonus,
         energy_full_refill_min_gain_fraction=config.energy_full_refill_min_gain_fraction,

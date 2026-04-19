@@ -24,6 +24,7 @@ class RunLayout:
 
     config_filename: str
     baseline_filename: str
+    baselines_dirname: str
     watch_rootname: str
     runtime_dirname: str
     tensorboard_dirname: str
@@ -34,6 +35,7 @@ class RunLayout:
 RUN_LAYOUT = RunLayout(
     config_filename="train_config.yaml",
     baseline_filename="baseline.state",
+    baselines_dirname="baselines",
     watch_rootname="watch",
     runtime_dirname="runtime",
     tensorboard_dirname="tensorboard",
@@ -63,6 +65,7 @@ class RunPaths:
     best_policy_path: Path
     final_model_path: Path
     final_policy_path: Path
+    baselines_dir: Path
     baseline_state_path: Path
 
     def env_runtime_dir(self, env_index: int) -> Path:
@@ -95,7 +98,8 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
         best_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.best,
         final_model_path=run_dir / RUN_LAYOUT.model_artifacts.final,
         final_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.final,
-        baseline_state_path=run_dir / RUN_LAYOUT.baseline_filename,
+        baselines_dir=run_dir / RUN_LAYOUT.baselines_dirname,
+        baseline_state_path=run_dir / RUN_LAYOUT.baselines_dirname / RUN_LAYOUT.baseline_filename,
     )
 
 
@@ -105,6 +109,7 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     paths.run_dir.mkdir(parents=True, exist_ok=True)
     paths.runtime_root.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
+    paths.baselines_dir.mkdir(parents=True, exist_ok=True)
 
 
 def build_watch_session_paths(

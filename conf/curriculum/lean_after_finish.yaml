@@ -14,8 +14,8 @@ stages:
       race_laps_completed_mean_gte: 3.0
     action_mask:
       # Keep lean actions disabled until the agent can finish the race.
-      lean: [0]
+      lean: [idle]
   - name: lean_enabled
     action_mask:
       # Re-enable the full lean branch after the finish trigger is met.
-      lean: [0, 1, 2]
+      lean: [idle, left, right]

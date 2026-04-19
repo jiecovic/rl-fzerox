@@ -100,6 +100,10 @@ class EmulatorBackend(Protocol):
 
     def randomize_game_rng(self, seed: int) -> tuple[int, int, int, int]: ...
 
+    def read_system_ram(self, offset: int, length: int) -> bytes: ...
+
+    def write_system_ram(self, offset: int, data: bytes) -> None: ...
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,

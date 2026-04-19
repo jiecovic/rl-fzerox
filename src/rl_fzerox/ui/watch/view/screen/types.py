@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol, TypeAlias
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
+
+StatusIcon: TypeAlias = Literal["none", "in_range", "outside"]
 
 
 class TextSurface(Protocol):
@@ -35,6 +37,10 @@ class PanelLine:
     color: Color
     wrap: bool = False
     min_value_lines: int = 1
+    divider: bool = False
+    heading: bool = False
+    status_icon: StatusIcon | None = None
+    status_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -79,10 +85,11 @@ class PanelSection:
 
 @dataclass(frozen=True)
 class PanelColumns:
-    """Left and right panel columns rendered next to the game view."""
+    """Side-panel columns rendered next to the game view."""
 
     left: list[PanelSection]
-    right: list[PanelSection]
+    middle: list[PanelSection]
+    stats: list[PanelSection]
 
 
 @dataclass(frozen=True)
@@ -91,5 +98,6 @@ class ViewerFonts:
 
     title: RenderFont
     section: RenderFont
+    record_header: RenderFont
     body: RenderFont
     small: RenderFont

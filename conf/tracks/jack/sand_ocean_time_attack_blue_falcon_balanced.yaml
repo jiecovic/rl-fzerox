@@ -5,13 +5,12 @@
 track:
   id: sand_ocean_time_attack_blue_falcon_balanced
   display_name: "Sand Ocean Time Attack - Blue Falcon Balanced"
-  course_index: 2
+  course_ref: jack/sand_ocean
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/sand-ocean-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Sand Ocean time-attack baseline without ghost."
+  notes: "Sand Ocean time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

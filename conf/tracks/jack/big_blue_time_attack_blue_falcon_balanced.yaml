@@ -5,13 +5,12 @@
 track:
   id: big_blue_time_attack_blue_falcon_balanced
   display_name: "Big Blue Time Attack - Blue Falcon Balanced"
-  course_index: 4
+  course_ref: jack/big_blue
   mode: time_attack
   vehicle: blue_falcon
   engine_setting: balanced
-  ghost: none
   baseline_state_path: checkpoints/baselines/jack/big-blue-time-attack-blue-falcon-balanced-no-ghost-go-window.state
-  notes: "Big Blue time-attack baseline without ghost."
+  notes: "Big Blue time-attack baseline."
 
 emulator:
   baseline_state_path: ${track.baseline_state_path}

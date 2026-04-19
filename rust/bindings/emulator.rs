@@ -430,6 +430,17 @@ impl PyEmulator {
         Ok(PyBytes::new(py, &bytes))
     }
 
+    fn write_system_ram(
+        &mut self,
+        py: Python<'_>,
+        offset: usize,
+        data: &Bound<'_, PyBytes>,
+    ) -> PyResult<()> {
+        let bytes = data.as_bytes().to_vec();
+        py.detach(|| self.host.write_system_ram(offset, &bytes))
+            .map_err(map_core_error)
+    }
+
     fn game_rng_state(&mut self, py: Python<'_>) -> PyResult<(u32, u32, u32, u32)> {
         let state = py
             .detach(|| self.host.game_rng_state())

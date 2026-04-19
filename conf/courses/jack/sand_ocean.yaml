@@ -1,0 +1,20 @@
+# Course-level metadata shared by all Sand Ocean baselines.
+course:
+  id: sand_ocean
+  display_name: "Sand Ocean"
+  cup: jack
+  course_index: 2
+  # Non-AGG course WR history from fzerowrs.com, using the NTSC-normalized column.
+  records:
+    source_label: "F-Zero X WR History"
+    source_url: https://www.fzerowrs.com/x/display.php?track=Sand+Ocean
+    non_agg_best:
+      time_ms: 56171
+      player: Linner
+      date: "2009-07-23"
+      mode: NTSC
+    non_agg_worst:
+      time_ms: 63185
+      player: "こにたま"
+      date: "1998-12-04"
+      mode: NTSC
