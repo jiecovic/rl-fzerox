@@ -6,6 +6,7 @@ from rl_fzerox.ui.watch.view.components.cockpit.style import (
     STEER_AXIS_GUIDE,
     STEER_DEADZONE_COLOR,
     STEER_EXTREME_COLOR,
+    THRUST_COLUMN_BORDER_WIDTH,
 )
 from rl_fzerox.ui.watch.view.components.effects import (
     draw_glass_track_overlay as _draw_glass_track_overlay,
@@ -34,7 +35,7 @@ def _draw_steer_instrument(
         screen,
         PALETTE.control_lever_border,
         track,
-        width=PALETTE.control_lever_border_width,
+        width=THRUST_COLUMN_BORDER_WIDTH,
         border_radius=track.height // 2,
     )
     _draw_round_marker(
