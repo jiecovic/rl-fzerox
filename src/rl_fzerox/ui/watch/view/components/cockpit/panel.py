@@ -86,7 +86,7 @@ def _draw_control_viz(
     )
 
     lean_y = panel.y + (108 if wide else 76)
-    lean_width = 74 if wide else 48 if dual_gas_levers else 56
+    lean_width = 30 if wide else 24 if dual_gas_levers else 26
     lean_gap = 12 if wide else 6 if dual_gas_levers else 8
     boost_radius = 17 if wide else 11 if dual_gas_levers else 13
     boost_center_x = steer_x + lean_width + lean_gap + boost_radius

@@ -1,18 +1,17 @@
 # src/rl_fzerox/ui/watch/view/components/cockpit/buttons.py
 from __future__ import annotations
 
+import math
+
 from rl_fzerox.ui.watch.view.components.cockpit.style import (
-    BUTTON_ACTIVE_TEXT,
     BUTTON_FACE_FILL,
-    BUTTON_FACE_HIGHLIGHT,
-    BUTTON_FACE_INNER,
     BUTTON_SHADOW,
     LEAN_ACTIVE_BORDER,
     LEAN_ACTIVE_FILL,
+    LEAN_CONTROL_STYLE,
 )
 from rl_fzerox.ui.watch.view.components.effects import (
     BOOST_EDGE_GLOW,
-    GLASS_EDGE_GLOW,
     GLASS_SHADOW,
     GLASS_SHEEN,
 )
@@ -24,9 +23,6 @@ from rl_fzerox.ui.watch.view.components.effects import (
 )
 from rl_fzerox.ui.watch.view.components.effects import (
     draw_alpha_polygon as _draw_alpha_polygon,
-)
-from rl_fzerox.ui.watch.view.components.effects import (
-    offset_points as _offset_points,
 )
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 
@@ -44,143 +40,107 @@ def _draw_lean_button(
 ) -> None:
     from rl_fzerox.ui.watch.view.components.tokens import _pill_height
 
-    height = _pill_height(font) + 2
-    rect = pygame.Rect(x, y, width, height)
-    points = _lean_button_points(rect, direction=direction)
-    inner_points = _lean_button_points(rect.inflate(-5, -5), direction=direction)
-    pygame.draw.polygon(screen, BUTTON_SHADOW, _offset_points(points, dx=1, dy=2))
-
-    fill_color = LEAN_ACTIVE_FILL if active else BUTTON_FACE_FILL
-    border_color = LEAN_ACTIVE_BORDER if active else PALETTE.flag_inactive_border
-    text_color = BUTTON_ACTIVE_TEXT if active else PALETTE.text_muted
-    pygame.draw.polygon(screen, fill_color, points)
-    pygame.draw.polygon(screen, BUTTON_FACE_INNER if not active else LEAN_ACTIVE_FILL, inner_points)
-    _draw_alpha_polygon(
-        pygame=pygame,
-        screen=screen,
-        points=_lean_button_sheen_points(rect, direction=direction),
-        color=GLASS_SHEEN,
+    style = LEAN_CONTROL_STYLE
+    height = _pill_height(font) + style.height_extra
+    rect = pygame.Rect(x, y + style.y_offset, width, height)
+    face = _lean_half_moon_points(rect, direction=direction)
+    inner = _lean_half_moon_points(
+        rect.inflate(-style.inner_inset, -style.inner_inset),
+        direction=direction,
     )
-    _draw_alpha_polygon(
-        pygame=pygame,
-        screen=screen,
-        points=_lean_button_shadow_points(rect, direction=direction),
-        color=GLASS_SHADOW,
+    fill_color = LEAN_ACTIVE_FILL if active else BUTTON_FACE_FILL
+    border_color = style.inactive_border if not active else LEAN_ACTIVE_BORDER
+    text_color = LEAN_ACTIVE_BORDER if active else style.inactive_text
+
+    pygame.draw.polygon(
+        screen,
+        BUTTON_SHADOW,
+        tuple(
+            (point_x + style.shadow_offset[0], point_y + style.shadow_offset[1])
+            for point_x, point_y in face
+        ),
     )
     if active:
         _draw_alpha_polygon(
             pygame=pygame,
             screen=screen,
-            points=_offset_points(points, dx=0, dy=0),
-            color=GLASS_EDGE_GLOW,
+            points=_lean_half_moon_points(
+                rect.inflate(style.glow_inflate, style.glow_inflate),
+                direction=direction,
+            ),
+            color=(
+                LEAN_ACTIVE_BORDER[0],
+                LEAN_ACTIVE_BORDER[1],
+                LEAN_ACTIVE_BORDER[2],
+                style.active_glow_alpha,
+            ),
         )
-        pygame.draw.polygon(screen, fill_color, inner_points)
-        _draw_alpha_polygon(
-            pygame=pygame,
-            screen=screen,
-            points=_lean_button_sheen_points(rect, direction=direction),
-            color=GLASS_SHEEN,
-        )
-        _draw_alpha_polygon(
-            pygame=pygame,
-            screen=screen,
-            points=_lean_button_shadow_points(rect, direction=direction),
-            color=GLASS_SHADOW,
-        )
-    pygame.draw.polygon(screen, border_color, points, width=2 if active else 1)
-
-    highlight_start = (rect.left + 10, rect.top + 4)
-    highlight_end = (rect.right - 10, rect.top + 4)
-    pygame.draw.line(
-        screen,
-        LEAN_ACTIVE_BORDER if active else BUTTON_FACE_HIGHLIGHT,
-        highlight_start,
-        highlight_end,
-        width=1,
+    pygame.draw.polygon(screen, fill_color, face)
+    pygame.draw.polygon(screen, style.inactive_inner_fill if not active else fill_color, inner)
+    _draw_alpha_polygon(
+        pygame=pygame,
+        screen=screen,
+        points=_lean_half_moon_sheen(rect, direction=direction),
+        color=style.sheen,
     )
-
-    arrow_color = LEAN_ACTIVE_BORDER if active else PALETTE.text_muted
-    arrow_center_y = rect.centery
-    if direction < 0:
-        arrow_points = (
-            (rect.left + 8, arrow_center_y),
-            (rect.left + 16, arrow_center_y - 5),
-            (rect.left + 16, arrow_center_y + 5),
-        )
-        label_x_offset = 7
-    else:
-        arrow_points = (
-            (rect.right - 8, arrow_center_y),
-            (rect.right - 16, arrow_center_y - 5),
-            (rect.right - 16, arrow_center_y + 5),
-        )
-        label_x_offset = -7
-    pygame.draw.polygon(screen, arrow_color, arrow_points)
+    pygame.draw.polygon(screen, border_color, face, width=2 if active else 1)
+    _draw_lean_flat_edge(
+        pygame=pygame,
+        screen=screen,
+        rect=rect,
+        direction=direction,
+        color=border_color,
+    )
 
     label = "L" if direction < 0 else "R"
     label_surface = font.render(label, True, text_color)
+    label_x = rect.centerx - (label_surface.get_width() // 2)
     screen.blit(
         label_surface,
         (
-            rect.centerx - (label_surface.get_width() // 2) + label_x_offset,
-            rect.centery - (label_surface.get_height() // 2),
+            label_x,
+            rect.bottom - label_surface.get_height() - style.label_bottom_padding,
         ),
     )
 
 
-def _lean_button_points(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
-    inset = 12
+def _lean_half_moon_points(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
+    steps = LEAN_CONTROL_STYLE.curve_steps
+    points: list[tuple[int, int]] = []
+    for index in range(steps + 1):
+        theta = math.pi * (index / steps)
+        y = rect.top + round((rect.height / 2) * (1.0 - math.cos(theta)))
+        curve_offset = round(rect.width * math.sin(theta))
+        x = rect.right - curve_offset if direction < 0 else rect.left + curve_offset
+        points.append((x, y))
+    if direction < 0:
+        points.append((rect.right, rect.top))
+    else:
+        points.append((rect.left, rect.top))
+    return tuple(points)
+
+
+def _lean_half_moon_sheen(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
+    inset = max(3, rect.width // 5)
     if direction < 0:
         return (
-            (rect.left, rect.centery),
-            (rect.left + inset, rect.top),
-            (rect.right, rect.top),
-            (rect.right - 5, rect.centery),
-            (rect.right, rect.bottom),
-            (rect.left + inset, rect.bottom),
+            (rect.right - 4, rect.top + 4),
+            (rect.left + inset, rect.top + 6),
+            (rect.left + inset + 2, rect.centery - 3),
+            (rect.right - 5, rect.centery - 4),
         )
     return (
-        (rect.right, rect.centery),
-        (rect.right - inset, rect.top),
-        (rect.left, rect.top),
-        (rect.left + 5, rect.centery),
-        (rect.left, rect.bottom),
-        (rect.right - inset, rect.bottom),
+        (rect.left + 4, rect.top + 4),
+        (rect.right - inset, rect.top + 6),
+        (rect.right - inset - 2, rect.centery - 3),
+        (rect.left + 5, rect.centery - 4),
     )
 
 
-def _lean_button_sheen_points(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
-    if direction < 0:
-        return (
-            (rect.left + 14, rect.top + 3),
-            (rect.right - 5, rect.top + 3),
-            (rect.right - 9, rect.centery - 3),
-            (rect.left + 18, rect.centery - 3),
-            (rect.left + 8, rect.centery),
-        )
-    return (
-        (rect.right - 14, rect.top + 3),
-        (rect.left + 5, rect.top + 3),
-        (rect.left + 9, rect.centery - 3),
-        (rect.right - 18, rect.centery - 3),
-        (rect.right - 8, rect.centery),
-    )
-
-
-def _lean_button_shadow_points(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
-    if direction < 0:
-        return (
-            (rect.left + 8, rect.centery + 2),
-            (rect.right - 8, rect.centery + 2),
-            (rect.right - 3, rect.bottom - 3),
-            (rect.left + 14, rect.bottom - 3),
-        )
-    return (
-        (rect.right - 8, rect.centery + 2),
-        (rect.left + 8, rect.centery + 2),
-        (rect.left + 3, rect.bottom - 3),
-        (rect.right - 14, rect.bottom - 3),
-    )
+def _draw_lean_flat_edge(*, pygame, screen, rect, direction: int, color) -> None:
+    x = rect.right if direction < 0 else rect.left
+    inset = LEAN_CONTROL_STYLE.flat_edge_inset
+    pygame.draw.line(screen, color, (x, rect.top + inset), (x, rect.bottom - inset), width=1)
 
 
 def _draw_boost_button(
