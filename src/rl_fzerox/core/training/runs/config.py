@@ -9,12 +9,13 @@ from pydantic import ValidationError
 
 from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig, WatchAppConfig
-from rl_fzerox.core.config.track_registry import expand_track_sampling_registry_refs
+from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
 from rl_fzerox.core.domain.training_algorithms import (
     TRAIN_ALGORITHM_AUTO,
     TRAIN_ALGORITHM_MASKABLE_PPO,
 )
-from rl_fzerox.core.training.runs.baseline_factory import materialize_run_baselines
+from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
+from rl_fzerox.core.training.runs.migration import scrub_obsolete_train_config_data
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -99,10 +100,14 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
 
     config_path = resolve_train_run_config_path(run_dir)
     loaded = _load_train_config_mapping(config_path)
-    expand_track_sampling_registry_refs(
+    expand_track_registry_metadata(
         loaded,
         config_root=config_root_dir().resolve(),
     )
+    # V4 LEGACY SHIM: old local run manifests may contain fields that were
+    # deliberately removed from the canonical schema. Keep this isolated so it
+    # can be deleted with the migration tool when v4 checkpoints are obsolete.
+    scrub_obsolete_train_config_data(loaded)
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
 
@@ -176,7 +181,7 @@ def _prefer_action_branch_snapshot(config_data: dict[str, object]) -> None:
     if branches_data is None:
         return
 
-    # COMPAT SHIM: new branch configs compile to adapter-era fields at runtime.
+    # Runtime bridge: branch configs compile to adapter-era fields internally.
     # Do not persist those generated fields in fresh run manifests; keeping the
     # branch declaration as the only saved source makes this bridge removable.
     action_data.clear()

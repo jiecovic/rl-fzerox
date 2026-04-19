@@ -48,11 +48,12 @@ def validate_recurrent_configuration_alignment(
 
 
 def _validate_sac_training_config(config: TrainAppConfig) -> None:
-    if config.env.action.name not in SAC_ACTION_ADAPTERS:
+    action_config = config.env.action.runtime()
+    if action_config.name not in SAC_ACTION_ADAPTERS:
         raise RuntimeError(
             "SAC requires a continuous steer-drive action adapter so the action space is Box"
         )
-    if config.env.action.mask is not None:
+    if action_config.mask is not None:
         raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
     if config.curriculum.enabled:
         raise RuntimeError("SAC does not support curriculum stages")
@@ -83,7 +84,8 @@ def _validate_hybrid_action_adapter(
     *,
     algorithm_label: str,
 ) -> None:
-    if config.env.action.name not in HYBRID_ACTION_ADAPTERS:
+    action_config = config.env.action.runtime()
+    if action_config.name not in HYBRID_ACTION_ADAPTERS:
         raise RuntimeError(
             f"{algorithm_label} requires a hybrid steer-drive action adapter "
             "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"

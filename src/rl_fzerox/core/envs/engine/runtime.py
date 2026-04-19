@@ -95,7 +95,8 @@ class FZeroXEnvEngine:
         self.backend = backend
         self.config = config
         self._curriculum_config = curriculum_config
-        self._action_adapter = build_action_adapter(config.action)
+        self._action_config = config.action.runtime()
+        self._action_adapter = build_action_adapter(self._action_config)
         self._observation_spec = backend.observation_spec(config.observation.preset)
         self._observation_state_components = config.observation.state_components_data()
         (
@@ -127,11 +128,13 @@ class FZeroXEnvEngine:
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
             base_overrides=(
-                config.action.mask.branch_overrides() if config.action.mask is not None else None
+                self._action_config.mask.branch_overrides()
+                if self._action_config.mask is not None
+                else None
             ),
             curriculum_config=curriculum_config,
-            boost_unmask_max_speed_kph=config.action.boost_unmask_max_speed_kph,
-            lean_unmask_min_speed_kph=config.action.lean_unmask_min_speed_kph,
+            boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
+            lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
         )
         self._active_track_sampling = self._stage_track_sampling_config(
             self._mask_controller.stage_index
@@ -140,9 +143,9 @@ class FZeroXEnvEngine:
         self._track_baseline_cache = TrackBaselineCache()
         self._active_track: SelectedTrack | None = None
         self._control_state = ControlStateTracker(
-            lean_mode=config.action.lean_mode,
-            boost_decision_interval_frames=config.action.boost_decision_interval_frames,
-            boost_request_lockout_frames=config.action.boost_request_lockout_frames,
+            lean_mode=self._action_config.lean_mode,
+            boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
+            boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
             action_history_len=self._observation_action_history_len,
             action_history_controls=self._observation_action_history_controls,
         )
@@ -443,7 +446,7 @@ class FZeroXEnvEngine:
         can_boost = can_boost and not telemetry.player.airborne
         can_boost = can_boost and telemetry.player.reverse_timer <= 0
         can_boost = can_boost and self._control_state.boost_action_allowed_by_timing()
-        max_boost_speed = self.config.action.boost_unmask_max_speed_kph
+        max_boost_speed = self._action_config.boost_unmask_max_speed_kph
         if max_boost_speed is not None:
             can_boost = can_boost and speed_kph < float(max_boost_speed)
         energy_fraction = telemetry_energy_fraction(telemetry)
@@ -508,7 +511,7 @@ class FZeroXEnvEngine:
             progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
-            lean_timer_assist=(self.config.action.lean_mode == LEAN_MODE_TIMER_ASSIST),
+            lean_timer_assist=(self._action_config.lean_mode == LEAN_MODE_TIMER_ASSIST),
         )
         info = backend_step_info(self.backend)
         if self._active_track is not None:
@@ -518,8 +521,8 @@ class FZeroXEnvEngine:
         gas_level = requested_gas_level(
             control_state=requested_control_state,
             drive_axis=action_drive_axis,
-            continuous_drive_mode=self.config.action.continuous_drive_mode,
-            continuous_drive_deadzone=float(self.config.action.continuous_drive_deadzone),
+            continuous_drive_mode=self._action_config.continuous_drive_mode,
+            continuous_drive_deadzone=float(self._action_config.continuous_drive_deadzone),
         )
         self._last_requested_control_state = requested_control_state
         self._last_gas_level = gas_level
@@ -620,7 +623,7 @@ class FZeroXEnvEngine:
 
         if self._manual_boost_allowed is False:
             control_state = _without_joypad_mask(control_state, BOOST_MASK)
-        air_brake_mode = self.config.action.continuous_air_brake_mode
+        air_brake_mode = self._action_config.continuous_air_brake_mode
         if air_brake_mode == "always":
             return control_state
         if air_brake_mode == "off":

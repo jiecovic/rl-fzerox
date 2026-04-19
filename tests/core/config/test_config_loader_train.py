@@ -17,12 +17,7 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
         {
             "mode": "image_state",
             "state_components": [
-                {
-                    "vehicle_state": {
-                        "speed_normalizer_kph": 1_500.0,
-                        "lateral_velocity_normalizer": 32.0,
-                    }
-                },
+                "vehicle_state",
                 "track_position",
                 "surface_state",
                 {"course_context": {"encoding": "one_hot_builtin"}},
@@ -32,11 +27,7 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
     )
 
     assert config.state_components_data() == (
-        {
-            "name": "vehicle_state",
-            "speed_normalizer_kph": 1_500.0,
-            "lateral_velocity_normalizer": 32.0,
-        },
+        {"name": "vehicle_state"},
         {"name": "track_position"},
         {"name": "surface_state"},
         {"name": "course_context", "encoding": "one_hot_builtin"},
@@ -99,14 +90,6 @@ def test_load_train_app_config_composes_track_registry_entry(
     )
     config_path = config_root / "local" / "train.track.yaml"
     _write_yaml(
-        config_root / "track_pools" / "jack4_test.yaml",
-        [
-            "registry_refs:",
-            "  - ref: mute_city_test",
-            "    weight: 0.4",
-        ],
-    )
-    _write_yaml(
         config_path,
         [
             "defaults:",
@@ -119,7 +102,10 @@ def test_load_train_app_config_composes_track_registry_entry(
             "  track_sampling:",
             "    enabled: true",
             "    sampling_mode: balanced",
-            "    pool_ref: jack4_test",
+            "    entries:",
+            "      - id: mute_city_test",
+            "        baseline_state_path: local/test-artifacts/time-attack.state",
+            "        weight: 0.4",
             "curriculum:",
             "  enabled: true",
             "  stages:",
@@ -199,7 +185,7 @@ def test_load_train_app_config_expands_course_registry_selection(
         ],
     )
     _write_yaml(
-        config_root / "tracks" / "jack" / "silence_test_time_attack_blue_falcon_balanced.yaml",
+        config_root / "tracks" / "jack" / "metadata_selected_silence.yaml",
         [
             "track:",
             "  id: silence_test_time_attack_blue_falcon_balanced",

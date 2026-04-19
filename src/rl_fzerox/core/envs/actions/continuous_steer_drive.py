@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ActionMask, ContinuousAction
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
@@ -28,7 +28,7 @@ _STEER_DRIVE_LEAN_ACTION_SIZE = 3
 class ContinuousSteerDriveActionAdapter:
     """Map continuous steering and accelerate intent to simple held controls."""
 
-    def __init__(self, config: ActionConfig) -> None:
+    def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,
@@ -94,7 +94,7 @@ class ContinuousSteerDriveActionAdapter:
 class ContinuousSteerDriveLeanActionAdapter:
     """Map continuous steer/drive/lean intent to held controller inputs."""
 
-    def __init__(self, config: ActionConfig) -> None:
+    def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
             mode=config.continuous_drive_mode,

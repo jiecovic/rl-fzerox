@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/actions/__init__.py
 from collections.abc import Callable
 
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN,
@@ -45,7 +45,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_lean import (
     SteerGasAirBrakeBoostLeanActionAdapter,
 )
 
-ActionAdapterFactory = Callable[[ActionConfig], ActionAdapter]
+ActionAdapterFactory = Callable[[ActionRuntimeConfig], ActionAdapter]
 DEFAULT_ACTION_NAME: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
 ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE: ContinuousSteerDriveActionAdapter,
@@ -66,13 +66,14 @@ ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
 }
 
 
-def build_action_adapter(config: ActionConfig) -> ActionAdapter:
+def build_action_adapter(config: ActionConfig | ActionRuntimeConfig) -> ActionAdapter:
     """Construct one registered action adapter from the env config."""
 
-    factory = ACTION_ADAPTER_REGISTRY.get(config.name)
+    runtime_config = config.runtime() if isinstance(config, ActionConfig) else config
+    factory = ACTION_ADAPTER_REGISTRY.get(runtime_config.name)
     if factory is None:
-        raise ValueError(f"Unsupported action adapter: {config.name!r}")
-    return factory(config)
+        raise ValueError(f"Unsupported action adapter: {runtime_config.name!r}")
+    return factory(runtime_config)
 
 
 def action_adapter_names() -> tuple[ActionAdapterName, ...]:

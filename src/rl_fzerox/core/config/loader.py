@@ -13,7 +13,7 @@ from pydantic import ValidationError
 
 from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig
-from rl_fzerox.core.config.track_registry import expand_track_sampling_registry_refs
+from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
 
 ConfigModel = TypeVar("ConfigModel", WatchAppConfig, TrainAppConfig)
 
@@ -87,7 +87,7 @@ def _load_app_config(
             config_path=resolved_config_path,
             overrides=overrides,
         )
-        expand_track_sampling_registry_refs(
+        expand_track_registry_metadata(
             config_data,
             config_root=config_root_dir().resolve(),
         )

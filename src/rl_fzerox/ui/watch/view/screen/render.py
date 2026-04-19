@@ -23,6 +23,7 @@ def draw_watch_frame(
 ) -> None:
     """Render one worker state packet without leaking env/policy logic into drawing."""
 
+    action_config = config.env.action.runtime()
     telemetry = _telemetry_from_data(snapshot.telemetry_data)
     draw_info = _with_viewer_rates(
         snapshot.info,
@@ -63,8 +64,8 @@ def draw_watch_frame(
         best_finish_position=snapshot.best_finish_position,
         best_finish_times=snapshot.best_finish_times,
         track_pool_records=_track_pool_records(config),
-        continuous_drive_deadzone=config.env.action.continuous_drive_deadzone,
-        continuous_air_brake_mode=config.env.action.continuous_air_brake_mode,
+        continuous_drive_deadzone=action_config.continuous_drive_deadzone,
+        continuous_air_brake_mode=action_config.continuous_air_brake_mode,
         continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
         action_repeat=config.env.action_repeat,
         max_episode_steps=config.env.max_episode_steps,

@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
+from rl_fzerox.core.envs.observation_image import image_observation_shape
 from rl_fzerox.core.envs.observations import (
     ActionHistoryControl,
     ObservationCourseContext,
@@ -12,7 +13,6 @@ from rl_fzerox.core.envs.observations import (
     ObservationStackMode,
     ObservationStateProfile,
     StateComponentsSettings,
-    image_observation_shape,
     state_feature_count,
     state_feature_names,
 )

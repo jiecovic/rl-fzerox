@@ -110,7 +110,7 @@ def test_watch_rejects_overrides_without_config(
         main(["--run-dir", str(run_dir), "--", "watch.fps=30"])
 
 
-def test_watch_reports_stale_saved_manifest_scrub_command(tmp_path: Path) -> None:
+def test_watch_loads_v4_stale_saved_manifest_through_legacy_scrub(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
     run_dir = tmp_path / "runs" / "ppo_cnn_0001"
@@ -137,13 +137,15 @@ def test_watch_reports_stale_saved_manifest_scrub_command(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    with pytest.raises(RuntimeError, match="scrub_train_config"):
-        resolve_watch_app_config(
-            config_path=None,
-            policy_run_dir=run_dir,
-            policy_artifact="latest",
-            overrides=[],
-        )
+    config = resolve_watch_app_config(
+        config_path=None,
+        policy_run_dir=run_dir,
+        policy_artifact="latest",
+        overrides=[],
+    )
+
+    assert config.watch.policy_run_dir == run_dir.resolve()
+    assert "energy_gain_reward_scale" not in config.reward.model_dump()
 
 
 def test_resolve_watch_app_config_can_be_reused_by_headless_apps(

@@ -2,76 +2,23 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
 
 from omegaconf import OmegaConf
 
-
-@dataclass(frozen=True, slots=True)
-class RegistryRoots:
-    """Config subdirectories used by the track registry."""
-
-    courses: str = "courses"
-    tracks: str = "tracks"
-    track_pools: str = "track_pools"
-    vehicles: str = "vehicles"
+from rl_fzerox.core.config.track_registry_types import (
+    REGISTRY,
+    BaselineVariant,
+    CourseSelection,
+)
 
 
-@dataclass(frozen=True, slots=True)
-class RegistryKeys:
-    """YAML keys accepted by registry expansion."""
-
-    baseline: str = "baseline"
-    course_ref: str = "course_ref"
-    courses: str = "courses"
-    cup: str = "cup"
-    entries: str = "entries"
-    id: str = "id"
-    pool_ref: str = "pool_ref"
-    registry_refs: str = "registry_refs"
-    ref: str = "ref"
-    weight: str = "weight"
-
-
-@dataclass(frozen=True, slots=True)
-class RegistrySchema:
-    """Centralized registry vocabulary instead of scattered string constants."""
-
-    roots: RegistryRoots = field(default_factory=RegistryRoots)
-    keys: RegistryKeys = field(default_factory=RegistryKeys)
-
-
-REGISTRY = RegistrySchema()
-
-
-@dataclass(frozen=True, slots=True)
-class CourseSelection:
-    """One course selected from the course registry for a baseline variant."""
-
-    ref: str
-    weight: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class BaselineVariant:
-    """Concrete race-start baseline flavor applied to selected courses."""
-
-    mode: str
-    vehicle: str
-    engine_setting: str
-
-    @property
-    def track_ref_suffix(self) -> str:
-        return f"{self.mode}_{self.vehicle}_{self.engine_setting}"
-
-
-def expand_track_sampling_registry_refs(
+def expand_track_registry_metadata(
     config_data: dict[str, object],
     *,
     config_root: Path,
 ) -> None:
-    """Expand compact course/track registry references into concrete entries."""
+    """Expand compact course selections and enrich concrete track metadata."""
 
     _expand_track_course_metadata(_nested_mapping(config_data, "track"), config_root)
     _expand_track_sampling_section(
@@ -97,46 +44,18 @@ def _expand_track_sampling_section(
 
     raw_courses = section.pop(REGISTRY.keys.courses, None)
     raw_baseline_spec = section.pop(REGISTRY.keys.baseline, None)
-    raw_pool_ref = section.pop(REGISTRY.keys.pool_ref, None)
-    raw_refs = section.pop(REGISTRY.keys.registry_refs, None)
 
     if raw_courses is not None:
-        if raw_pool_ref is not None or raw_refs is not None or section.get(REGISTRY.keys.entries):
-            raise ValueError(
-                "track_sampling.courses cannot be combined with entries/pool_ref/registry_refs"
-            )
-        raw_refs = _track_refs_from_courses(raw_courses, raw_baseline_spec, config_root=config_root)
-
-    if raw_pool_ref is not None:
-        if raw_refs is not None or section.get(REGISTRY.keys.entries):
-            raise ValueError(
-                "track_sampling.pool_ref cannot be combined with entries/registry_refs"
-            )
-        pool = _load_track_pool(raw_pool_ref, config_root=config_root)
-        raw_refs = pool.get(REGISTRY.keys.registry_refs)
-        pool_entries = pool.get(REGISTRY.keys.entries)
-        if raw_refs is not None and pool_entries is not None:
-            raise ValueError(
-                f"Track pool {raw_pool_ref!r} cannot combine entries and registry_refs"
-            )
-        if pool_entries is not None:
-            if not isinstance(pool_entries, list | tuple):
-                raise TypeError(f"Track pool {raw_pool_ref!r} entries must be a list")
-            section[REGISTRY.keys.entries] = list(pool_entries)
-            _expand_concrete_entries(section, config_root)
-            return
-
-    if raw_refs is None:
-        _expand_concrete_entries(section, config_root)
+        if section.get(REGISTRY.keys.entries):
+            raise ValueError("track_sampling.courses cannot be combined with entries")
+        section[REGISTRY.keys.entries] = _entries_from_courses(
+            raw_courses,
+            raw_baseline_spec,
+            config_root=config_root,
+        )
         return
-    if section.get(REGISTRY.keys.entries):
-        raise ValueError("track_sampling cannot combine entries with registry_refs")
-    if not isinstance(raw_refs, list | tuple):
-        raise TypeError("track_sampling.registry_refs must be a list")
 
-    section[REGISTRY.keys.entries] = [
-        _entry_from_registry_ref(raw_ref, config_root=config_root) for raw_ref in raw_refs
-    ]
+    _expand_concrete_entries(section, config_root)
 
 
 def _expand_concrete_entries(section: dict[str, object], config_root: Path) -> None:
@@ -148,38 +67,60 @@ def _expand_concrete_entries(section: dict[str, object], config_root: Path) -> N
     ]
 
 
-def _load_track_pool(raw_pool_ref: object, *, config_root: Path) -> dict[str, object]:
-    if not isinstance(raw_pool_ref, str) or not raw_pool_ref:
-        raise ValueError("track_sampling.pool_ref must be a non-empty string")
-    path = _registry_path(
-        root=config_root / REGISTRY.roots.track_pools,
-        ref=raw_pool_ref,
-        label="Track pool",
-    )
-    loaded = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
-    if not isinstance(loaded, dict):
-        raise TypeError(f"Track pool {raw_pool_ref!r} must resolve to a mapping")
-    return {str(key): value for key, value in loaded.items() if isinstance(key, str)}
-
-
-def _track_refs_from_courses(
+def _entries_from_courses(
     raw_courses: object,
     raw_baseline_spec: object,
     *,
     config_root: Path,
-) -> list[object]:
+) -> list[dict[str, object]]:
     if not isinstance(raw_courses, list | tuple):
         raise TypeError("track_sampling.courses must be a list")
     baseline_variant = _baseline_variant(raw_baseline_spec, config_root=config_root)
-    refs: list[object] = []
+    entries: list[dict[str, object]] = []
     for raw_course in raw_courses:
         selection = _course_selection(raw_course, config_root=config_root)
-        track_ref = f"{selection.ref}_{baseline_variant.track_ref_suffix}"
-        if selection.weight is None:
-            refs.append(track_ref)
-        else:
-            refs.append({REGISTRY.keys.ref: track_ref, REGISTRY.keys.weight: selection.weight})
-    return refs
+        track_ref = _track_ref_for_course_variant(
+            course_ref=selection.ref,
+            variant=baseline_variant,
+            config_root=config_root,
+        )
+        entries.append(
+            _entry_from_track_ref(
+                track_ref,
+                weight=selection.weight,
+                config_root=config_root,
+            )
+        )
+    return entries
+
+
+def _track_ref_for_course_variant(
+    *,
+    course_ref: str,
+    variant: BaselineVariant,
+    config_root: Path,
+) -> str:
+    matches = [
+        ref
+        for ref, track in _iter_track_configs(config_root=config_root)
+        if track.get("course_ref") == course_ref
+        and track.get("mode") == variant.mode
+        and track.get("vehicle") == variant.vehicle
+        and track.get("engine_setting") == variant.engine_setting
+    ]
+    if not matches:
+        raise FileNotFoundError(
+            "Track registry entry not found for "
+            f"course={course_ref!r}, mode={variant.mode!r}, "
+            f"vehicle={variant.vehicle!r}, engine_setting={variant.engine_setting!r}"
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            "Track registry selection is ambiguous for "
+            f"course={course_ref!r}, mode={variant.mode!r}, "
+            f"vehicle={variant.vehicle!r}, engine_setting={variant.engine_setting!r}"
+        )
+    return matches[0]
 
 
 def _course_selection(raw_course: object, *, config_root: Path) -> CourseSelection:
@@ -251,8 +192,12 @@ def _required_baseline_field(raw_baseline_spec: Mapping[object, object], key: st
     return value
 
 
-def _entry_from_registry_ref(raw_ref: object, *, config_root: Path) -> dict[str, object]:
-    ref, weight = _parse_registry_ref(raw_ref)
+def _entry_from_track_ref(
+    ref: str,
+    *,
+    weight: float | None = None,
+    config_root: Path,
+) -> dict[str, object]:
     track_config = _load_track_config(ref, config_root=config_root)
     track = track_config.get("track")
     if not isinstance(track, dict):
@@ -298,6 +243,7 @@ def _entry_with_registry_metadata(
         registry_entry = _track_with_registry_metadata(registry_entry, config_root=config_root)
         for key, value in registry_entry.items():
             if key in {
+                "display_name",
                 "course_ref",
                 "course_id",
                 "course_name",
@@ -360,17 +306,26 @@ def _track_with_registry_metadata(
 def _registry_track_by_id(raw_id: object, *, config_root: Path) -> dict[str, object] | None:
     if not isinstance(raw_id, str) or not raw_id:
         return None
-    registry_root = config_root / REGISTRY.roots.tracks
+    for _, track in _iter_track_configs(config_root=config_root):
+        if track.get("id") == raw_id:
+            return track
+    return None
+
+
+def _iter_track_configs(*, config_root: Path) -> tuple[tuple[str, dict[str, object]], ...]:
+    registry_root = (config_root / REGISTRY.roots.tracks).resolve()
     if not registry_root.is_dir():
-        return None
-    for path in registry_root.rglob("*.yaml"):
+        return ()
+    tracks: list[tuple[str, dict[str, object]]] = []
+    for path in sorted(registry_root.rglob("*.yaml")):
+        ref = path.relative_to(registry_root).with_suffix("").as_posix()
         loaded = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
         if not isinstance(loaded, dict):
             continue
         track = loaded.get("track")
-        if isinstance(track, dict) and track.get("id") == raw_id:
-            return {str(key): value for key, value in track.items() if isinstance(key, str)}
-    return None
+        if isinstance(track, dict):
+            tracks.append((ref, {str(key): value for key, value in track.items()}))
+    return tuple(tracks)
 
 
 def _iter_course_configs(*, config_root: Path) -> tuple[tuple[str, dict[str, object]], ...]:
@@ -480,23 +435,15 @@ def _engine_setting_raw_value(setting_data: object) -> int | None:
     return raw_value if isinstance(raw_value, int) else None
 
 
-def _parse_registry_ref(raw_ref: object) -> tuple[str, float | None]:
-    if isinstance(raw_ref, str):
-        return raw_ref, None
-    if not isinstance(raw_ref, Mapping):
-        raise TypeError("track registry refs must be strings or mappings")
-    ref = raw_ref.get(REGISTRY.keys.ref)
-    if not isinstance(ref, str) or not ref:
-        raise ValueError("track registry ref mappings must define a non-empty ref")
-    return ref, _optional_weight(raw_ref.get(REGISTRY.keys.weight), label="track weight")
-
-
 def _optional_weight(raw_weight: object, *, label: str) -> float | None:
     if raw_weight is None:
         return None
     if isinstance(raw_weight, bool) or not isinstance(raw_weight, int | float):
         raise TypeError(f"{label} must be numeric")
-    return float(raw_weight)
+    weight = float(raw_weight)
+    if weight <= 0.0:
+        raise ValueError(f"{label} must be greater than zero")
+    return weight
 
 
 def _load_track_config(ref: str, *, config_root: Path) -> dict[str, object]:

@@ -40,7 +40,7 @@ class ActionBranchConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: ActionBranchType
-    # COMPAT SHIM: integer masks are accepted for old manifests; new branch
+    # V4 LEGACY SHIM: integer masks are accepted for old manifests; new branch
     # YAML should use named values such as idle/engaged/left/right.
     mask: tuple[ActionMaskValue, ...] | None = None
     response_power: PositiveFloat | None = None

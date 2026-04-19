@@ -6,7 +6,7 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ActionMask, DiscreteAction
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
@@ -23,7 +23,7 @@ from rl_fzerox.core.envs.actions.steer_drive_boost_lean import BOOST_MASK
 class SteerDriveBoostActionAdapter:
     """Map steering, drive-mode, and boost actions to controls."""
 
-    def __init__(self, config: ActionConfig) -> None:
+    def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_values = steer_values(
             config.steer_buckets,
             response_power=float(config.steer_response_power),
