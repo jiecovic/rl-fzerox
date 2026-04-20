@@ -48,9 +48,9 @@ from tests.support.fakes import SyntheticBackend
 
 class _CapturingLogger:
     def __init__(self) -> None:
-        self.records: dict[str, float] = {}
+        self.records: dict[str, object] = {}
 
-    def record(self, key: str, value: float) -> None:
+    def record(self, key: str, value: object) -> None:
         self.records[key] = value
 
 
@@ -194,6 +194,8 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "race_laps_completed": 0,
             "damage_taken_frames": 0,
             "collision_recoil_entered": False,
+            "boost_used": True,
+            "lean_used": False,
             "episode": {
                 "position": 2,
                 "race_laps_completed": 3,
@@ -201,6 +203,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "episode_step": 7_404,
                 "termination_reason": "finished",
                 "truncation_reason": None,
+                "track_course_id": "mute_city",
             },
         },
         {
@@ -211,6 +214,8 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "race_laps_completed": 0,
             "damage_taken_frames": 2,
             "collision_recoil_entered": True,
+            "boost_used": False,
+            "lean_used": True,
             "episode": {
                 "position": 8,
                 "race_laps_completed": 1,
@@ -229,11 +234,14 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
     assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
+    assert accumulator.step_rates["boost_used"].rate() == 0.5
+    assert accumulator.step_rates["lean_used"].rate() == 0.5
     assert accumulator.episode_metrics["position"].mean() == 5.0
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
     assert accumulator.finished_episode_metrics["race_time_ms"].mean() == 123.4
     assert accumulator.finished_episode_metrics["episode_step"].mean() == 7404.0
     assert accumulator.finished_episode_metrics["position"].mean() == 2.0
+    assert accumulator.course_finish_times_s["mute_city"].mean() == 123.4
     assert accumulator.episode_count == 2
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["progress_stalled"] == 1
@@ -243,7 +251,10 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
 
     assert logger.records["state/damage_taken_step_rate"] == 0.5
     assert logger.records["state/collision_recoil_entry_rate"] == 0.5
+    assert logger.records["action/boost_used_step_rate"] == 0.5
+    assert logger.records["action/lean_used_step_rate"] == 0.5
     assert logger.records["episode/finish_time_s_mean"] == 123.4
+    assert logger.records["episode/by_course/mute_city/finish_time_s_mean"] == 123.4
     assert logger.records["episode/finish_steps_mean"] == 7404.0
     assert logger.records["episode/finish_position_mean"] == 2.0
 
@@ -563,9 +574,21 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
 def test_monitor_info_keys_include_position_context() -> None:
     assert "position" in MONITOR_INFO_KEYS
     assert "total_racers" in MONITOR_INFO_KEYS
+    assert "course_index" in MONITOR_INFO_KEYS
 
 
 def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> None:
     assert "race_time_ms" in MONITOR_INFO_KEYS
     assert "damage_taken_frames" in MONITOR_INFO_KEYS
     assert "collision_recoil_entered" in MONITOR_INFO_KEYS
+
+
+def test_monitor_info_keys_exclude_step_only_action_rates() -> None:
+    assert "boost_used" not in MONITOR_INFO_KEYS
+    assert "lean_used" not in MONITOR_INFO_KEYS
+
+
+def test_monitor_info_keys_include_track_context_for_course_metrics() -> None:
+    assert "track_id" in MONITOR_INFO_KEYS
+    assert "track_course_id" in MONITOR_INFO_KEYS
+    assert "track_course_name" in MONITOR_INFO_KEYS

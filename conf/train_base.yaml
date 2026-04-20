@@ -55,11 +55,6 @@ env:
     # Boost still requires can_boost, enough energy, grounded state, and no active boost.
     # null disables only this speed gate.
     boost_unmask_max_speed_kph: null
-    # Keep boost visible whenever gameplay-valid; request lockout below prevents per-frame spam.
-    # Values above 1 make the action too sparse and can teach the policy that boost is unavailable.
-    boost_decision_interval_frames: 1
-    # Minimum internal-frame spacing between accepted manual boost requests.
-    boost_request_lockout_frames: 5
     # Optional live speed gate for lean actions.
     # null disables it; 0 allows lean input immediately; e.g. 500 masks it below 500 km/h.
     lean_unmask_min_speed_kph: null

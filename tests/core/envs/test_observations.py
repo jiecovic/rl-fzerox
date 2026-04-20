@@ -369,6 +369,8 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         signed_lateral_offset=-90.0,
         current_radius_left=120.0,
         current_radius_right=100.0,
+        lap_distance=20_000.0,
+        course_length=80_000.0,
     )
 
     vector = telemetry_state_vector(
@@ -384,8 +386,8 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     feature_names = state_feature_names("race_core", state_components=components)
     values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
 
-    assert vector.shape == (45,)
-    assert feature_names[:10] == (
+    assert vector.shape == (46,)
+    assert feature_names[:11] == (
         "vehicle_state.speed_norm",
         "vehicle_state.energy_frac",
         "vehicle_state.reverse_active",
@@ -394,6 +396,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         "vehicle_state.boost_active",
         "vehicle_state.lateral_velocity_norm",
         "vehicle_state.sliding_active",
+        "track_position.lap_progress",
         "track_position.edge_ratio",
         "track_position.outside_track_bounds",
     )
@@ -403,6 +406,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["vehicle_state.boost_ready"] == 1.0
     assert values["vehicle_state.lateral_velocity_norm"] == 0.5
     assert values["vehicle_state.sliding_active"] == 1.0
+    assert values["track_position.lap_progress"] == 0.25
     assert values["track_position.edge_ratio"] == pytest.approx(-0.9)
     assert values["track_position.outside_track_bounds"] == 0.0
     assert values["surface_state.on_dirt_surface"] == 1.0
@@ -426,6 +430,20 @@ def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:
 
     assert values["track_position.edge_ratio"] == 1.0
     assert values["track_position.outside_track_bounds"] == 1.0
+
+
+def test_state_components_clamp_lap_progress() -> None:
+    components = _clean_state_components(control_history_enabled=False)
+    telemetry = make_telemetry(
+        lap_distance=90_000.0,
+        course_length=80_000.0,
+    )
+
+    vector = telemetry_state_vector(telemetry, state_components=components)
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert values["track_position.lap_progress"] == 1.0
 
 
 def test_state_components_can_disable_control_history() -> None:
@@ -459,7 +477,7 @@ def test_state_components_define_observation_space_shape_and_bounds() -> None:
     assert isinstance(state_space, spaces.Box)
 
     assert image_space.shape == (66, 82, 6)
-    assert state_space.shape == (45,)
+    assert state_space.shape == (46,)
     feature_names = state_feature_names("race_core", state_components=components)
     lateral_index = feature_names.index("vehicle_state.lateral_velocity_norm")
     edge_index = feature_names.index("track_position.edge_ratio")

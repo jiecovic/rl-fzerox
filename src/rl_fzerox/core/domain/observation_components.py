@@ -11,6 +11,7 @@ ActionHistoryControlName: TypeAlias = Literal[
     "air_brake",
     "boost",
     "lean",
+    "pitch",
 ]
 ObservationCourseContextName: TypeAlias = Literal["none", "one_hot_builtin"]
 ObservationGroundEffectContextName: TypeAlias = Literal["none", "effect_flags"]

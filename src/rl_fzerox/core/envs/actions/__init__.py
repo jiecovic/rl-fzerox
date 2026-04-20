@@ -5,6 +5,7 @@ from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN,
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
@@ -23,6 +24,7 @@ from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     ContinuousSteerDriveLeanActionAdapter,
 )
 from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
+    HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerDriveBoostLeanActionAdapter,
     HybridSteerDriveBoostLeanPrimitiveActionAdapter,
     HybridSteerDriveLeanActionAdapter,
@@ -53,6 +55,9 @@ ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: HybridSteerDriveBoostLeanActionAdapter,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE: (
         HybridSteerDriveBoostLeanPrimitiveActionAdapter
+    ),
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH: (
+        HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter
     ),
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: HybridSteerGasBoostLeanActionAdapter,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: (
@@ -96,6 +101,7 @@ __all__ = [
     "DEFAULT_ACTION_NAME",
     "LEAN_LEFT_MASK",
     "LEAN_RIGHT_MASK",
+    "HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter",
     "HybridSteerDriveBoostLeanActionAdapter",
     "HybridSteerDriveBoostLeanPrimitiveActionAdapter",
     "HybridSteerDriveLeanActionAdapter",

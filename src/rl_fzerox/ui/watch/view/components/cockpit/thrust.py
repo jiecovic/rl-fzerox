@@ -8,18 +8,19 @@ from rl_fzerox.ui.watch.view.components.cockpit.style import (
 from rl_fzerox.ui.watch.view.components.effects import (
     draw_glass_column_overlay as _draw_glass_column_overlay,
 )
-from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import PygameModule, PygameSurface
 
 
 def _draw_thrust_column(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     x: int,
     y: int,
     level: float,
     threshold: float | None,
-    fill_color,
+    fill_color: Color,
     width: int,
     height: int,
 ) -> None:

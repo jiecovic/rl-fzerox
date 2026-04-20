@@ -232,8 +232,6 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
                         "boost": {
                             "type": "discrete",
                             "mask": ("idle",),
-                            "decision_interval_frames": 1,
-                            "request_lockout_frames": 5,
                         },
                         "lean": {
                             "type": "discrete",
@@ -266,12 +264,14 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
     assert isinstance(branches_data, dict)
     boost_data = branches_data["boost"]
     assert isinstance(boost_data, dict)
-    assert boost_data["request_lockout_frames"] == 5
+    assert "decision_interval_frames" not in boost_data
+    assert "request_lockout_frames" not in boost_data
 
     loaded_config = load_train_run_config(run_paths.run_dir)
     action_config = loaded_config.env.action.runtime()
 
     assert action_config.name == "hybrid_steer_gas_boost_lean"
+    assert action_config.boost_decision_interval_frames == 1
     assert action_config.boost_request_lockout_frames == 5
 
 

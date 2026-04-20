@@ -9,6 +9,7 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
+    AIR_BRAKE_MASK,
     BOOST_MASK,
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
@@ -16,7 +17,13 @@ from rl_fzerox.core.envs.actions import (
 )
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
-from rl_fzerox.ui.watch.view.screen.types import ControlViz, FlagToken, FlagViz, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.types import (
+    ControlViz,
+    FlagToken,
+    FlagViz,
+    RenderFont,
+    ViewerFonts,
+)
 
 
 def _control_viz(
@@ -37,6 +44,12 @@ def _control_viz(
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_air_brake_enabled=continuous_air_brake_mode != "off",
     )
+    if (
+        air_brake_axis is None
+        and continuous_air_brake_mode != "off"
+        and joypad_mask & AIR_BRAKE_MASK
+    ):
+        air_brake_axis = 1.0
     boost_pressed = bool(joypad_mask & BOOST_MASK)
     normalized_boost_lamp_level = max(
         0.0,
@@ -51,6 +64,7 @@ def _control_viz(
     )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
+        pitch_y=max(-1.0, min(1.0, control_state.left_stick_y)),
         gas_level=max(0.0, min(1.0, gas_level)),
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         air_brake_axis=air_brake_axis,
@@ -216,7 +230,7 @@ def _flag_viz_height(fonts: ViewerFonts, flag_viz: FlagViz) -> int:
     return row_height + LAYOUT.line_gap + (len(flag_viz.rows) * (pill_height + LAYOUT.line_gap))
 
 
-def _wrap_text(font, text: str, max_width: int) -> list[str]:
+def _wrap_text(font: RenderFont, text: str, max_width: int) -> list[str]:
     normalized = " ".join(text.split())
     if not normalized:
         return [""]

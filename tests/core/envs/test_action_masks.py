@@ -555,95 +555,77 @@ def test_env_action_masks_disable_boost_while_airborne() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
 
 
-def test_env_action_masks_expose_boost_only_on_decision_interval() -> None:
+def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
-                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "airborne", "can_boost"),
+                ),
                 summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
                 status=make_step_status(step_count=1),
             ),
-            _backend_step_result(
-                telemetry=_telemetry(race_distance=20.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(max_race_distance=20.0, final_frame_index=2),
-                status=make_step_status(step_count=2),
-            ),
-            _backend_step_result(
-                telemetry=_telemetry(race_distance=30.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(max_race_distance=30.0, final_frame_index=3),
-                status=make_step_status(step_count=3),
-            ),
         ],
         reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
     )
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
-            action=ActionConfig(
-                name="steer_drive_boost",
-                boost_decision_interval_frames=3,
+            boost_min_energy_fraction=0.0,
+            action=ActionConfig.model_validate(
+                {
+                    "branches": {
+                        "steer": {"type": "continuous"},
+                        "gas": {"type": "continuous"},
+                        "air_brake": {"type": "discrete"},
+                        "boost": {"type": "discrete"},
+                        "lean": {"type": "discrete"},
+                        "pitch": {"type": "discrete"},
+                    }
+                }
             ),
         ),
     )
 
     env.reset(seed=1)
 
-    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+    assert env.action_masks().tolist() == [
+        True,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        False,
+        True,
+        False,
+        False,
+    ]
 
-    env.step(np.array([3, 1, 0], dtype=np.int64))
-    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
-
-    env.step(np.array([3, 1, 0], dtype=np.int64))
-    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
-
-    env.step(np.array([3, 1, 0], dtype=np.int64))
-    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
-
-
-def test_env_action_masks_keep_boost_decision_slots_when_frame_skip_crosses_interval() -> None:
-    backend = ScriptedStepBackend(
-        [
-            _backend_step_result(
-                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(
-                    frames_run=2,
-                    max_race_distance=10.0,
-                    final_frame_index=2,
-                ),
-                status=make_step_status(step_count=1),
-            ),
-            _backend_step_result(
-                telemetry=_telemetry(race_distance=20.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(
-                    frames_run=2,
-                    max_race_distance=20.0,
-                    final_frame_index=4,
-                ),
-                status=make_step_status(step_count=2),
-            ),
-        ],
-        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
-    )
-    env = FZeroXEnv(
-        backend=backend,
-        config=EnvConfig(
-            action_repeat=2,
-            action=ActionConfig(
-                name="steer_drive_boost",
-                boost_decision_interval_frames=3,
-            ),
-        ),
+    env.step(
+        {
+            "continuous": np.array([0.0, 0.0], dtype=np.float32),
+            "discrete": np.array([0, 0, 0, 2], dtype=np.int64),
+        }
     )
 
-    env.reset(seed=1)
-
-    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
-
-    env.step(np.array([3, 1, 0], dtype=np.int64))
-    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
-
-    env.step(np.array([3, 1, 0], dtype=np.int64))
-    assert env.action_masks().tolist() == ([True] * (7 + 3 + 2))
+    assert env.action_masks().tolist() == [
+        True,
+        True,
+        True,
+        False,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+        True,
+    ]
 
 
 def test_env_action_masks_lock_boost_after_manual_request() -> None:
@@ -664,6 +646,16 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
                 summary=_step_summary(max_race_distance=30.0, final_frame_index=3),
                 status=make_step_status(step_count=3),
             ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=40.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=40.0, final_frame_index=4),
+                status=make_step_status(step_count=4),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=50.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=50.0, final_frame_index=5),
+                status=make_step_status(step_count=5),
+            ),
         ],
         reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
     )
@@ -672,7 +664,6 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
         config=EnvConfig(
             action=ActionConfig(
                 name="steer_drive_boost",
-                boost_request_lockout_frames=3,
             ),
         ),
     )
@@ -683,6 +674,12 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
 
     env.step(np.array([3, 1, 1], dtype=np.int64))
     assert backend.last_controller_state.joypad_mask & BOOST_MASK == BOOST_MASK
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+    env.step(np.array([3, 1, 0], dtype=np.int64))
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
+
+    env.step(np.array([3, 1, 0], dtype=np.int64))
     assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
 
     env.step(np.array([3, 1, 0], dtype=np.int64))

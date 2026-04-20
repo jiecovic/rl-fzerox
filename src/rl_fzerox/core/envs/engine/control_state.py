@@ -35,6 +35,7 @@ class _ActionHistorySample:
     air_brake: float
     boost: float
     lean: float
+    pitch: float
 
 
 @dataclass(slots=True)
@@ -285,6 +286,7 @@ class ControlStateTracker:
                 air_brake=1.0 if joypad & AIR_BRAKE_MASK else 0.0,
                 boost=1.0 if joypad & BOOST_MASK else 0.0,
                 lean=_signed_lean(_lean_index_from_mask(joypad)),
+                pitch=_clamp(float(control_state.left_stick_y), -1.0, 1.0),
             )
         )
 
@@ -299,6 +301,7 @@ class ControlStateTracker:
             fields[f"prev_air_brake_{suffix}"] = sample.air_brake
             fields[f"prev_boost_{suffix}"] = sample.boost
             fields[f"prev_lean_{suffix}"] = sample.lean
+            fields[f"prev_pitch_{suffix}"] = sample.pitch
         return {
             key: value
             for key, value in fields.items()
@@ -424,6 +427,7 @@ def _empty_action_history_sample() -> _ActionHistorySample:
         air_brake=0.0,
         boost=0.0,
         lean=0.0,
+        pitch=0.0,
     )
 
 
@@ -448,6 +452,8 @@ def _action_history_field_control(field_name: str) -> ActionHistoryControl:
         return "boost"
     if control_name == "lean":
         return "lean"
+    if control_name == "pitch":
+        return "pitch"
     raise ValueError(f"Unsupported action history field: {field_name!r}")
 
 

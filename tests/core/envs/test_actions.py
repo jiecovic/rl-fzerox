@@ -13,11 +13,13 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveLeanActionAdapter,
+    HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
     SteerDriveActionAdapter,
     SteerGasAirBrakeBoostLeanActionAdapter,
 )
+from rl_fzerox.core.envs.actions.continuous_controls import continuous_drive_gas_level
 
 
 def test_steer_drive_adapter_uses_default_seven_bucket_multidiscrete_space() -> None:
@@ -276,6 +278,45 @@ def test_hybrid_steer_gas_air_brake_boost_lean_adapter_masks_discrete_heads() ->
     ]
 
 
+def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:
+    adapter = HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter(
+        ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
+    )
+
+    assert isinstance(adapter.action_space, Dict)
+    assert isinstance(adapter.action_space.spaces["continuous"], Box)
+    assert adapter.action_space.spaces["continuous"].shape == (2,)
+    assert isinstance(adapter.action_space.spaces["discrete"], MultiDiscrete)
+    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2, 3, 5]
+    assert adapter.idle_action["continuous"].tolist() == [0.0, 0.0]
+    assert adapter.idle_action["discrete"].tolist() == [0, 0, 0, 2]
+    assert tuple(dimension.label for dimension in adapter.action_dimensions) == (
+        "air_brake",
+        "boost",
+        "lean",
+        "pitch",
+    )
+
+
+def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_decodes_pitch() -> None:
+    adapter = HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter(
+        ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
+    )
+
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([-0.25, 1.0], dtype=np.float32),
+            "discrete": np.array([1, 1, 2, 4], dtype=np.int64),
+        }
+    )
+
+    assert control_state == ControllerState(
+        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
+        left_stick_x=-0.25,
+        left_stick_y=1.0,
+    )
+
+
 def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:
     adapter = ContinuousSteerDriveActionAdapter(ActionConfig(name="continuous_steer_drive"))
 
@@ -357,6 +398,60 @@ def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
         ACCELERATE_MASK,
     ]
     assert full_accelerate_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
+
+
+def test_continuous_drive_pwm_supports_deadzone_and_full_zone() -> None:
+    assert (
+        continuous_drive_gas_level(
+            -0.95,
+            mode="pwm",
+            deadzone=0.10,
+            full_threshold=0.80,
+        )
+        == 0.0
+    )
+    assert continuous_drive_gas_level(
+        -0.45,
+        mode="pwm",
+        deadzone=0.10,
+        full_threshold=0.80,
+    ) == pytest.approx((0.55 - 0.10) / (0.80 - 0.10))
+    assert (
+        continuous_drive_gas_level(
+            -0.20,
+            mode="pwm",
+            deadzone=0.10,
+            full_threshold=0.80,
+        )
+        == 1.0
+    )
+
+
+def test_continuous_drive_pwm_applies_min_level_inside_deadzone() -> None:
+    assert continuous_drive_gas_level(
+        -0.95,
+        mode="pwm",
+        deadzone=0.10,
+        full_threshold=0.80,
+        min_level=0.25,
+    ) == pytest.approx(0.25)
+    assert continuous_drive_gas_level(
+        -0.45,
+        mode="pwm",
+        deadzone=0.10,
+        full_threshold=0.80,
+        min_level=0.25,
+    ) == pytest.approx(0.25 + (0.75 * ((0.55 - 0.10) / (0.80 - 0.10))))
+    assert (
+        continuous_drive_gas_level(
+            -0.20,
+            mode="pwm",
+            deadzone=0.10,
+            full_threshold=0.80,
+            min_level=0.25,
+        )
+        == 1.0
+    )
 
 
 def test_continuous_steer_drive_adapter_can_force_full_accelerate() -> None:

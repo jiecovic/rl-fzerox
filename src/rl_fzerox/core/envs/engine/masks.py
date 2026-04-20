@@ -20,12 +20,16 @@ class ActionMaskController:
     stage_overrides: tuple[ActionMaskOverrides | None, ...]
     stage_names: tuple[str, ...]
     stage_lean_unmask_min_speed_kph: tuple[float | None, ...]
+    stage_boost_unmask_max_speed_kph: tuple[float | None, ...]
+    stage_boost_min_energy_fraction: tuple[float | None, ...]
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
+    pitch_neutral_index: int = 2
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
     _speed_kph: float | None = None
+    _airborne: bool | None = None
 
     @classmethod
     def from_config(
@@ -49,6 +53,12 @@ class ActionMaskController:
             stage_overrides=stage_overrides,
             stage_names=_curriculum_stage_names(curriculum_config),
             stage_lean_unmask_min_speed_kph=_curriculum_stage_lean_gates(curriculum_config),
+            stage_boost_unmask_max_speed_kph=_curriculum_stage_boost_speed_gates(
+                curriculum_config
+            ),
+            stage_boost_min_energy_fraction=_curriculum_stage_boost_energy_gates(
+                curriculum_config
+            ),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             _stage_index=0 if stage_overrides else None,
@@ -65,15 +75,18 @@ class ActionMaskController:
             stage_lean_gate = self.stage_lean_unmask_min_speed_kph[self._stage_index]
             if stage_lean_gate is not None:
                 lean_unmask_min_speed_kph = stage_lean_gate
+        boost_unmask_max_speed_kph = self.current_boost_unmask_max_speed_kph
         return self.adapter.action_mask(
             base_overrides=self.base_overrides,
             stage_overrides=stage_overrides,
             dynamic_overrides=_dynamic_action_mask_overrides(
                 boost_unlocked=self._boost_unlocked,
+                airborne=self._airborne,
                 lean_allowed_values=self._lean_allowed_values,
                 speed_kph=self._speed_kph,
-                boost_unmask_max_speed_kph=self.boost_unmask_max_speed_kph,
+                boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+                pitch_neutral_index=self.pitch_neutral_index,
             ),
         )
 
@@ -116,6 +129,11 @@ class ActionMaskController:
 
         self._speed_kph = speed_kph
 
+    def set_airborne(self, airborne: bool | None) -> None:
+        """Update live airborne state for air-only input masks."""
+
+        self._airborne = airborne
+
     @property
     def stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""
@@ -129,6 +147,21 @@ class ActionMaskController:
         if self._stage_index is None:
             return None
         return self.stage_names[self._stage_index]
+
+    @property
+    def current_boost_unmask_max_speed_kph(self) -> float | None:
+        if self._stage_index is None:
+            return self.boost_unmask_max_speed_kph
+        stage_gate = self.stage_boost_unmask_max_speed_kph[self._stage_index]
+        if stage_gate is not None:
+            return stage_gate
+        return self.boost_unmask_max_speed_kph
+
+    def current_boost_min_energy_fraction(self, default: float) -> float:
+        if self._stage_index is None:
+            return float(default)
+        stage_gate = self.stage_boost_min_energy_fraction[self._stage_index]
+        return float(default if stage_gate is None else stage_gate)
 
 
 def _curriculum_stage_overrides(
@@ -154,6 +187,22 @@ def _curriculum_stage_lean_gates(
     if curriculum_config is None or not curriculum_config.enabled:
         return ()
     return tuple(stage.lean_unmask_min_speed_kph for stage in curriculum_config.stages)
+
+
+def _curriculum_stage_boost_speed_gates(
+    curriculum_config: CurriculumConfig | None,
+) -> tuple[float | None, ...]:
+    if curriculum_config is None or not curriculum_config.enabled:
+        return ()
+    return tuple(stage.boost_unmask_max_speed_kph for stage in curriculum_config.stages)
+
+
+def _curriculum_stage_boost_energy_gates(
+    curriculum_config: CurriculumConfig | None,
+) -> tuple[float | None, ...]:
+    if curriculum_config is None or not curriculum_config.enabled:
+        return ()
+    return tuple(stage.boost_min_energy_fraction for stage in curriculum_config.stages)
 
 
 def _validate_configured_overrides(
@@ -202,10 +251,12 @@ def _validate_override_branches(
 def _dynamic_action_mask_overrides(
     *,
     boost_unlocked: bool | None,
+    airborne: bool | None = None,
     lean_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
     boost_unmask_max_speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
+    pitch_neutral_index: int = 2,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
@@ -226,6 +277,9 @@ def _dynamic_action_mask_overrides(
             lean_values = (0,)
     if lean_values is not None:
         overrides["lean"] = lean_values
+    if airborne is False:
+        overrides["air_brake"] = (0,)
+        overrides["pitch"] = (pitch_neutral_index,)
     if not overrides:
         return None
     return overrides

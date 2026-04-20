@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
-from fzerox_emulator.arrays import ActionMask, ObservationFrame, RgbFrame
+from fzerox_emulator.arrays import ActionMask, RgbFrame
 from rl_fzerox.core.boot import sync_race_intro_target
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
@@ -29,30 +29,27 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
     requested_gas_level,
 )
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
-from rl_fzerox.core.envs.observations import (
-    ObservationValue,
-    action_history_settings_for_observation,
-    build_observation,
-    build_observation_space,
-)
+from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracker
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import derive_seed
 
 from .camera import sync_camera_setting
+from .control_gates import with_left_stick_y, without_joypad_mask
 from .control_state import ControlStateTracker
 from .info import (
     backend_step_info,
     has_custom_baseline,
     read_live_telemetry,
     set_curriculum_info,
-    set_observation_info,
     telemetry_can_boost,
     telemetry_energy_fraction,
     telemetry_info,
 )
 from .masks import ActionMaskController
+from .observation import EngineObservationBuilder
 from .reset import load_track_baseline, reset_race_state
+from .step_result import WatchEnvStep
 from .tracks import SelectedTrack, TrackBaselineCache, TrackResetSelector
 
 
@@ -66,21 +63,6 @@ class _EngineSeedDomains:
 
 
 _ENGINE_SEED_DOMAINS = _EngineSeedDomains()
-
-
-@dataclass(frozen=True)
-class WatchEnvStep:
-    """Gym step result plus watch-only display frames from repeated inner frames."""
-
-    observation: ObservationValue
-    reward: float
-    terminated: bool
-    truncated: bool
-    info: dict[str, object]
-    display_frames: tuple[RgbFrame, ...]
-
-    def gym_result(self) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self.observation, self.reward, self.terminated, self.truncated, self.info
 
 
 class FZeroXEnvEngine:
@@ -105,15 +87,9 @@ class FZeroXEnvEngine:
         self._curriculum_config = curriculum_config
         self._action_config = config.action.runtime()
         self._action_adapter = build_action_adapter(self._action_config)
-        self._observation_spec = backend.observation_spec(config.observation.preset)
-        self._observation_state_components = config.observation.state_components_data()
-        (
-            self._observation_action_history_len,
-            self._observation_action_history_controls,
-        ) = action_history_settings_for_observation(
-            state_components=self._observation_state_components,
-            fallback_len=config.observation.action_history_len,
-            fallback_controls=config.observation.action_history_controls,
+        self._observation_builder = EngineObservationBuilder.from_engine_config(
+            backend=backend,
+            config=config,
         )
         self._reward_tracker = build_reward_tracker(
             config=reward_config,
@@ -121,18 +97,7 @@ class FZeroXEnvEngine:
         )
         self._reward_summary_config = self._reward_tracker.summary_config()
         self._action_space = self._action_adapter.action_space
-        self._observation_space = build_observation_space(
-            self._observation_spec,
-            frame_stack=config.observation.frame_stack,
-            stack_mode=config.observation.stack_mode,
-            mode=config.observation.mode,
-            state_profile=config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=self._observation_action_history_len,
-            action_history_controls=self._observation_action_history_controls,
-            state_components=self._observation_state_components,
-        )
+        self._observation_space = self._observation_builder.space
         self._mask_controller = ActionMaskController.from_config(
             adapter=self._action_adapter,
             base_overrides=self._action_config.mask_overrides,
@@ -150,8 +115,8 @@ class FZeroXEnvEngine:
             lean_mode=self._action_config.lean_mode,
             boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
             boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
-            action_history_len=self._observation_action_history_len,
-            action_history_controls=self._observation_action_history_controls,
+            action_history_len=self._observation_builder.action_history_len,
+            action_history_controls=self._observation_builder.action_history_controls,
         )
         self._episode_done = False
         self._episode_uses_custom_baseline = False
@@ -274,21 +239,15 @@ class FZeroXEnvEngine:
         if telemetry is not None:
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
-        image_observation = self._render_observation_image()
-        observation = self._build_observation(image=image_observation, telemetry=telemetry)
-        set_observation_info(
+        image_observation = self._observation_builder.render_image()
+        observation = self._observation_builder.build_observation(
+            image=image_observation,
+            telemetry=telemetry,
+            control_state=self._control_state,
+        )
+        self._observation_builder.set_info(
             info,
-            observation_shape=tuple(int(value) for value in image_observation.shape),
-            observation_spec=self._observation_spec,
-            frame_stack=self.config.observation.frame_stack,
-            observation_stack_mode=self.config.observation.stack_mode,
-            observation_mode=self.config.observation.mode,
-            observation_state_profile=self.config.observation.state_profile,
-            observation_course_context=self.config.observation.course_context,
-            observation_ground_effect_context=self.config.observation.ground_effect_context,
-            action_history_len=self._observation_action_history_len,
-            action_history_controls=self._observation_action_history_controls,
-            observation_state_components=self._observation_state_components,
+            image_shape=tuple(int(value) for value in image_observation.shape),
         )
         self._last_info = dict(info)
         self._reset_count += 1
@@ -444,19 +403,23 @@ class FZeroXEnvEngine:
             self._manual_boost_allowed = None
             self._mask_controller.set_boost_unlocked(None)
             self._mask_controller.set_speed_kph(None)
+            self._mask_controller.set_airborne(None)
             return
         speed_kph = float(telemetry.player.speed_kph)
         self._mask_controller.set_speed_kph(speed_kph)
+        self._mask_controller.set_airborne(bool(telemetry.player.airborne))
         can_boost = telemetry_can_boost(telemetry)
         can_boost = can_boost and not telemetry_boost_active(telemetry)
         can_boost = can_boost and not telemetry.player.airborne
         can_boost = can_boost and telemetry.player.reverse_timer <= 0
         can_boost = can_boost and self._control_state.boost_action_allowed_by_timing()
-        max_boost_speed = self._action_config.boost_unmask_max_speed_kph
+        max_boost_speed = self._mask_controller.current_boost_unmask_max_speed_kph
         if max_boost_speed is not None:
             can_boost = can_boost and speed_kph < float(max_boost_speed)
         energy_fraction = telemetry_energy_fraction(telemetry)
-        min_energy_fraction = float(self.config.boost_min_energy_fraction)
+        min_energy_fraction = self._mask_controller.current_boost_min_energy_fraction(
+            self.config.boost_min_energy_fraction
+        )
         if energy_fraction is not None and min_energy_fraction > 0.0:
             can_boost = can_boost and energy_fraction >= min_energy_fraction
         self._manual_boost_allowed = can_boost
@@ -529,16 +492,24 @@ class FZeroXEnvEngine:
             drive_axis=action_drive_axis,
             continuous_drive_mode=self._action_config.continuous_drive_mode,
             continuous_drive_deadzone=float(self._action_config.continuous_drive_deadzone),
+            continuous_drive_full_threshold=float(
+                self._action_config.continuous_drive_full_threshold
+            ),
+            continuous_drive_min_level=float(self._action_config.continuous_drive_min_level),
         )
         self._last_requested_control_state = requested_control_state
         self._last_gas_level = gas_level
+        boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
+        lean_used = bool(
+            applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK)
+        )
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
             telemetry,
             RewardActionContext(
                 air_brake_requested=bool(requested_control_state.joypad_mask & AIR_BRAKE_MASK),
-                boost_requested=bool(applied_control_state.joypad_mask & BOOST_MASK),
+                boost_requested=boost_used,
                 lean_requested=bool(
                     requested_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK)
                 ),
@@ -559,6 +530,8 @@ class FZeroXEnvEngine:
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
+        info["boost_used"] = boost_used
+        info["lean_used"] = lean_used
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count
@@ -589,25 +562,19 @@ class FZeroXEnvEngine:
         )
         self._sync_dynamic_masks(telemetry)
         image_observation = step_result.observation
-        observation = self._build_observation(image=image_observation, telemetry=telemetry)
+        observation = self._observation_builder.build_observation(
+            image=image_observation,
+            telemetry=telemetry,
+            control_state=self._control_state,
+        )
         self._episode_return += reward
         info["episode_return"] = self._episode_return
         ensure_monitor_info_keys(info)
         self._episode_done = terminated or truncated
         self._last_info = dict(info)
-        set_observation_info(
+        self._observation_builder.set_info(
             info,
-            observation_shape=tuple(int(value) for value in image_observation.shape),
-            observation_spec=self._observation_spec,
-            frame_stack=self.config.observation.frame_stack,
-            observation_stack_mode=self.config.observation.stack_mode,
-            observation_mode=self.config.observation.mode,
-            observation_state_profile=self.config.observation.state_profile,
-            observation_course_context=self.config.observation.course_context,
-            observation_ground_effect_context=self.config.observation.ground_effect_context,
-            action_history_len=self._observation_action_history_len,
-            action_history_controls=self._observation_action_history_controls,
-            observation_state_components=self._observation_state_components,
+            image_shape=tuple(int(value) for value in image_observation.shape),
         )
         return WatchEnvStep(
             observation=observation,
@@ -628,53 +595,10 @@ class FZeroXEnvEngine:
         """Suppress controls whose validity depends on the latest telemetry."""
 
         if self._manual_boost_allowed is False:
-            control_state = _without_joypad_mask(control_state, BOOST_MASK)
+            control_state = without_joypad_mask(control_state, BOOST_MASK)
         air_brake_mode = self._action_config.continuous_air_brake_mode
-        if air_brake_mode == "always":
-            return control_state
         if air_brake_mode == "off":
-            return _without_joypad_mask(control_state, AIR_BRAKE_MASK)
+            control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
         if self._last_telemetry is None or self._last_telemetry.player.airborne:
             return control_state
-        return _without_joypad_mask(control_state, AIR_BRAKE_MASK)
-
-    def _render_observation_image(self) -> ObservationFrame:
-        return self.backend.render_observation(
-            preset=self.config.observation.preset,
-            frame_stack=self.config.observation.frame_stack,
-            stack_mode=self.config.observation.stack_mode,
-        )
-
-    def _build_observation(
-        self,
-        *,
-        image: ObservationFrame,
-        telemetry: FZeroXTelemetry | None,
-    ) -> ObservationValue:
-        """Build the policy observation from the rendered image plus control context."""
-
-        return build_observation(
-            image=image,
-            telemetry=telemetry,
-            mode=self.config.observation.mode,
-            state_profile=self.config.observation.state_profile,
-            course_context=self.config.observation.course_context,
-            ground_effect_context=self.config.observation.ground_effect_context,
-            action_history_len=self._observation_action_history_len,
-            action_history_controls=self._observation_action_history_controls,
-            action_history=self._control_state.action_history_fields(),
-            state_components=self._observation_state_components,
-            **self._control_state.observation_fields(),
-        )
-
-
-def _without_joypad_mask(control_state: ControllerState, joypad_mask: int) -> ControllerState:
-    if not control_state.joypad_mask & joypad_mask:
-        return control_state
-    return ControllerState(
-        joypad_mask=control_state.joypad_mask & ~joypad_mask,
-        left_stick_x=control_state.left_stick_x,
-        left_stick_y=control_state.left_stick_y,
-        right_stick_x=control_state.right_stick_x,
-        right_stick_y=control_state.right_stick_y,
-    )
+        return with_left_stick_y(without_joypad_mask(control_state, AIR_BRAKE_MASK), 0.0)
