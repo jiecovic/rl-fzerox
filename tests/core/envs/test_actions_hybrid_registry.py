@@ -14,6 +14,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
     ContinuousSteerDriveActionAdapter,
     ContinuousSteerDriveLeanActionAdapter,
+    HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerDriveBoostLeanActionAdapter,
     HybridSteerDriveBoostLeanPrimitiveActionAdapter,
     HybridSteerDriveLeanActionAdapter,
@@ -376,6 +377,12 @@ def test_build_action_adapter_supports_current_lean_variants() -> None:
     assert isinstance(
         build_action_adapter(ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean")),
         HybridSteerGasAirBrakeBoostLeanActionAdapter,
+    )
+    assert isinstance(
+        build_action_adapter(
+            ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
+        ),
+        HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     )
 
 

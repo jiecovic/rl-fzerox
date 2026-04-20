@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol, TypeAlias
+from typing import Any, Literal, Protocol, TypeAlias
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
 
+PygameModule: TypeAlias = Any
+PygameRect: TypeAlias = Any
+PygameSurface: TypeAlias = Any
 StatusIcon: TypeAlias = Literal["none", "in_range", "outside"]
 
 
@@ -48,6 +51,7 @@ class ControlViz:
     """Compact control-state visualization for the watch panel."""
 
     steer_x: float
+    pitch_y: float
     gas_level: float
     thrust_warning_threshold: float | None
     air_brake_axis: float | None

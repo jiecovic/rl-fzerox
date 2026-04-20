@@ -8,6 +8,11 @@ ActionBranchValue: TypeAlias = Literal[
     "engaged",
     "left",
     "right",
+    "down_full",
+    "down",
+    "neutral",
+    "up",
+    "up_full",
 ]
 ActionMaskValue: TypeAlias = int | ActionBranchValue
 
@@ -16,6 +21,7 @@ DISCRETE_ACTION_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
     "air_brake": ("idle", "engaged"),
     "boost": ("idle", "engaged"),
     "lean": ("idle", "left", "right"),
+    "pitch": ("down_full", "down", "neutral", "up", "up_full"),
 }
 
 

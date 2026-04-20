@@ -1,15 +1,15 @@
 # src/rl_fzerox/ui/watch/view/components/cockpit/panel.py
 from __future__ import annotations
 
+from rl_fzerox.ui.watch.view.components.cockpit.axis import (
+    draw_pitch_instrument,
+    draw_steer_instrument,
+)
 from rl_fzerox.ui.watch.view.components.cockpit.buttons import (
     _draw_boost_button,
     _draw_lean_button,
 )
 from rl_fzerox.ui.watch.view.components.cockpit.primitives import _draw_centered_label
-from rl_fzerox.ui.watch.view.components.cockpit.steer import (
-    _draw_pitch_instrument,
-    _draw_steer_instrument,
-)
 from rl_fzerox.ui.watch.view.components.cockpit.style import (
     COCKPIT_PANEL_STYLE,
     THRUST_COLUMN_STYLE,
@@ -18,13 +18,19 @@ from rl_fzerox.ui.watch.view.components.cockpit.thrust import _draw_thrust_colum
 from rl_fzerox.ui.watch.view.components.tokens import _pill_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
-from rl_fzerox.ui.watch.view.screen.types import ControlViz, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.types import (
+    ControlViz,
+    PygameModule,
+    PygameRect,
+    PygameSurface,
+    ViewerFonts,
+)
 
 
 def _draw_control_viz(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
@@ -84,7 +90,7 @@ def _draw_control_viz(
         steer_width,
         steer_height,
     )
-    _draw_steer_instrument(
+    draw_steer_instrument(
         pygame=pygame,
         screen=screen,
         track=steer_track,
@@ -162,11 +168,11 @@ def _draw_control_viz(
         width=gas_width,
         height=gas_height,
     )
-    _draw_pitch_instrument(
+    draw_pitch_instrument(
         pygame=pygame,
         screen=screen,
         track=pygame.Rect(pitch_x, thrust_y, pitch_width, gas_height),
-        value=0.0,
+        value=control_viz.pitch_y,
         marker_radius=marker_radius,
     )
 
@@ -184,7 +190,7 @@ def _control_viz_panel_height(width: int) -> int:
     return 160 if width >= COCKPIT_PANEL_STYLE.wide_control_min_width else 118
 
 
-def _draw_cockpit_panel(*, pygame, screen, rect) -> None:
+def _draw_cockpit_panel(*, pygame: PygameModule, screen: PygameSurface, rect: PygameRect) -> None:
     cut = 10
     points = (
         (rect.left + cut, rect.top),

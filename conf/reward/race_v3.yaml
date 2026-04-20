@@ -68,8 +68,8 @@ energy_full_refill_min_gain_fraction: 0.10
 
 # Gas: optional per-frame penalty for requesting less than the threshold.
 # Disabled at 0.0; with threshold 0.5, discrete idle gas gets the full penalty.
-gas_underuse_penalty: -0.1
-gas_underuse_threshold: 0.9
+gas_underuse_penalty: -0.01
+gas_underuse_threshold: 0.8
 
 # Steering: acceleration penalty for rapid direction changes.
 # This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
@@ -80,7 +80,7 @@ steer_oscillation_cap: 2.0
 steer_oscillation_power: 2.0
 
 # Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
-lean_low_speed_penalty: -0.02
+lean_low_speed_penalty: 0.0
 lean_low_speed_penalty_max_speed_kph: 990.0
 
 # Airborne: event reward when an airborne machine lands back on the track.

@@ -16,9 +16,18 @@ from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK
 class ContinuousDriveDecoder:
     """Decode one continuous drive axis into the game's binary accelerate button."""
 
-    def __init__(self, *, mode: str, deadzone: float) -> None:
+    def __init__(
+        self,
+        *,
+        mode: str,
+        deadzone: float,
+        full_threshold: float = 1.0,
+        min_level: float = 0.0,
+    ) -> None:
         self._mode = mode
         self._deadzone = deadzone
+        self._full_threshold = full_threshold
+        self._min_level = min_level
         self._pwm_phase = 0.0
 
     def reset(self) -> None:
@@ -36,6 +45,8 @@ class ContinuousDriveDecoder:
                     drive,
                     mode=self._mode,
                     deadzone=self._deadzone,
+                    full_threshold=self._full_threshold,
+                    min_level=self._min_level,
                 )
                 > 0.0
                 else 0
@@ -46,6 +57,8 @@ class ContinuousDriveDecoder:
                     drive,
                     mode=self._mode,
                     deadzone=self._deadzone,
+                    full_threshold=self._full_threshold,
+                    min_level=self._min_level,
                 )
             )
         raise ValueError(f"Unsupported continuous drive mode: {self._mode!r}")
@@ -151,15 +164,27 @@ def hybrid_branch(
         raise ValueError(f"Hybrid action is missing {branch_name!r} branch") from exc
 
 
-def continuous_drive_gas_level(drive: float, *, mode: str, deadzone: float) -> float:
+def continuous_drive_gas_level(
+    drive: float,
+    *,
+    mode: str,
+    deadzone: float,
+    full_threshold: float = 1.0,
+    min_level: float = 0.0,
+) -> float:
     """Return normalized gas intent for one continuous drive axis."""
 
     if mode == "always_accelerate":
         return 1.0
     if mode == "threshold":
-        return 1.0 if drive > deadzone else 0.0
+        return 1.0 if drive > deadzone else _clamp_unit(min_level)
     if mode == "pwm":
-        return _pwm_duty_cycle(drive, deadzone=deadzone)
+        return _pwm_duty_cycle(
+            drive,
+            deadzone=deadzone,
+            full_threshold=full_threshold,
+            min_level=min_level,
+        )
     raise ValueError(f"Unsupported continuous drive mode: {mode!r}")
 
 
@@ -169,6 +194,8 @@ def requested_gas_level(
     drive_axis: float | None,
     continuous_drive_mode: str,
     continuous_drive_deadzone: float,
+    continuous_drive_full_threshold: float = 1.0,
+    continuous_drive_min_level: float = 0.0,
 ) -> float:
     """Return one canonical 0..1 gas intent for reward and HUD consumers."""
 
@@ -177,6 +204,8 @@ def requested_gas_level(
             drive_axis,
             mode=continuous_drive_mode,
             deadzone=continuous_drive_deadzone,
+            full_threshold=continuous_drive_full_threshold,
+            min_level=continuous_drive_min_level,
         )
     return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
 
@@ -204,12 +233,26 @@ def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float 
     return float(np.clip(values[1], -1.0, 1.0))
 
 
-def _pwm_duty_cycle(drive: float, *, deadzone: float) -> float:
+def _pwm_duty_cycle(
+    drive: float,
+    *,
+    deadzone: float,
+    full_threshold: float,
+    min_level: float,
+) -> float:
     # F-Zero X usually wants full gas: negative values reduce duty, 0+ holds full throttle.
     duty = min(max(drive + 1.0, 0.0), 1.0)
-    if duty <= deadzone:
-        return 0.0
-    return (duty - deadzone) / (1.0 - deadzone)
+    minimum = _clamp_unit(min_level)
+    if duty <= deadzone or bool(np.isclose(duty, deadzone)):
+        return minimum
+    if duty >= full_threshold or bool(np.isclose(duty, full_threshold)):
+        return 1.0
+    scaled = (duty - deadzone) / (full_threshold - deadzone)
+    return minimum + ((1.0 - minimum) * scaled)
+
+
+def _clamp_unit(value: float) -> float:
+    return min(max(float(value), 0.0), 1.0)
 
 
 def _positive_button_pwm_duty_cycle(value: float, *, deadzone: float) -> float:

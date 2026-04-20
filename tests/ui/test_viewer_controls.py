@@ -81,7 +81,7 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
     assert 0.0 < lamp_level < BOOST_LAMP_CONFIG.active_level
 
 
-def test_control_viz_ignores_air_brake_button_without_air_brake_axis() -> None:
+def test_control_viz_visualizes_air_brake_button_without_air_brake_axis() -> None:
     control_viz = _control_viz(
         ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
         gas_level=0.0,
@@ -89,7 +89,7 @@ def test_control_viz_ignores_air_brake_button_without_air_brake_axis() -> None:
     )
 
     assert control_viz.gas_level == 0
-    assert control_viz.air_brake_axis is None
+    assert control_viz.air_brake_axis == pytest.approx(1.0)
 
 
 def test_control_viz_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
@@ -100,7 +100,7 @@ def test_control_viz_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
     )
 
     assert control_viz.gas_level == 1.0
-    assert control_viz.air_brake_axis is None
+    assert control_viz.air_brake_axis == pytest.approx(1.0)
 
 
 def test_control_viz_visualizes_canonical_gas_level() -> None:
@@ -113,6 +113,16 @@ def test_control_viz_visualizes_canonical_gas_level() -> None:
 
     assert control_viz.gas_level == pytest.approx(0.5)
     assert control_viz.air_brake_axis is None
+
+
+def test_control_viz_visualizes_pitch_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(left_stick_y=-0.5),
+        gas_level=0.0,
+        policy_action=None,
+    )
+
+    assert control_viz.pitch_y == pytest.approx(-0.5)
 
 
 def test_control_viz_visualizes_thrust_warning_threshold() -> None:

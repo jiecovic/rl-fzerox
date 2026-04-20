@@ -10,6 +10,7 @@ ActionAdapterName: TypeAlias = Literal[
     "continuous_steer_drive_lean",
     "hybrid_steer_drive_boost_lean",
     "hybrid_steer_drive_boost_lean_primitive",
+    "hybrid_steer_drive_air_brake_boost_lean_pitch",
     "hybrid_steer_gas_boost_lean",
     "hybrid_steer_gas_air_brake_boost_lean",
     "hybrid_steer_drive_lean",
@@ -26,6 +27,9 @@ ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: Final[ActionAdapterName] = (
 )
 ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE: Final[ActionAdapterName] = (
     "hybrid_steer_drive_boost_lean_primitive"
+)
+ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH: Final[ActionAdapterName] = (
+    "hybrid_steer_drive_air_brake_boost_lean_pitch"
 )
 ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: Final[ActionAdapterName] = "hybrid_steer_gas_boost_lean"
 ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: Final[ActionAdapterName] = (
@@ -55,6 +59,7 @@ HYBRID_ACTION_ADAPTERS: Final = _adapter_set(
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
+    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
 )

@@ -311,7 +311,7 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
             self.step_control_called = True
             raise AssertionError("recording must not bypass env.step(action)")
 
-    monkeypatch.setattr("rl_fzerox.apps.record_policy.FfmpegRgbWriter", FakeWriter)
+    monkeypatch.setattr("rl_fzerox.apps.recording.runner.FfmpegRgbWriter", FakeWriter)
     env: Any = FakeEnv()
     policy_runner: Any = FakePolicyRunner()
 

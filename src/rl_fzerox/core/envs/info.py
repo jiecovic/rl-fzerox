@@ -10,6 +10,7 @@ MONITOR_INFO_KEYS: tuple[str, ...] = (
     "speed_kph",
     "position",
     "total_racers",
+    "course_index",
     "lap",
     "laps_completed",
     "race_laps_completed",
@@ -17,6 +18,9 @@ MONITOR_INFO_KEYS: tuple[str, ...] = (
     "race_time_ms",
     "damage_taken_frames",
     "collision_recoil_entered",
+    "track_id",
+    "track_course_id",
+    "track_course_name",
 )
 
 
@@ -31,6 +35,7 @@ def ensure_monitor_info_keys(info: dict[str, object]) -> None:
     info.setdefault("speed_kph", None)
     info.setdefault("position", None)
     info.setdefault("total_racers", None)
+    info.setdefault("course_index", None)
     info.setdefault("lap", None)
     info.setdefault("laps_completed", None)
     info.setdefault("race_laps_completed", None)
@@ -38,3 +43,6 @@ def ensure_monitor_info_keys(info: dict[str, object]) -> None:
     info.setdefault("race_time_ms", None)
     info.setdefault("damage_taken_frames", 0)
     info.setdefault("collision_recoil_entered", False)
+    info.setdefault("track_id", None)
+    info.setdefault("track_course_id", None)
+    info.setdefault("track_course_name", None)

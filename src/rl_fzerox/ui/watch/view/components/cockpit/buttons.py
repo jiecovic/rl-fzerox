@@ -19,14 +19,15 @@ from rl_fzerox.ui.watch.view.components.effects import (
 from rl_fzerox.ui.watch.view.components.effects import (
     draw_alpha_polygon as _draw_alpha_polygon,
 )
-from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import PygameModule, PygameRect, PygameSurface, RenderFont
 
 
 def _draw_lean_button(
     *,
-    pygame,
-    screen,
-    font,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    font: RenderFont,
     x: int,
     y: int,
     width: int,
@@ -100,7 +101,7 @@ def _draw_lean_button(
     )
 
 
-def _lean_half_moon_points(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
+def _lean_half_moon_points(rect: PygameRect, *, direction: int) -> tuple[tuple[int, int], ...]:
     steps = LEAN_CONTROL_STYLE.curve_steps
     points: list[tuple[int, int]] = []
     for index in range(steps + 1):
@@ -116,7 +117,7 @@ def _lean_half_moon_points(rect, *, direction: int) -> tuple[tuple[int, int], ..
     return tuple(points)
 
 
-def _lean_half_moon_sheen(rect, *, direction: int) -> tuple[tuple[int, int], ...]:
+def _lean_half_moon_sheen(rect: PygameRect, *, direction: int) -> tuple[tuple[int, int], ...]:
     inset = max(3, rect.width // 5)
     if direction < 0:
         return (
@@ -133,7 +134,14 @@ def _lean_half_moon_sheen(rect, *, direction: int) -> tuple[tuple[int, int], ...
     )
 
 
-def _draw_lean_flat_edge(*, pygame, screen, rect, direction: int, color) -> None:
+def _draw_lean_flat_edge(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    rect: PygameRect,
+    direction: int,
+    color: Color,
+) -> None:
     x = rect.right if direction < 0 else rect.left
     inset = LEAN_CONTROL_STYLE.flat_edge_inset
     pygame.draw.line(screen, color, (x, rect.top + inset), (x, rect.bottom - inset), width=1)
@@ -141,8 +149,8 @@ def _draw_lean_flat_edge(*, pygame, screen, rect, direction: int, color) -> None
 
 def _draw_boost_button(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     center: tuple[int, int],
     radius: int,
     level: float,

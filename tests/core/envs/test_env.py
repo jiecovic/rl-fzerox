@@ -336,8 +336,8 @@ def test_step_shifts_the_frame_stack_forward():
 
 def test_env_reset_passes_preset_to_render_observation() -> None:
     class ObservationPresetBackend(SyntheticBackend):
-        def __init__(self, *args, **kwargs) -> None:
-            super().__init__(*args, **kwargs)
+        def __init__(self) -> None:
+            super().__init__()
             self.render_observation_calls: list[tuple[str, int, str]] = []
 
         def render_observation(
@@ -471,6 +471,65 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     assert backend.last_controller_state == air_brake_state
     assert reward == 0.0
     assert "reward_breakdown" not in info
+
+
+def test_step_suppresses_air_only_controls_until_airborne() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=5.0,
+                    state_labels=("active", "airborne"),
+                ),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "airborne"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=2),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig.model_validate(
+                {
+                    "branches": {
+                        "steer": {"type": "continuous"},
+                        "gas": {"type": "continuous"},
+                        "air_brake": {"type": "discrete"},
+                        "boost": {"type": "discrete", "mask": ("idle",)},
+                        "lean": {"type": "discrete"},
+                        "pitch": {"type": "discrete"},
+                    }
+                }
+            ),
+        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
+    )
+    airborne_action = {
+        "continuous": np.array([0.0, -1.0], dtype=np.float32),
+        "discrete": np.array([1, 0, 0, 4], dtype=np.int64),
+    }
+
+    env.reset(seed=21)
+    env.step(airborne_action)
+
+    assert backend.last_controller_state == ControllerState()
+
+    env.step(airborne_action)
+
+    assert backend.last_controller_state == ControllerState(
+        joypad_mask=AIR_BRAKE_MASK,
+        left_stick_y=1.0,
+    )
 
 
 def test_step_forces_accelerate_when_drive_mode_always_accelerate() -> None:

@@ -51,6 +51,8 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
     step_rates=(
         _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
         _MetricLogSpec("collision_recoil_entered", "state/collision_recoil_entry_rate"),
+        _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
+        _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
     ),
     episode_metrics=(
         _MetricLogSpec("position", "episode/final_position_mean"),
@@ -158,6 +160,7 @@ class RolloutInfoAccumulator:
             for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics
         }
     )
+    course_finish_times_s: dict[str, _MeanAccumulator] = field(default_factory=dict)
     termination_counts: dict[str, int] = field(
         default_factory=lambda: {
             reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination
@@ -194,6 +197,8 @@ class RolloutInfoAccumulator:
             if values:
                 scaled_values = [value * spec.scale for value in values]
                 self.finished_episode_metrics[spec.info_key].add_many(scaled_values)
+        for episode in finished_episodes:
+            self._add_course_finish_time(episode)
 
         for episode in episodes:
             termination_reason = episode.get("termination_reason")
@@ -226,6 +231,10 @@ class RolloutInfoAccumulator:
             mean = self.finished_episode_metrics[spec.info_key].mean()
             if mean is not None:
                 logger.record(spec.log_key, mean)
+        for course_key, accumulator in sorted(self.course_finish_times_s.items()):
+            mean = accumulator.mean()
+            if mean is not None:
+                logger.record(f"episode/by_course/{course_key}/finish_time_s_mean", mean)
 
         if self.episode_count == 0:
             return
@@ -240,6 +249,17 @@ class RolloutInfoAccumulator:
                 f"episode/{reason}_rate",
                 self.truncation_counts[reason] / self.episode_count,
             )
+
+    def _add_course_finish_time(self, episode: dict[str, object]) -> None:
+        course_key = _course_log_key(episode)
+        if course_key is None:
+            return
+        race_time_ms = episode.get("race_time_ms")
+        if not isinstance(race_time_ms, int | float):
+            return
+        self.course_finish_times_s.setdefault(course_key, _MeanAccumulator()).add_many(
+            [float(race_time_ms) * 0.001]
+        )
 
 
 def build_callbacks(
@@ -431,6 +451,28 @@ def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
 
 def _finished_episode_dicts(episodes: Sequence[dict[str, object]]) -> list[dict[str, object]]:
     return [episode for episode in episodes if episode.get("termination_reason") == "finished"]
+
+
+def _course_log_key(episode: dict[str, object]) -> str | None:
+    for key in ("track_course_id", "track_id", "track_course_name", "course_index"):
+        value = episode.get(key)
+        if isinstance(value, int):
+            return f"course_{value}"
+        if isinstance(value, str) and value.strip():
+            sanitized = _sanitize_log_component(value)
+            if sanitized:
+                return sanitized
+    return None
+
+
+def _sanitize_log_component(value: str) -> str:
+    normalized = value.strip().lower()
+    characters = [
+        character if character.isalnum() else "_"
+        for character in normalized
+    ]
+    collapsed = "_".join(part for part in "".join(characters).split("_") if part)
+    return collapsed
 
 
 def _apply_stage_train_overrides(
