@@ -4,6 +4,6 @@ defaults:
   - _self_
 
 train:
-  init_run_dir: null
-  init_artifact: latest
+  resume_run_dir: null
+  resume_artifact: latest
   save_freq: 10_000

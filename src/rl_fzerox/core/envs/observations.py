@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/observations.py
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from typing import TypeAlias, TypedDict
 
 import numpy as np
@@ -114,6 +114,7 @@ def build_observation(
     action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
+    zeroed_state_components: Collection[str] = (),
 ) -> ObservationValue:
     if mode == "image":
         return image
@@ -137,6 +138,7 @@ def build_observation(
                 action_history_controls=action_history_controls,
                 action_history=action_history,
                 state_components=state_components,
+                zeroed_state_components=zeroed_state_components,
             ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")
@@ -147,6 +149,7 @@ def build_observation_space(
     *,
     frame_stack: int,
     stack_mode: ObservationStackMode = "rgb",
+    minimap_layer: bool = False,
     mode: ObservationMode,
     state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
     course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
@@ -161,6 +164,7 @@ def build_observation_space(
         observation_spec,
         frame_stack=frame_stack,
         stack_mode=stack_mode,
+        minimap_layer=minimap_layer,
     )
     if mode == "image":
         return image_space

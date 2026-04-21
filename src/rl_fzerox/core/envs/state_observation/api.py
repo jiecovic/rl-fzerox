@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/state_observation/api.py
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 
 import numpy as np
 
@@ -61,6 +61,7 @@ def telemetry_state_vector(
     ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
+    zeroed_state_components: Collection[str] = (),
 ) -> StateVector:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
@@ -68,6 +69,7 @@ def telemetry_state_vector(
         values = component_state_values(
             telemetry,
             state_components=state_components,
+            zeroed_state_components=zeroed_state_components,
             action_history=action_history or {},
             legacy_fields={
                 "left_lean_held": left_lean_held,

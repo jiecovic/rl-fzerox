@@ -88,6 +88,33 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
 
     resolved_output_root = output_root.expanduser().resolve()
     run_dir = _next_run_dir(resolved_output_root, run_name)
+    return _run_paths(run_dir)
+
+
+def reserve_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
+    """Atomically reserve a fresh training run directory.
+
+    Training must never write into an existing run directory. This function
+    creates the selected top-level run directory with ``exist_ok=False`` and
+    retries the next numeric suffix if another process wins the same name.
+    """
+
+    resolved_output_root = output_root.expanduser().resolve()
+    resolved_output_root.mkdir(parents=True, exist_ok=True)
+    prefix = f"{run_name}_"
+    next_index = _next_run_index(resolved_output_root, prefix=prefix)
+
+    while True:
+        run_dir = resolved_output_root / f"{run_name}_{next_index:04d}"
+        try:
+            run_dir.mkdir(exist_ok=False)
+        except FileExistsError:
+            next_index += 1
+            continue
+        return _run_paths(run_dir)
+
+
+def _run_paths(run_dir: Path) -> RunPaths:
     return RunPaths(
         run_dir=run_dir,
         runtime_root=run_dir / RUN_LAYOUT.runtime_dirname,
@@ -167,6 +194,12 @@ def _watch_session_name() -> str:
 def _next_run_dir(output_root: Path, run_name: str) -> Path:
     output_root.mkdir(parents=True, exist_ok=True)
     prefix = f"{run_name}_"
+    next_index = _next_run_index(output_root, prefix=prefix)
+
+    return output_root / f"{run_name}_{next_index:04d}"
+
+
+def _next_run_index(output_root: Path, *, prefix: str) -> int:
     next_index = 1
 
     for child in output_root.iterdir():
@@ -175,5 +208,4 @@ def _next_run_dir(output_root: Path, run_name: str) -> Path:
         suffix = child.name.removeprefix(prefix)
         if suffix.isdigit():
             next_index = max(next_index, int(suffix) + 1)
-
-    return output_root / f"{run_name}_{next_index:04d}"
+    return next_index

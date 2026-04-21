@@ -46,7 +46,6 @@ from rl_fzerox.core.config.schema_models.tracks import (
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
-    VehicleMachineConfig,
 )
 from rl_fzerox.core.config.schema_models.training import TrainConfig
 
@@ -79,7 +78,6 @@ __all__ = [
     "TrackSamplingMode",
     "TrainAppConfig",
     "TrainConfig",
-    "VehicleMachineConfig",
     "WatchAppConfig",
     "WatchConfig",
     "WatchFpsSetting",

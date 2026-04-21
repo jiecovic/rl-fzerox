@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+from pydantic import ValidationError
+
 from rl_fzerox.core.config import load_train_app_config
 from rl_fzerox.core.config.schema import ObservationConfig
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
@@ -19,6 +22,7 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
             "mode": "image_state",
             "state_components": [
                 "vehicle_state",
+                "machine_context",
                 "track_position",
                 "surface_state",
                 {"course_context": {"encoding": "one_hot_builtin"}},
@@ -29,6 +33,7 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
 
     assert config.state_components_data() == (
         ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="machine_context"),
         ObservationStateComponentSettings(name="track_position"),
         ObservationStateComponentSettings(name="surface_state"),
         ObservationStateComponentSettings(
@@ -41,6 +46,28 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
             controls=("steer", "thrust"),
         ),
     )
+    assert config.zeroed_state_components == ()
+
+
+def test_observation_zeroed_state_components_must_be_active() -> None:
+    config = ObservationConfig.model_validate(
+        {
+            "mode": "image_state",
+            "state_components": ["vehicle_state", "track_position"],
+            "zeroed_state_components": ["track_position"],
+        }
+    )
+
+    assert config.zeroed_state_components == ("track_position",)
+
+    with pytest.raises(ValidationError, match="must reference active state components"):
+        ObservationConfig.model_validate(
+            {
+                "mode": "image_state",
+                "state_components": ["vehicle_state"],
+                "zeroed_state_components": ["track_position"],
+            }
+        )
 
 
 def test_load_train_app_config_composes_track_registry_entry(
@@ -57,25 +84,6 @@ def test_load_train_app_config_composes_track_registry_entry(
     rom_path.touch()
     baseline_path.write_bytes(b"baseline")
 
-    _write_yaml(
-        config_root / "vehicles" / "blue_falcon.yaml",
-        [
-            "vehicle:",
-            "  id: blue_falcon",
-            "  display_name: Blue Falcon",
-            "  engine_settings:",
-            "    max_speed:",
-            "      raw_value: 100",
-            "    balanced:",
-            "      raw_value: 50",
-            "  machine:",
-            "    character_index: 0",
-            "    body_stat: 1",
-            "    boost_stat: 2",
-            "    grip_stat: 1",
-            "    weight: 1260",
-        ],
-    )
     _write_yaml(
         config_root / "tracks" / "mute_city_test.yaml",
         [
@@ -181,25 +189,6 @@ def test_load_train_app_config_expands_course_registry_selection(
     baseline_path.write_bytes(b"baseline")
 
     _write_yaml(
-        config_root / "vehicles" / "blue_falcon.yaml",
-        [
-            "vehicle:",
-            "  id: blue_falcon",
-            "  display_name: Blue Falcon",
-            "  engine_settings:",
-            "    max_speed:",
-            "      raw_value: 100",
-            "    balanced:",
-            "      raw_value: 50",
-            "  machine:",
-            "    character_index: 0",
-            "    body_stat: 1",
-            "    boost_stat: 2",
-            "    grip_stat: 1",
-            "    weight: 1260",
-        ],
-    )
-    _write_yaml(
         config_root / "courses" / "jack" / "silence_test.yaml",
         [
             "course:",
@@ -256,8 +245,6 @@ def test_load_train_app_config_expands_course_registry_selection(
     assert entry.engine_setting_raw_value == 50
     assert entry.source_engine_setting is None
     assert entry.source_engine_setting_raw_value is None
-    assert entry.vehicle_machine is not None
-    assert entry.vehicle_machine.weight == 1260
     assert entry.baseline_state_path is None
 
 
@@ -274,25 +261,6 @@ def test_load_train_app_config_derives_engine_variant_from_source_baseline(
     rom_path.touch()
     baseline_path.write_bytes(b"baseline")
 
-    _write_yaml(
-        config_root / "vehicles" / "blue_falcon.yaml",
-        [
-            "vehicle:",
-            "  id: blue_falcon",
-            "  display_name: Blue Falcon",
-            "  engine_settings:",
-            "    balanced:",
-            "      raw_value: 50",
-            "    max_speed:",
-            "      raw_value: 100",
-            "  machine:",
-            "    character_index: 0",
-            "    body_stat: 1",
-            "    boost_stat: 2",
-            "    grip_stat: 1",
-            "    weight: 1260",
-        ],
-    )
     _write_yaml(
         config_root / "courses" / "jack" / "silence_test.yaml",
         [
@@ -359,26 +327,6 @@ def test_load_train_app_config_generates_vehicle_variant_without_source_baseline
     baseline_path.write_bytes(b"baseline")
 
     _write_yaml(
-        config_root / "vehicles" / "blue_falcon.yaml",
-        [
-            "vehicle:",
-            "  id: blue_falcon",
-            "  display_name: Blue Falcon",
-            "  machine:",
-            "    character_index: 0",
-        ],
-    )
-    _write_yaml(
-        config_root / "vehicles" / "golden_fox.yaml",
-        [
-            "vehicle:",
-            "  id: golden_fox",
-            "  display_name: Golden Fox",
-            "  machine:",
-            "    character_index: 1",
-        ],
-    )
-    _write_yaml(
         config_root / "courses" / "jack" / "silence_test.yaml",
         [
             "course:",
@@ -427,11 +375,9 @@ def test_load_train_app_config_generates_vehicle_variant_without_source_baseline
     assert entry.vehicle == "golden_fox"
     assert entry.engine_setting == "max_speed"
     assert entry.engine_setting_raw_value == 100
-    assert entry.vehicle_machine is not None
-    assert entry.vehicle_machine.character_index == 1
 
 
-def test_load_train_app_config_uses_builtin_vehicle_registry_for_raw_engine(
+def test_load_train_app_config_uses_stock_vehicle_catalog_for_raw_engine(
     isolated_repo_layout: tuple[Path, Path],
 ) -> None:
     project_root, config_root = isolated_repo_layout
@@ -480,9 +426,6 @@ def test_load_train_app_config_uses_builtin_vehicle_registry_for_raw_engine(
     assert entry.engine_setting == "engine_70"
     assert entry.engine_setting_raw_value == 70
     assert entry.baseline_state_path is None
-    assert entry.vehicle_machine is not None
-    assert entry.vehicle_machine.character_index == 4
-    assert entry.vehicle_machine.machine_select_slot == 4
 
 
 def test_load_train_app_config_round_trips_generated_engine_id(
@@ -527,8 +470,6 @@ def test_load_train_app_config_round_trips_generated_engine_id(
     assert config.track.engine_setting == "engine_70"
     assert config.track.engine_setting_raw_value == 70
     assert config.track.vehicle == "fire_stingray"
-    assert config.track.vehicle_machine is not None
-    assert config.track.vehicle_machine.character_index == 3
 
 
 def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:
@@ -644,7 +585,37 @@ def test_load_train_app_config_reads_compact_deep_extractor_profile(tmp_path: Pa
     assert config.policy.extractor.conv_profile == "compact_deep"
 
 
-def test_load_train_app_config_resolves_init_run_dir(tmp_path: Path) -> None:
+def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "train:",
+            "  total_timesteps: 1000",
+            f"  resume_run_dir: {run_dir}",
+            "  resume_artifact: latest",
+            "  resume_mode: weights_only",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.train.resume_run_dir == run_dir.resolve()
+    assert config.train.resume_artifact == "latest"
+    assert config.train.resume_mode == "weights_only"
+
+
+def test_load_train_app_config_migrates_legacy_init_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
@@ -662,14 +633,15 @@ def test_load_train_app_config_resolves_init_run_dir(tmp_path: Path) -> None:
             "train:",
             "  total_timesteps: 1000",
             f"  init_run_dir: {run_dir}",
-            "  init_artifact: latest",
+            "  init_artifact: best",
         ],
     )
 
     config = load_train_app_config(config_path)
 
-    assert config.train.init_run_dir == run_dir.resolve()
-    assert config.train.init_artifact == "latest"
+    assert config.train.resume_run_dir == run_dir.resolve()
+    assert config.train.resume_artifact == "best"
+    assert config.train.resume_mode == "weights_only"
 
 
 def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path) -> None:
@@ -785,7 +757,7 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "        ent_coef: 0.01",
             "    - name: lean_enabled",
             "      action_mask:",
-            "        lean: [idle, left, right]",
+            "        lean: unrestricted",
             "train:",
             "  algorithm: maskable_ppo",
             "  total_timesteps: 1000",

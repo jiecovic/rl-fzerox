@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/state_observation/components.py
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry
@@ -53,6 +53,22 @@ class StateComponentDefinition:
     ]
 
 
+@dataclass(frozen=True, slots=True)
+class MachineContextNormalization:
+    """Fixed stock-machine bounds used to scale vehicle setup into [0, 1]."""
+
+    stat_max: float = 4.0
+    weight_min: float = 780.0
+    weight_max: float = 2340.0
+
+    @property
+    def weight_range(self) -> float:
+        return self.weight_max - self.weight_min
+
+
+MACHINE_CONTEXT_NORMALIZATION = MachineContextNormalization()
+
+
 def state_vector_spec_from_components(
     state_components: StateComponentsSettings,
 ) -> StateVectorSpec:
@@ -73,19 +89,24 @@ def component_state_values(
     telemetry: FZeroXTelemetry | None,
     *,
     state_components: StateComponentsSettings,
+    zeroed_state_components: Collection[str] = (),
     action_history: Mapping[str, float],
     legacy_fields: Mapping[str, float],
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
-        values.extend(
-            state_component_definition(component).values(
-                telemetry,
-                component,
-                action_history,
-                legacy_fields,
+        definition = state_component_definition(component)
+        if component.name in zeroed_state_components:
+            values.extend([0.0] * len(definition.features(component)))
+        else:
+            values.extend(
+                definition.values(
+                    telemetry,
+                    component,
+                    action_history,
+                    legacy_fields,
+                )
             )
-        )
 
     return values
 
@@ -199,6 +220,23 @@ def _track_position_component_values(
     return _track_position_values(telemetry)
 
 
+def _machine_context_component_features(
+    component: ObservationStateComponentSettings,
+) -> tuple[StateFeature, ...]:
+    del component
+    return _machine_context_features()
+
+
+def _machine_context_component_values(
+    telemetry: FZeroXTelemetry | None,
+    component: ObservationStateComponentSettings,
+    action_history: Mapping[str, float],
+    legacy_fields: Mapping[str, float],
+) -> list[float]:
+    del component, action_history, legacy_fields
+    return _machine_context_values(telemetry)
+
+
 def _surface_state_component_features(
     component: ObservationStateComponentSettings,
 ) -> tuple[StateFeature, ...]:
@@ -292,6 +330,10 @@ STATE_COMPONENT_DEFINITIONS: dict[str, StateComponentDefinition] = {
     "vehicle_state": StateComponentDefinition(
         features=_vehicle_component_features,
         values=_vehicle_component_values,
+    ),
+    "machine_context": StateComponentDefinition(
+        features=_machine_context_component_features,
+        values=_machine_context_component_values,
     ),
     "track_position": StateComponentDefinition(
         features=_track_position_component_features,
@@ -400,6 +442,42 @@ def _raw_edge_ratio(telemetry: FZeroXTelemetry | None) -> float | None:
     if radius <= 0.0:
         return None
     return offset / radius
+
+
+def _machine_context_features() -> tuple[StateFeature, ...]:
+    return (
+        StateFeature("machine_context.body_stat", 1.0),
+        StateFeature("machine_context.boost_stat", 1.0),
+        StateFeature("machine_context.grip_stat", 1.0),
+        StateFeature("machine_context.weight", 1.0),
+        StateFeature("machine_context.engine", 1.0),
+    )
+
+
+def _machine_context_values(telemetry: FZeroXTelemetry | None) -> list[float]:
+    if telemetry is None:
+        return [0.0] * len(_machine_context_features())
+    player = telemetry.player
+    return [
+        _machine_stat_value(float(player.machine_body_stat)),
+        _machine_stat_value(float(player.machine_boost_stat)),
+        _machine_stat_value(float(player.machine_grip_stat)),
+        _machine_weight_value(float(player.machine_weight)),
+        clamp(float(player.engine_setting), 0.0, 1.0),
+    ]
+
+
+def _machine_stat_value(raw_value: float) -> float:
+    return clamp(raw_value / MACHINE_CONTEXT_NORMALIZATION.stat_max, 0.0, 1.0)
+
+
+def _machine_weight_value(raw_value: float) -> float:
+    return clamp(
+        (raw_value - MACHINE_CONTEXT_NORMALIZATION.weight_min)
+        / MACHINE_CONTEXT_NORMALIZATION.weight_range,
+        0.0,
+        1.0,
+    )
 
 
 def _surface_state_features() -> tuple[StateFeature, ...]:

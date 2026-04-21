@@ -61,10 +61,13 @@ _OBSOLETE_TRACK_FIELDS = frozenset(
         "human_reference_lap_time_ms",
         "reference_source",
         "reference_url",
+        "vehicle_machine",
         "ghost",
     )
 )
-_OBSOLETE_TRACK_SAMPLING_ENTRY_FIELDS = frozenset(("finish_time_target_ms", "ghost"))
+_OBSOLETE_TRACK_SAMPLING_ENTRY_FIELDS = frozenset(
+    ("finish_time_target_ms", "ghost", "vehicle_machine")
+)
 _OBSOLETE_ENV_FIELDS = frozenset(("benchmark_noop_reset",))
 
 
@@ -158,6 +161,7 @@ def _resolve_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
             ),
             "train": (
                 "output_root",
+                "resume_run_dir",
                 "init_run_dir",
             ),
         },

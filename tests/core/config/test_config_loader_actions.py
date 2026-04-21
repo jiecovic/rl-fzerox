@@ -234,7 +234,7 @@ def test_load_train_app_config_compiles_airborne_pitch_branch(tmp_path: Path) ->
             "        mask: [idle, left, right]",
             "      pitch:",
             "        type: discrete",
-            "        mask: [down_full, down, neutral, up, up_full]",
+            "        mask: unrestricted",
             "train:",
             "  algorithm: maskable_hybrid_action_ppo",
             "  total_timesteps: 1000",
@@ -253,6 +253,47 @@ def test_load_train_app_config_compiles_airborne_pitch_branch(tmp_path: Path) ->
         "lean": (0, 1, 2),
         "pitch": (0, 1, 2, 3, 4),
     }
+
+
+def test_load_train_app_config_compiles_neutral_pitch_mask(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    branches:",
+            "      steer:",
+            "        type: continuous",
+            "      gas:",
+            "        type: continuous",
+            "      air_brake:",
+            "        type: discrete",
+            "      boost:",
+            "        type: discrete",
+            "      lean:",
+            "        type: discrete",
+            "      pitch:",
+            "        type: discrete",
+            "        mask: [neutral]",
+            "train:",
+            "  algorithm: maskable_hybrid_action_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+    action_config = config.env.action.runtime()
+
+    assert action_config.mask_overrides == {"pitch": (2,)}
 
 
 def test_load_train_app_config_rejects_invalid_continuous_gas_zone(tmp_path: Path) -> None:

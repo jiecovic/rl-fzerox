@@ -79,7 +79,7 @@ class ObservationStateComponentConfig(BaseModel):
                 return frozenset({"state_profile"})
             case "control_history":
                 return frozenset({"length", "controls"})
-            case "vehicle_state" | "track_position" | "surface_state":
+            case "vehicle_state" | "machine_context" | "track_position" | "surface_state":
                 return frozenset()
 
     def data(self) -> ObservationStateComponentSettings:
@@ -108,6 +108,7 @@ class ObservationConfig(BaseModel):
     preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
+    minimap_layer: bool = False
     course_context: ObservationCourseContextName = "none"
     ground_effect_context: ObservationGroundEffectContextName = "none"
     action_history_len: PositiveInt | None = Field(default=None, le=16)
@@ -118,6 +119,7 @@ class ObservationConfig(BaseModel):
         "lean",
     )
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
+    zeroed_state_components: tuple[ObservationStateComponentName, ...] = ()
 
     @field_validator("preset", mode="before")
     @classmethod
@@ -152,6 +154,38 @@ class ObservationConfig(BaseModel):
         if len(set(names)) != len(names):
             raise ValueError("observation.state_components must not contain duplicates")
         return value
+
+    @field_validator("zeroed_state_components")
+    @classmethod
+    def _validate_unique_zeroed_state_components(
+        cls,
+        value: tuple[ObservationStateComponentName, ...],
+    ) -> tuple[ObservationStateComponentName, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("observation.zeroed_state_components must not contain duplicates")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_zeroed_state_components_are_active(self) -> ObservationConfig:
+        if not self.zeroed_state_components:
+            return self
+        if self.state_components is None:
+            raise ValueError(
+                "observation.zeroed_state_components requires observation.state_components"
+            )
+        active_names = {str(component.name) for component in self.state_components}
+        unknown_names = sorted(
+            str(component_name)
+            for component_name in self.zeroed_state_components
+            if str(component_name) not in active_names
+        )
+        if unknown_names:
+            joined = ", ".join(unknown_names)
+            raise ValueError(
+                "observation.zeroed_state_components must reference active state components: "
+                f"{joined}"
+            )
+        return self
 
     def state_components_data(self) -> tuple[ObservationStateComponentSettings, ...] | None:
         """Return state-component settings in the plain form consumed by env code."""

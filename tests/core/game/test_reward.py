@@ -50,6 +50,7 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "progress_bucket_distance": 123.0,
         "progress_bucket_reward": 2.5,
         "progress_reward_interval_frames": 7,
+        "defer_progress_reward_while_airborne": True,
         "time_penalty_per_frame": -0.002,
         "reverse_time_penalty_scale": 1.25,
         "low_speed_time_penalty_scale": 1.5,
@@ -58,11 +59,14 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "damage_taken_frame_penalty": -0.02,
         "damage_taken_streak_ramp_penalty": -0.001,
         "damage_taken_streak_cap_frames": 120,
+        "manual_boost_reward": 0.25,
         "boost_pad_reward": 10.0,
         "boost_pad_reward_progress_window": 800.0,
         "energy_refill_progress_multiplier": 3.0,
         "dirt_progress_multiplier": 0.5,
         "ice_progress_multiplier": 0.75,
+        "dirt_entry_penalty": -0.5,
+        "ice_entry_penalty": -0.25,
         "energy_refill_collision_cooldown_frames": 17,
         "energy_full_refill_lap_bonus": 4.0,
         "energy_full_refill_min_gain_fraction": 0.12,
@@ -152,6 +156,38 @@ def test_race_v3_can_delay_frontier_rewards_by_interval() -> None:
 
     assert held_step.reward == 0.0
     assert flushed_step.breakdown == {"frontier_progress": 3.0}
+
+
+def test_race_v3_can_defer_frontier_rewards_until_landing() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            defer_progress_reward_while_airborne=True,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    airborne = tracker.step_summary(
+        _summary(max_race_distance=300.0),
+        _status(step_count=1),
+        _telemetry(race_distance=300.0, state_labels=("active", "airborne")),
+    )
+    landing = tracker.step_summary(
+        _summary(max_race_distance=350.0),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    assert airborne.reward == 0.0
+    assert airborne.breakdown == {}
+    assert landing.reward == 3.0
+    assert landing.breakdown == {"frontier_progress": 3.0}
+    info = tracker.info(_telemetry(race_distance=350.0))
+    assert info["frontier_progress_bucket_index"] == 3
 
 
 def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:
@@ -303,6 +339,50 @@ def test_race_v3_does_not_penalize_bad_ground_without_new_progress() -> None:
 
     assert step.reward == 0.0
     assert step.breakdown == {}
+
+
+def test_race_v3_penalizes_bad_ground_entry_once_per_transition() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            dirt_entry_penalty=-0.5,
+            ice_entry_penalty=-0.25,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    dirt_entry = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, course_effect_raw=_COURSE_EFFECT_DIRT),
+    )
+    still_on_dirt = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0, course_effect_raw=_COURSE_EFFECT_DIRT),
+    )
+    left_dirt = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+    )
+    ice_entry = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=4),
+        _telemetry(race_distance=0.0, course_effect_raw=_COURSE_EFFECT_ICE),
+    )
+
+    assert dirt_entry.reward == pytest.approx(-0.5)
+    assert dirt_entry.breakdown == {"dirt_entry": -0.5}
+    assert still_on_dirt.reward == 0.0
+    assert still_on_dirt.breakdown == {}
+    assert left_dirt.reward == 0.0
+    assert left_dirt.breakdown == {}
+    assert ice_entry.reward == pytest.approx(-0.25)
+    assert ice_entry.breakdown == {"ice_entry": -0.25}
 
 
 def test_race_v3_rewards_full_energy_refill_once_per_lap() -> None:

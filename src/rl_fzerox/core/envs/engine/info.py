@@ -1,10 +1,12 @@
 # src/rl_fzerox/core/envs/engine/info.py
 from __future__ import annotations
 
+import struct
 from collections.abc import Mapping
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from typing import Protocol
 
-from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
+from fzerox_emulator import FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observation_image import image_observation_shape
 from rl_fzerox.core.envs.observations import (
@@ -19,13 +21,51 @@ from rl_fzerox.core.envs.observations import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class VehicleSetupRamLayout:
+    """RAM fields that describe the selected player machine setup."""
+
+    player_characters: int = 0x000E_5EE0
+    character_last_engine: int = 0x000E_40F0
+    player_engine: int = 0x000E_5EF0
+    player_racer_base: int = 0x002C_4920
+    racer_engine_curve: int = 0x1A8
+
+
+VEHICLE_SETUP_RAM = VehicleSetupRamLayout()
+
+
+class BackendInfoReader(Protocol):
+    """Narrow backend surface needed for frame/debug info."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def native_fps(self) -> float: ...
+
+    @property
+    def display_aspect_ratio(self) -> float: ...
+
+    @property
+    def frame_index(self) -> int: ...
+
+    def read_system_ram(self, offset: int, length: int) -> bytes: ...
+
+
+class TelemetryBackend(Protocol):
+    """Backend surface needed to read live telemetry."""
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None: ...
+
+
 def has_custom_baseline(info: Mapping[str, object]) -> bool:
     """Return whether reset info points at a custom user baseline."""
 
     return info.get("baseline_kind") == "custom"
 
 
-def read_live_telemetry(backend: EmulatorBackend) -> FZeroXTelemetry | None:
+def read_live_telemetry(backend: TelemetryBackend) -> FZeroXTelemetry | None:
     """Read the latest live telemetry snapshot, if one is available."""
 
     return backend.try_read_telemetry()
@@ -38,6 +78,7 @@ def set_observation_info(
     observation_spec: ObservationSpec,
     frame_stack: int,
     observation_stack_mode: ObservationStackMode,
+    observation_minimap_layer: bool,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
     observation_course_context: ObservationCourseContext,
@@ -45,6 +86,7 @@ def set_observation_info(
     action_history_len: int | None,
     action_history_controls: tuple[ActionHistoryControl, ...],
     observation_state_components: StateComponentsSettings | None,
+    observation_zeroed_state_components: tuple[str, ...] = (),
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -52,6 +94,7 @@ def set_observation_info(
         observation_spec,
         frame_stack=frame_stack,
         stack_mode=observation_stack_mode,
+        minimap_layer=observation_minimap_layer,
     )
     if observation_shape != expected_image_shape:
         raise ValueError(
@@ -68,6 +111,7 @@ def set_observation_info(
     )
     info["observation_stack"] = frame_stack
     info["observation_stack_mode"] = observation_stack_mode
+    info["observation_minimap_layer"] = observation_minimap_layer
     if observation_mode == "image_state":
         info["observation_state_profile"] = observation_state_profile
         info["observation_course_context"] = observation_course_context
@@ -78,6 +122,7 @@ def set_observation_info(
             info["observation_state_components"] = tuple(
                 asdict(component) for component in observation_state_components
             )
+        info["observation_zeroed_state_components"] = observation_zeroed_state_components
         info["observation_state_shape"] = (
             state_feature_count(
                 observation_state_profile,
@@ -140,15 +185,51 @@ def telemetry_energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None
     return max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
 
 
-def backend_step_info(backend: EmulatorBackend) -> dict[str, object]:
+def backend_step_info(backend: BackendInfoReader) -> dict[str, object]:
     """Return backend-side timing/display metadata for the current frame."""
 
-    return {
+    info: dict[str, object] = {
         "backend": backend.name,
         "frame_index": backend.frame_index,
         "display_aspect_ratio": backend.display_aspect_ratio,
         "native_fps": backend.native_fps,
     }
+    info.update(vehicle_setup_info(backend))
+    return info
+
+
+def vehicle_setup_info(backend: BackendInfoReader) -> dict[str, object]:
+    """Read the live RAM-backed player engine setting for HUD/debug checks."""
+
+    try:
+        character_index = _read_i16(backend, VEHICLE_SETUP_RAM.player_characters)
+        player_engine = _read_f32(backend, VEHICLE_SETUP_RAM.player_engine)
+        character_engine = _read_f32(
+            backend,
+            VEHICLE_SETUP_RAM.character_last_engine + (character_index * 4),
+        )
+        racer_engine_curve = _read_f32(
+            backend,
+            VEHICLE_SETUP_RAM.player_racer_base + VEHICLE_SETUP_RAM.racer_engine_curve,
+        )
+    except (OSError, RuntimeError, struct.error, ValueError):
+        return {}
+
+    return {
+        "vehicle_character_index_ram": character_index,
+        "engine_setting_ram": player_engine,
+        "engine_setting_percent_ram": player_engine * 100.0,
+        "character_engine_setting_ram": character_engine,
+        "racer_engine_curve_ram": racer_engine_curve,
+    }
+
+
+def _read_i16(backend: BackendInfoReader, offset: int) -> int:
+    return int(struct.unpack("<h", backend.read_system_ram(offset, 2))[0])
+
+
+def _read_f32(backend: BackendInfoReader, offset: int) -> float:
+    return float(struct.unpack("<f", backend.read_system_ram(offset, 4))[0])
 
 
 def set_curriculum_info(

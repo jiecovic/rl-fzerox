@@ -85,6 +85,17 @@ def lean_low_speed_penalty(
     return max(int(summary.frames_run), 0) * penalty
 
 
+def manual_boost_reward(
+    action_context: RewardActionContext | None,
+    *,
+    weights: RaceV3RewardWeights,
+) -> float:
+    reward = weights.manual_boost_reward
+    if reward <= 0.0 or action_context is None or not action_context.boost_requested:
+        return 0.0
+    return reward
+
+
 def _steer_oscillation_penalty_for(
     steer_level: float,
     *,

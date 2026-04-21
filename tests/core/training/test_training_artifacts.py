@@ -20,7 +20,6 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
-    VehicleMachineConfig,
     WatchAppConfig,
     WatchConfig,
 )
@@ -34,6 +33,7 @@ from rl_fzerox.core.training.runs import (
     load_train_run_config,
     materialize_train_run_config,
     materialize_watch_session_config,
+    reserve_run_paths,
     resolve_latest_model_path,
     resolve_latest_policy_path,
     resolve_model_artifact_path,
@@ -432,7 +432,7 @@ def test_materialize_train_run_config_normalizes_auto_to_maskable_ppo(tmp_path: 
     assert materialized.train.algorithm == "maskable_ppo"
 
 
-def test_materialize_train_run_config_preserves_init_artifact_source(tmp_path: Path) -> None:
+def test_materialize_train_run_config_preserves_resume_artifact_source(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     init_run_dir = tmp_path / "runs" / "ppo_cnn_0042"
@@ -451,8 +451,8 @@ def test_materialize_train_run_config_preserves_init_artifact_source(tmp_path: P
         train=TrainConfig(
             output_root=tmp_path / "runs",
             run_name="ppo_cnn",
-            init_run_dir=init_run_dir,
-            init_artifact="latest",
+            resume_run_dir=init_run_dir,
+            resume_artifact="latest",
         ),
     )
     run_paths = build_run_paths(
@@ -462,8 +462,8 @@ def test_materialize_train_run_config_preserves_init_artifact_source(tmp_path: P
 
     materialized = materialize_train_run_config(train_config, run_paths=run_paths)
 
-    assert materialized.train.init_run_dir == init_run_dir.resolve()
-    assert materialized.train.init_artifact == "latest"
+    assert materialized.train.resume_run_dir == init_run_dir.resolve()
+    assert materialized.train.resume_artifact == "latest"
 
 
 def test_materialize_train_run_config_does_not_copy_init_run_baseline(
@@ -510,14 +510,13 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
             vehicle="blue_falcon",
             engine_setting="balanced",
             engine_setting_raw_value=50,
-            vehicle_machine=VehicleMachineConfig(character_index=0),
         ),
         policy=PolicyConfig(),
         train=TrainConfig(
             output_root=tmp_path / "runs",
             run_name="target",
-            init_run_dir=init_baseline_path.parent.parent,
-            init_artifact="latest",
+            resume_run_dir=init_baseline_path.parent.parent,
+            resume_artifact="latest",
         ),
     )
     run_paths = build_run_paths(
@@ -536,7 +535,7 @@ def test_materialize_train_run_config_does_not_copy_init_run_baseline(
     assert materialized.emulator.baseline_state_path is not None
     assert materialized.emulator.baseline_state_path.parent == run_paths.baselines_dir
     assert materialized.emulator.baseline_state_path.read_bytes() == b"current-baseline"
-    assert materialized.train.init_run_dir == init_baseline_path.parent.parent.resolve()
+    assert materialized.train.resume_run_dir == init_baseline_path.parent.parent.resolve()
 
 
 def test_resolve_latest_model_path_prefers_latest_over_best_and_final(tmp_path: Path) -> None:
@@ -630,6 +629,16 @@ def test_build_run_paths_allocates_numbered_run_directories(tmp_path: Path) -> N
     assert first.baseline_state_path == first.run_dir / "baselines" / "baseline.state"
 
 
+def test_reserve_run_paths_never_reuses_existing_run_directory(tmp_path: Path) -> None:
+    output_root = tmp_path / "runs"
+    (output_root / "ppo_cnn_0001").mkdir(parents=True)
+
+    reserved = reserve_run_paths(output_root=output_root, run_name="ppo_cnn")
+
+    assert reserved.run_dir.name == "ppo_cnn_0002"
+    assert reserved.run_dir.is_dir()
+
+
 def test_materialize_train_run_config_rejects_source_state_copy(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -685,7 +694,6 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
             vehicle="blue_falcon",
             engine_setting="balanced",
             engine_setting_raw_value=50,
-            vehicle_machine=VehicleMachineConfig(character_index=0),
         ),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
@@ -746,29 +754,27 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
             track_sampling=TrackSamplingConfig(
                 enabled=True,
                 sampling_mode="balanced",
-                    entries=(
-                        TrackSamplingEntryConfig(
-                            id="mute_city_time_attack_blue_falcon_balanced",
-                            course_id="mute_city",
-                            course_index=0,
-                            mode="time_attack",
-                            vehicle="blue_falcon",
-                            engine_setting="balanced",
-                            engine_setting_raw_value=50,
-                            vehicle_machine=VehicleMachineConfig(character_index=0),
-                        ),
-                        TrackSamplingEntryConfig(
-                            id="silence_time_attack_blue_falcon_balanced",
-                            course_id="silence",
-                            course_index=1,
-                            mode="time_attack",
-                            vehicle="blue_falcon",
-                            engine_setting="balanced",
-                            engine_setting_raw_value=50,
-                            vehicle_machine=VehicleMachineConfig(character_index=0),
-                        ),
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_time_attack_blue_falcon_balanced",
+                        course_id="mute_city",
+                        course_index=0,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting="balanced",
+                        engine_setting_raw_value=50,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence_time_attack_blue_falcon_balanced",
+                        course_id="silence",
+                        course_index=1,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting="balanced",
+                        engine_setting_raw_value=50,
                     ),
                 ),
+            ),
         ),
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
@@ -823,7 +829,6 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
                         vehicle="blue_falcon",
                         engine_setting="max_speed",
                         engine_setting_raw_value=100,
-                        vehicle_machine=VehicleMachineConfig(character_index=0),
                     ),
                 ),
             ),
@@ -890,7 +895,6 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
                             vehicle="blue_falcon",
                             engine_setting="max_speed",
                             engine_setting_raw_value=100,
-                            vehicle_machine=VehicleMachineConfig(character_index=0),
                         ),
                     ),
                 ),
@@ -925,6 +929,7 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
             course_index=1,
             mode="time_attack",
             character_index=0,
+            machine_select_slot=0,
             engine_setting_raw_value=100,
             race_intro_target_timer=38,
         )
@@ -958,10 +963,6 @@ def test_materialize_train_run_config_generates_vehicle_variant(
                         vehicle="white_cat",
                         engine_setting="engine_70",
                         engine_setting_raw_value=70,
-                        vehicle_machine=VehicleMachineConfig(
-                            character_index=4,
-                            machine_select_slot=4,
-                        ),
                     ),
                 ),
             ),
@@ -1018,7 +1019,6 @@ def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
                                 vehicle="blue_falcon",
                                 engine_setting="balanced",
                                 engine_setting_raw_value=50,
-                                vehicle_machine=VehicleMachineConfig(character_index=0),
                             ),
                         ),
                     ),

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs, save_train_run_config
+from rl_fzerox.core.training.runs import ensure_run_dirs, reserve_run_paths, save_train_run_config
 from rl_fzerox.core.training.session import (
     build_callbacks,
     build_tensorboard_logger,
@@ -11,7 +11,7 @@ from rl_fzerox.core.training.session import (
     build_training_model,
     cleanup_failed_run,
     current_policy_artifact_metadata,
-    maybe_preload_training_parameters,
+    maybe_resume_training_model,
     print_training_startup,
     resolve_train_run_config,
     save_artifacts_atomically,
@@ -26,7 +26,7 @@ def run_training(config: TrainAppConfig) -> None:
     """Run one training session from the composed train config."""
 
     seed_process(config.seed)
-    run_paths = build_run_paths(
+    run_paths = reserve_run_paths(
         output_root=config.train.output_root,
         run_name=config.train.run_name,
     )
@@ -45,8 +45,9 @@ def run_training(config: TrainAppConfig) -> None:
             policy_config=run_config.policy,
             tensorboard_log=None,
         )
-        maybe_preload_training_parameters(
+        model = maybe_resume_training_model(
             model=model,
+            train_env=train_env,
             train_config=run_config.train,
         )
         save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
@@ -75,6 +76,7 @@ def run_training(config: TrainAppConfig) -> None:
                 callback=callbacks,
                 use_masking=masking_required,
                 progress_bar=True,
+                reset_num_timesteps=run_config.train.resume_mode != "full_model",
             )
         except Exception:
             if model.num_timesteps > 0:
@@ -110,6 +112,7 @@ def _learn_model(
     callback,
     use_masking: bool,
     progress_bar: bool,
+    reset_num_timesteps: bool,
 ) -> None:
     """Train one configured SB3 model with the shared learn kwargs."""
 
@@ -121,6 +124,7 @@ def _learn_model(
             total_timesteps=total_timesteps,
             callback=callback,
             progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
         )
         return
 
@@ -130,6 +134,7 @@ def _learn_model(
             callback=callback,
             use_masking=use_masking,
             progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
         )
         return
 
@@ -144,6 +149,7 @@ def _learn_model(
             callback=callback,
             use_masking=use_masking,
             progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
         )
         return
 
@@ -158,6 +164,7 @@ def _learn_model(
             callback=callback,
             use_masking=use_masking,
             progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
         )
         return
 
@@ -172,6 +179,7 @@ def _learn_model(
             callback=callback,
             use_masking=use_masking,
             progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
         )
         return
 

@@ -62,12 +62,15 @@ class RewardConfig(BaseModel):
     progress_bucket_distance: PositiveFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
+    defer_progress_reward_while_airborne: bool = False
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
     dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)
     ice_progress_multiplier: float = Field(default=1.0, ge=0.0)
+    dirt_entry_penalty: float = Field(default=0.0, le=0.0)
+    ice_entry_penalty: float = Field(default=0.0, le=0.0)
     energy_refill_collision_cooldown_frames: NonNegativeInt = 0
     energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
     energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -83,6 +86,7 @@ class RewardConfig(BaseModel):
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
+    manual_boost_reward: NonNegativeFloat = 0.0
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
     collision_recoil_penalty: float = -2.0

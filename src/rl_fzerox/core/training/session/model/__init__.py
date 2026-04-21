@@ -10,7 +10,7 @@ from rl_fzerox.core.training.session.model.builders import (
     build_training_model,
 )
 from rl_fzerox.core.training.session.model.policy import resolve_policy_activation_fn
-from rl_fzerox.core.training.session.model.preload import maybe_preload_training_parameters
+from rl_fzerox.core.training.session.model.preload import maybe_resume_training_model
 from rl_fzerox.core.training.session.model.startup import (
     build_tensorboard_logger,
     print_training_startup,
@@ -23,7 +23,7 @@ __all__ = [
     "build_ppo_model",
     "build_tensorboard_logger",
     "build_training_model",
-    "maybe_preload_training_parameters",
+    "maybe_resume_training_model",
     "print_training_startup",
     "resolve_effective_training_algorithm",
     "resolve_policy_activation_fn",

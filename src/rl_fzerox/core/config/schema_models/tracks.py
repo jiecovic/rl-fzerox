@@ -7,7 +7,6 @@ from typing import Literal
 from pydantic import (
     BaseModel,
     ConfigDict,
-    Field,
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
@@ -63,19 +62,6 @@ class TrackRecordsConfig(BaseModel):
         return info
 
 
-class VehicleMachineConfig(BaseModel):
-    """Machine identity and optional metadata for race-start materialization."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    character_index: NonNegativeInt
-    machine_select_slot: NonNegativeInt | None = None
-    body_stat: int | None = Field(default=None, ge=0, le=4)
-    boost_stat: int | None = Field(default=None, ge=0, le=4)
-    grip_stat: int | None = Field(default=None, ge=0, le=4)
-    weight: PositiveFloat | None = None
-
-
 class TrackSamplingEntryConfig(BaseModel):
     """One reset-time baseline candidate for multi-track training."""
 
@@ -98,7 +84,6 @@ class TrackSamplingEntryConfig(BaseModel):
     source_course_index: NonNegativeInt | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
-    vehicle_machine: VehicleMachineConfig | None = None
     records: TrackRecordsConfig | None = None
 
 
@@ -138,7 +123,6 @@ class TrackConfig(BaseModel):
     source_course_index: NonNegativeInt | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
-    vehicle_machine: VehicleMachineConfig | None = None
     baseline_state_path: Path | None = None
     records: TrackRecordsConfig | None = None
     notes: str | None = None

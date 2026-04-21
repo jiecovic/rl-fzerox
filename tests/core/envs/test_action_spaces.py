@@ -3,6 +3,10 @@ from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from rl_fzerox.core.config.schema import ActionConfig, ActionMaskConfig, EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.engine.masks import (
+    action_branch_non_neutral_allowed,
+    action_branch_value_allowed,
+)
 from tests.support.fakes import SyntheticBackend
 
 
@@ -83,6 +87,35 @@ def test_hybrid_steer_gas_air_brake_boost_lean_env_exposes_maskable_action_space
         False,
         False,
     ]
+    assert env.action_mask_branches() == {
+        "gas": (False, True),
+        "air_brake": (True, False),
+        "boost": (True, False),
+        "lean": (True, False, False),
+    }
+    snapshot = env.action_mask_snapshot()
+    assert snapshot.flat.tolist() == env.action_masks().tolist()
+    assert snapshot.branches == env.action_mask_branches()
+
+
+def test_action_branch_allowed_helpers_make_missing_branch_policy_explicit() -> None:
+    branches = {"boost": (True, False), "pitch": (False, False, True, False, False)}
+
+    assert not action_branch_value_allowed(branches, "boost", 1, missing_allowed=False)
+    assert action_branch_value_allowed(branches, "gas", 1, missing_allowed=True)
+    assert not action_branch_value_allowed(branches, "lean", 1, missing_allowed=False)
+    assert not action_branch_non_neutral_allowed(
+        branches,
+        "pitch",
+        neutral_index=2,
+        missing_allowed=False,
+    )
+    assert action_branch_non_neutral_allowed(
+        branches,
+        "gas",
+        neutral_index=0,
+        missing_allowed=True,
+    )
 
 
 def test_hybrid_steer_gas_boost_lean_env_exposes_maskable_action_space() -> None:

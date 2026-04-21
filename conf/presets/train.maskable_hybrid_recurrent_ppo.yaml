@@ -32,8 +32,8 @@ env:
 train:
   algorithm: maskable_hybrid_recurrent_ppo
   run_name: ppo_hybrid_full_gas_recurrent_cnn
-  init_run_dir: null
-  init_artifact: latest
+  resume_run_dir: null
+  resume_artifact: latest
   num_envs: 10
   ent_coef: 0.01
   n_steps: 2048

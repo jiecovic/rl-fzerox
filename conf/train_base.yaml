@@ -63,6 +63,7 @@ env:
     mode: image_state
     preset: crop_116x164
     frame_stack: 4
+    minimap_layer: false
 
 train:
   verbose: 0

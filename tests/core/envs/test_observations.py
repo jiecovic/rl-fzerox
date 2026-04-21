@@ -119,6 +119,37 @@ def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
     assert np.array_equal(observation[:, :, -3:], current_frame)
 
 
+def test_minimap_layer_appends_single_channel_after_frame_stack() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_66x82",
+        frame_stack=4,
+        stack_mode="rgb_gray",
+        minimap_layer=True,
+    )
+    spec = backend.observation_spec("crop_66x82")
+    image_space = build_image_observation_space(
+        spec,
+        frame_stack=4,
+        stack_mode="rgb_gray",
+        minimap_layer=True,
+    )
+
+    assert observation.shape == (66, 82, 7)
+    assert image_space.shape == (66, 82, 7)
+    assert (
+        stacked_observation_channels(
+            3,
+            frame_stack=4,
+            stack_mode="rgb_gray",
+            minimap_layer=True,
+        )
+        == 7
+    )
+
+
 def test_state_vector_treats_dash_pad_boost_as_boost_active() -> None:
     vector = telemetry_state_vector(
         make_telemetry(state_labels=("active", "dash_pad_boost"), boost_timer=0)
@@ -371,6 +402,11 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         current_radius_right=100.0,
         lap_distance=20_000.0,
         course_length=80_000.0,
+        machine_body_stat=1,
+        machine_boost_stat=2,
+        machine_grip_stat=3,
+        machine_weight=1560,
+        engine_setting=0.7,
     )
 
     vector = telemetry_state_vector(
@@ -386,8 +422,8 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     feature_names = state_feature_names("race_core", state_components=components)
     values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
 
-    assert vector.shape == (46,)
-    assert feature_names[:11] == (
+    assert vector.shape == (51,)
+    assert feature_names[:16] == (
         "vehicle_state.speed_norm",
         "vehicle_state.energy_frac",
         "vehicle_state.reverse_active",
@@ -396,6 +432,11 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         "vehicle_state.boost_active",
         "vehicle_state.lateral_velocity_norm",
         "vehicle_state.sliding_active",
+        "machine_context.body_stat",
+        "machine_context.boost_stat",
+        "machine_context.grip_stat",
+        "machine_context.weight",
+        "machine_context.engine",
         "track_position.lap_progress",
         "track_position.edge_ratio",
         "track_position.outside_track_bounds",
@@ -406,6 +447,11 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["vehicle_state.boost_ready"] == 1.0
     assert values["vehicle_state.lateral_velocity_norm"] == 0.5
     assert values["vehicle_state.sliding_active"] == 1.0
+    assert values["machine_context.body_stat"] == 0.25
+    assert values["machine_context.boost_stat"] == 0.5
+    assert values["machine_context.grip_stat"] == 0.75
+    assert values["machine_context.weight"] == 0.5
+    assert values["machine_context.engine"] == pytest.approx(0.7)
     assert values["track_position.lap_progress"] == 0.25
     assert values["track_position.edge_ratio"] == pytest.approx(-0.9)
     assert values["track_position.outside_track_bounds"] == 0.0
@@ -415,6 +461,33 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["control_history.prev_thrust_1"] == 1.0
     assert values["control_history.prev_boost_2"] == 1.0
     assert values["control_history.prev_lean_1"] == -1.0
+
+
+def test_state_components_can_zero_selected_components_without_changing_shape() -> None:
+    components = _clean_state_components()
+    telemetry = make_telemetry(
+        course_index=2,
+        speed_kph=750.0,
+        signed_lateral_offset=-90.0,
+        current_radius_right=100.0,
+        lap_distance=20_000.0,
+        course_length=80_000.0,
+    )
+
+    vector = telemetry_state_vector(
+        telemetry,
+        state_components=components,
+        zeroed_state_components=frozenset({"track_position"}),
+    )
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert vector.shape == (51,)
+    assert values["vehicle_state.speed_norm"] == 0.5
+    assert values["track_position.lap_progress"] == 0.0
+    assert values["track_position.edge_ratio"] == 0.0
+    assert values["track_position.outside_track_bounds"] == 0.0
+    assert feature_names.index("track_position.lap_progress") == 13
 
 
 def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:
@@ -477,7 +550,7 @@ def test_state_components_define_observation_space_shape_and_bounds() -> None:
     assert isinstance(state_space, spaces.Box)
 
     assert image_space.shape == (66, 82, 6)
-    assert state_space.shape == (46,)
+    assert state_space.shape == (51,)
     feature_names = state_feature_names("race_core", state_components=components)
     lateral_index = feature_names.index("vehicle_state.lateral_velocity_norm")
     edge_index = feature_names.index("track_position.edge_ratio")
@@ -491,6 +564,7 @@ def _clean_state_components(
 ) -> tuple[ObservationStateComponentSettings, ...]:
     components: list[ObservationStateComponentSettings] = [
         ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="machine_context"),
         ObservationStateComponentSettings(name="track_position"),
         ObservationStateComponentSettings(name="surface_state"),
         ObservationStateComponentSettings(

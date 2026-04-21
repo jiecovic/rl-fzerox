@@ -17,9 +17,11 @@ from rl_fzerox.core.envs.rewards.race_v3.controls import (
     SteerOscillationRewardTracker,
     gas_underuse_penalty,
     lean_low_speed_penalty,
+    manual_boost_reward,
 )
 from rl_fzerox.core.envs.rewards.race_v3.energy import EnergyRefillRewardTracker
 from rl_fzerox.core.envs.rewards.race_v3.events import (
+    BadSurfaceEntryPenaltyTracker,
     BoostPadRewardTracker,
     LapRewardTracker,
     landing_reward,
@@ -27,6 +29,7 @@ from rl_fzerox.core.envs.rewards.race_v3.events import (
 )
 from rl_fzerox.core.envs.rewards.race_v3.progress import (
     FrontierProgressRewardTracker,
+    FrontierReward,
 )
 from rl_fzerox.core.envs.rewards.race_v3.weights import RaceV3RewardWeights
 
@@ -45,6 +48,7 @@ class RaceV3RewardTracker:
         self._progress = FrontierProgressRewardTracker()
         self._energy = EnergyRefillRewardTracker()
         self._boost_pads = BoostPadRewardTracker()
+        self._bad_surfaces = BadSurfaceEntryPenaltyTracker()
         self._laps = LapRewardTracker()
         self._damage = DamagePenaltyState()
         self._steering = SteerOscillationRewardTracker()
@@ -62,6 +66,7 @@ class RaceV3RewardTracker:
         self._progress.reset(telemetry)
         self._energy.reset(telemetry)
         self._boost_pads.reset()
+        self._bad_surfaces.reset(telemetry)
         self._laps.reset(telemetry)
         self._damage.reset()
         self._steering.reset()
@@ -85,6 +90,7 @@ class RaceV3RewardTracker:
             self._progress.reset_inactive()
             self._energy.reset_inactive()
             self._boost_pads.reset()
+            self._bad_surfaces.reset(None)
             self._laps.reset(None)
             self._damage.reset()
             self._steering.reset()
@@ -111,20 +117,7 @@ class RaceV3RewardTracker:
             telemetry,
             weights=self._weights,
         )
-        frontier_reward = self._progress.step(
-            summary,
-            status,
-            weights=self._weights,
-            progress_multiplier=progress_multiplier,
-            energy_refill_bonus_for_progress=lambda progress_reward: (
-                self._energy.progress_bonus(
-                    progress_reward,
-                    summary,
-                    telemetry,
-                    weights=self._weights,
-                )
-            ),
-        )
+        frontier_reward = self._frontier_reward(summary, status, telemetry, progress_multiplier)
         if frontier_reward.progress:
             reward += frontier_reward.progress
             breakdown["frontier_progress"] = frontier_reward.progress
@@ -151,6 +144,14 @@ class RaceV3RewardTracker:
         if boost_pad_reward:
             reward += boost_pad_reward
             breakdown["boost_pad"] = boost_pad_reward
+
+        bad_surface_penalty = self._bad_surfaces.penalty(
+            telemetry,
+            weights=self._weights,
+            breakdown=breakdown,
+        )
+        if bad_surface_penalty:
+            reward += bad_surface_penalty
 
         self._energy.accumulate_since_full(summary, telemetry)
         full_refill_reward = self._energy.full_refill_lap_reward(
@@ -188,6 +189,11 @@ class RaceV3RewardTracker:
         if lean_penalty:
             reward += lean_penalty
             breakdown["lean_low_speed"] = lean_penalty
+
+        boost_reward = manual_boost_reward(action_context, weights=self._weights)
+        if boost_reward:
+            reward += boost_reward
+            breakdown["manual_boost"] = boost_reward
 
         landing = landing_reward(
             previous_airborne=self._previous_airborne,
@@ -257,6 +263,33 @@ class RaceV3RewardTracker:
         if summary.low_speed_frames <= 0 or extra_scale == 0.0:
             return 0.0
         return summary.low_speed_frames * self._weights.time_penalty_per_frame * extra_scale
+
+    def _frontier_reward(
+        self,
+        summary: StepSummary,
+        status: StepStatus,
+        telemetry: FZeroXTelemetry,
+        progress_multiplier: float,
+    ) -> FrontierReward:
+        if self._weights.defer_progress_reward_while_airborne and telemetry.player.airborne:
+            return FrontierReward(
+                progress=0.0,
+                ground_effect_adjustment=0.0,
+                energy_refill_bonus=0.0,
+            )
+
+        return self._progress.step(
+            summary,
+            status,
+            weights=self._weights,
+            progress_multiplier=progress_multiplier,
+            energy_refill_bonus_for_progress=lambda progress_reward: self._energy.progress_bonus(
+                progress_reward,
+                summary,
+                telemetry,
+                weights=self._weights,
+            ),
+        )
 
 
 def _ground_effect_progress_modifier(

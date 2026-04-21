@@ -30,6 +30,7 @@ class EngineObservationBuilder:
     config: EnvConfig
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
+    zeroed_state_components: tuple[str, ...]
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -52,6 +53,7 @@ class EngineObservationBuilder:
             spec,
             frame_stack=config.observation.frame_stack,
             stack_mode=config.observation.stack_mode,
+            minimap_layer=config.observation.minimap_layer,
             mode=config.observation.mode,
             state_profile=config.observation.state_profile,
             course_context=config.observation.course_context,
@@ -65,6 +67,7 @@ class EngineObservationBuilder:
             config=config,
             spec=spec,
             state_components=state_components,
+            zeroed_state_components=tuple(config.observation.zeroed_state_components),
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -75,6 +78,7 @@ class EngineObservationBuilder:
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
+            minimap_layer=self.config.observation.minimap_layer,
         )
 
     def build_observation(
@@ -97,6 +101,7 @@ class EngineObservationBuilder:
             action_history_controls=self.action_history_controls,
             action_history=control_state.action_history_fields(),
             state_components=self.state_components,
+            zeroed_state_components=self.zeroed_state_components,
             **control_state.observation_fields(),
         )
 
@@ -112,6 +117,7 @@ class EngineObservationBuilder:
             observation_spec=self.spec,
             frame_stack=self.config.observation.frame_stack,
             observation_stack_mode=self.config.observation.stack_mode,
+            observation_minimap_layer=self.config.observation.minimap_layer,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
             observation_course_context=self.config.observation.course_context,
@@ -119,4 +125,5 @@ class EngineObservationBuilder:
             action_history_len=self.action_history_len,
             action_history_controls=self.action_history_controls,
             observation_state_components=self.state_components,
+            observation_zeroed_state_components=self.zeroed_state_components,
         )

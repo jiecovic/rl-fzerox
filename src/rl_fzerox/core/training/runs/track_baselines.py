@@ -42,7 +42,6 @@ def track_config_from_sampling_entry(
             "source_course_index": entry.source_course_index,
             "source_engine_setting": entry.source_engine_setting,
             "source_engine_setting_raw_value": entry.source_engine_setting_raw_value,
-            "vehicle_machine": entry.vehicle_machine,
             "baseline_state_path": entry.baseline_state_path,
             "records": entry.records,
         }
