@@ -6,6 +6,7 @@ pub mod error;
 pub mod game;
 pub mod host;
 pub mod libretro;
+pub mod minimap;
 pub mod observation;
 
 pub use game::telemetry;

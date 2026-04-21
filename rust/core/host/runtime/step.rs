@@ -247,6 +247,8 @@ pub struct RepeatedStepConfig {
     pub frame_stack: usize,
     /// Channel encoding used for stacked observation frames.
     pub stack_mode: ObservationStackMode,
+    /// Append a masked one-channel minimap crop after the stacked image channels.
+    pub minimap_layer: bool,
     /// Speed threshold used by the stuck limit tracker.
     pub stuck_min_speed_kph: f32,
     /// Epsilon used for reward-side energy-loss aggregation.

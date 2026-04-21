@@ -49,17 +49,19 @@ def stacked_observation_channels(
     *,
     frame_stack: int,
     stack_mode: ObservationStackMode,
+    minimap_layer: bool = False,
 ) -> int:
     """Return channel count after temporal frame-stack encoding."""
 
     if frame_stack <= 0:
         raise ValueError("frame_stack must be positive")
+    extra_channels = 1 if minimap_layer else 0
     if stack_mode == "rgb":
-        return single_frame_channels * frame_stack
+        return (single_frame_channels * frame_stack) + extra_channels
     if stack_mode == "rgb_gray":
         if frame_stack == 1:
-            return single_frame_channels
-        return (frame_stack - 1) + single_frame_channels
+            return single_frame_channels + extra_channels
+        return (frame_stack - 1) + single_frame_channels + extra_channels
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
 
 
@@ -112,6 +114,7 @@ class EmulatorBackend(Protocol):
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -131,6 +134,7 @@ class EmulatorBackend(Protocol):
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -160,6 +164,7 @@ class EmulatorBackend(Protocol):
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
     ) -> ObservationFrame: ...
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None: ...

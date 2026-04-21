@@ -7,11 +7,12 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
 use crate::core::telemetry::layout::{
-    CAMERA, COURSE_INFO, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, RACER,
-    RACER_SEGMENT_POSITION_INFO, RaceDifficulty, TELEMETRY_CONFIG,
+    CAMERA, COURSE_INFO, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, MACHINE_TABLE,
+    RACER, RACER_SEGMENT_POSITION_INFO, RaceDifficulty, TELEMETRY_CONFIG,
 };
 use crate::core::telemetry::model::{
-    PlayerTelemetry, RacerGeometryTelemetry, StepTelemetrySample, TelemetrySnapshot,
+    MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry, StepTelemetrySample,
+    TelemetrySnapshot,
 };
 
 /// Decode a typed telemetry snapshot from a full system RAM view.
@@ -42,6 +43,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         laps_completed: read_i16(system_ram, player_base + RACER.laps_completed)?,
         position: read_i32(system_ram, player_base + RACER.position)?,
         geometry: read_racer_geometry(system_ram, player_base)?,
+        machine_context: read_machine_context(system_ram)?,
     };
 
     Ok(TelemetrySnapshot {
@@ -110,6 +112,27 @@ fn player_damage_rumble_counter_offset() -> usize {
 
 fn player_camera_setting_offset() -> usize {
     GLOBALS.cameras + CAMERA.race_setting
+}
+
+fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, CoreError> {
+    let character_index = read_i16(system_ram, GLOBALS.player_characters)?;
+    let engine_setting = read_f32(system_ram, GLOBALS.player_engine)?;
+    if character_index < 0 || character_index as usize >= MACHINE_TABLE.machine_count {
+        return Ok(MachineContextTelemetry {
+            engine_setting,
+            ..MachineContextTelemetry::default()
+        });
+    }
+
+    let machine_base =
+        MACHINE_TABLE.machines + ((character_index as usize) * MACHINE_TABLE.machine_size);
+    Ok(MachineContextTelemetry {
+        body_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.body_stat)?,
+        boost_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.boost_stat)?,
+        grip_stat: read_machine_i8(system_ram, machine_base + MACHINE_TABLE.grip_stat)?,
+        weight: read_machine_i16(system_ram, machine_base + MACHINE_TABLE.weight)?,
+        engine_setting,
+    })
 }
 
 fn read_racer_geometry(
@@ -233,6 +256,21 @@ fn read_f32(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
     Ok(f32::from_le_bytes(read_array(memory, offset)?))
 }
 
+fn read_machine_i8(memory: &[u8], offset: usize) -> Result<i8, CoreError> {
+    Ok(read_word_swapped_u8(memory, offset)? as i8)
+}
+
+fn read_machine_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {
+    Ok(i16::from_be_bytes([
+        read_word_swapped_u8(memory, offset)?,
+        read_word_swapped_u8(memory, offset + 1)?,
+    ]))
+}
+
+fn read_word_swapped_u8(memory: &[u8], logical_offset: usize) -> Result<u8, CoreError> {
+    read_raw_u8(memory, logical_offset ^ 0x03)
+}
+
 fn read_vec3_magnitude(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
     let x = read_f32(memory, offset)?;
     let y = read_f32(memory, offset + size_of::<f32>())?;
@@ -257,6 +295,13 @@ fn read_array<const N: usize>(memory: &[u8], offset: usize) -> Result<[u8; N], C
     let mut array = [0_u8; N];
     array.copy_from_slice(bytes);
     Ok(array)
+}
+
+fn read_raw_u8(memory: &[u8], offset: usize) -> Result<u8, CoreError> {
+    memory
+        .get(offset)
+        .copied()
+        .ok_or_else(|| memory_error(offset, 1, memory.len()))
 }
 
 fn memory_error(offset: usize, length: usize, available: usize) -> CoreError {

@@ -24,6 +24,7 @@ use super::util::{
 use crate::core::error::CoreError;
 use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
+use crate::core::minimap::{MinimapLayerRenderer, MinimapLayerRequest};
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
     PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame, VideoCrop, VideoFrame,
@@ -46,6 +47,8 @@ pub struct CallbackState {
     raw_frame: Option<RawVideoFrame>,
     observation_buffer: Vec<u8>,
     display_buffer: Vec<u8>,
+    minimap_buffer: Vec<u8>,
+    minimap_renderer: MinimapLayerRenderer,
     stacked_observation_buffers: BTreeMap<StackedObservationKey, StackedObservationBuffer>,
     render_plans: BTreeMap<ProcessedFramePlanKey, ProcessedFramePlan>,
     capture_video: bool,
@@ -96,6 +99,8 @@ impl CallbackState {
             raw_frame: None,
             observation_buffer: Vec::new(),
             display_buffer: Vec::new(),
+            minimap_buffer: Vec::new(),
+            minimap_renderer: MinimapLayerRenderer::default(),
             stacked_observation_buffers: BTreeMap::new(),
             render_plans: BTreeMap::new(),
             capture_video: true,
@@ -133,6 +138,7 @@ impl CallbackState {
         self.frame = Some(frame);
         self.frame_serial += 1;
         self.clear_stacked_observation_buffers();
+        self.minimap_renderer.clear();
     }
 
     pub fn set_capture_video(&mut self, capture_video: bool) {
@@ -218,8 +224,16 @@ impl CallbackState {
             render_plan: render_request.plan_key(),
             frame_stack: request.frame_stack,
             stack_mode: request.stack_mode,
+            extra_channels_per_pixel: usize::from(request.minimap_layer.is_some()),
         };
         self.render_observation_into_buffer(render_request)?;
+        let minimap_layer = match request.minimap_layer {
+            Some(minimap_request) => {
+                self.render_minimap_layer_into_buffer(minimap_request)?;
+                Some(self.minimap_buffer.clone())
+            }
+            None => None,
+        };
 
         let observation_buffer = self.observation_buffer.as_slice();
         let stack_buffer = self
@@ -231,9 +245,10 @@ impl CallbackState {
                     request.frame_stack,
                     if request.rgb { 3 } else { 1 },
                     request.stack_mode,
+                    usize::from(request.minimap_layer.is_some()),
                 )
             });
-        stack_buffer.update(observation_buffer, frame_serial)?;
+        stack_buffer.update(observation_buffer, frame_serial, minimap_layer.as_deref())?;
         Ok(stack_buffer.as_slice())
     }
 
@@ -492,6 +507,30 @@ impl CallbackState {
         )?;
         self.observation_buffer.clear();
         self.observation_buffer.extend_from_slice(&rendered);
+        Ok(())
+    }
+
+    fn render_minimap_layer_into_buffer(
+        &mut self,
+        request: MinimapLayerRequest,
+    ) -> Result<(), CoreError> {
+        if let Some(raw_frame) = self.raw_frame.as_ref() {
+            self.minimap_renderer.render_from_raw_into(
+                raw_frame,
+                request,
+                &mut self.minimap_buffer,
+            )?;
+            return Ok(());
+        }
+
+        let rendered = {
+            let frame = self.frame().cloned().ok_or(CoreError::NoFrameAvailable)?;
+            let mut output = Vec::new();
+            self.minimap_renderer
+                .render_from_frame_into(&frame, request, &mut output)?;
+            output
+        };
+        self.minimap_buffer = rendered;
         Ok(())
     }
 

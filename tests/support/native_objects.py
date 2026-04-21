@@ -50,6 +50,11 @@ def make_player_telemetry(
     acceleration_force: float = 0.0,
     drift_attack_force: float = 0.0,
     collision_mass: float = 0.0,
+    machine_body_stat: int = 0,
+    machine_boost_stat: int = 0,
+    machine_grip_stat: int = 0,
+    machine_weight: int = 0,
+    engine_setting: float = 0.0,
 ) -> PlayerTelemetry:
     resolved_state_flags = encode_state_flags(state_labels) if state_flags is None else state_flags
     return PlayerTelemetry(
@@ -82,6 +87,11 @@ def make_player_telemetry(
         acceleration_force=acceleration_force,
         drift_attack_force=drift_attack_force,
         collision_mass=collision_mass,
+        machine_body_stat=machine_body_stat,
+        machine_boost_stat=machine_boost_stat,
+        machine_grip_stat=machine_grip_stat,
+        machine_weight=machine_weight,
+        engine_setting=engine_setting,
     )
 
 
@@ -130,6 +140,11 @@ def make_telemetry(
     acceleration_force: float = 0.0,
     drift_attack_force: float = 0.0,
     collision_mass: float = 0.0,
+    machine_body_stat: int = 0,
+    machine_boost_stat: int = 0,
+    machine_grip_stat: int = 0,
+    machine_weight: int = 0,
+    engine_setting: float = 0.0,
 ) -> FZeroXTelemetry:
     resolved_player = player or make_player_telemetry(
         state_labels=state_labels,
@@ -162,6 +177,11 @@ def make_telemetry(
         acceleration_force=acceleration_force,
         drift_attack_force=drift_attack_force,
         collision_mass=collision_mass,
+        machine_body_stat=machine_body_stat,
+        machine_boost_stat=machine_boost_stat,
+        machine_grip_stat=machine_grip_stat,
+        machine_weight=machine_weight,
+        engine_setting=engine_setting,
     )
     return FZeroXTelemetry(
         total_lap_count=total_lap_count,

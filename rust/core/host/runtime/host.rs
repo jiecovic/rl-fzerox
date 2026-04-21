@@ -10,6 +10,7 @@ use crate::core::api::LoadedCore;
 use crate::core::callbacks::{CallbackGuard, CallbackState, StackedObservationRequest};
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
+use crate::core::minimap::MinimapLayerRequest;
 use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
@@ -232,8 +233,12 @@ impl Host {
         let final_telemetry = self.telemetry()?;
         let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
         self.step_counters = status.counters;
-        let observation =
-            self.observation_frame(config.preset, config.frame_stack, config.stack_mode)?;
+        let observation = self.observation_frame(
+            config.preset,
+            config.frame_stack,
+            config.stack_mode,
+            config.minimap_layer,
+        )?;
         Ok(NativeStepResult {
             observation,
             summary,
@@ -293,8 +298,12 @@ impl Host {
         let final_telemetry = self.telemetry()?;
         let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
         self.step_counters = status.counters;
-        let observation =
-            self.observation_frame(config.preset, config.frame_stack, config.stack_mode)?;
+        let observation = self.observation_frame(
+            config.preset,
+            config.frame_stack,
+            config.stack_mode,
+            config.minimap_layer,
+        )?;
         Ok(NativeWatchStepResult {
             observation,
             display_frames,
@@ -369,8 +378,10 @@ impl Host {
         preset: ObservationPreset,
         frame_stack: usize,
         stack_mode: crate::core::observation::ObservationStackMode,
+        minimap_layer: bool,
     ) -> Result<&[u8], CoreError> {
         let spec = self.observation_spec(preset)?;
+        let minimap_layer_request = self.minimap_layer_request(minimap_layer, &spec);
         self.callbacks
             .stacked_observation_frame(StackedObservationRequest {
                 aspect_ratio: preset.observation_aspect_ratio(self.display_aspect_ratio),
@@ -380,6 +391,7 @@ impl Host {
                 crop: preset.crop(self.observation_crop_profile),
                 frame_stack,
                 stack_mode,
+                minimap_layer: minimap_layer_request,
             })
     }
 
@@ -392,6 +404,26 @@ impl Host {
             true,
             preset.crop(self.observation_crop_profile),
         )
+    }
+
+    fn minimap_layer_request(
+        &mut self,
+        enabled: bool,
+        spec: &ObservationSpec,
+    ) -> Option<MinimapLayerRequest> {
+        if !enabled {
+            return None;
+        }
+        let course_index = self
+            .telemetry()
+            .map(|telemetry| telemetry.course_index as usize)
+            .unwrap_or(usize::MAX);
+        Some(MinimapLayerRequest {
+            crop_profile: self.observation_crop_profile,
+            course_index,
+            target_width: spec.frame_width,
+            target_height: spec.frame_height,
+        })
     }
 
     pub fn close(&mut self) {

@@ -108,7 +108,7 @@ pub(crate) fn convert_argb1555(
     rgb
 }
 
-pub(super) fn sample_rgb(frame: &RawVideoFrame, x: usize, y: usize) -> Option<[u8; 3]> {
+pub(crate) fn sample_rgb(frame: &RawVideoFrame, x: usize, y: usize) -> Option<[u8; 3]> {
     match frame.pixel_layout {
         PixelLayout::Argb8888 => {
             let offset = y.checked_mul(frame.pitch)?.checked_add(x.checked_mul(4)?)?;

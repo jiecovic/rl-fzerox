@@ -28,8 +28,21 @@ pub(super) struct GlobalOffsets {
     pub course_index: usize,
     pub cameras: usize,
     pub damage_rumble_counters: usize,
+    pub player_characters: usize,
+    pub player_engine: usize,
     pub reverse_timers: usize,
     pub racers: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct MachineTableOffsets {
+    pub machines: usize,
+    pub machine_count: usize,
+    pub machine_size: usize,
+    pub body_stat: usize,
+    pub boost_stat: usize,
+    pub grip_stat: usize,
+    pub weight: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -99,8 +112,22 @@ pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
     course_index: rdram_offset(0x800F8514),
     cameras: rdram_offset(0x800E5220),
     damage_rumble_counters: rdram_offset(0x800E5F20),
+    player_characters: rdram_offset(0x800E5EE0),
+    player_engine: rdram_offset(0x800E5EF0),
     reverse_timers: rdram_offset(0x800F_80A8),
     racers: rdram_offset(0x802C4920),
+};
+
+// Byte offsets within the live `gMachines` table. Single-byte table fields are
+// read with word-swapped addressing because Mupen exposes raw N64 RDRAM bytes.
+pub(super) const MACHINE_TABLE: MachineTableOffsets = MachineTableOffsets {
+    machines: rdram_offset(0x800F80C8),
+    machine_count: 30,
+    machine_size: 0x16,
+    body_stat: 0x11,
+    boost_stat: 0x12,
+    grip_stat: 0x13,
+    weight: 0x14,
 };
 
 // Byte offsets within `struct Camera`, derived from the decomp's

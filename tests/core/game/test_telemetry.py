@@ -24,6 +24,11 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
         lap=2,
         laps_completed=1,
         position=3,
+        machine_body_stat=4,
+        machine_boost_stat=3,
+        machine_grip_stat=2,
+        machine_weight=1260,
+        engine_setting=0.7,
     )
 
     assert player.can_boost is True
@@ -34,6 +39,11 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
     assert player.course_effect_name == "none"
     assert player.on_energy_refill is False
     assert player.state_labels == ("can_boost", "active")
+    assert player.machine_body_stat == 4
+    assert player.machine_boost_stat == 3
+    assert player.machine_grip_stat == 2
+    assert player.machine_weight == 1260
+    assert abs(player.engine_setting - 0.7) < 1e-6
 
 
 def test_native_player_telemetry_decodes_course_effect_low_bits() -> None:
@@ -106,6 +116,11 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             position=3,
             local_lateral_velocity=-9.5,
             signed_lateral_offset=42.0,
+            machine_body_stat=4,
+            machine_boost_stat=3,
+            machine_grip_stat=2,
+            machine_weight=1260,
+            engine_setting=0.7,
         ),
         difficulty_raw=2,
         difficulty_name="expert",
@@ -128,6 +143,12 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
     assert player_payload["recoil_tilt_magnitude"] == 0.5
+    assert player_payload["machine_body_stat"] == 4
+    assert player_payload["machine_boost_stat"] == 3
+    assert player_payload["machine_grip_stat"] == 2
+    assert player_payload["machine_weight"] == 1260
+    assert isinstance(player_payload["engine_setting"], float)
+    assert abs(player_payload["engine_setting"] - 0.7) < 1e-6
     assert player_payload["local_lateral_velocity"] == -9.5
     assert player_payload["signed_lateral_offset"] == 42.0
     assert player_payload["course_effect_raw"] == 0

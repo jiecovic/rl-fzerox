@@ -9,7 +9,9 @@ use crate::bindings::emulator::state::{
     FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK, FLAG_FINISHED, FLAG_RETIRED,
     FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
 };
-use crate::core::telemetry::{PlayerTelemetry, RacerGeometryTelemetry, TelemetrySnapshot};
+use crate::core::telemetry::{
+    MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry, TelemetrySnapshot,
+};
 
 #[pyclass(
     name = "PlayerTelemetry",
@@ -55,6 +57,11 @@ impl PyPlayerTelemetry {
         acceleration_force = 0.0,
         drift_attack_force = 0.0,
         collision_mass = 0.0,
+        machine_body_stat = 0,
+        machine_boost_stat = 0,
+        machine_grip_stat = 0,
+        machine_weight = 0,
+        engine_setting = 0.0,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -87,6 +94,11 @@ impl PyPlayerTelemetry {
         acceleration_force: f32,
         drift_attack_force: f32,
         collision_mass: f32,
+        machine_body_stat: i8,
+        machine_boost_stat: i8,
+        machine_grip_stat: i8,
+        machine_weight: i16,
+        engine_setting: f32,
     ) -> Self {
         Self {
             inner: PlayerTelemetry {
@@ -120,6 +132,13 @@ impl PyPlayerTelemetry {
                     acceleration_force,
                     drift_attack_force,
                     collision_mass,
+                },
+                machine_context: MachineContextTelemetry {
+                    body_stat: machine_body_stat,
+                    boost_stat: machine_boost_stat,
+                    grip_stat: machine_grip_stat,
+                    weight: machine_weight,
+                    engine_setting,
                 },
             },
         }
@@ -276,6 +295,31 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn machine_body_stat(&self) -> i8 {
+        self.inner.machine_context.body_stat
+    }
+
+    #[getter]
+    fn machine_boost_stat(&self) -> i8 {
+        self.inner.machine_context.boost_stat
+    }
+
+    #[getter]
+    fn machine_grip_stat(&self) -> i8 {
+        self.inner.machine_context.grip_stat
+    }
+
+    #[getter]
+    fn machine_weight(&self) -> i16 {
+        self.inner.machine_context.weight
+    }
+
+    #[getter]
+    fn engine_setting(&self) -> f32 {
+        self.inner.machine_context.engine_setting
+    }
+
+    #[getter]
     fn collision_recoil(&self) -> bool {
         has_state_flag(self.inner.state_flags, FLAG_COLLISION_RECOIL)
     }
@@ -388,6 +432,11 @@ impl PyPlayerTelemetry {
         dict.set_item("acceleration_force", self.acceleration_force())?;
         dict.set_item("drift_attack_force", self.drift_attack_force())?;
         dict.set_item("collision_mass", self.collision_mass())?;
+        dict.set_item("machine_body_stat", self.machine_body_stat())?;
+        dict.set_item("machine_boost_stat", self.machine_boost_stat())?;
+        dict.set_item("machine_grip_stat", self.machine_grip_stat())?;
+        dict.set_item("machine_weight", self.machine_weight())?;
+        dict.set_item("engine_setting", self.engine_setting())?;
         dict.set_item("course_effect_raw", self.course_effect_raw())?;
         dict.set_item("course_effect_name", self.course_effect_name())?;
         dict.set_item("on_energy_refill", self.on_energy_refill())?;
