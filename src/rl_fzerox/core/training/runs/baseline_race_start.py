@@ -365,6 +365,7 @@ def _engine_to_curve_value(engine_value: float) -> float:
 
 def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
     engine_value = variant.engine_setting_raw_value / 100.0
+    engine_curve = _engine_to_curve_value(engine_value)
     mismatches: list[str] = []
     for label, actual, expected in (
         ("course_index", _read_i32(emulator, RAM_LAYOUT.course_index), variant.course_index),
@@ -388,6 +389,14 @@ def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) 
             _read_i8(emulator, RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_character),
             variant.character_index,
         ),
+        (
+            "racer_machine_skin",
+            _read_i16(
+                emulator,
+                RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_machine_skin_index,
+            ),
+            variant.machine_skin_index,
+        ),
     ):
         if actual != expected:
             mismatches.append(f"{label}: expected {expected!r}, got {actual!r}")
@@ -395,6 +404,14 @@ def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) 
     actual_engine = _read_f32(emulator, RAM_LAYOUT.player_engine)
     if abs(actual_engine - engine_value) > 0.001:
         mismatches.append(f"player_engine: expected {engine_value:.3f}, got {actual_engine:.3f}")
+    actual_engine_curve = _read_f32(
+        emulator,
+        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_engine_curve,
+    )
+    if abs(actual_engine_curve - engine_curve) > 0.001:
+        mismatches.append(
+            f"racer_engine_curve: expected {engine_curve:.3f}, got {actual_engine_curve:.3f}"
+        )
 
     if mismatches:
         raise RuntimeError(
@@ -405,6 +422,7 @@ def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) 
 
 def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
     engine_value = variant.engine_setting_raw_value / 100.0
+    engine_curve = _engine_to_curve_value(engine_value)
     mismatches: list[str] = []
     for label, actual, expected in (
         ("course_index", _read_i32(emulator, RAM_LAYOUT.course_index), variant.course_index),
@@ -423,6 +441,19 @@ def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVari
             _read_i16(emulator, RAM_LAYOUT.player_characters),
             variant.character_index,
         ),
+        (
+            "racer_character",
+            _read_i8(emulator, RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_character),
+            variant.character_index,
+        ),
+        (
+            "racer_machine_skin",
+            _read_i16(
+                emulator,
+                RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_machine_skin_index,
+            ),
+            variant.machine_skin_index,
+        ),
     ):
         if actual != expected:
             mismatches.append(f"{label}: expected {expected!r}, got {actual!r}")
@@ -430,6 +461,14 @@ def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVari
     actual_engine = _read_f32(emulator, RAM_LAYOUT.player_engine)
     if abs(actual_engine - engine_value) > 0.001:
         mismatches.append(f"player_engine: expected {engine_value:.3f}, got {actual_engine:.3f}")
+    actual_engine_curve = _read_f32(
+        emulator,
+        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_engine_curve,
+    )
+    if abs(actual_engine_curve - engine_curve) > 0.001:
+        mismatches.append(
+            f"racer_engine_curve: expected {engine_curve:.3f}, got {actual_engine_curve:.3f}"
+        )
 
     telemetry = emulator.try_read_telemetry()
     if telemetry is None:
