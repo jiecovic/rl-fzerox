@@ -44,6 +44,11 @@ class PlayerTelemetry:
         acceleration_force: float = 0.0,
         drift_attack_force: float = 0.0,
         collision_mass: float = 0.0,
+        machine_body_stat: int = 0,
+        machine_boost_stat: int = 0,
+        machine_grip_stat: int = 0,
+        machine_weight: int = 0,
+        engine_setting: float = 0.0,
     ) -> None: ...
     @property
     def state_flags(self) -> int: ...
@@ -105,6 +110,16 @@ class PlayerTelemetry:
     def drift_attack_force(self) -> float: ...
     @property
     def collision_mass(self) -> float: ...
+    @property
+    def machine_body_stat(self) -> int: ...
+    @property
+    def machine_boost_stat(self) -> int: ...
+    @property
+    def machine_grip_stat(self) -> int: ...
+    @property
+    def machine_weight(self) -> int: ...
+    @property
+    def engine_setting(self) -> float: ...
     @property
     def collision_recoil(self) -> bool: ...
     @property
@@ -302,6 +317,7 @@ class Emulator:
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
         stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        minimap_layer: bool = False,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -323,6 +339,7 @@ class Emulator:
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
         stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        minimap_layer: bool = False,
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -354,6 +371,7 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        minimap_layer: bool = False,
     ) -> npt.NDArray[np.uint8]: ...
     def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...

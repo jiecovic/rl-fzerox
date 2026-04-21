@@ -115,6 +115,7 @@ impl PyEmulator {
         terminate_on_energy_depleted=true,
         lean_timer_assist=false,
         stack_mode="rgb",
+        minimap_layer=false,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -138,6 +139,7 @@ impl PyEmulator {
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool,
         stack_mode: &str,
+        minimap_layer: bool,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -164,6 +166,7 @@ impl PyEmulator {
                     preset,
                     frame_stack,
                     stack_mode,
+                    minimap_layer,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -181,7 +184,7 @@ impl PyEmulator {
             result.observation,
             spec.frame_height,
             spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack),
+            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
         )?;
         let summary = step_summary_to_py(py, &result.summary)?;
         let status = step_status_to_py(py, &result.status)?;
@@ -211,6 +214,7 @@ impl PyEmulator {
         terminate_on_energy_depleted=true,
         lean_timer_assist=false,
         stack_mode="rgb",
+        minimap_layer=false,
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -234,6 +238,7 @@ impl PyEmulator {
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool,
         stack_mode: &str,
+        minimap_layer: bool,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -260,6 +265,7 @@ impl PyEmulator {
                     preset,
                     frame_stack,
                     stack_mode,
+                    minimap_layer,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -277,7 +283,7 @@ impl PyEmulator {
             result.observation,
             spec.frame_height,
             spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack),
+            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
         )?;
         let display_frames = frames_to_pylist(
             py,
@@ -374,13 +380,14 @@ impl PyEmulator {
         Ok(dict)
     }
 
-    #[pyo3(signature = (preset, frame_stack, stack_mode="rgb"))]
+    #[pyo3(signature = (preset, frame_stack, stack_mode="rgb", minimap_layer=false))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
         frame_stack: usize,
         stack_mode: &str,
+        minimap_layer: bool,
     ) -> PyResult<Bound<'py, PyAny>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
         let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
@@ -388,14 +395,17 @@ impl PyEmulator {
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
         let frame = py
-            .detach(|| self.host.observation_frame(preset, frame_stack, stack_mode))
+            .detach(|| {
+                self.host
+                    .observation_frame(preset, frame_stack, stack_mode, minimap_layer)
+            })
             .map_err(map_core_error)?;
         frame_to_pyarray(
             py,
             frame,
             spec.frame_height,
             spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack),
+            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
         )
     }
 

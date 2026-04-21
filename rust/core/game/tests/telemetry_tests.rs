@@ -1,7 +1,7 @@
 // Covers decoding a representative player-one race telemetry snapshot.
 use super::layout::{
-    CAMERA, COURSE_INFO, COURSE_SEGMENT, GLOBALS, RACER, RACER_SEGMENT_POSITION_INFO,
-    TELEMETRY_CONFIG,
+    CAMERA, COURSE_INFO, COURSE_SEGMENT, GLOBALS, MACHINE_TABLE, RACER,
+    RACER_SEGMENT_POSITION_INFO, TELEMETRY_CONFIG,
 };
 use super::{read_snapshot, read_step_sample};
 
@@ -16,6 +16,15 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&39_i32.to_le_bytes());
     memory[GLOBALS.game_mode..GLOBALS.game_mode + 4].copy_from_slice(&1_u32.to_le_bytes());
     memory[GLOBALS.total_racers..GLOBALS.total_racers + 4].copy_from_slice(&30_i32.to_le_bytes());
+    memory[GLOBALS.player_characters..GLOBALS.player_characters + 2]
+        .copy_from_slice(&4_i16.to_le_bytes());
+    memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
+        .copy_from_slice(&0.7_f32.to_le_bytes());
+    let machine_base = MACHINE_TABLE.machines + (4 * MACHINE_TABLE.machine_size);
+    write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.body_stat, 4);
+    write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.boost_stat, 3);
+    write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.grip_stat, 2);
+    write_machine_i16(&mut memory, machine_base + MACHINE_TABLE.weight, 1260);
     memory[GLOBALS.course_index..GLOBALS.course_index + 4].copy_from_slice(&0_u32.to_le_bytes());
     let course_info_address = 0x802A_6B40_u32;
     let course_info_offset = (course_info_address as usize) - TELEMETRY_CONFIG.kseg0_base;
@@ -146,6 +155,11 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!((telemetry.player.geometry.acceleration_force - 9.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.drift_attack_force - 10.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.collision_mass - 0.5).abs() < f32::EPSILON);
+    assert_eq!(telemetry.player.machine_context.body_stat, 4);
+    assert_eq!(telemetry.player.machine_context.boost_stat, 3);
+    assert_eq!(telemetry.player.machine_context.grip_stat, 2);
+    assert_eq!(telemetry.player.machine_context.weight, 1260);
+    assert!((telemetry.player.machine_context.engine_setting - 0.7).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -164,4 +178,14 @@ fn read_step_sample_decodes_player_damage_rumble_counter() {
     let telemetry = read_step_sample(&memory).expect("step telemetry should decode");
 
     assert_eq!(telemetry.damage_rumble_counter, 1);
+}
+
+fn write_machine_u8(memory: &mut [u8], logical_offset: usize, value: u8) {
+    memory[logical_offset ^ 0x03] = value;
+}
+
+fn write_machine_i16(memory: &mut [u8], logical_offset: usize, value: i16) {
+    let bytes = value.to_be_bytes();
+    write_machine_u8(memory, logical_offset, bytes[0]);
+    write_machine_u8(memory, logical_offset + 1, bytes[1]);
 }

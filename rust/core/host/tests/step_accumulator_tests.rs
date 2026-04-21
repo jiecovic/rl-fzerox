@@ -118,6 +118,7 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         preset: ObservationPreset::Crop84x116,
         frame_stack: 4,
         stack_mode: ObservationStackMode::Rgb,
+        minimap_layer: false,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,

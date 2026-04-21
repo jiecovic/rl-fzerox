@@ -203,5 +203,6 @@ fn stacked_observation_request(
         crop: VideoCrop::default(),
         frame_stack,
         stack_mode,
+        minimap_layer: None,
     }
 }

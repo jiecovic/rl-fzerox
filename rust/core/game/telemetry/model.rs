@@ -160,6 +160,27 @@ impl Default for RacerGeometryTelemetry {
 }
 
 #[derive(Clone, Debug)]
+pub struct MachineContextTelemetry {
+    pub body_stat: i8,
+    pub boost_stat: i8,
+    pub grip_stat: i8,
+    pub weight: i16,
+    pub engine_setting: f32,
+}
+
+impl Default for MachineContextTelemetry {
+    fn default() -> Self {
+        Self {
+            body_stat: 0,
+            boost_stat: 0,
+            grip_stat: 0,
+            weight: 0,
+            engine_setting: 0.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct PlayerTelemetry {
     pub state_flags: u32,
     pub speed_kph: f32,
@@ -176,6 +197,7 @@ pub struct PlayerTelemetry {
     pub laps_completed: i16,
     pub position: i32,
     pub geometry: RacerGeometryTelemetry,
+    pub machine_context: MachineContextTelemetry,
 }
 
 impl PlayerTelemetry {

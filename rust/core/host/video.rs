@@ -12,6 +12,7 @@ mod types;
 
 pub use capture::{capture_raw_frame, capture_raw_frame_into};
 pub use convert::decode_frame;
+pub(crate) use convert::sample_rgb;
 pub use plan::{
     ProcessedFramePlan, ProcessedFramePlanKey, build_processed_frame_plan, cropped_dimensions,
     display_size,

@@ -278,6 +278,7 @@ fn repeated_step_config(
         preset: ObservationPreset::Crop84x116,
         frame_stack: 4,
         stack_mode: ObservationStackMode::Rgb,
+        minimap_layer: false,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
@@ -320,6 +321,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
             laps_completed: 0,
             position: 1,
             geometry: Default::default(),
+            machine_context: Default::default(),
         },
     }
 }

@@ -134,6 +134,7 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -152,6 +153,7 @@ class Emulator:
             preset=preset,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
@@ -173,6 +175,7 @@ class Emulator:
             spec.channels,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         expected_shape = (spec.height, spec.width, stacked_channels)
         if tuple(int(value) for value in frame.shape) != expected_shape:
@@ -195,6 +198,7 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -214,6 +218,7 @@ class Emulator:
                 preset=preset,
                 frame_stack=frame_stack,
                 stack_mode=stack_mode,
+                minimap_layer=minimap_layer,
                 stuck_min_speed_kph=stuck_min_speed_kph,
                 energy_loss_epsilon=energy_loss_epsilon,
                 max_episode_steps=max_episode_steps,
@@ -236,6 +241,7 @@ class Emulator:
             spec.channels,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         expected_observation_shape = (spec.height, spec.width, stacked_channels)
         if tuple(int(value) for value in frame.shape) != expected_observation_shape:
@@ -362,18 +368,20 @@ class Emulator:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
     ) -> ObservationFrame:
         """Return one native stacked observation tensor for the requested preset."""
 
         spec = self.observation_spec(preset)
         frame = np.asarray(
-            self._native.frame_observation(preset, frame_stack, stack_mode),
+            self._native.frame_observation(preset, frame_stack, stack_mode, minimap_layer),
             dtype=np.uint8,
         )
         stacked_channels = stacked_observation_channels(
             spec.channels,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         expected_size = spec.height * spec.width * stacked_channels
         if frame.size != expected_size:
