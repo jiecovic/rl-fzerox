@@ -25,7 +25,7 @@ class RewardSummaryConfig:
 
 @dataclass(frozen=True)
 class RewardActionContext:
-    """Action bits the reward function may need for context-dependent shaping."""
+    """Applied action context the reward function may need for shaping."""
 
     boost_requested: bool = False
     lean_requested: bool = False
