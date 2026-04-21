@@ -19,6 +19,7 @@ def draw_speed_gauge(
     screen: PygameSurface,
     rect: PygameRect,
     speed_kph: float | None,
+    energy_fraction: float | None,
     value_font: RenderFont,
 ) -> None:
     style = SPEED_GAUGE_STYLE
@@ -91,6 +92,12 @@ def draw_speed_gauge(
         scale=scale,
     )
     screen.blit(pygame.transform.smoothscale(overlay, rect.size), rect.topleft)
+    _draw_energy_meter(
+        pygame=pygame,
+        screen=screen,
+        rect=rect,
+        energy_fraction=energy_fraction,
+    )
     _draw_speed_text(
         screen=screen,
         rect=rect,
@@ -188,6 +195,111 @@ def _draw_speed_text(
     )
 
 
+def _draw_energy_meter(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    rect: PygameRect,
+    energy_fraction: float | None,
+) -> None:
+    style = SPEED_GAUGE_STYLE
+    meter_height = min(style.energy_meter_height, max(0, rect.height - 12))
+    meter = pygame.Rect(
+        rect.right - style.energy_meter_margin_right - style.energy_meter_width,
+        rect.centery - (meter_height // 2) + style.energy_meter_center_y_offset,
+        style.energy_meter_width,
+        meter_height,
+    )
+    radius = style.energy_meter_radius
+    pygame.draw.rect(screen, style.energy_track, meter, border_radius=radius)
+    pygame.draw.rect(
+        screen,
+        style.energy_border,
+        meter,
+        width=style.energy_outer_border_width,
+        border_radius=radius,
+    )
+    inner = meter.inflate(-(2 * style.energy_meter_padding), -(2 * style.energy_meter_padding))
+    if inner.width <= 0 or inner.height <= 0:
+        return
+
+    pygame.draw.rect(screen, style.energy_empty_fill, inner, border_radius=max(1, radius - 2))
+    if energy_fraction is not None:
+        fill_height = _energy_fill_height(
+            energy_fraction=energy_fraction, meter_height=inner.height
+        )
+        if fill_height > 0:
+            fill = pygame.Rect(inner.left, inner.bottom - fill_height, inner.width, fill_height)
+            pygame.draw.rect(screen, _energy_color(energy_fraction), fill, border_radius=2)
+            pygame.draw.line(
+                screen,
+                style.energy_fill_lip,
+                fill.topleft,
+                fill.topright,
+                width=1,
+            )
+    _draw_energy_glass(pygame=pygame, screen=screen, meter=meter)
+    pygame.draw.rect(
+        screen,
+        style.energy_inner_border,
+        inner,
+        width=style.energy_inner_border_width,
+        border_radius=max(1, radius - 2),
+    )
+    pygame.draw.rect(
+        screen,
+        style.energy_border,
+        meter,
+        width=style.energy_outer_border_width,
+        border_radius=radius,
+    )
+
+
+def _energy_fill_height(*, energy_fraction: float, meter_height: int) -> int:
+    clamped = max(0.0, min(1.0, energy_fraction))
+    if clamped <= 0.0 or meter_height <= 0:
+        return 0
+    return max(1, min(meter_height, round(clamped * meter_height)))
+
+
+def _draw_energy_glass(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    meter: PygameRect,
+) -> None:
+    style = SPEED_GAUGE_STYLE
+    overlay = pygame.Surface(meter.size, pygame.SRCALPHA)
+    overlay_rect = overlay.get_rect()
+    shadow = pygame.Rect(
+        0,
+        overlay_rect.centery,
+        overlay_rect.width,
+        overlay_rect.height - overlay_rect.centery,
+    )
+    highlight = pygame.Rect(2, 2, max(1, overlay_rect.width // 3), max(1, overlay_rect.height - 4))
+    pygame.draw.rect(
+        overlay, style.energy_glass_shadow, shadow, border_radius=style.energy_meter_radius
+    )
+    pygame.draw.rect(overlay, style.energy_glass_highlight, highlight, border_radius=2)
+    pygame.draw.line(
+        overlay,
+        style.energy_glass_edge,
+        (2, 1),
+        (max(2, overlay_rect.width - 3), 1),
+        width=1,
+    )
+    screen.blit(overlay, meter.topleft)
+
+
+def _energy_color(energy_fraction: float) -> Color:
+    return (
+        SPEED_GAUGE_STYLE.energy_low_fill
+        if energy_fraction < 0.25
+        else SPEED_GAUGE_STYLE.energy_fill
+    )
+
+
 def _arc_point(
     *,
     center: tuple[int, int],
@@ -204,4 +316,8 @@ def _arc_point(
 
 
 def _speed_color(normalized: float) -> Color:
-    return SPEED_GAUGE_STYLE.active_high if normalized >= 0.75 else SPEED_GAUGE_STYLE.active_low
+    return (
+        SPEED_GAUGE_STYLE.active_high
+        if normalized >= SPEED_GAUGE_STYLE.red_zone_start
+        else SPEED_GAUGE_STYLE.active_low
+    )

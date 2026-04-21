@@ -177,6 +177,7 @@ def _draw_control_viz(
                 screen=screen,
                 rect=pygame.Rect(speed_x, lean_y - 7, speed_width, 88),
                 speed_kph=control_viz.speed_kph,
+                energy_fraction=control_viz.energy_fraction,
                 value_font=fonts.body,
             )
 

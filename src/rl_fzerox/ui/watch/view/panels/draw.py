@@ -1,56 +1,75 @@
 # src/rl_fzerox/ui/watch/view/panels/draw.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
+from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator.arrays import StateVector
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_column_widths
 from rl_fzerox.ui.watch.view.panels.viz import _wrap_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
-from rl_fzerox.ui.watch.view.screen.theme import PALETTE
-from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import (
+    PanelLine,
+    PanelSection,
+    PygameModule,
+    PygameRect,
+    PygameSurface,
+    ViewerFonts,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SidePanelData:
+    """Presentation data needed to build and draw the watch side panel."""
+
+    episode: int
+    info: dict[str, object]
+    reset_info: dict[str, object]
+    episode_reward: float
+    paused: bool
+    control_state: ControllerState
+    gas_level: float
+    thrust_warning_threshold: float | None
+    boost_active: bool
+    boost_lamp_level: float
+    action_mask_branches: ActionMaskBranches
+    policy_label: str | None
+    policy_curriculum_stage: str | None
+    policy_deterministic: bool | None
+    policy_action: ActionValue | None
+    policy_reload_age_seconds: float | None
+    policy_reload_error: str | None
+    best_finish_position: int | None
+    best_finish_times: dict[str, int]
+    track_pool_records: tuple[dict[str, object], ...]
+    continuous_drive_deadzone: float
+    continuous_air_brake_mode: str
+    continuous_air_brake_disabled: bool
+    action_repeat: int
+    max_episode_steps: int
+    stuck_step_limit: int | None
+    wrong_way_timer_limit: int | None
+    progress_frontier_stall_limit_frames: int | None
+    stuck_min_speed_kph: float
+    game_display_size: tuple[int, int]
+    observation_shape: tuple[int, ...]
+    observation_state: StateVector | None
+    observation_state_feature_names: tuple[str, ...]
+    telemetry: FZeroXTelemetry | None
 
 
 def _draw_side_panel(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
-    panel_rect,
-    episode: int,
-    info: dict[str, object],
-    reset_info: dict[str, object],
-    episode_reward: float,
-    paused: bool,
-    control_state,
-    gas_level: float,
-    thrust_warning_threshold: float | None,
-    boost_active: bool,
-    boost_lamp_level: float,
-    action_mask_branches: ActionMaskBranches,
-    policy_label: str | None,
-    policy_curriculum_stage: str | None,
-    policy_deterministic: bool | None,
-    policy_action,
-    policy_reload_age_seconds: float | None,
-    policy_reload_error: str | None,
-    best_finish_position: int | None,
-    best_finish_times: dict[str, int],
-    track_pool_records: tuple[dict[str, object], ...],
-    continuous_drive_deadzone: float,
-    continuous_air_brake_mode: str,
-    continuous_air_brake_disabled: bool,
-    action_repeat: int,
-    max_episode_steps: int,
-    stuck_step_limit: int | None,
-    wrong_way_timer_limit: int | None,
-    progress_frontier_stall_limit_frames: int | None,
-    stuck_min_speed_kph: float,
-    game_display_size: tuple[int, int],
-    observation_shape: tuple[int, ...],
-    observation_state,
-    observation_state_feature_names: tuple[str, ...],
-    telemetry,
+    panel_rect: PygameRect,
+    data: SidePanelData,
 ) -> None:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
     pygame.draw.line(
@@ -65,40 +84,40 @@ def _draw_side_panel(
     y = panel_rect.y + LAYOUT.panel_padding
     panel_width = panel_rect.width - (2 * LAYOUT.panel_padding)
     columns = _build_panel_columns(
-        episode=episode,
-        info=info,
-        reset_info=reset_info,
-        episode_reward=episode_reward,
-        paused=paused,
-        control_state=control_state,
-        gas_level=gas_level,
-        thrust_warning_threshold=thrust_warning_threshold,
-        boost_active=boost_active,
-        boost_lamp_level=boost_lamp_level,
-        action_mask_branches=action_mask_branches,
-        policy_label=policy_label,
-        policy_curriculum_stage=policy_curriculum_stage,
-        policy_deterministic=policy_deterministic,
-        policy_action=policy_action,
-        policy_reload_age_seconds=policy_reload_age_seconds,
-        policy_reload_error=policy_reload_error,
-        best_finish_position=best_finish_position,
-        best_finish_times=best_finish_times,
-        track_pool_records=track_pool_records,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-        continuous_air_brake_mode=continuous_air_brake_mode,
-        continuous_air_brake_disabled=continuous_air_brake_disabled,
-        action_repeat=action_repeat,
-        max_episode_steps=max_episode_steps,
-        stuck_step_limit=stuck_step_limit,
-        wrong_way_timer_limit=wrong_way_timer_limit,
-        progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
-        stuck_min_speed_kph=stuck_min_speed_kph,
-        game_display_size=game_display_size,
-        observation_shape=observation_shape,
-        observation_state=observation_state,
-        observation_state_feature_names=observation_state_feature_names,
-        telemetry=telemetry,
+        episode=data.episode,
+        info=data.info,
+        reset_info=data.reset_info,
+        episode_reward=data.episode_reward,
+        paused=data.paused,
+        control_state=data.control_state,
+        gas_level=data.gas_level,
+        thrust_warning_threshold=data.thrust_warning_threshold,
+        boost_active=data.boost_active,
+        boost_lamp_level=data.boost_lamp_level,
+        action_mask_branches=data.action_mask_branches,
+        policy_label=data.policy_label,
+        policy_curriculum_stage=data.policy_curriculum_stage,
+        policy_deterministic=data.policy_deterministic,
+        policy_action=data.policy_action,
+        policy_reload_age_seconds=data.policy_reload_age_seconds,
+        policy_reload_error=data.policy_reload_error,
+        best_finish_position=data.best_finish_position,
+        best_finish_times=data.best_finish_times,
+        track_pool_records=data.track_pool_records,
+        continuous_drive_deadzone=data.continuous_drive_deadzone,
+        continuous_air_brake_mode=data.continuous_air_brake_mode,
+        continuous_air_brake_disabled=data.continuous_air_brake_disabled,
+        action_repeat=data.action_repeat,
+        max_episode_steps=data.max_episode_steps,
+        stuck_step_limit=data.stuck_step_limit,
+        wrong_way_timer_limit=data.wrong_way_timer_limit,
+        progress_frontier_stall_limit_frames=data.progress_frontier_stall_limit_frames,
+        stuck_min_speed_kph=data.stuck_min_speed_kph,
+        game_display_size=data.game_display_size,
+        observation_shape=data.observation_shape,
+        observation_state=data.observation_state,
+        observation_state_feature_names=data.observation_state_feature_names,
+        telemetry=data.telemetry,
     )
 
     y = _draw_panel_title(
@@ -392,11 +411,11 @@ def _draw_labeled_value_line(
 
 
 def _draw_status_icon(
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     *,
     icon: str,
-    color,
+    color: Color,
     center: tuple[int, int],
 ) -> None:
     x, y = center

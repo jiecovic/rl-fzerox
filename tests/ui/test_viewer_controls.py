@@ -13,6 +13,13 @@ from rl_fzerox.ui.watch.runtime.snapshots import (
     BOOST_LAMP_CONFIG,
     _next_boost_lamp_level,
 )
+from rl_fzerox.ui.watch.view.components.cockpit.speed import (
+    _energy_color,
+    _energy_fill_height,
+    _normalized_speed,
+    _speed_color,
+)
+from rl_fzerox.ui.watch.view.components.cockpit.style import SPEED_GAUGE_STYLE
 from rl_fzerox.ui.watch.view.panels.viz import _control_viz
 
 
@@ -81,6 +88,19 @@ def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
     assert 0.0 < lamp_level < BOOST_LAMP_CONFIG.active_level
 
 
+def test_speed_gauge_treats_800_kph_as_red_zone() -> None:
+    assert _normalized_speed(800.0) >= SPEED_GAUGE_STYLE.red_zone_start
+    assert _speed_color(_normalized_speed(800.0)) == SPEED_GAUGE_STYLE.active_high
+
+
+def test_speed_gauge_energy_meter_fill_height_and_low_color() -> None:
+    assert _energy_fill_height(energy_fraction=0.0, meter_height=50) == 0
+    assert _energy_fill_height(energy_fraction=0.5, meter_height=50) == 25
+    assert _energy_fill_height(energy_fraction=1.0, meter_height=50) == 50
+    assert _energy_color(0.2) == SPEED_GAUGE_STYLE.energy_low_fill
+    assert _energy_color(0.5) == SPEED_GAUGE_STYLE.energy_fill
+
+
 def test_control_viz_visualizes_air_brake_button_without_air_brake_axis() -> None:
     control_viz = _control_viz(
         ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
@@ -139,6 +159,17 @@ def test_control_viz_visualizes_thrust_warning_threshold() -> None:
     assert control_viz.thrust_warning_threshold == pytest.approx(0.5)
     assert control_viz.thrust_deadzone_threshold == pytest.approx(0.05)
     assert control_viz.thrust_full_threshold == pytest.approx(0.85)
+
+
+def test_control_viz_visualizes_energy_fraction() -> None:
+    control_viz = _control_viz(
+        ControllerState(),
+        gas_level=0.0,
+        energy_fraction=0.75,
+        policy_action=None,
+    )
+
+    assert control_viz.energy_fraction == pytest.approx(0.75)
 
 
 def test_control_viz_visualizes_forced_full_accelerate_drive_mode() -> None:
