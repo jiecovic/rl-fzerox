@@ -17,10 +17,7 @@ def course_context_features(
     if course_context == "none":
         return ()
     if course_context == "one_hot_builtin":
-        return tuple(
-            StateFeature(f"course_builtin_{index:02d}", 1.0)
-            for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
-        )
+        return _course_one_hot_features(prefix="course_builtin_")
     raise ValueError(f"Unsupported observation course context: {course_context!r}")
 
 
@@ -40,10 +37,7 @@ def course_component_features(encoding: str) -> tuple[StateFeature, ...]:
     if encoding == "none":
         return ()
     if encoding == "one_hot_builtin":
-        return tuple(
-            StateFeature(f"course_context.course_builtin_{index:02d}", 1.0)
-            for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
-        )
+        return _course_one_hot_features(prefix="course_context.course_builtin_")
     raise ValueError(f"Unsupported course-context encoding: {encoding!r}")
 
 
@@ -67,6 +61,13 @@ def course_one_hot_values(telemetry: FZeroXTelemetry | None) -> list[float]:
     if 0 <= course_index < OBSERVATION_STATE_DEFAULTS.builtin_course_count:
         values[course_index] = 1.0
     return values
+
+
+def _course_one_hot_features(*, prefix: str) -> tuple[StateFeature, ...]:
+    return tuple(
+        StateFeature(f"{prefix}{index:02d}", 1.0)
+        for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
+    )
 
 
 def ground_effect_context_features(
