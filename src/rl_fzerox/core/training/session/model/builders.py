@@ -1,11 +1,13 @@
 # src/rl_fzerox/core/training/session/model/builders.py
 from __future__ import annotations
 
+from stable_baselines3.common.vec_env import VecEnv
+
 from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAIN_ALGORITHM_SAC
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
-    resolve_training_algorithm_class,
+    resolve_ppo_training_algorithm_class,
 )
 from rl_fzerox.core.training.session.model.policy import (
     build_policy_kwargs,
@@ -19,7 +21,7 @@ from rl_fzerox.core.training.session.model.validation import (
 
 def build_training_model(
     *,
-    train_env,
+    train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
@@ -47,7 +49,7 @@ def build_training_model(
 
 def build_ppo_model(
     *,
-    train_env,
+    train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
@@ -70,7 +72,7 @@ def build_ppo_model(
 
 def _build_ppo_family_model(
     *,
-    train_env,
+    train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
@@ -87,7 +89,7 @@ def _build_ppo_family_model(
         effective_algorithm=effective_algorithm,
     )
 
-    algorithm_class = resolve_training_algorithm_class(effective_algorithm)
+    algorithm_class = resolve_ppo_training_algorithm_class(effective_algorithm)
     recurrent_enabled = policy_config.recurrent.enabled
     policy_name = resolve_policy_name(
         train_env=train_env,
@@ -130,7 +132,7 @@ def _build_ppo_family_model(
 
 def _build_sac_model(
     *,
-    train_env,
+    train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,

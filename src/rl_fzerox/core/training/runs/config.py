@@ -232,6 +232,7 @@ def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: P
             ),
             "train": (
                 "output_root",
+                "resume_run_dir",
                 "init_run_dir",
             ),
         },

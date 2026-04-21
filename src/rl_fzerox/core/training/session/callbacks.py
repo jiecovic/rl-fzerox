@@ -467,10 +467,7 @@ def _course_log_key(episode: dict[str, object]) -> str | None:
 
 def _sanitize_log_component(value: str) -> str:
     normalized = value.strip().lower()
-    characters = [
-        character if character.isalnum() else "_"
-        for character in normalized
-    ]
+    characters = [character if character.isalnum() else "_" for character in normalized]
     collapsed = "_".join(part for part in "".join(characters).split("_") if part)
     return collapsed
 

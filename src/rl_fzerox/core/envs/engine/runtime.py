@@ -46,7 +46,7 @@ from .info import (
     telemetry_energy_fraction,
     telemetry_info,
 )
-from .masks import ActionMaskController
+from .masks import ActionMaskBranches, ActionMaskController, ActionMaskSnapshot
 from .observation import EngineObservationBuilder
 from .reset import load_track_baseline, reset_race_state
 from .step_result import WatchEnvStep
@@ -150,6 +150,16 @@ class FZeroXEnvEngine:
         """Return the flattened boolean action mask for the current stage."""
 
         return self._mask_controller.action_mask()
+
+    def action_mask_branches(self) -> ActionMaskBranches:
+        """Return the current action mask grouped by branch label."""
+
+        return self._mask_controller.action_mask_branches()
+
+    def action_mask_snapshot(self) -> ActionMaskSnapshot:
+        """Return the flat mask and branch view from one mask computation."""
+
+        return self._mask_controller.action_mask_snapshot()
 
     def set_curriculum_stage(self, stage_index: int) -> None:
         """Switch the active curriculum stage for subsequent action masks."""
@@ -420,8 +430,10 @@ class FZeroXEnvEngine:
         min_energy_fraction = self._mask_controller.current_boost_min_energy_fraction(
             self.config.boost_min_energy_fraction
         )
-        if energy_fraction is not None and min_energy_fraction > 0.0:
-            can_boost = can_boost and energy_fraction >= min_energy_fraction
+        if energy_fraction is not None:
+            can_boost = can_boost and energy_fraction > 0.0
+            if min_energy_fraction > 0.0:
+                can_boost = can_boost and energy_fraction >= min_energy_fraction
         self._manual_boost_allowed = can_boost
         self._mask_controller.set_boost_unlocked(can_boost)
 
@@ -468,6 +480,7 @@ class FZeroXEnvEngine:
             preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
+            minimap_layer=self.config.observation.minimap_layer,
             stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
             max_episode_steps=self.config.max_episode_steps,
@@ -500,9 +513,7 @@ class FZeroXEnvEngine:
         self._last_requested_control_state = requested_control_state
         self._last_gas_level = gas_level
         boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
-        lean_used = bool(
-            applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK)
-        )
+        lean_used = bool(applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK))
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,

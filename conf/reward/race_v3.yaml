@@ -12,6 +12,9 @@ progress_bucket_distance: 25.0
 progress_bucket_reward: 0.05
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
+# Spline coverage: when true, airborne steps do not advance/pay frontier buckets.
+# The first grounded step after landing pays the combined frontier delta.
+defer_progress_reward_while_airborne: false
 
 # Time pressure: optional per-internal-frame penalty. Negative values make
 # elapsed game time costly. The tracker multiplies this by the native
@@ -32,9 +35,9 @@ lap_position_scale: 0.25
 # controlled by env.progress_frontier_stall_limit_frames.
 # Game-ending failures: spin-out/death, crash, fall-off, or retire.
 # Raw energy depletion stays an env fallback, not a v3 failure reward event.
-failure_penalty: -20.0
+failure_penalty: -50.0
 # Training guard endings: stuck/slow-speed, wrong-way, progress-stalled, or timeout.
-truncation_penalty: -20.0
+truncation_penalty: -50.0
 
 # Damage: continuous anti-wall-grinding pressure.
 damage_taken_frame_penalty: -0.02
@@ -42,12 +45,16 @@ damage_taken_streak_ramp_penalty: -0.001
 damage_taken_streak_cap_frames: 120
 # Damage: small entry-only penalty for collision recoil. Kept mild because other
 # racers can also bump into the player.
-collision_recoil_penalty: -1.0
+collision_recoil_penalty: -2.5
 
 # Boost pads: small route incentive for entering dash-pad boost, guarded so
 # reversing or revisiting the same unwrapped progress region cannot farm it.
-boost_pad_reward: 15.0
+boost_pad_reward: 17.0
 boost_pad_reward_progress_window: 800.0
+
+# Manual boost: small event reward for an actually applied boost-button request.
+# This is not paid per boost-active frame and is not multiplied by action_repeat.
+manual_boost_reward: 0.0
 
 # Energy refill: multiplier scale applied only to actual frontier-progress reward.
 # No new progress means no refill reward, so recharge strips cannot be farmed by stalling.
@@ -56,20 +63,24 @@ energy_refill_progress_multiplier: 3.0
 # 1.0 still reward forward motion, but make routes over dirt/ice less attractive.
 dirt_progress_multiplier: 0.50
 ice_progress_multiplier: 0.70
+# Bad ground effects: entry-only penalties for touching dirt/ice regions.
+# These fire on transitions into the surface, not for every frame spent there.
+dirt_entry_penalty: -1.0
+ice_entry_penalty: -1.0
 # Energy refill: suppress refill multipliers after damage/collision to avoid crash-refill loops.
 energy_refill_collision_cooldown_frames: 240
 # Energy refill: max once-per-lap bonus for reaching full energy from below.
 # The payout is scaled by the recovered energy fraction since the last full
 # state, so a tiny scratch/refill cannot collect the full bonus.
-energy_full_refill_lap_bonus: 5.0
+energy_full_refill_lap_bonus: 3.0
 # Energy refill: require at least this much recovered energy before the flat
 # full-refill bonus can fire. At 0.10 and bonus 5, the threshold payout is 0.5.
 energy_full_refill_min_gain_fraction: 0.10
 
 # Gas: optional per-frame penalty for requesting less than the threshold.
 # Disabled at 0.0; with threshold 0.5, discrete idle gas gets the full penalty.
-gas_underuse_penalty: -0.01
-gas_underuse_threshold: 0.8
+gas_underuse_penalty: 0.0
+gas_underuse_threshold: 0.5
 
 # Steering: acceleration penalty for rapid direction changes.
 # This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
@@ -81,7 +92,7 @@ steer_oscillation_power: 2.0
 
 # Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
 lean_low_speed_penalty: 0.0
-lean_low_speed_penalty_max_speed_kph: 990.0
+lean_low_speed_penalty_max_speed_kph: 600.0
 
 # Airborne: event reward when an airborne machine lands back on the track.
 airborne_landing_reward: 0.0

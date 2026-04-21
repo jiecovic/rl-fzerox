@@ -28,6 +28,7 @@ from rl_fzerox.core.training.runs.paths import (
     build_watch_session_paths,
     ensure_run_dirs,
     ensure_watch_session_dirs,
+    reserve_run_paths,
     resolve_train_run_config_path,
 )
 
@@ -50,6 +51,7 @@ __all__ = [
     "resolve_model_artifact_path",
     "resolve_policy_artifact_path",
     "resolve_train_run_config_path",
+    "reserve_run_paths",
     "save_train_run_config",
     "scrub_obsolete_train_run_config",
     "TrainConfigScrubResult",

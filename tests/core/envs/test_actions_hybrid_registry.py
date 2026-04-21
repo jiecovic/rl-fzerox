@@ -379,9 +379,7 @@ def test_build_action_adapter_supports_current_lean_variants() -> None:
         HybridSteerGasAirBrakeBoostLeanActionAdapter,
     )
     assert isinstance(
-        build_action_adapter(
-            ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
-        ),
+        build_action_adapter(ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")),
         HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     )
 

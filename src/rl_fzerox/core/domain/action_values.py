@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias
 
+ActionMaskPreset: TypeAlias = Literal["unrestricted"]
 ActionBranchValue: TypeAlias = Literal[
     "idle",
     "engaged",
@@ -15,6 +16,7 @@ ActionBranchValue: TypeAlias = Literal[
     "up_full",
 ]
 ActionMaskValue: TypeAlias = int | ActionBranchValue
+ActionMaskSpec: TypeAlias = ActionMaskPreset | tuple[ActionMaskValue, ...]
 
 DISCRETE_ACTION_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
     "gas": ("idle", "engaged"),
@@ -25,13 +27,19 @@ DISCRETE_ACTION_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
 }
 
 
-def compile_action_mask_values(
-    branch_name: str,
-    values: tuple[ActionMaskValue, ...],
-) -> tuple[int, ...]:
+def compile_action_mask_values(branch_name: str, values: ActionMaskSpec) -> tuple[int, ...]:
     """Compile user-facing discrete action mask values to branch indices."""
 
     expected_values = DISCRETE_ACTION_BRANCH_VALUES.get(branch_name)
+    if isinstance(values, str):
+        if expected_values is None:
+            raise ValueError(
+                f"Mask preset {values!r} is not supported for action branch {branch_name!r}"
+            )
+        if values == "unrestricted":
+            return tuple(range(len(expected_values)))
+        raise ValueError(f"Unknown mask preset {values!r} for action branch {branch_name!r}")
+
     indices: list[int] = []
     for mask_value in values:
         if isinstance(mask_value, bool):

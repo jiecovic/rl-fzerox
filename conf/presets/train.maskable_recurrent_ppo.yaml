@@ -6,8 +6,8 @@ defaults:
 train:
   algorithm: maskable_recurrent_ppo
   run_name: ppo_discrete_full_gas_recurrent_cnn
-  init_run_dir: null
-  init_artifact: latest
+  resume_run_dir: null
+  resume_artifact: latest
   ent_coef: 0.0
   n_steps: 2048
   batch_size: 1024

@@ -12,6 +12,7 @@ def build_image_observation_space(
     *,
     frame_stack: int,
     stack_mode: ObservationStackMode = "rgb",
+    minimap_layer: bool = False,
 ) -> spaces.Box:
     return spaces.Box(
         low=0,
@@ -20,6 +21,7 @@ def build_image_observation_space(
             observation_spec,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         ),
         dtype=np.uint8,
     )
@@ -30,6 +32,7 @@ def image_observation_shape(
     *,
     frame_stack: int,
     stack_mode: ObservationStackMode = "rgb",
+    minimap_layer: bool = False,
 ) -> tuple[int, int, int]:
     return (
         observation_spec.height,
@@ -38,5 +41,6 @@ def image_observation_shape(
             observation_spec.channels,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         ),
     )

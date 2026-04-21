@@ -103,10 +103,12 @@ class PolicyRunner:
         *,
         deterministic: bool = True,
         action_masks: ActionMask | None = None,
+        refresh: bool = True,
     ) -> ActionValue:
         """Predict one action for the current observation."""
 
-        self._maybe_reload()
+        if refresh:
+            self._maybe_reload()
         action, next_state = _predict_policy_action(
             self._policy,
             observation,

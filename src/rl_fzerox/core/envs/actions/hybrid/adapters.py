@@ -217,12 +217,15 @@ class HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter:
             parse_hybrid_steer_drive_air_brake_boost_lean_pitch(action)
         )
         joypad_mask = self._drive_decoder.decode(drive)
-        joypad_mask = _button_mask(
-            gas=0,
-            air_brake=air_brake,
-            boost=boost,
-            lean=lean,
-        ) | joypad_mask
+        joypad_mask = (
+            _button_mask(
+                gas=0,
+                air_brake=air_brake,
+                boost=boost,
+                lean=lean,
+            )
+            | joypad_mask
+        )
         return _controller_state(
             joypad_mask=joypad_mask,
             steer=steer,

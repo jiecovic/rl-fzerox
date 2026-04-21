@@ -8,5 +8,5 @@ env:
     name: steer_drive_boost_lean
 
 train:
-  init_run_dir: null
-  init_artifact: latest
+  resume_run_dir: null
+  resume_artifact: latest

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
+from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.rewards.common import finish_placement_bonus
 from rl_fzerox.core.envs.rewards.race_v3.weights import RaceV3RewardWeights
@@ -42,6 +43,43 @@ class BoostPadRewardTracker:
             return 0.0
         self._rewarded_progress_windows.add(window_index)
         return reward
+
+
+class BadSurfaceEntryPenaltyTracker:
+    """Penalize transitions into bad course surfaces once per entry."""
+
+    def __init__(self) -> None:
+        self._previous_effect = int(CourseEffect.NONE)
+
+    def reset(self, telemetry: FZeroXTelemetry | None = None) -> None:
+        self._previous_effect = course_effect_raw(telemetry)
+
+    def penalty(
+        self,
+        telemetry: FZeroXTelemetry,
+        *,
+        weights: RaceV3RewardWeights,
+        breakdown: dict[str, float],
+    ) -> float:
+        current_effect = course_effect_raw(telemetry)
+        previous_effect = self._previous_effect
+        self._previous_effect = current_effect
+
+        if current_effect == previous_effect:
+            return 0.0
+        if current_effect == CourseEffect.DIRT:
+            penalty = weights.dirt_entry_penalty
+            label = "dirt_entry"
+        elif current_effect == CourseEffect.ICE:
+            penalty = weights.ice_entry_penalty
+            label = "ice_entry"
+        else:
+            return 0.0
+
+        if penalty == 0.0:
+            return 0.0
+        breakdown[label] = penalty
+        return penalty
 
 
 class LapRewardTracker:

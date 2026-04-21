@@ -20,7 +20,10 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
     ActionAdapterName,
 )
-from rl_fzerox.core.domain.action_values import ActionMaskValue, compile_action_mask_values
+from rl_fzerox.core.domain.action_values import (
+    ActionMaskSpec,
+    compile_action_mask_values,
+)
 from rl_fzerox.core.domain.lean import LeanMode
 
 ActionBranchType: TypeAlias = Literal["continuous", "discrete"]
@@ -62,7 +65,7 @@ class ActionBranchConfig(BaseModel):
     type: ActionBranchType
     # V4 LEGACY SHIM: integer masks are accepted for old manifests; new branch
     # YAML should use named values such as idle/engaged/left/right.
-    mask: tuple[ActionMaskValue, ...] | None = None
+    mask: ActionMaskSpec | None = None
     response_power: PositiveFloat | None = None
     deadzone: float | None = Field(default=None, ge=0.0, lt=1.0)
     full_threshold: float | None = Field(default=None, gt=0.0, le=1.0)
@@ -75,9 +78,9 @@ class ActionBranchConfig(BaseModel):
     @classmethod
     def _validate_unique_values(
         cls,
-        value: tuple[ActionMaskValue, ...] | None,
-    ) -> tuple[ActionMaskValue, ...] | None:
-        if value is not None and len(set(value)) != len(value):
+        value: ActionMaskSpec | None,
+    ) -> ActionMaskSpec | None:
+        if value is not None and not isinstance(value, str) and len(set(value)) != len(value):
             raise ValueError("action branch mask must not contain duplicates")
         return value
 

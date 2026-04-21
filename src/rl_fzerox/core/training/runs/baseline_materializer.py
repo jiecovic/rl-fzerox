@@ -18,8 +18,8 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     TrainAppConfig,
-    VehicleMachineConfig,
 )
+from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.baseline_race_start import (
     RaceStartVariant,
     materialize_time_attack_race_start_from_boot,
@@ -35,7 +35,7 @@ from rl_fzerox.core.training.runs.track_baselines import (
 class BaselineMaterializerSettings:
     """Stable materializer settings that affect cache identity and filenames."""
 
-    schema_version: int = 7
+    schema_version: int = 8
     boot_menu_time_attack_mode: str = "boot_menu_time_attack"
     cache_root: Path = field(
         default_factory=lambda: project_root_dir() / "local" / "cache" / "baseline_materializer"
@@ -66,7 +66,6 @@ class BaselineRequest:
     source_course_index: int | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
-    vehicle_machine: dict[str, object] | None = None
     camera_setting: str | None = None
 
 
@@ -319,7 +318,6 @@ def _request_from_track_config(
         source_course_index=track.source_course_index,
         source_engine_setting=track.source_engine_setting,
         source_engine_setting_raw_value=track.source_engine_setting_raw_value,
-        vehicle_machine=_vehicle_machine_data(track.vehicle_machine),
         camera_setting=camera_setting,
     )
 
@@ -330,7 +328,6 @@ def _can_generate_track_config(track: TrackConfig) -> bool:
         and track.mode is not None
         and track.vehicle is not None
         and track.engine_setting_raw_value is not None
-        and track.vehicle_machine is not None
     )
 
 
@@ -354,7 +351,6 @@ def _request_from_track_entry(
         source_course_index=entry.source_course_index,
         source_engine_setting=entry.source_engine_setting,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
-        vehicle_machine=_vehicle_machine_data(entry.vehicle_machine),
         camera_setting=camera_setting,
     )
 
@@ -381,8 +377,9 @@ def _generate_race_start_variant_state(
         raise ValueError("course_index is required for race-start generation")
     if request.mode is None:
         raise ValueError("mode is required for race-start generation")
-    if request.vehicle_machine is None:
-        raise ValueError("vehicle_machine is required for race-start generation")
+    if request.vehicle is None:
+        raise ValueError("vehicle is required for race-start generation")
+    vehicle = vehicle_by_id(request.vehicle)
 
     runtime_dir = cache_root / "runtime" / cache_state_path.stem
     runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -402,11 +399,8 @@ def _generate_race_start_variant_state(
             variant=RaceStartVariant(
                 course_index=request.course_index,
                 mode=request.mode,
-                character_index=_required_int(request.vehicle_machine, "character_index"),
-                machine_select_slot=_optional_int(
-                    request.vehicle_machine,
-                    "machine_select_slot",
-                ),
+                character_index=vehicle.character_index,
+                machine_select_slot=vehicle.machine_select_slot,
                 engine_setting_raw_value=request.engine_setting_raw_value,
                 race_intro_target_timer=context.race_intro_target_timer,
             ),
@@ -416,28 +410,6 @@ def _generate_race_start_variant_state(
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
     return _sha256_bytes(cache_state_path.read_bytes())
-
-
-def _vehicle_machine_data(machine: VehicleMachineConfig | None) -> dict[str, object] | None:
-    if machine is None:
-        return None
-    return machine.model_dump(mode="json")
-
-
-def _required_int(data: dict[str, object], key: str) -> int:
-    value = data.get(key)
-    if isinstance(value, bool) or not isinstance(value, int | float | str):
-        raise ValueError(f"vehicle_machine.{key} must be numeric")
-    return int(value)
-
-
-def _optional_int(data: dict[str, object], key: str) -> int | None:
-    value = data.get(key)
-    if value is None:
-        return None
-    if isinstance(value, bool) or not isinstance(value, int | float | str):
-        raise ValueError(f"vehicle_machine.{key} must be numeric when set")
-    return int(value)
 
 
 def _cache_payload(
@@ -458,7 +430,7 @@ def _target_variant_cache_data(
     *,
     context: BaselineMaterializerContext,
 ) -> dict[str, object]:
-    return {
+    payload = {
         "camera_setting": request.camera_setting,
         "course_id": request.course_id,
         "course_index": request.course_index,
@@ -468,8 +440,12 @@ def _target_variant_cache_data(
         "race_intro_target_timer": context.race_intro_target_timer,
         "renderer": context.renderer,
         "vehicle": request.vehicle,
-        "vehicle_machine": request.vehicle_machine,
     }
+    if request.vehicle is not None:
+        vehicle = vehicle_by_id(request.vehicle)
+        payload["vehicle_character_index"] = vehicle.character_index
+        payload["vehicle_menu_slot"] = vehicle.machine_select_slot
+    return payload
 
 
 def _cache_metadata(

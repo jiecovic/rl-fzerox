@@ -43,6 +43,7 @@ env:
     mode: image_state
     preset: crop_116x164
     frame_stack: 4
+    minimap_layer: false
 
 watch:
   # Env/policy step rate. `auto` means native_fps / action_repeat; use

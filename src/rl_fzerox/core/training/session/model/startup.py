@@ -130,6 +130,8 @@ def _training_summary_parts(
         f"batch_size={train_config.batch_size}",
         f"lr={train_config.learning_rate}",
     ]
+    if train_config.resume_run_dir is not None:
+        parts.append(f"resume={train_config.resume_mode}:{train_config.resume_artifact}")
     if effective_algorithm == TRAIN_ALGORITHM_SAC:
         parts.extend(
             [

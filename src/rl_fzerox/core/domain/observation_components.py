@@ -22,6 +22,7 @@ ObservationStateProfileName: TypeAlias = Literal[
 ]
 ObservationStateComponentName: TypeAlias = Literal[
     "vehicle_state",
+    "machine_context",
     "track_position",
     "surface_state",
     "course_context",

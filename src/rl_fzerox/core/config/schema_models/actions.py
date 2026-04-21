@@ -27,7 +27,7 @@ from rl_fzerox.core.config.schema_models.common import (
 )
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.domain.action_values import (
-    ActionMaskValue,
+    ActionMaskSpec,
     compile_action_mask_values,
 )
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
@@ -49,22 +49,22 @@ class ActionMaskConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    steer: tuple[ActionMaskValue, ...] | None = None
-    drive: tuple[ActionMaskValue, ...] | None = None
-    gas: tuple[ActionMaskValue, ...] | None = None
-    air_brake: tuple[ActionMaskValue, ...] | None = None
-    boost: tuple[ActionMaskValue, ...] | None = None
-    lean: tuple[ActionMaskValue, ...] | None = None
-    pitch: tuple[ActionMaskValue, ...] | None = None
+    steer: ActionMaskSpec | None = None
+    drive: ActionMaskSpec | None = None
+    gas: ActionMaskSpec | None = None
+    air_brake: ActionMaskSpec | None = None
+    boost: ActionMaskSpec | None = None
+    lean: ActionMaskSpec | None = None
+    pitch: ActionMaskSpec | None = None
 
     @field_validator("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch")
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
-        value: tuple[ActionMaskValue, ...] | None,
+        value: ActionMaskSpec | None,
         info: ValidationInfo,
-    ) -> tuple[ActionMaskValue, ...] | None:
-        if value is not None and len(value) == 0:
+    ) -> ActionMaskSpec | None:
+        if value is not None and not isinstance(value, str) and len(value) == 0:
             raise ValueError("Action mask branches must not be empty")
         if value is not None:
             compile_action_mask_values(str(info.field_name), value)

@@ -42,6 +42,7 @@ class ScriptedStepBackend(SyntheticBackend):
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -78,6 +79,7 @@ class ScriptedStepBackend(SyntheticBackend):
             3,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         if result.observation.shape[2] != expected_channels:
             raise AssertionError("Scripted observation stack does not match frame_stack")

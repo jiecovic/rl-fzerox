@@ -8,6 +8,7 @@ from fzerox_emulator.arrays import ActionMask, RgbFrame
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.observations import ObservationValue
 
 
@@ -72,6 +73,16 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Return the flattened boolean action mask for maskable PPO."""
 
         return self._engine.action_masks()
+
+    def action_mask_branches(self) -> ActionMaskBranches:
+        """Return the mask grouped by action branch for watch/debug UI."""
+
+        return self._engine.action_mask_branches()
+
+    def action_mask_snapshot(self) -> ActionMaskSnapshot:
+        """Return the flat mask and branch view from one mask computation."""
+
+        return self._engine.action_mask_snapshot()
 
     def set_curriculum_stage(self, stage_index: int) -> None:
         """Switch the active curriculum stage used for action masking."""

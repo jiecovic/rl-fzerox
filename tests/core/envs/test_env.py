@@ -338,7 +338,7 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     class ObservationPresetBackend(SyntheticBackend):
         def __init__(self) -> None:
             super().__init__()
-            self.render_observation_calls: list[tuple[str, int, str]] = []
+            self.render_observation_calls: list[tuple[str, int, str, bool]] = []
 
         def render_observation(
             self,
@@ -346,12 +346,14 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
             preset: str,
             frame_stack: int,
             stack_mode: ObservationStackMode = "rgb",
+            minimap_layer: bool = False,
         ) -> ObservationFrame:
-            self.render_observation_calls.append((preset, frame_stack, stack_mode))
+            self.render_observation_calls.append((preset, frame_stack, stack_mode, minimap_layer))
             return super().render_observation(
                 preset=preset,
                 frame_stack=frame_stack,
                 stack_mode=stack_mode,
+                minimap_layer=minimap_layer,
             )
 
     backend = ObservationPresetBackend()
@@ -363,7 +365,7 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
 
     assert obs.shape == (116, 164, 12)
     assert info["observation_frame_shape"] == (116, 164, 3)
-    assert backend.render_observation_calls == [("crop_116x164", 4, "rgb")]
+    assert backend.render_observation_calls == [("crop_116x164", 4, "rgb", False)]
 
 
 def test_env_reset_uses_rgb_gray_stack_shape() -> None:
@@ -386,6 +388,28 @@ def test_env_reset_uses_rgb_gray_stack_shape() -> None:
     assert env.observation_space.shape == (98, 130, 6)
     assert info["observation_stack"] == 4
     assert info["observation_stack_mode"] == "rgb_gray"
+
+
+def test_env_reset_uses_optional_minimap_layer_shape() -> None:
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            observation=ObservationConfig(
+                preset="crop_66x82",
+                frame_stack=4,
+                stack_mode="rgb_gray",
+                minimap_layer=True,
+            ),
+        ),
+    )
+
+    obs, info = env.reset(seed=13)
+    obs = _image_obs(obs)
+
+    assert obs.shape == (66, 82, 7)
+    assert isinstance(env.observation_space, Box)
+    assert env.observation_space.shape == (66, 82, 7)
+    assert info["observation_minimap_layer"] is True
 
 
 def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:

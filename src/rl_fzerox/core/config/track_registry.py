@@ -11,13 +11,12 @@ from rl_fzerox.core.config.track_registry_types import (
     BaselineVariant,
     CourseSelection,
 )
-from rl_fzerox.core.config.vehicle_registry import (
+from rl_fzerox.core.config.vehicle_catalog import (
     engine_setting_display_name,
     known_vehicle_ids,
     resolve_engine_setting,
     try_resolve_engine_setting_id,
-    vehicle_config_by_id,
-    vehicle_machine_config,
+    vehicle_by_id,
 )
 
 
@@ -106,9 +105,9 @@ def _entry_from_course_variant(
     config_root: Path,
 ) -> dict[str, object]:
     course = _load_course_config(course_ref, config_root=config_root)
-    vehicle_config = vehicle_config_by_id(variant.vehicle, config_root=config_root)
-    vehicle_name = _optional_str(vehicle_config.get("display_name")) or variant.vehicle
-    engine_display_name = engine_setting_display_name(vehicle_config, variant.engine_setting)
+    vehicle = vehicle_by_id(variant.vehicle)
+    vehicle_name = vehicle.display_name
+    engine_display_name = engine_setting_display_name(variant.engine_setting)
     course_id = _optional_str(course.get("id")) or _safe_id(course_ref)
     mode_id = _safe_id(variant.mode)
 
@@ -129,9 +128,6 @@ def _entry_from_course_variant(
         "engine_setting": variant.engine_setting,
         "engine_setting_raw_value": variant.engine_setting_raw_value,
     }
-    machine = vehicle_machine_config(vehicle_config)
-    if machine is not None:
-        entry["vehicle_machine"] = machine
     if "records" in course:
         entry["records"] = course["records"]
     if weight is not None:
@@ -186,9 +182,7 @@ def _baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> Baseli
         raise ValueError(
             "track_sampling.baseline.ghost is not configurable; use no-ghost baselines"
         )
-    vehicle_config = vehicle_config_by_id(vehicle, config_root=config_root)
     engine_setting = resolve_engine_setting(
-        vehicle_config,
         raw_baseline_spec.get("engine_setting"),
         context=f"track_sampling.baseline.vehicle={vehicle!r}",
     )
@@ -235,7 +229,6 @@ def _entry_with_registry_metadata(
                 "source_course_index",
                 "source_engine_setting",
                 "source_engine_setting_raw_value",
-                "vehicle_machine",
                 "records",
             }:
                 enriched.setdefault(key, value)
@@ -307,14 +300,12 @@ def _baseline_variant_from_generated_entry_id(
     if not suffix.startswith(mode_prefix):
         return None
     vehicle_and_engine = suffix.removeprefix(mode_prefix)
-    for vehicle_id in sorted(known_vehicle_ids(config_root=config_root), key=len, reverse=True):
+    for vehicle_id in sorted(known_vehicle_ids(), key=len, reverse=True):
         vehicle_prefix = f"{vehicle_id}_"
         if not vehicle_and_engine.startswith(vehicle_prefix):
             continue
         engine_setting = vehicle_and_engine.removeprefix(vehicle_prefix)
-        vehicle_config = vehicle_config_by_id(vehicle_id, config_root=config_root)
         resolved_engine_setting = try_resolve_engine_setting_id(
-            vehicle_config,
             engine_setting,
             context=f"track_sampling.entries.id={suffix!r}",
         )
@@ -362,13 +353,12 @@ def _track_with_registry_metadata(
 
     vehicle = enriched.get("vehicle")
     if isinstance(vehicle, str) and vehicle:
-        vehicle_config = vehicle_config_by_id(vehicle, config_root=config_root)
+        vehicle_info = vehicle_by_id(vehicle)
         engine_setting = enriched.get("engine_setting")
         if (isinstance(engine_setting, str) and engine_setting) or (
             isinstance(engine_setting, int) and not isinstance(engine_setting, bool)
         ):
             resolved_engine_setting = resolve_engine_setting(
-                vehicle_config,
                 engine_setting,
                 context=f"track vehicle={vehicle!r}",
             )
@@ -380,13 +370,8 @@ def _track_with_registry_metadata(
                     "source_engine_setting_raw_value",
                     resolved_engine_setting.raw_value,
                 )
-        vehicle_name = _optional_str(vehicle_config.get("display_name"))
-        if vehicle_name is not None:
-            enriched.setdefault("vehicle_name", vehicle_name)
+        enriched.setdefault("vehicle_name", vehicle_info.display_name)
         enriched.setdefault("source_vehicle", vehicle)
-        machine = vehicle_machine_config(vehicle_config)
-        if machine is not None:
-            enriched.setdefault("vehicle_machine", machine)
     return enriched
 
 

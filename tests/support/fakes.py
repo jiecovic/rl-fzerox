@@ -49,7 +49,7 @@ class SyntheticBackend:
         self._last_controller_state = ControllerState()
         self._capture_video_flags: list[bool] = []
         self._observation_stacks: dict[
-            tuple[str, int, str],
+            tuple[str, int, str, bool],
             tuple[list[RgbFrame], int | None],
         ] = {}
         self.randomized_rng_seeds: list[int] = []
@@ -166,6 +166,7 @@ class SyntheticBackend:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
     ) -> ObservationFrame:
         spec = self.observation_spec(preset)
         cropped = _crop_visible_game_area(self._last_frame)
@@ -175,18 +176,26 @@ class SyntheticBackend:
             height=spec.display_height,
         )
         frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
-        stack_key = (spec.preset, frame_stack, stack_mode)
+        stack_key = (spec.preset, frame_stack, stack_mode, minimap_layer)
         stacked_entry = self._observation_stacks.get(stack_key)
         if stacked_entry is None or stacked_entry[1] is None:
             frames = [np.array(frame, copy=True) for _ in range(frame_stack)]
             self._observation_stacks[stack_key] = (frames, self.frame_index)
-            return _materialize_observation_stack(frames, stack_mode=stack_mode)
+            return _materialize_observation_stack(
+                frames,
+                stack_mode=stack_mode,
+                minimap_layer=minimap_layer,
+            )
 
         frames, last_frame_index = stacked_entry
         if last_frame_index != self.frame_index:
             frames = [*frames[1:], np.array(frame, copy=True)]
             self._observation_stacks[stack_key] = (frames, self.frame_index)
-        return _materialize_observation_stack(self._observation_stacks[stack_key][0], stack_mode)
+        return _materialize_observation_stack(
+            self._observation_stacks[stack_key][0],
+            stack_mode,
+            minimap_layer=minimap_layer,
+        )
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         if self.frame_index < 240:
@@ -236,6 +245,7 @@ class SyntheticBackend:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -281,6 +291,7 @@ class SyntheticBackend:
             preset=preset,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
@@ -322,6 +333,7 @@ class SyntheticBackend:
         preset: str,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
+        minimap_layer: bool = False,
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -368,6 +380,7 @@ class SyntheticBackend:
             preset=preset,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
         )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
@@ -469,15 +482,27 @@ def _resize_frame(frame: RgbFrame, *, width: int, height: int) -> RgbFrame:
 def _materialize_observation_stack(
     frames: list[RgbFrame],
     stack_mode: ObservationStackMode,
+    *,
+    minimap_layer: bool = False,
 ) -> ObservationFrame:
     if not frames:
         raise ValueError("observation frame stack must not be empty")
     if stack_mode == "rgb":
-        return np.ascontiguousarray(np.concatenate(frames, axis=2))
+        stacked = np.concatenate(frames, axis=2)
+        return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     if stack_mode == "rgb_gray":
         grayscale_history = [_rgb_luma(frame) for frame in frames[:-1]]
-        return np.ascontiguousarray(np.concatenate([*grayscale_history, frames[-1]], axis=2))
+        stacked = np.concatenate([*grayscale_history, frames[-1]], axis=2)
+        return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
+
+
+def _append_fake_minimap_layer(
+    observation: ObservationFrame,
+    current_frame: RgbFrame,
+) -> ObservationFrame:
+    minimap = _rgb_luma(current_frame)
+    return np.ascontiguousarray(np.concatenate([observation, minimap], axis=2))
 
 
 def _rgb_luma(frame: RgbFrame) -> ObservationFrame:
