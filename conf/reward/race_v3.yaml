@@ -77,22 +77,22 @@ energy_full_refill_lap_bonus: 3.0
 # full-refill bonus can fire. At 0.10 and bonus 5, the threshold payout is 0.5.
 energy_full_refill_min_gain_fraction: 0.10
 
-# Gas: optional per-frame penalty for requesting less than the threshold.
-# Disabled at 0.0; with threshold 0.5, discrete idle gas gets the full penalty.
+# Gas: optional per-internal-frame penalty for requesting less than the threshold.
+# Scales with frames_run/action_repeat; disabled at 0.0.
 gas_underuse_penalty: 0.0
 gas_underuse_threshold: 0.5
 
 # Steering: acceleration penalty for rapid direction changes.
 # This compares steer_t - 2*steer_t-1 + steer_t-2 once per policy decision.
-# Smooth ramps and steady cornering are near zero; left-right flips hit the cap.
+# Decision-based, not multiplied by action_repeat.
 steer_oscillation_penalty: -0.0
 steer_oscillation_deadzone: 0.07
 steer_oscillation_cap: 2.0
 steer_oscillation_power: 2.0
 
-# Lean: discourage using Z/R lean below useful high-speed ranges without hard-masking it.
-lean_low_speed_penalty: 0.0
-lean_low_speed_penalty_max_speed_kph: 600.0
+# Lean: per-internal-frame penalty when Z/R lean is requested below this speed.
+lean_low_speed_penalty: -0.005
+lean_low_speed_penalty_max_speed_kph: 1200.0
 
 # Airborne: event reward when an airborne machine lands back on the track.
 airborne_landing_reward: 0.0

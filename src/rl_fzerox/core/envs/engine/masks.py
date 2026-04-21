@@ -12,6 +12,7 @@ from rl_fzerox.core.config.schema import CurriculumConfig
 from rl_fzerox.core.domain.hybrid_action import HYBRID_DISCRETE_ACTION_KEY
 from rl_fzerox.core.envs.actions import ActionAdapter, ActionValue
 from rl_fzerox.core.envs.actions.base import DiscreteActionDimension
+from rl_fzerox.core.envs.actions.hybrid.layouts import PITCH_BUCKETS
 
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
 ActionMaskBranches: TypeAlias = dict[str, tuple[bool, ...]]
@@ -38,7 +39,7 @@ class ActionMaskController:
     stage_boost_min_energy_fraction: tuple[float | None, ...]
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
-    pitch_neutral_index: int = 2
+    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
@@ -85,7 +86,6 @@ class ActionMaskController:
             stage_lean_gate = self.stage_lean_unmask_min_speed_kph[self._stage_index]
             if stage_lean_gate is not None:
                 lean_unmask_min_speed_kph = stage_lean_gate
-        boost_unmask_max_speed_kph = self.current_boost_unmask_max_speed_kph
         return self.adapter.action_mask(
             base_overrides=self.base_overrides,
             stage_overrides=stage_overrides,
@@ -94,7 +94,6 @@ class ActionMaskController:
                 airborne=self._airborne,
                 lean_allowed_values=self._lean_allowed_values,
                 speed_kph=self._speed_kph,
-                boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
                 pitch_neutral_index=self.pitch_neutral_index,
             ),
@@ -389,18 +388,13 @@ def _dynamic_action_mask_overrides(
     airborne: bool | None = None,
     lean_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
-    boost_unmask_max_speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
-    pitch_neutral_index: int = 2,
+    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
     # In that case keep the branch open instead of masking boost prematurely.
-    if boost_unlocked is False or (
-        boost_unmask_max_speed_kph is not None
-        and speed_kph is not None
-        and speed_kph > boost_unmask_max_speed_kph
-    ):
+    if boost_unlocked is False:
         overrides["boost"] = (0,)
     lean_values = lean_allowed_values
     if lean_values is None:

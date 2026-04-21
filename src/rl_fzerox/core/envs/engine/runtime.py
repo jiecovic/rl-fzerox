@@ -46,7 +46,13 @@ from .info import (
     telemetry_energy_fraction,
     telemetry_info,
 )
-from .masks import ActionMaskBranches, ActionMaskController, ActionMaskSnapshot
+from .masks import (
+    ActionMaskBranches,
+    ActionMaskController,
+    ActionMaskSnapshot,
+    action_branch_non_neutral_allowed,
+    action_branch_value_allowed,
+)
 from .observation import EngineObservationBuilder
 from .reset import load_track_baseline, reset_race_state
 from .step_result import WatchEnvStep
@@ -126,7 +132,6 @@ class FZeroXEnvEngine:
         self._last_gas_level = 0.0
         self._last_info: dict[str, object] = {}
         self._last_telemetry: FZeroXTelemetry | None = None
-        self._manual_boost_allowed: bool | None = None
         self._reset_count = 0
         self._rng_seed_base: int | None = None
 
@@ -410,7 +415,6 @@ class FZeroXEnvEngine:
 
     def _sync_dynamic_masks(self, telemetry: FZeroXTelemetry | None) -> None:
         if telemetry is None:
-            self._manual_boost_allowed = None
             self._mask_controller.set_boost_unlocked(None)
             self._mask_controller.set_speed_kph(None)
             self._mask_controller.set_airborne(None)
@@ -434,7 +438,6 @@ class FZeroXEnvEngine:
             can_boost = can_boost and energy_fraction > 0.0
             if min_energy_fraction > 0.0:
                 can_boost = can_boost and energy_fraction >= min_energy_fraction
-        self._manual_boost_allowed = can_boost
         self._mask_controller.set_boost_unlocked(can_boost)
 
     def _run_env_step(
@@ -514,16 +517,15 @@ class FZeroXEnvEngine:
         self._last_gas_level = gas_level
         boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
         lean_used = bool(applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK))
+        air_brake_used = bool(applied_control_state.joypad_mask & AIR_BRAKE_MASK)
         reward_step = self._reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
             telemetry,
             RewardActionContext(
-                air_brake_requested=bool(requested_control_state.joypad_mask & AIR_BRAKE_MASK),
+                air_brake_requested=air_brake_used,
                 boost_requested=boost_used,
-                lean_requested=bool(
-                    requested_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK)
-                ),
+                lean_requested=lean_used,
                 gas_level=gas_level,
                 steer_level=max(
                     -1.0,
@@ -605,11 +607,46 @@ class FZeroXEnvEngine:
     def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
         """Suppress controls whose validity depends on the latest telemetry."""
 
-        if self._manual_boost_allowed is False:
+        branches = self._mask_controller.action_mask_branches()
+        if not action_branch_value_allowed(
+            branches,
+            "boost",
+            1,
+            missing_allowed=True,
+        ):
             control_state = without_joypad_mask(control_state, BOOST_MASK)
+        if not action_branch_value_allowed(
+            branches,
+            "lean",
+            1,
+            missing_allowed=True,
+        ):
+            control_state = without_joypad_mask(control_state, LEAN_LEFT_MASK)
+        if not action_branch_value_allowed(
+            branches,
+            "lean",
+            2,
+            missing_allowed=True,
+        ):
+            control_state = without_joypad_mask(control_state, LEAN_RIGHT_MASK)
+        if not action_branch_value_allowed(
+            branches,
+            "air_brake",
+            1,
+            missing_allowed=True,
+        ):
+            control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
         air_brake_mode = self._action_config.continuous_air_brake_mode
         if air_brake_mode == "off":
             control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
+        pitch_non_neutral_allowed = action_branch_non_neutral_allowed(
+            branches,
+            "pitch",
+            neutral_index=self._mask_controller.pitch_neutral_index,
+            missing_allowed=True,
+        )
+        if not pitch_non_neutral_allowed:
+            control_state = with_left_stick_y(control_state, 0.0)
         if self._last_telemetry is None or self._last_telemetry.player.airborne:
             return control_state
         return with_left_stick_y(without_joypad_mask(control_state, AIR_BRAKE_MASK), 0.0)

@@ -11,7 +11,7 @@ from rl_fzerox.core.config.schema import (
     EnvConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import BOOST_MASK
+from rl_fzerox.core.envs.actions import AIR_BRAKE_MASK, BOOST_MASK, LEAN_LEFT_MASK
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -495,6 +495,37 @@ def test_env_action_masks_keep_boost_masked_when_speed_cap_allows_before_unlock(
     assert env.action_masks().tolist() == (([True] * 7) + ([True] * 3) + [True, False])
 
 
+def test_env_control_gates_suppress_masked_lean_request() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+            speed_kph=500.0,
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig(
+                name="steer_drive_boost_lean",
+                lean_unmask_min_speed_kph=900.0,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+    env.step(np.array([3, 1, 0, 1], dtype=np.int64))
+
+    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK == 0
+
+
 def test_env_action_masks_disable_boost_while_boost_is_active() -> None:
     backend = ScriptedStepBackend(
         [
@@ -647,10 +678,12 @@ def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
     env.step(
         {
             "continuous": np.array([0.0, 0.0], dtype=np.float32),
-            "discrete": np.array([0, 0, 0, 2], dtype=np.int64),
+            "discrete": np.array([1, 0, 0, 4], dtype=np.int64),
         }
     )
 
+    assert backend.last_controller_state.joypad_mask & AIR_BRAKE_MASK == 0
+    assert backend.last_controller_state.left_stick_y == 0.0
     assert env.action_masks().tolist() == [
         True,
         True,
