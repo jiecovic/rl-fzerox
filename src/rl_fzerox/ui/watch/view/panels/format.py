@@ -95,6 +95,8 @@ def _format_observation_summary(
     color_mode = "rgb+gray" if stack_mode == "rgb_gray" else "rgb"
     if channels == 1:
         color_mode = "gray"
+    if _observation_minimap_layer(info):
+        color_mode = f"{color_mode}+map"
     return f"{width}x{height} {color_mode} x{stack_size} strip"
 
 
@@ -229,7 +231,8 @@ def _preview_frame_shape(
         raise ValueError(f"Expected an HxWxC observation shape, got {observation_shape!r}")
     height, width, _ = observation_shape
     stack_size = max(1, _observation_stack_size(observation_shape, info=info))
-    columns, rows = _observation_preview_grid(stack_size)
+    frame_count = stack_size + (1 if _observation_minimap_layer(info) else 0)
+    columns, rows = _observation_preview_grid(frame_count)
     return height * rows, width * columns, 3
 
 
@@ -253,6 +256,12 @@ def _observation_stack_mode(info: Mapping[str, object] | None) -> str:
         return "rgb"
     value = info.get("observation_stack_mode")
     return value if isinstance(value, str) else "rgb"
+
+
+def _observation_minimap_layer(info: Mapping[str, object] | None) -> bool:
+    if info is None:
+        return False
+    return info.get("observation_minimap_layer") is True
 
 
 def _observation_preview_grid(stack_size: int) -> tuple[int, int]:

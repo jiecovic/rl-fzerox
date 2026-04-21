@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Literal
 
+from omegaconf import OmegaConf
+
 from rl_fzerox.apps._cli import normalize_hydra_overrides
 from rl_fzerox.core.config import load_watch_app_config
 from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig, WatchConfig
@@ -90,7 +92,7 @@ def resolve_watch_app_config(
         if cli_run_dir is None:
             raise ValueError("--config is required unless --run-dir is provided")
         if normalized_overrides:
-            raise ValueError("Hydra overrides require --config")
+            cli_override_delta = _watch_config_delta_from_dotlist(normalized_overrides)
         train_config = load_train_run_config_for_watch(cli_run_dir)
         config = _default_watch_config_from_train_run(
             train_config,
@@ -183,6 +185,40 @@ def _watch_config_delta(
         value, path = override_value
         _set_mapping_path_value(delta, path, value)
     return delta
+
+
+def _watch_config_delta_from_dotlist(overrides: Sequence[str]) -> dict[str, object]:
+    """Parse direct CLI overrides without composing an external watch YAML."""
+
+    dotlist = [
+        dotlist_override
+        for override in overrides
+        if (dotlist_override := _direct_dotlist_override(override)) is not None
+    ]
+    if not dotlist:
+        return {}
+    delta = _string_key_mapping(
+        OmegaConf.to_container(OmegaConf.from_dotlist(dotlist), resolve=True)
+    )
+    if delta is None:
+        raise ValueError("Watch overrides must resolve to a string-keyed mapping")
+    return delta
+
+
+def _direct_dotlist_override(override: str) -> str | None:
+    key, separator, value = override.partition("=")
+    key = key.strip()
+    while key.startswith("+"):
+        key = key[1:]
+    if not key or key.startswith("hydra."):
+        return None
+    if key.startswith("~"):
+        raise ValueError("Deletion overrides require --config")
+    if key.startswith("/") or "@" in key:
+        raise ValueError("Config-group overrides require --config")
+    if not separator:
+        raise ValueError(f"Watch override must use key=value syntax: {override!r}")
+    return f"{key}={value}"
 
 
 def _apply_watch_config_delta(

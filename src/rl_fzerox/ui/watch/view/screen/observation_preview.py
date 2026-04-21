@@ -6,6 +6,7 @@ import numpy as np
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
+    _observation_minimap_layer,
     _observation_preview_grid,
     _observation_stack_mode,
     _observation_stack_size,
@@ -44,26 +45,33 @@ def _preview_frames(
     *,
     info: dict[str, object] | None,
 ) -> tuple[RgbFrame, ...]:
-    channels = observation.shape[2]
     stack_size = _observation_stack_size(observation.shape, info=info)
     stack_mode = _observation_stack_mode(info)
+    minimap_layer = _observation_minimap_layer(info)
+    base_observation = observation[:, :, :-1] if minimap_layer else observation
 
     if stack_mode == "rgb_gray":
-        return _rgb_gray_preview_frames(observation, stack_size=stack_size)
+        frames = _rgb_gray_preview_frames(base_observation, stack_size=stack_size)
+        return (
+            (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
+        )
 
-    if channels == 3:
-        return (np.ascontiguousarray(observation),)
-    if channels == 1:
-        return (np.repeat(observation, 3, axis=2),)
-    if channels >= 3 and channels % 3 == 0:
+    base_channels = base_observation.shape[2]
+    if base_channels == 3:
+        frames = (np.ascontiguousarray(base_observation),)
+    elif base_channels == 1:
+        frames = (_grayscale_preview_frame(base_observation),)
+    elif base_channels >= 3 and base_channels % 3 == 0:
         frames = [
-            np.ascontiguousarray(observation[:, :, start : start + 3])
-            for start in range(0, channels, 3)
+            np.ascontiguousarray(base_observation[:, :, start : start + 3])
+            for start in range(0, base_channels, 3)
         ]
-        return tuple(frames)
+        frames = tuple(frames)
+    else:
+        latest_channel = base_observation[:, :, -1:]
+        frames = (_grayscale_preview_frame(latest_channel),)
 
-    latest_channel = observation[:, :, -1:]
-    return (np.repeat(latest_channel, 3, axis=2),)
+    return (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
 
 
 def _rgb_gray_preview_frames(
@@ -81,6 +89,10 @@ def _rgb_gray_preview_frames(
     ]
     frames.append(np.ascontiguousarray(observation[:, :, -3:]))
     return tuple(frames)
+
+
+def _grayscale_preview_frame(channel: ObservationFrame) -> RgbFrame:
+    return np.repeat(channel, 3, axis=2)
 
 
 def _preview_frame_grid(frames: tuple[RgbFrame, ...]) -> RgbFrame:

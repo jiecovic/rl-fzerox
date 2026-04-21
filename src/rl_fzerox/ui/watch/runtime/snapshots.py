@@ -10,6 +10,7 @@ from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
@@ -43,6 +44,8 @@ class _SnapshotEnv(Protocol):
     def backend(self) -> _SnapshotBackend: ...
 
     def render(self) -> RgbFrame: ...
+
+    def action_mask_branches(self) -> ActionMaskBranches: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +81,7 @@ def _publish_step_snapshots(
     control_state: ControllerState,
     gas_level: float,
     boost_lamp_level: float,
+    action_mask_branches: ActionMaskBranches,
     policy_action: ActionValue | None,
     policy_runner: PolicyRunner | None,
     policy_reload_error: str | None,
@@ -109,6 +113,7 @@ def _publish_step_snapshots(
                 control_state=control_state,
                 gas_level=gas_level,
                 boost_lamp_level=boost_lamp_level,
+                action_mask_branches=action_mask_branches,
                 telemetry=final_telemetry if is_final_frame else previous_telemetry,
                 policy_action=policy_action,
                 policy_runner=policy_runner,
@@ -140,6 +145,7 @@ def _build_snapshot(
     control_state: ControllerState,
     gas_level: float,
     boost_lamp_level: float,
+    action_mask_branches: ActionMaskBranches | None = None,
     policy_action: ActionValue | None,
     policy_runner: PolicyRunner | None,
     policy_reload_error: str | None,
@@ -167,6 +173,9 @@ def _build_snapshot(
         control_state=control_state,
         gas_level=gas_level,
         boost_lamp_level=max(0.0, min(1.0, boost_lamp_level)),
+        action_mask_branches=(
+            env.action_mask_branches() if action_mask_branches is None else action_mask_branches
+        ),
         policy_action=policy_action,
         policy_label=_policy_label(policy_runner),
         policy_curriculum_stage=_policy_curriculum_stage(policy_runner),

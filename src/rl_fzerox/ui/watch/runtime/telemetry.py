@@ -60,6 +60,11 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
         acceleration_force=_mapping_float(player_value, "acceleration_force"),
         drift_attack_force=_mapping_float(player_value, "drift_attack_force"),
         collision_mass=_mapping_float(player_value, "collision_mass"),
+        machine_body_stat=_mapping_int(player_value, "machine_body_stat"),
+        machine_boost_stat=_mapping_int(player_value, "machine_boost_stat"),
+        machine_grip_stat=_mapping_int(player_value, "machine_grip_stat"),
+        machine_weight=_mapping_int(player_value, "machine_weight"),
+        engine_setting=_mapping_float(player_value, "engine_setting"),
     )
     return FZeroXTelemetry(
         total_lap_count=_mapping_int(data, "total_lap_count"),

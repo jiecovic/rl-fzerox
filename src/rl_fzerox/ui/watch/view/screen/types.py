@@ -54,12 +54,22 @@ class ControlViz:
     pitch_y: float
     gas_level: float
     thrust_warning_threshold: float | None
+    thrust_deadzone_threshold: float | None
+    thrust_full_threshold: float | None
+    engine_setting_level: float | None
+    speed_kph: float | None
     air_brake_axis: float | None
     air_brake_disabled: bool
     boost_pressed: bool
     boost_active: bool
     boost_lamp_level: float
     lean_direction: int
+    thrust_masked: bool = False
+    air_brake_masked: bool = False
+    boost_masked: bool = False
+    lean_left_masked: bool = False
+    lean_right_masked: bool = False
+    pitch_masked: bool = False
 
 
 @dataclass(frozen=True)

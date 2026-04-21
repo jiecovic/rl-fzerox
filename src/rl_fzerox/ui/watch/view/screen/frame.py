@@ -1,12 +1,15 @@
 # src/rl_fzerox/ui/watch/view/screen/frame.py
 from __future__ import annotations
 
+import math
 import os
 
 import numpy as np
 
+from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_observation_preview_below_game,
@@ -89,8 +92,11 @@ def _draw_frame(
     control_state,
     gas_level: float,
     thrust_warning_threshold: float | None,
+    thrust_deadzone_threshold: float | None,
+    thrust_full_threshold: float | None,
     boost_active: bool,
     boost_lamp_level: float,
+    action_mask_branches: ActionMaskBranches,
     policy_label: str | None,
     policy_curriculum_stage: str | None,
     policy_deterministic: bool | None,
@@ -109,7 +115,7 @@ def _draw_frame(
     wrong_way_timer_limit: int | None,
     progress_frontier_stall_limit_frames: int | None,
     stuck_min_speed_kph: float,
-    telemetry,
+    telemetry: FZeroXTelemetry | None,
 ) -> None:
     game_display_size = _watch_game_display_size()
     game_surface = _rgb_surface(pygame, raw_frame)
@@ -142,9 +148,14 @@ def _draw_frame(
             control_state,
             gas_level=gas_level,
             thrust_warning_threshold=thrust_warning_threshold,
+            thrust_deadzone_threshold=thrust_deadzone_threshold,
+            thrust_full_threshold=thrust_full_threshold,
+            engine_setting_level=_engine_setting_level(info),
+            speed_kph=_speed_kph(telemetry),
             boost_active=boost_active,
             boost_lamp_level=boost_lamp_level,
             policy_action=policy_action,
+            action_mask_branches=action_mask_branches,
             continuous_drive_deadzone=continuous_drive_deadzone,
             continuous_air_brake_mode=continuous_air_brake_mode,
             continuous_air_brake_disabled=continuous_air_brake_disabled,
@@ -171,6 +182,7 @@ def _draw_frame(
         thrust_warning_threshold=thrust_warning_threshold,
         boost_active=boost_active,
         boost_lamp_level=boost_lamp_level,
+        action_mask_branches=action_mask_branches,
         policy_label=policy_label,
         policy_curriculum_stage=policy_curriculum_stage,
         policy_deterministic=policy_deterministic,
@@ -204,6 +216,25 @@ def _rgb_surface(pygame, frame: RgbFrame):
     if channels != 3:
         raise ValueError(f"Expected an RGB frame for display, got shape {frame.shape!r}")
     return pygame.image.frombuffer(rgb_frame.tobytes(), (width, height), "RGB")
+
+
+def _engine_setting_level(info: dict[str, object]) -> float | None:
+    value = info.get("engine_setting_ram")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    level = float(value)
+    if not math.isfinite(level):
+        return None
+    return max(0.0, min(1.0, level))
+
+
+def _speed_kph(telemetry: FZeroXTelemetry | None) -> float | None:
+    if telemetry is None:
+        return None
+    speed = float(telemetry.player.speed_kph)
+    if not math.isfinite(speed):
+        return None
+    return max(0.0, speed)
 
 
 def _apply_window_position_hint() -> None:

@@ -80,7 +80,7 @@ def test_watch_rejects_missing_config_without_run_dir() -> None:
         main([])
 
 
-def test_watch_rejects_overrides_without_config(
+def test_watch_allows_run_dir_overrides_without_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -101,13 +101,37 @@ def test_watch_rejects_overrides_without_config(
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
 
+    captured: dict[str, WatchAppConfig] = {}
+
     monkeypatch.setattr(
         "rl_fzerox.apps.watch.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
     )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.materialize_watch_session_config",
+        lambda config, *, run_dir: config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.run_viewer",
+        lambda config: captured.setdefault("config", config),
+    )
 
-    with pytest.raises(SystemExit, match="Hydra overrides require --config"):
-        main(["--run-dir", str(run_dir), "--", "watch.fps=30"])
+    main(
+        [
+            "--run-dir",
+            str(run_dir),
+            "--",
+            "watch.deterministic_policy=false",
+            "watch.fps=30",
+        ]
+    )
+
+    config = captured["config"]
+    assert config.watch.policy_run_dir == run_dir.resolve()
+    assert config.watch.deterministic_policy is False
+    assert config.watch.fps == 30.0
+    assert config.watch.control_fps == 30.0
+    assert config.watch.render_fps == 30.0
 
 
 def test_watch_loads_v4_stale_saved_manifest_through_legacy_scrub(tmp_path: Path) -> None:
