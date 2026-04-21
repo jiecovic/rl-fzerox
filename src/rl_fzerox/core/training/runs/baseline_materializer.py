@@ -6,6 +6,9 @@ import json
 import os
 import re
 import shutil
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -43,6 +46,8 @@ class BaselineMaterializerSettings:
     safe_name_pattern: re.Pattern[str] = field(
         default_factory=lambda: re.compile(r"[^a-zA-Z0-9_.-]+")
     )
+    cache_lock_timeout_seconds: float = 600.0
+    cache_lock_poll_seconds: float = 0.1
 
 
 BASELINE_MATERIALIZER_SETTINGS = BaselineMaterializerSettings()
@@ -195,36 +200,29 @@ def materialize_baseline(
     cache_key = _sha256_json(cache_payload)
     cache_state_path = cache_root / f"{cache_key}.state"
     cache_metadata_path = cache_root / f"{cache_key}.json"
-    if not cache_state_path.is_file():
-        cache_root.mkdir(parents=True, exist_ok=True)
-        materialized_sha256 = _generate_race_start_variant_state(
-            request,
-            cache_state_path=cache_state_path,
-            cache_root=cache_root,
-            context=context,
-        )
-        _atomic_write_json(
-            cache_metadata_path,
-            _cache_metadata(
-                request,
-                cache_payload=cache_payload,
-                cache_key=cache_key,
-                materializer_mode=materializer_mode,
-                materialized_state_sha256=materialized_sha256,
-            ),
-        )
-    elif not cache_metadata_path.is_file():
-        cache_root.mkdir(parents=True, exist_ok=True)
-        _atomic_write_json(
-            cache_metadata_path,
-            _cache_metadata(
-                request,
-                cache_payload=cache_payload,
-                cache_key=cache_key,
-                materializer_mode=materializer_mode,
-                materialized_state_sha256=_sha256_bytes(cache_state_path.read_bytes()),
-            ),
-        )
+    if not cache_state_path.is_file() or not cache_metadata_path.is_file():
+        with _cache_write_lock(cache_state_path):
+            if not cache_state_path.is_file():
+                cache_root.mkdir(parents=True, exist_ok=True)
+                materialized_sha256 = _generate_race_start_variant_state(
+                    request,
+                    cache_state_path=cache_state_path,
+                    cache_root=cache_root,
+                    context=context,
+                )
+            else:
+                materialized_sha256 = _sha256_bytes(cache_state_path.read_bytes())
+            if not cache_metadata_path.is_file():
+                _atomic_write_json(
+                    cache_metadata_path,
+                    _cache_metadata(
+                        request,
+                        cache_payload=cache_payload,
+                        cache_key=cache_key,
+                        materializer_mode=materializer_mode,
+                        materialized_state_sha256=materialized_sha256,
+                    ),
+                )
 
     run_state_path = _run_state_path(run_paths, label=request.label, cache_key=cache_key)
     run_metadata_path = run_state_path.with_suffix(".json")
@@ -384,7 +382,7 @@ def _generate_race_start_variant_state(
     runtime_dir = cache_root / "runtime" / cache_state_path.stem
     runtime_dir.mkdir(parents=True, exist_ok=True)
     tmp_state_path = cache_state_path.with_name(
-        f".{cache_state_path.stem}.tmp{cache_state_path.suffix}"
+        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
     )
     emulator = Emulator(
         core_path=context.core_path,
@@ -410,6 +408,32 @@ def _generate_race_start_variant_state(
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
     return _sha256_bytes(cache_state_path.read_bytes())
+
+
+@contextmanager
+def _cache_write_lock(cache_state_path: Path) -> Iterator[None]:
+    """Serialize generation for one cache key.
+
+    Atomic directory creation avoids two training processes writing the same
+    cache state/metadata pair concurrently.
+    """
+
+    lock_path = cache_state_path.with_suffix(f"{cache_state_path.suffix}.lock")
+    deadline = time.monotonic() + BASELINE_MATERIALIZER_SETTINGS.cache_lock_timeout_seconds
+    while True:
+        try:
+            lock_path.mkdir(parents=True)
+            break
+        except FileExistsError as exc:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"Timed out waiting for baseline cache lock {lock_path}"
+                ) from exc
+            time.sleep(BASELINE_MATERIALIZER_SETTINGS.cache_lock_poll_seconds)
+    try:
+        yield
+    finally:
+        shutil.rmtree(lock_path, ignore_errors=True)
 
 
 def _cache_payload(
