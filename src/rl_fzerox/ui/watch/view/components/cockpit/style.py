@@ -120,13 +120,21 @@ class SpeedGaugeStyle:
 
     render_scale: int = 3
     max_kph: float = STATE_SPEED_NORMALIZER_KPH
+    red_zone_start_kph: float = 800.0
     start_degrees: float = 200.0
     sweep_degrees: float = 220.0
     tick_count: int = 5
     arc_segments: int = 44
     arc_width: int = 2
     active_arc_width: int = 3
-    red_zone_start: float = 1000.0 / STATE_SPEED_NORMALIZER_KPH
+    energy_meter_width: int = 10
+    energy_meter_height: int = 54
+    energy_meter_margin_right: int = 9
+    energy_meter_center_y_offset: int = -2
+    energy_meter_padding: int = 2
+    energy_meter_radius: int = 4
+    energy_outer_border_width: int = 2
+    energy_inner_border_width: int = 1
     radius_padding: int = 9
     vertical_radius_padding: int = 42
     center_bottom_padding: int = 32
@@ -146,6 +154,22 @@ class SpeedGaugeStyle:
     pivot: Color = ButtonFaceStyle().inner
     active_low: Color = PALETTE.text_accent
     active_high: Color = PALETTE.text_warning
+    energy_track: Color = CockpitPanelStyle().grid
+    energy_border: Color = (82, 62, 118)
+    energy_inner_border: Color = (236, 220, 255)
+    energy_empty_fill: Color = (18, 24, 31)
+    energy_fill: Color = (176, 128, 255)
+    energy_low_fill: Color = (224, 96, 76)
+    energy_fill_lip: Color = (226, 206, 255)
+    energy_glass_highlight: AlphaColor = (245, 235, 255, 58)
+    energy_glass_shadow: AlphaColor = (0, 0, 0, 52)
+    energy_glass_edge: AlphaColor = (210, 236, 224, 42)
+
+    @property
+    def red_zone_start(self) -> float:
+        """Normalized speed where the warning arc begins."""
+
+        return max(0.0, min(1.0, self.red_zone_start_kph / self.max_kph))
 
 
 @dataclass(frozen=True)

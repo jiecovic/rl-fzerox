@@ -58,6 +58,7 @@ class ControlViz:
     thrust_full_threshold: float | None
     engine_setting_level: float | None
     speed_kph: float | None
+    energy_fraction: float | None
     air_brake_axis: float | None
     air_brake_disabled: bool
     boost_pressed: bool

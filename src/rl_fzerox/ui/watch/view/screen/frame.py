@@ -14,7 +14,7 @@ from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_observation_preview_below_game,
 )
-from rl_fzerox.ui.watch.view.panels.draw import _draw_side_panel
+from rl_fzerox.ui.watch.view.panels.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.model import (
     _observation_preview_size,
     _preview_frame,
@@ -152,6 +152,7 @@ def _draw_frame(
             thrust_full_threshold=thrust_full_threshold,
             engine_setting_level=_engine_setting_level(info),
             speed_kph=_speed_kph(telemetry),
+            energy_fraction=_energy_fraction(telemetry),
             boost_active=boost_active,
             boost_lamp_level=boost_lamp_level,
             policy_action=policy_action,
@@ -172,40 +173,42 @@ def _draw_frame(
         screen=screen,
         fonts=fonts,
         panel_rect=panel_rect,
-        episode=episode,
-        info=info,
-        reset_info=reset_info,
-        episode_reward=episode_reward,
-        paused=paused,
-        control_state=control_state,
-        gas_level=gas_level,
-        thrust_warning_threshold=thrust_warning_threshold,
-        boost_active=boost_active,
-        boost_lamp_level=boost_lamp_level,
-        action_mask_branches=action_mask_branches,
-        policy_label=policy_label,
-        policy_curriculum_stage=policy_curriculum_stage,
-        policy_deterministic=policy_deterministic,
-        policy_action=policy_action,
-        policy_reload_age_seconds=policy_reload_age_seconds,
-        policy_reload_error=policy_reload_error,
-        best_finish_position=best_finish_position,
-        best_finish_times=best_finish_times,
-        track_pool_records=track_pool_records,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-        continuous_air_brake_mode=continuous_air_brake_mode,
-        continuous_air_brake_disabled=continuous_air_brake_disabled,
-        action_repeat=action_repeat,
-        max_episode_steps=max_episode_steps,
-        stuck_step_limit=stuck_step_limit,
-        wrong_way_timer_limit=wrong_way_timer_limit,
-        progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
-        stuck_min_speed_kph=stuck_min_speed_kph,
-        game_display_size=game_display_size,
-        observation_shape=observation.shape,
-        observation_state=observation_state,
-        observation_state_feature_names=observation_state_feature_names,
-        telemetry=telemetry,
+        data=SidePanelData(
+            episode=episode,
+            info=info,
+            reset_info=reset_info,
+            episode_reward=episode_reward,
+            paused=paused,
+            control_state=control_state,
+            gas_level=gas_level,
+            thrust_warning_threshold=thrust_warning_threshold,
+            boost_active=boost_active,
+            boost_lamp_level=boost_lamp_level,
+            action_mask_branches=action_mask_branches,
+            policy_label=policy_label,
+            policy_curriculum_stage=policy_curriculum_stage,
+            policy_deterministic=policy_deterministic,
+            policy_action=policy_action,
+            policy_reload_age_seconds=policy_reload_age_seconds,
+            policy_reload_error=policy_reload_error,
+            best_finish_position=best_finish_position,
+            best_finish_times=best_finish_times,
+            track_pool_records=track_pool_records,
+            continuous_drive_deadzone=continuous_drive_deadzone,
+            continuous_air_brake_mode=continuous_air_brake_mode,
+            continuous_air_brake_disabled=continuous_air_brake_disabled,
+            action_repeat=action_repeat,
+            max_episode_steps=max_episode_steps,
+            stuck_step_limit=stuck_step_limit,
+            wrong_way_timer_limit=wrong_way_timer_limit,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            game_display_size=game_display_size,
+            observation_shape=observation.shape,
+            observation_state=observation_state,
+            observation_state_feature_names=observation_state_feature_names,
+            telemetry=telemetry,
+        ),
     )
     pygame.display.flip()
 
@@ -235,6 +238,18 @@ def _speed_kph(telemetry: FZeroXTelemetry | None) -> float | None:
     if not math.isfinite(speed):
         return None
     return max(0.0, speed)
+
+
+def _energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None:
+    if telemetry is None:
+        return None
+    max_energy = float(telemetry.player.max_energy)
+    if max_energy <= 0.0:
+        return None
+    energy = float(telemetry.player.energy)
+    if not math.isfinite(energy) or not math.isfinite(max_energy):
+        return None
+    return max(0.0, min(1.0, energy / max_energy))
 
 
 def _apply_window_position_hint() -> None:
