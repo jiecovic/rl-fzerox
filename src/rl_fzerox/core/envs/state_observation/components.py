@@ -364,7 +364,7 @@ def _vehicle_state_features() -> tuple[StateFeature, ...]:
         StateFeature("vehicle_state.energy_frac", 1.0),
         StateFeature("vehicle_state.reverse_active", 1.0),
         StateFeature("vehicle_state.airborne", 1.0),
-        StateFeature("vehicle_state.boost_ready", 1.0),
+        StateFeature("vehicle_state.boost_unlocked", 1.0),
         StateFeature("vehicle_state.boost_active", 1.0),
         StateFeature("vehicle_state.lateral_velocity_norm", 1.0, low=-1.0),
         StateFeature("vehicle_state.sliding_active", 1.0),

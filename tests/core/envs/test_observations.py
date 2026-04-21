@@ -428,7 +428,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
         "vehicle_state.energy_frac",
         "vehicle_state.reverse_active",
         "vehicle_state.airborne",
-        "vehicle_state.boost_ready",
+        "vehicle_state.boost_unlocked",
         "vehicle_state.boost_active",
         "vehicle_state.lateral_velocity_norm",
         "vehicle_state.sliding_active",
@@ -444,7 +444,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["vehicle_state.speed_norm"] == 0.5
     assert values["vehicle_state.energy_frac"] == 0.5
     assert values["vehicle_state.reverse_active"] == 1.0
-    assert values["vehicle_state.boost_ready"] == 1.0
+    assert values["vehicle_state.boost_unlocked"] == 1.0
     assert values["vehicle_state.lateral_velocity_norm"] == 0.5
     assert values["vehicle_state.sliding_active"] == 1.0
     assert values["machine_context.body_stat"] == 0.25
