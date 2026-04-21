@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from rl_fzerox.core.envs.state_observation import STATE_SPEED_NORMALIZER_KPH
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 
 AlphaColor = tuple[int, int, int, int]
@@ -74,6 +75,8 @@ class CockpitPanelStyle:
     """Shared cockpit panel colors."""
 
     wide_control_min_width: int = 420
+    wide_panel_height: int = 204
+    compact_panel_height: int = 144
     fill: Color = (14, 19, 25)
     border: Color = (74, 91, 112)
     grid: Color = (31, 42, 54)
@@ -95,8 +98,72 @@ class ThrustColumnStyle:
     """Shared vertical level-meter styling for thrust and brake columns."""
 
     warning_fill: Color = (241, 206, 108)
+    deadzone_marker: Color = (96, 165, 250)
+    full_zone_marker: Color = PALETTE.text_accent
     unlit_segment_fill: Color = CockpitPanelStyle().grid
     border_width: int = 2
+    marker_width: int = 2
+    marker_extension: int = 5
+    tall_segment_count: int = 9
+    compact_segment_count: int = 7
+    tall_segment_gap: int = 2
+    compact_segment_gap: int = 1
+    tall_segment_height: int = 9
+    tall_segment_trimmed_height: int = 8
+    compact_segment_height: int = 8
+    segment_horizontal_inset: int = 4
+
+
+@dataclass(frozen=True)
+class SpeedGaugeStyle:
+    """Compact analog speedometer used inside the cockpit panel."""
+
+    render_scale: int = 3
+    max_kph: float = STATE_SPEED_NORMALIZER_KPH
+    start_degrees: float = 200.0
+    sweep_degrees: float = 220.0
+    tick_count: int = 5
+    arc_segments: int = 44
+    arc_width: int = 2
+    active_arc_width: int = 3
+    red_zone_start: float = 1000.0 / STATE_SPEED_NORMALIZER_KPH
+    radius_padding: int = 9
+    vertical_radius_padding: int = 42
+    center_bottom_padding: int = 32
+    needle_width: int = 2
+    needle_length_fraction: float = 0.78
+    label_y_offset: int = 20
+    fill: Color = CockpitPanelStyle().fill
+    inner_fill: Color = ButtonFaceStyle().inner
+    border: Color = CockpitPanelStyle().border
+    inner_border: Color = PALETTE.panel_border
+    scanline: Color = CockpitPanelStyle().grid
+    arc_idle: Color = PALETTE.control_track
+    red_zone: Color = (68, 48, 38)
+    tick: Color = PALETTE.control_lever_border
+    needle: Color = PALETTE.text_warning
+    needle_shadow: Color = (3, 5, 8)
+    pivot: Color = ButtonFaceStyle().inner
+    active_low: Color = PALETTE.text_accent
+    active_high: Color = PALETTE.text_warning
+
+
+@dataclass(frozen=True)
+class AvailabilityLedStyle:
+    """Small status lamps showing whether a control branch is currently usable."""
+
+    radius: int = 4
+    inner_radius: int = 2
+    glow_radius: int = 10
+    on_fill: Color = (228, 112, 28)
+    on_inner: Color = (255, 210, 94)
+    on_border: Color = (255, 184, 80)
+    on_glow: AlphaColor = (255, 126, 26, 92)
+    off_fill: Color = (28, 32, 36)
+    off_inner: Color = (49, 55, 61)
+    off_border: Color = (94, 86, 74)
+    shadow: Color = (4, 6, 8)
+    highlight: AlphaColor = (255, 239, 184, 92)
 
 
 STEER_AXIS_GUIDE = SteerAxisGuide()
@@ -105,3 +172,5 @@ STEER_GAUGE_STYLE = SteerGaugeStyle()
 COCKPIT_PANEL_STYLE = CockpitPanelStyle()
 BUTTON_FACE_STYLE = ButtonFaceStyle()
 THRUST_COLUMN_STYLE = ThrustColumnStyle()
+SPEED_GAUGE_STYLE = SpeedGaugeStyle()
+AVAILABILITY_LED_STYLE = AvailabilityLedStyle()

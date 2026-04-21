@@ -1,6 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/draw.py
 from __future__ import annotations
 
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_column_widths
@@ -26,6 +27,7 @@ def _draw_side_panel(
     thrust_warning_threshold: float | None,
     boost_active: bool,
     boost_lamp_level: float,
+    action_mask_branches: ActionMaskBranches,
     policy_label: str | None,
     policy_curriculum_stage: str | None,
     policy_deterministic: bool | None,
@@ -73,6 +75,7 @@ def _draw_side_panel(
         thrust_warning_threshold=thrust_warning_threshold,
         boost_active=boost_active,
         boost_lamp_level=boost_lamp_level,
+        action_mask_branches=action_mask_branches,
         policy_label=policy_label,
         policy_curriculum_stage=policy_curriculum_stage,
         policy_deterministic=policy_deterministic,

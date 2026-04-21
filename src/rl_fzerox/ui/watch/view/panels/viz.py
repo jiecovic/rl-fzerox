@@ -15,6 +15,13 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
     ActionValue,
 )
+from rl_fzerox.core.envs.engine.masks import (
+    ActionMaskBranches,
+    action_branch_non_neutral_allowed,
+    action_branch_value_allowed,
+    selected_action_branches,
+)
+from rl_fzerox.ui.watch.view.components.cockpit.style import COCKPIT_PANEL_STYLE
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -31,9 +38,14 @@ def _control_viz(
     *,
     gas_level: float,
     thrust_warning_threshold: float | None = None,
+    thrust_deadzone_threshold: float | None = None,
+    thrust_full_threshold: float | None = None,
+    engine_setting_level: float | None = None,
+    speed_kph: float | None = None,
     boost_active: bool = False,
     boost_lamp_level: float = 0.0,
     policy_action: ActionValue | None = None,
+    action_mask_branches: ActionMaskBranches | None = None,
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
@@ -50,7 +62,19 @@ def _control_viz(
         and joypad_mask & AIR_BRAKE_MASK
     ):
         air_brake_axis = 1.0
-    boost_pressed = bool(joypad_mask & BOOST_MASK)
+    selected_branches = _selected_policy_branches(
+        action_mask_branches=action_mask_branches,
+        policy_action=policy_action,
+    )
+    boost_pressed = _branch_pressed(
+        selected_branches,
+        "boost",
+        fallback=bool(joypad_mask & BOOST_MASK),
+    )
+    lean_direction = _lean_direction(
+        selected_branches,
+        fallback=-1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0,
+    )
     normalized_boost_lamp_level = max(
         0.0,
         min(
@@ -67,15 +91,85 @@ def _control_viz(
         pitch_y=max(-1.0, min(1.0, control_state.left_stick_y)),
         gas_level=max(0.0, min(1.0, gas_level)),
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
+        thrust_deadzone_threshold=_normalize_optional_level(thrust_deadzone_threshold),
+        thrust_full_threshold=_normalize_optional_level(thrust_full_threshold),
+        engine_setting_level=_normalize_optional_level(engine_setting_level),
+        speed_kph=_normalize_optional_speed(speed_kph),
         air_brake_axis=air_brake_axis,
         air_brake_disabled=continuous_air_brake_disabled and air_brake_axis is not None,
         boost_pressed=boost_pressed,
         boost_active=boost_active,
         boost_lamp_level=normalized_boost_lamp_level,
-        lean_direction=(
-            -1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0
+        lean_direction=lean_direction,
+        thrust_masked=not action_branch_value_allowed(
+            action_mask_branches,
+            "gas",
+            1,
+            missing_allowed=True,
+        ),
+        air_brake_masked=not action_branch_value_allowed(
+            action_mask_branches,
+            "air_brake",
+            1,
+            missing_allowed=False,
+        ),
+        boost_masked=not action_branch_value_allowed(
+            action_mask_branches,
+            "boost",
+            1,
+            missing_allowed=False,
+        ),
+        lean_left_masked=not action_branch_value_allowed(
+            action_mask_branches,
+            "lean",
+            1,
+            missing_allowed=False,
+        ),
+        lean_right_masked=not action_branch_value_allowed(
+            action_mask_branches,
+            "lean",
+            2,
+            missing_allowed=False,
+        ),
+        pitch_masked=not action_branch_non_neutral_allowed(
+            action_mask_branches,
+            "pitch",
+            neutral_index=2,
+            missing_allowed=False,
         ),
     )
+
+
+def _selected_policy_branches(
+    *,
+    action_mask_branches: ActionMaskBranches | None,
+    policy_action: ActionValue | None,
+) -> dict[str, int]:
+    if action_mask_branches is None or policy_action is None:
+        return {}
+    return selected_action_branches(action_mask_branches, policy_action)
+
+
+def _branch_pressed(
+    selected_branches: dict[str, int],
+    label: str,
+    *,
+    fallback: bool,
+) -> bool:
+    if label not in selected_branches:
+        return fallback
+    return selected_branches[label] == 1
+
+
+def _lean_direction(selected_branches: dict[str, int], *, fallback: int) -> int:
+    lean = selected_branches.get("lean")
+    if lean is None:
+        return fallback
+    if lean == 1:
+        return -1
+    if lean == 2:
+        return 1
+    return 0
 
 
 def _continuous_air_brake_axis_from_action(
@@ -134,16 +228,18 @@ def _normalize_optional_level(value: float | None) -> float | None:
     return max(0.0, min(1.0, float(value)))
 
 
+def _normalize_optional_speed(value: float | None) -> float | None:
+    if value is None:
+        return None
+    scalar = float(value)
+    if not np.isfinite(scalar):
+        return None
+    return max(0.0, scalar)
+
+
 def _control_viz_height(fonts: ViewerFonts) -> int:
-    small_height = fonts.small.render("Thrust", True, PALETTE.text_primary).get_height()
-    return (
-        small_height
-        + LAYOUT.control_track_gap
-        + LAYOUT.control_gas_height
-        + (2 * LAYOUT.control_caption_gap)
-        + (2 * small_height)
-        + (2 * LAYOUT.flag_token_pad_y)
-    )
+    _ = fonts
+    return COCKPIT_PANEL_STYLE.wide_panel_height
 
 
 _FLAG_DISPLAY_LABELS = {

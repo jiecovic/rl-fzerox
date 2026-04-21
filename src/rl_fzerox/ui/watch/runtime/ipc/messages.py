@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 
 
 @dataclass(frozen=True)
@@ -61,6 +62,7 @@ class WatchSnapshot:
     control_state: ControllerState
     gas_level: float
     boost_lamp_level: float
+    action_mask_branches: ActionMaskBranches
     policy_action: ActionValue | None
     policy_label: str | None
     policy_curriculum_stage: str | None

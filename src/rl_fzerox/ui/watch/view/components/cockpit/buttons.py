@@ -33,7 +33,7 @@ def _draw_lean_button(
     width: int,
     direction: int,
     active: bool,
-) -> None:
+) -> PygameRect:
     from rl_fzerox.ui.watch.view.components.tokens import _pill_height
 
     style = LEAN_CONTROL_STYLE
@@ -46,7 +46,7 @@ def _draw_lean_button(
     )
     button_style = BUTTON_FACE_STYLE
     fill_color = style.active_fill if active else button_style.fill
-    border_color = style.inactive_border if not active else style.active_border
+    border_color = style.active_border if active else style.inactive_border
     text_color = style.active_border if active else style.inactive_text
 
     pygame.draw.polygon(
@@ -73,7 +73,7 @@ def _draw_lean_button(
             ),
         )
     pygame.draw.polygon(screen, fill_color, face)
-    pygame.draw.polygon(screen, style.inactive_inner_fill if not active else fill_color, inner)
+    pygame.draw.polygon(screen, fill_color if active else style.inactive_inner_fill, inner)
     _draw_alpha_polygon(
         pygame=pygame,
         screen=screen,
@@ -88,7 +88,6 @@ def _draw_lean_button(
         direction=direction,
         color=border_color,
     )
-
     label = "L" if direction < 0 else "R"
     label_surface = font.render(label, True, text_color)
     label_x = rect.centerx - (label_surface.get_width() // 2)
@@ -99,6 +98,7 @@ def _draw_lean_button(
             rect.bottom - label_surface.get_height() - style.label_bottom_padding,
         ),
     )
+    return rect
 
 
 def _lean_half_moon_points(rect: PygameRect, *, direction: int) -> tuple[tuple[int, int], ...]:

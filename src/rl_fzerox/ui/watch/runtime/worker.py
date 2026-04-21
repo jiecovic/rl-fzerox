@@ -8,6 +8,7 @@ from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.engine.masks import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
@@ -184,6 +185,7 @@ def _run_simulation_loop(
                 previous_info = dict(info)
                 previous_episode_reward = episode_reward
                 previous_telemetry = _read_live_telemetry(emulator)
+                decision_action_mask = env.action_mask_snapshot()
                 if policy_runner is None:
                     if single_frame_manual:
                         observation, reward, terminated, truncated, info = env.step_frame(
@@ -199,11 +201,17 @@ def _run_simulation_loop(
                     current_gas_level = env.last_gas_level
                 else:
                     _sync_policy_curriculum_stage(policy_runner, env)
+                    decision_action_mask = env.action_mask_snapshot()
                     action = policy_runner.predict(
                         observation,
                         deterministic=config.watch.deterministic_policy,
-                        action_masks=env.action_masks(),
+                        action_masks=decision_action_mask.flat,
+                        refresh=False,
                     )
+                    violations = action_mask_violations(decision_action_mask.branches, action)
+                    if violations:
+                        details = ", ".join(violations)
+                        raise RuntimeError(f"Policy selected masked action values: {details}")
                     current_policy_action = action
                     watch_step = env.step_watch(action)
                     observation, reward, terminated, truncated, info = watch_step.gym_result()
@@ -251,6 +259,7 @@ def _run_simulation_loop(
                     control_state=current_control_state,
                     gas_level=current_gas_level,
                     boost_lamp_level=boost_lamp_level,
+                    action_mask_branches=decision_action_mask.branches,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     policy_reload_error=policy_reload_error,

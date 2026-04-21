@@ -37,6 +37,9 @@ class _Env:
     def render(self) -> RgbFrame:
         return _rgb(0)
 
+    def action_mask_branches(self) -> dict[str, tuple[bool, ...]]:
+        return {}
+
 
 class _Emulator:
     def try_read_telemetry(self) -> None:
@@ -76,6 +79,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         control_state=ControllerState(left_stick_x=0.5),
         gas_level=1.0,
         boost_lamp_level=0.0,
+        action_mask_branches={"lean": (True, False, True)},
         policy_action=policy_action,
         policy_runner=None,
         policy_reload_error=None,
@@ -106,6 +110,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, policy_action)
+        assert snapshot.action_mask_branches == {"lean": (True, False, True)}
         assert snapshot.best_finish_times == {"mute": 98_000}
 
 

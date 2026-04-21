@@ -1,7 +1,13 @@
 # src/rl_fzerox/ui/watch/view/screen/render.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import TrackConfig, TrackSamplingEntryConfig, WatchAppConfig
+from rl_fzerox.core.config.schema import (
+    ActionRuntimeConfig,
+    TrackConfig,
+    TrackSamplingEntryConfig,
+    WatchAppConfig,
+)
+from rl_fzerox.core.domain.action_adapters import CONTINUOUS_DRIVE_ACTION_ADAPTERS
 from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
@@ -53,8 +59,11 @@ def draw_watch_frame(
         control_state=snapshot.control_state,
         gas_level=snapshot.gas_level,
         thrust_warning_threshold=_thrust_warning_threshold(config),
+        thrust_deadzone_threshold=_thrust_deadzone_threshold(action_config),
+        thrust_full_threshold=_thrust_full_threshold(action_config),
         boost_active=telemetry_boost_active(telemetry),
         boost_lamp_level=snapshot.boost_lamp_level,
+        action_mask_branches=snapshot.action_mask_branches,
         policy_label=snapshot.policy_label,
         policy_curriculum_stage=snapshot.policy_curriculum_stage,
         policy_deterministic=snapshot.policy_deterministic,
@@ -93,6 +102,18 @@ def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
     if config.reward.gas_underuse_penalty >= 0.0:
         return None
     return float(config.reward.gas_underuse_threshold)
+
+
+def _thrust_deadzone_threshold(action_config: ActionRuntimeConfig) -> float | None:
+    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+        return None
+    return float(action_config.continuous_drive_deadzone)
+
+
+def _thrust_full_threshold(action_config: ActionRuntimeConfig) -> float | None:
+    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+        return None
+    return float(action_config.continuous_drive_full_threshold)
 
 
 def _add_config_track_info(info: dict[str, object], config: WatchAppConfig) -> None:

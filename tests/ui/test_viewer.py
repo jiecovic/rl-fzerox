@@ -466,6 +466,7 @@ def test_side_panel_splits_legacy_action_history_from_state_vector() -> None:
 def test_side_panel_groups_component_state_vector_by_component() -> None:
     feature_names = (
         "vehicle_state.speed_norm",
+        "machine_context.engine",
         "surface_state.on_dirt_surface",
         "course_context.course_builtin_00",
         "course_context.course_builtin_01",
@@ -489,7 +490,10 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(98, 130, 9),
-        observation_state=np.array([0.5, 1.0, 0.0, 1.0, 0.0, -1.0, 1.0], dtype=np.float32),
+        observation_state=np.array(
+            [0.5, 0.7, 1.0, 0.0, 1.0, 0.0, -1.0, 1.0],
+            dtype=np.float32,
+        ),
         observation_state_feature_names=feature_names,
         telemetry=_sample_telemetry(),
     )
@@ -499,14 +503,53 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
     )
 
     assert _panel_group_labels(state_vector_section, "Vehicle") == ["speed_norm"]
+    assert _panel_group_labels(state_vector_section, "Machine") == ["engine"]
     assert _panel_group_labels(state_vector_section, "Surface") == ["on_dirt_surface"]
-    assert _panel_group_values(state_vector_section, "Course") == {
-        "categorical": "1",
-        "one hot": "010",
-    }
+    assert _panel_group_values(state_vector_section, "Course") == {"course": "1 | 010"}
     assert _panel_group_labels(state_vector_section, "Control History") == [
         "prev_steer_1",
         "prev_thrust_1",
+    ]
+
+
+def test_side_panel_marks_zeroed_state_components() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "track_position.lap_progress",
+        "track_position.edge_ratio",
+    )
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "observation_zeroed_state_components": ("track_position",),
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=0.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(98, 130, 9),
+        observation_state=np.array([0.5, 0.0, 0.0], dtype=np.float32),
+        observation_state_feature_names=feature_names,
+        telemetry=_sample_telemetry(),
+    )
+
+    state_vector_section = next(
+        section for section in columns.stats if section.title == "State Vector"
+    )
+
+    assert _panel_group_labels(state_vector_section, "// Track Position") == [
+        "// lap_progress",
+        "// edge_ratio",
     ]
 
 

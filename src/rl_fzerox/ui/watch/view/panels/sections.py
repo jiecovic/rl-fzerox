@@ -4,6 +4,7 @@ from __future__ import annotations
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
 from rl_fzerox.ui.watch.view.panels.format import (
     _float_info,
     _format_control_rate,
@@ -56,6 +57,7 @@ def _build_panel_columns(
     thrust_warning_threshold: float | None = None,
     boost_active: bool = False,
     boost_lamp_level: float = 0.0,
+    action_mask_branches: ActionMaskBranches | None = None,
     best_finish_position: int | None = None,
     best_finish_times: dict[str, int] | None = None,
     track_pool_records: tuple[dict[str, object], ...] = (),
@@ -94,6 +96,13 @@ def _build_panel_columns(
                         "Checkpoint stage",
                         policy_curriculum_stage if policy_curriculum_stage is not None else "-",
                         PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Env stage",
+                        _format_env_curriculum_stage(info),
+                        PALETTE.text_primary
+                        if _format_env_curriculum_stage(info) != "-"
+                        else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Deterministic",
@@ -237,8 +246,18 @@ def _build_panel_columns(
             *policy_state_sections(
                 observation_state=observation_state,
                 feature_names=observation_state_feature_names,
+                zeroed_components=_zeroed_state_components(info),
             ),
         ],
+    )
+
+
+def _zeroed_state_components(info: dict[str, object]) -> frozenset[str]:
+    raw_components = info.get("observation_zeroed_state_components")
+    if not isinstance(raw_components, tuple | list):
+        return frozenset()
+    return frozenset(
+        component for component in raw_components if isinstance(component, str) and component
     )
 
 
@@ -314,6 +333,16 @@ def _format_policy_deterministic(value: bool | None) -> str:
     if value is None:
         return "-"
     return "true" if value else "false"
+
+
+def _format_env_curriculum_stage(info: dict[str, object]) -> str:
+    stage_name = info.get("curriculum_stage_name")
+    if isinstance(stage_name, str) and stage_name:
+        return stage_name
+    stage_index = info.get("curriculum_stage")
+    if isinstance(stage_index, int):
+        return str(stage_index)
+    return "-"
 
 
 def _format_best_position(value: int | None) -> str:
