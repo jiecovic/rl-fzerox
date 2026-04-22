@@ -20,6 +20,6 @@ numpy = "0.28"
 pyo3 = { version = "0.28.3", features = ["extension-module"] }
 
 [profile.release]
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 strip = "debuginfo"

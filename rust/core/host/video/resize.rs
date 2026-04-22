@@ -1,7 +1,7 @@
 // rust/core/host/video/resize.rs
 //! Small wrapper around `fast_image_resize` for policy-frame resampling.
 
-use fast_image_resize::images::Image;
+use fast_image_resize::images::{Image, ImageRef};
 use fast_image_resize::{FilterType, PixelType, ResizeAlg, ResizeOptions, Resizer};
 
 use crate::core::error::CoreError;
@@ -58,10 +58,10 @@ fn resize_u8_image(
         return Ok(pixels.to_vec());
     }
 
-    let source = Image::from_vec_u8(
+    let source = ImageRef::new(
         checked_u32(input_width)?,
         checked_u32(input_height)?,
-        pixels.to_vec(),
+        pixels,
         pixel_type,
     )
     .map_err(|error| CoreError::ResizeFailed {
