@@ -3,11 +3,13 @@
 
 use crate::core::error::CoreError;
 use crate::core::observation::ObservationCropProfile;
-use crate::core::video::{RawVideoFrame, VideoFrame, sample_rgb};
+use crate::core::video::{RawVideoFrame, VideoFrame, VideoResizeFilter, resize_luma, sample_rgb};
 
 const COURSE_COUNT: usize = 24;
-const MARKER_HOLD_SAMPLES: u8 = 4;
-const PLAYER_MARKER_LUMA: u8 = 192;
+const MARKER_HOLD_SAMPLES: u8 = 16;
+const PARTIAL_MARKER_REPLACE_SAMPLES: u8 = 3;
+const TRACK_LUMA: u8 = 128;
+const PLAYER_MARKER_LUMA: u8 = 255;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MinimapRoi {
@@ -97,6 +99,7 @@ pub(crate) struct MinimapLayerRequest {
     pub course_index: usize,
     pub target_width: usize,
     pub target_height: usize,
+    pub resize_filter: VideoResizeFilter,
 }
 
 #[derive(Debug, Default)]
@@ -111,13 +114,16 @@ struct MinimapLayerKey {
     course_index: usize,
     target_width: usize,
     target_height: usize,
+    resize_filter: VideoResizeFilter,
 }
 
 #[derive(Debug, Default)]
 struct MinimapMarkerHold {
     key: Option<MinimapLayerKey>,
     marker_layer: Vec<u8>,
+    marker_pixels: usize,
     missing_samples: u8,
+    partial_samples: u8,
 }
 
 impl MinimapLayerRenderer {
@@ -196,18 +202,25 @@ impl MinimapMarkerHold {
             course_index: request.course_index,
             target_width: request.target_width,
             target_height: request.target_height,
+            resize_filter: request.resize_filter,
         };
         if self.key != Some(key) {
             self.key = Some(key);
             self.marker_layer.clear();
+            self.marker_pixels = 0;
             self.missing_samples = MARKER_HOLD_SAMPLES;
+            self.partial_samples = 0;
         }
     }
 
-    fn update(&mut self, marker_count: usize, current_marker: &[u8]) {
-        if marker_count > 0 {
-            self.marker_layer.clear();
-            self.marker_layer.extend_from_slice(current_marker);
+    fn update(&mut self, _marker_count: usize, current_marker: &[u8]) {
+        let current_pixels = marker_pixel_count(current_marker);
+        if current_pixels > 0 {
+            if self.should_replace_marker(current_marker, current_pixels) {
+                self.replace_marker(current_marker, current_pixels);
+            } else {
+                self.partial_samples = self.partial_samples.saturating_add(1);
+            }
             self.missing_samples = 0;
             return;
         }
@@ -217,6 +230,8 @@ impl MinimapMarkerHold {
         self.missing_samples = self.missing_samples.saturating_add(1);
         if self.missing_samples > MARKER_HOLD_SAMPLES {
             self.marker_layer.clear();
+            self.marker_pixels = 0;
+            self.partial_samples = 0;
         }
     }
 
@@ -234,8 +249,44 @@ impl MinimapMarkerHold {
     fn clear(&mut self) {
         self.key = None;
         self.marker_layer.clear();
+        self.marker_pixels = 0;
         self.missing_samples = MARKER_HOLD_SAMPLES;
+        self.partial_samples = 0;
     }
+
+    fn should_replace_marker(&self, current_marker: &[u8], current_pixels: usize) -> bool {
+        if self.marker_layer.is_empty() {
+            return true;
+        }
+        if current_pixels >= self.marker_pixels {
+            return true;
+        }
+        if marker_is_subset(current_marker, &self.marker_layer) {
+            return false;
+        }
+        self.partial_samples >= PARTIAL_MARKER_REPLACE_SAMPLES
+    }
+
+    fn replace_marker(&mut self, current_marker: &[u8], current_pixels: usize) {
+        self.marker_layer.clear();
+        self.marker_layer.extend_from_slice(current_marker);
+        self.marker_pixels = current_pixels;
+        self.partial_samples = 0;
+    }
+}
+
+fn marker_pixel_count(marker_layer: &[u8]) -> usize {
+    marker_layer.iter().filter(|value| **value != 0).count()
+}
+
+fn marker_is_subset(candidate: &[u8], reference: &[u8]) -> bool {
+    candidate.len() == reference.len()
+        && candidate
+            .iter()
+            .zip(reference.iter())
+            .all(|(candidate_value, reference_value)| {
+                *candidate_value == 0 || *reference_value != 0
+            })
 }
 
 fn mask_set(crop_profile: ObservationCropProfile) -> Option<MinimapMaskSet> {
@@ -263,39 +314,64 @@ fn render_layer_into(
         .target_width
         .checked_mul(request.target_height)
         .ok_or(CoreError::NoFrameAvailable)?;
+    let roi_len = roi
+        .width
+        .checked_mul(roi.height)
+        .ok_or(CoreError::NoFrameAvailable)?;
     if mask.len() != roi.width * roi.height {
         return Err(CoreError::NoFrameAvailable);
     }
 
-    output.resize(output_len, 0);
+    let mut roi_output = vec![0_u8; roi_len];
     let mut marker_count = 0_usize;
     let mut marker_layer = marker_layer;
     if let Some(marker_layer) = marker_layer.as_deref_mut() {
         marker_layer.clear();
-        marker_layer.resize(output_len, 0);
+        marker_layer.resize(roi_len, 0);
     }
 
-    for output_y in 0..request.target_height {
-        let mask_y = scale_axis(output_y, request.target_height, roi.height);
-        for output_x in 0..request.target_width {
-            let mask_x = scale_axis(output_x, request.target_width, roi.width);
-            let mask_index = mask_y * roi.width + mask_x;
-            let output_index = output_y * request.target_width + output_x;
+    for roi_y in 0..roi.height {
+        for roi_x in 0..roi.width {
+            let roi_index = roi_y * roi.width + roi_x;
             let [red, green, blue] =
-                sample(roi.x + mask_x, roi.y + mask_y).ok_or(CoreError::NoFrameAvailable)?;
+                sample(roi.x + roi_x, roi.y + roi_y).ok_or(CoreError::NoFrameAvailable)?;
             if is_player_marker_color(red, green, blue)
                 && let Some(marker_layer) = marker_layer.as_deref_mut()
             {
-                marker_layer[output_index] = 1;
+                marker_layer[roi_index] = 1;
                 marker_count += 1;
             }
-            if mask[mask_index] == 0 {
-                output[output_index] = 0;
+            if mask[roi_index] == 0 {
+                roi_output[roi_index] = 0;
                 continue;
             }
-            output[output_index] = rgb_to_luma(red, green, blue);
+            roi_output[roi_index] = TRACK_LUMA;
         }
     }
+
+    let resized_output = resize_luma(
+        &roi_output,
+        roi.width,
+        roi.height,
+        request.target_width,
+        request.target_height,
+        request.resize_filter,
+    )?;
+    output.clear();
+    output.extend_from_slice(&resized_output);
+    if let Some(marker_layer) = marker_layer.as_deref_mut() {
+        let resized_marker = resize_luma(
+            marker_layer,
+            roi.width,
+            roi.height,
+            request.target_width,
+            request.target_height,
+            VideoResizeFilter::Nearest,
+        )?;
+        marker_layer.clear();
+        marker_layer.extend_from_slice(&resized_marker);
+    }
+    debug_assert_eq!(output.len(), output_len);
     Ok(marker_count)
 }
 
@@ -307,19 +383,6 @@ fn write_zero_layer(request: MinimapLayerRequest, output: &mut Vec<u8>) -> Resul
     output.clear();
     output.resize(output_len, 0);
     Ok(())
-}
-
-fn scale_axis(output_index: usize, output_size: usize, input_size: usize) -> usize {
-    if output_size <= 1 || input_size <= 1 {
-        return 0;
-    }
-    let scale = (input_size - 1) as f64 / (output_size - 1) as f64;
-    ((output_index as f64) * scale).round() as usize
-}
-
-fn rgb_to_luma(red: u8, green: u8, blue: u8) -> u8 {
-    let weighted = (77 * u16::from(red)) + (150 * u16::from(green)) + (29 * u16::from(blue)) + 128;
-    (weighted >> 8) as u8
 }
 
 fn is_player_marker_color(red: u8, green: u8, blue: u8) -> bool {
@@ -334,10 +397,12 @@ fn is_player_marker_color(red: u8, green: u8, blue: u8) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        ANGRYLION_ROI, COURSE_COUNT, GLIDEN64_MASKS, GLIDEN64_ROI, MinimapLayerRenderer,
-        MinimapLayerRequest, MinimapRoi, PLAYER_MARKER_LUMA,
+        ANGRYLION_ROI, COURSE_COUNT, GLIDEN64_MASKS, GLIDEN64_ROI, MARKER_HOLD_SAMPLES,
+        MinimapLayerRenderer, MinimapLayerRequest, MinimapRoi, PARTIAL_MARKER_REPLACE_SAMPLES,
+        PLAYER_MARKER_LUMA, TRACK_LUMA,
     };
     use crate::core::observation::ObservationCropProfile;
+    use crate::core::video::VideoResizeFilter;
 
     #[test]
     fn embedded_gliden64_masks_match_roi_area() {
@@ -377,6 +442,7 @@ mod tests {
             })
             .expect("visible marker frame should render");
         assert_eq!(output[0], PLAYER_MARKER_LUMA);
+        assert_eq!(output[1], TRACK_LUMA);
 
         renderer
             .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
@@ -384,6 +450,98 @@ mod tests {
             })
             .expect("blink-off marker frame should render");
         assert_eq!(output[0], PLAYER_MARKER_LUMA);
+        assert_eq!(output[1], TRACK_LUMA);
+    }
+
+    #[test]
+    fn marker_hold_bridges_multi_frame_blink_off_at_action_repeat_one() {
+        let request = test_request();
+        let roi = MinimapRoi {
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 1,
+        };
+        let mask = [1_u8, 1_u8];
+        let mut renderer = MinimapLayerRenderer::default();
+        let mut output = Vec::new();
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+                Some(if x == 0 { [0, 255, 255] } else { [0, 0, 0] })
+            })
+            .expect("visible marker frame should render");
+        assert_eq!(output[0], PLAYER_MARKER_LUMA);
+
+        for _ in 0..MARKER_HOLD_SAMPLES {
+            renderer
+                .render_with_marker_hold(request, roi, &mask, &mut output, |_, _| Some([0, 0, 0]))
+                .expect("blink-off marker frame should render");
+            assert_eq!(output[0], PLAYER_MARKER_LUMA);
+        }
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |_, _| Some([0, 0, 0]))
+            .expect("expired blink-off marker frame should render");
+        assert_eq!(output[0], TRACK_LUMA);
+    }
+
+    #[test]
+    fn partial_marker_detection_does_not_replace_full_held_marker() {
+        let request = test_request_for_width(3);
+        let roi = MinimapRoi {
+            x: 0,
+            y: 0,
+            width: 3,
+            height: 1,
+        };
+        let mask = [1_u8, 1_u8, 1_u8];
+        let mut renderer = MinimapLayerRenderer::default();
+        let mut output = Vec::new();
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+                Some(if x <= 1 { [0, 255, 255] } else { [0, 0, 0] })
+            })
+            .expect("full marker frame should render");
+        assert_eq!(output, [PLAYER_MARKER_LUMA, PLAYER_MARKER_LUMA, TRACK_LUMA]);
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+                Some(if x == 0 { [0, 255, 255] } else { [0, 0, 0] })
+            })
+            .expect("partial marker frame should render");
+        assert_eq!(output, [PLAYER_MARKER_LUMA, PLAYER_MARKER_LUMA, TRACK_LUMA]);
+    }
+
+    #[test]
+    fn persistent_smaller_marker_eventually_replaces_held_marker() {
+        let request = test_request_for_width(3);
+        let roi = MinimapRoi {
+            x: 0,
+            y: 0,
+            width: 3,
+            height: 1,
+        };
+        let mask = [1_u8, 1_u8, 1_u8];
+        let mut renderer = MinimapLayerRenderer::default();
+        let mut output = Vec::new();
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+                Some(if x <= 1 { [0, 255, 255] } else { [0, 0, 0] })
+            })
+            .expect("full marker frame should render");
+
+        for _ in 0..=PARTIAL_MARKER_REPLACE_SAMPLES {
+            renderer
+                .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+                    Some(if x == 2 { [0, 255, 255] } else { [0, 0, 0] })
+                })
+                .expect("persistent smaller marker frame should render");
+        }
+
+        assert_eq!(output, [TRACK_LUMA, TRACK_LUMA, PLAYER_MARKER_LUMA]);
     }
 
     #[test]
@@ -410,15 +568,20 @@ mod tests {
             })
             .expect("second marker frame should render");
 
-        assert_eq!(output, [0, PLAYER_MARKER_LUMA]);
+        assert_eq!(output, [TRACK_LUMA, PLAYER_MARKER_LUMA]);
     }
 
     fn test_request() -> MinimapLayerRequest {
+        test_request_for_width(2)
+    }
+
+    fn test_request_for_width(width: usize) -> MinimapLayerRequest {
         MinimapLayerRequest {
             crop_profile: ObservationCropProfile::Gliden64,
             course_index: 0,
-            target_width: 2,
+            target_width: width,
             target_height: 1,
+            resize_filter: VideoResizeFilter::Nearest,
         }
     }
 }

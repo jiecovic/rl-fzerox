@@ -6,6 +6,7 @@ struct RacerStateFlags {
     retired: u32,
     falling_off_track: u32,
     finished: u32,
+    airborne: u32,
     crashed: u32,
     active: u32,
     received_damage: u32,
@@ -22,6 +23,7 @@ const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
     retired: 1 << 18,
     falling_off_track: 1 << 19,
     finished: 1 << 25,
+    airborne: 1 << 26,
     crashed: 1 << 27,
     active: 1 << 30,
     received_damage: 1 << 17,
@@ -96,6 +98,10 @@ impl StepTelemetrySample {
     pub(crate) fn damage_taken(&self) -> bool {
         (self.state_flags & RACER_STATE_FLAGS.received_damage) != 0
             || self.damage_rumble_counter > 0
+    }
+
+    pub(crate) fn airborne(&self) -> bool {
+        (self.state_flags & RACER_STATE_FLAGS.airborne) != 0
     }
 }
 

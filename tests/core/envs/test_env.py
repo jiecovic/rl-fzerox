@@ -347,13 +347,18 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
             frame_stack: int,
             stack_mode: ObservationStackMode = "rgb",
             minimap_layer: bool = False,
+            resize_filter: object = "nearest",
+            minimap_resize_filter: object = "nearest",
         ) -> ObservationFrame:
+            _ = (resize_filter, minimap_resize_filter)
             self.render_observation_calls.append((preset, frame_stack, stack_mode, minimap_layer))
             return super().render_observation(
                 preset=preset,
                 frame_stack=frame_stack,
                 stack_mode=stack_mode,
                 minimap_layer=minimap_layer,
+                resize_filter=resize_filter,
+                minimap_resize_filter=minimap_resize_filter,
             )
 
     backend = ObservationPresetBackend()

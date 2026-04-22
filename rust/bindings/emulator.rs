@@ -7,9 +7,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 
 use crate::bindings::error::map_core_error;
+use crate::core::error::CoreError;
 use crate::core::host::{Host, RepeatedStepConfig};
 use crate::core::input::ControllerState;
 use crate::core::observation::{ObservationPreset, ObservationStackMode};
+use crate::core::video::VideoResizeFilter;
 
 mod frame;
 mod state;
@@ -116,6 +118,8 @@ impl PyEmulator {
         lean_timer_assist=false,
         stack_mode="rgb",
         minimap_layer=false,
+        resize_filter="nearest",
+        minimap_resize_filter="nearest",
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -140,6 +144,8 @@ impl PyEmulator {
         lean_timer_assist: bool,
         stack_mode: &str,
         minimap_layer: bool,
+        resize_filter: &str,
+        minimap_resize_filter: &str,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -148,6 +154,8 @@ impl PyEmulator {
     ) -> PyResult<Bound<'py, PyTuple>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
         let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
+        let resize_filter = parse_resize_filter(resize_filter)?;
+        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
@@ -167,6 +175,8 @@ impl PyEmulator {
                     frame_stack,
                     stack_mode,
                     minimap_layer,
+                    resize_filter,
+                    minimap_resize_filter,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -215,6 +225,8 @@ impl PyEmulator {
         lean_timer_assist=false,
         stack_mode="rgb",
         minimap_layer=false,
+        resize_filter="nearest",
+        minimap_resize_filter="nearest",
         joypad_mask=0,
         left_stick_x=0.0,
         left_stick_y=0.0,
@@ -239,6 +251,8 @@ impl PyEmulator {
         lean_timer_assist: bool,
         stack_mode: &str,
         minimap_layer: bool,
+        resize_filter: &str,
+        minimap_resize_filter: &str,
         joypad_mask: u16,
         left_stick_x: f32,
         left_stick_y: f32,
@@ -247,6 +261,8 @@ impl PyEmulator {
     ) -> PyResult<Bound<'py, PyTuple>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
         let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
+        let resize_filter = parse_resize_filter(resize_filter)?;
+        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
@@ -266,6 +282,8 @@ impl PyEmulator {
                     frame_stack,
                     stack_mode,
                     minimap_layer,
+                    resize_filter,
+                    minimap_resize_filter,
                     stuck_min_speed_kph,
                     energy_loss_epsilon,
                     max_episode_steps,
@@ -380,7 +398,14 @@ impl PyEmulator {
         Ok(dict)
     }
 
-    #[pyo3(signature = (preset, frame_stack, stack_mode="rgb", minimap_layer=false))]
+    #[pyo3(signature = (
+        preset,
+        frame_stack,
+        stack_mode="rgb",
+        minimap_layer=false,
+        resize_filter="nearest",
+        minimap_resize_filter="nearest"
+    ))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
@@ -388,16 +413,26 @@ impl PyEmulator {
         frame_stack: usize,
         stack_mode: &str,
         minimap_layer: bool,
+        resize_filter: &str,
+        minimap_resize_filter: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
         let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
+        let resize_filter = parse_resize_filter(resize_filter)?;
+        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
         let frame = py
             .detach(|| {
-                self.host
-                    .observation_frame(preset, frame_stack, stack_mode, minimap_layer)
+                self.host.observation_frame(
+                    preset,
+                    frame_stack,
+                    stack_mode,
+                    minimap_layer,
+                    resize_filter,
+                    minimap_resize_filter,
+                )
             })
             .map_err(map_core_error)?;
         frame_to_pyarray(
@@ -468,4 +503,12 @@ impl PyEmulator {
     fn close(&mut self) {
         self.host.close();
     }
+}
+
+fn parse_resize_filter(name: &str) -> PyResult<VideoResizeFilter> {
+    VideoResizeFilter::parse(name).ok_or_else(|| {
+        map_core_error(CoreError::InvalidResizeFilter {
+            name: name.to_owned(),
+        })
+    })
 }

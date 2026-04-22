@@ -14,7 +14,7 @@ use crate::core::minimap::MinimapLayerRequest;
 use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
-use crate::core::video::VideoFrame;
+use crate::core::video::{VideoFrame, VideoResizeFilter};
 
 use super::step::{
     NativeStepResult, NativeWatchStepResult, RepeatedStepConfig, StepCounters, StepStatus,
@@ -238,6 +238,8 @@ impl Host {
             config.frame_stack,
             config.stack_mode,
             config.minimap_layer,
+            config.resize_filter,
+            config.minimap_resize_filter,
         )?;
         Ok(NativeStepResult {
             observation,
@@ -303,6 +305,8 @@ impl Host {
             config.frame_stack,
             config.stack_mode,
             config.minimap_layer,
+            config.resize_filter,
+            config.minimap_resize_filter,
         )?;
         Ok(NativeWatchStepResult {
             observation,
@@ -379,9 +383,12 @@ impl Host {
         frame_stack: usize,
         stack_mode: crate::core::observation::ObservationStackMode,
         minimap_layer: bool,
+        resize_filter: VideoResizeFilter,
+        minimap_resize_filter: VideoResizeFilter,
     ) -> Result<&[u8], CoreError> {
         let spec = self.observation_spec(preset)?;
-        let minimap_layer_request = self.minimap_layer_request(minimap_layer, &spec);
+        let minimap_layer_request =
+            self.minimap_layer_request(minimap_layer, &spec, minimap_resize_filter);
         self.callbacks
             .stacked_observation_frame(StackedObservationRequest {
                 aspect_ratio: preset.observation_aspect_ratio(self.display_aspect_ratio),
@@ -389,6 +396,7 @@ impl Host {
                 target_height: spec.frame_height,
                 rgb: spec.channels == 3,
                 crop: preset.crop(self.observation_crop_profile),
+                resize_filter,
                 frame_stack,
                 stack_mode,
                 minimap_layer: minimap_layer_request,
@@ -403,6 +411,7 @@ impl Host {
             spec.display_height,
             true,
             preset.crop(self.observation_crop_profile),
+            VideoResizeFilter::Nearest,
         )
     }
 
@@ -410,6 +419,7 @@ impl Host {
         &mut self,
         enabled: bool,
         spec: &ObservationSpec,
+        resize_filter: VideoResizeFilter,
     ) -> Option<MinimapLayerRequest> {
         if !enabled {
             return None;
@@ -423,6 +433,7 @@ impl Host {
             course_index,
             target_width: spec.frame_width,
             target_height: spec.frame_height,
+            resize_filter,
         })
     }
 

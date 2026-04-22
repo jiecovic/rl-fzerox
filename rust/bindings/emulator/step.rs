@@ -35,6 +35,7 @@ impl PyStepSummary {
         consecutive_low_speed_frames=0,
         entered_state_flags=0,
         final_frame_index=0,
+        airborne_frames=0,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -48,6 +49,7 @@ impl PyStepSummary {
         consecutive_low_speed_frames: usize,
         entered_state_flags: u32,
         final_frame_index: usize,
+        airborne_frames: usize,
     ) -> Self {
         Self {
             inner: StepSummary {
@@ -58,6 +60,7 @@ impl PyStepSummary {
                 energy_loss_total,
                 energy_gain_total,
                 damage_taken_frames,
+                airborne_frames,
                 consecutive_low_speed_frames,
                 entered_state_flags,
                 final_frame_index,
@@ -98,6 +101,11 @@ impl PyStepSummary {
     #[getter]
     fn damage_taken_frames(&self) -> usize {
         self.inner.damage_taken_frames
+    }
+
+    #[getter]
+    fn airborne_frames(&self) -> usize {
+        self.inner.airborne_frames
     }
 
     #[getter]
@@ -164,6 +172,7 @@ impl PyStepSummary {
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
+        dict.set_item("airborne_frames", self.airborne_frames())?;
         dict.set_item(
             "consecutive_low_speed_frames",
             self.consecutive_low_speed_frames(),

@@ -4,7 +4,7 @@
 use crate::core::error::CoreError;
 use crate::core::minimap::MinimapLayerRequest;
 use crate::core::observation::ObservationStackMode;
-use crate::core::video::{ProcessedFramePlanKey, VideoCrop};
+use crate::core::video::{ProcessedFramePlanKey, VideoCrop, VideoResizeFilter};
 
 pub(crate) struct StackedObservationRequest {
     pub aspect_ratio: f64,
@@ -12,6 +12,7 @@ pub(crate) struct StackedObservationRequest {
     pub target_height: usize,
     pub rgb: bool,
     pub crop: VideoCrop,
+    pub resize_filter: VideoResizeFilter,
     pub frame_stack: usize,
     pub stack_mode: ObservationStackMode,
     pub minimap_layer: Option<MinimapLayerRequest>,
@@ -158,6 +159,40 @@ impl StackedObservationBuffer {
             return;
         }
 
+        if self.stack_mode == ObservationStackMode::Gray && self.channels_per_pixel == 3 {
+            for pixel_index in 0..pixel_count {
+                let pixel_src = pixel_index * 3;
+                let pixel_dst = pixel_index * total_channels;
+                for stack_index in 0..self.frame_stack {
+                    let slot = (self.next_slot + stack_index) % self.frame_stack;
+                    let src = (slot * self.frame_len) + pixel_src;
+                    self.bytes[pixel_dst + stack_index] =
+                        rgb_to_luma(self.frames[src], self.frames[src + 1], self.frames[src + 2]);
+                }
+            }
+            self.write_extra_frame(extra_frame, pixel_count);
+            return;
+        }
+
+        if self.stack_mode == ObservationStackMode::LumaChroma && self.channels_per_pixel == 3 {
+            for pixel_index in 0..pixel_count {
+                let pixel_src = pixel_index * 3;
+                let pixel_dst = pixel_index * total_channels;
+                for stack_index in 0..self.frame_stack {
+                    let slot = (self.next_slot + stack_index) % self.frame_stack;
+                    let src = (slot * self.frame_len) + pixel_src;
+                    let dst = pixel_dst + (stack_index * 2);
+                    let red = self.frames[src];
+                    let green = self.frames[src + 1];
+                    let blue = self.frames[src + 2];
+                    self.bytes[dst] = rgb_to_luma(red, green, blue);
+                    self.bytes[dst + 1] = rgb_to_yellow_purple_chroma(red, green, blue);
+                }
+            }
+            self.write_extra_frame(extra_frame, pixel_count);
+            return;
+        }
+
         for pixel_index in 0..pixel_count {
             let pixel_dst = pixel_index * total_channels;
             for stack_index in 0..self.frame_stack {
@@ -186,6 +221,11 @@ fn rgb_to_luma(red: u8, green: u8, blue: u8) -> u8 {
     (weighted >> 8) as u8
 }
 
+fn rgb_to_yellow_purple_chroma(red: u8, green: u8, blue: u8) -> u8 {
+    let opponent = (2 * i16::from(green)) - i16::from(red) - i16::from(blue);
+    (128 + (opponent / 4)).clamp(0, 255) as u8
+}
+
 #[cfg(test)]
 mod tests {
     use super::StackedObservationBuffer;
@@ -208,6 +248,37 @@ mod tests {
         assert_eq!(
             stack.as_slice(),
             &[18, 70, 80, 90, 130, 48, 100, 110, 120, 160]
+        );
+    }
+
+    #[test]
+    fn gray_stack_encodes_all_frames_as_luma() {
+        let mut stack = StackedObservationBuffer::new(6, 2, 3, ObservationStackMode::Gray, 1);
+
+        stack
+            .update(&[10, 20, 30, 40, 50, 60], 1, Some(&[90, 120]))
+            .expect("initial stack should accept minimap layer");
+
+        assert_eq!(stack.as_slice(), &[18, 18, 90, 48, 48, 120]);
+
+        stack
+            .update(&[70, 80, 90, 100, 110, 120], 2, Some(&[130, 160]))
+            .expect("next stack should update grayscale stack");
+
+        assert_eq!(stack.as_slice(), &[18, 78, 130, 48, 108, 160]);
+    }
+
+    #[test]
+    fn luma_chroma_stack_preserves_yellow_purple_cue() {
+        let mut stack = StackedObservationBuffer::new(6, 2, 3, ObservationStackMode::LumaChroma, 1);
+
+        stack
+            .update(&[255, 255, 0, 255, 0, 255], 1, Some(&[90, 120]))
+            .expect("initial stack should accept luma-chroma stack");
+
+        assert_eq!(
+            stack.as_slice(),
+            &[226, 191, 226, 191, 90, 106, 1, 106, 1, 120]
         );
     }
 }

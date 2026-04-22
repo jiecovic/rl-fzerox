@@ -79,6 +79,8 @@ class EngineObservationBuilder:
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
+            resize_filter=self.config.observation.resize_filter,
+            minimap_resize_filter=self.config.observation.minimap_resize_filter,
         )
 
     def build_observation(
@@ -118,6 +120,8 @@ class EngineObservationBuilder:
             frame_stack=self.config.observation.frame_stack,
             observation_stack_mode=self.config.observation.stack_mode,
             observation_minimap_layer=self.config.observation.minimap_layer,
+            observation_resize_filter=self.config.observation.resize_filter,
+            observation_minimap_resize_filter=self.config.observation.minimap_resize_filter,
             observation_mode=self.config.observation.mode,
             observation_state_profile=self.config.observation.state_profile,
             observation_course_context=self.config.observation.course_context,

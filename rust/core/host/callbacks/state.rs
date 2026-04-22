@@ -28,8 +28,8 @@ use crate::core::minimap::{MinimapLayerRenderer, MinimapLayerRequest};
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
     PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame, VideoCrop, VideoFrame,
-    build_processed_frame_plan, capture_raw_frame, capture_raw_frame_into, decode_frame,
-    processed_frame, processed_frame_from_raw_into,
+    VideoResizeFilter, build_processed_frame_plan, capture_raw_frame, capture_raw_frame_into,
+    decode_frame, processed_frame, processed_frame_from_raw_into,
 };
 
 /// State that lives on the frontend side of the libretro boundary.
@@ -69,6 +69,7 @@ struct RenderRequest {
     target_height: usize,
     rgb: bool,
     crop: VideoCrop,
+    resize_filter: VideoResizeFilter,
 }
 
 impl CallbackState {
@@ -152,6 +153,7 @@ impl CallbackState {
         target_height: usize,
         rgb: bool,
         crop: VideoCrop,
+        resize_filter: VideoResizeFilter,
     ) -> Result<&[u8], CoreError> {
         // Prefer the raw-frame fast path so we can render directly into the
         // reusable output buffers without fully decoding to an intermediate
@@ -169,6 +171,7 @@ impl CallbackState {
                 target_height,
                 rgb,
                 crop,
+                resize_filter,
             };
             let plan = self.render_plan(request)?.clone();
             let use_display_buffer = self.use_display_buffer(target_width, target_height);
@@ -183,8 +186,15 @@ impl CallbackState {
         }
 
         let frame = self.frame().ok_or(CoreError::NoFrameAvailable)?;
-        let rendered =
-            processed_frame(frame, aspect_ratio, target_width, target_height, rgb, crop)?;
+        let rendered = processed_frame(
+            frame,
+            aspect_ratio,
+            target_width,
+            target_height,
+            rgb,
+            crop,
+            resize_filter,
+        )?;
         let use_display_buffer = self.use_display_buffer(target_width, target_height);
         let target_buffer = if use_display_buffer {
             &mut self.display_buffer
@@ -218,6 +228,7 @@ impl CallbackState {
             target_height: request.target_height,
             rgb: request.rgb,
             crop: request.crop,
+            resize_filter: request.resize_filter,
         };
         let frame_serial = self.frame_serial;
         let stack_key = StackedObservationKey {
@@ -465,6 +476,7 @@ impl CallbackState {
             target_width: request.target_width,
             target_height: request.target_height,
             rgb: request.rgb,
+            resize_filter: request.resize_filter,
         };
         if !self.render_plans.contains_key(&key) {
             let plan = build_processed_frame_plan(
@@ -475,6 +487,7 @@ impl CallbackState {
                 request.target_height,
                 request.rgb,
                 request.crop,
+                request.resize_filter,
             )?;
             self.render_plans.insert(key.clone(), plan);
         }
@@ -504,6 +517,7 @@ impl CallbackState {
             request.target_height,
             request.rgb,
             request.crop,
+            request.resize_filter,
         )?;
         self.observation_buffer.clear();
         self.observation_buffer.extend_from_slice(&rendered);
@@ -571,6 +585,7 @@ impl RenderRequest {
             target_width: self.target_width,
             target_height: self.target_height,
             rgb: self.rgb,
+            resize_filter: self.resize_filter,
         }
     }
 }

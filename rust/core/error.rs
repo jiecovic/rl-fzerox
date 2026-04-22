@@ -63,6 +63,12 @@ pub enum CoreError {
     InvalidObservationPreset {
         name: String,
     },
+    InvalidResizeFilter {
+        name: String,
+    },
+    ResizeFailed {
+        message: String,
+    },
     InvalidVideoCrop {
         frame_width: usize,
         frame_height: usize,
@@ -172,6 +178,12 @@ impl Display for CoreError {
             }
             Self::InvalidObservationPreset { name } => {
                 write!(formatter, "Unknown observation preset '{name}'")
+            }
+            Self::InvalidResizeFilter { name } => {
+                write!(formatter, "Unknown video resize filter '{name}'")
+            }
+            Self::ResizeFailed { message } => {
+                write!(formatter, "Video resize failed: {message}")
             }
             Self::InvalidVideoCrop {
                 frame_width,

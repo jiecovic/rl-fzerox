@@ -484,6 +484,8 @@ class FZeroXEnvEngine:
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
+            resize_filter=self.config.observation.resize_filter,
+            minimap_resize_filter=self.config.observation.minimap_resize_filter,
             stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
             energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
             max_episode_steps=self.config.max_episode_steps,
@@ -539,9 +541,11 @@ class FZeroXEnvEngine:
         terminated = step_result.status.terminated
         truncated = step_result.status.truncated
         info["step_reward"] = reward
+        info["frames_run"] = int(step_result.summary.frames_run)
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
+        info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used

@@ -4,6 +4,9 @@ use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
 use crate::core::observation::{ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::StepTelemetrySample;
+use crate::core::video::VideoResizeFilter;
+
+const AIRBORNE_FLAG: u32 = 1 << 26;
 
 #[test]
 fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
@@ -93,6 +96,21 @@ fn step_accumulator_counts_received_damage_state_as_damage_taken() {
 }
 
 #[test]
+fn step_accumulator_counts_airborne_frames() {
+    let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(&telemetry(101.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 21);
+    accumulator.observe(&telemetry(102.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 22);
+    accumulator.observe(&telemetry(103.0, 100.0, 120.0, 0, 0, 0), 23);
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.frames_run, 3);
+    assert_eq!(summary.airborne_frames, 2);
+}
+
+#[test]
 fn step_accumulator_tracks_summary_needed_for_stop_state_derivation() {
     let initial = telemetry(100.0, 100.0, 120.0, 0b001, 99, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(10, 2), 99);
@@ -119,6 +137,8 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         frame_stack: 4,
         stack_mode: ObservationStackMode::Rgb,
         minimap_layer: false,
+        resize_filter: VideoResizeFilter::Nearest,
+        minimap_resize_filter: VideoResizeFilter::Nearest,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
