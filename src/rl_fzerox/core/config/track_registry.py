@@ -18,6 +18,11 @@ from rl_fzerox.core.config.vehicle_catalog import (
     try_resolve_engine_setting_id,
     vehicle_by_id,
 )
+from rl_fzerox.core.domain.courses import (
+    built_in_course_by_ref,
+    built_in_course_configs,
+    built_in_course_ref_by_id,
+)
 
 
 def expand_track_registry_metadata(
@@ -160,11 +165,12 @@ def _course_ref_by_id(
     config_root: Path,
     cup: str | None = None,
 ) -> str:
-    matches = [
+    matches = list(built_in_course_ref_by_id(course_id, cup=cup))
+    matches.extend(
         ref
-        for ref, course in _iter_course_configs(config_root=config_root)
+        for ref, course in _iter_external_course_configs(config_root=config_root)
         if course.get("id") == course_id and (cup is None or course.get("cup") == cup)
-    ]
+    )
     if not matches:
         qualifier = f" in cup {cup!r}" if cup is not None else ""
         raise FileNotFoundError(f"Course registry id not found{qualifier}: {course_id!r}")
@@ -401,22 +407,48 @@ def _iter_track_configs(*, config_root: Path) -> tuple[tuple[str, dict[str, obje
 
 
 def _iter_course_configs(*, config_root: Path) -> tuple[tuple[str, dict[str, object]], ...]:
-    registry_root = (config_root / REGISTRY.roots.courses).resolve()
+    built_in_courses = built_in_course_configs()
+    external_courses = {
+        ref: course for ref, course in _iter_external_course_configs(config_root=config_root)
+    }
+    return (*built_in_courses, *external_courses.items())
+
+
+def _iter_external_course_configs(
+    *,
+    config_root: Path,
+) -> tuple[tuple[str, dict[str, object]], ...]:
+    registry_root = (config_root / REGISTRY.roots.external_courses).resolve()
     if not registry_root.is_dir():
         return ()
     courses: list[tuple[str, dict[str, object]]] = []
     for path in sorted(registry_root.rglob("*.yaml")):
         ref = path.relative_to(registry_root).with_suffix("").as_posix()
-        courses.append((ref, _load_course_config(ref, config_root=config_root)))
+        course = _load_external_course_config(ref, config_root=config_root)
+        if course is not None:
+            courses.append((ref, course))
     return tuple(courses)
 
 
 def _load_course_config(ref: str, *, config_root: Path) -> dict[str, object]:
+    built_in = built_in_course_by_ref(ref)
+    if built_in is not None:
+        return built_in
+    external = _load_external_course_config(ref, config_root=config_root)
+    if external is not None:
+        return external
+    raise FileNotFoundError(f"Course registry entry not found: {ref!r}")
+
+
+def _load_external_course_config(ref: str, *, config_root: Path) -> dict[str, object] | None:
     path = _registry_path(
-        root=config_root / REGISTRY.roots.courses,
+        root=config_root / REGISTRY.roots.external_courses,
         ref=ref,
         label="Course registry entry",
+        required=False,
     )
+    if path is None:
+        return None
     loaded = OmegaConf.to_container(OmegaConf.load(path), resolve=True)
     if not isinstance(loaded, dict):
         raise TypeError(f"Course registry entry {ref!r} must resolve to a mapping")
@@ -441,12 +473,14 @@ def _optional_weight(raw_weight: object, *, label: str) -> float | None:
     return weight
 
 
-def _registry_path(*, root: Path, ref: str, label: str) -> Path:
+def _registry_path(*, root: Path, ref: str, label: str, required: bool = True) -> Path | None:
     registry_root = root.resolve()
     path = (registry_root / ref).with_suffix(".yaml").resolve()
     if not path.is_relative_to(registry_root):
         raise ValueError(f"{label} ref escapes registry root: {ref!r}")
     if not path.is_file():
+        if not required:
+            return None
         raise FileNotFoundError(f"{label} not found: {ref!r}")
     return path
 

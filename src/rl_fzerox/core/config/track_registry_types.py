@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 class RegistryRoots:
     """Config subdirectories used by the track registry."""
 
-    courses: str = "courses"
+    external_courses: str = "courses"
     tracks: str = "tracks"
 
 
