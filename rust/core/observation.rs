@@ -35,6 +35,9 @@ pub enum ObservationPreset {
     Crop116x164,
     Crop98x130,
     Crop66x82,
+    Crop68x68,
+    Crop84x84,
+    Crop64x64,
 }
 
 /// How repeated observation frames are encoded along the channel axis.
@@ -44,6 +47,10 @@ pub enum ObservationStackMode {
     Rgb,
     /// Encode history as grayscale and keep the latest frame RGB.
     RgbGray,
+    /// Encode every stacked frame as grayscale: `frame_stack` channels.
+    Gray,
+    /// Encode every frame as luminance plus a yellow-vs-purple chroma cue.
+    LumaChroma,
 }
 
 /// Resolved spatial spec for one observation frame plus the matching display
@@ -67,6 +74,9 @@ impl ObservationPreset {
             "crop_116x164" => Ok(Self::Crop116x164),
             "crop_98x130" => Ok(Self::Crop98x130),
             "crop_66x82" => Ok(Self::Crop66x82),
+            "crop_68x68" => Ok(Self::Crop68x68),
+            "crop_84x84" => Ok(Self::Crop84x84),
+            "crop_64x64" => Ok(Self::Crop64x64),
             // V4 LEGACY SHIM: accept old saved run manifests and CLI overrides.
             "native_crop_v1" => Ok(Self::Crop84x116),
             "native_crop_v2" => Ok(Self::Crop92x124),
@@ -86,6 +96,9 @@ impl ObservationPreset {
             Self::Crop116x164 => "crop_116x164",
             Self::Crop98x130 => "crop_98x130",
             Self::Crop66x82 => "crop_66x82",
+            Self::Crop68x68 => "crop_68x68",
+            Self::Crop84x84 => "crop_84x84",
+            Self::Crop64x64 => "crop_64x64",
         }
     }
 
@@ -96,7 +109,10 @@ impl ObservationPreset {
                 | Self::Crop92x124
                 | Self::Crop116x164
                 | Self::Crop98x130
-                | Self::Crop66x82,
+                | Self::Crop66x82
+                | Self::Crop68x68
+                | Self::Crop84x84
+                | Self::Crop64x64,
                 ObservationCropProfile::Angrylion,
             ) => VideoCrop {
                 top: 16,
@@ -109,7 +125,10 @@ impl ObservationPreset {
                 | Self::Crop92x124
                 | Self::Crop116x164
                 | Self::Crop98x130
-                | Self::Crop66x82,
+                | Self::Crop66x82
+                | Self::Crop68x68
+                | Self::Crop84x84
+                | Self::Crop64x64,
                 ObservationCropProfile::Gliden64,
             ) => VideoCrop {
                 top: 15,
@@ -138,6 +157,9 @@ impl ObservationPreset {
             Self::Crop116x164 => (164, 116, 3),
             Self::Crop98x130 => (130, 98, 3),
             Self::Crop66x82 => (82, 66, 3),
+            Self::Crop68x68 => (68, 68, 3),
+            Self::Crop84x84 => (84, 84, 3),
+            Self::Crop64x64 => (64, 64, 3),
         };
         Ok(ObservationSpec {
             preset_name: self.name(),
@@ -155,7 +177,10 @@ impl ObservationPreset {
             | Self::Crop92x124
             | Self::Crop116x164
             | Self::Crop98x130
-            | Self::Crop66x82 => display_aspect_ratio,
+            | Self::Crop66x82
+            | Self::Crop68x68
+            | Self::Crop84x84
+            | Self::Crop64x64 => display_aspect_ratio,
         }
     }
 }
@@ -165,6 +190,8 @@ impl ObservationStackMode {
         match name {
             "rgb" => Ok(Self::Rgb),
             "rgb_gray" => Ok(Self::RgbGray),
+            "gray" => Ok(Self::Gray),
+            "luma_chroma" => Ok(Self::LumaChroma),
             _ => Err(CoreError::InvalidObservationPreset {
                 name: name.to_owned(),
             }),
@@ -181,6 +208,8 @@ impl ObservationStackMode {
                     (frame_stack - 1) + single_frame_channels
                 }
             }
+            Self::Gray => frame_stack,
+            Self::LumaChroma => frame_stack * 2,
         }
     }
 }
@@ -247,6 +276,36 @@ mod tests {
     }
 
     #[test]
+    fn crop_68x68_resolves_to_square_nature_geometry() {
+        let spec = ObservationPreset::Crop68x68
+            .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+            .expect("crop_68x68 should resolve");
+
+        assert_eq!(spec.preset_name, "crop_68x68");
+        assert_eq!((spec.frame_width, spec.frame_height), (68, 68));
+    }
+
+    #[test]
+    fn crop_84x84_resolves_to_square_nature_geometry() {
+        let spec = ObservationPreset::Crop84x84
+            .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+            .expect("crop_84x84 should resolve");
+
+        assert_eq!(spec.preset_name, "crop_84x84");
+        assert_eq!((spec.frame_width, spec.frame_height), (84, 84));
+    }
+
+    #[test]
+    fn crop_64x64_resolves_to_square_geometry() {
+        let spec = ObservationPreset::Crop64x64
+            .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+            .expect("crop_64x64 should resolve");
+
+        assert_eq!(spec.preset_name, "crop_64x64");
+        assert_eq!((spec.frame_width, spec.frame_height), (64, 64));
+    }
+
+    #[test]
     fn legacy_native_crop_name_aliases_to_canonical_name() {
         let preset = ObservationPreset::parse("native_crop_v4").expect("legacy name resolves");
 
@@ -259,5 +318,7 @@ mod tests {
         assert_eq!(ObservationStackMode::Rgb.stacked_channels(3, 4), 12);
         assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 4), 6);
         assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 1), 3);
+        assert_eq!(ObservationStackMode::Gray.stacked_channels(3, 4), 4);
+        assert_eq!(ObservationStackMode::LumaChroma.stacked_channels(3, 4), 8);
     }
 }

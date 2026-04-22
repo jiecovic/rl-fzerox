@@ -10,7 +10,7 @@ from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
-ConvProfile = Literal["auto", "nature", "compact_deep", "compact_bottleneck"]
+ConvProfile = Literal["auto", "nature", "compact_deep", "compact_bottleneck", "tiny_256"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,12 +57,21 @@ COMPACT_BOTTLENECK_CONV_SPEC: ConvSpec = (
     _conv_layer(128, kernel_size=3, stride=2),
     _conv_layer(256, kernel_size=4, stride=1),
 )
+TINY_256_CONV_SPEC: ConvSpec = (
+    _conv_layer(64, kernel_size=8, stride=2),
+    _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=4, stride=2),
+    _conv_layer(256, kernel_size=4, stride=2),
+)
 SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (84, 116): NATURE_CNN_CONV_SPEC,
     (92, 124): NATURE_CNN_CONV_SPEC,
     (116, 164): LEGACY_DEEP_CONV_SPEC,
     (98, 130): COMPACT_DEEP_CONV_SPEC,
     (66, 82): COMPACT_DEEP_CONV_SPEC,
+    (68, 68): NATURE_CNN_CONV_SPEC,
+    (84, 84): NATURE_CNN_CONV_SPEC,
+    (64, 64): TINY_256_CONV_SPEC,
 }
 
 
@@ -297,6 +306,8 @@ def _resolve_conv_spec(
         return COMPACT_DEEP_CONV_SPEC
     if conv_profile == "compact_bottleneck":
         return COMPACT_BOTTLENECK_CONV_SPEC
+    if conv_profile == "tiny_256":
+        return TINY_256_CONV_SPEC
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
 
 

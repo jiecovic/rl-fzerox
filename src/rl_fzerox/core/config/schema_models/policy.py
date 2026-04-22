@@ -20,7 +20,13 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    conv_profile: Literal["auto", "nature", "compact_deep", "compact_bottleneck"] = "auto"
+    conv_profile: Literal[
+        "auto",
+        "nature",
+        "compact_deep",
+        "compact_bottleneck",
+        "tiny_256",
+    ] = "auto"
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     fusion_features_dim: PositiveInt | None = None

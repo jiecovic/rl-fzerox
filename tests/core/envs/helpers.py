@@ -43,6 +43,8 @@ class ScriptedStepBackend(SyntheticBackend):
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: object = "nearest",
+        minimap_resize_filter: object = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -63,6 +65,8 @@ class ScriptedStepBackend(SyntheticBackend):
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
+            resize_filter,
+            minimap_resize_filter,
         )
         self.set_controller_state(controller_state)
         self.last_lean_timer_assist = lean_timer_assist

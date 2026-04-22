@@ -7,9 +7,9 @@
 name: race_v3
 
 # Spline coverage: distance between equally spaced reward points on the game spline.
-progress_bucket_distance: 25.0
+progress_bucket_distance: 50.0
 # Spline coverage: reward for each newly covered point.
-progress_bucket_reward: 0.05
+progress_bucket_reward: 0.1
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
 # Spline coverage: when true, airborne steps do not advance/pay frontier buckets.
@@ -49,8 +49,8 @@ collision_recoil_penalty: -2.5
 
 # Boost pads: small route incentive for entering dash-pad boost, guarded so
 # reversing or revisiting the same unwrapped progress region cannot farm it.
-boost_pad_reward: 17.0
-boost_pad_reward_progress_window: 800.0
+boost_pad_reward: 20.0
+boost_pad_reward_progress_window: 700.0
 
 # Manual boost: small event reward for an actually applied boost-button request.
 # This is not paid per boost-active frame and is not multiplied by action_repeat.

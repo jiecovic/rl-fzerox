@@ -21,6 +21,8 @@ from fzerox_emulator import (
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from tests.support.native_objects import make_telemetry
 
+_ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
+
 
 @dataclass
 class SyntheticState:
@@ -48,10 +50,7 @@ class SyntheticBackend:
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
         self._capture_video_flags: list[bool] = []
-        self._observation_stacks: dict[
-            tuple[str, int, str, bool],
-            tuple[list[RgbFrame], int | None],
-        ] = {}
+        self._observation_stacks: dict[_ObservationStackKey, tuple[list[RgbFrame], int | None]] = {}
         self.randomized_rng_seeds: list[int] = []
         self.loaded_baselines: list[Path] = []
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
@@ -139,8 +138,14 @@ class SyntheticBackend:
             width, height = (164, 116)
         elif canonical_preset == "crop_98x130":
             width, height = (130, 98)
-        else:
+        elif canonical_preset == "crop_66x82":
             width, height = (82, 66)
+        elif canonical_preset == "crop_68x68":
+            width, height = (68, 68)
+        elif canonical_preset == "crop_84x84":
+            width, height = (84, 84)
+        else:
+            width, height = (64, 64)
         return ObservationSpec(
             preset=canonical_preset,
             width=width,
@@ -167,7 +172,10 @@ class SyntheticBackend:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: object = "nearest",
+        minimap_resize_filter: object = "nearest",
     ) -> ObservationFrame:
+        _ = (resize_filter, minimap_resize_filter)
         spec = self.observation_spec(preset)
         cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
@@ -176,7 +184,14 @@ class SyntheticBackend:
             height=spec.display_height,
         )
         frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
-        stack_key = (spec.preset, frame_stack, stack_mode, minimap_layer)
+        stack_key = (
+            spec.preset,
+            frame_stack,
+            stack_mode,
+            minimap_layer,
+            resize_filter,
+            minimap_resize_filter,
+        )
         stacked_entry = self._observation_stacks.get(stack_key)
         if stacked_entry is None or stacked_entry[1] is None:
             frames = [np.array(frame, copy=True) for _ in range(frame_stack)]
@@ -246,6 +261,8 @@ class SyntheticBackend:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: object = "nearest",
+        minimap_resize_filter: object = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -292,6 +309,8 @@ class SyntheticBackend:
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
         )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
@@ -334,6 +353,8 @@ class SyntheticBackend:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: object = "nearest",
+        minimap_resize_filter: object = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -381,6 +402,8 @@ class SyntheticBackend:
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
         )
         truncation_reason = None
         if self._state.step_count >= max_episode_steps:
@@ -453,6 +476,9 @@ def _canonical_observation_preset(preset: str) -> str | None:
         "crop_116x164": "crop_116x164",
         "crop_98x130": "crop_98x130",
         "crop_66x82": "crop_66x82",
+        "crop_68x68": "crop_68x68",
+        "crop_84x84": "crop_84x84",
+        "crop_64x64": "crop_64x64",
         # V4 LEGACY SHIM: tests can still load stale run manifests.
         "native_crop_v1": "crop_84x116",
         "native_crop_v2": "crop_92x124",
@@ -494,6 +520,12 @@ def _materialize_observation_stack(
         grayscale_history = [_rgb_luma(frame) for frame in frames[:-1]]
         stacked = np.concatenate([*grayscale_history, frames[-1]], axis=2)
         return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
+    if stack_mode == "gray":
+        stacked = np.concatenate([_rgb_luma(frame) for frame in frames], axis=2)
+        return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
+    if stack_mode == "luma_chroma":
+        stacked = np.concatenate([_rgb_luma_chroma(frame) for frame in frames], axis=2)
+        return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
 
 
@@ -511,3 +543,13 @@ def _rgb_luma(frame: RgbFrame) -> ObservationFrame:
     blue = frame[:, :, 2].astype(np.uint16)
     luma = ((77 * red) + (150 * green) + (29 * blue) + 128) >> 8
     return luma.astype(np.uint8)[:, :, None]
+
+
+def _rgb_luma_chroma(frame: RgbFrame) -> ObservationFrame:
+    red = frame[:, :, 0].astype(np.int16)
+    green = frame[:, :, 1].astype(np.int16)
+    blue = frame[:, :, 2].astype(np.int16)
+    luma = _rgb_luma(frame)
+    opponent = np.trunc(((2 * green) - red - blue) / 4.0).astype(np.int16)
+    chroma = np.clip(128 + opponent, 0, 255).astype(np.uint8)
+    return np.ascontiguousarray(np.concatenate([luma, chroma[:, :, None]], axis=2))

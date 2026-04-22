@@ -27,6 +27,23 @@ pub enum PixelLayout {
     Rgb565,
 }
 
+/// Resize filter used by policy observation rendering.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum VideoResizeFilter {
+    Nearest,
+    Bilinear,
+}
+
+impl VideoResizeFilter {
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "nearest" => Some(Self::Nearest),
+            "bilinear" => Some(Self::Bilinear),
+            _ => None,
+        }
+    }
+}
+
 /// Number of pixels trimmed from each side before observation/display resize.
 #[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 pub struct VideoCrop {

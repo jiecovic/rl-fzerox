@@ -79,6 +79,8 @@ def set_observation_info(
     frame_stack: int,
     observation_stack_mode: ObservationStackMode,
     observation_minimap_layer: bool,
+    observation_resize_filter: str,
+    observation_minimap_resize_filter: str,
     observation_mode: str,
     observation_state_profile: ObservationStateProfile,
     observation_course_context: ObservationCourseContext,
@@ -112,6 +114,8 @@ def set_observation_info(
     info["observation_stack"] = frame_stack
     info["observation_stack_mode"] = observation_stack_mode
     info["observation_minimap_layer"] = observation_minimap_layer
+    info["observation_resize_filter"] = observation_resize_filter
+    info["observation_minimap_resize_filter"] = observation_minimap_resize_filter
     if observation_mode == "image_state":
         info["observation_state_profile"] = observation_state_profile
         info["observation_course_context"] = observation_course_context

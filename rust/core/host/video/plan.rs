@@ -2,7 +2,7 @@
 //! Render-plan construction for cropping and resampling raw frames.
 
 use crate::core::error::CoreError;
-use crate::core::video::VideoCrop;
+use crate::core::video::{VideoCrop, VideoResizeFilter};
 
 /// Cache key for one raw-source to processed-target render plan.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -14,18 +14,20 @@ pub struct ProcessedFramePlanKey {
     pub target_width: usize,
     pub target_height: usize,
     pub rgb: bool,
+    pub resize_filter: VideoResizeFilter,
 }
 
-/// Precomputed sampling plan reused for observation/display rendering.
+/// Precomputed crop/resize plan reused for observation/display rendering.
 #[derive(Clone, Debug)]
 pub struct ProcessedFramePlan {
     pub key: ProcessedFramePlanKey,
     pub crop_x: usize,
     pub crop_y: usize,
+    pub crop_width: usize,
+    pub crop_height: usize,
+    pub display_width: usize,
+    pub display_height: usize,
     pub output_len: usize,
-    pub direct_row_copy: bool,
-    pub x_index: Vec<usize>,
-    pub y_index: Vec<usize>,
 }
 
 /// Resolve the output size after applying a display aspect ratio.
@@ -47,20 +49,10 @@ pub fn build_processed_frame_plan(
     target_height: usize,
     rgb: bool,
     crop: VideoCrop,
+    resize_filter: VideoResizeFilter,
 ) -> Result<ProcessedFramePlan, CoreError> {
     let (crop_x, crop_y, crop_width, crop_height) = crop_bounds(source_width, source_height, crop)?;
     let (display_width, display_height) = display_size(crop_width, crop_height, aspect_ratio);
-    let direct_row_copy = rgb && target_width == display_width && target_height == display_height;
-    let x_index = if direct_row_copy {
-        Vec::new()
-    } else {
-        compose_axis_index_map(crop_width, display_width, target_width)
-    };
-    let y_index = if direct_row_copy {
-        axis_index_map(crop_height, display_height)
-    } else {
-        compose_axis_index_map(crop_height, display_height, target_height)
-    };
     let channels = if rgb { 3 } else { 1 };
 
     Ok(ProcessedFramePlan {
@@ -72,13 +64,15 @@ pub fn build_processed_frame_plan(
             target_width,
             target_height,
             rgb,
+            resize_filter,
         },
         crop_x,
         crop_y,
+        crop_width,
+        crop_height,
+        display_width,
+        display_height,
         output_len: target_width * target_height * channels,
-        direct_row_copy,
-        x_index,
-        y_index,
     })
 }
 
@@ -114,28 +108,4 @@ pub(super) fn crop_bounds(
         frame_width - crop.left - crop.right,
         frame_height - crop.top - crop.bottom,
     ))
-}
-
-fn axis_index_map(input_size: usize, output_size: usize) -> Vec<usize> {
-    if output_size <= 1 || input_size <= 1 {
-        return vec![0; output_size.max(1)];
-    }
-
-    let scale = (input_size - 1) as f64 / (output_size - 1) as f64;
-    (0..output_size)
-        .map(|index| ((index as f64) * scale).round() as usize)
-        .collect()
-}
-
-fn compose_axis_index_map(
-    input_size: usize,
-    intermediate_size: usize,
-    output_size: usize,
-) -> Vec<usize> {
-    let intermediate_index = axis_index_map(input_size, intermediate_size);
-    let output_index = axis_index_map(intermediate_size, output_size);
-    output_index
-        .into_iter()
-        .map(|index| intermediate_index[index])
-        .collect()
 }

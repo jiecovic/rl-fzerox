@@ -90,6 +90,20 @@ def test_crop_66x82_uses_small_aspect_correct_shape() -> None:
     assert observation.shape == (66, 82, 6)
 
 
+def test_crop_64x64_uses_square_grayscale_minimap_shape() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_64x64",
+        frame_stack=4,
+        stack_mode="gray",
+        minimap_layer=True,
+    )
+
+    assert observation.shape == (64, 64, 5)
+
+
 def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
     backend = SyntheticBackend()
     backend.reset()
@@ -117,6 +131,68 @@ def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
     assert np.array_equal(observation[:, :, 0], observation[:, :, 1])
     assert np.array_equal(observation[:, :, 1], observation[:, :, 2])
     assert np.array_equal(observation[:, :, -3:], current_frame)
+
+
+def test_gray_observation_stack_encodes_all_frames_as_luma() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_64x64",
+        frame_stack=4,
+        stack_mode="gray",
+        minimap_layer=True,
+    )
+    spec = backend.observation_spec("crop_64x64")
+    image_space = build_image_observation_space(
+        spec,
+        frame_stack=4,
+        stack_mode="gray",
+        minimap_layer=True,
+    )
+
+    assert observation.shape == (64, 64, 5)
+    assert image_space.shape == (64, 64, 5)
+    assert (
+        stacked_observation_channels(
+            3,
+            frame_stack=4,
+            stack_mode="gray",
+            minimap_layer=True,
+        )
+        == 5
+    )
+
+
+def test_luma_chroma_observation_stack_uses_two_channels_per_frame() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_84x84",
+        frame_stack=4,
+        stack_mode="luma_chroma",
+        minimap_layer=True,
+    )
+    spec = backend.observation_spec("crop_84x84")
+    image_space = build_image_observation_space(
+        spec,
+        frame_stack=4,
+        stack_mode="luma_chroma",
+        minimap_layer=True,
+    )
+
+    assert observation.shape == (84, 84, 9)
+    assert image_space.shape == (84, 84, 9)
+    assert (
+        stacked_observation_channels(
+            3,
+            frame_stack=4,
+            stack_mode="luma_chroma",
+            minimap_layer=True,
+        )
+        == 9
+    )
 
 
 def test_minimap_layer_appends_single_channel_after_frame_stack() -> None:

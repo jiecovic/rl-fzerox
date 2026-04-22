@@ -7,12 +7,16 @@ from pydantic import PositiveFloat
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
 TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
+ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 ObservationPresetName: TypeAlias = Literal[
     "crop_84x116",
     "crop_92x124",
     "crop_116x164",
     "crop_98x130",
     "crop_66x82",
+    "crop_68x68",
+    "crop_84x84",
+    "crop_64x64",
 ]
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
 ContinuousDriveMode: TypeAlias = Literal["threshold", "pwm", "always_accelerate"]

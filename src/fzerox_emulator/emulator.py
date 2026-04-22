@@ -11,6 +11,7 @@ from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import (
     BackendStepResult,
     FrameStep,
+    ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
     ResetState,
@@ -135,6 +136,8 @@ class Emulator:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -154,6 +157,8 @@ class Emulator:
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
@@ -199,6 +204,8 @@ class Emulator:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -219,6 +226,8 @@ class Emulator:
                 frame_stack=frame_stack,
                 stack_mode=stack_mode,
                 minimap_layer=minimap_layer,
+                resize_filter=resize_filter,
+                minimap_resize_filter=minimap_resize_filter,
                 stuck_min_speed_kph=stuck_min_speed_kph,
                 energy_loss_epsilon=energy_loss_epsilon,
                 max_episode_steps=max_episode_steps,
@@ -369,12 +378,21 @@ class Emulator:
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
     ) -> ObservationFrame:
         """Return one native stacked observation tensor for the requested preset."""
 
         spec = self.observation_spec(preset)
         frame = np.asarray(
-            self._native.frame_observation(preset, frame_stack, stack_mode, minimap_layer),
+            self._native.frame_observation(
+                preset,
+                frame_stack,
+                stack_mode,
+                minimap_layer,
+                resize_filter,
+                minimap_resize_filter,
+            ),
             dtype=np.uint8,
         )
         stacked_channels = stacked_observation_channels(

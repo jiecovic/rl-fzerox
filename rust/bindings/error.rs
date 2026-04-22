@@ -12,7 +12,9 @@ pub fn map_core_error(error: CoreError) -> PyErr {
         CoreError::MissingCore(_) | CoreError::MissingRom(_) => {
             PyFileNotFoundError::new_err(error.to_string())
         }
-        CoreError::InvalidObservationPreset { .. } => PyValueError::new_err(error.to_string()),
+        CoreError::InvalidObservationPreset { .. } | CoreError::InvalidResizeFilter { .. } => {
+            PyValueError::new_err(error.to_string())
+        }
         _ => PyRuntimeError::new_err(error.to_string()),
     }
 }

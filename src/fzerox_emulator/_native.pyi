@@ -210,6 +210,7 @@ class StepSummary:
         consecutive_low_speed_frames: int = 0,
         entered_state_flags: int = 0,
         final_frame_index: int = 0,
+        airborne_frames: int = 0,
     ) -> None: ...
     @property
     def frames_run(self) -> int: ...
@@ -225,6 +226,8 @@ class StepSummary:
     def energy_gain_total(self) -> float: ...
     @property
     def damage_taken_frames(self) -> int: ...
+    @property
+    def airborne_frames(self) -> int: ...
     @property
     def consecutive_low_speed_frames(self) -> int: ...
     @property
@@ -316,8 +319,10 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
         minimap_layer: bool = False,
+        resize_filter: Literal["nearest", "bilinear"] = "nearest",
+        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -338,8 +343,10 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
         minimap_layer: bool = False,
+        resize_filter: Literal["nearest", "bilinear"] = "nearest",
+        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
         joypad_mask: int = 0,
         left_stick_x: float = 0.0,
         left_stick_y: float = 0.0,
@@ -370,8 +377,10 @@ class Emulator:
         self,
         preset: str,
         frame_stack: int,
-        stack_mode: Literal["rgb", "rgb_gray"] = "rgb",
+        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
         minimap_layer: bool = False,
+        resize_filter: Literal["nearest", "bilinear"] = "nearest",
+        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
     ) -> npt.NDArray[np.uint8]: ...
     def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...

@@ -26,6 +26,13 @@ class _MetricLogSpec:
 
 
 @dataclass(frozen=True, slots=True)
+class _FrameRatioLogSpec:
+    numerator_key: str
+    denominator_key: str
+    log_key: str
+
+
+@dataclass(frozen=True, slots=True)
 class _EpisodeReasonSpecs:
     termination: tuple[str, ...]
     truncation: tuple[str, ...]
@@ -35,6 +42,7 @@ class _EpisodeReasonSpecs:
 class _RolloutInfoLogSpecs:
     state_metrics: tuple[_MetricLogSpec, ...]
     step_rates: tuple[_MetricLogSpec, ...]
+    frame_ratios: tuple[_FrameRatioLogSpec, ...]
     episode_metrics: tuple[_MetricLogSpec, ...]
     finished_episode_metrics: tuple[_MetricLogSpec, ...]
     episode_reasons: _EpisodeReasonSpecs
@@ -53,6 +61,13 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("collision_recoil_entered", "state/collision_recoil_entry_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
+    ),
+    frame_ratios=(
+        _FrameRatioLogSpec(
+            numerator_key="airborne_frames",
+            denominator_key="frames_run",
+            log_key="state/airborne_frame_ratio",
+        ),
     ),
     episode_metrics=(
         _MetricLogSpec("position", "episode/final_position_mean"),
@@ -138,6 +153,23 @@ class _RateAccumulator:
 
 
 @dataclass
+class _RatioAccumulator:
+    numerator_total: float = 0.0
+    denominator_total: float = 0.0
+
+    def add(self, numerator: float, denominator: float) -> None:
+        if denominator <= 0.0:
+            return
+        self.numerator_total += numerator
+        self.denominator_total += denominator
+
+    def ratio(self) -> float | None:
+        if self.denominator_total <= 0.0:
+            return None
+        return self.numerator_total / self.denominator_total
+
+
+@dataclass
 class RolloutInfoAccumulator:
     state_metrics: dict[str, _MeanAccumulator] = field(
         default_factory=lambda: {
@@ -147,6 +179,11 @@ class RolloutInfoAccumulator:
     step_rates: dict[str, _RateAccumulator] = field(
         default_factory=lambda: {
             spec.info_key: _RateAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.step_rates
+        }
+    )
+    frame_ratios: dict[str, _RatioAccumulator] = field(
+        default_factory=lambda: {
+            spec.log_key: _RatioAccumulator() for spec in ROLLOUT_INFO_LOG_SPECS.frame_ratios
         }
     )
     episode_metrics: dict[str, _MeanAccumulator] = field(
@@ -183,6 +220,14 @@ class RolloutInfoAccumulator:
             values = _positive_values(infos, spec.info_key)
             if values:
                 self.step_rates[spec.info_key].add_many(values)
+
+        for spec in ROLLOUT_INFO_LOG_SPECS.frame_ratios:
+            for numerator, denominator in _numeric_pair_values(
+                infos,
+                numerator_key=spec.numerator_key,
+                denominator_key=spec.denominator_key,
+            ):
+                self.frame_ratios[spec.log_key].add(numerator, denominator)
 
         episodes = _episode_dicts(infos)
         self.episode_count += len(episodes)
@@ -221,6 +266,11 @@ class RolloutInfoAccumulator:
             rate = self.step_rates[spec.info_key].rate()
             if rate is not None:
                 logger.record(spec.log_key, rate)
+
+        for spec in ROLLOUT_INFO_LOG_SPECS.frame_ratios:
+            ratio = self.frame_ratios[spec.log_key].ratio()
+            if ratio is not None:
+                logger.record(spec.log_key, ratio)
 
         for spec in ROLLOUT_INFO_LOG_SPECS.episode_metrics:
             mean = self.episode_metrics[spec.info_key].mean()
@@ -429,6 +479,23 @@ def _positive_values(infos: Sequence[object], key: str) -> list[bool]:
             values.append(value)
         elif isinstance(value, int | float):
             values.append(float(value) > 0.0)
+    return values
+
+
+def _numeric_pair_values(
+    infos: Sequence[object],
+    *,
+    numerator_key: str,
+    denominator_key: str,
+) -> list[tuple[float, float]]:
+    values: list[tuple[float, float]] = []
+    for info in infos:
+        if not isinstance(info, dict):
+            continue
+        numerator = info.get(numerator_key)
+        denominator = info.get(denominator_key)
+        if isinstance(numerator, int | float) and isinstance(denominator, int | float):
+            values.append((float(numerator), float(denominator)))
     return values
 
 

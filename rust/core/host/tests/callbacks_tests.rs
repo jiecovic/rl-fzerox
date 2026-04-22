@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{CallbackState, StackedObservationRequest, runtime_root_for_core};
 use crate::core::observation::ObservationStackMode;
-use crate::core::video::{VideoCrop, VideoFrame};
+use crate::core::video::{VideoCrop, VideoFrame, VideoResizeFilter};
 
 static NEXT_RUNTIME_DIR_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -201,6 +201,7 @@ fn stacked_observation_request(
         target_height,
         rgb: true,
         crop: VideoCrop::default(),
+        resize_filter: VideoResizeFilter::Nearest,
         frame_stack,
         stack_mode,
         minimap_layer: None,

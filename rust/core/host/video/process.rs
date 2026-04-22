@@ -1,10 +1,10 @@
 // rust/core/host/video/process.rs
 use crate::core::error::CoreError;
-use crate::core::video::convert::sample_rgb;
 #[cfg(test)]
 use crate::core::video::plan::build_processed_frame_plan;
 use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
-use crate::core::video::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame};
+use crate::core::video::resize_rgb;
+use crate::core::video::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter};
 
 pub fn processed_frame(
     frame: &VideoFrame,
@@ -13,8 +13,9 @@ pub fn processed_frame(
     target_height: usize,
     rgb: bool,
     crop: VideoCrop,
+    resize_filter: VideoResizeFilter,
 ) -> Result<Vec<u8>, CoreError> {
-    let display_frame = processed_rgb_frame(frame, aspect_ratio, crop)?;
+    let display_frame = processed_rgb_frame(frame, aspect_ratio, crop, resize_filter)?;
     let resized = if display_frame.width != target_width || display_frame.height != target_height {
         resize_rgb(
             &display_frame.rgb,
@@ -22,7 +23,8 @@ pub fn processed_frame(
             display_frame.height,
             target_width,
             target_height,
-        )
+            resize_filter,
+        )?
     } else {
         display_frame.rgb
     };
@@ -38,6 +40,7 @@ pub fn processed_rgb_frame(
     frame: &VideoFrame,
     aspect_ratio: f64,
     crop: VideoCrop,
+    resize_filter: VideoResizeFilter,
 ) -> Result<VideoFrame, CoreError> {
     let (crop_x, crop_y, crop_width, crop_height) = crop_bounds(frame.width, frame.height, crop)?;
     let cropped =
@@ -62,7 +65,8 @@ pub fn processed_rgb_frame(
             crop_height,
             display_width,
             display_height,
-        )
+            resize_filter,
+        )?
     } else {
         cropped
     };
@@ -81,6 +85,7 @@ pub fn processed_frame_from_raw(
     target_height: usize,
     rgb: bool,
     crop: VideoCrop,
+    resize_filter: VideoResizeFilter,
 ) -> Result<Vec<u8>, CoreError> {
     let plan = build_processed_frame_plan(
         frame.width,
@@ -90,6 +95,7 @@ pub fn processed_frame_from_raw(
         target_height,
         rgb,
         crop,
+        resize_filter,
     )?;
     let mut output = Vec::new();
     processed_frame_from_raw_into(frame, &plan, &mut output)?;
@@ -101,46 +107,76 @@ pub fn processed_frame_from_raw_into(
     plan: &ProcessedFramePlan,
     output: &mut Vec<u8>,
 ) -> Result<(), CoreError> {
-    output.resize(plan.output_len, 0);
-
-    if plan.direct_row_copy {
-        for (output_y, &input_y) in plan.y_index.iter().enumerate() {
-            let dst_start = output_y * plan.key.target_width * 3;
-            let dst_end = dst_start + (plan.key.target_width * 3);
-            write_raw_rgb_row(
-                frame,
-                plan.crop_x,
-                plan.crop_y + input_y,
-                plan.key.target_width,
-                &mut output[dst_start..dst_end],
-            )?;
-        }
-        return Ok(());
-    }
+    let cropped = crop_raw_rgb(
+        frame,
+        plan.crop_x,
+        plan.crop_y,
+        plan.crop_width,
+        plan.crop_height,
+    )?;
+    let display_rgb =
+        if plan.display_width != plan.crop_width || plan.display_height != plan.crop_height {
+            resize_rgb(
+                &cropped,
+                plan.crop_width,
+                plan.crop_height,
+                plan.display_width,
+                plan.display_height,
+                plan.key.resize_filter,
+            )?
+        } else {
+            cropped
+        };
+    let target_rgb = if plan.key.target_width != plan.display_width
+        || plan.key.target_height != plan.display_height
+    {
+        resize_rgb(
+            &display_rgb,
+            plan.display_width,
+            plan.display_height,
+            plan.key.target_width,
+            plan.key.target_height,
+            plan.key.resize_filter,
+        )?
+    } else {
+        display_rgb
+    };
 
     if plan.key.rgb {
-        for (output_y, &input_y) in plan.y_index.iter().enumerate() {
-            for (output_x, &input_x) in plan.x_index.iter().enumerate() {
-                let rgb = sample_rgb(frame, plan.crop_x + input_x, plan.crop_y + input_y)
-                    .ok_or(CoreError::NoFrameAvailable)?;
-                let dst_index = (output_y * plan.key.target_width + output_x) * 3;
-                output[dst_index..dst_index + 3].copy_from_slice(&rgb);
-            }
-        }
-        return Ok(());
+        output.clear();
+        output.extend_from_slice(&target_rgb);
+    } else {
+        output.clear();
+        output.extend_from_slice(&to_grayscale(
+            &target_rgb,
+            plan.key.target_width,
+            plan.key.target_height,
+        ));
     }
-
-    for (output_y, &input_y) in plan.y_index.iter().enumerate() {
-        for (output_x, &input_x) in plan.x_index.iter().enumerate() {
-            let [red, green, blue] =
-                sample_rgb(frame, plan.crop_x + input_x, plan.crop_y + input_y)
-                    .ok_or(CoreError::NoFrameAvailable)?;
-            let gray =
-                (0.299_f32 * red as f32) + (0.587_f32 * green as f32) + (0.114_f32 * blue as f32);
-            output[output_y * plan.key.target_width + output_x] = gray.round() as u8;
-        }
-    }
+    debug_assert_eq!(output.len(), plan.output_len);
     Ok(())
+}
+
+fn crop_raw_rgb(
+    frame: &RawVideoFrame,
+    crop_x: usize,
+    crop_y: usize,
+    crop_width: usize,
+    crop_height: usize,
+) -> Result<Vec<u8>, CoreError> {
+    let mut cropped = vec![0_u8; crop_width * crop_height * 3];
+    for row in 0..crop_height {
+        let dst_start = row * crop_width * 3;
+        let dst_end = dst_start + (crop_width * 3);
+        write_raw_rgb_row(
+            frame,
+            crop_x,
+            crop_y + row,
+            crop_width,
+            &mut cropped[dst_start..dst_end],
+        )?;
+    }
+    Ok(cropped)
 }
 
 fn write_raw_rgb_row(
@@ -216,30 +252,6 @@ fn write_raw_rgb_row(
     }
 }
 
-fn resize_rgb(
-    rgb: &[u8],
-    input_width: usize,
-    input_height: usize,
-    output_width: usize,
-    output_height: usize,
-) -> Vec<u8> {
-    if input_width == output_width && input_height == output_height {
-        return rgb.to_vec();
-    }
-
-    let x_index = axis_index_map(input_width, output_width);
-    let y_index = axis_index_map(input_height, output_height);
-    let mut resized = vec![0_u8; output_width * output_height * 3];
-    for (output_y, &input_y) in y_index.iter().enumerate() {
-        for (output_x, &input_x) in x_index.iter().enumerate() {
-            let src_index = (input_y * input_width + input_x) * 3;
-            let dst_index = (output_y * output_width + output_x) * 3;
-            resized[dst_index..dst_index + 3].copy_from_slice(&rgb[src_index..src_index + 3]);
-        }
-    }
-    resized
-}
-
 fn crop_rgb(
     rgb: &[u8],
     frame_width: usize,
@@ -269,15 +281,4 @@ fn to_grayscale(rgb: &[u8], width: usize, height: usize) -> Vec<u8> {
         *pixel = value.round() as u8;
     }
     gray
-}
-
-fn axis_index_map(input_size: usize, output_size: usize) -> Vec<usize> {
-    if output_size <= 1 || input_size <= 1 {
-        return vec![0; output_size.max(1)];
-    }
-
-    let scale = (input_size - 1) as f64 / (output_size - 1) as f64;
-    (0..output_size)
-        .map(|index| ((index as f64) * scale).round() as usize)
-        .collect()
 }

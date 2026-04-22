@@ -9,6 +9,7 @@ use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{
     input::ControllerState,
     observation::{ObservationPreset, ObservationStackMode},
+    video::VideoResizeFilter,
 };
 
 /// Aggregated per-step features collected across repeated internal frames.
@@ -32,6 +33,8 @@ pub struct StepSummary {
     pub energy_gain_total: f32,
     /// Number of internal frames where the game damage pulse was active.
     pub damage_taken_frames: usize,
+    /// Number of internal frames where the player machine was airborne.
+    pub airborne_frames: usize,
     /// Low-speed streak length at the end of the repeated step.
     pub consecutive_low_speed_frames: usize,
     /// OR of state flags newly entered at least once during this env step.
@@ -249,6 +252,10 @@ pub struct RepeatedStepConfig {
     pub stack_mode: ObservationStackMode,
     /// Append a masked one-channel minimap crop after the stacked image channels.
     pub minimap_layer: bool,
+    /// Resize filter for camera observation frames.
+    pub resize_filter: VideoResizeFilter,
+    /// Resize filter for the optional minimap layer.
+    pub minimap_resize_filter: VideoResizeFilter,
     /// Speed threshold used by the stuck limit tracker.
     pub stuck_min_speed_kph: f32,
     /// Epsilon used for reward-side energy-loss aggregation.

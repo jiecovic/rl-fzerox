@@ -54,6 +54,9 @@ impl StepAccumulator {
         if telemetry.damage_taken() {
             self.summary.damage_taken_frames += 1;
         }
+        if telemetry.airborne() {
+            self.summary.airborne_frames += 1;
+        }
 
         let energy_delta = telemetry.energy - self.previous_energy;
         if energy_delta < -self.energy_loss_epsilon {

@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator,
 from rl_fzerox.core.config.schema_models.common import (
     LEGACY_OBSERVATION_PRESET_ALIASES,
     ObservationPresetName,
+    ObservationResizeFilter,
 )
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
@@ -107,8 +108,10 @@ class ObservationConfig(BaseModel):
     ] = "default"
     preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
-    stack_mode: Literal["rgb", "rgb_gray"] = "rgb"
+    stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb"
     minimap_layer: bool = False
+    resize_filter: ObservationResizeFilter = "nearest"
+    minimap_resize_filter: ObservationResizeFilter = "nearest"
     course_context: ObservationCourseContextName = "none"
     ground_effect_context: ObservationGroundEffectContextName = "none"
     action_history_len: PositiveInt | None = Field(default=None, le=16)

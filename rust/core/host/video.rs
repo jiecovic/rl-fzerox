@@ -8,6 +8,7 @@ mod capture;
 mod convert;
 mod plan;
 mod process;
+mod resize;
 mod types;
 
 pub use capture::{capture_raw_frame, capture_raw_frame_into};
@@ -18,7 +19,8 @@ pub use plan::{
     display_size,
 };
 pub use process::{processed_frame, processed_frame_from_raw_into};
-pub use types::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame};
+pub use resize::{resize_luma, resize_rgb};
+pub use types::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter};
 
 #[cfg(test)]
 use convert::{convert_argb1555, convert_argb8888, convert_rgb565};

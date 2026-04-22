@@ -41,7 +41,8 @@ class ObservationSpec:
     display_height: int
 
 
-ObservationStackMode: TypeAlias = Literal["rgb", "rgb_gray"]
+ObservationStackMode: TypeAlias = Literal["rgb", "rgb_gray", "gray", "luma_chroma"]
+ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 
 
 def stacked_observation_channels(
@@ -62,6 +63,10 @@ def stacked_observation_channels(
         if frame_stack == 1:
             return single_frame_channels + extra_channels
         return (frame_stack - 1) + single_frame_channels + extra_channels
+    if stack_mode == "gray":
+        return frame_stack + extra_channels
+    if stack_mode == "luma_chroma":
+        return (frame_stack * 2) + extra_channels
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
 
 
@@ -115,6 +120,8 @@ class EmulatorBackend(Protocol):
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -135,6 +142,8 @@ class EmulatorBackend(Protocol):
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
@@ -165,6 +174,8 @@ class EmulatorBackend(Protocol):
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
+        resize_filter: ObservationResizeFilter = "nearest",
+        minimap_resize_filter: ObservationResizeFilter = "nearest",
     ) -> ObservationFrame: ...
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None: ...

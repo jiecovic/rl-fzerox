@@ -585,6 +585,38 @@ def test_load_train_app_config_reads_compact_deep_extractor_profile(tmp_path: Pa
     assert config.policy.extractor.conv_profile == "compact_deep"
 
 
+def test_load_train_app_config_reads_square_gray_tiny_extractor_profile(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: crop_64x64",
+            "    stack_mode: gray",
+            "policy:",
+            "  extractor:",
+            "    conv_profile: tiny_256",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.observation.preset == "crop_64x64"
+    assert config.env.observation.stack_mode == "gray"
+    assert config.policy.extractor.conv_profile == "tiny_256"
+
+
 def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
