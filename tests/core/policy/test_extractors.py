@@ -147,6 +147,20 @@ def test_observation_extractor_nature_profile_supports_square_dqn_geometry() -> 
     assert tuple(features.shape) == (2, 3_136)
 
 
+def test_observation_extractor_nature_profile_supports_compact_aspect_geometry() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(76, 100, 9), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="nature",
+    )
+
+    observations = torch.zeros((2, 76, 100, 9), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 3_456
+    assert tuple(features.shape) == (2, 3_456)
+
+
 def test_observation_extractor_compact_bottleneck_profile_uses_compact_input() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(98, 130, 6), dtype=np.uint8),

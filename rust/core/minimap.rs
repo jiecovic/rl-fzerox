@@ -25,6 +25,39 @@ struct MinimapMaskSet {
     masks: [&'static [u8]; COURSE_COUNT],
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MinimapTransform {
+    Identity,
+    Rotate90Clockwise,
+}
+
+const COURSE_MINIMAP_TRANSFORMS: [MinimapTransform; COURSE_COUNT] = [
+    MinimapTransform::Identity,          // Mute City
+    MinimapTransform::Rotate90Clockwise, // Silence
+    MinimapTransform::Identity,          // Sand Ocean
+    MinimapTransform::Rotate90Clockwise, // Devil's Forest
+    MinimapTransform::Rotate90Clockwise, // Big Blue
+    MinimapTransform::Identity,          // Port Town
+    MinimapTransform::Identity,          // Sector Alpha
+    MinimapTransform::Identity,          // Red Canyon
+    MinimapTransform::Identity,          // Devil's Forest 2
+    MinimapTransform::Identity,          // Mute City 2
+    MinimapTransform::Identity,          // Big Blue 2
+    MinimapTransform::Identity,          // White Land
+    MinimapTransform::Rotate90Clockwise, // Fire Field
+    MinimapTransform::Identity,          // Silence 2
+    MinimapTransform::Identity,          // Sector Beta
+    MinimapTransform::Identity,          // Red Canyon 2
+    MinimapTransform::Identity,          // White Land 2
+    MinimapTransform::Identity,          // Mute City 3
+    MinimapTransform::Rotate90Clockwise, // Rainbow Road
+    MinimapTransform::Identity,          // Devil's Forest 3
+    MinimapTransform::Identity,          // Space Plant
+    MinimapTransform::Identity,          // Sand Ocean 2
+    MinimapTransform::Rotate90Clockwise, // Port Town 2
+    MinimapTransform::Identity,          // Big Hand
+];
+
 const GLIDEN64_ROI: MinimapRoi = MinimapRoi {
     x: 235,
     y: 133,
@@ -185,6 +218,7 @@ impl MinimapLayerRenderer {
             request,
             roi,
             mask,
+            course_minimap_transform(request.course_index),
             output,
             Some(&mut self.marker_scratch),
             sample,
@@ -302,10 +336,18 @@ fn mask_set(crop_profile: ObservationCropProfile) -> Option<MinimapMaskSet> {
     }
 }
 
+fn course_minimap_transform(course_index: usize) -> MinimapTransform {
+    COURSE_MINIMAP_TRANSFORMS
+        .get(course_index)
+        .copied()
+        .unwrap_or(MinimapTransform::Identity)
+}
+
 fn render_layer_into(
     request: MinimapLayerRequest,
     roi: MinimapRoi,
     mask: &[u8],
+    transform: MinimapTransform,
     output: &mut Vec<u8>,
     marker_layer: Option<&mut Vec<u8>>,
     mut sample: impl FnMut(usize, usize) -> Option<[u8; 3]>,
@@ -349,10 +391,19 @@ fn render_layer_into(
         }
     }
 
+    let (roi_output, layer_width, layer_height) =
+        transform_luma_layer(&roi_output, roi.width, roi.height, transform);
+    if let Some(marker_layer) = marker_layer.as_deref_mut() {
+        let (transformed_marker, _, _) =
+            transform_luma_layer(marker_layer, roi.width, roi.height, transform);
+        marker_layer.clear();
+        marker_layer.extend_from_slice(&transformed_marker);
+    }
+
     let resized_output = resize_luma(
         &roi_output,
-        roi.width,
-        roi.height,
+        layer_width,
+        layer_height,
         request.target_width,
         request.target_height,
         request.resize_filter,
@@ -362,8 +413,8 @@ fn render_layer_into(
     if let Some(marker_layer) = marker_layer.as_deref_mut() {
         let resized_marker = resize_luma(
             marker_layer,
-            roi.width,
-            roi.height,
+            layer_width,
+            layer_height,
             request.target_width,
             request.target_height,
             VideoResizeFilter::Nearest,
@@ -373,6 +424,33 @@ fn render_layer_into(
     }
     debug_assert_eq!(output.len(), output_len);
     Ok(marker_count)
+}
+
+fn transform_luma_layer(
+    layer: &[u8],
+    width: usize,
+    height: usize,
+    transform: MinimapTransform,
+) -> (Vec<u8>, usize, usize) {
+    match transform {
+        MinimapTransform::Identity => (layer.to_vec(), width, height),
+        MinimapTransform::Rotate90Clockwise => rotate_luma_90_clockwise(layer, width, height),
+    }
+}
+
+fn rotate_luma_90_clockwise(layer: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {
+    let output_width = height;
+    let output_height = width;
+    let mut output = vec![0_u8; layer.len()];
+    for y in 0..height {
+        for x in 0..width {
+            let source_index = y * width + x;
+            let target_x = height - 1 - y;
+            let target_y = x;
+            output[target_y * output_width + target_x] = layer[source_index];
+        }
+    }
+    (output, output_width, output_height)
 }
 
 fn write_zero_layer(request: MinimapLayerRequest, output: &mut Vec<u8>) -> Result<(), CoreError> {
@@ -417,6 +495,30 @@ mod tests {
     #[test]
     fn embedded_angrylion_roi_is_double_width_renderer_variant() {
         assert_eq!(ANGRYLION_ROI.width, GLIDEN64_ROI.width * 2);
+    }
+
+    #[test]
+    fn silence_minimap_rotates_before_resize() {
+        let request = test_request_for_course_and_size(1, 3, 2);
+        let roi = MinimapRoi {
+            x: 0,
+            y: 0,
+            width: 2,
+            height: 3,
+        };
+        let mask = [
+            1_u8, 0_u8, //
+            0_u8, 1_u8, //
+            1_u8, 0_u8,
+        ];
+        let mut renderer = MinimapLayerRenderer::default();
+        let mut output = Vec::new();
+
+        renderer
+            .render_with_marker_hold(request, roi, &mask, &mut output, |_, _| Some([0, 0, 0]))
+            .expect("rotated minimap layer should render");
+
+        assert_eq!(output, [TRACK_LUMA, 0, TRACK_LUMA, 0, TRACK_LUMA, 0,]);
     }
 
     #[test]
@@ -576,11 +678,19 @@ mod tests {
     }
 
     fn test_request_for_width(width: usize) -> MinimapLayerRequest {
+        test_request_for_course_and_size(0, width, 1)
+    }
+
+    fn test_request_for_course_and_size(
+        course_index: usize,
+        target_width: usize,
+        target_height: usize,
+    ) -> MinimapLayerRequest {
         MinimapLayerRequest {
             crop_profile: ObservationCropProfile::Gliden64,
-            course_index: 0,
-            target_width: width,
-            target_height: 1,
+            course_index,
+            target_width,
+            target_height,
             resize_filter: VideoResizeFilter::Nearest,
         }
     }

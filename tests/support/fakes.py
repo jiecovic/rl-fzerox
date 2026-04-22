@@ -144,6 +144,8 @@ class SyntheticBackend:
             width, height = (68, 68)
         elif canonical_preset == "crop_84x84":
             width, height = (84, 84)
+        elif canonical_preset == "crop_76x100":
+            width, height = (100, 76)
         else:
             width, height = (64, 64)
         return ObservationSpec(
@@ -478,6 +480,7 @@ def _canonical_observation_preset(preset: str) -> str | None:
         "crop_66x82": "crop_66x82",
         "crop_68x68": "crop_68x68",
         "crop_84x84": "crop_84x84",
+        "crop_76x100": "crop_76x100",
         "crop_64x64": "crop_64x64",
         # V4 LEGACY SHIM: tests can still load stale run manifests.
         "native_crop_v1": "crop_84x116",
