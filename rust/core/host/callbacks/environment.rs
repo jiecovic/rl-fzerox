@@ -3,9 +3,13 @@
 
 use bitflags::bitflags;
 use libretro_sys::{
-    ENVIRONMENT_SET_CONTROLLER_INFO, ENVIRONMENT_SET_INPUT_DESCRIPTORS,
-    ENVIRONMENT_SET_MEMORY_MAPS, ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK,
-    ENVIRONMENT_SET_SUBSYSTEM_INFO,
+    ENVIRONMENT_GET_CAN_DUPE, ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
+    ENVIRONMENT_GET_LIBRETRO_PATH, ENVIRONMENT_GET_LOG_INTERFACE, ENVIRONMENT_GET_OVERSCAN,
+    ENVIRONMENT_GET_SAVE_DIRECTORY, ENVIRONMENT_GET_SYSTEM_DIRECTORY, ENVIRONMENT_GET_VARIABLE,
+    ENVIRONMENT_GET_VARIABLE_UPDATE, ENVIRONMENT_SET_CONTROLLER_INFO, ENVIRONMENT_SET_GEOMETRY,
+    ENVIRONMENT_SET_HW_RENDER, ENVIRONMENT_SET_INPUT_DESCRIPTORS, ENVIRONMENT_SET_MEMORY_MAPS,
+    ENVIRONMENT_SET_PIXEL_FORMAT, ENVIRONMENT_SET_PROC_ADDRESS_CALLBACK,
+    ENVIRONMENT_SET_SUBSYSTEM_INFO, ENVIRONMENT_SET_VARIABLES,
 };
 
 const ENVIRONMENT_EXPERIMENTAL: u32 = 0x10000;
@@ -24,6 +28,30 @@ pub(super) enum EnvironmentCmd {
     SetCoreOptionsUpdateDisplayCallback = 69,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum EnvironmentCommand {
+    SetVariables,
+    GetVariable,
+    GetVariableUpdate,
+    GetSystemDirectory,
+    GetSaveDirectory,
+    GetLibretroPath,
+    GetLogInterface,
+    SetPixelFormat,
+    GetOverscan,
+    GetCanDupe,
+    GetInputBitmasks,
+    GetFastForwarding,
+    GetTargetRefreshRate,
+    GetAudioVideoEnable,
+    GetCoreOptionsVersion,
+    SetGeometry,
+    GetCurrentSoftwareFramebuffer,
+    SetHardwareRender,
+    Passthrough,
+    Unknown,
+}
+
 bitflags! {
     // Flags returned for ENVIRONMENT_GET_AUDIO_VIDEO_ENABLE from libretro.h.
     pub(super) struct AudioVideoEnable: u32 {
@@ -35,6 +63,39 @@ bitflags! {
 impl EnvironmentCmd {
     pub(super) const fn code(self) -> u32 {
         self as u32
+    }
+}
+
+impl EnvironmentCommand {
+    pub(super) fn from_raw(cmd: u32) -> Self {
+        match cmd {
+            ENVIRONMENT_SET_VARIABLES => Self::SetVariables,
+            ENVIRONMENT_GET_VARIABLE => Self::GetVariable,
+            ENVIRONMENT_GET_VARIABLE_UPDATE => Self::GetVariableUpdate,
+            ENVIRONMENT_GET_SYSTEM_DIRECTORY => Self::GetSystemDirectory,
+            ENVIRONMENT_GET_SAVE_DIRECTORY => Self::GetSaveDirectory,
+            ENVIRONMENT_GET_LIBRETRO_PATH => Self::GetLibretroPath,
+            ENVIRONMENT_GET_LOG_INTERFACE => Self::GetLogInterface,
+            ENVIRONMENT_SET_PIXEL_FORMAT => Self::SetPixelFormat,
+            ENVIRONMENT_GET_OVERSCAN => Self::GetOverscan,
+            ENVIRONMENT_GET_CAN_DUPE => Self::GetCanDupe,
+            ENVIRONMENT_SET_GEOMETRY => Self::SetGeometry,
+            ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER => Self::GetCurrentSoftwareFramebuffer,
+            ENVIRONMENT_SET_HW_RENDER => Self::SetHardwareRender,
+            value if value == EnvironmentCmd::GetInputBitmasks.code() => Self::GetInputBitmasks,
+            value if value == EnvironmentCmd::GetFastForwarding.code() => Self::GetFastForwarding,
+            value if value == EnvironmentCmd::GetTargetRefreshRate.code() => {
+                Self::GetTargetRefreshRate
+            }
+            value if value == EnvironmentCmd::GetAudioVideoEnable.code() => {
+                Self::GetAudioVideoEnable
+            }
+            value if value == EnvironmentCmd::GetCoreOptionsVersion.code() => {
+                Self::GetCoreOptionsVersion
+            }
+            value if is_passthrough_environment_cmd(value) => Self::Passthrough,
+            _ => Self::Unknown,
+        }
     }
 }
 
