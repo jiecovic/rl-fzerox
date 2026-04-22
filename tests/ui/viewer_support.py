@@ -9,6 +9,8 @@ def sample_telemetry(
     state_flags: int | None = None,
     reverse_timer: int = 0,
     boost_timer: int = 0,
+    game_mode_raw: int = 1,
+    game_mode_name: str = "gp_race",
     difficulty_raw: int = 0,
     difficulty_name: str = "novice",
     camera_setting_raw: int = 2,
@@ -41,6 +43,8 @@ def sample_telemetry(
     return make_telemetry(
         state_labels=state_labels,
         state_flags=state_flags,
+        game_mode_raw=game_mode_raw,
+        game_mode_name=game_mode_name,
         speed_kph=0.0,
         reverse_timer=reverse_timer,
         boost_timer=boost_timer,
