@@ -3,7 +3,7 @@ from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from rl_fzerox.core.config.schema import ActionConfig, ActionMaskConfig, EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.masks import (
+from rl_fzerox.core.envs.engine.controls import (
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
 )

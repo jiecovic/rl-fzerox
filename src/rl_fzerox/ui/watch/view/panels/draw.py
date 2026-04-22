@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
+from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_column_widths

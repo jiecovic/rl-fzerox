@@ -8,7 +8,7 @@ from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.masks import action_mask_violations
+from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state

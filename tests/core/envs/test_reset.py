@@ -18,7 +18,7 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
 )
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.tracks import TrackBaselineCache
+from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
 from tests.core.envs.helpers import (
     CameraSyncBackend,
     ScriptedStepBackend,

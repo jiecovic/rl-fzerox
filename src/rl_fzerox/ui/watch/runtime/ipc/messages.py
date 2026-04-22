@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
+from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 
 
 @dataclass(frozen=True)

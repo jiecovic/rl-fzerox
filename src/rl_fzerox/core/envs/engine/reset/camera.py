@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/engine/camera.py
+# src/rl_fzerox/core/envs/engine/reset/camera.py
 from __future__ import annotations
 
 from dataclasses import dataclass

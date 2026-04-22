@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/engine/control_gates.py
+# src/rl_fzerox/core/envs/engine/controls/gates.py
 from __future__ import annotations
 
 from fzerox_emulator import ControllerState

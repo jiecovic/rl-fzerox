@@ -8,7 +8,7 @@ from fzerox_emulator.arrays import ActionMask, RgbFrame
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
-from rl_fzerox.core.envs.engine.masks import ActionMaskBranches, ActionMaskSnapshot
+from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.observations import ObservationValue
 
 

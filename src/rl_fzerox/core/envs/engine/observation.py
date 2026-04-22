@@ -12,7 +12,7 @@ from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
     StateComponentsSettings,
 )
-from rl_fzerox.core.envs.engine.control_state import ControlStateTracker
+from rl_fzerox.core.envs.engine.controls import ControlStateTracker
 from rl_fzerox.core.envs.engine.info import set_observation_info
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
