@@ -43,12 +43,10 @@ pub(crate) fn convert_argb8888(
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 4) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 4;
-            let dst_index = column * 3;
-            dst[dst_index] = src[src_index + 2];
-            dst[dst_index + 1] = src[src_index + 1];
-            dst[dst_index + 2] = src[src_index];
+        for (src_pixel, dst_pixel) in src.chunks_exact(4).zip(dst.chunks_exact_mut(3)) {
+            dst_pixel[0] = src_pixel[2];
+            dst_pixel[1] = src_pixel[1];
+            dst_pixel[2] = src_pixel[0];
         }
     }
     rgb
@@ -65,17 +63,15 @@ pub(crate) fn convert_rgb565(
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 2;
-            let pixel = u16::from_le_bytes([src[src_index], src[src_index + 1]]);
+        for (src_pixel, dst_pixel) in src.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
+            let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
             let red = ((pixel >> 11) & 0x1f) as u8;
             let green = ((pixel >> 5) & 0x3f) as u8;
             let blue = (pixel & 0x1f) as u8;
 
-            let dst_index = column * 3;
-            dst[dst_index] = expand_5_to_8(red);
-            dst[dst_index + 1] = expand_6_to_8(green);
-            dst[dst_index + 2] = expand_5_to_8(blue);
+            dst_pixel[0] = expand_5_to_8(red);
+            dst_pixel[1] = expand_6_to_8(green);
+            dst_pixel[2] = expand_5_to_8(blue);
         }
     }
     rgb
@@ -92,17 +88,15 @@ pub(crate) fn convert_argb1555(
         let src =
             unsafe { std::slice::from_raw_parts((data as *const u8).add(row * pitch), width * 2) };
         let dst = &mut rgb[row * width * 3..(row + 1) * width * 3];
-        for column in 0..width {
-            let src_index = column * 2;
-            let pixel = u16::from_le_bytes([src[src_index], src[src_index + 1]]);
+        for (src_pixel, dst_pixel) in src.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
+            let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
             let red = ((pixel >> 10) & 0x1f) as u8;
             let green = ((pixel >> 5) & 0x1f) as u8;
             let blue = (pixel & 0x1f) as u8;
 
-            let dst_index = column * 3;
-            dst[dst_index] = expand_5_to_8(red);
-            dst[dst_index + 1] = expand_5_to_8(green);
-            dst[dst_index + 2] = expand_5_to_8(blue);
+            dst_pixel[0] = expand_5_to_8(red);
+            dst_pixel[1] = expand_5_to_8(green);
+            dst_pixel[2] = expand_5_to_8(blue);
         }
     }
     rgb
@@ -149,11 +143,11 @@ fn read_le_u16(frame: &RawVideoFrame, x: usize, y: usize) -> Option<u16> {
 }
 
 #[inline(always)]
-fn expand_5_to_8(value: u8) -> u8 {
+pub(super) fn expand_5_to_8(value: u8) -> u8 {
     (value << 3) | (value >> 2)
 }
 
 #[inline(always)]
-fn expand_6_to_8(value: u8) -> u8 {
+pub(super) fn expand_6_to_8(value: u8) -> u8 {
     (value << 2) | (value >> 4)
 }

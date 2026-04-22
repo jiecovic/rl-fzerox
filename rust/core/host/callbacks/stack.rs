@@ -4,7 +4,9 @@
 use crate::core::error::CoreError;
 use crate::core::minimap::MinimapLayerRequest;
 use crate::core::observation::ObservationStackMode;
-use crate::core::video::{ProcessedFramePlanKey, VideoCrop, VideoResizeFilter};
+use crate::core::video::{
+    ProcessedFramePlanKey, VideoCrop, VideoResizeFilter, rgb_to_luma, rgb_to_yellow_purple_chroma,
+};
 
 pub(crate) struct StackedObservationRequest {
     pub aspect_ratio: f64,
@@ -214,18 +216,6 @@ impl StackedObservationBuffer {
             self.bytes[dst] = *value;
         }
     }
-}
-
-#[inline(always)]
-fn rgb_to_luma(red: u8, green: u8, blue: u8) -> u8 {
-    let weighted = (77 * u16::from(red)) + (150 * u16::from(green)) + (29 * u16::from(blue)) + 128;
-    (weighted >> 8) as u8
-}
-
-#[inline(always)]
-fn rgb_to_yellow_purple_chroma(red: u8, green: u8, blue: u8) -> u8 {
-    let opponent = (2 * i16::from(green)) - i16::from(red) - i16::from(blue);
-    (128 + (opponent / 4)).clamp(0, 255) as u8
 }
 
 #[cfg(test)]

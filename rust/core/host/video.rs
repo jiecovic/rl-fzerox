@@ -5,6 +5,7 @@
 //! generation, and output processing.
 
 mod capture;
+mod color;
 mod convert;
 mod plan;
 mod process;
@@ -12,6 +13,7 @@ mod resize;
 mod types;
 
 pub use capture::{capture_raw_frame, capture_raw_frame_into};
+pub(crate) use color::{rgb_to_luma, rgb_to_luma_vec, rgb_to_yellow_purple_chroma};
 pub use convert::decode_frame;
 pub(crate) use convert::sample_rgb;
 pub use plan::{
