@@ -106,15 +106,14 @@ impl CallbackState {
             extra_channels_per_pixel: usize::from(request.minimap_layer.is_some()),
         };
         self.render_observation_into_buffer(render_request)?;
-        let minimap_layer = match request.minimap_layer {
-            Some(minimap_request) => {
-                self.render_minimap_layer_into_buffer(minimap_request)?;
-                Some(self.minimap_buffer.clone())
-            }
-            None => None,
-        };
+        if let Some(minimap_request) = request.minimap_layer {
+            self.render_minimap_layer_into_buffer(minimap_request)?;
+        }
 
         let observation_buffer = self.observation_buffer.as_slice();
+        let minimap_layer = request
+            .minimap_layer
+            .map(|_| self.minimap_buffer.as_slice());
         let stack_buffer = self
             .stacked_observation_buffers
             .entry(stack_key)
@@ -127,7 +126,7 @@ impl CallbackState {
                     usize::from(request.minimap_layer.is_some()),
                 )
             });
-        stack_buffer.update(observation_buffer, frame_serial, minimap_layer.as_deref())?;
+        stack_buffer.update(observation_buffer, frame_serial, minimap_layer)?;
         Ok(stack_buffer.as_slice())
     }
 
