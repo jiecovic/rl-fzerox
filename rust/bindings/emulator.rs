@@ -1,5 +1,5 @@
 // rust/bindings/emulator.rs
-//! Python binding for the native libretro host runtime.
+//! Python binding facade for the native libretro host runtime.
 
 use std::path::Path;
 
@@ -8,21 +8,17 @@ use pyo3::types::{PyBytes, PyDict, PyTuple};
 
 use crate::bindings::error::map_core_error;
 use crate::core::error::CoreError;
-use crate::core::host::{Host, RepeatedStepConfig};
-use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationStackMode};
+use crate::core::host::Host;
 use crate::core::video::VideoResizeFilter;
 
 mod frame;
+mod methods;
 mod state;
 mod step;
 mod telemetry;
 
-use frame::{frame_to_pyarray, frames_to_pylist};
 pub use state::encode_state_flags;
 pub use step::{PyStepStatus, PyStepSummary};
-use step::{step_status_to_py, step_summary_to_py};
-use telemetry::telemetry_to_py;
 pub use telemetry::{PyPlayerTelemetry, PyTelemetry};
 
 #[derive(Debug)]
@@ -136,13 +132,12 @@ impl PyEmulator {
     }
 
     fn reset(&mut self, py: Python<'_>) -> PyResult<()> {
-        py.detach(|| self.host.reset()).map_err(map_core_error)
+        methods::control::reset(self, py)
     }
 
     #[pyo3(signature = (count=1, capture_video=true))]
     fn step_frames(&mut self, py: Python<'_>, count: usize, capture_video: bool) -> PyResult<()> {
-        py.detach(|| self.host.step_frames(count, capture_video))
-            .map_err(map_core_error)
+        methods::control::step_frames(self, py, count, capture_video)
     }
 
     #[pyo3(signature = (
@@ -194,61 +189,32 @@ impl PyEmulator {
         right_stick_x: f32,
         right_stick_y: f32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
-        let resize_filter = parse_resize_filter(resize_filter)?;
-        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
-        let spec = py
-            .detach(|| self.host.observation_spec(preset))
-            .map_err(map_core_error)?;
-        let controller_state = ControllerState::from_normalized(
-            joypad_mask,
-            left_stick_x,
-            left_stick_y,
-            right_stick_x,
-            right_stick_y,
-        );
-        let result = py
-            .detach(|| {
-                self.host.step_repeat_raw(RepeatedStepConfig {
-                    controller_state,
-                    action_repeat,
-                    preset,
-                    frame_stack,
-                    stack_mode,
-                    minimap_layer,
-                    resize_filter,
-                    minimap_resize_filter,
-                    stuck_min_speed_kph,
-                    energy_loss_epsilon,
-                    max_episode_steps,
-                    stuck_step_limit,
-                    wrong_way_timer_limit,
-                    progress_frontier_stall_limit_frames,
-                    progress_frontier_epsilon,
-                    terminate_on_energy_depleted,
-                    lean_timer_assist,
-                })
-            })
-            .map_err(map_core_error)?;
-        let observation = frame_to_pyarray(
+        methods::repeat::step_repeat_raw(
+            self,
             py,
-            result.observation,
-            spec.frame_height,
-            spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
-        )?;
-        let summary = step_summary_to_py(py, &result.summary)?;
-        let status = step_status_to_py(py, &result.status)?;
-        let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
-        PyTuple::new(
-            py,
-            [
-                observation,
-                summary.into_bound(py).into_any(),
-                status.into_bound(py).into_any(),
-                telemetry.into_bound(py).into_any(),
-            ],
+            methods::repeat::RepeatStepArgs {
+                action_repeat,
+                preset,
+                frame_stack,
+                stuck_min_speed_kph,
+                energy_loss_epsilon,
+                max_episode_steps,
+                stuck_step_limit,
+                wrong_way_timer_limit,
+                progress_frontier_stall_limit_frames,
+                progress_frontier_epsilon,
+                terminate_on_energy_depleted,
+                lean_timer_assist,
+                stack_mode,
+                minimap_layer,
+                resize_filter,
+                minimap_resize_filter,
+                joypad_mask,
+                left_stick_x,
+                left_stick_y,
+                right_stick_x,
+                right_stick_y,
+            },
         )
     }
 
@@ -301,69 +267,32 @@ impl PyEmulator {
         right_stick_x: f32,
         right_stick_y: f32,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
-        let resize_filter = parse_resize_filter(resize_filter)?;
-        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
-        let spec = py
-            .detach(|| self.host.observation_spec(preset))
-            .map_err(map_core_error)?;
-        let controller_state = ControllerState::from_normalized(
-            joypad_mask,
-            left_stick_x,
-            left_stick_y,
-            right_stick_x,
-            right_stick_y,
-        );
-        let result = py
-            .detach(|| {
-                self.host.step_repeat_watch_raw(RepeatedStepConfig {
-                    controller_state,
-                    action_repeat,
-                    preset,
-                    frame_stack,
-                    stack_mode,
-                    minimap_layer,
-                    resize_filter,
-                    minimap_resize_filter,
-                    stuck_min_speed_kph,
-                    energy_loss_epsilon,
-                    max_episode_steps,
-                    stuck_step_limit,
-                    wrong_way_timer_limit,
-                    progress_frontier_stall_limit_frames,
-                    progress_frontier_epsilon,
-                    terminate_on_energy_depleted,
-                    lean_timer_assist,
-                })
-            })
-            .map_err(map_core_error)?;
-        let observation = frame_to_pyarray(
+        methods::repeat::step_repeat_watch_raw(
+            self,
             py,
-            result.observation,
-            spec.frame_height,
-            spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
-        )?;
-        let display_frames = frames_to_pylist(
-            py,
-            &result.display_frames,
-            spec.display_height,
-            spec.display_width,
-            3,
-        )?;
-        let summary = step_summary_to_py(py, &result.summary)?;
-        let status = step_status_to_py(py, &result.status)?;
-        let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
-        PyTuple::new(
-            py,
-            [
-                observation,
-                display_frames.into_any(),
-                summary.into_bound(py).into_any(),
-                status.into_bound(py).into_any(),
-                telemetry.into_bound(py).into_any(),
-            ],
+            methods::repeat::RepeatStepArgs {
+                action_repeat,
+                preset,
+                frame_stack,
+                stuck_min_speed_kph,
+                energy_loss_epsilon,
+                max_episode_steps,
+                stuck_step_limit,
+                wrong_way_timer_limit,
+                progress_frontier_stall_limit_frames,
+                progress_frontier_epsilon,
+                terminate_on_energy_depleted,
+                lean_timer_assist,
+                stack_mode,
+                minimap_layer,
+                resize_filter,
+                minimap_resize_filter,
+                joypad_mask,
+                left_stick_x,
+                left_stick_y,
+                right_stick_x,
+                right_stick_y,
+            },
         )
     }
 
@@ -383,42 +312,36 @@ impl PyEmulator {
         right_stick_x: f32,
         right_stick_y: f32,
     ) -> PyResult<()> {
-        let controller_state = ControllerState::from_normalized(
+        methods::control::set_controller_state(
+            self,
+            py,
             joypad_mask,
             left_stick_x,
             left_stick_y,
             right_stick_x,
             right_stick_y,
-        );
-        py.detach(|| self.host.set_controller_state(controller_state))
-            .map_err(map_core_error)
+        )
     }
 
     fn save_state(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
-        py.detach(|| self.host.save_state(Path::new(path)))
-            .map_err(map_core_error)
+        methods::control::save_state(self, py, path)
     }
 
     fn load_baseline(&mut self, py: Python<'_>, path: &str) -> PyResult<()> {
-        py.detach(|| self.host.load_baseline(Path::new(path)))
-            .map_err(map_core_error)
+        methods::control::load_baseline(self, py, path)
     }
 
     fn load_baseline_bytes(&mut self, state: &Bound<'_, PyBytes>) -> PyResult<()> {
-        self.host
-            .load_baseline_bytes(state.as_bytes())
-            .map_err(map_core_error)
+        methods::control::load_baseline_bytes(self, state)
     }
 
     #[pyo3(signature = (path=None))]
     fn capture_current_as_baseline(&mut self, py: Python<'_>, path: Option<&str>) -> PyResult<()> {
-        py.detach(|| self.host.capture_current_as_baseline(path.map(Path::new)))
-            .map_err(map_core_error)
+        methods::control::capture_current_as_baseline(self, py, path)
     }
 
     fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
-        let frame = self.host.frame_rgb().map_err(map_core_error)?;
-        Ok(PyBytes::new(py, frame))
+        methods::frame::frame_rgb(self, py)
     }
 
     fn observation_spec<'py>(
@@ -426,18 +349,7 @@ impl PyEmulator {
         py: Python<'py>,
         preset: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let spec = py
-            .detach(|| self.host.observation_spec(preset))
-            .map_err(map_core_error)?;
-        let dict = PyDict::new(py);
-        dict.set_item("preset", spec.preset_name)?;
-        dict.set_item("width", spec.frame_width)?;
-        dict.set_item("height", spec.frame_height)?;
-        dict.set_item("channels", spec.channels)?;
-        dict.set_item("display_width", spec.display_width)?;
-        dict.set_item("display_height", spec.display_height)?;
-        Ok(dict)
+        methods::frame::observation_spec(self, py, preset)
     }
 
     #[pyo3(signature = (preset, frame_stack, options=None))]
@@ -448,54 +360,16 @@ impl PyEmulator {
         frame_stack: usize,
         options: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let options = FrameObservationOptions::from_py_dict(options)?;
-        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let stack_mode =
-            ObservationStackMode::parse(&options.stack_mode).map_err(map_core_error)?;
-        let resize_filter = parse_resize_filter(&options.resize_filter)?;
-        let minimap_resize_filter = parse_resize_filter(&options.minimap_resize_filter)?;
-        let spec = py
-            .detach(|| self.host.observation_spec(preset))
-            .map_err(map_core_error)?;
-        let frame = py
-            .detach(|| {
-                self.host.observation_frame(
-                    preset,
-                    frame_stack,
-                    stack_mode,
-                    options.minimap_layer,
-                    resize_filter,
-                    minimap_resize_filter,
-                )
-            })
-            .map_err(map_core_error)?;
-        frame_to_pyarray(
-            py,
-            frame,
-            spec.frame_height,
-            spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack)
-                + usize::from(options.minimap_layer),
-        )
+        methods::frame::frame_observation(self, py, preset, frame_stack, options)
     }
 
     #[pyo3(signature = (preset))]
     fn frame_display<'py>(&mut self, py: Python<'py>, preset: &str) -> PyResult<Bound<'py, PyAny>> {
-        let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let spec = py
-            .detach(|| self.host.observation_spec(preset))
-            .map_err(map_core_error)?;
-        let frame = py
-            .detach(|| self.host.display_frame(preset))
-            .map_err(map_core_error)?;
-        frame_to_pyarray(py, frame, spec.display_height, spec.display_width, 3)
+        methods::frame::frame_display(self, py, preset)
     }
 
     fn telemetry(&mut self, py: Python<'_>) -> PyResult<Py<PyTelemetry>> {
-        let telemetry = py
-            .detach(|| self.host.telemetry())
-            .map_err(map_core_error)?;
-        telemetry_to_py(py, &telemetry)
+        methods::control::telemetry(self, py)
     }
 
     fn read_system_ram<'py>(
@@ -504,10 +378,7 @@ impl PyEmulator {
         offset: usize,
         length: usize,
     ) -> PyResult<Bound<'py, PyBytes>> {
-        let bytes = py
-            .detach(|| self.host.read_system_ram(offset, length))
-            .map_err(map_core_error)?;
-        Ok(PyBytes::new(py, &bytes))
+        methods::control::read_system_ram(self, py, offset, length)
     }
 
     fn write_system_ram(
@@ -516,27 +387,19 @@ impl PyEmulator {
         offset: usize,
         data: &Bound<'_, PyBytes>,
     ) -> PyResult<()> {
-        let bytes = data.as_bytes().to_vec();
-        py.detach(|| self.host.write_system_ram(offset, &bytes))
-            .map_err(map_core_error)
+        methods::control::write_system_ram(self, py, offset, data)
     }
 
     fn game_rng_state(&mut self, py: Python<'_>) -> PyResult<(u32, u32, u32, u32)> {
-        let state = py
-            .detach(|| self.host.game_rng_state())
-            .map_err(map_core_error)?;
-        Ok(state.as_tuple())
+        methods::control::game_rng_state(self, py)
     }
 
     fn randomize_game_rng(&mut self, py: Python<'_>, seed: u64) -> PyResult<(u32, u32, u32, u32)> {
-        let state = py
-            .detach(|| self.host.randomize_game_rng(seed))
-            .map_err(map_core_error)?;
-        Ok(state.as_tuple())
+        methods::control::randomize_game_rng(self, py, seed)
     }
 
     fn close(&mut self) {
-        self.host.close();
+        methods::control::close(self);
     }
 }
 
