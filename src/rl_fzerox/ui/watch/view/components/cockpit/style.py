@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/components/cockpit/style.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from rl_fzerox.core.envs.state_observation import STATE_SPEED_NORMALIZER_KPH
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
@@ -71,6 +71,22 @@ class SteerGaugeStyle:
 
 
 @dataclass(frozen=True)
+class PolicyModeSwitchStyle:
+    """Top-down switch sprite for deterministic versus stochastic playback."""
+
+    switch_width: int = 50
+    height: int = 42
+    label_gap: int = 8
+    y_offset: int = 2
+    asset_package: str = "rl_fzerox.ui.watch.view.assets"
+    on_asset: str = "policy_switch_on.png"
+    off_asset: str = "policy_switch_off.png"
+    disabled_asset: str = "policy_switch_disabled.png"
+    active_text: Color = (244, 218, 132)
+    inactive_text: Color = PALETTE.text_muted
+
+
+@dataclass(frozen=True)
 class CockpitPanelStyle:
     """Shared cockpit panel colors."""
 
@@ -80,6 +96,7 @@ class CockpitPanelStyle:
     fill: Color = (14, 19, 25)
     border: Color = (74, 91, 112)
     grid: Color = (31, 42, 54)
+    policy_mode_switch: PolicyModeSwitchStyle = field(default_factory=PolicyModeSwitchStyle)
 
 
 @dataclass(frozen=True)

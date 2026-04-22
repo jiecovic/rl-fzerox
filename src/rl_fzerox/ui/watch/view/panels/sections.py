@@ -15,7 +15,6 @@ from rl_fzerox.ui.watch.view.panels.format import (
     _format_policy_action,
     _format_progress_frontier_counter,
     _format_reload_age,
-    _format_reload_error,
     _format_render_rate,
     _format_reverse_counter,
     _format_stuck_counter,
@@ -60,6 +59,7 @@ def _build_panel_columns(
     action_mask_branches: ActionMaskBranches | None = None,
     best_finish_position: int | None = None,
     best_finish_times: dict[str, int] | None = None,
+    latest_finish_times: dict[str, int] | None = None,
     track_pool_records: tuple[dict[str, object], ...] = (),
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -86,11 +86,6 @@ def _build_panel_columns(
                         "State",
                         "paused" if paused else "running",
                         PALETTE.text_warning if paused else PALETTE.text_accent,
-                    ),
-                    _panel_line(
-                        "Policy",
-                        policy_label if policy_label is not None else "manual",
-                        PALETTE.text_primary,
                     ),
                     _panel_line(
                         "Checkpoint stage",
@@ -120,15 +115,6 @@ def _build_panel_columns(
                         "Reload",
                         _format_reload_age(policy_reload_age_seconds),
                         PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Last reload err",
-                        _format_reload_error(policy_reload_error),
-                        PALETTE.text_warning
-                        if policy_reload_error is not None
-                        else PALETTE.text_muted,
-                        wrap=True,
-                        min_value_lines=2,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line(
@@ -197,6 +183,7 @@ def _build_panel_columns(
                 current_info=info,
                 track_pool_records=track_pool_records,
                 best_finish_times=best_finish_times or {},
+                latest_finish_times=latest_finish_times or {},
             ),
         ],
         middle=[
@@ -238,6 +225,8 @@ def _build_panel_columns(
                         _format_render_rate(info),
                         PALETTE.text_primary,
                     ),
+                    _panel_line("Keys", "P pause  N step  +/- speed", PALETTE.text_muted),
+                    _panel_line("More keys", "R reset  K save  D/click policy", PALETTE.text_muted),
                 ],
             ),
             *track_geometry_sections(telemetry),
@@ -332,7 +321,7 @@ def _format_reward_value(value: float) -> str:
 def _format_policy_deterministic(value: bool | None) -> str:
     if value is None:
         return "-"
-    return "true" if value else "false"
+    return "deterministic" if value else "stochastic"
 
 
 def _format_env_curriculum_stage(info: dict[str, object]) -> str:

@@ -11,15 +11,22 @@ def track_record_sections(
     current_info: dict[str, object],
     track_pool_records: tuple[dict[str, object], ...],
     best_finish_times: dict[str, int],
+    latest_finish_times: dict[str, int],
 ) -> tuple[PanelSection, ...]:
     records = track_pool_records or _current_track_record_pool(current_info)
-    if not records and not best_finish_times:
+    if not records and not best_finish_times and not latest_finish_times:
         return ()
     lines: list[PanelLine] = []
     for index, record in enumerate(records):
         if index > 0:
             lines.append(panel_divider())
-        lines.extend(_track_record_pool_lines(record, best_finish_times=best_finish_times))
+        lines.extend(
+            _track_record_pool_lines(
+                record,
+                best_finish_times=best_finish_times,
+                latest_finish_times=latest_finish_times,
+            )
+        )
     if not lines:
         return ()
     return (PanelSection(title="Records", lines=lines),)
@@ -38,8 +45,10 @@ def _track_record_pool_lines(
     record: dict[str, object],
     *,
     best_finish_times: dict[str, int],
+    latest_finish_times: dict[str, int],
 ) -> tuple[PanelLine, ...]:
-    watch_best = _watch_best_time_ms(record, best_finish_times)
+    watch_best = _watch_finish_time_ms(record, best_finish_times)
+    watch_latest = _watch_finish_time_ms(record, latest_finish_times)
     best_time = _optional_int_info(record, "track_non_agg_best_time_ms")
     worst_time = _optional_int_info(record, "track_non_agg_worst_time_ms")
     status_icon, status_color = _track_record_status(
@@ -65,6 +74,11 @@ def _track_record_pool_lines(
             "PB",
             _format_optional_compact_time(watch_best),
             status_color if watch_best is not None else PALETTE.text_muted,
+        ),
+        panel_line(
+            "Latest",
+            _format_latest_compact_time(watch_latest, watch_best),
+            _latest_time_color(latest_time_ms=watch_latest, best_time_ms=watch_best),
         ),
         panel_line(
             "WR",
@@ -149,6 +163,25 @@ def _format_optional_compact_time(time_ms: int | None) -> str:
     return _format_compact_race_time_ms(time_ms)
 
 
+def _format_latest_compact_time(latest_time_ms: int | None, best_time_ms: int | None) -> str:
+    if latest_time_ms is None:
+        return "--"
+    latest = _format_compact_race_time_ms(latest_time_ms)
+    if best_time_ms is None:
+        return latest
+    delta_ms = latest_time_ms - best_time_ms
+    sign = "+" if delta_ms >= 0 else "-"
+    return f"{latest} ({sign}{_format_compact_duration_ms(abs(delta_ms))})"
+
+
+def _latest_time_color(*, latest_time_ms: int | None, best_time_ms: int | None) -> Color:
+    if latest_time_ms is None:
+        return PALETTE.text_muted
+    if best_time_ms is not None and latest_time_ms > best_time_ms:
+        return PALETTE.text_warning
+    return PALETTE.text_accent
+
+
 def _format_record_range(best_time_ms: int | None, worst_time_ms: int | None) -> str:
     best = _format_optional_compact_time(best_time_ms)
     worst = _format_optional_compact_time(worst_time_ms)
@@ -171,14 +204,14 @@ def _format_compact_duration_ms(duration_ms: int) -> str:
     return f"{minutes}min {remaining_tenths / 10:.1f}s"
 
 
-def _watch_best_time_ms(
+def _watch_finish_time_ms(
     info: dict[str, object],
-    best_finish_times: dict[str, int],
+    finish_times: dict[str, int],
 ) -> int | None:
     track_key = _track_best_key(info)
     if track_key is None:
         return None
-    return best_finish_times.get(track_key)
+    return finish_times.get(track_key)
 
 
 def _track_best_key(info: dict[str, object]) -> str | None:

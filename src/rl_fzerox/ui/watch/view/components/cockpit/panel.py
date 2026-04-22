@@ -9,6 +9,7 @@ from rl_fzerox.ui.watch.view.components.cockpit.buttons import (
     _draw_boost_button,
     _draw_lean_button,
 )
+from rl_fzerox.ui.watch.view.components.cockpit.policy_switch import draw_policy_mode_switch
 from rl_fzerox.ui.watch.view.components.cockpit.primitives import (
     _draw_availability_led,
     _draw_centered_label,
@@ -25,6 +26,7 @@ from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
     ControlViz,
+    MouseRect,
     PygameModule,
     PygameRect,
     PygameSurface,
@@ -41,7 +43,7 @@ def _draw_control_viz(
     y: int,
     width: int,
     control_viz: ControlViz,
-) -> int:
+) -> tuple[int, MouseRect | None]:
     wide = width >= COCKPIT_PANEL_STYLE.wide_control_min_width
     panel_height = _control_viz_panel_height(width)
     panel = pygame.Rect(x, y, width, panel_height)
@@ -49,6 +51,15 @@ def _draw_control_viz(
 
     header = fonts.small.render("COCKPIT CONTROL", True, PALETTE.text_muted)
     screen.blit(header, (panel.x + 16, panel.y + 9))
+    mode_switch_style = COCKPIT_PANEL_STYLE.policy_mode_switch
+    mode_switch_rect = draw_policy_mode_switch(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=panel.x + 16 + header.get_width() + mode_switch_style.label_gap,
+        y=panel.y + mode_switch_style.y_offset,
+        deterministic_policy=control_viz.deterministic_policy,
+    )
 
     gas_width = 24 if wide else LAYOUT.control_gas_width
     gas_height = 102 if wide else LAYOUT.control_gas_height
@@ -270,7 +281,7 @@ def _draw_control_viz(
             percent_y,
         ),
     )
-    return panel.bottom
+    return panel.bottom, mode_switch_rect
 
 
 def _control_viz_panel_height(width: int) -> int:

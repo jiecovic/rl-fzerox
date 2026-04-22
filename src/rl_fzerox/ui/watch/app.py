@@ -19,6 +19,7 @@ from rl_fzerox.ui.watch.view.screen.frame import (
     _watch_game_display_size,
 )
 from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
+from rl_fzerox.ui.watch.view.screen.types import ViewerHitboxes
 
 __all__ = ["run_viewer"]
 
@@ -48,12 +49,16 @@ def run_viewer(config: WatchAppConfig) -> None:
         screen = None
         fonts = _create_fonts(pygame)
         paused = False
+        hitboxes = ViewerHitboxes()
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
             render_clock.tick(render_limit)
 
-            viewer_input = _poll_viewer_input(pygame)
+            viewer_input = _poll_viewer_input(
+                pygame,
+                deterministic_toggle_rect=hitboxes.deterministic_toggle,
+            )
             paused = apply_viewer_input(
                 worker.command_queue,
                 viewer_input,
@@ -80,7 +85,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 snapshot.observation_image.shape,
             )
             render_rate.tick()
-            draw_watch_frame(
+            hitboxes = draw_watch_frame(
                 pygame=pygame,
                 screen=screen,
                 fonts=fonts,

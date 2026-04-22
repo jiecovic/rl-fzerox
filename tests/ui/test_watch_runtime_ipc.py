@@ -32,3 +32,23 @@ def test_drain_worker_commands_coalesces_force_reset() -> None:
     assert commands.reset_requested is True
     assert paused is False
     assert control_state == ControllerState()
+
+
+def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(toggle_deterministic_policy=True),
+            ViewerCommand(toggle_deterministic_policy=True),
+            ViewerCommand(toggle_deterministic_policy=True),
+        ]
+    )
+
+    commands, paused, control_state = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+    )
+
+    assert commands.toggle_deterministic_policy is True
+    assert paused is False
+    assert control_state == ControllerState()

@@ -9,6 +9,7 @@ from rl_fzerox.ui.watch.view.screen.theme import Color
 PygameModule: TypeAlias = Any
 PygameRect: TypeAlias = Any
 PygameSurface: TypeAlias = Any
+MouseRect: TypeAlias = tuple[int, int, int, int]
 StatusIcon: TypeAlias = Literal["none", "in_range", "outside"]
 
 
@@ -65,6 +66,7 @@ class ControlViz:
     boost_active: bool
     boost_lamp_level: float
     lean_direction: int
+    deterministic_policy: bool | None = None
     thrust_masked: bool = False
     air_brake_masked: bool = False
     boost_masked: bool = False
@@ -116,3 +118,10 @@ class ViewerFonts:
     record_header: RenderFont
     body: RenderFont
     small: RenderFont
+
+
+@dataclass(frozen=True)
+class ViewerHitboxes:
+    """Clickable regions from the most recently drawn watch frame."""
+
+    deterministic_toggle: MouseRect | None = None
