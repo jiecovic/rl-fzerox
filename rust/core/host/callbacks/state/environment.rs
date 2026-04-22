@@ -1,4 +1,4 @@
-// rust/core/host/callbacks/environment_state.rs
+// rust/core/host/callbacks/state/environment.rs
 //! CallbackState handling for libretro environment commands.
 
 use std::ffi::{CString, c_void};

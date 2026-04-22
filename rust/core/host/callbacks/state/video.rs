@@ -1,4 +1,4 @@
-// rust/core/host/callbacks/video_state.rs
+// rust/core/host/callbacks/state/video.rs
 //! CallbackState video-frame capture and frame-buffer ownership.
 
 use std::ffi::c_void;

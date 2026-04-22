@@ -108,6 +108,7 @@ pub(crate) fn convert_argb1555(
     rgb
 }
 
+#[inline]
 pub(crate) fn sample_rgb(frame: &RawVideoFrame, x: usize, y: usize) -> Option<[u8; 3]> {
     match frame.pixel_layout {
         PixelLayout::Argb8888 => {
@@ -140,16 +141,19 @@ pub(crate) fn sample_rgb(frame: &RawVideoFrame, x: usize, y: usize) -> Option<[u
     }
 }
 
+#[inline(always)]
 fn read_le_u16(frame: &RawVideoFrame, x: usize, y: usize) -> Option<u16> {
     let offset = y.checked_mul(frame.pitch)?.checked_add(x.checked_mul(2)?)?;
     let bytes = frame.bytes.get(offset..offset + 2)?;
     Some(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
+#[inline(always)]
 fn expand_5_to_8(value: u8) -> u8 {
     (value << 3) | (value >> 2)
 }
 
+#[inline(always)]
 fn expand_6_to_8(value: u8) -> u8 {
     (value << 2) | (value >> 4)
 }

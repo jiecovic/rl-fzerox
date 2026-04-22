@@ -1,4 +1,4 @@
-// rust/core/host/callbacks/hardware_state.rs
+// rust/core/host/callbacks/state/hardware.rs
 //! CallbackState hardware-render context setup and lifecycle.
 
 use std::ffi::c_void;

@@ -47,7 +47,10 @@ impl PyTelemetry {
         camera_setting_name = None,
         race_intro_timer = 0,
     ))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 constructor mirrors the flat Python telemetry object"
+    )]
     fn new(
         total_lap_count: i32,
         game_mode_raw: u32,

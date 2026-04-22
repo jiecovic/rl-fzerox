@@ -1,3 +1,4 @@
+// rust/core/libretro/tests/api_tests.rs
 // Covers libretro API loader helpers that do not require a real core binary.
 use super::{empty_system_av_info, empty_system_info, printable_symbol};
 

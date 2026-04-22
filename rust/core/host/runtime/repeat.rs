@@ -20,7 +20,6 @@ impl Host {
     /// keeps the common path fast at the cost of not returning the exact first
     /// terminal/truncation frame image when a stop condition occurs earlier in
     /// the repeated step.
-    #[allow(dead_code)]
     pub fn step_repeat_raw(
         &mut self,
         config: RepeatedStepConfig,
@@ -86,7 +85,6 @@ impl Host {
     /// This is intentionally separate from `step_repeat_raw`: watch mode needs
     /// smooth visual playback when actions are held for multiple frames, while
     /// training and benchmarks should avoid those extra frame copies.
-    #[allow(dead_code)]
     pub fn step_repeat_watch_raw(
         &mut self,
         config: RepeatedStepConfig,

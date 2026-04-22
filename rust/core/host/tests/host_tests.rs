@@ -1,3 +1,4 @@
+// rust/core/host/tests/host_tests.rs
 // Covers host bootstrap helpers and runtime step-summary/status types.
 use super::{
     resolve_display_aspect_ratio,

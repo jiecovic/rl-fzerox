@@ -1,3 +1,4 @@
+// rust/core/game/tests/telemetry_tests.rs
 // Covers decoding a representative player-one race telemetry snapshot.
 use super::layout::{
     CAMERA, COURSE_INFO, COURSE_SEGMENT, GLOBALS, MACHINE_TABLE, RACER,

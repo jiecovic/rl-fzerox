@@ -1,3 +1,4 @@
+// rust/core/host/tests/step_accumulator_tests.rs
 // Covers step-local aggregation for one repeated env step.
 use super::step_accumulator::StepAccumulator;
 use crate::core::host::RepeatedStepConfig;

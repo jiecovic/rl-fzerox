@@ -1,3 +1,4 @@
+// rust/core/host/tests/input_tests.rs
 // Covers normalized controller input clamping into libretro's integer range.
 use libretro_sys::{
     DEVICE_ID_ANALOG_X, DEVICE_ID_ANALOG_Y, DEVICE_INDEX_ANALOG_LEFT, DEVICE_INDEX_ANALOG_RIGHT,
