@@ -9,9 +9,9 @@ use crate::core::error::CoreError;
 use crate::core::observation::ObservationCropProfile;
 use crate::core::video::{RawVideoFrame, VideoFrame, VideoResizeFilter, sample_rgb};
 
-use catalog::{MinimapRoi, course_minimap_transform, mask_set};
+use catalog::{MinimapRoi, course_minimap_mask, course_minimap_transform, minimap_roi};
 use marker::MinimapMarkerHold;
-use render::{render_layer_into, write_zero_layer};
+use render::{MinimapRenderScratch, MinimapRenderTarget, render_layer_into, write_zero_layer};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct MinimapLayerRequest {
@@ -26,6 +26,7 @@ pub(crate) struct MinimapLayerRequest {
 pub(crate) struct MinimapLayerRenderer {
     marker_hold: MinimapMarkerHold,
     marker_scratch: Vec<u8>,
+    render_scratch: MinimapRenderScratch,
 }
 
 impl MinimapLayerRenderer {
@@ -35,17 +36,15 @@ impl MinimapLayerRenderer {
         request: MinimapLayerRequest,
         output: &mut Vec<u8>,
     ) -> Result<(), CoreError> {
-        let Some(mask_set) = mask_set(request.crop_profile) else {
+        let Some(roi) = minimap_roi(request.crop_profile) else {
             self.clear();
             return write_zero_layer(request, output);
         };
-        let Some(mask) = mask_set.masks.get(request.course_index).copied() else {
+        let Some(mask) = course_minimap_mask(request.crop_profile, request.course_index) else {
             self.clear();
             return write_zero_layer(request, output);
         };
-        self.render_with_marker_hold(request, mask_set.roi, mask, output, |x, y| {
-            sample_rgb(frame, x, y)
-        })
+        self.render_with_marker_hold(request, roi, mask, output, |x, y| sample_rgb(frame, x, y))
     }
 
     pub fn render_from_frame_into(
@@ -54,15 +53,15 @@ impl MinimapLayerRenderer {
         request: MinimapLayerRequest,
         output: &mut Vec<u8>,
     ) -> Result<(), CoreError> {
-        let Some(mask_set) = mask_set(request.crop_profile) else {
+        let Some(roi) = minimap_roi(request.crop_profile) else {
             self.clear();
             return write_zero_layer(request, output);
         };
-        let Some(mask) = mask_set.masks.get(request.course_index).copied() else {
+        let Some(mask) = course_minimap_mask(request.crop_profile, request.course_index) else {
             self.clear();
             return write_zero_layer(request, output);
         };
-        self.render_with_marker_hold(request, mask_set.roi, mask, output, |x, y| {
+        self.render_with_marker_hold(request, roi, mask, output, |x, y| {
             let index = y.checked_mul(frame.width)?.checked_add(x)?.checked_mul(3)?;
             let pixel = frame.rgb.get(index..index + 3)?;
             Some([pixel[0], pixel[1], pixel[2]])
@@ -72,6 +71,7 @@ impl MinimapLayerRenderer {
     pub fn clear(&mut self) {
         self.marker_hold.clear();
         self.marker_scratch.clear();
+        self.render_scratch.clear();
     }
 
     fn render_with_marker_hold(
@@ -88,8 +88,11 @@ impl MinimapLayerRenderer {
             roi,
             mask,
             course_minimap_transform(request.course_index),
-            output,
-            Some(&mut self.marker_scratch),
+            MinimapRenderTarget {
+                output,
+                marker_layer: Some(&mut self.marker_scratch),
+                scratch: &mut self.render_scratch,
+            },
             sample,
         )?;
         self.marker_hold.update(marker_count, &self.marker_scratch);

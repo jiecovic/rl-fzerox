@@ -24,7 +24,9 @@ pub use plan::{
     build_processed_frame_plan, cropped_dimensions, display_size,
 };
 pub use process::{processed_frame, processed_frame_from_raw_into};
-pub use resize::{resize_luma, resize_rgb};
+pub use resize::{
+    ImageResizeScratch, ResizeRequest, resize_luma_into, resize_rgb, resize_rgb_into,
+};
 pub use types::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter};
 
 #[cfg(test)]

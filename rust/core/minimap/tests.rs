@@ -1,5 +1,7 @@
 // rust/core/minimap/tests.rs
-use super::catalog::{ANGRYLION_ROI, COURSE_COUNT, GLIDEN64_MASKS, GLIDEN64_ROI, MinimapRoi};
+use super::catalog::{
+    ANGRYLION_ROI, COURSE_COUNT, COURSE_MINIMAP_CATALOG, GLIDEN64_ROI, MinimapRoi,
+};
 use super::marker::{
     MARKER_HOLD_SAMPLES, PARTIAL_MARKER_REPLACE_SAMPLES, PLAYER_MARKER_LUMA, TRACK_LUMA,
 };
@@ -9,11 +11,49 @@ use crate::core::video::VideoResizeFilter;
 
 #[test]
 fn embedded_gliden64_masks_match_roi_area() {
-    assert_eq!(GLIDEN64_MASKS.len(), COURSE_COUNT);
+    assert_eq!(COURSE_MINIMAP_CATALOG.len(), COURSE_COUNT);
     assert!(
-        GLIDEN64_MASKS
+        COURSE_MINIMAP_CATALOG
             .iter()
-            .all(|mask| mask.len() == GLIDEN64_ROI.width * GLIDEN64_ROI.height)
+            .all(|entry| entry.gliden64_mask.len() == GLIDEN64_ROI.width * GLIDEN64_ROI.height)
+    );
+}
+
+#[test]
+fn embedded_course_catalog_matches_game_course_order() {
+    let course_ids: Vec<_> = COURSE_MINIMAP_CATALOG
+        .iter()
+        .map(|entry| entry.id)
+        .collect();
+
+    assert_eq!(
+        course_ids,
+        [
+            "jack/mute_city",
+            "jack/silence",
+            "jack/sand_ocean",
+            "jack/devils_forest",
+            "jack/big_blue",
+            "jack/port_town",
+            "queen/sector_alpha",
+            "queen/red_canyon",
+            "queen/devils_forest_2",
+            "queen/mute_city_2",
+            "queen/big_blue_2",
+            "queen/white_land",
+            "king/fire_field",
+            "king/silence_2",
+            "king/sector_beta",
+            "king/red_canyon_2",
+            "king/white_land_2",
+            "king/mute_city_3",
+            "joker/rainbow_road",
+            "joker/devils_forest_3",
+            "joker/space_plant",
+            "joker/sand_ocean_2",
+            "joker/port_town_2",
+            "joker/big_hand",
+        ]
     );
 }
 
