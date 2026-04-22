@@ -8,6 +8,7 @@ pub mod host;
 pub mod libretro;
 pub mod minimap;
 pub mod observation;
+pub mod rom;
 
 pub use game::telemetry;
 pub use host::{callbacks, input, options, stdio, video};

@@ -31,6 +31,18 @@ pub enum CoreError {
         path: PathBuf,
         message: String,
     },
+    InvalidRomHeader {
+        path: PathBuf,
+    },
+    UnsupportedRom {
+        path: PathBuf,
+        title: String,
+        game_code: String,
+        revision: u8,
+        expected_title: &'static str,
+        expected_game_code: &'static str,
+        expected_revision: u8,
+    },
     WriteFile {
         path: PathBuf,
         message: String,
@@ -136,6 +148,28 @@ impl Display for CoreError {
             }
             Self::ReadFile { path, message } => {
                 write!(formatter, "Could not read '{}': {message}", path.display())
+            }
+            Self::InvalidRomHeader { path } => {
+                write!(
+                    formatter,
+                    "Unsupported ROM '{}': not a recognized N64 ROM image",
+                    path.display()
+                )
+            }
+            Self::UnsupportedRom {
+                path,
+                title,
+                game_code,
+                revision,
+                expected_title,
+                expected_game_code,
+                expected_revision,
+            } => {
+                write!(
+                    formatter,
+                    "Unsupported ROM '{}': detected title='{title}', game_code='{game_code}', revision={revision}; expected title='{expected_title}', game_code='{expected_game_code}', revision={expected_revision}. This project uses fixed RAM offsets for the US F-Zero X ROM.",
+                    path.display()
+                )
             }
             Self::WriteFile { path, message } => {
                 write!(formatter, "Could not write '{}': {message}", path.display())
