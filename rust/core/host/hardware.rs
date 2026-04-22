@@ -135,5 +135,9 @@ impl Drop for HardwareRenderContext {
     }
 }
 
+// SAFETY: This is required by PyO3's `Python::detach`/`Ungil` bound for native
+// emulator calls that release the GIL while continuing on the same OS thread.
+// `PyEmulator` is declared `unsendable`, and the runtime does not hand
+// `HardwareRenderContext` to worker threads. Do not use this as permission to
+// move EGL/OpenGL contexts across threads.
 unsafe impl Send for HardwareRenderContext {}
-unsafe impl Sync for HardwareRenderContext {}

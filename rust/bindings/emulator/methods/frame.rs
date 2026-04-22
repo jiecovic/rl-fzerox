@@ -23,8 +23,9 @@ pub(in crate::bindings::emulator) fn observation_spec<'py>(
     preset: &str,
 ) -> PyResult<Bound<'py, PyDict>> {
     let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-    let spec = py
-        .detach(|| emulator.host.observation_spec(preset))
+    let spec = emulator
+        .host
+        .observation_spec(preset)
         .map_err(map_core_error)?;
     let dict = PyDict::new(py);
     dict.set_item("preset", spec.preset_name)?;
@@ -48,8 +49,9 @@ pub(in crate::bindings::emulator) fn frame_observation<'py>(
     let stack_mode = ObservationStackMode::parse(&options.stack_mode).map_err(map_core_error)?;
     let resize_filter = parse_resize_filter(&options.resize_filter)?;
     let minimap_resize_filter = parse_resize_filter(&options.minimap_resize_filter)?;
-    let spec = py
-        .detach(|| emulator.host.observation_spec(preset))
+    let spec = emulator
+        .host
+        .observation_spec(preset)
         .map_err(map_core_error)?;
     let frame = py
         .detach(|| {
@@ -79,8 +81,9 @@ pub(in crate::bindings::emulator) fn frame_display<'py>(
     preset: &str,
 ) -> PyResult<Bound<'py, PyAny>> {
     let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-    let spec = py
-        .detach(|| emulator.host.observation_spec(preset))
+    let spec = emulator
+        .host
+        .observation_spec(preset)
         .map_err(map_core_error)?;
     let frame = py
         .detach(|| emulator.host.display_frame(preset))

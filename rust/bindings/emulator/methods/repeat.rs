@@ -42,7 +42,7 @@ pub(in crate::bindings::emulator) fn step_repeat_raw<'py>(
     py: Python<'py>,
     args: RepeatStepArgs<'_>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let prepared = prepare_repeated_step(emulator, py, &args)?;
+    let prepared = prepare_repeated_step(emulator, &args)?;
     let result = py
         .detach(|| emulator.host.step_repeat_raw(prepared.config))
         .map_err(map_core_error)?;
@@ -72,7 +72,7 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
     py: Python<'py>,
     args: RepeatStepArgs<'_>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let prepared = prepare_repeated_step(emulator, py, &args)?;
+    let prepared = prepare_repeated_step(emulator, &args)?;
     let result = py
         .detach(|| emulator.host.step_repeat_watch_raw(prepared.config))
         .map_err(map_core_error)?;
@@ -116,15 +116,15 @@ struct PreparedRepeatStep {
 
 fn prepare_repeated_step(
     emulator: &mut PyEmulator,
-    py: Python<'_>,
     args: &RepeatStepArgs<'_>,
 ) -> PyResult<PreparedRepeatStep> {
     let preset = ObservationPreset::parse(args.preset).map_err(map_core_error)?;
     let stack_mode = ObservationStackMode::parse(args.stack_mode).map_err(map_core_error)?;
     let resize_filter = parse_resize_filter(args.resize_filter)?;
     let minimap_resize_filter = parse_resize_filter(args.minimap_resize_filter)?;
-    let spec = py
-        .detach(|| emulator.host.observation_spec(preset))
+    let spec = emulator
+        .host
+        .observation_spec(preset)
         .map_err(map_core_error)?;
     let controller_state = ControllerState::from_normalized(
         args.joypad_mask,

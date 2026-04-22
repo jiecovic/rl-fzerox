@@ -2,21 +2,49 @@
 //! Minimap crop, mask, transform, and resize pipeline.
 
 use crate::core::error::CoreError;
-use crate::core::video::{VideoResizeFilter, resize_luma};
+use crate::core::video::{ImageResizeScratch, ResizeRequest, VideoResizeFilter, resize_luma_into};
 
 use super::MinimapLayerRequest;
 use super::catalog::{MinimapRoi, MinimapTransform};
 use super::marker::{TRACK_LUMA, is_player_marker_color};
+
+#[derive(Debug, Default)]
+pub(super) struct MinimapRenderScratch {
+    roi_layer: Vec<u8>,
+    transformed_roi_layer: Vec<u8>,
+    transformed_marker_layer: Vec<u8>,
+    resized_marker_layer: Vec<u8>,
+    resize: ImageResizeScratch,
+}
+
+impl MinimapRenderScratch {
+    pub(super) fn clear(&mut self) {
+        self.roi_layer.clear();
+        self.transformed_roi_layer.clear();
+        self.transformed_marker_layer.clear();
+        self.resized_marker_layer.clear();
+    }
+}
+
+pub(super) struct MinimapRenderTarget<'a> {
+    pub output: &'a mut Vec<u8>,
+    pub marker_layer: Option<&'a mut Vec<u8>>,
+    pub scratch: &'a mut MinimapRenderScratch,
+}
 
 pub(super) fn render_layer_into(
     request: MinimapLayerRequest,
     roi: MinimapRoi,
     mask: &[u8],
     transform: MinimapTransform,
-    output: &mut Vec<u8>,
-    marker_layer: Option<&mut Vec<u8>>,
+    target: MinimapRenderTarget<'_>,
     mut sample: impl FnMut(usize, usize) -> Option<[u8; 3]>,
 ) -> Result<usize, CoreError> {
+    let MinimapRenderTarget {
+        output,
+        marker_layer,
+        scratch,
+    } = target;
     let output_len = request
         .target_width
         .checked_mul(request.target_height)
@@ -29,7 +57,8 @@ pub(super) fn render_layer_into(
         return Err(CoreError::NoFrameAvailable);
     }
 
-    let mut roi_output = vec![0_u8; roi_len];
+    scratch.roi_layer.clear();
+    scratch.roi_layer.resize(roi_len, 0);
     let mut marker_count = 0_usize;
     let mut marker_layer = marker_layer;
     if let Some(marker_layer) = marker_layer.as_deref_mut() {
@@ -40,7 +69,7 @@ pub(super) fn render_layer_into(
     if let Some(marker_layer) = marker_layer.as_deref_mut() {
         for (roi_y, ((mask_row, output_row), marker_row)) in mask
             .chunks_exact(roi.width)
-            .zip(roi_output.chunks_exact_mut(roi.width))
+            .zip(scratch.roi_layer.chunks_exact_mut(roi.width))
             .zip(marker_layer.chunks_exact_mut(roi.width))
             .enumerate()
         {
@@ -56,63 +85,80 @@ pub(super) fn render_layer_into(
     } else {
         for (roi_y, (mask_row, output_row)) in mask
             .chunks_exact(roi.width)
-            .zip(roi_output.chunks_exact_mut(roi.width))
+            .zip(scratch.roi_layer.chunks_exact_mut(roi.width))
             .enumerate()
         {
             render_roi_row(roi, roi_y, mask_row, output_row, None, &mut sample)?;
         }
     }
 
-    let transformed_roi_storage;
     let (roi_layer, layer_width, layer_height): (&[u8], usize, usize) = match transform {
-        MinimapTransform::Identity => (&roi_output, roi.width, roi.height),
+        MinimapTransform::Identity => (&scratch.roi_layer, roi.width, roi.height),
         MinimapTransform::Rotate90Clockwise => {
-            let (rotated, width, height) =
-                rotate_luma_90_clockwise(&roi_output, roi.width, roi.height);
-            transformed_roi_storage = rotated;
-            (&transformed_roi_storage, width, height)
+            let (width, height) = rotate_luma_90_clockwise_into(
+                &scratch.roi_layer,
+                roi.width,
+                roi.height,
+                &mut scratch.transformed_roi_layer,
+            );
+            (&scratch.transformed_roi_layer, width, height)
         }
     };
 
-    let resized_output = resize_luma(
+    resize_luma_into(
         roi_layer,
-        layer_width,
-        layer_height,
-        request.target_width,
-        request.target_height,
-        request.resize_filter,
+        ResizeRequest {
+            input_width: layer_width,
+            input_height: layer_height,
+            output_width: request.target_width,
+            output_height: request.target_height,
+            filter: request.resize_filter,
+        },
+        output,
+        &mut scratch.resize,
     )?;
-    output.clear();
-    output.extend_from_slice(&resized_output);
     if let Some(marker_layer) = marker_layer {
-        let transformed_marker_storage;
         let marker_input = match transform {
             MinimapTransform::Identity => marker_layer.as_slice(),
             MinimapTransform::Rotate90Clockwise => {
-                let (rotated, _, _) = rotate_luma_90_clockwise(marker_layer, roi.width, roi.height);
-                transformed_marker_storage = rotated;
-                transformed_marker_storage.as_slice()
+                rotate_luma_90_clockwise_into(
+                    marker_layer,
+                    roi.width,
+                    roi.height,
+                    &mut scratch.transformed_marker_layer,
+                );
+                scratch.transformed_marker_layer.as_slice()
             }
         };
-        let resized_marker = resize_luma(
+        resize_luma_into(
             marker_input,
-            layer_width,
-            layer_height,
-            request.target_width,
-            request.target_height,
-            VideoResizeFilter::Nearest,
+            ResizeRequest {
+                input_width: layer_width,
+                input_height: layer_height,
+                output_width: request.target_width,
+                output_height: request.target_height,
+                filter: VideoResizeFilter::Nearest,
+            },
+            &mut scratch.resized_marker_layer,
+            &mut scratch.resize,
         )?;
         marker_layer.clear();
-        marker_layer.extend_from_slice(&resized_marker);
+        marker_layer.extend_from_slice(&scratch.resized_marker_layer);
     }
     debug_assert_eq!(output.len(), output_len);
     Ok(marker_count)
 }
 
-fn rotate_luma_90_clockwise(layer: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {
+fn rotate_luma_90_clockwise_into(
+    layer: &[u8],
+    width: usize,
+    height: usize,
+    output: &mut Vec<u8>,
+) -> (usize, usize) {
     let output_width = height;
     let output_height = width;
-    let mut output = vec![0_u8; layer.len()];
+    output.clear();
+    output.resize(layer.len(), 0);
     for (y, row) in layer.chunks_exact(width).enumerate() {
         for (x, value) in row.iter().enumerate() {
             let target_x = height - 1 - y;
@@ -120,7 +166,7 @@ fn rotate_luma_90_clockwise(layer: &[u8], width: usize, height: usize) -> (Vec<u
             output[target_y * output_width + target_x] = *value;
         }
     }
-    (output, output_width, output_height)
+    (output_width, output_height)
 }
 
 fn render_roi_row(

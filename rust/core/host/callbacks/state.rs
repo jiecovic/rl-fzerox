@@ -15,8 +15,8 @@ use crate::core::host::hardware::HardwareRenderContext;
 use crate::core::input::ControllerState;
 use crate::core::minimap::MinimapLayerRenderer;
 use crate::core::video::{
-    PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame, VideoCrop, VideoFrame,
-    VideoResizeFilter, decode_frame,
+    ImageResizeScratch, PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame,
+    VideoCrop, VideoFrame, VideoResizeFilter, decode_frame,
 };
 
 mod environment;
@@ -39,6 +39,8 @@ pub struct CallbackState {
     pub(super) raw_frame: Option<RawVideoFrame>,
     pub(super) observation_buffer: Vec<u8>,
     pub(super) display_buffer: Vec<u8>,
+    pub(super) resize_buffer: Vec<u8>,
+    pub(super) resize_scratch: ImageResizeScratch,
     pub(super) minimap_buffer: Vec<u8>,
     pub(super) minimap_renderer: MinimapLayerRenderer,
     pub(super) stacked_observation_buffers: Vec<StackedObservationCacheEntry>,
@@ -102,6 +104,8 @@ impl CallbackState {
             raw_frame: None,
             observation_buffer: Vec::new(),
             display_buffer: Vec::new(),
+            resize_buffer: Vec::new(),
+            resize_scratch: ImageResizeScratch::default(),
             minimap_buffer: Vec::new(),
             minimap_renderer: MinimapLayerRenderer::default(),
             stacked_observation_buffers: Vec::new(),

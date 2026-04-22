@@ -49,7 +49,13 @@ impl CallbackState {
             } else {
                 &mut self.observation_buffer
             };
-            processed_frame_from_raw_into(raw_frame, &plan, target_buffer)?;
+            processed_frame_from_raw_into(
+                raw_frame,
+                &plan,
+                target_buffer,
+                &mut self.resize_buffer,
+                &mut self.resize_scratch,
+            )?;
             return Ok(target_buffer.as_slice());
         }
 
@@ -177,7 +183,13 @@ impl CallbackState {
         {
             let plan = *self.render_plan(request)?;
             let raw_frame = self.raw_frame.as_ref().ok_or(CoreError::NoFrameAvailable)?;
-            processed_frame_from_raw_into(raw_frame, &plan, &mut self.observation_buffer)?;
+            processed_frame_from_raw_into(
+                raw_frame,
+                &plan,
+                &mut self.observation_buffer,
+                &mut self.resize_buffer,
+                &mut self.resize_scratch,
+            )?;
             return Ok(());
         }
 

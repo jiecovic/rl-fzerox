@@ -5,7 +5,7 @@ use crate::core::error::CoreError;
 use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
 #[cfg(test)]
 use crate::core::video::plan::{ProcessedFramePlanRequest, build_processed_frame_plan};
-use crate::core::video::resize_rgb;
+use crate::core::video::{ImageResizeScratch, ResizeRequest, resize_rgb, resize_rgb_into};
 use crate::core::video::{
     PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_in_place,
     rgb_to_luma_into, rgb_to_luma_vec,
@@ -22,6 +22,8 @@ pub fn processed_frame(
     crop: VideoCrop,
     resize_filter: VideoResizeFilter,
 ) -> Result<Vec<u8>, CoreError> {
+    // Owned decoded-frame path for fallback/display use. The training hot path
+    // should prefer `processed_frame_from_raw_into`, which reuses buffers.
     let display_frame = processed_rgb_frame(frame, aspect_ratio, crop, resize_filter)?;
     let resized = if display_frame.width != target_width || display_frame.height != target_height {
         resize_rgb(
@@ -105,7 +107,15 @@ pub fn processed_frame_from_raw(
         resize_filter,
     })?;
     let mut output = Vec::new();
-    processed_frame_from_raw_into(frame, &plan, &mut output)?;
+    let mut scratch_output = Vec::new();
+    let mut resize_scratch = ImageResizeScratch::default();
+    processed_frame_from_raw_into(
+        frame,
+        &plan,
+        &mut output,
+        &mut scratch_output,
+        &mut resize_scratch,
+    )?;
     Ok(output)
 }
 
@@ -113,6 +123,8 @@ pub fn processed_frame_from_raw_into(
     frame: &RawVideoFrame,
     plan: &ProcessedFramePlan,
     output: &mut Vec<u8>,
+    scratch_output: &mut Vec<u8>,
+    resize_scratch: &mut ImageResizeScratch,
 ) -> Result<(), CoreError> {
     crop_raw_rgb_into(
         frame,
@@ -129,43 +141,65 @@ pub fn processed_frame_from_raw_into(
         || plan.key.target_height != plan.display_height;
 
     if display_resized {
-        let display_rgb = resize_rgb(
+        resize_rgb_into(
             output,
-            plan.crop_width,
-            plan.crop_height,
-            plan.display_width,
-            plan.display_height,
-            plan.key.resize_filter,
+            ResizeRequest {
+                input_width: plan.crop_width,
+                input_height: plan.crop_height,
+                output_width: plan.display_width,
+                output_height: plan.display_height,
+                filter: plan.key.resize_filter,
+            },
+            scratch_output,
+            resize_scratch,
         )?;
         if target_resized {
-            let target_rgb = resize_rgb(
-                &display_rgb,
-                plan.display_width,
-                plan.display_height,
-                plan.key.target_width,
-                plan.key.target_height,
-                plan.key.resize_filter,
+            resize_rgb_into(
+                scratch_output,
+                ResizeRequest {
+                    input_width: plan.display_width,
+                    input_height: plan.display_height,
+                    output_width: plan.key.target_width,
+                    output_height: plan.key.target_height,
+                    filter: plan.key.resize_filter,
+                },
+                output,
+                resize_scratch,
             )?;
-            write_final_rgb(&target_rgb, output, plan.key.rgb);
+            if !plan.key.rgb {
+                rgb_to_luma_in_place(output);
+            }
         } else {
-            write_final_rgb(&display_rgb, output, plan.key.rgb);
+            write_final_rgb_from_scratch(scratch_output, output, plan.key.rgb);
         }
     } else if target_resized {
-        let target_rgb = resize_rgb(
+        resize_rgb_into(
             output,
-            plan.display_width,
-            plan.display_height,
-            plan.key.target_width,
-            plan.key.target_height,
-            plan.key.resize_filter,
+            ResizeRequest {
+                input_width: plan.display_width,
+                input_height: plan.display_height,
+                output_width: plan.key.target_width,
+                output_height: plan.key.target_height,
+                filter: plan.key.resize_filter,
+            },
+            scratch_output,
+            resize_scratch,
         )?;
-        write_final_rgb(&target_rgb, output, plan.key.rgb);
+        write_final_rgb_from_scratch(scratch_output, output, plan.key.rgb);
     } else if !plan.key.rgb {
         rgb_to_luma_in_place(output);
     }
 
     debug_assert_eq!(output.len(), plan.output_len);
     Ok(())
+}
+
+fn write_final_rgb_from_scratch(rgb: &mut Vec<u8>, output: &mut Vec<u8>, keep_rgb: bool) {
+    if keep_rgb {
+        std::mem::swap(output, rgb);
+    } else {
+        write_final_rgb(rgb, output, false);
+    }
 }
 
 fn write_final_rgb(rgb: &[u8], output: &mut Vec<u8>, keep_rgb: bool) {
