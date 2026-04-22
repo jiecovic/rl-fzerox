@@ -388,10 +388,12 @@ class Emulator:
             self._native.frame_observation(
                 preset,
                 frame_stack,
-                stack_mode,
-                minimap_layer,
-                resize_filter,
-                minimap_resize_filter,
+                {
+                    "stack_mode": stack_mode,
+                    "minimap_layer": minimap_layer,
+                    "resize_filter": resize_filter,
+                    "minimap_resize_filter": minimap_resize_filter,
+                },
             ),
             dtype=np.uint8,
         )

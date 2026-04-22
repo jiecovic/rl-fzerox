@@ -1,8 +1,8 @@
 // rust/core/host/video/process.rs
 use crate::core::error::CoreError;
-#[cfg(test)]
-use crate::core::video::plan::build_processed_frame_plan;
 use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
+#[cfg(test)]
+use crate::core::video::plan::{ProcessedFramePlanRequest, build_processed_frame_plan};
 use crate::core::video::resize_rgb;
 use crate::core::video::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter};
 
@@ -87,16 +87,16 @@ pub fn processed_frame_from_raw(
     crop: VideoCrop,
     resize_filter: VideoResizeFilter,
 ) -> Result<Vec<u8>, CoreError> {
-    let plan = build_processed_frame_plan(
-        frame.width,
-        frame.height,
+    let plan = build_processed_frame_plan(ProcessedFramePlanRequest {
+        source_width: frame.width,
+        source_height: frame.height,
         aspect_ratio,
         target_width,
         target_height,
         rgb,
         crop,
         resize_filter,
-    )?;
+    })?;
     let mut output = Vec::new();
     processed_frame_from_raw_into(frame, &plan, &mut output)?;
     Ok(output)

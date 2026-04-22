@@ -25,6 +25,48 @@ use step::{step_status_to_py, step_summary_to_py};
 use telemetry::telemetry_to_py;
 pub use telemetry::{PyPlayerTelemetry, PyTelemetry};
 
+#[derive(Debug)]
+struct FrameObservationOptions {
+    stack_mode: String,
+    minimap_layer: bool,
+    resize_filter: String,
+    minimap_resize_filter: String,
+}
+
+impl Default for FrameObservationOptions {
+    fn default() -> Self {
+        Self {
+            stack_mode: "rgb".to_owned(),
+            minimap_layer: false,
+            resize_filter: "nearest".to_owned(),
+            minimap_resize_filter: "nearest".to_owned(),
+        }
+    }
+}
+
+impl FrameObservationOptions {
+    fn from_py_dict(options: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
+        let mut parsed = Self::default();
+        let Some(options) = options else {
+            return Ok(parsed);
+        };
+
+        if let Some(value) = options.get_item("stack_mode")? {
+            parsed.stack_mode = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_layer")? {
+            parsed.minimap_layer = value.extract()?;
+        }
+        if let Some(value) = options.get_item("resize_filter")? {
+            parsed.resize_filter = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_resize_filter")? {
+            parsed.minimap_resize_filter = value.extract()?;
+        }
+        Ok(parsed)
+    }
+}
+
 /// Python-facing wrapper around one native `Host` instance.
 #[pyclass(name = "Emulator", unsendable)]
 pub struct PyEmulator {
@@ -398,28 +440,20 @@ impl PyEmulator {
         Ok(dict)
     }
 
-    #[pyo3(signature = (
-        preset,
-        frame_stack,
-        stack_mode="rgb",
-        minimap_layer=false,
-        resize_filter="nearest",
-        minimap_resize_filter="nearest"
-    ))]
+    #[pyo3(signature = (preset, frame_stack, options=None))]
     fn frame_observation<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
         frame_stack: usize,
-        stack_mode: &str,
-        minimap_layer: bool,
-        resize_filter: &str,
-        minimap_resize_filter: &str,
+        options: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        let options = FrameObservationOptions::from_py_dict(options)?;
         let preset = ObservationPreset::parse(preset).map_err(map_core_error)?;
-        let stack_mode = ObservationStackMode::parse(stack_mode).map_err(map_core_error)?;
-        let resize_filter = parse_resize_filter(resize_filter)?;
-        let minimap_resize_filter = parse_resize_filter(minimap_resize_filter)?;
+        let stack_mode =
+            ObservationStackMode::parse(&options.stack_mode).map_err(map_core_error)?;
+        let resize_filter = parse_resize_filter(&options.resize_filter)?;
+        let minimap_resize_filter = parse_resize_filter(&options.minimap_resize_filter)?;
         let spec = py
             .detach(|| self.host.observation_spec(preset))
             .map_err(map_core_error)?;
@@ -429,7 +463,7 @@ impl PyEmulator {
                     preset,
                     frame_stack,
                     stack_mode,
-                    minimap_layer,
+                    options.minimap_layer,
                     resize_filter,
                     minimap_resize_filter,
                 )
@@ -440,7 +474,8 @@ impl PyEmulator {
             frame,
             spec.frame_height,
             spec.frame_width,
-            stack_mode.stacked_channels(spec.channels, frame_stack) + usize::from(minimap_layer),
+            stack_mode.stacked_channels(spec.channels, frame_stack)
+                + usize::from(options.minimap_layer),
         )
     }
 
