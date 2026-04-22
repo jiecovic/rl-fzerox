@@ -14,49 +14,41 @@ from rl_fzerox.core.config.schema import (
     RewardConfig,
     TrackSamplingConfig,
 )
-from rl_fzerox.core.domain.lean import LEAN_MODE_TIMER_ASSIST
 from rl_fzerox.core.envs.actions import (
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
     ActionValue,
     ResettableActionAdapter,
     build_action_adapter,
 )
-from rl_fzerox.core.envs.actions.continuous_controls import (
-    action_drive_axis,
-    requested_gas_level,
-)
-from rl_fzerox.core.envs.info import ensure_monitor_info_keys
+from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracker
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.envs.rewards import build_reward_tracker
 from rl_fzerox.core.seed import derive_seed
 
-from .camera import sync_camera_setting
-from .control_gates import with_left_stick_y, without_joypad_mask
-from .control_state import ControlStateTracker
+from .controls import (
+    ActionMaskBranches,
+    ActionMaskController,
+    ActionMaskSnapshot,
+    ControlStateTracker,
+    apply_dynamic_control_gates,
+    sync_dynamic_action_masks,
+)
 from .info import (
     backend_step_info,
     has_custom_baseline,
     read_live_telemetry,
     set_curriculum_info,
-    telemetry_can_boost,
-    telemetry_energy_fraction,
     telemetry_info,
 )
-from .masks import (
-    ActionMaskBranches,
-    ActionMaskController,
-    ActionMaskSnapshot,
-    action_branch_non_neutral_allowed,
-    action_branch_value_allowed,
-)
 from .observation import EngineObservationBuilder
-from .reset import load_track_baseline, reset_race_state
-from .step_result import WatchEnvStep
-from .tracks import SelectedTrack, TrackBaselineCache, TrackResetSelector
+from .reset import (
+    SelectedTrack,
+    TrackBaselineCache,
+    TrackResetSelector,
+    load_track_baseline,
+    reset_race_state,
+    sync_camera_setting,
+)
+from .stepping import EngineStepAssembler, EnvStepRequest, WatchEnvStep, set_episode_boost_pad_info
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +115,16 @@ class FZeroXEnvEngine:
             boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
             action_history_len=self._observation_builder.action_history_len,
             action_history_controls=self._observation_builder.action_history_controls,
+        )
+        self._step_assembler = EngineStepAssembler(
+            backend=self.backend,
+            config=self.config,
+            action_config=self._action_config,
+            reward_summary_config=self._reward_summary_config,
+            reward_tracker=self._reward_tracker,
+            observation_builder=self._observation_builder,
+            mask_controller=self._mask_controller,
+            control_state=self._control_state,
         )
         self._episode_done = False
         self._episode_uses_custom_baseline = False
@@ -239,7 +241,12 @@ class FZeroXEnvEngine:
         self.backend.set_controller_state(self._held_controller_state)
         self._control_state.reset()
         self._mask_controller.set_lean_allowed_values(None)
-        self._sync_dynamic_masks(telemetry)
+        sync_dynamic_action_masks(
+            mask_controller=self._mask_controller,
+            control_state=self._control_state,
+            telemetry=telemetry,
+            boost_min_energy_fraction=self.config.boost_min_energy_fraction,
+        )
         self._last_telemetry = telemetry
         self._reward_tracker.reset(
             telemetry,
@@ -256,7 +263,10 @@ class FZeroXEnvEngine:
         if telemetry is not None:
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
-        self._set_episode_boost_pad_info(info)
+        set_episode_boost_pad_info(
+            info,
+            episode_boost_pad_entries=self._episode_boost_pad_entries,
+        )
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
             image=image_observation,
@@ -416,33 +426,6 @@ class FZeroXEnvEngine:
         stage = self._curriculum_config.stages[stage_index]
         return stage.track_sampling or self.config.track_sampling
 
-    def _sync_dynamic_masks(self, telemetry: FZeroXTelemetry | None) -> None:
-        if telemetry is None:
-            self._mask_controller.set_boost_unlocked(None)
-            self._mask_controller.set_speed_kph(None)
-            self._mask_controller.set_airborne(None)
-            return
-        speed_kph = float(telemetry.player.speed_kph)
-        self._mask_controller.set_speed_kph(speed_kph)
-        self._mask_controller.set_airborne(bool(telemetry.player.airborne))
-        can_boost = telemetry_can_boost(telemetry)
-        can_boost = can_boost and not telemetry_boost_active(telemetry)
-        can_boost = can_boost and not telemetry.player.airborne
-        can_boost = can_boost and telemetry.player.reverse_timer <= 0
-        can_boost = can_boost and self._control_state.boost_action_allowed_by_timing()
-        max_boost_speed = self._mask_controller.current_boost_unmask_max_speed_kph
-        if max_boost_speed is not None:
-            can_boost = can_boost and speed_kph < float(max_boost_speed)
-        energy_fraction = telemetry_energy_fraction(telemetry)
-        min_energy_fraction = self._mask_controller.current_boost_min_energy_fraction(
-            self.config.boost_min_energy_fraction
-        )
-        if energy_fraction is not None:
-            can_boost = can_boost and energy_fraction > 0.0
-            if min_energy_fraction > 0.0:
-                can_boost = can_boost and energy_fraction >= min_energy_fraction
-        self._mask_controller.set_boost_unlocked(can_boost)
-
     def _run_env_step(
         self,
         control_state: ControllerState,
@@ -468,209 +451,36 @@ class FZeroXEnvEngine:
         action_drive_axis: float | None,
         capture_display_frames: bool,
     ) -> WatchEnvStep:
-        requested_control_state = requested_control_state or control_state
-        applied_control_state = control_state
-        stuck_step_limit = (
-            self.config.stuck_step_limit
-            if self.config.stuck_truncation_enabled
-            else self.config.max_episode_steps + 1
+        assembly = self._step_assembler.run(
+            EnvStepRequest(
+                control_state=control_state,
+                action_repeat=action_repeat,
+                requested_control_state=requested_control_state,
+                action_drive_axis=action_drive_axis,
+                capture_display_frames=capture_display_frames,
+                active_track=self._active_track,
+                episode_return=self._episode_return,
+                episode_boost_pad_entries=self._episode_boost_pad_entries,
+                curriculum_stage_index=self.curriculum_stage_index,
+                curriculum_stage_name=self.curriculum_stage_name,
+            )
         )
-        step_function = (
-            self.backend.step_repeat_watch_raw
-            if capture_display_frames
-            else self.backend.step_repeat_raw
-        )
-        step_result = step_function(
-            applied_control_state,
-            action_repeat=action_repeat,
-            preset=self.config.observation.preset,
-            frame_stack=self.config.observation.frame_stack,
-            stack_mode=self.config.observation.stack_mode,
-            minimap_layer=self.config.observation.minimap_layer,
-            resize_filter=self.config.observation.resize_filter,
-            minimap_resize_filter=self.config.observation.minimap_resize_filter,
-            stuck_min_speed_kph=float(self.config.stuck_min_speed_kph),
-            energy_loss_epsilon=self._reward_summary_config.energy_loss_epsilon,
-            max_episode_steps=self.config.max_episode_steps,
-            stuck_step_limit=stuck_step_limit,
-            wrong_way_timer_limit=(
-                self.config.wrong_way_timer_limit
-                if self.config.wrong_way_truncation_enabled
-                else None
-            ),
-            progress_frontier_stall_limit_frames=self.config.progress_frontier_stall_limit_frames,
-            progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
-            terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
-            lean_timer_assist=(self._action_config.lean_mode == LEAN_MODE_TIMER_ASSIST),
-        )
-        info = backend_step_info(self.backend)
-        if self._active_track is not None:
-            info.update(self._active_track.info())
-        telemetry = step_result.telemetry
-        self._last_telemetry = telemetry
-        gas_level = requested_gas_level(
-            control_state=requested_control_state,
-            drive_axis=action_drive_axis,
-            continuous_drive_mode=self._action_config.continuous_drive_mode,
-            continuous_drive_deadzone=float(self._action_config.continuous_drive_deadzone),
-            continuous_drive_full_threshold=float(
-                self._action_config.continuous_drive_full_threshold
-            ),
-            continuous_drive_min_level=float(self._action_config.continuous_drive_min_level),
-        )
-        self._last_requested_control_state = requested_control_state
-        self._last_gas_level = gas_level
-        boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
-        lean_used = bool(applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK))
-        air_brake_used = bool(applied_control_state.joypad_mask & AIR_BRAKE_MASK)
-        reward_step = self._reward_tracker.step_summary(
-            step_result.summary,
-            step_result.status,
-            telemetry,
-            RewardActionContext(
-                air_brake_requested=air_brake_used,
-                boost_requested=boost_used,
-                lean_requested=lean_used,
-                gas_level=gas_level,
-                steer_level=max(
-                    -1.0,
-                    min(1.0, float(requested_control_state.left_stick_x)),
-                ),
-                drive_axis=action_drive_axis,
-            ),
-        )
-        reward = reward_step.reward
-        reward_breakdown = dict(reward_step.breakdown)
-        terminated = step_result.status.terminated
-        truncated = step_result.status.truncated
-        info["step_reward"] = reward
-        info["frames_run"] = int(step_result.summary.frames_run)
-        info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
-        info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
-        info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
-        info["airborne_frames"] = int(step_result.summary.airborne_frames)
-        info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
-        boost_pad_entered = bool(step_result.summary.entered_dash_pad_boost)
-        info["boost_pad_entered"] = boost_pad_entered
-        if boost_pad_entered:
-            self._episode_boost_pad_entries += 1
-        info["boost_used"] = boost_used
-        info["lean_used"] = lean_used
-        if reward_breakdown:
-            info["reward_breakdown"] = reward_breakdown
-        info["episode_step"] = step_result.status.step_count
-        info["stuck_truncation_enabled"] = self.config.stuck_truncation_enabled
-        info["stalled_steps"] = step_result.status.stalled_steps
-        info["reverse_timer"] = step_result.status.reverse_timer
-        info["progress_frontier_stalled_frames"] = (
-            step_result.status.progress_frontier_stalled_frames
-        )
-        info["termination_reason"] = step_result.status.termination_reason
-        info["truncation_reason"] = step_result.status.truncation_reason
-        set_curriculum_info(
-            info,
-            stage_index=self.curriculum_stage_index,
-            stage_name=self.curriculum_stage_name,
-        )
-        if telemetry is not None:
-            # Keep env info pickle-safe for SubprocVecEnv workers.
-            info.update(telemetry_info(telemetry))
-        info.update(self._reward_tracker.info(telemetry))
-        self._set_episode_boost_pad_info(info)
-        self._control_state.record_step(
-            control_state=applied_control_state,
-            frames_run=step_result.summary.frames_run,
-            gas_level=gas_level,
-        )
-        self._mask_controller.set_lean_allowed_values(
-            self._control_state.lean_action_mask_override(),
-        )
-        self._sync_dynamic_masks(telemetry)
-        image_observation = step_result.observation
-        observation = self._observation_builder.build_observation(
-            image=image_observation,
-            telemetry=telemetry,
-            control_state=self._control_state,
-        )
-        self._episode_return += reward
-        info["episode_return"] = self._episode_return
-        ensure_monitor_info_keys(info)
-        self._episode_done = terminated or truncated
-        self._last_info = dict(info)
-        self._observation_builder.set_info(
-            info,
-            image_shape=tuple(int(value) for value in image_observation.shape),
-        )
-        return WatchEnvStep(
-            observation=observation,
-            reward=reward,
-            terminated=terminated,
-            truncated=truncated,
-            info=info,
-            display_frames=step_result.display_frames,
-        )
-
-    def _set_episode_boost_pad_info(self, info: dict[str, object]) -> None:
-        """Attach episode-local boost-pad counts for Monitor/TensorBoard."""
-
-        info["boost_pad_entries"] = self._episode_boost_pad_entries
-        laps_completed = info.get("race_laps_completed")
-        if not isinstance(laps_completed, int | float) or laps_completed <= 0:
-            info["boost_pad_entries_per_lap"] = None
-            return
-        info["boost_pad_entries_per_lap"] = self._episode_boost_pad_entries / float(
-            laps_completed
-        )
+        self._last_telemetry = assembly.telemetry
+        self._last_requested_control_state = assembly.requested_control_state
+        self._last_gas_level = assembly.gas_level
+        self._episode_return = assembly.episode_return
+        self._episode_boost_pad_entries = assembly.episode_boost_pad_entries
+        self._episode_done = assembly.step.terminated or assembly.step.truncated
+        self._last_info = dict(assembly.step.info)
+        return assembly.step
 
     def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
         """Apply telemetry gates and configured lean semantics."""
 
-        gated_control_state = self._apply_dynamic_control_gates(control_state)
-        return self._control_state.apply_lean_semantics(gated_control_state)
-
-    def _apply_dynamic_control_gates(self, control_state: ControllerState) -> ControllerState:
-        """Suppress controls whose validity depends on the latest telemetry."""
-
-        branches = self._mask_controller.action_mask_branches()
-        if not action_branch_value_allowed(
-            branches,
-            "boost",
-            1,
-            missing_allowed=True,
-        ):
-            control_state = without_joypad_mask(control_state, BOOST_MASK)
-        if not action_branch_value_allowed(
-            branches,
-            "lean",
-            1,
-            missing_allowed=True,
-        ):
-            control_state = without_joypad_mask(control_state, LEAN_LEFT_MASK)
-        if not action_branch_value_allowed(
-            branches,
-            "lean",
-            2,
-            missing_allowed=True,
-        ):
-            control_state = without_joypad_mask(control_state, LEAN_RIGHT_MASK)
-        if not action_branch_value_allowed(
-            branches,
-            "air_brake",
-            1,
-            missing_allowed=True,
-        ):
-            control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
-        air_brake_mode = self._action_config.continuous_air_brake_mode
-        if air_brake_mode == "off":
-            control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
-        pitch_non_neutral_allowed = action_branch_non_neutral_allowed(
-            branches,
-            "pitch",
-            neutral_index=self._mask_controller.pitch_neutral_index,
-            missing_allowed=True,
+        gated_control_state = apply_dynamic_control_gates(
+            control_state,
+            mask_controller=self._mask_controller,
+            continuous_air_brake_mode=self._action_config.continuous_air_brake_mode,
+            last_telemetry=self._last_telemetry,
         )
-        if not pitch_non_neutral_allowed:
-            control_state = with_left_stick_y(control_state, 0.0)
-        if self._last_telemetry is None or self._last_telemetry.player.airborne:
-            return control_state
-        return with_left_stick_y(without_joypad_mask(control_state, AIR_BRAKE_MASK), 0.0)
+        return self._control_state.apply_lean_semantics(gated_control_state)

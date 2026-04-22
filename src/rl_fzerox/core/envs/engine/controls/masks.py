@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/engine/masks.py
+# src/rl_fzerox/core/envs/engine/controls/masks.py
 from __future__ import annotations
 
 from collections.abc import Mapping

@@ -10,7 +10,7 @@ from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
-from rl_fzerox.core.envs.engine.masks import ActionMaskBranches
+from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (

@@ -15,7 +15,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
     ActionValue,
 )
-from rl_fzerox.core.envs.engine.masks import (
+from rl_fzerox.core.envs.engine.controls import (
     ActionMaskBranches,
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
