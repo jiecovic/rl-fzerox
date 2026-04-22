@@ -14,7 +14,7 @@ from rl_fzerox.ui.watch.view.panels.format import (
 from rl_fzerox.ui.watch.view.panels.lines import panel_line
 from rl_fzerox.ui.watch.view.panels.viz import _flag_viz
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
-from rl_fzerox.ui.watch.view.screen.types import PanelSection
+from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection
 
 
 def game_section(
@@ -35,44 +35,46 @@ def game_section(
         telemetry.player.recoil_tilt_magnitude if telemetry.player.collision_recoil else 0.0
     )
     raw_course_effect = course_effect_raw(telemetry)
+    lines = [
+        panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
+        panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
+        panel_line("Course", _format_course_name(info, telemetry), PALETTE.text_primary),
+        panel_line("Vehicle", _format_vehicle_setup(info), PALETTE.text_primary),
+        panel_line(
+            "Time",
+            _format_race_time_ms(telemetry.player.race_time_ms),
+            PALETTE.text_primary,
+        ),
+        panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
+        panel_line(
+            "Recoil",
+            f"{recoil_magnitude:.3f}",
+            PALETTE.text_warning if recoil_magnitude > 0.001 else PALETTE.text_muted,
+        ),
+        panel_line(
+            "Energy",
+            f"{telemetry.player.energy:.1f} / {telemetry.player.max_energy:.1f}",
+            PALETTE.text_primary,
+        ),
+        panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
+        panel_line("Position", _format_position(telemetry), PALETTE.text_primary),
+        panel_line(
+            "Progress",
+            _format_distance(telemetry.player.race_distance),
+            PALETTE.text_primary,
+        ),
+        panel_line(
+            "Lap prog",
+            _format_distance(telemetry.player.lap_distance),
+            PALETTE.text_primary,
+        ),
+    ]
+    if difficulty_line := _difficulty_line(telemetry):
+        lines.insert(1, difficulty_line)
 
     return PanelSection(
         title="Game",
-        lines=[
-            panel_line("Mode", _format_mode_name(telemetry.game_mode_name), PALETTE.text_primary),
-            panel_line("Difficulty", _format_difficulty(telemetry), PALETTE.text_primary),
-            panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
-            panel_line("Course", _format_course_name(info, telemetry), PALETTE.text_primary),
-            panel_line("Vehicle", _format_vehicle_setup(info), PALETTE.text_primary),
-            panel_line(
-                "Time",
-                _format_race_time_ms(telemetry.player.race_time_ms),
-                PALETTE.text_primary,
-            ),
-            panel_line("Speed", f"{telemetry.player.speed_kph:.1f} km/h", PALETTE.text_primary),
-            panel_line(
-                "Recoil",
-                f"{recoil_magnitude:.3f}",
-                PALETTE.text_warning if recoil_magnitude > 0.001 else PALETTE.text_muted,
-            ),
-            panel_line(
-                "Energy",
-                f"{telemetry.player.energy:.1f} / {telemetry.player.max_energy:.1f}",
-                PALETTE.text_primary,
-            ),
-            panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
-            panel_line("Position", _format_position(telemetry), PALETTE.text_primary),
-            panel_line(
-                "Progress",
-                _format_distance(telemetry.player.race_distance),
-                PALETTE.text_primary,
-            ),
-            panel_line(
-                "Lap prog",
-                _format_distance(telemetry.player.lap_distance),
-                PALETTE.text_primary,
-            ),
-        ],
+        lines=lines,
         flag_viz=_flag_viz(
             telemetry.player.state_labels,
             boost_active=telemetry_boost_active(telemetry),
@@ -86,6 +88,12 @@ def game_section(
             damage_taken_detected=_int_info(info, "damage_taken_frames") > 0,
         ),
     )
+
+
+def _difficulty_line(telemetry: FZeroXTelemetry) -> PanelLine | None:
+    if telemetry.game_mode_name != "gp_race":
+        return None
+    return panel_line("Difficulty", _format_difficulty(telemetry), PALETTE.text_primary)
 
 
 def _format_difficulty(telemetry: FZeroXTelemetry) -> str:

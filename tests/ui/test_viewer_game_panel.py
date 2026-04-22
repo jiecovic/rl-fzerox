@@ -277,6 +277,35 @@ def test_game_section_shows_unknown_difficulty_raw_value() -> None:
     assert difficulty_line.value == "unknown (99)"
 
 
+def test_game_section_hides_difficulty_for_time_attack() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            game_mode_raw=14,
+            game_mode_name="time_attack",
+            difficulty_raw=0,
+            difficulty_name="novice",
+        ),
+    )
+
+    game_section = columns.middle[0]
+    assert all(line.label != "Difficulty" for line in game_section.lines)
+
+
 def test_game_section_shows_camera_setting() -> None:
     columns = _build_panel_columns(
         episode=0,
