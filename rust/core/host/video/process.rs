@@ -1,4 +1,6 @@
 // rust/core/host/video/process.rs
+use std::borrow::Cow;
+
 use crate::core::error::CoreError;
 use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
 #[cfg(test)]
@@ -47,18 +49,18 @@ pub fn processed_rgb_frame(
     resize_filter: VideoResizeFilter,
 ) -> Result<VideoFrame, CoreError> {
     let (crop_x, crop_y, crop_width, crop_height) = crop_bounds(frame.width, frame.height, crop)?;
-    let cropped =
+    let cropped: Cow<'_, [u8]> =
         if crop_x == 0 && crop_y == 0 && crop_width == frame.width && crop_height == frame.height {
-            frame.rgb.clone()
+            Cow::Borrowed(&frame.rgb)
         } else {
-            crop_rgb(
+            Cow::Owned(crop_rgb(
                 &frame.rgb,
                 frame.width,
                 crop_x,
                 crop_y,
                 crop_width,
                 crop_height,
-            )
+            ))
         };
 
     let (display_width, display_height) = display_size(crop_width, crop_height, aspect_ratio);
@@ -72,7 +74,7 @@ pub fn processed_rgb_frame(
             resize_filter,
         )?
     } else {
-        cropped
+        cropped.into_owned()
     };
     Ok(VideoFrame {
         width: display_width,
