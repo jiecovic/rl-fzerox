@@ -1,6 +1,5 @@
 defaults:
   - reward: race_v3
-  - curriculum: none
   - _self_
 
 seed: 123
