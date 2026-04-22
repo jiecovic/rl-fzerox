@@ -5,7 +5,7 @@ use crate::core::error::CoreError;
 use crate::core::video::{VideoCrop, VideoResizeFilter};
 
 /// Cache key for one raw-source to processed-target render plan.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct ProcessedFramePlanKey {
     pub source_width: usize,
     pub source_height: usize,
@@ -46,7 +46,7 @@ impl ProcessedFramePlanRequest {
 }
 
 /// Precomputed crop/resize plan reused for observation/display rendering.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ProcessedFramePlan {
     pub key: ProcessedFramePlanKey,
     pub crop_x: usize,

@@ -56,17 +56,19 @@ pub(super) fn render_layer_into(
         }
     }
 
-    let (roi_output, layer_width, layer_height) =
-        transform_luma_layer(&roi_output, roi.width, roi.height, transform);
-    if let Some(marker_layer) = marker_layer.as_deref_mut() {
-        let (transformed_marker, _, _) =
-            transform_luma_layer(marker_layer, roi.width, roi.height, transform);
-        marker_layer.clear();
-        marker_layer.extend_from_slice(&transformed_marker);
-    }
+    let transformed_roi_storage;
+    let (roi_layer, layer_width, layer_height): (&[u8], usize, usize) = match transform {
+        MinimapTransform::Identity => (&roi_output, roi.width, roi.height),
+        MinimapTransform::Rotate90Clockwise => {
+            let (rotated, width, height) =
+                rotate_luma_90_clockwise(&roi_output, roi.width, roi.height);
+            transformed_roi_storage = rotated;
+            (&transformed_roi_storage, width, height)
+        }
+    };
 
     let resized_output = resize_luma(
-        &roi_output,
+        roi_layer,
         layer_width,
         layer_height,
         request.target_width,
@@ -76,8 +78,17 @@ pub(super) fn render_layer_into(
     output.clear();
     output.extend_from_slice(&resized_output);
     if let Some(marker_layer) = marker_layer {
+        let transformed_marker_storage;
+        let marker_input = match transform {
+            MinimapTransform::Identity => marker_layer.as_slice(),
+            MinimapTransform::Rotate90Clockwise => {
+                let (rotated, _, _) = rotate_luma_90_clockwise(marker_layer, roi.width, roi.height);
+                transformed_marker_storage = rotated;
+                transformed_marker_storage.as_slice()
+            }
+        };
         let resized_marker = resize_luma(
-            marker_layer,
+            marker_input,
             layer_width,
             layer_height,
             request.target_width,
@@ -89,18 +100,6 @@ pub(super) fn render_layer_into(
     }
     debug_assert_eq!(output.len(), output_len);
     Ok(marker_count)
-}
-
-fn transform_luma_layer(
-    layer: &[u8],
-    width: usize,
-    height: usize,
-    transform: MinimapTransform,
-) -> (Vec<u8>, usize, usize) {
-    match transform {
-        MinimapTransform::Identity => (layer.to_vec(), width, height),
-        MinimapTransform::Rotate90Clockwise => rotate_luma_90_clockwise(layer, width, height),
-    }
 }
 
 fn rotate_luma_90_clockwise(layer: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {

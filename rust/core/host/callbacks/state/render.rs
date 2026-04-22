@@ -5,7 +5,7 @@ use crate::core::error::CoreError;
 use crate::core::minimap::MinimapLayerRequest;
 use crate::core::video::{
     ProcessedFramePlan, ProcessedFramePlanKey, ProcessedFramePlanRequest,
-    build_processed_frame_plan, processed_frame, processed_frame_from_raw_into,
+    build_processed_frame_plan, decode_frame, processed_frame, processed_frame_from_raw_into,
 };
 
 use super::super::stack::{
@@ -41,8 +41,8 @@ impl CallbackState {
                 crop,
                 resize_filter,
             };
-            let plan = self.render_plan(request)?.clone();
             let use_display_buffer = self.use_display_buffer(target_width, target_height);
+            let plan = *self.render_plan(request)?;
             let raw_frame = self.raw_frame.as_ref().ok_or(CoreError::NoFrameAvailable)?;
             let target_buffer = if use_display_buffer {
                 &mut self.display_buffer
@@ -137,8 +137,8 @@ impl CallbackState {
         // Observation and display targets are stable for a run, so the sampling
         // plan is cached once per source/target combination.
         let key = request.plan_key();
-        if !self.render_plans.contains_key(&key) {
-            let plan = build_processed_frame_plan(ProcessedFramePlanRequest {
+        if let std::collections::btree_map::Entry::Vacant(entry) = self.render_plans.entry(key) {
+            entry.insert(build_processed_frame_plan(ProcessedFramePlanRequest {
                 source_width: request.source_width,
                 source_height: request.source_height,
                 aspect_ratio: request.aspect_ratio,
@@ -147,8 +147,7 @@ impl CallbackState {
                 rgb: request.rgb,
                 crop: request.crop,
                 resize_filter: request.resize_filter,
-            })?;
-            self.render_plans.insert(key.clone(), plan);
+            })?);
         }
         self.render_plans
             .get(&key)
@@ -165,7 +164,7 @@ impl CallbackState {
             .map(|raw_frame| (raw_frame.width, raw_frame.height))
             .is_some()
         {
-            let plan = self.render_plan(request)?.clone();
+            let plan = *self.render_plan(request)?;
             let raw_frame = self.raw_frame.as_ref().ok_or(CoreError::NoFrameAvailable)?;
             processed_frame_from_raw_into(raw_frame, &plan, &mut self.observation_buffer)?;
             return Ok(());
@@ -199,14 +198,12 @@ impl CallbackState {
             return Ok(());
         }
 
-        let rendered = {
-            let frame = self.frame().cloned().ok_or(CoreError::NoFrameAvailable)?;
-            let mut output = Vec::new();
-            self.minimap_renderer
-                .render_from_frame_into(&frame, request, &mut output)?;
-            output
-        };
-        self.minimap_buffer = rendered;
+        if self.frame.is_none() {
+            self.frame = self.raw_frame.as_ref().and_then(decode_frame);
+        }
+        let frame = self.frame.as_ref().ok_or(CoreError::NoFrameAvailable)?;
+        self.minimap_renderer
+            .render_from_frame_into(frame, request, &mut self.minimap_buffer)?;
         Ok(())
     }
 
