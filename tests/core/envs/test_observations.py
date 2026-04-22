@@ -9,12 +9,12 @@ from rl_fzerox.core.domain.observation_components import ObservationStateCompone
 from rl_fzerox.core.envs.course_effects import CourseEffect
 from rl_fzerox.core.envs.observation_image import build_image_observation_space
 from rl_fzerox.core.envs.observations import (
-    STATE_FEATURE_NAMES,
     action_history_settings_for_observation,
     build_observation_space,
     state_feature_names,
     telemetry_state_vector,
 )
+from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import encode_state_flags, make_telemetry
 
@@ -245,7 +245,7 @@ def test_state_vector_treats_dash_pad_boost_as_boost_active() -> None:
         make_telemetry(state_labels=("active", "dash_pad_boost"), boost_timer=0)
     )
 
-    boost_active_index = STATE_FEATURE_NAMES.index("boost_active")
+    boost_active_index = DEFAULT_STATE_VECTOR_SPEC.names.index("boost_active")
     assert vector[boost_active_index] == 1.0
 
 

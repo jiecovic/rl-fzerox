@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.envs.state_observation import STATE_SPEED_NORMALIZER_KPH
+from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 
 AlphaColor = tuple[int, int, int, int]
@@ -136,7 +136,7 @@ class SpeedGaugeStyle:
     """Compact analog speedometer used inside the cockpit panel."""
 
     render_scale: int = 3
-    max_kph: float = STATE_SPEED_NORMALIZER_KPH
+    max_kph: float = DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph
     red_zone_start_kph: float = 800.0
     start_degrees: float = 200.0
     sweep_degrees: float = 220.0

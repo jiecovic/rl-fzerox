@@ -19,7 +19,8 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
+from rl_fzerox.core.envs.observations import state_feature_names
+from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.ui.watch.input import _point_in_rect
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
@@ -535,7 +536,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
             [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.2, 0.25],
             dtype=np.float32,
         ),
-        observation_state_feature_names=STATE_FEATURE_NAMES,
+        observation_state_feature_names=DEFAULT_STATE_VECTOR_SPEC.names,
         telemetry=_sample_telemetry(),
     )
 
