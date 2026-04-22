@@ -4,7 +4,11 @@ use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
 #[cfg(test)]
 use crate::core::video::plan::{ProcessedFramePlanRequest, build_processed_frame_plan};
 use crate::core::video::resize_rgb;
-use crate::core::video::{PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter};
+use crate::core::video::{
+    PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_vec,
+};
+
+use super::convert::{expand_5_to_8, expand_6_to_8};
 
 pub fn processed_frame(
     frame: &VideoFrame,
@@ -32,7 +36,7 @@ pub fn processed_frame(
     if rgb {
         Ok(resized)
     } else {
-        Ok(to_grayscale(&resized, target_width, target_height))
+        Ok(rgb_to_luma_vec(&resized))
     }
 }
 
@@ -147,11 +151,7 @@ pub fn processed_frame_from_raw_into(
         output.extend_from_slice(&target_rgb);
     } else {
         output.clear();
-        output.extend_from_slice(&to_grayscale(
-            &target_rgb,
-            plan.key.target_width,
-            plan.key.target_height,
-        ));
+        output.extend_from_slice(&rgb_to_luma_vec(&target_rgb));
     }
     debug_assert_eq!(output.len(), plan.output_len);
     Ok(())
@@ -196,12 +196,10 @@ fn write_raw_rgb_row(
                 .bytes
                 .get(row_offset..row_offset + (width * 4))
                 .ok_or(CoreError::NoFrameAvailable)?;
-            for column in 0..width {
-                let src_index = column * 4;
-                let dst_index = column * 3;
-                dst[dst_index] = row_bytes[src_index + 2];
-                dst[dst_index + 1] = row_bytes[src_index + 1];
-                dst[dst_index + 2] = row_bytes[src_index];
+            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(4).zip(dst.chunks_exact_mut(3)) {
+                dst_pixel[0] = src_pixel[2];
+                dst_pixel[1] = src_pixel[1];
+                dst_pixel[2] = src_pixel[0];
             }
             Ok(())
         }
@@ -214,16 +212,14 @@ fn write_raw_rgb_row(
                 .bytes
                 .get(row_offset..row_offset + (width * 2))
                 .ok_or(CoreError::NoFrameAvailable)?;
-            for column in 0..width {
-                let src_index = column * 2;
-                let pixel = u16::from_le_bytes([row_bytes[src_index], row_bytes[src_index + 1]]);
+            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
+                let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
                 let red = ((pixel >> 11) & 0x1f) as u8;
                 let green = ((pixel >> 5) & 0x3f) as u8;
                 let blue = (pixel & 0x1f) as u8;
-                let dst_index = column * 3;
-                dst[dst_index] = (red << 3) | (red >> 2);
-                dst[dst_index + 1] = (green << 2) | (green >> 4);
-                dst[dst_index + 2] = (blue << 3) | (blue >> 2);
+                dst_pixel[0] = expand_5_to_8(red);
+                dst_pixel[1] = expand_6_to_8(green);
+                dst_pixel[2] = expand_5_to_8(blue);
             }
             Ok(())
         }
@@ -236,16 +232,14 @@ fn write_raw_rgb_row(
                 .bytes
                 .get(row_offset..row_offset + (width * 2))
                 .ok_or(CoreError::NoFrameAvailable)?;
-            for column in 0..width {
-                let src_index = column * 2;
-                let pixel = u16::from_le_bytes([row_bytes[src_index], row_bytes[src_index + 1]]);
+            for (src_pixel, dst_pixel) in row_bytes.chunks_exact(2).zip(dst.chunks_exact_mut(3)) {
+                let pixel = u16::from_le_bytes([src_pixel[0], src_pixel[1]]);
                 let red = ((pixel >> 10) & 0x1f) as u8;
                 let green = ((pixel >> 5) & 0x1f) as u8;
                 let blue = (pixel & 0x1f) as u8;
-                let dst_index = column * 3;
-                dst[dst_index] = (red << 3) | (red >> 2);
-                dst[dst_index + 1] = (green << 3) | (green >> 2);
-                dst[dst_index + 2] = (blue << 3) | (blue >> 2);
+                dst_pixel[0] = expand_5_to_8(red);
+                dst_pixel[1] = expand_5_to_8(green);
+                dst_pixel[2] = expand_5_to_8(blue);
             }
             Ok(())
         }
@@ -269,16 +263,4 @@ fn crop_rgb(
         cropped[dst_start..dst_end].copy_from_slice(&rgb[src_start..src_end]);
     }
     cropped
-}
-
-fn to_grayscale(rgb: &[u8], width: usize, height: usize) -> Vec<u8> {
-    let mut gray = vec![0_u8; width * height];
-    for (index, pixel) in gray.iter_mut().enumerate().take(width * height) {
-        let src = index * 3;
-        let value = (0.299_f32 * rgb[src] as f32)
-            + (0.587_f32 * rgb[src + 1] as f32)
-            + (0.114_f32 * rgb[src + 2] as f32);
-        *pixel = value.round() as u8;
-    }
-    gray
 }

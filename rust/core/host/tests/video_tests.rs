@@ -143,3 +143,25 @@ fn processed_frame_crops_before_resize() {
     assert_eq!(observation.len(), 6 * 4 * 3);
     assert!(observation.chunks_exact(3).all(|pixel| pixel[1] == 255));
 }
+
+#[test]
+fn processed_frame_grayscale_uses_canonical_luma_weights() {
+    let frame = VideoFrame {
+        width: 4,
+        height: 1,
+        rgb: vec![255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255],
+    };
+
+    let observation = processed_frame(
+        &frame,
+        0.0,
+        4,
+        1,
+        false,
+        VideoCrop::default(),
+        VideoResizeFilter::Nearest,
+    )
+    .expect("grayscale observation should render");
+
+    assert_eq!(observation, vec![77, 149, 29, 255]);
+}
