@@ -16,6 +16,7 @@ ObservationPresetName: TypeAlias = Literal[
     "crop_66x82",
     "crop_68x68",
     "crop_84x84",
+    "crop_76x100",
     "crop_64x64",
 ]
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]

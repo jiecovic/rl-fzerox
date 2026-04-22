@@ -184,6 +184,20 @@ def test_luma_chroma_observation_stack_uses_two_channels_per_frame() -> None:
 
     assert observation.shape == (84, 84, 9)
     assert image_space.shape == (84, 84, 9)
+
+
+def test_crop_76x100_luma_chroma_minimap_shape_matches_nature_input() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_76x100",
+        frame_stack=4,
+        stack_mode="luma_chroma",
+        minimap_layer=True,
+    )
+
+    assert observation.shape == (76, 100, 9)
     assert (
         stacked_observation_channels(
             3,

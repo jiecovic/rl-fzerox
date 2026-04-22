@@ -37,6 +37,7 @@ pub enum ObservationPreset {
     Crop66x82,
     Crop68x68,
     Crop84x84,
+    Crop76x100,
     Crop64x64,
 }
 
@@ -76,6 +77,7 @@ impl ObservationPreset {
             "crop_66x82" => Ok(Self::Crop66x82),
             "crop_68x68" => Ok(Self::Crop68x68),
             "crop_84x84" => Ok(Self::Crop84x84),
+            "crop_76x100" => Ok(Self::Crop76x100),
             "crop_64x64" => Ok(Self::Crop64x64),
             // V4 LEGACY SHIM: accept old saved run manifests and CLI overrides.
             "native_crop_v1" => Ok(Self::Crop84x116),
@@ -98,6 +100,7 @@ impl ObservationPreset {
             Self::Crop66x82 => "crop_66x82",
             Self::Crop68x68 => "crop_68x68",
             Self::Crop84x84 => "crop_84x84",
+            Self::Crop76x100 => "crop_76x100",
             Self::Crop64x64 => "crop_64x64",
         }
     }
@@ -112,6 +115,7 @@ impl ObservationPreset {
                 | Self::Crop66x82
                 | Self::Crop68x68
                 | Self::Crop84x84
+                | Self::Crop76x100
                 | Self::Crop64x64,
                 ObservationCropProfile::Angrylion,
             ) => VideoCrop {
@@ -128,6 +132,7 @@ impl ObservationPreset {
                 | Self::Crop66x82
                 | Self::Crop68x68
                 | Self::Crop84x84
+                | Self::Crop76x100
                 | Self::Crop64x64,
                 ObservationCropProfile::Gliden64,
             ) => VideoCrop {
@@ -159,6 +164,7 @@ impl ObservationPreset {
             Self::Crop66x82 => (82, 66, 3),
             Self::Crop68x68 => (68, 68, 3),
             Self::Crop84x84 => (84, 84, 3),
+            Self::Crop76x100 => (100, 76, 3),
             Self::Crop64x64 => (64, 64, 3),
         };
         Ok(ObservationSpec {
@@ -180,6 +186,7 @@ impl ObservationPreset {
             | Self::Crop66x82
             | Self::Crop68x68
             | Self::Crop84x84
+            | Self::Crop76x100
             | Self::Crop64x64 => display_aspect_ratio,
         }
     }
@@ -293,6 +300,16 @@ mod tests {
 
         assert_eq!(spec.preset_name, "crop_84x84");
         assert_eq!((spec.frame_width, spec.frame_height), (84, 84));
+    }
+
+    #[test]
+    fn crop_76x100_resolves_to_nature_geometry() {
+        let spec = ObservationPreset::Crop76x100
+            .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+            .expect("crop_76x100 should resolve");
+
+        assert_eq!(spec.preset_name, "crop_76x100");
+        assert_eq!((spec.frame_width, spec.frame_height), (100, 76));
     }
 
     #[test]

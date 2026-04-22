@@ -10,7 +10,13 @@ from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
-ConvProfile = Literal["auto", "nature", "compact_deep", "compact_bottleneck", "tiny_256"]
+ConvProfile = Literal[
+    "auto",
+    "nature",
+    "compact_deep",
+    "compact_bottleneck",
+    "tiny_256",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +77,7 @@ SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (66, 82): COMPACT_DEEP_CONV_SPEC,
     (68, 68): NATURE_CNN_CONV_SPEC,
     (84, 84): NATURE_CNN_CONV_SPEC,
+    (76, 100): NATURE_CNN_CONV_SPEC,
     (64, 64): TINY_256_CONV_SPEC,
 }
 
