@@ -17,7 +17,12 @@ from rl_fzerox.ui.watch.view.panels.format import (
 )
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
-from rl_fzerox.ui.watch.view.screen.types import ControlViz, RenderFont, ViewerFonts
+from rl_fzerox.ui.watch.view.screen.types import (
+    ControlViz,
+    RenderFont,
+    ViewerFonts,
+    ViewerHitboxes,
+)
 
 
 @dataclass(frozen=True)
@@ -87,13 +92,13 @@ def _draw_observation_preview_below_game(
     observation_shape: tuple[int, ...],
     info: dict[str, object],
     control_viz: ControlViz,
-) -> None:
+) -> ViewerHitboxes:
     x = LAYOUT.preview_padding
     y = game_display_size[1] + LAYOUT.preview_gap
     width = game_display_size[0] - (2 * LAYOUT.preview_padding)
     height = screen.get_height() - y - LAYOUT.preview_padding
     if width <= 0 or height <= 0:
-        return
+        return ViewerHitboxes()
 
     title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render(
@@ -126,7 +131,7 @@ def _draw_observation_preview_below_game(
     )
     scale = min(width / preview_width, available_height / preview_height)
     if scale <= 0:
-        return
+        return ViewerHitboxes()
 
     scaled_size = (
         max(1, round(preview_width * scale)),
@@ -168,7 +173,7 @@ def _draw_observation_preview_below_game(
         _glass_overlay_surface(pygame, glass_rect.size, 10),
         glass_rect.topleft,
     )
-    _draw_control_viz(
+    _, deterministic_toggle_rect = _draw_control_viz(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -177,6 +182,7 @@ def _draw_observation_preview_below_game(
         width=width,
         control_viz=control_viz,
     )
+    return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect)
 
 
 def _draw_outer_preview_border(

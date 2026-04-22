@@ -23,7 +23,7 @@ from rl_fzerox.ui.watch.view.panels.model import (
 from rl_fzerox.ui.watch.view.panels.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
-from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
+from rl_fzerox.ui.watch.view.screen.types import ViewerFonts, ViewerHitboxes
 
 
 def _create_fonts(pygame) -> ViewerFonts:
@@ -105,6 +105,7 @@ def _draw_frame(
     policy_reload_error: str | None,
     best_finish_position: int | None,
     best_finish_times: dict[str, int],
+    latest_finish_times: dict[str, int],
     track_pool_records: tuple[dict[str, object], ...],
     continuous_drive_deadzone: float,
     continuous_air_brake_mode: str,
@@ -116,7 +117,7 @@ def _draw_frame(
     progress_frontier_stall_limit_frames: int | None,
     stuck_min_speed_kph: float,
     telemetry: FZeroXTelemetry | None,
-) -> None:
+) -> ViewerHitboxes:
     game_display_size = _watch_game_display_size()
     game_surface = _rgb_surface(pygame, raw_frame)
 
@@ -136,7 +137,7 @@ def _draw_frame(
         surface=game_surface,
         outer_size=game_display_size,
     )
-    _draw_observation_preview_below_game(
+    hitboxes = _draw_observation_preview_below_game(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -155,6 +156,7 @@ def _draw_frame(
             energy_fraction=_energy_fraction(telemetry),
             boost_active=boost_active,
             boost_lamp_level=boost_lamp_level,
+            policy_deterministic=policy_deterministic,
             policy_action=policy_action,
             action_mask_branches=action_mask_branches,
             continuous_drive_deadzone=continuous_drive_deadzone,
@@ -193,6 +195,7 @@ def _draw_frame(
             policy_reload_error=policy_reload_error,
             best_finish_position=best_finish_position,
             best_finish_times=best_finish_times,
+            latest_finish_times=latest_finish_times,
             track_pool_records=track_pool_records,
             continuous_drive_deadzone=continuous_drive_deadzone,
             continuous_air_brake_mode=continuous_air_brake_mode,
@@ -211,6 +214,7 @@ def _draw_frame(
         ),
     )
     pygame.display.flip()
+    return hitboxes
 
 
 def _rgb_surface(pygame, frame: RgbFrame):

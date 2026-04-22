@@ -421,6 +421,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
         best_finish_times={"silence": 98765},
+        latest_finish_times={"silence": 101234},
         track_pool_records=(
             {
                 "track_id": "silence",
@@ -434,10 +435,12 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     records_section = next(section for section in columns.left if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Silence")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
+    latest_line = next(line for line in records_section.lines if line.label == "Latest")
     assert header_line.value == ""
     assert header_line.status_icon == "outside"
     assert header_line.status_text == "+35.5s"
     assert pb_line.value == "1:38.765"
+    assert latest_line.value == "1:41.234 (+2.5s)"
 
 
 def test_records_section_marks_watch_best_inside_reference_range() -> None:

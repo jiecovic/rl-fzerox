@@ -15,6 +15,7 @@ from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_latest_finish_times,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
     WorkerClosed,
@@ -95,7 +96,9 @@ def _run_simulation_loop(
         episode = 0
         best_finish_position: int | None = None
         best_finish_times: dict[str, int] = {}
+        latest_finish_times: dict[str, int] = {}
         paused = False
+        deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_state = ControllerState()
 
         while config.watch.episodes is None or episode < config.watch.episodes:
@@ -131,9 +134,11 @@ def _run_simulation_loop(
                     boost_lamp_level=boost_lamp_level,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
+                    deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
+                    latest_finish_times=latest_finish_times,
                 ),
             )
 
@@ -161,6 +166,8 @@ def _run_simulation_loop(
                         emulator=emulator,
                         baseline_state_path=config.emulator.baseline_state_path,
                     )
+                if commands.toggle_deterministic_policy and policy_runner is not None:
+                    deterministic_policy = not deterministic_policy
                 if policy_runner is None:
                     current_control_state = commands.control_state
 
@@ -204,7 +211,7 @@ def _run_simulation_loop(
                     decision_action_mask = env.action_mask_snapshot()
                     action = policy_runner.predict(
                         observation,
-                        deterministic=config.watch.deterministic_policy,
+                        deterministic=deterministic_policy,
                         action_masks=decision_action_mask.flat,
                         refresh=False,
                     )
@@ -237,6 +244,11 @@ def _run_simulation_loop(
                     info,
                     live_telemetry,
                 )
+                latest_finish_times = _update_latest_finish_times(
+                    latest_finish_times,
+                    info,
+                    live_telemetry,
+                )
                 _publish_step_snapshots(
                     config=config,
                     env=env,
@@ -262,9 +274,11 @@ def _run_simulation_loop(
                     action_mask_branches=decision_action_mask.branches,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
+                    deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
+                    latest_finish_times=latest_finish_times,
                 )
                 if target_control_seconds is not None:
                     now = time.perf_counter()

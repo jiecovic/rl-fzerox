@@ -19,6 +19,8 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
     PygameRect,
     PygameSurface,
+    RenderFont,
+    TextSurface,
     ViewerFonts,
 )
 
@@ -46,6 +48,7 @@ class SidePanelData:
     policy_reload_error: str | None
     best_finish_position: int | None
     best_finish_times: dict[str, int]
+    latest_finish_times: dict[str, int]
     track_pool_records: tuple[dict[str, object], ...]
     continuous_drive_deadzone: float
     continuous_air_brake_mode: str
@@ -103,6 +106,7 @@ def _draw_side_panel(
         policy_reload_error=data.policy_reload_error,
         best_finish_position=data.best_finish_position,
         best_finish_times=data.best_finish_times,
+        latest_finish_times=data.latest_finish_times,
         track_pool_records=data.track_pool_records,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
@@ -125,8 +129,9 @@ def _draw_side_panel(
         fonts=fonts,
         x=x,
         y=y,
+        width=panel_width,
         title="F-Zero X Watch",
-        subtitle="live emulator session",
+        subtitle=_panel_subtitle(data.policy_label),
     )
     y += LAYOUT.title_section_gap
 
@@ -209,9 +214,25 @@ def _draw_column(
     return current_y
 
 
-def _draw_panel_title(*, screen, fonts, x: int, y: int, title: str, subtitle: str) -> int:
+def _panel_subtitle(policy_label: str | None) -> str:
+    if policy_label is None:
+        return "manual control"
+    return f"policy: {policy_label}"
+
+
+def _draw_panel_title(
+    *,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    title: str,
+    subtitle: str,
+) -> int:
     title_surface = fonts.title.render(title, True, PALETTE.text_primary)
-    subtitle_surface = fonts.small.render(subtitle, True, PALETTE.text_muted)
+    fitted_subtitle = _fit_text(fonts.small, subtitle, width)
+    subtitle_surface = fonts.small.render(fitted_subtitle, True, PALETTE.text_muted)
     screen.blit(title_surface, (x, y))
     subtitle_y = y + title_surface.get_height() + LAYOUT.title_gap
     screen.blit(subtitle_surface, (x, subtitle_y))
@@ -264,12 +285,13 @@ def _draw_section(
             continue
 
         value_surface = fonts.small.render(line.value, True, line.color)
-        screen.blit(value_surface, (x, y))
-        y += value_surface.get_height() + LAYOUT.line_gap
+        line_height = _font_line_height(fonts.small)
+        screen.blit(value_surface, (x, _centered_text_y(y, line_height, value_surface)))
+        y += line_height + LAYOUT.line_gap
 
     if section.control_viz is not None:
         y += LAYOUT.control_viz_gap
-        y = _draw_control_viz(
+        y, _ = _draw_control_viz(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -311,8 +333,9 @@ def _draw_wrapped_line(
     min_value_lines: int,
 ) -> int:
     label_surface = fonts.small.render(label, True, PALETTE.text_muted)
-    screen.blit(label_surface, (x, y))
-    y += label_surface.get_height() + LAYOUT.line_gap
+    label_height = _font_line_height(fonts.small)
+    screen.blit(label_surface, (x, _centered_text_y(y, label_height, label_surface)))
+    y += label_height + LAYOUT.line_gap
 
     wrapped_lines = _wrap_text(
         fonts.small,
@@ -321,11 +344,15 @@ def _draw_wrapped_line(
     )
     for wrapped_line in wrapped_lines:
         value_surface = fonts.small.render(wrapped_line, True, color)
-        screen.blit(value_surface, (x + LAYOUT.wrapped_value_indent, y))
-        y += value_surface.get_height() + LAYOUT.line_gap
+        value_height = _font_line_height(fonts.small)
+        screen.blit(
+            value_surface,
+            (x + LAYOUT.wrapped_value_indent, _centered_text_y(y, value_height, value_surface)),
+        )
+        y += value_height + LAYOUT.line_gap
 
     if len(wrapped_lines) < min_value_lines:
-        blank_height = fonts.small.render("Ag", True, PALETTE.text_primary).get_height()
+        blank_height = _font_line_height(fonts.small)
         y += (min_value_lines - len(wrapped_lines)) * (blank_height + LAYOUT.line_gap)
 
     return y
@@ -344,56 +371,39 @@ def _draw_labeled_value_line(
     label_font = fonts.record_header if line.heading else fonts.small
     label_color = PALETTE.text_primary if line.heading else PALETTE.text_muted
     label_surface = label_font.render(line.label, True, label_color)
+    label_height = _font_line_height(label_font)
 
     value_font = fonts.small if line.heading else fonts.body
-    value_surface = value_font.render(line.value, True, line.color)
+    value_height = _font_line_height(value_font)
     status_text_surface = fonts.small.render(line.status_text, True, line.color)
-    value_width = (
-        value_surface.get_width()
-        if line.status_icon is None
-        else value_surface.get_height() + status_text_surface.get_width()
-    )
-    inline_value_space = width - label_surface.get_width() - LAYOUT.inline_value_gap
-    if value_width <= inline_value_space:
-        screen.blit(label_surface, (x, y))
-        if line.status_icon is None:
-            value_x = x + width - value_surface.get_width()
-            screen.blit(value_surface, (value_x, y - 1))
-        else:
-            center = (
-                x + width - (value_surface.get_height() // 2),
-                y + (max(label_surface.get_height(), value_surface.get_height()) // 2),
-            )
-            if line.status_text:
-                text_x = center[0] - (value_surface.get_height() // 2) - 4
-                screen.blit(
-                    status_text_surface,
-                    (
-                        text_x - status_text_surface.get_width(),
-                        y + (label_surface.get_height() - status_text_surface.get_height()) // 2,
-                    ),
-                )
-            _draw_status_icon(
-                pygame,
-                screen,
-                icon=line.status_icon,
-                color=line.color,
-                center=center,
-            )
-        return y + max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+    status_text_height = _font_line_height(fonts.small)
+    row_height = max(label_height, value_height, status_text_height)
 
-    screen.blit(label_surface, (x, y))
-    y += label_surface.get_height() + LAYOUT.line_gap
+    screen.blit(label_surface, (x, _centered_text_y(y, row_height, label_surface)))
+
+    inline_value_space = max(
+        0,
+        width - label_surface.get_width() - LAYOUT.inline_value_gap,
+    )
+
     if line.status_icon is not None:
+        icon_slot_width = row_height
         center = (
-            x + width - (value_surface.get_height() // 2),
-            y + (value_surface.get_height() // 2),
+            x + width - (icon_slot_width // 2),
+            y + (row_height // 2),
         )
         if line.status_text:
-            text_x = center[0] - (value_surface.get_height() // 2) - 4
+            status_gap = max(1, LAYOUT.inline_value_gap // 2)
+            status_text_space = max(0, inline_value_space - icon_slot_width - status_gap)
+            fitted_status_text = _fit_text(fonts.small, line.status_text, status_text_space)
+            status_text_surface = fonts.small.render(fitted_status_text, True, line.color)
+            text_x = center[0] - (icon_slot_width // 2) - status_gap
             screen.blit(
                 status_text_surface,
-                (text_x - status_text_surface.get_width(), y),
+                (
+                    text_x - status_text_surface.get_width(),
+                    _centered_text_y(y, row_height, status_text_surface),
+                ),
             )
         _draw_status_icon(
             pygame,
@@ -402,12 +412,23 @@ def _draw_labeled_value_line(
             color=line.color,
             center=center,
         )
-        return y + value_surface.get_height() + LAYOUT.line_gap
+        return y + row_height + LAYOUT.line_gap
 
-    fitted_value = _fit_text(value_font, line.value, width)
+    fitted_value = _fit_text(value_font, line.value, inline_value_space)
     value_surface = value_font.render(fitted_value, True, line.color)
-    screen.blit(value_surface, (x, y - 1))
-    return y + value_surface.get_height() + LAYOUT.line_gap
+    value_x = x + width - value_surface.get_width()
+    screen.blit(value_surface, (value_x, _centered_text_y(y, row_height, value_surface)))
+    return y + row_height + LAYOUT.line_gap
+
+
+def _font_line_height(font: RenderFont) -> int:
+    """Use a stable row height so glyphs like 'g' do not shift the panel."""
+
+    return font.render("Ag", True, PALETTE.text_primary).get_height()
+
+
+def _centered_text_y(y: int, row_height: int, surface: TextSurface) -> int:
+    return y + max(0, (row_height - surface.get_height()) // 2)
 
 
 def _draw_status_icon(

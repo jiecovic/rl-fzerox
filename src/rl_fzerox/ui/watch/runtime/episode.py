@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry
 
-TrackBestFinishTimes = dict[str, int]
+TrackFinishTimes = dict[str, int]
+TrackBestFinishTimes = TrackFinishTimes
 
 
 def _update_best_finish_position(
@@ -34,6 +35,22 @@ def _update_best_finish_times(
     if current_best is not None and current_best <= finish_time_ms:
         return best_finish_times
     updated = dict(best_finish_times)
+    updated[track_key] = finish_time_ms
+    return updated
+
+
+def _update_latest_finish_times(
+    latest_finish_times: TrackFinishTimes,
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+) -> TrackFinishTimes:
+    """Return updated per-track latest finish times for successful episodes."""
+
+    finish_time_ms = _successful_finish_time_ms(info, telemetry)
+    track_key = _track_key(info)
+    if finish_time_ms is None or track_key is None:
+        return latest_finish_times
+    updated = dict(latest_finish_times)
     updated[track_key] = finish_time_ms
     return updated
 

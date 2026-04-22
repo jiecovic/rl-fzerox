@@ -55,6 +55,16 @@ def _preview_frames(
         return (
             (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
         )
+    if stack_mode == "gray":
+        frames = _grayscale_preview_frames(base_observation, stack_size=stack_size)
+        return (
+            (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
+        )
+    if stack_mode == "luma_chroma":
+        frames = _luma_chroma_preview_frames(base_observation, stack_size=stack_size)
+        return (
+            (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
+        )
 
     base_channels = base_observation.shape[2]
     if base_channels == 3:
@@ -89,6 +99,41 @@ def _rgb_gray_preview_frames(
     ]
     frames.append(np.ascontiguousarray(observation[:, :, -3:]))
     return tuple(frames)
+
+
+def _grayscale_preview_frames(
+    observation: ObservationFrame,
+    *,
+    stack_size: int,
+) -> tuple[RgbFrame, ...]:
+    frame_count = max(1, min(stack_size, observation.shape[2]))
+    return tuple(
+        _grayscale_preview_frame(observation[:, :, index : index + 1])
+        for index in range(frame_count)
+    )
+
+
+def _luma_chroma_preview_frames(
+    observation: ObservationFrame,
+    *,
+    stack_size: int,
+) -> tuple[RgbFrame, ...]:
+    frame_count = max(1, min(stack_size, observation.shape[2] // 2))
+    return tuple(
+        _luma_chroma_preview_frame(observation[:, :, start : start + 2])
+        for start in range(0, frame_count * 2, 2)
+    )
+
+
+def _luma_chroma_preview_frame(channels: ObservationFrame) -> RgbFrame:
+    luma = channels[:, :, 0].astype(np.int16)
+    chroma = channels[:, :, 1].astype(np.int16) - 128
+    yellow = np.clip(chroma, 0, 127)
+    purple = np.clip(-chroma, 0, 127)
+    red = np.clip(luma + yellow + (purple // 2), 0, 255)
+    green = np.clip(luma + yellow, 0, 255)
+    blue = np.clip(luma + purple, 0, 255)
+    return np.ascontiguousarray(np.stack((red, green, blue), axis=2).astype(np.uint8))
 
 
 def _grayscale_preview_frame(channel: ObservationFrame) -> RgbFrame:

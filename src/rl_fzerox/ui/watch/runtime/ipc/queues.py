@@ -96,6 +96,7 @@ def drain_worker_commands(
     step_requests = 0
     save_requests = 0
     reset_requested = False
+    toggle_deterministic_policy = False
     control_fps_delta = 0
     while True:
         try:
@@ -108,6 +109,7 @@ def drain_worker_commands(
                     step_requests=step_requests,
                     save_requests=save_requests,
                     reset_requested=reset_requested,
+                    toggle_deterministic_policy=toggle_deterministic_policy,
                     control_fps_delta=control_fps_delta,
                     control_state=next_control_state,
                 ),
@@ -126,6 +128,8 @@ def drain_worker_commands(
             save_requests += 1
         if command.force_reset:
             reset_requested = True
+        if command.toggle_deterministic_policy:
+            toggle_deterministic_policy = not toggle_deterministic_policy
         control_fps_delta += command.control_fps_delta
         if command.control_state is not None:
             next_control_state = command.control_state
@@ -146,6 +150,7 @@ def apply_viewer_input(
             step_once=viewer_input.step_once,
             save_state=viewer_input.save_state,
             force_reset=viewer_input.force_reset,
+            toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             control_fps_delta=viewer_input.control_fps_delta,
             control_state=viewer_input.control_state,
         ),

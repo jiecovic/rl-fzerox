@@ -45,6 +45,7 @@ def _control_viz(
     energy_fraction: float | None = None,
     boost_active: bool = False,
     boost_lamp_level: float = 0.0,
+    policy_deterministic: bool | None = None,
     policy_action: ActionValue | None = None,
     action_mask_branches: ActionMaskBranches | None = None,
     continuous_drive_deadzone: float = 0.2,
@@ -103,6 +104,7 @@ def _control_viz(
         boost_active=boost_active,
         boost_lamp_level=normalized_boost_lamp_level,
         lean_direction=lean_direction,
+        deterministic_policy=policy_deterministic,
         thrust_masked=not action_branch_value_allowed(
             action_mask_branches,
             "gas",

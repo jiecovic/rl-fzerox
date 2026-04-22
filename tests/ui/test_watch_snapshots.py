@@ -82,9 +82,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         action_mask_branches={"lean": (True, False, True)},
         policy_action=policy_action,
         policy_runner=None,
+        deterministic_policy=True,
         policy_reload_error=None,
         best_finish_position=None,
         best_finish_times={"mute": 98_000},
+        latest_finish_times={"mute": 101_000},
     )
 
     snapshots: list[WatchSnapshot] = []
@@ -112,6 +114,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert np.array_equal(snapshot.policy_action, policy_action)
         assert snapshot.action_mask_branches == {"lean": (True, False, True)}
         assert snapshot.best_finish_times == {"mute": 98_000}
+        assert snapshot.latest_finish_times == {"mute": 101_000}
 
 
 def _rgb(value: int) -> RgbFrame:

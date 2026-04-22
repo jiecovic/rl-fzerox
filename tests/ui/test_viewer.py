@@ -20,9 +20,11 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.envs.observations import STATE_FEATURE_NAMES, state_feature_names
+from rl_fzerox.ui.watch.input import _point_in_rect
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_latest_finish_times,
 )
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
 from rl_fzerox.ui.watch.runtime.timing import (
@@ -30,11 +32,11 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
+from rl_fzerox.ui.watch.view.panels.draw import _draw_labeled_value_line
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _format_policy_action,
     _format_reload_age,
-    _format_reload_error,
     _pressed_button_labels,
 )
 from rl_fzerox.ui.watch.view.panels.model import (
@@ -46,8 +48,42 @@ from rl_fzerox.ui.watch.view.panels.model import (
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
 from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info
-from rl_fzerox.ui.watch.view.screen.types import PanelSection
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
+from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, ViewerFonts
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+class _FakeTextSurface:
+    def __init__(self, text: str) -> None:
+        self._width = len(text) * 7
+        self._height = 18 if any(char in text for char in "Agyp") else 11
+
+    def get_width(self) -> int:
+        return self._width
+
+    def get_height(self) -> int:
+        return self._height
+
+
+class _FakeFont:
+    def render(self, text: str, antialias: bool, color: Color) -> _FakeTextSurface:
+        return _FakeTextSurface(text)
+
+
+class _FakeScreen:
+    def blit(self, surface: _FakeTextSurface, position: tuple[int, int]) -> None:
+        return None
+
+
+def _fake_viewer_fonts() -> ViewerFonts:
+    font = _FakeFont()
+    return ViewerFonts(
+        title=font,
+        section=font,
+        record_header=font,
+        body=font,
+        small=font,
+    )
 
 
 def _panel_group_labels(section: PanelSection, heading: str) -> list[str]:
@@ -86,6 +122,40 @@ def _panel_group_values(section: PanelSection, heading: str) -> dict[str, str]:
     return values
 
 
+def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None:
+    fonts = _fake_viewer_fonts()
+    screen = _FakeScreen()
+    common_kwargs = {
+        "pygame": None,
+        "screen": screen,
+        "fonts": fonts,
+        "x": 0,
+        "y": 10,
+        "width": 160,
+    }
+
+    no_y = _draw_labeled_value_line(
+        **common_kwargs,
+        line=PanelLine("Sliding", "no", PALETTE.text_muted),
+    )
+    yes_y = _draw_labeled_value_line(
+        **common_kwargs,
+        line=PanelLine("Sliding", "yes", PALETTE.text_warning),
+    )
+
+    assert no_y == yes_y
+
+
+def test_point_in_rect_matches_clickable_region_bounds() -> None:
+    rect = (10, 20, 30, 40)
+
+    assert _point_in_rect((10, 20), rect) is True
+    assert _point_in_rect((39, 59), rect) is True
+    assert _point_in_rect((40, 59), rect) is False
+    assert _point_in_rect((39, 60), rect) is False
+    assert _point_in_rect((10, 20), None) is False
+
+
 def test_target_display_size_applies_aspect_correction() -> None:
     frame_shape = np.zeros((240, 640, 3), dtype=np.uint8).shape
 
@@ -103,7 +173,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1504, 880)
+    assert _window_size((592, 444), (84, 116, 12)) == (1504, 980)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -297,6 +367,50 @@ def test_preview_frame_shows_rgb_gray_observations_as_grid() -> None:
     )
 
 
+def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
+    stacked = np.zeros((2, 3, 4), dtype=np.uint8)
+    stacked[:, :, 0] = 32
+    stacked[:, :, 1] = 96
+    stacked[:, :, 2] = 160
+    stacked[:, :, 3] = 224
+    info = {"observation_stack": 4, "observation_stack_mode": "gray"}
+
+    preview = _preview_frame(stacked, info=info)
+
+    assert preview.shape == (2, 12, 3)
+    assert np.array_equal(preview[:2, :3, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
+    assert np.array_equal(preview[:2, 3:6, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
+    assert np.array_equal(preview[:2, 6:9, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
+    assert np.array_equal(preview[:2, 9:12, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
+    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
+    assert (
+        _format_observation_summary(
+            stacked.shape,
+            info=info,
+        )
+        == "3x2 gray x4 strip"
+    )
+
+
+def test_preview_frame_shows_luma_chroma_observations_as_grid() -> None:
+    stacked = np.zeros((2, 3, 8), dtype=np.uint8)
+    stacked[:, :, 0::2] = 96
+    stacked[:, :, 1::2] = 192
+    info = {"observation_stack": 4, "observation_stack_mode": "luma_chroma"}
+
+    preview = _preview_frame(stacked, info=info)
+
+    assert preview.shape == (2, 12, 3)
+    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
+    assert (
+        _format_observation_summary(
+            stacked.shape,
+            info=info,
+        )
+        == "3x2 y+c x4 strip"
+    )
+
+
 def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(None) == "manual"
     assert _format_policy_action(np.array([2, 0], dtype=np.int64)) == "[2,0]"
@@ -353,6 +467,34 @@ def test_display_section_includes_action_repeat() -> None:
     assert control_rate_line.value == "30.0 / 120.0"
     assert game_rate_line.value == "60.0 / 240.0"
     assert render_rate_line.value == "60.0 / 60.0"
+
+
+def test_keys_section_lists_watch_hotkeys() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=2,
+        stuck_step_limit=240,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    display_section = next(section for section in columns.middle if section.title == "Display")
+    key_map = {line.label: line.value for line in display_section.lines}
+
+    assert key_map["Keys"] == "P pause  N step  +/- speed"
+    assert key_map["More keys"] == "R reset  K save  D/click policy"
+    assert "Manual" not in key_map
 
 
 def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
@@ -677,7 +819,7 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         line for line in session_section.lines if line.label == "Deterministic"
     )
 
-    assert deterministic_line.value == "false"
+    assert deterministic_line.value == "stochastic"
 
 
 def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None:
@@ -861,6 +1003,33 @@ def test_best_finish_times_track_successful_finishes_per_track() -> None:
     assert best_times == {"mute": 95_000, "silence": 105_000}
 
 
+def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
+    latest_times = _update_latest_finish_times(
+        {},
+        {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    assert latest_times == {}
+
+    latest_times = _update_latest_finish_times(
+        latest_times,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    latest_times = _update_latest_finish_times(
+        latest_times,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=101_000),
+    )
+    latest_times = _update_latest_finish_times(
+        latest_times,
+        {"termination_reason": "finished", "track_id": "silence"},
+        _sample_telemetry(race_time_ms=105_000),
+    )
+
+    assert latest_times == {"mute": 101_000, "silence": 105_000}
+
+
 def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -897,14 +1066,6 @@ def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(12.7) == "12s ago"
     assert _format_reload_age(125.0) == "2m 05s"
     assert _format_reload_age(3665.0) == "1h 01m"
-
-
-def test_format_reload_error_truncates_long_messages() -> None:
-    assert _format_reload_error(None) == "-"
-    assert _format_reload_error("bad checkpoint") == "bad checkpoint"
-    assert _format_reload_error("this is a much longer checkpoint parse failure message") == (
-        "this is a much longer checkpoint pa…"
-    )
 
 
 def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:

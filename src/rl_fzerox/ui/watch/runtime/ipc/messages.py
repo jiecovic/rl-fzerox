@@ -18,6 +18,7 @@ class ViewerCommand:
     step_once: bool = False
     save_state: bool = False
     force_reset: bool = False
+    toggle_deterministic_policy: bool = False
     control_fps_delta: int = 0
     control_state: ControllerState | None = None
 
@@ -31,6 +32,7 @@ class WorkerCommandBatch:
     step_requests: int
     save_requests: int
     reset_requested: bool
+    toggle_deterministic_policy: bool
     control_fps_delta: int
     control_state: ControllerState
 
@@ -71,6 +73,7 @@ class WatchSnapshot:
     policy_reload_error: str | None
     best_finish_position: int | None
     best_finish_times: dict[str, int]
+    latest_finish_times: dict[str, int]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
     action_hold_frame: int = 1

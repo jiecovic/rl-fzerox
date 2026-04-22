@@ -14,6 +14,7 @@ from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
 from rl_fzerox.ui.watch.view.screen.frame import _draw_frame
+from rl_fzerox.ui.watch.view.screen.types import ViewerHitboxes
 
 
 def draw_watch_frame(
@@ -26,7 +27,7 @@ def draw_watch_frame(
     paused: bool,
     render_rate: RateMeter,
     target_render_fps: float | None,
-) -> None:
+) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
 
     action_config = config.env.action.runtime()
@@ -40,7 +41,7 @@ def draw_watch_frame(
         target_render_fps=target_render_fps,
     )
     _add_config_track_info(draw_info, config)
-    _draw_frame(
+    return _draw_frame(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -72,6 +73,7 @@ def draw_watch_frame(
         policy_reload_error=snapshot.policy_reload_error,
         best_finish_position=snapshot.best_finish_position,
         best_finish_times=snapshot.best_finish_times,
+        latest_finish_times=snapshot.latest_finish_times,
         track_pool_records=_track_pool_records(config),
         continuous_drive_deadzone=action_config.continuous_drive_deadzone,
         continuous_air_brake_mode=action_config.continuous_air_brake_mode,
