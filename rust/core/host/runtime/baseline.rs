@@ -69,8 +69,10 @@ impl Host {
             .baseline_frame
             .clone()
             .ok_or(CoreError::NoFrameAvailable)?;
-        let baseline_state = self.baseline_state.clone();
-        self.restore_state_bytes(&baseline_state)?;
+        let baseline_state = std::mem::take(&mut self.baseline_state);
+        let restore_result = self.restore_state_bytes(&baseline_state);
+        self.baseline_state = baseline_state;
+        restore_result?;
         self.callbacks.set_frame(baseline_frame);
         Ok(())
     }

@@ -12,4 +12,6 @@ pub mod runtime;
 pub mod stdio;
 pub mod video;
 
-pub use runtime::{Host, RepeatedStepConfig, StepCounters, StepStatus, StepSummary};
+pub use runtime::{
+    DisplayFrameBatch, Host, RepeatedStepConfig, StepCounters, StepStatus, StepSummary,
+};
