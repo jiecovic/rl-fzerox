@@ -7,7 +7,8 @@ use crate::core::video::plan::{ProcessedFramePlan, crop_bounds, display_size};
 use crate::core::video::plan::{ProcessedFramePlanRequest, build_processed_frame_plan};
 use crate::core::video::resize_rgb;
 use crate::core::video::{
-    PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_vec,
+    PixelLayout, RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, rgb_to_luma_in_place,
+    rgb_to_luma_into, rgb_to_luma_vec,
 };
 
 use super::convert::{expand_5_to_8, expand_6_to_8};
@@ -113,72 +114,86 @@ pub fn processed_frame_from_raw_into(
     plan: &ProcessedFramePlan,
     output: &mut Vec<u8>,
 ) -> Result<(), CoreError> {
-    let cropped = crop_raw_rgb(
+    crop_raw_rgb_into(
         frame,
         plan.crop_x,
         plan.crop_y,
         plan.crop_width,
         plan.crop_height,
+        output,
     )?;
-    let display_rgb =
-        if plan.display_width != plan.crop_width || plan.display_height != plan.crop_height {
-            resize_rgb(
-                &cropped,
-                plan.crop_width,
-                plan.crop_height,
+
+    let display_resized =
+        plan.display_width != plan.crop_width || plan.display_height != plan.crop_height;
+    let target_resized = plan.key.target_width != plan.display_width
+        || plan.key.target_height != plan.display_height;
+
+    if display_resized {
+        let display_rgb = resize_rgb(
+            output,
+            plan.crop_width,
+            plan.crop_height,
+            plan.display_width,
+            plan.display_height,
+            plan.key.resize_filter,
+        )?;
+        if target_resized {
+            let target_rgb = resize_rgb(
+                &display_rgb,
                 plan.display_width,
                 plan.display_height,
+                plan.key.target_width,
+                plan.key.target_height,
                 plan.key.resize_filter,
-            )?
+            )?;
+            write_final_rgb(&target_rgb, output, plan.key.rgb);
         } else {
-            cropped
-        };
-    let target_rgb = if plan.key.target_width != plan.display_width
-        || plan.key.target_height != plan.display_height
-    {
-        resize_rgb(
-            &display_rgb,
+            write_final_rgb(&display_rgb, output, plan.key.rgb);
+        }
+    } else if target_resized {
+        let target_rgb = resize_rgb(
+            output,
             plan.display_width,
             plan.display_height,
             plan.key.target_width,
             plan.key.target_height,
             plan.key.resize_filter,
-        )?
-    } else {
-        display_rgb
-    };
-
-    if plan.key.rgb {
-        output.clear();
-        output.extend_from_slice(&target_rgb);
-    } else {
-        output.clear();
-        output.extend_from_slice(&rgb_to_luma_vec(&target_rgb));
+        )?;
+        write_final_rgb(&target_rgb, output, plan.key.rgb);
+    } else if !plan.key.rgb {
+        rgb_to_luma_in_place(output);
     }
+
     debug_assert_eq!(output.len(), plan.output_len);
     Ok(())
 }
 
-fn crop_raw_rgb(
+fn write_final_rgb(rgb: &[u8], output: &mut Vec<u8>, keep_rgb: bool) {
+    if keep_rgb {
+        output.clear();
+        output.extend_from_slice(rgb);
+    } else {
+        output.clear();
+        output.resize(rgb.len() / 3, 0);
+        rgb_to_luma_into(rgb, output);
+    }
+}
+
+fn crop_raw_rgb_into(
     frame: &RawVideoFrame,
     crop_x: usize,
     crop_y: usize,
     crop_width: usize,
     crop_height: usize,
-) -> Result<Vec<u8>, CoreError> {
-    let mut cropped = vec![0_u8; crop_width * crop_height * 3];
-    for row in 0..crop_height {
-        let dst_start = row * crop_width * 3;
-        let dst_end = dst_start + (crop_width * 3);
-        write_raw_rgb_row(
-            frame,
-            crop_x,
-            crop_y + row,
-            crop_width,
-            &mut cropped[dst_start..dst_end],
-        )?;
+    output: &mut Vec<u8>,
+) -> Result<(), CoreError> {
+    let row_len = crop_width * 3;
+    output.clear();
+    output.resize(row_len * crop_height, 0);
+    for (row, dst) in output.chunks_exact_mut(row_len).enumerate() {
+        write_raw_rgb_row(frame, crop_x, crop_y + row, crop_width, dst)?;
     }
-    Ok(cropped)
+    Ok(())
 }
 
 fn write_raw_rgb_row(

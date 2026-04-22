@@ -16,6 +16,16 @@ pub(crate) fn rgb_to_luma_into(rgb: &[u8], luma: &mut [u8]) {
     }
 }
 
+#[inline]
+pub(crate) fn rgb_to_luma_in_place(rgb: &mut Vec<u8>) {
+    let pixel_count = rgb.len() / 3;
+    for pixel_index in 0..pixel_count {
+        let rgb_index = pixel_index * 3;
+        rgb[pixel_index] = rgb_to_luma(rgb[rgb_index], rgb[rgb_index + 1], rgb[rgb_index + 2]);
+    }
+    rgb.truncate(pixel_count);
+}
+
 #[inline(always)]
 pub(crate) fn rgb_to_luma(red: u8, green: u8, blue: u8) -> u8 {
     let weighted = (77 * u16::from(red)) + (150 * u16::from(green)) + (29 * u16::from(blue)) + 128;
