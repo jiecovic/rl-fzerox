@@ -10,6 +10,8 @@ mod bootstrap;
 mod host;
 mod lean_slide;
 mod memory;
+mod render;
+mod repeat;
 mod rng;
 mod step;
 mod step_accumulator;

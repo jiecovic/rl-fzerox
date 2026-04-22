@@ -7,20 +7,16 @@ use std::path::{Path, PathBuf};
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::api::LoadedCore;
-use crate::core::callbacks::{CallbackGuard, CallbackState, StackedObservationRequest};
+use crate::core::callbacks::{CallbackGuard, CallbackState};
 use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
-use crate::core::minimap::MinimapLayerRequest;
-use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
+use crate::core::observation::ObservationCropProfile;
 use crate::core::rom::validate_supported_rom;
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
-use crate::core::video::{VideoFrame, VideoResizeFilter};
+use crate::core::video::VideoFrame;
 
-use super::step::{
-    NativeStepResult, NativeWatchStepResult, RepeatedStepConfig, StepCounters, StepStatus,
-};
-use super::step_accumulator::StepAccumulator;
+use super::step::StepCounters;
 
 // Maximum number of `core.run()` calls we allow while waiting for a reset/load
 // path to produce a fresh frame before treating it as a core failure.
@@ -180,146 +176,6 @@ impl Host {
         Ok(())
     }
 
-    /// Execute one outer env step fully inside the host runtime.
-    ///
-    /// The chosen controller state is held for exactly `action_repeat`
-    /// internal frames. The host aggregates step-level telemetry features and
-    /// stop-state counters across those frames, then returns the final stacked
-    /// observation once at the end.
-    ///
-    /// We intentionally capture video only on the last repeated frame. That
-    /// keeps the common path fast at the cost of not returning the exact first
-    /// terminal/truncation frame image when a stop condition occurs earlier in
-    /// the repeated step.
-    #[allow(dead_code)]
-    pub fn step_repeat_raw(
-        &mut self,
-        config: RepeatedStepConfig,
-    ) -> Result<NativeStepResult<'_>, CoreError> {
-        self.ensure_open()?;
-        if config.action_repeat == 0 {
-            return Err(CoreError::InvalidStepRepeatCount {
-                count: config.action_repeat,
-            });
-        }
-
-        let initial_sample = self.telemetry_sample()?;
-        self.callbacks.set_controller_state(config.controller_state);
-        let step_result = with_silenced_stdio(|| {
-            let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-
-            for repeat_index in 0..config.action_repeat {
-                let capture_video = repeat_index + 1 == config.action_repeat;
-                self.callbacks.set_capture_video(capture_video);
-                if config.lean_timer_assist {
-                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
-                }
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
-                self.frame_index += 1;
-
-                let telemetry = self.telemetry_sample()?;
-                accumulator.observe(&telemetry, self.frame_index);
-            }
-
-            Ok(accumulator.finish())
-        });
-        self.callbacks.set_capture_video(true);
-        self.refresh_shape_from_frame();
-
-        let summary = step_result?;
-        if !self.callbacks.has_frame() {
-            return Err(CoreError::NoFrameAvailable);
-        }
-
-        let final_telemetry = self.telemetry()?;
-        let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
-        self.step_counters = status.counters;
-        let observation = self.observation_frame(
-            config.preset,
-            config.frame_stack,
-            config.stack_mode,
-            config.minimap_layer,
-            config.resize_filter,
-            config.minimap_resize_filter,
-        )?;
-        Ok(NativeStepResult {
-            observation,
-            summary,
-            status,
-            final_telemetry,
-        })
-    }
-
-    /// Execute one repeated step and capture a display frame after each inner frame.
-    ///
-    /// This is intentionally separate from `step_repeat_raw`: watch mode needs
-    /// smooth visual playback when actions are held for multiple frames, while
-    /// training and benchmarks should avoid those extra frame copies.
-    #[allow(dead_code)]
-    pub fn step_repeat_watch_raw(
-        &mut self,
-        config: RepeatedStepConfig,
-    ) -> Result<NativeWatchStepResult<'_>, CoreError> {
-        self.ensure_open()?;
-        if config.action_repeat == 0 {
-            return Err(CoreError::InvalidStepRepeatCount {
-                count: config.action_repeat,
-            });
-        }
-
-        let initial_sample = self.telemetry_sample()?;
-        self.callbacks.set_controller_state(config.controller_state);
-        let step_result = with_silenced_stdio(|| {
-            let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-            let mut display_frames = Vec::with_capacity(config.action_repeat);
-
-            for _ in 0..config.action_repeat {
-                self.callbacks.set_capture_video(true);
-                if config.lean_timer_assist {
-                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
-                }
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
-                self.frame_index += 1;
-
-                let telemetry = self.telemetry_sample()?;
-                accumulator.observe(&telemetry, self.frame_index);
-                display_frames.push(self.display_frame(config.preset)?.to_vec());
-            }
-
-            Ok((accumulator.finish(), display_frames))
-        });
-        self.callbacks.set_capture_video(true);
-        self.refresh_shape_from_frame();
-
-        let (summary, display_frames) = step_result?;
-        if !self.callbacks.has_frame() {
-            return Err(CoreError::NoFrameAvailable);
-        }
-
-        let final_telemetry = self.telemetry()?;
-        let status = StepStatus::from_step(self.step_counters, &summary, &final_telemetry, config);
-        self.step_counters = status.counters;
-        let observation = self.observation_frame(
-            config.preset,
-            config.frame_stack,
-            config.stack_mode,
-            config.minimap_layer,
-            config.resize_filter,
-            config.minimap_resize_filter,
-        )?;
-        Ok(NativeWatchStepResult {
-            observation,
-            display_frames,
-            summary,
-            status,
-            final_telemetry,
-        })
-    }
-
     pub fn set_controller_state(
         &mut self,
         controller_state: ControllerState,
@@ -342,13 +198,6 @@ impl Host {
         self.capture_current_as_baseline_to_path(save_path)
     }
 
-    pub fn frame_rgb(&mut self) -> Result<&[u8], CoreError> {
-        self.callbacks
-            .frame()
-            .map(|frame| frame.rgb.as_slice())
-            .ok_or(CoreError::NoFrameAvailable)
-    }
-
     pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
         self.read_memory(MEMORY_SYSTEM_RAM, offset, length)
     }
@@ -362,82 +211,9 @@ impl Host {
         crate::core::telemetry::read_snapshot(system_ram)
     }
 
-    fn telemetry_sample(&mut self) -> Result<StepTelemetrySample, CoreError> {
+    pub(super) fn telemetry_sample(&mut self) -> Result<StepTelemetrySample, CoreError> {
         let system_ram = self.system_ram_slice()?;
         crate::core::telemetry::read_step_sample(system_ram)
-    }
-
-    pub fn observation_spec(
-        &self,
-        preset: ObservationPreset,
-    ) -> Result<ObservationSpec, CoreError> {
-        let (frame_height, frame_width, _) = self.frame_shape;
-        preset.resolve(
-            frame_width,
-            frame_height,
-            self.display_aspect_ratio,
-            self.observation_crop_profile,
-        )
-    }
-
-    pub fn observation_frame(
-        &mut self,
-        preset: ObservationPreset,
-        frame_stack: usize,
-        stack_mode: crate::core::observation::ObservationStackMode,
-        minimap_layer: bool,
-        resize_filter: VideoResizeFilter,
-        minimap_resize_filter: VideoResizeFilter,
-    ) -> Result<&[u8], CoreError> {
-        let spec = self.observation_spec(preset)?;
-        let minimap_layer_request =
-            self.minimap_layer_request(minimap_layer, &spec, minimap_resize_filter);
-        self.callbacks
-            .stacked_observation_frame(StackedObservationRequest {
-                aspect_ratio: preset.observation_aspect_ratio(self.display_aspect_ratio),
-                target_width: spec.frame_width,
-                target_height: spec.frame_height,
-                rgb: spec.channels == 3,
-                crop: preset.crop(self.observation_crop_profile),
-                resize_filter,
-                frame_stack,
-                stack_mode,
-                minimap_layer: minimap_layer_request,
-            })
-    }
-
-    pub fn display_frame(&mut self, preset: ObservationPreset) -> Result<&[u8], CoreError> {
-        let spec = self.observation_spec(preset)?;
-        self.callbacks.observation_frame(
-            self.display_aspect_ratio,
-            spec.display_width,
-            spec.display_height,
-            true,
-            preset.crop(self.observation_crop_profile),
-            VideoResizeFilter::Nearest,
-        )
-    }
-
-    fn minimap_layer_request(
-        &mut self,
-        enabled: bool,
-        spec: &ObservationSpec,
-        resize_filter: VideoResizeFilter,
-    ) -> Option<MinimapLayerRequest> {
-        if !enabled {
-            return None;
-        }
-        let course_index = self
-            .telemetry()
-            .map(|telemetry| telemetry.course_index as usize)
-            .unwrap_or(usize::MAX);
-        Some(MinimapLayerRequest {
-            crop_profile: self.observation_crop_profile,
-            course_index,
-            target_width: spec.frame_width,
-            target_height: spec.frame_height,
-            resize_filter,
-        })
     }
 
     pub fn close(&mut self) {
