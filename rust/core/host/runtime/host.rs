@@ -12,6 +12,7 @@ use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::minimap::MinimapLayerRequest;
 use crate::core::observation::{ObservationCropProfile, ObservationPreset, ObservationSpec};
+use crate::core::rom::validate_supported_rom;
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
 use crate::core::video::{VideoFrame, VideoResizeFilter};
@@ -63,12 +64,14 @@ impl Host {
             return Err(CoreError::MissingRom(rom_path.to_path_buf()));
         }
 
-        let core = LoadedCore::load(core_path)?;
-        let callbacks = Box::new(CallbackState::new(core_path, runtime_dir, renderer)?);
         let rom_bytes = std::fs::read(rom_path).map_err(|error| CoreError::ReadFile {
             path: rom_path.to_path_buf(),
             message: error.to_string(),
         })?;
+        validate_supported_rom(rom_path, &rom_bytes)?;
+
+        let core = LoadedCore::load(core_path)?;
+        let callbacks = Box::new(CallbackState::new(core_path, runtime_dir, renderer)?);
         let rom_path_c_string =
             CString::new(rom_path.to_string_lossy().as_bytes()).map_err(|_| {
                 CoreError::InvalidPath {
