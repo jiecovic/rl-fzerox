@@ -62,7 +62,6 @@ pub enum CoreError {
         actual: u32,
         expected: u32,
     },
-    #[allow(dead_code)]
     InvalidStepRepeatCount {
         count: usize,
     },

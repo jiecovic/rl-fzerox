@@ -1,3 +1,4 @@
+// rust/core/host/tests/callbacks_tests.rs
 // Covers callback utility helpers and callback-owned observation stacking.
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};

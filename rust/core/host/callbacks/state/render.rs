@@ -1,4 +1,4 @@
-// rust/core/host/callbacks/render.rs
+// rust/core/host/callbacks/state/render.rs
 //! Observation, display, minimap, and render-plan cache methods.
 
 use crate::core::error::CoreError;

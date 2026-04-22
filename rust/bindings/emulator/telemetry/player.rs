@@ -4,11 +4,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
-use crate::bindings::emulator::state::{
-    FLAG_ACTIVE, FLAG_AIRBORNE, FLAG_CAN_BOOST, FLAG_COLLISION_RECOIL, FLAG_CPU_CONTROLLED,
-    FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK, FLAG_FINISHED, FLAG_RETIRED,
-    FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
-};
+use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
 use crate::core::telemetry::{MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry};
 
 #[pyclass(
@@ -61,7 +57,10 @@ impl PyPlayerTelemetry {
         machine_weight = 0,
         engine_setting = 0.0,
     ))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 constructor mirrors the flat Python telemetry object"
+    )]
     fn new(
         state_flags: u32,
         speed_kph: f32,
@@ -319,57 +318,57 @@ impl PyPlayerTelemetry {
 
     #[getter]
     fn collision_recoil(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_COLLISION_RECOIL)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.collision_recoil)
     }
 
     #[getter]
     fn spinning_out(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_SPINNING_OUT)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.spinning_out)
     }
 
     #[getter]
     fn retired(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_RETIRED)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.retired)
     }
 
     #[getter]
     fn falling_off_track(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_FALLING_OFF_TRACK)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.falling_off_track)
     }
 
     #[getter]
     fn can_boost(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_CAN_BOOST)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.can_boost)
     }
 
     #[getter]
     fn cpu_controlled(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_CPU_CONTROLLED)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.cpu_controlled)
     }
 
     #[getter]
     fn dash_pad_boost(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_DASH_PAD_BOOST)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.dash_pad_boost)
     }
 
     #[getter]
     fn finished(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_FINISHED)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.finished)
     }
 
     #[getter]
     fn airborne(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_AIRBORNE)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.airborne)
     }
 
     #[getter]
     fn crashed(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_CRASHED)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.crashed)
     }
 
     #[getter]
     fn active(&self) -> bool {
-        has_state_flag(self.inner.state_flags, FLAG_ACTIVE)
+        has_state_flag(self.inner.state_flags, RACER_STATE_FLAGS.active)
     }
 
     #[getter]

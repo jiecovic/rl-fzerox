@@ -16,7 +16,6 @@ use crate::core::{
 ///
 /// This is the native summary Python reward trackers and limit trackers will
 /// consume once the repeated step loop moves behind the Rust boundary.
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StepSummary {
     /// Number of internal frames actually executed for this env step.
@@ -203,7 +202,6 @@ fn carried_progress_frontier(
 }
 
 /// Native env-step payload returned after executing a repeated step.
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct NativeStepResult<'a> {
     /// Final stacked observation tensor for this outer env step.
@@ -222,7 +220,6 @@ pub struct NativeStepResult<'a> {
 /// during each internal emulator frame. The training path intentionally does
 /// not use this payload because those per-frame copies are only useful for UI
 /// playback.
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct NativeWatchStepResult<'a> {
     /// Final stacked observation tensor for this outer env step.

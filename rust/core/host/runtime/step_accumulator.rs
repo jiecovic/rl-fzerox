@@ -9,7 +9,6 @@ use crate::core::telemetry::StepTelemetrySample;
 use super::step::{RepeatedStepConfig, StepSummary};
 
 /// Collect step-level aggregates across repeated internal emulator frames.
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug)]
 pub(super) struct StepAccumulator {
     summary: StepSummary,
@@ -19,7 +18,6 @@ pub(super) struct StepAccumulator {
     energy_loss_epsilon: f32,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 impl StepAccumulator {
     /// Start one fresh step accumulator from the telemetry state before the
     /// repeated inner-frame loop begins.

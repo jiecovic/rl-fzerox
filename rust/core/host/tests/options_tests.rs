@@ -1,3 +1,4 @@
+// rust/core/host/tests/options_tests.rs
 // Covers small libretro option parsing and renderer override helpers.
 use std::ffi::CString;
 

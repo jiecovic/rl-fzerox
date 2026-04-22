@@ -1,3 +1,4 @@
+// rust/core/libretro/tests/info_tests.rs
 // Covers parsing libretro extension strings from raw system-info metadata.
 use std::ffi::CString;
 

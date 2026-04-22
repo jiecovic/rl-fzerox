@@ -4,10 +4,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
-use crate::bindings::emulator::state::{
-    FLAG_COLLISION_RECOIL, FLAG_CRASHED, FLAG_DASH_PAD_BOOST, FLAG_FALLING_OFF_TRACK,
-    FLAG_FINISHED, FLAG_RETIRED, FLAG_SPINNING_OUT, has_state_flag, state_flag_labels,
-};
+use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
 use crate::core::host::{StepStatus, StepSummary};
 
 #[pyclass(
@@ -37,7 +34,10 @@ impl PyStepSummary {
         final_frame_index=0,
         airborne_frames=0,
     ))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 constructor mirrors the flat Python step-summary object"
+    )]
     fn new(
         frames_run: usize,
         max_race_distance: f32,
@@ -125,37 +125,49 @@ impl PyStepSummary {
 
     #[getter]
     fn entered_collision_recoil(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_COLLISION_RECOIL)
+        has_state_flag(
+            self.inner.entered_state_flags,
+            RACER_STATE_FLAGS.collision_recoil,
+        )
     }
 
     #[getter]
     fn entered_spinning_out(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_SPINNING_OUT)
+        has_state_flag(
+            self.inner.entered_state_flags,
+            RACER_STATE_FLAGS.spinning_out,
+        )
     }
 
     #[getter]
     fn entered_falling_off_track(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_FALLING_OFF_TRACK)
+        has_state_flag(
+            self.inner.entered_state_flags,
+            RACER_STATE_FLAGS.falling_off_track,
+        )
     }
 
     #[getter]
     fn entered_crashed(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_CRASHED)
+        has_state_flag(self.inner.entered_state_flags, RACER_STATE_FLAGS.crashed)
     }
 
     #[getter]
     fn entered_retired(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_RETIRED)
+        has_state_flag(self.inner.entered_state_flags, RACER_STATE_FLAGS.retired)
     }
 
     #[getter]
     fn entered_finished(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_FINISHED)
+        has_state_flag(self.inner.entered_state_flags, RACER_STATE_FLAGS.finished)
     }
 
     #[getter]
     fn entered_dash_pad_boost(&self) -> bool {
-        has_state_flag(self.inner.entered_state_flags, FLAG_DASH_PAD_BOOST)
+        has_state_flag(
+            self.inner.entered_state_flags,
+            RACER_STATE_FLAGS.dash_pad_boost,
+        )
     }
 
     #[getter]

@@ -163,7 +163,10 @@ impl PyEmulator {
         right_stick_x=0.0,
         right_stick_y=0.0,
     ))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 method signature is the stable Python training API"
+    )]
     fn step_repeat_raw<'py>(
         &mut self,
         py: Python<'py>,
@@ -241,7 +244,10 @@ impl PyEmulator {
         right_stick_x=0.0,
         right_stick_y=0.0,
     ))]
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 method signature is the stable Python watch API"
+    )]
     fn step_repeat_watch_raw<'py>(
         &mut self,
         py: Python<'py>,

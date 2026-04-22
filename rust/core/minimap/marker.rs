@@ -104,6 +104,7 @@ fn marker_is_subset(candidate: &[u8], reference: &[u8]) -> bool {
             })
 }
 
+#[inline(always)]
 pub(super) fn is_player_marker_color(red: u8, green: u8, blue: u8) -> bool {
     red <= 80
         && green >= 140
