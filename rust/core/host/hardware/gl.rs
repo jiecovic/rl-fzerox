@@ -37,10 +37,16 @@ impl GlFns {
 pub(super) fn flip_rgb_rows(rgb_bottom_left: &[u8], width: usize, height: usize) -> Vec<u8> {
     let row_len = width * 3;
     let mut rgb = vec![0_u8; rgb_bottom_left.len()];
-    for y in 0..height {
-        let src = (height - 1 - y) * row_len;
-        let dst = y * row_len;
-        rgb[dst..dst + row_len].copy_from_slice(&rgb_bottom_left[src..src + row_len]);
+    if row_len == 0 || height == 0 {
+        return rgb;
+    }
+    for (src_row, dst_row) in rgb_bottom_left
+        .chunks_exact(row_len)
+        .take(height)
+        .rev()
+        .zip(rgb.chunks_exact_mut(row_len))
+    {
+        dst_row.copy_from_slice(src_row);
     }
     rgb
 }
