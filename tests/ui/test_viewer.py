@@ -24,6 +24,7 @@ from rl_fzerox.ui.watch.input import _point_in_rect
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
@@ -1028,6 +1029,32 @@ def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> 
     )
 
     assert latest_times == {"mute": 101_000, "silence": 105_000}
+
+
+def test_latest_finish_delta_tracks_previous_pb_gap() -> None:
+    latest_deltas = _update_latest_finish_deltas_ms(
+        {},
+        {},
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=98_000),
+    )
+    assert latest_deltas == {}
+
+    latest_deltas = _update_latest_finish_deltas_ms(
+        latest_deltas,
+        {"mute": 98_000},
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=101_000),
+    )
+    assert latest_deltas == {"mute": 3_000}
+
+    latest_deltas = _update_latest_finish_deltas_ms(
+        latest_deltas,
+        {"mute": 98_000},
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(race_time_ms=95_000),
+    )
+    assert latest_deltas == {"mute": -3_000}
 
 
 def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -> None:

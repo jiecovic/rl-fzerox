@@ -15,6 +15,7 @@ from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
 from rl_fzerox.ui.watch.runtime.ipc import (
@@ -97,6 +98,7 @@ def _run_simulation_loop(
         best_finish_position: int | None = None
         best_finish_times: dict[str, int] = {}
         latest_finish_times: dict[str, int] = {}
+        latest_finish_deltas_ms: dict[str, int] = {}
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_state = ControllerState()
@@ -139,6 +141,7 @@ def _run_simulation_loop(
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
+                    latest_finish_deltas_ms=latest_finish_deltas_ms,
                 ),
             )
 
@@ -239,6 +242,12 @@ def _run_simulation_loop(
                     info,
                     None,
                 )
+                latest_finish_deltas_ms = _update_latest_finish_deltas_ms(
+                    latest_finish_deltas_ms,
+                    best_finish_times,
+                    info,
+                    live_telemetry,
+                )
                 best_finish_times = _update_best_finish_times(
                     best_finish_times,
                     info,
@@ -279,6 +288,7 @@ def _run_simulation_loop(
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
+                    latest_finish_deltas_ms=latest_finish_deltas_ms,
                 )
                 if target_control_seconds is not None:
                     now = time.perf_counter()

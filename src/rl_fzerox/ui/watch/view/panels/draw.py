@@ -49,6 +49,7 @@ class SidePanelData:
     best_finish_position: int | None
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
+    latest_finish_deltas_ms: dict[str, int]
     track_pool_records: tuple[dict[str, object], ...]
     continuous_drive_deadzone: float
     continuous_air_brake_mode: str
@@ -107,6 +108,7 @@ def _draw_side_panel(
         best_finish_position=data.best_finish_position,
         best_finish_times=data.best_finish_times,
         latest_finish_times=data.latest_finish_times,
+        latest_finish_deltas_ms=data.latest_finish_deltas_ms,
         track_pool_records=data.track_pool_records,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
         continuous_air_brake_mode=data.continuous_air_brake_mode,

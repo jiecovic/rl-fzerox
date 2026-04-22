@@ -60,6 +60,7 @@ def _build_panel_columns(
     best_finish_position: int | None = None,
     best_finish_times: dict[str, int] | None = None,
     latest_finish_times: dict[str, int] | None = None,
+    latest_finish_deltas_ms: dict[str, int] | None = None,
     track_pool_records: tuple[dict[str, object], ...] = (),
     continuous_drive_deadzone: float = 0.2,
     continuous_air_brake_mode: str = "always",
@@ -184,6 +185,7 @@ def _build_panel_columns(
                 track_pool_records=track_pool_records,
                 best_finish_times=best_finish_times or {},
                 latest_finish_times=latest_finish_times or {},
+                latest_finish_deltas_ms=latest_finish_deltas_ms or {},
             ),
         ],
         middle=[

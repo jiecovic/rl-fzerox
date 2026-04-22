@@ -87,6 +87,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         best_finish_position=None,
         best_finish_times={"mute": 98_000},
         latest_finish_times={"mute": 101_000},
+        latest_finish_deltas_ms={"mute": 3_000},
     )
 
     snapshots: list[WatchSnapshot] = []
@@ -115,6 +116,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert snapshot.action_mask_branches == {"lean": (True, False, True)}
         assert snapshot.best_finish_times == {"mute": 98_000}
         assert snapshot.latest_finish_times == {"mute": 101_000}
+        assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
 
 
 def _rgb(value: int) -> RgbFrame:
