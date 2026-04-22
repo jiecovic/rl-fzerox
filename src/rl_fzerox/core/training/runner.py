@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.seed import seed_process
-from rl_fzerox.core.training.runs import ensure_run_dirs, reserve_run_paths, save_train_run_config
+from rl_fzerox.core.training.runs import (
+    ensure_run_dirs,
+    reserve_run_paths,
+    resolve_policy_artifact_path,
+    save_train_run_config,
+)
 from rl_fzerox.core.training.session import (
     build_callbacks,
     build_tensorboard_logger,
@@ -11,6 +16,7 @@ from rl_fzerox.core.training.session import (
     build_training_model,
     cleanup_failed_run,
     current_policy_artifact_metadata,
+    load_policy_artifact_metadata,
     maybe_resume_training_model,
     print_training_startup,
     resolve_train_run_config,
@@ -50,6 +56,12 @@ def run_training(config: TrainAppConfig) -> None:
             train_env=train_env,
             train_config=run_config.train,
         )
+        initial_curriculum_stage_index = _resume_curriculum_stage_index(run_config)
+        if initial_curriculum_stage_index is not None:
+            train_env.env_method(
+                "sync_checkpoint_curriculum_stage",
+                initial_curriculum_stage_index,
+            )
         save_train_run_config(config=run_config, run_dir=run_paths.run_dir)
         model.set_logger(build_tensorboard_logger(run_paths))
         print_training_startup(
@@ -67,6 +79,7 @@ def run_training(config: TrainAppConfig) -> None:
             train_config=run_config.train,
             curriculum_config=run_config.curriculum,
             run_paths=run_paths,
+            initial_curriculum_stage_index=initial_curriculum_stage_index,
         )
         masking_required = training_requires_action_masks(run_config)
         try:
@@ -103,6 +116,19 @@ def run_training(config: TrainAppConfig) -> None:
     finally:
         if train_env is not None:
             train_env.close()
+
+
+def _resume_curriculum_stage_index(config: TrainAppConfig) -> int | None:
+    if config.train.resume_run_dir is None or config.train.resume_mode != "full_model":
+        return None
+    policy_path = resolve_policy_artifact_path(
+        config.train.resume_run_dir,
+        artifact=config.train.resume_artifact,
+    )
+    metadata = load_policy_artifact_metadata(policy_path)
+    if metadata is None:
+        return None
+    return metadata.curriculum_stage_index
 
 
 def _learn_model(

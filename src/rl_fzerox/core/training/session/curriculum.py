@@ -14,11 +14,18 @@ from rl_fzerox.core.config.schema import (
 class ActionMaskCurriculumController:
     """Track episode-smoothed curriculum progress and stage promotion."""
 
-    def __init__(self, config: CurriculumConfig) -> None:
+    def __init__(
+        self,
+        config: CurriculumConfig,
+        *,
+        initial_stage_index: int | None = None,
+    ) -> None:
         self._config = config
         self._race_laps_completed_window: deque[float] = deque(maxlen=config.smoothing_episodes)
         self._stage_episode_count = 0
         self._stage_index = 0 if config.enabled and config.stages else None
+        if initial_stage_index is not None:
+            self._set_initial_stage(initial_stage_index)
 
     @property
     def enabled(self) -> bool:
@@ -85,6 +92,13 @@ class ActionMaskCurriculumController:
     def _clear_stage_windows(self) -> None:
         self._race_laps_completed_window.clear()
         self._stage_episode_count = 0
+
+    def _set_initial_stage(self, stage_index: int) -> None:
+        if self._stage_index is None:
+            raise ValueError("Cannot restore a curriculum stage without configured stages")
+        if not 0 <= stage_index < len(self._config.stages):
+            raise ValueError(f"Invalid initial curriculum stage index {stage_index}")
+        self._stage_index = int(stage_index)
 
 
 def _episode_metric(episode: dict[str, object], key: str) -> float:
