@@ -18,6 +18,13 @@ class FrameObservationOptionsDict(TypedDict):
     resize_filter: Literal["nearest", "bilinear"]
     minimap_resize_filter: Literal["nearest", "bilinear"]
 
+class VehicleSetupInfoDict(TypedDict):
+    vehicle_character_index_ram: int
+    engine_setting_ram: float
+    engine_setting_percent_ram: float
+    character_engine_setting_ram: float
+    racer_engine_curve_ram: float
+
 class PlayerTelemetry:
     def __init__(
         self,
@@ -387,6 +394,32 @@ class Emulator:
     ) -> npt.NDArray[np.uint8]: ...
     def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...
+    def patch_time_attack_race_start_setup(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
+    def patch_time_attack_machine_settings(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
+    def force_time_attack_reinit(self) -> None: ...
+    def validate_time_attack_race_start_setup(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
+    def vehicle_setup_info(self) -> VehicleSetupInfoDict: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...
     def write_system_ram(self, offset: int, data: bytes) -> None: ...
     def game_rng_state(self) -> tuple[int, int, int, int]: ...

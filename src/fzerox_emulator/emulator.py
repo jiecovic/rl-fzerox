@@ -127,6 +127,73 @@ class Emulator:
 
         self._native.write_system_ram(offset, data)
 
+    def patch_time_attack_race_start_setup(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Patch a live Time Attack race start using native-owned RAM layout rules."""
+
+        self._native.patch_time_attack_race_start_setup(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def patch_time_attack_machine_settings(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Patch menu-level Time Attack machine settings before race initialization."""
+
+        self._native.patch_time_attack_machine_settings(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def force_time_attack_reinit(self) -> None:
+        """Force the game to rebuild the current Time Attack race from menu globals."""
+
+        self._native.force_time_attack_reinit()
+
+    def validate_time_attack_race_start_setup(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Validate that the native race-start RAM view matches the requested setup."""
+
+        self._native.validate_time_attack_race_start_setup(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def vehicle_setup_info(self) -> dict[str, object]:
+        """Return native-decoded setup info for HUD/debug checks."""
+
+        return dict(self._native.vehicle_setup_info())
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,

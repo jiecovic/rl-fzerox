@@ -1,9 +1,8 @@
 # src/rl_fzerox/core/envs/engine/info.py
 from __future__ import annotations
 
-import struct
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from typing import Protocol
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec
@@ -21,20 +20,6 @@ from rl_fzerox.core.envs.observations import (
 )
 
 
-@dataclass(frozen=True, slots=True)
-class VehicleSetupRamLayout:
-    """RAM fields that describe the selected player machine setup."""
-
-    player_characters: int = 0x000E_5EE0
-    character_last_engine: int = 0x000E_40F0
-    player_engine: int = 0x000E_5EF0
-    player_racer_base: int = 0x002C_4920
-    racer_engine_curve: int = 0x1A8
-
-
-VEHICLE_SETUP_RAM = VehicleSetupRamLayout()
-
-
 class BackendInfoReader(Protocol):
     """Narrow backend surface needed for frame/debug info."""
 
@@ -50,7 +35,7 @@ class BackendInfoReader(Protocol):
     @property
     def frame_index(self) -> int: ...
 
-    def read_system_ram(self, offset: int, length: int) -> bytes: ...
+    def vehicle_setup_info(self) -> dict[str, object]: ...
 
 
 class TelemetryBackend(Protocol):
@@ -203,37 +188,12 @@ def backend_step_info(backend: BackendInfoReader) -> dict[str, object]:
 
 
 def vehicle_setup_info(backend: BackendInfoReader) -> dict[str, object]:
-    """Read the live RAM-backed player engine setting for HUD/debug checks."""
+    """Read native-decoded player machine setup info for HUD/debug checks."""
 
     try:
-        character_index = _read_i16(backend, VEHICLE_SETUP_RAM.player_characters)
-        player_engine = _read_f32(backend, VEHICLE_SETUP_RAM.player_engine)
-        character_engine = _read_f32(
-            backend,
-            VEHICLE_SETUP_RAM.character_last_engine + (character_index * 4),
-        )
-        racer_engine_curve = _read_f32(
-            backend,
-            VEHICLE_SETUP_RAM.player_racer_base + VEHICLE_SETUP_RAM.racer_engine_curve,
-        )
-    except (OSError, RuntimeError, struct.error, ValueError):
+        return dict(backend.vehicle_setup_info())
+    except (OSError, RuntimeError, ValueError):
         return {}
-
-    return {
-        "vehicle_character_index_ram": character_index,
-        "engine_setting_ram": player_engine,
-        "engine_setting_percent_ram": player_engine * 100.0,
-        "character_engine_setting_ram": character_engine,
-        "racer_engine_curve_ram": racer_engine_curve,
-    }
-
-
-def _read_i16(backend: BackendInfoReader, offset: int) -> int:
-    return int(struct.unpack("<h", backend.read_system_ram(offset, 2))[0])
-
-
-def _read_f32(backend: BackendInfoReader, offset: int) -> float:
-    return float(struct.unpack("<f", backend.read_system_ram(offset, 4))[0])
 
 
 def set_curriculum_info(

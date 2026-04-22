@@ -4,11 +4,12 @@
 use std::path::Path;
 
 use pyo3::prelude::*;
-use pyo3::types::PyBytes;
+use pyo3::types::{PyBytes, PyDict};
 
 use crate::bindings::emulator::telemetry::telemetry_to_py;
 use crate::bindings::emulator::{PyEmulator, PyTelemetry};
 use crate::bindings::error::map_core_error;
+use crate::core::game::race_start::RaceStartSetup;
 use crate::core::input::ControllerState;
 
 pub(in crate::bindings::emulator) fn reset(
@@ -97,6 +98,93 @@ pub(in crate::bindings::emulator) fn telemetry(
         .detach(|| emulator.host.telemetry())
         .map_err(map_core_error)?;
     telemetry_to_py(py, &telemetry)
+}
+
+pub(in crate::bindings::emulator) fn patch_time_attack_race_start_setup(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.patch_time_attack_race_start_setup(setup))
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn patch_time_attack_machine_settings(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.patch_time_attack_machine_settings(setup))
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn force_time_attack_reinit(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+) -> PyResult<()> {
+    py.detach(|| emulator.host.force_time_attack_reinit())
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn validate_time_attack_race_start_setup(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.validate_time_attack_race_start_setup(setup))
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn vehicle_setup_info<'py>(
+    emulator: &mut PyEmulator,
+    py: Python<'py>,
+) -> PyResult<Bound<'py, PyDict>> {
+    let setup = py
+        .detach(|| emulator.host.vehicle_setup_info())
+        .map_err(map_core_error)?;
+    let dict = PyDict::new(py);
+    dict.set_item("vehicle_character_index_ram", setup.character_index)?;
+    dict.set_item("engine_setting_ram", setup.engine_setting)?;
+    dict.set_item("engine_setting_percent_ram", setup.engine_setting * 100.0)?;
+    dict.set_item(
+        "character_engine_setting_ram",
+        setup.character_engine_setting,
+    )?;
+    dict.set_item("racer_engine_curve_ram", setup.racer_engine_curve)?;
+    Ok(dict)
 }
 
 pub(in crate::bindings::emulator) fn read_system_ram<'py>(

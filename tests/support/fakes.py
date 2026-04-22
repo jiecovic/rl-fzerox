@@ -254,6 +254,9 @@ class SyntheticBackend:
     def write_system_ram(self, offset: int, data: bytes) -> None:
         self._system_ram[offset : offset + len(data)] = data
 
+    def vehicle_setup_info(self) -> dict[str, object]:
+        return {}
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,

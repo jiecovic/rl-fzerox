@@ -6,7 +6,7 @@
 //! - `model`: typed telemetry structs exposed to the rest of the codebase
 //! - `read`: RAM decoding helpers and the `read_snapshot(...)` entry point
 
-mod layout;
+pub(crate) mod layout;
 mod model;
 mod read;
 

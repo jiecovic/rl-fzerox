@@ -378,6 +378,95 @@ impl PyEmulator {
         methods::control::telemetry(self, py)
     }
 
+    #[pyo3(signature = (
+        course_index,
+        character_index,
+        engine_setting_raw_value,
+        machine_skin_index=0,
+        total_lap_count=3,
+    ))]
+    fn patch_time_attack_race_start_setup(
+        &mut self,
+        py: Python<'_>,
+        course_index: i32,
+        character_index: i16,
+        engine_setting_raw_value: i32,
+        machine_skin_index: i16,
+        total_lap_count: i32,
+    ) -> PyResult<()> {
+        methods::control::patch_time_attack_race_start_setup(
+            self,
+            py,
+            course_index,
+            character_index,
+            engine_setting_raw_value,
+            machine_skin_index,
+            total_lap_count,
+        )
+    }
+
+    #[pyo3(signature = (
+        course_index,
+        character_index,
+        engine_setting_raw_value,
+        machine_skin_index=0,
+        total_lap_count=3,
+    ))]
+    fn patch_time_attack_machine_settings(
+        &mut self,
+        py: Python<'_>,
+        course_index: i32,
+        character_index: i16,
+        engine_setting_raw_value: i32,
+        machine_skin_index: i16,
+        total_lap_count: i32,
+    ) -> PyResult<()> {
+        methods::control::patch_time_attack_machine_settings(
+            self,
+            py,
+            course_index,
+            character_index,
+            engine_setting_raw_value,
+            machine_skin_index,
+            total_lap_count,
+        )
+    }
+
+    fn force_time_attack_reinit(&mut self, py: Python<'_>) -> PyResult<()> {
+        methods::control::force_time_attack_reinit(self, py)
+    }
+
+    #[pyo3(signature = (
+        course_index,
+        character_index,
+        engine_setting_raw_value,
+        machine_skin_index=0,
+        total_lap_count=3,
+    ))]
+    fn validate_time_attack_race_start_setup(
+        &mut self,
+        py: Python<'_>,
+        course_index: i32,
+        character_index: i16,
+        engine_setting_raw_value: i32,
+        machine_skin_index: i16,
+        total_lap_count: i32,
+    ) -> PyResult<()> {
+        methods::control::validate_time_attack_race_start_setup(
+            self,
+            py,
+            course_index,
+            character_index,
+            engine_setting_raw_value,
+            machine_skin_index,
+            total_lap_count,
+        )
+    }
+
+    fn vehicle_setup_info<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        methods::control::vehicle_setup_info(self, py)
+    }
+
     fn read_system_ram<'py>(
         &mut self,
         py: Python<'py>,
