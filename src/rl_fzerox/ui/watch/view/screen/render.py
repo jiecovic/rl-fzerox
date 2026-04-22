@@ -74,6 +74,7 @@ def draw_watch_frame(
         best_finish_position=snapshot.best_finish_position,
         best_finish_times=snapshot.best_finish_times,
         latest_finish_times=snapshot.latest_finish_times,
+        latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
         track_pool_records=_track_pool_records(config),
         continuous_drive_deadzone=action_config.continuous_drive_deadzone,
         continuous_air_brake_mode=action_config.continuous_air_brake_mode,

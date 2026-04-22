@@ -74,6 +74,7 @@ class WatchSnapshot:
     best_finish_position: int | None
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
+    latest_finish_deltas_ms: dict[str, int]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
     action_hold_frame: int = 1
