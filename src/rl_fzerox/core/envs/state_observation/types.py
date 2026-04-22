@@ -77,18 +77,3 @@ class StateVectorSpec:
 
     def low_array(self) -> Float32Array:
         return np.array([feature.low for feature in self.features], dtype=np.float32)
-
-
-@dataclass(frozen=True, slots=True)
-class LegacyStateVectorExports:
-    """Derived names for the original scalar-state profile API."""
-
-    spec: StateVectorSpec
-    names: tuple[str, ...]
-    count: int
-    speed_normalizer_kph: float
-    lean_tap_guard_frames: int
-    recent_boost_window_frames: int
-    recent_steer_window_frames: int
-    low: Float32Array
-    high: Float32Array

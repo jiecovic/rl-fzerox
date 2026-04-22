@@ -5,7 +5,6 @@ from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.envs.state_observation.types import (
-    LegacyStateVectorExports,
     ObservationStateProfile,
     StateFeature,
     StateVectorSpec,
@@ -68,18 +67,6 @@ STATE_VECTOR_SPECS: dict[ObservationStateProfile, StateVectorSpec] = {
     "steer_history": STEER_HISTORY_STATE_VECTOR_SPEC,
     "race_core": RACE_CORE_STATE_VECTOR_SPEC,
 }
-
-LEGACY_STATE_VECTOR_EXPORTS = LegacyStateVectorExports(
-    spec=DEFAULT_STATE_VECTOR_SPEC,
-    names=DEFAULT_STATE_VECTOR_SPEC.names,
-    count=DEFAULT_STATE_VECTOR_SPEC.count,
-    speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
-    lean_tap_guard_frames=DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
-    recent_boost_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames,
-    recent_steer_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames,
-    low=DEFAULT_STATE_VECTOR_SPEC.low_array(),
-    high=DEFAULT_STATE_VECTOR_SPEC.high_array(),
-)
 
 
 def state_profile_name(value: str) -> ObservationStateProfile:

@@ -20,10 +20,8 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
 )
-from rl_fzerox.core.envs.observations import (
-    LEAN_DOUBLE_TAP_WINDOW_FRAMES,
-    ObservationStackMode,
-)
+from rl_fzerox.core.envs.observations import ObservationStackMode
+from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -302,7 +300,7 @@ def test_step_updates_right_lean_hold_and_press_age_in_image_state_observation()
             0.0,
             1.0,
             1.0,
-            1.0 / LEAN_DOUBLE_TAP_WINDOW_FRAMES,
+            1.0 / DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
             0.0,
         ]
     )

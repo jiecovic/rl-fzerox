@@ -11,20 +11,7 @@ from fzerox_emulator import FZeroXTelemetry, ObservationSpec, ObservationStackMo
 from fzerox_emulator.arrays import ObservationFrame, StateVector
 from rl_fzerox.core.envs.observation_image import build_image_observation_space
 from rl_fzerox.core.envs.observation_state import (
-    DEFAULT_ACTION_HISTORY_CONTROLS,
-    DEFAULT_ACTION_HISTORY_LEN,
-    DEFAULT_OBSERVATION_COURSE_CONTEXT,
-    DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT,
-    DEFAULT_OBSERVATION_STATE_PROFILE,
-    LEAN_DOUBLE_TAP_WINDOW_FRAMES,
-    RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
-    RECENT_STEER_PRESSURE_WINDOW_FRAMES,
-    STATE_FEATURE_COUNT,
-    STATE_FEATURE_HIGH,
-    STATE_FEATURE_LOW,
-    STATE_FEATURE_NAMES,
-    STATE_SPEED_NORMALIZER_KPH,
-    STATE_VECTOR_SPEC,
+    OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     ObservationCourseContext,
     ObservationGroundEffectContext,
@@ -53,28 +40,15 @@ ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
 
 __all__ = [
     "ActionHistoryControl",
-    "DEFAULT_ACTION_HISTORY_CONTROLS",
-    "DEFAULT_ACTION_HISTORY_LEN",
-    "DEFAULT_OBSERVATION_COURSE_CONTEXT",
-    "DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT",
-    "DEFAULT_OBSERVATION_STATE_PROFILE",
     "ImageObservation",
     "ImageStateObservation",
-    "LEAN_DOUBLE_TAP_WINDOW_FRAMES",
+    "OBSERVATION_STATE_DEFAULTS",
     "ObservationCourseContext",
     "ObservationGroundEffectContext",
     "ObservationMode",
     "ObservationStackMode",
     "ObservationStateProfile",
     "ObservationValue",
-    "RECENT_BOOST_PRESSURE_WINDOW_FRAMES",
-    "RECENT_STEER_PRESSURE_WINDOW_FRAMES",
-    "STATE_FEATURE_COUNT",
-    "STATE_FEATURE_HIGH",
-    "STATE_FEATURE_LOW",
-    "STATE_FEATURE_NAMES",
-    "STATE_SPEED_NORMALIZER_KPH",
-    "STATE_VECTOR_SPEC",
     "StateComponentsSettings",
     "StateFeature",
     "StateVectorSpec",
@@ -97,10 +71,10 @@ def build_observation(
     image: ObservationFrame,
     telemetry: FZeroXTelemetry | None,
     mode: ObservationMode,
-    state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
     left_lean_held: float = 0.0,
     right_lean_held: float = 0.0,
@@ -110,8 +84,10 @@ def build_observation(
     steer_left_held: float = 0.0,
     steer_right_held: float = 0.0,
     recent_steer_pressure: float = 0.0,
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
     zeroed_state_components: Collection[str] = (),
@@ -151,13 +127,15 @@ def build_observation_space(
     stack_mode: ObservationStackMode = "rgb",
     minimap_layer: bool = False,
     mode: ObservationMode,
-    state_profile: ObservationStateProfile = DEFAULT_OBSERVATION_STATE_PROFILE,
-    course_context: ObservationCourseContext = DEFAULT_OBSERVATION_COURSE_CONTEXT,
+    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
+    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
     ground_effect_context: ObservationGroundEffectContext = (
-        DEFAULT_OBSERVATION_GROUND_EFFECT_CONTEXT
+        OBSERVATION_STATE_DEFAULTS.ground_effect_context
     ),
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN,
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS,
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
+    action_history_controls: tuple[
+        ActionHistoryControl, ...
+    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
 ) -> spaces.Box | spaces.Dict:
     image_space = build_image_observation_space(

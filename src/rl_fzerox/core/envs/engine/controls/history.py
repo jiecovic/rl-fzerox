@@ -18,12 +18,9 @@ from rl_fzerox.core.envs.actions import (
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
 )
-from rl_fzerox.core.envs.observations import (
-    DEFAULT_ACTION_HISTORY_CONTROLS,
-    DEFAULT_ACTION_HISTORY_LEN,
-    LEAN_DOUBLE_TAP_WINDOW_FRAMES,
-    RECENT_BOOST_PRESSURE_WINDOW_FRAMES,
-    RECENT_STEER_PRESSURE_WINDOW_FRAMES,
+from rl_fzerox.core.envs.state_observation import (
+    DEFAULT_STATE_VECTOR_SPEC,
+    OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
 )
 
@@ -50,13 +47,15 @@ class ControlStateTracker:
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_decision_interval_frames: int = 1
     boost_request_lockout_frames: int = 0
-    action_history_len: int | None = DEFAULT_ACTION_HISTORY_LEN
-    action_history_controls: tuple[ActionHistoryControl, ...] = DEFAULT_ACTION_HISTORY_CONTROLS
+    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len
+    action_history_controls: tuple[ActionHistoryControl, ...] = (
+        OBSERVATION_STATE_DEFAULTS.action_history_controls
+    )
     _recent_boost_frames: deque[int] = field(
-        default_factory=lambda: deque(maxlen=RECENT_BOOST_PRESSURE_WINDOW_FRAMES),
+        default_factory=lambda: deque(maxlen=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames),
     )
     _recent_steer_frames: deque[float] = field(
-        default_factory=lambda: deque(maxlen=RECENT_STEER_PRESSURE_WINDOW_FRAMES),
+        default_factory=lambda: deque(maxlen=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames),
     )
     _action_history: deque[_ActionHistorySample] = field(init=False)
     _resolved_action_history_len: int = field(init=False, default=0)
@@ -66,8 +65,8 @@ class ControlStateTracker:
     _right_lean_held: bool = False
     _left_steer_held: bool = False
     _right_steer_held: bool = False
-    _left_press_age_frames: int = LEAN_DOUBLE_TAP_WINDOW_FRAMES
-    _right_press_age_frames: int = LEAN_DOUBLE_TAP_WINDOW_FRAMES
+    _left_press_age_frames: int = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+    _right_press_age_frames: int = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
     _lean_lock_index: int = 0
     _lean_lock_remaining_frames: int = 0
     _lean_cooldown_remaining_frames: int = 0
@@ -91,8 +90,8 @@ class ControlStateTracker:
         self._right_lean_held = False
         self._left_steer_held = False
         self._right_steer_held = False
-        self._left_press_age_frames = LEAN_DOUBLE_TAP_WINDOW_FRAMES
-        self._right_press_age_frames = LEAN_DOUBLE_TAP_WINDOW_FRAMES
+        self._left_press_age_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+        self._right_press_age_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
         self._lean_lock_index = 0
         self._lean_lock_remaining_frames = 0
         self._lean_cooldown_remaining_frames = 0
@@ -362,7 +361,7 @@ class ControlStateTracker:
         if current_lean_index != 0 and current_lean_index != previous_lean_index:
             self._lean_lock_index = current_lean_index
             self._lean_lock_remaining_frames = max(
-                LEAN_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
+                DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames - frames_elapsed,
                 0,
             )
             return
@@ -383,7 +382,7 @@ class ControlStateTracker:
     ) -> None:
         if previous_lean_index != 0 and current_lean_index != previous_lean_index:
             self._lean_cooldown_remaining_frames = max(
-                LEAN_DOUBLE_TAP_WINDOW_FRAMES - frames_elapsed,
+                DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames - frames_elapsed,
                 0,
             )
             return
@@ -479,14 +478,16 @@ def _advance_press_age(
     is_held: bool,
     frames_elapsed: int,
 ) -> int:
+    guard_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
     if is_held and not was_held:
-        return min(frames_elapsed, LEAN_DOUBLE_TAP_WINDOW_FRAMES)
-    return min(previous_age_frames + frames_elapsed, LEAN_DOUBLE_TAP_WINDOW_FRAMES)
+        return min(frames_elapsed, guard_frames)
+    return min(previous_age_frames + frames_elapsed, guard_frames)
 
 
 def _lean_press_age_norm(frames: int) -> float:
-    clamped_frames = min(max(int(frames), 0), LEAN_DOUBLE_TAP_WINDOW_FRAMES)
-    return clamped_frames / LEAN_DOUBLE_TAP_WINDOW_FRAMES
+    guard_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+    clamped_frames = min(max(int(frames), 0), guard_frames)
+    return clamped_frames / guard_frames
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
