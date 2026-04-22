@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from rl_fzerox.core.config import load_train_app_config
 from rl_fzerox.core.config.schema import ObservationConfig
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 
 
@@ -68,6 +69,14 @@ def test_observation_zeroed_state_components_must_be_active() -> None:
                 "zeroed_state_components": ["track_position"],
             }
         )
+
+
+def test_builtin_course_catalog_covers_base_game_courses() -> None:
+    assert len(BUILT_IN_COURSES) == 24
+    assert [course.course_index for course in BUILT_IN_COURSES] == list(range(24))
+    assert {course.cup for course in BUILT_IN_COURSES} == {"jack", "queen", "king", "joker"}
+    assert BUILT_IN_COURSES[0].id == "mute_city"
+    assert BUILT_IN_COURSES[-1].id == "big_hand"
 
 
 def test_load_train_app_config_composes_track_registry_entry(
