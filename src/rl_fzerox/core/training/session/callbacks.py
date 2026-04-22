@@ -59,6 +59,7 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
     step_rates=(
         _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
         _MetricLogSpec("collision_recoil_entered", "state/collision_recoil_entry_rate"),
+        _MetricLogSpec("boost_pad_entered", "state/boost_pad_entry_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
     ),
@@ -72,6 +73,8 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
     episode_metrics=(
         _MetricLogSpec("position", "episode/final_position_mean"),
         _MetricLogSpec("race_laps_completed", "episode/race_laps_completed_mean"),
+        _MetricLogSpec("boost_pad_entries", "episode/boost_pad_entries_mean"),
+        _MetricLogSpec("boost_pad_entries_per_lap", "episode/boost_pad_entries_per_lap_mean"),
     ),
     finished_episode_metrics=(
         _MetricLogSpec("race_time_ms", "episode/finish_time_s_mean", scale=0.001),

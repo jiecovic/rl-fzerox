@@ -127,6 +127,7 @@ class FZeroXEnvEngine:
         self._episode_done = False
         self._episode_uses_custom_baseline = False
         self._episode_return = 0.0
+        self._episode_boost_pad_entries = 0
         self._held_controller_state = ControllerState()
         self._last_requested_control_state = ControllerState()
         self._last_gas_level = 0.0
@@ -231,6 +232,7 @@ class FZeroXEnvEngine:
         info.update(backend_step_info(self.backend))
         self._episode_done = False
         self._episode_return = 0.0
+        self._episode_boost_pad_entries = 0
         self._held_controller_state = ControllerState()
         self._last_requested_control_state = ControllerState()
         self._last_gas_level = 0.0
@@ -254,6 +256,7 @@ class FZeroXEnvEngine:
         if telemetry is not None:
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
+        self._set_episode_boost_pad_info(info)
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
             image=image_observation,
@@ -547,6 +550,10 @@ class FZeroXEnvEngine:
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
+        boost_pad_entered = bool(step_result.summary.entered_dash_pad_boost)
+        info["boost_pad_entered"] = boost_pad_entered
+        if boost_pad_entered:
+            self._episode_boost_pad_entries += 1
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
         if reward_breakdown:
@@ -569,6 +576,7 @@ class FZeroXEnvEngine:
             # Keep env info pickle-safe for SubprocVecEnv workers.
             info.update(telemetry_info(telemetry))
         info.update(self._reward_tracker.info(telemetry))
+        self._set_episode_boost_pad_info(info)
         self._control_state.record_step(
             control_state=applied_control_state,
             frames_run=step_result.summary.frames_run,
@@ -600,6 +608,18 @@ class FZeroXEnvEngine:
             truncated=truncated,
             info=info,
             display_frames=step_result.display_frames,
+        )
+
+    def _set_episode_boost_pad_info(self, info: dict[str, object]) -> None:
+        """Attach episode-local boost-pad counts for Monitor/TensorBoard."""
+
+        info["boost_pad_entries"] = self._episode_boost_pad_entries
+        laps_completed = info.get("race_laps_completed")
+        if not isinstance(laps_completed, int | float) or laps_completed <= 0:
+            info["boost_pad_entries_per_lap"] = None
+            return
+        info["boost_pad_entries_per_lap"] = self._episode_boost_pad_entries / float(
+            laps_completed
         )
 
     def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
