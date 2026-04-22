@@ -41,9 +41,8 @@ pub struct CallbackState {
     pub(super) display_buffer: Vec<u8>,
     pub(super) minimap_buffer: Vec<u8>,
     pub(super) minimap_renderer: MinimapLayerRenderer,
-    pub(super) stacked_observation_buffers:
-        BTreeMap<StackedObservationKey, StackedObservationBuffer>,
-    pub(super) render_plans: BTreeMap<ProcessedFramePlanKey, ProcessedFramePlan>,
+    pub(super) stacked_observation_buffers: Vec<StackedObservationCacheEntry>,
+    pub(super) render_plans: Vec<RenderPlanCacheEntry>,
     pub(super) capture_video: bool,
     pub(super) frame_serial: u64,
     pub(super) pixel_format: PixelLayout,
@@ -51,6 +50,16 @@ pub struct CallbackState {
     pub(super) hardware_render_error: Option<String>,
     pub(super) log_callback: LogCallback,
     pub(super) geometry: Option<(usize, usize)>,
+}
+
+pub(super) struct StackedObservationCacheEntry {
+    pub(super) key: StackedObservationKey,
+    pub(super) buffer: StackedObservationBuffer,
+}
+
+pub(super) struct RenderPlanCacheEntry {
+    pub(super) key: ProcessedFramePlanKey,
+    pub(super) plan: ProcessedFramePlan,
 }
 
 #[derive(Clone, Copy)]
@@ -95,8 +104,8 @@ impl CallbackState {
             display_buffer: Vec::new(),
             minimap_buffer: Vec::new(),
             minimap_renderer: MinimapLayerRenderer::default(),
-            stacked_observation_buffers: BTreeMap::new(),
-            render_plans: BTreeMap::new(),
+            stacked_observation_buffers: Vec::new(),
+            render_plans: Vec::new(),
             capture_video: true,
             frame_serial: 0,
             pixel_format: PixelLayout::Argb1555,

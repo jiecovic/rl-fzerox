@@ -11,7 +11,7 @@ use crate::core::video::{
 use super::super::stack::{
     StackedObservationBuffer, StackedObservationKey, StackedObservationRequest,
 };
-use super::{CallbackState, RenderRequest};
+use super::{CallbackState, RenderPlanCacheEntry, RenderRequest, StackedObservationCacheEntry};
 
 impl CallbackState {
     pub fn observation_frame(
@@ -114,18 +114,25 @@ impl CallbackState {
         let minimap_layer = request
             .minimap_layer
             .map(|_| self.minimap_buffer.as_slice());
-        let stack_buffer = self
+        let stack_index = self
             .stacked_observation_buffers
-            .entry(stack_key)
-            .or_insert_with(|| {
-                StackedObservationBuffer::new(
-                    observation_buffer.len(),
-                    request.frame_stack,
-                    if request.rgb { 3 } else { 1 },
-                    request.stack_mode,
-                    usize::from(request.minimap_layer.is_some()),
-                )
+            .iter()
+            .position(|entry| entry.key == stack_key)
+            .unwrap_or_else(|| {
+                self.stacked_observation_buffers
+                    .push(StackedObservationCacheEntry {
+                        key: stack_key,
+                        buffer: StackedObservationBuffer::new(
+                            observation_buffer.len(),
+                            request.frame_stack,
+                            if request.rgb { 3 } else { 1 },
+                            request.stack_mode,
+                            usize::from(request.minimap_layer.is_some()),
+                        ),
+                    });
+                self.stacked_observation_buffers.len() - 1
             });
+        let stack_buffer = &mut self.stacked_observation_buffers[stack_index].buffer;
         stack_buffer.update(observation_buffer, frame_serial, minimap_layer)?;
         Ok(stack_buffer.as_slice())
     }
@@ -137,8 +144,13 @@ impl CallbackState {
         // Observation and display targets are stable for a run, so the sampling
         // plan is cached once per source/target combination.
         let key = request.plan_key();
-        if let std::collections::btree_map::Entry::Vacant(entry) = self.render_plans.entry(key) {
-            entry.insert(build_processed_frame_plan(ProcessedFramePlanRequest {
+        if let Some(index) = self.render_plans.iter().position(|entry| entry.key == key) {
+            return Ok(&self.render_plans[index].plan);
+        }
+
+        self.render_plans.push(RenderPlanCacheEntry {
+            key,
+            plan: build_processed_frame_plan(ProcessedFramePlanRequest {
                 source_width: request.source_width,
                 source_height: request.source_height,
                 aspect_ratio: request.aspect_ratio,
@@ -147,11 +159,10 @@ impl CallbackState {
                 rgb: request.rgb,
                 crop: request.crop,
                 resize_filter: request.resize_filter,
-            })?);
-        }
-        self.render_plans
-            .get(&key)
-            .ok_or(CoreError::NoFrameAvailable)
+            })?,
+        });
+        let index = self.render_plans.len() - 1;
+        Ok(&self.render_plans[index].plan)
     }
 
     pub(super) fn render_observation_into_buffer(
@@ -208,8 +219,8 @@ impl CallbackState {
     }
 
     pub(in crate::core::host::callbacks) fn clear_stacked_observation_buffers(&mut self) {
-        for stack in self.stacked_observation_buffers.values_mut() {
-            stack.clear();
+        for entry in &mut self.stacked_observation_buffers {
+            entry.buffer.clear();
         }
     }
 
