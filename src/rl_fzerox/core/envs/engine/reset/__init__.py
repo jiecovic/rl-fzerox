@@ -3,6 +3,11 @@
 
 from rl_fzerox.core.envs.engine.reset.camera import sync_camera_setting
 from rl_fzerox.core.envs.engine.reset.race import load_track_baseline, reset_race_state
+from rl_fzerox.core.envs.engine.reset.seeding import (
+    ENGINE_SEED_DOMAINS,
+    EngineResetSeeds,
+    EngineSeedDomains,
+)
 from rl_fzerox.core.envs.engine.reset.tracks import (
     SelectedTrack,
     TrackBaselineCache,
@@ -13,6 +18,9 @@ from rl_fzerox.core.envs.engine.reset.tracks import (
 
 __all__ = [
     "SelectedTrack",
+    "ENGINE_SEED_DOMAINS",
+    "EngineResetSeeds",
+    "EngineSeedDomains",
     "TrackBaselineCache",
     "TrackResetSelector",
     "TrackSamplingLimits",

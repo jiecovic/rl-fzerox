@@ -1,8 +1,6 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
@@ -22,7 +20,6 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.rewards import build_reward_tracker
-from rl_fzerox.core.seed import derive_seed
 
 from .controls import (
     ActionMaskBranches,
@@ -32,6 +29,7 @@ from .controls import (
     apply_dynamic_control_gates,
     sync_dynamic_action_masks,
 )
+from .episode import EngineEpisodeState
 from .info import (
     backend_step_info,
     has_custom_baseline,
@@ -41,6 +39,7 @@ from .info import (
 )
 from .observation import EngineObservationBuilder
 from .reset import (
+    EngineResetSeeds,
     SelectedTrack,
     TrackBaselineCache,
     TrackResetSelector,
@@ -48,19 +47,12 @@ from .reset import (
     reset_race_state,
     sync_camera_setting,
 )
-from .stepping import EngineStepAssembler, EnvStepRequest, WatchEnvStep, set_episode_boost_pad_info
-
-
-@dataclass(frozen=True, slots=True)
-class _EngineSeedDomains:
-    """Domain separators for independent per-env RNG streams."""
-
-    reset_rng: int = 0xD6E8_2BC9_2A5F_1873
-    reward_milestone_phase: int = 0xA409_3822_299F_31D0
-    track_sampling: int = 0x35E7_40D8_FF53_42B1
-
-
-_ENGINE_SEED_DOMAINS = _EngineSeedDomains()
+from .stepping import (
+    EngineStepAssembler,
+    EnvStepRequest,
+    WatchEnvStep,
+    set_episode_boost_pad_info,
+)
 
 
 class FZeroXEnvEngine:
@@ -108,7 +100,6 @@ class FZeroXEnvEngine:
         )
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
-        self._active_track: SelectedTrack | None = None
         self._control_state = ControlStateTracker(
             lean_mode=self._action_config.lean_mode,
             boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
@@ -126,17 +117,8 @@ class FZeroXEnvEngine:
             mask_controller=self._mask_controller,
             control_state=self._control_state,
         )
-        self._episode_done = False
-        self._episode_uses_custom_baseline = False
-        self._episode_return = 0.0
-        self._episode_boost_pad_entries = 0
-        self._held_controller_state = ControllerState()
-        self._last_requested_control_state = ControllerState()
-        self._last_gas_level = 0.0
-        self._last_info: dict[str, object] = {}
-        self._last_telemetry: FZeroXTelemetry | None = None
-        self._reset_count = 0
-        self._rng_seed_base: int | None = None
+        self._episode = EngineEpisodeState()
+        self._reset_seeds = EngineResetSeeds()
 
     @property
     def action_space(self) -> spaces.Space:
@@ -148,11 +130,11 @@ class FZeroXEnvEngine:
 
     @property
     def last_requested_control_state(self) -> ControllerState:
-        return self._last_requested_control_state
+        return self._episode.last_requested_control_state
 
     @property
     def last_gas_level(self) -> float:
-        return self._last_gas_level
+        return self._episode.last_gas_level
 
     def action_masks(self) -> ActionMask:
         """Return the flattened boolean action mask for the current stage."""
@@ -200,10 +182,9 @@ class FZeroXEnvEngine:
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""
 
-        if seed is not None:
-            self._rng_seed_base = seed
+        self._reset_seeds.remember_reset_seed(seed)
         selected_track = self._select_reset_track(seed)
-        self._active_track = selected_track
+        self._episode.begin_reset(active_track=selected_track)
         if selected_track is not None:
             load_track_baseline(
                 backend=self.backend,
@@ -218,7 +199,7 @@ class FZeroXEnvEngine:
         )
         if selected_track is not None:
             info.update(selected_track.info())
-        self._episode_uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
+        self._episode.uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
         telemetry = sync_camera_setting(
             self.backend,
@@ -232,13 +213,7 @@ class FZeroXEnvEngine:
         )
         info.update(race_intro_info)
         info.update(backend_step_info(self.backend))
-        self._episode_done = False
-        self._episode_return = 0.0
-        self._episode_boost_pad_entries = 0
-        self._held_controller_state = ControllerState()
-        self._last_requested_control_state = ControllerState()
-        self._last_gas_level = 0.0
-        self.backend.set_controller_state(self._held_controller_state)
+        self.backend.set_controller_state(self._episode.held_controller_state)
         self._control_state.reset()
         self._mask_controller.set_lean_allowed_values(None)
         sync_dynamic_action_masks(
@@ -247,7 +222,7 @@ class FZeroXEnvEngine:
             telemetry=telemetry,
             boost_min_energy_fraction=self.config.boost_min_energy_fraction,
         )
-        self._last_telemetry = telemetry
+        self._episode.last_telemetry = telemetry
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
@@ -265,7 +240,7 @@ class FZeroXEnvEngine:
         info.update(self._reward_tracker.info(telemetry))
         set_episode_boost_pad_info(
             info,
-            episode_boost_pad_entries=self._episode_boost_pad_entries,
+            episode_boost_pad_entries=self._episode.boost_pad_entries,
         )
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
@@ -277,8 +252,8 @@ class FZeroXEnvEngine:
             info,
             image_shape=tuple(int(value) for value in image_observation.shape),
         )
-        self._last_info = dict(info)
-        self._reset_count += 1
+        self._episode.last_info = dict(info)
+        self._reset_seeds.advance_reset_count()
         return observation, info
 
     def step(
@@ -322,7 +297,7 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._held_controller_state = applied_control_state
+        self._episode.held_controller_state = applied_control_state
         return self._run_env_step(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -338,7 +313,7 @@ class FZeroXEnvEngine:
     ) -> WatchEnvStep:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._held_controller_state = applied_control_state
+        self._episode.held_controller_state = applied_control_state
         return self._run_env_step_result(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -354,11 +329,11 @@ class FZeroXEnvEngine:
         """Advance one frame through the same reward path used by step()."""
 
         requested_control_state = (
-            self._held_controller_state if control_state is None else control_state
+            self._episode.held_controller_state if control_state is None else control_state
         )
-        self._held_controller_state = self._apply_control_semantics(requested_control_state)
+        self._episode.held_controller_state = self._apply_control_semantics(requested_control_state)
         return self._run_env_step(
-            self._held_controller_state,
+            self._episode.held_controller_state,
             action_repeat=1,
             requested_control_state=requested_control_state,
             action_drive_axis=None,
@@ -378,9 +353,6 @@ class FZeroXEnvEngine:
     ) -> FZeroXTelemetry | None:
         if not self.config.randomize_game_rng_on_reset:
             return telemetry
-        seed_base = seed if seed is not None else self._rng_seed_base
-        if seed_base is None:
-            return telemetry
         if self.config.randomize_game_rng_requires_race_mode and (
             telemetry is None or not telemetry.in_race_mode
         ):
@@ -388,7 +360,7 @@ class FZeroXEnvEngine:
             info["rng_randomization_skip_reason"] = "not_in_race"
             return telemetry
 
-        rng_seed = derive_seed(seed_base, _ENGINE_SEED_DOMAINS.reset_rng, self._reset_count)
+        rng_seed = self._reset_seeds.reset_rng_seed(seed)
         if rng_seed is None:
             return telemetry
         rng_state = self.backend.randomize_game_rng(rng_seed)
@@ -398,23 +370,13 @@ class FZeroXEnvEngine:
         return read_live_telemetry(self.backend) or telemetry
 
     def _reward_episode_seed(self, seed: int | None) -> int | None:
-        seed_base = seed if seed is not None else self._rng_seed_base
-        if seed_base is None:
-            return None
-        return derive_seed(
-            seed_base,
-            _ENGINE_SEED_DOMAINS.reward_milestone_phase,
-            self._reset_count,
-        )
+        return self._reset_seeds.reward_episode_seed(seed)
 
     def _select_reset_track(self, seed: int | None) -> SelectedTrack | None:
-        seed_base = seed if seed is not None else self._rng_seed_base
-        sampling_seed = (
-            None
-            if seed_base is None
-            else derive_seed(seed_base, _ENGINE_SEED_DOMAINS.track_sampling, self._reset_count)
+        return self._track_selector.select(
+            self._active_track_sampling,
+            seed=self._reset_seeds.track_sampling_seed(seed),
         )
-        return self._track_selector.select(self._active_track_sampling, seed=sampling_seed)
 
     def _stage_track_sampling_config(self, stage_index: int | None) -> TrackSamplingConfig:
         if (
@@ -458,20 +420,22 @@ class FZeroXEnvEngine:
                 requested_control_state=requested_control_state,
                 action_drive_axis=action_drive_axis,
                 capture_display_frames=capture_display_frames,
-                active_track=self._active_track,
-                episode_return=self._episode_return,
-                episode_boost_pad_entries=self._episode_boost_pad_entries,
+                active_track=self._episode.active_track,
+                episode_return=self._episode.return_value,
+                episode_boost_pad_entries=self._episode.boost_pad_entries,
                 curriculum_stage_index=self.curriculum_stage_index,
                 curriculum_stage_name=self.curriculum_stage_name,
             )
         )
-        self._last_telemetry = assembly.telemetry
-        self._last_requested_control_state = assembly.requested_control_state
-        self._last_gas_level = assembly.gas_level
-        self._episode_return = assembly.episode_return
-        self._episode_boost_pad_entries = assembly.episode_boost_pad_entries
-        self._episode_done = assembly.step.terminated or assembly.step.truncated
-        self._last_info = dict(assembly.step.info)
+        self._episode.record_step(
+            telemetry=assembly.telemetry,
+            requested_control_state=assembly.requested_control_state,
+            gas_level=assembly.gas_level,
+            return_value=assembly.episode_return,
+            boost_pad_entries=assembly.episode_boost_pad_entries,
+            done=assembly.step.terminated or assembly.step.truncated,
+            info=assembly.step.info,
+        )
         return assembly.step
 
     def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
@@ -481,6 +445,6 @@ class FZeroXEnvEngine:
             control_state,
             mask_controller=self._mask_controller,
             continuous_air_brake_mode=self._action_config.continuous_air_brake_mode,
-            last_telemetry=self._last_telemetry,
+            last_telemetry=self._episode.last_telemetry,
         )
         return self._control_state.apply_lean_semantics(gated_control_state)

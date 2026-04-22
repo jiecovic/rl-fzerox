@@ -253,7 +253,7 @@ def test_terminal_reset_reuses_sampled_baseline_instead_of_continuing_race(
         ),
     )
     env.reset(seed=123)
-    env._engine._episode_done = True
+    env._engine._episode.done = True
     _, info = env.reset(seed=124)
 
     assert info["baseline_kind"] == "custom"
