@@ -5,28 +5,30 @@ F-Zero X through an N64/libretro emulator.
 
 It combines:
 
-- a Rust libretro host exposed to Python with `pyo3`
+- a Rust libretro host exposed to Python with `pyo3`, supporting the
+  Angrylion and GLideN64 renderer paths used by the observation pipeline
 - a Gymnasium environment around F-Zero X
-- game-state telemetry for rewards and action masks
-- a pygame watch UI
-- PPO-family training pipelines and an experimental SAC pipeline
+- game-state telemetry for rewards, action masks, state-vector observations,
+  reset materialization, and the pygame watch UI
+- PPO-family training pipelines using SB3-compatible maskable, recurrent, and
+  hybrid-action algorithms for continuous plus multi-discrete controls
+- an experimental SAC pipeline for continuous-control experiments
+
+```text
+!! LOCAL RUNTIME ASSETS REQUIRED !!
+```
 
 ROMs and emulator cores are not included. The current setup targets the US
-F-Zero X ROM.
-
-## What Works
-
-- Train agents on emulator frames plus game state.
-- Watch trained policies drive in the live game.
-- Resume from saved checkpoints and compare runs.
-- Experiment with discrete, continuous, recurrent, and masked action spaces.
-- Start from a saved race baseline for faster iteration.
+F-Zero X ROM, and RAM offsets are only maintained for that build.
 
 ## Algorithms
 
-The main training path is maskable PPO.
+The main training path is maskable PPO. It is on-policy and comparatively
+simple to operate on local hardware because it does not need a large replay
+buffer. That matters for emulator-heavy experiments where CPU time and RAM are
+usually the first bottlenecks.
 
-Implemented PPO-family variants:
+Configured PPO-family variants:
 
 - `maskable_ppo`
 - `maskable_recurrent_ppo`
@@ -36,7 +38,8 @@ Implemented PPO-family variants:
 The recurrent and hybrid PPO variants come from the companion
 [`sb3x-extensions`](https://github.com/jiecovic/sb3x-extensions) package.
 
-SAC is included as a separate continuous-control experiment.
+SAC is wired as a separate continuous-control experiment, but it is not the
+primary tested path for this project.
 
 ## Requirements
 
