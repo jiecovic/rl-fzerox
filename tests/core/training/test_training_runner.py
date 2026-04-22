@@ -1,6 +1,7 @@
 # tests/core/training/test_training_runner.py
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -319,6 +320,64 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
     )
 
 
+def test_resume_curriculum_stage_index_reads_full_model_artifact_metadata(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    (run_dir / "latest_policy.zip").write_bytes(b"policy")
+    (run_dir / "latest_policy.metadata.json").write_text(
+        json.dumps(
+            {
+                "curriculum_stage_index": 2,
+                "curriculum_stage_name": "finetune",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(
+            resume_run_dir=run_dir,
+            resume_artifact="latest",
+            resume_mode="full_model",
+        ),
+    )
+
+    assert runner._resume_curriculum_stage_index(config) == 2
+
+
+def test_weights_only_resume_does_not_restore_curriculum_stage(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(
+            resume_run_dir=run_dir,
+            resume_artifact="latest",
+            resume_mode="weights_only",
+        ),
+    )
+
+    assert runner._resume_curriculum_stage_index(config) is None
+
+
 def test_resolve_policy_activation_fn_supports_known_names() -> None:
     from torch import nn
 
@@ -479,6 +538,22 @@ def test_curriculum_controller_exposes_active_train_overrides() -> None:
     assert controller.stage_train_overrides.ent_coef == 0.0
 
 
+def test_curriculum_controller_can_start_from_checkpoint_stage() -> None:
+    controller = ActionMaskCurriculumController(
+        CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(name="explore"),
+                CurriculumStageConfig(name="finetune"),
+            ),
+        ),
+        initial_stage_index=1,
+    )
+
+    assert controller.stage_index == 1
+    assert controller.stage_name == "finetune"
+
+
 def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -572,6 +647,76 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
         clip_range = model.clip_range
         assert callable(clip_range)
         assert clip_range(1.0) == pytest.approx(0.1)
+        assert model.ent_coef == pytest.approx(0.0)
+    finally:
+        env.close()
+
+
+def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    curriculum = CurriculumConfig(
+        enabled=True,
+        stages=(
+            CurriculumStageConfig(
+                name="explore",
+                train=CurriculumTrainOverridesConfig(
+                    learning_rate=2.0e-4,
+                    n_epochs=5,
+                    batch_size=4,
+                    clip_range=0.2,
+                    ent_coef=0.01,
+                ),
+            ),
+            CurriculumStageConfig(
+                name="finetune",
+                train=CurriculumTrainOverridesConfig(
+                    learning_rate=3.0e-5,
+                    n_epochs=2,
+                    batch_size=4,
+                    clip_range=0.1,
+                    ent_coef=0.0,
+                ),
+            ),
+        ),
+    )
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    callbacks = build_callbacks(
+        train_config=TrainConfig(save_freq=1_000, num_envs=1),
+        curriculum_config=curriculum,
+        run_paths=run_paths,
+        initial_curriculum_stage_index=1,
+    )
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
+                curriculum_config=curriculum,
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+                ent_coef=0.01,
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+        callbacks.init_callback(model)
+        callbacks.on_training_start({}, {})
+
+        assert env.get_attr("curriculum_stage_index") == [1]
+        assert model.lr_schedule(1.0) == pytest.approx(3.0e-5)
+        assert model.n_epochs == 2
         assert model.ent_coef == pytest.approx(0.0)
     finally:
         env.close()

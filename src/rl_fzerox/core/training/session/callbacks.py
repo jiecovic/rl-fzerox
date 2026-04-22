@@ -317,6 +317,7 @@ def build_callbacks(
     train_config: TrainConfig,
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
+    initial_curriculum_stage_index: int | None = None,
 ):
     """Construct the SB3 callback list used during training."""
 
@@ -407,9 +408,17 @@ def build_callbacks(
     class CurriculumCallback(BaseCallback):
         """Promote curriculum stages and apply their rollout-time overrides."""
 
-        def __init__(self, curriculum: CurriculumConfig) -> None:
+        def __init__(
+            self,
+            curriculum: CurriculumConfig,
+            *,
+            initial_stage_index: int | None = None,
+        ) -> None:
             super().__init__(verbose=0)
-            self._controller = ActionMaskCurriculumController(curriculum)
+            self._controller = ActionMaskCurriculumController(
+                curriculum,
+                initial_stage_index=initial_stage_index,
+            )
 
         def _on_training_start(self) -> None:
             self._apply_current_stage()
@@ -454,7 +463,12 @@ def build_callbacks(
         InfoLoggingCallback(),
     ]
     if curriculum_config.enabled:
-        callbacks.append(CurriculumCallback(curriculum_config))
+        callbacks.append(
+            CurriculumCallback(
+                curriculum_config,
+                initial_stage_index=initial_curriculum_stage_index,
+            )
+        )
     return CallbackList(callbacks)
 
 
