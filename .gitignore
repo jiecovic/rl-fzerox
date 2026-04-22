@@ -143,6 +143,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.codex
 src/rl_fzerox/_native*.so
 src/rl_fzerox/_native*.pyd
 src/rl_fzerox/_native*.dylib
