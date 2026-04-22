@@ -42,15 +42,15 @@ pub(super) fn render_layer_into(
             let roi_index = roi_y * roi.width + roi_x;
             let [red, green, blue] =
                 sample(roi.x + roi_x, roi.y + roi_y).ok_or(CoreError::NoFrameAvailable)?;
+            if mask[roi_index] == 0 {
+                roi_output[roi_index] = 0;
+                continue;
+            }
             if is_player_marker_color(red, green, blue)
                 && let Some(marker_layer) = marker_layer.as_deref_mut()
             {
                 marker_layer[roi_index] = 1;
                 marker_count += 1;
-            }
-            if mask[roi_index] == 0 {
-                roi_output[roi_index] = 0;
-                continue;
             }
             roi_output[roi_index] = TRACK_LUMA;
         }

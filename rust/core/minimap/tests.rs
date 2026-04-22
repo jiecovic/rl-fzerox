@@ -81,6 +81,32 @@ fn marker_hold_reuses_last_marker_when_marker_blinks_off() {
 }
 
 #[test]
+fn marker_detection_is_clipped_to_course_mask() {
+    let request = test_request_for_width(3);
+    let roi = MinimapRoi {
+        x: 0,
+        y: 0,
+        width: 3,
+        height: 1,
+    };
+    let mask = [1_u8, 0_u8, 1_u8];
+    let mut renderer = MinimapLayerRenderer::default();
+    let mut output = Vec::new();
+
+    renderer
+        .render_with_marker_hold(request, roi, &mask, &mut output, |x, _| {
+            Some(if x == 1 { [0, 255, 255] } else { [0, 0, 0] })
+        })
+        .expect("marker-colored noise outside the mask should render");
+    assert_eq!(output, [TRACK_LUMA, 0, TRACK_LUMA]);
+
+    renderer
+        .render_with_marker_hold(request, roi, &mask, &mut output, |_, _| Some([0, 0, 0]))
+        .expect("masked marker-colored noise should not enter marker hold");
+    assert_eq!(output, [TRACK_LUMA, 0, TRACK_LUMA]);
+}
+
+#[test]
 fn marker_hold_bridges_multi_frame_blink_off_at_action_repeat_one() {
     let request = test_request();
     let roi = MinimapRoi {
