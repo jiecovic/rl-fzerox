@@ -20,7 +20,7 @@ pub(crate) struct StackedObservationRequest {
     pub minimap_layer: Option<MinimapLayerRequest>,
 }
 
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(super) struct StackedObservationKey {
     pub render_plan: ProcessedFramePlanKey,
     pub frame_stack: usize,
