@@ -80,7 +80,6 @@ Watch manually or with a policy:
 
 ```bash
 python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml
-python -m rl_fzerox.apps.watch --config conf/local/watch.local.yaml --run-dir checkpoints/mute-city-3steer-recurrent-ppo-v1 --artifact best
 ```
 
 Train recurrent PPO:
@@ -103,14 +102,9 @@ python -m rl_fzerox.apps.train --config conf/presets/train.sac.yaml
 
 ## Checkpoints
 
-A sample checkpoint is included:
-
-```text
-checkpoints/mute-city-3steer-recurrent-ppo-v1
-```
-
-The checkpoint includes the model artifacts, run config, and baseline state.
-Edit the config paths if your ROM or libretro core live somewhere else.
+No model checkpoint is currently tracked. Training and watch runs should use
+run-local artifacts under `local/runs/`; those generated files are intentionally
+kept out of git.
 
 ## Contributing
 
