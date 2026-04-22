@@ -12,7 +12,7 @@ It combines:
   reset materialization, and the pygame watch UI
 - PPO-family training pipelines using SB3-compatible maskable, recurrent, and
   hybrid-action algorithms for continuous plus multi-discrete controls
-- an experimental SAC pipeline for continuous-control experiments
+- a SAC pipeline for continuous-control experiments
 
 ```text
 !! LOCAL RUNTIME ASSETS REQUIRED !!
@@ -106,8 +106,7 @@ python -m rl_fzerox.apps.train --config conf/presets/train.sac.yaml
 ## Checkpoints
 
 No model checkpoint is currently tracked. Training and watch runs should use
-run-local artifacts under `local/runs/`; those generated files are intentionally
-kept out of git.
+run-local artifacts under `local/runs/`.
 
 ## Contributing
 
