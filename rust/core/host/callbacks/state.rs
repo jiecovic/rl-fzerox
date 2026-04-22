@@ -27,9 +27,10 @@ use crate::core::input::ControllerState;
 use crate::core::minimap::{MinimapLayerRenderer, MinimapLayerRequest};
 use crate::core::options::{default_option_value, override_option};
 use crate::core::video::{
-    PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, RawVideoFrame, VideoCrop, VideoFrame,
-    VideoResizeFilter, build_processed_frame_plan, capture_raw_frame, capture_raw_frame_into,
-    decode_frame, processed_frame, processed_frame_from_raw_into,
+    PixelLayout, ProcessedFramePlan, ProcessedFramePlanKey, ProcessedFramePlanRequest,
+    RawVideoFrame, VideoCrop, VideoFrame, VideoResizeFilter, build_processed_frame_plan,
+    capture_raw_frame, capture_raw_frame_into, decode_frame, processed_frame,
+    processed_frame_from_raw_into,
 };
 
 /// State that lives on the frontend side of the libretro boundary.
@@ -479,16 +480,16 @@ impl CallbackState {
             resize_filter: request.resize_filter,
         };
         if !self.render_plans.contains_key(&key) {
-            let plan = build_processed_frame_plan(
-                request.source_width,
-                request.source_height,
-                request.aspect_ratio,
-                request.target_width,
-                request.target_height,
-                request.rgb,
-                request.crop,
-                request.resize_filter,
-            )?;
+            let plan = build_processed_frame_plan(ProcessedFramePlanRequest {
+                source_width: request.source_width,
+                source_height: request.source_height,
+                aspect_ratio: request.aspect_ratio,
+                target_width: request.target_width,
+                target_height: request.target_height,
+                rgb: request.rgb,
+                crop: request.crop,
+                resize_filter: request.resize_filter,
+            })?;
             self.render_plans.insert(key.clone(), plan);
         }
         self.render_plans

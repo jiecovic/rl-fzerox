@@ -12,6 +12,12 @@ class ObservationSpecDict(TypedDict):
     display_width: int
     display_height: int
 
+class FrameObservationOptionsDict(TypedDict):
+    stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"]
+    minimap_layer: bool
+    resize_filter: Literal["nearest", "bilinear"]
+    minimap_resize_filter: Literal["nearest", "bilinear"]
+
 class PlayerTelemetry:
     def __init__(
         self,
@@ -377,10 +383,7 @@ class Emulator:
         self,
         preset: str,
         frame_stack: int,
-        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
+        options: FrameObservationOptionsDict | None = None,
     ) -> npt.NDArray[np.uint8]: ...
     def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...

@@ -17,6 +17,34 @@ pub struct ProcessedFramePlanKey {
     pub resize_filter: VideoResizeFilter,
 }
 
+/// Inputs needed to precompute one processed frame plan.
+#[derive(Clone, Copy, Debug)]
+pub struct ProcessedFramePlanRequest {
+    pub source_width: usize,
+    pub source_height: usize,
+    pub aspect_ratio: f64,
+    pub target_width: usize,
+    pub target_height: usize,
+    pub rgb: bool,
+    pub crop: VideoCrop,
+    pub resize_filter: VideoResizeFilter,
+}
+
+impl ProcessedFramePlanRequest {
+    pub fn key(self) -> ProcessedFramePlanKey {
+        ProcessedFramePlanKey {
+            source_width: self.source_width,
+            source_height: self.source_height,
+            crop: self.crop,
+            aspect_ratio_bits: self.aspect_ratio.to_bits(),
+            target_width: self.target_width,
+            target_height: self.target_height,
+            rgb: self.rgb,
+            resize_filter: self.resize_filter,
+        }
+    }
+}
+
 /// Precomputed crop/resize plan reused for observation/display rendering.
 #[derive(Clone, Debug)]
 pub struct ProcessedFramePlan {
@@ -42,37 +70,23 @@ pub fn display_size(width: usize, height: usize, aspect_ratio: f64) -> (usize, u
 
 /// Precompute the crop and sampling plan for one fixed source/target pair.
 pub fn build_processed_frame_plan(
-    source_width: usize,
-    source_height: usize,
-    aspect_ratio: f64,
-    target_width: usize,
-    target_height: usize,
-    rgb: bool,
-    crop: VideoCrop,
-    resize_filter: VideoResizeFilter,
+    request: ProcessedFramePlanRequest,
 ) -> Result<ProcessedFramePlan, CoreError> {
-    let (crop_x, crop_y, crop_width, crop_height) = crop_bounds(source_width, source_height, crop)?;
-    let (display_width, display_height) = display_size(crop_width, crop_height, aspect_ratio);
-    let channels = if rgb { 3 } else { 1 };
+    let (crop_x, crop_y, crop_width, crop_height) =
+        crop_bounds(request.source_width, request.source_height, request.crop)?;
+    let (display_width, display_height) =
+        display_size(crop_width, crop_height, request.aspect_ratio);
+    let channels = if request.rgb { 3 } else { 1 };
 
     Ok(ProcessedFramePlan {
-        key: ProcessedFramePlanKey {
-            source_width,
-            source_height,
-            crop,
-            aspect_ratio_bits: aspect_ratio.to_bits(),
-            target_width,
-            target_height,
-            rgb,
-            resize_filter,
-        },
+        key: request.key(),
         crop_x,
         crop_y,
         crop_width,
         crop_height,
         display_width,
         display_height,
-        output_len: target_width * target_height * channels,
+        output_len: request.target_width * request.target_height * channels,
     })
 }
 

@@ -15,8 +15,8 @@ pub use capture::{capture_raw_frame, capture_raw_frame_into};
 pub use convert::decode_frame;
 pub(crate) use convert::sample_rgb;
 pub use plan::{
-    ProcessedFramePlan, ProcessedFramePlanKey, build_processed_frame_plan, cropped_dimensions,
-    display_size,
+    ProcessedFramePlan, ProcessedFramePlanKey, ProcessedFramePlanRequest,
+    build_processed_frame_plan, cropped_dimensions, display_size,
 };
 pub use process::{processed_frame, processed_frame_from_raw_into};
 pub use resize::{resize_luma, resize_rgb};
