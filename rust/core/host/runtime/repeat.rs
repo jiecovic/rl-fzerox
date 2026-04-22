@@ -5,7 +5,9 @@ use crate::core::error::CoreError;
 use crate::core::stdio::with_silenced_stdio;
 
 use super::host::Host;
-use super::step::{NativeStepResult, NativeWatchStepResult, RepeatedStepConfig, StepStatus};
+use super::step::{
+    DisplayFrameBatch, NativeStepResult, NativeWatchStepResult, RepeatedStepConfig, StepStatus,
+};
 use super::step_accumulator::StepAccumulator;
 
 impl Host {
@@ -100,7 +102,9 @@ impl Host {
         self.callbacks.set_controller_state(config.controller_state);
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-            let mut display_frames = Vec::with_capacity(config.action_repeat);
+            let display_frame_len = self.display_frame(config.preset)?.len();
+            let mut display_frames =
+                DisplayFrameBatch::with_capacity(display_frame_len, config.action_repeat);
 
             for _ in 0..config.action_repeat {
                 self.callbacks.set_capture_video(true);
@@ -114,7 +118,7 @@ impl Host {
 
                 let telemetry = self.telemetry_sample()?;
                 accumulator.observe(&telemetry, self.frame_index);
-                display_frames.push(self.display_frame(config.preset)?.to_vec());
+                display_frames.push_frame(self.display_frame(config.preset)?);
             }
 
             Ok((accumulator.finish(), display_frames))

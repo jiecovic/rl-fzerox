@@ -214,6 +214,30 @@ pub struct NativeStepResult<'a> {
     pub final_telemetry: TelemetrySnapshot,
 }
 
+/// Flat watch-frame storage for one repeated step.
+///
+/// Watch mode still returns individual frames to Python, but internally this
+/// avoids one allocation per repeated display frame.
+#[derive(Clone, Debug, Default)]
+pub struct DisplayFrameBatch {
+    pub frame_len: usize,
+    pub bytes: Vec<u8>,
+}
+
+impl DisplayFrameBatch {
+    pub fn with_capacity(frame_len: usize, frame_count: usize) -> Self {
+        Self {
+            frame_len,
+            bytes: Vec::with_capacity(frame_len * frame_count),
+        }
+    }
+
+    pub fn push_frame(&mut self, frame: &[u8]) {
+        debug_assert_eq!(frame.len(), self.frame_len);
+        self.bytes.extend_from_slice(frame);
+    }
+}
+
 /// Watch-mode repeated-step payload.
 ///
 /// This extends the normal repeated-step result with display frames captured
@@ -225,7 +249,7 @@ pub struct NativeWatchStepResult<'a> {
     /// Final stacked observation tensor for this outer env step.
     pub observation: &'a [u8],
     /// Display-sized RGB frames captured after each internal repeated frame.
-    pub display_frames: Vec<Vec<u8>>,
+    pub display_frames: DisplayFrameBatch,
     /// Aggregated step features spanning the internal repeated frames.
     pub summary: StepSummary,
     /// Native counter/stop state after the repeated env step completed.
