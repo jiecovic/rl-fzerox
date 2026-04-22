@@ -197,11 +197,14 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "frames_run": 2,
             "airborne_frames": 1,
             "collision_recoil_entered": False,
+            "boost_pad_entered": True,
             "boost_used": True,
             "lean_used": False,
             "episode": {
                 "position": 2,
                 "race_laps_completed": 3,
+                "boost_pad_entries": 6,
+                "boost_pad_entries_per_lap": 2.0,
                 "race_time_ms": 123_400,
                 "episode_step": 7_404,
                 "termination_reason": "finished",
@@ -219,11 +222,14 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "frames_run": 3,
             "airborne_frames": 3,
             "collision_recoil_entered": True,
+            "boost_pad_entered": False,
             "boost_used": False,
             "lean_used": True,
             "episode": {
                 "position": 8,
                 "race_laps_completed": 1,
+                "boost_pad_entries": 1,
+                "boost_pad_entries_per_lap": 1.0,
                 "race_time_ms": 40_000,
                 "episode_step": 2_400,
                 "termination_reason": None,
@@ -239,11 +245,14 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
     assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
+    assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
     assert accumulator.frame_ratios["state/airborne_frame_ratio"].ratio() == 0.8
     assert accumulator.episode_metrics["position"].mean() == 5.0
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
+    assert accumulator.episode_metrics["boost_pad_entries"].mean() == 3.5
+    assert accumulator.episode_metrics["boost_pad_entries_per_lap"].mean() == 1.5
     assert accumulator.finished_episode_metrics["race_time_ms"].mean() == 123.4
     assert accumulator.finished_episode_metrics["episode_step"].mean() == 7404.0
     assert accumulator.finished_episode_metrics["position"].mean() == 2.0
@@ -257,9 +266,12 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
 
     assert logger.records["state/damage_taken_step_rate"] == 0.5
     assert logger.records["state/collision_recoil_entry_rate"] == 0.5
+    assert logger.records["state/boost_pad_entry_step_rate"] == 0.5
     assert logger.records["state/airborne_frame_ratio"] == 0.8
     assert logger.records["action/boost_used_step_rate"] == 0.5
     assert logger.records["action/lean_used_step_rate"] == 0.5
+    assert logger.records["episode/boost_pad_entries_mean"] == 3.5
+    assert logger.records["episode/boost_pad_entries_per_lap_mean"] == 1.5
     assert logger.records["episode/finish_time_s_mean"] == 123.4
     assert logger.records["episode/by_course/mute_city/finish_time_s_mean"] == 123.4
     assert logger.records["episode/finish_steps_mean"] == 7404.0
@@ -732,11 +744,14 @@ def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> No
     assert "race_time_ms" in MONITOR_INFO_KEYS
     assert "damage_taken_frames" in MONITOR_INFO_KEYS
     assert "collision_recoil_entered" in MONITOR_INFO_KEYS
+    assert "boost_pad_entries" in MONITOR_INFO_KEYS
+    assert "boost_pad_entries_per_lap" in MONITOR_INFO_KEYS
 
 
 def test_monitor_info_keys_exclude_step_only_action_rates() -> None:
     assert "boost_used" not in MONITOR_INFO_KEYS
     assert "lean_used" not in MONITOR_INFO_KEYS
+    assert "boost_pad_entered" not in MONITOR_INFO_KEYS
 
 
 def test_monitor_info_keys_include_track_context_for_course_metrics() -> None:
