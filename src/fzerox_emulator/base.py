@@ -111,6 +111,8 @@ class EmulatorBackend(Protocol):
 
     def write_system_ram(self, offset: int, data: bytes) -> None: ...
 
+    def vehicle_setup_info(self) -> dict[str, object]: ...
+
     def step_repeat_raw(
         self,
         controller_state: ControllerState,

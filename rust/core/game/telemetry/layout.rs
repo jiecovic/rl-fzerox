@@ -3,14 +3,14 @@
 
 /// Scalar decoder settings that conceptually belong together.
 #[derive(Clone, Copy, Debug)]
-pub(super) struct TelemetryConfig {
+pub(crate) struct TelemetryConfig {
     pub kseg0_base: usize,
     pub system_ram_size_min: usize,
     pub player_racer_index: usize,
     pub speed_to_kph: f32,
 }
 
-pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
+pub(crate) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
     kseg0_base: 0x8000_0000,
     system_ram_size_min: 0x0030_0000,
     player_racer_index: 0,
@@ -18,24 +18,31 @@ pub(super) const TELEMETRY_CONFIG: TelemetryConfig = TelemetryConfig {
 };
 
 #[derive(Clone, Copy)]
-pub(super) struct GlobalOffsets {
+pub(crate) struct GlobalOffsets {
+    pub num_players: usize,
     pub total_lap_count: usize,
     pub difficulty: usize,
     pub race_intro_timer: usize,
+    pub selected_mode: usize,
+    pub game_mode_change_state: usize,
+    pub current_ghost_type: usize,
     pub game_mode: usize,
+    pub queued_game_mode: usize,
     pub total_racers: usize,
     pub current_course_info: usize,
     pub course_index: usize,
     pub cameras: usize,
     pub damage_rumble_counters: usize,
+    pub character_last_engine: usize,
     pub player_characters: usize,
+    pub player_machine_skins: usize,
     pub player_engine: usize,
     pub reverse_timers: usize,
     pub racers: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct MachineTableOffsets {
+pub(crate) struct MachineTableOffsets {
     pub machines: usize,
     pub machine_count: usize,
     pub machine_size: usize,
@@ -46,12 +53,12 @@ pub(super) struct MachineTableOffsets {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct CameraOffsets {
+pub(crate) struct CameraOffsets {
     pub race_setting: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct RacerOffsets {
+pub(crate) struct RacerOffsets {
     pub size: usize,
     pub state_flags: usize,
     pub segment_position_info: usize,
@@ -63,6 +70,7 @@ pub(super) struct RacerOffsets {
     pub acceleration_force: usize,
     pub drift_attack_force: usize,
     pub colliding_strength: usize,
+    pub engine_curve: usize,
     pub boost_timer: usize,
     pub recoil_tilt: usize,
     pub energy: usize,
@@ -75,13 +83,15 @@ pub(super) struct RacerOffsets {
     pub z_button_timer: usize,
     pub r_button_timer: usize,
     pub race_time: usize,
+    pub character: usize,
+    pub machine_skin_index: usize,
     pub lap: usize,
     pub laps_completed: usize,
     pub position: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct RacerSegmentPositionInfoOffsets {
+pub(crate) struct RacerSegmentPositionInfoOffsets {
     pub course_segment: usize,
     pub segment_t_value: usize,
     pub segment_length_proportion: usize,
@@ -90,29 +100,36 @@ pub(super) struct RacerSegmentPositionInfoOffsets {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct CourseSegmentOffsets {
+pub(crate) struct CourseSegmentOffsets {
     pub segment_index: usize,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct CourseInfoOffsets {
+pub(crate) struct CourseInfoOffsets {
     pub length: usize,
 }
 
 // Global RDRAM addresses derived from the F-Zero X USA decomp / symbol dumps.
 // We keep them grouped here so the reverse-engineered memory layout is easy to
 // audit and update as field semantics are validated.
-pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
+pub(crate) const GLOBALS: GlobalOffsets = GlobalOffsets {
+    num_players: rdram_offset(0x800C_D000),
     total_lap_count: rdram_offset(0x800C_D00C),
     difficulty: rdram_offset(0x800C_D008),
     race_intro_timer: rdram_offset(0x800F_5E98),
+    selected_mode: rdram_offset(0x800C_D380),
+    game_mode_change_state: rdram_offset(0x800C_D046),
+    current_ghost_type: rdram_offset(0x800C_D3CC),
     game_mode: rdram_offset(0x800DCE44),
+    queued_game_mode: rdram_offset(0x800DCE48),
     total_racers: rdram_offset(0x800E5EC0),
     current_course_info: rdram_offset(0x800F8510),
     course_index: rdram_offset(0x800F8514),
     cameras: rdram_offset(0x800E5220),
     damage_rumble_counters: rdram_offset(0x800E5F20),
+    character_last_engine: rdram_offset(0x800E40F0),
     player_characters: rdram_offset(0x800E5EE0),
+    player_machine_skins: rdram_offset(0x800E5EE8),
     player_engine: rdram_offset(0x800E5EF0),
     reverse_timers: rdram_offset(0x800F_80A8),
     racers: rdram_offset(0x802C4920),
@@ -120,7 +137,7 @@ pub(super) const GLOBALS: GlobalOffsets = GlobalOffsets {
 
 // Byte offsets within the live `gMachines` table. Single-byte table fields are
 // read with word-swapped addressing because Mupen exposes raw N64 RDRAM bytes.
-pub(super) const MACHINE_TABLE: MachineTableOffsets = MachineTableOffsets {
+pub(crate) const MACHINE_TABLE: MachineTableOffsets = MachineTableOffsets {
     machines: rdram_offset(0x800F80C8),
     machine_count: 30,
     machine_size: 0x16,
@@ -132,13 +149,13 @@ pub(super) const MACHINE_TABLE: MachineTableOffsets = MachineTableOffsets {
 
 // Byte offsets within `struct Camera`, derived from the decomp's
 // `include/fzx_camera.h`.
-pub(super) const CAMERA: CameraOffsets = CameraOffsets {
+pub(crate) const CAMERA: CameraOffsets = CameraOffsets {
     race_setting: 0x008,
 };
 
 // Byte offsets within `struct Racer`, derived from the decomp's
 // `include/unk_structs.h`.
-pub(super) const RACER: RacerOffsets = RacerOffsets {
+pub(crate) const RACER: RacerOffsets = RacerOffsets {
     size: 0x3A8,
     state_flags: 0x004,
     segment_position_info: 0x00C,
@@ -150,6 +167,7 @@ pub(super) const RACER: RacerOffsets = RacerOffsets {
     acceleration_force: 0x1D4,
     drift_attack_force: 0x1D8,
     colliding_strength: 0x1F4,
+    engine_curve: 0x1A8,
     boost_timer: 0x218,
     recoil_tilt: 0x118,
     energy: 0x228,
@@ -162,12 +180,14 @@ pub(super) const RACER: RacerOffsets = RacerOffsets {
     z_button_timer: 0x278,
     r_button_timer: 0x27A,
     race_time: 0x2A0,
+    character: 0x2C8,
+    machine_skin_index: 0x2CC,
     lap: 0x2A8,
     laps_completed: 0x2AA,
     position: 0x2AC,
 };
 
-pub(super) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
+pub(crate) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
     RacerSegmentPositionInfoOffsets {
         course_segment: 0x000,
         segment_t_value: 0x004,
@@ -176,13 +196,13 @@ pub(super) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
         distance_from_segment: 0x040,
     };
 
-pub(super) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
+pub(crate) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
     segment_index: 0x030,
 };
 
 // Byte offsets within `struct CourseInfo`, derived from the decomp's
 // `include/course.h`. `length` is the summed spline length for one lap.
-pub(super) const COURSE_INFO: CourseInfoOffsets = CourseInfoOffsets { length: 0x00C };
+pub(crate) const COURSE_INFO: CourseInfoOffsets = CourseInfoOffsets { length: 0x00C };
 
 pub(crate) const fn player_z_button_timer_offset() -> usize {
     player_racer_field_offset(RACER.z_button_timer)
@@ -199,7 +219,7 @@ const fn player_racer_field_offset(field_offset: usize) -> usize {
 // F-Zero X game-mode ids derived from the decomp's `include/fzx_game.h`.
 #[repr(u32)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum GameMode {
+pub(crate) enum GameMode {
     Title = 0x00,
     GpRace = 0x01,
     Practice = 0x02,

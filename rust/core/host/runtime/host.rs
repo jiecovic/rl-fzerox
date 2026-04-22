@@ -9,6 +9,7 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 use crate::core::api::LoadedCore;
 use crate::core::callbacks::{CallbackGuard, CallbackState};
 use crate::core::error::CoreError;
+use crate::core::game::race_start::{RaceStartSetup, VehicleSetupInfo};
 use crate::core::input::ControllerState;
 use crate::core::observation::ObservationCropProfile;
 use crate::core::rom::validate_supported_rom;
@@ -209,6 +210,40 @@ impl Host {
     pub fn telemetry(&mut self) -> Result<TelemetrySnapshot, CoreError> {
         let system_ram = self.system_ram_slice()?;
         crate::core::telemetry::read_snapshot(system_ram)
+    }
+
+    pub fn patch_time_attack_race_start_setup(
+        &mut self,
+        setup: RaceStartSetup,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_time_attack_race_setup(system_ram, setup)
+    }
+
+    pub fn patch_time_attack_machine_settings(
+        &mut self,
+        setup: RaceStartSetup,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_time_attack_machine_settings(system_ram, setup)
+    }
+
+    pub fn force_time_attack_reinit(&mut self) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::force_time_attack_reinit(system_ram)
+    }
+
+    pub fn validate_time_attack_race_start_setup(
+        &mut self,
+        setup: RaceStartSetup,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice()?;
+        crate::core::game::race_start::validate_time_attack_race_setup(system_ram, setup)
+    }
+
+    pub fn vehicle_setup_info(&mut self) -> Result<VehicleSetupInfo, CoreError> {
+        let system_ram = self.system_ram_slice()?;
+        crate::core::game::race_start::vehicle_setup_info(system_ram)
     }
 
     pub(super) fn telemetry_sample(&mut self) -> Result<StepTelemetrySample, CoreError> {

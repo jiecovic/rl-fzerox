@@ -6,6 +6,7 @@ use std::mem::size_of;
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
+use crate::core::game::memory::{read_f32, read_i16, read_i32, read_u32, read_word_swapped_u8};
 use crate::core::telemetry::layout::{
     CAMERA, COURSE_INFO, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, MACHINE_TABLE,
     RACER, RACER_SEGMENT_POSITION_INFO, RaceDifficulty, TELEMETRY_CONFIG,
@@ -240,22 +241,6 @@ fn resolve_camera_setting(camera_setting_raw: i32) -> Option<CameraRaceSetting> 
     CameraRaceSetting::try_from(camera_setting_raw).ok()
 }
 
-fn read_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {
-    Ok(i16::from_le_bytes(read_array(memory, offset)?))
-}
-
-fn read_i32(memory: &[u8], offset: usize) -> Result<i32, CoreError> {
-    Ok(i32::from_le_bytes(read_array(memory, offset)?))
-}
-
-fn read_u32(memory: &[u8], offset: usize) -> Result<u32, CoreError> {
-    Ok(u32::from_le_bytes(read_array(memory, offset)?))
-}
-
-fn read_f32(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
-    Ok(f32::from_le_bytes(read_array(memory, offset)?))
-}
-
 fn read_machine_i8(memory: &[u8], offset: usize) -> Result<i8, CoreError> {
     Ok(read_word_swapped_u8(memory, offset)? as i8)
 }
@@ -265,10 +250,6 @@ fn read_machine_i16(memory: &[u8], offset: usize) -> Result<i16, CoreError> {
         read_word_swapped_u8(memory, offset)?,
         read_word_swapped_u8(memory, offset + 1)?,
     ]))
-}
-
-fn read_word_swapped_u8(memory: &[u8], logical_offset: usize) -> Result<u8, CoreError> {
-    read_raw_u8(memory, logical_offset ^ 0x03)
 }
 
 fn read_vec3_magnitude(memory: &[u8], offset: usize) -> Result<f32, CoreError> {
@@ -285,30 +266,4 @@ fn dot_vec3(memory: &[u8], lhs_offset: usize, rhs_offset: usize) -> Result<f32, 
     let z = read_f32(memory, lhs_offset + (2 * size_of::<f32>()))?
         * read_f32(memory, rhs_offset + (2 * size_of::<f32>()))?;
     Ok(x + y + z)
-}
-
-fn read_array<const N: usize>(memory: &[u8], offset: usize) -> Result<[u8; N], CoreError> {
-    let end = offset + N;
-    let bytes = memory
-        .get(offset..end)
-        .ok_or_else(|| memory_error(offset, N, memory.len()))?;
-    let mut array = [0_u8; N];
-    array.copy_from_slice(bytes);
-    Ok(array)
-}
-
-fn read_raw_u8(memory: &[u8], offset: usize) -> Result<u8, CoreError> {
-    memory
-        .get(offset)
-        .copied()
-        .ok_or_else(|| memory_error(offset, 1, memory.len()))
-}
-
-fn memory_error(offset: usize, length: usize, available: usize) -> CoreError {
-    CoreError::MemoryOutOfRange {
-        memory_id: MEMORY_SYSTEM_RAM,
-        offset,
-        length,
-        available,
-    }
 }

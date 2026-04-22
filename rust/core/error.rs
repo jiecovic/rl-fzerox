@@ -88,6 +88,9 @@ pub enum CoreError {
         left: usize,
         right: usize,
     },
+    InvalidRaceStartSetup {
+        message: String,
+    },
     NoFrameAvailable,
 }
 
@@ -230,6 +233,9 @@ impl Display for CoreError {
                     formatter,
                     "Invalid video crop for frame {frame_width}x{frame_height}: top={top}, bottom={bottom}, left={left}, right={right}"
                 )
+            }
+            Self::InvalidRaceStartSetup { message } => {
+                write!(formatter, "Invalid F-Zero X race-start setup: {message}")
             }
             Self::NoFrameAvailable => {
                 write!(formatter, "The emulator did not produce a video frame")

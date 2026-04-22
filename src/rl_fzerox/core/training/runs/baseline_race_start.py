@@ -1,7 +1,6 @@
 # src/rl_fzerox/core/training/runs/baseline_race_start.py
 from __future__ import annotations
 
-import struct
 from dataclasses import dataclass
 
 from fzerox_emulator import (
@@ -11,39 +10,6 @@ from fzerox_emulator import (
     Emulator,
     joypad_mask,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class RaceStartRamLayout:
-    """RAM offsets touched when preparing a race-start save state."""
-
-    num_players: int = 0x000C_D000
-    total_lap_count: int = 0x000C_D00C
-    selected_mode: int = 0x000C_D380
-    game_mode_change_state: int = 0x000C_D046
-    current_ghost_type: int = 0x000C_D3CC
-    game_mode: int = 0x000D_CE44
-    queued_game_mode: int = 0x000D_CE48
-    character_last_engine: int = 0x000E_40F0
-    player_characters: int = 0x000E_5EE0
-    player_machine_skins: int = 0x000E_5EE8
-    player_engine: int = 0x000E_5EF0
-    course_index: int = 0x000F_8514
-    player_racer_base: int = 0x002C_4920
-    racer_engine_curve: int = 0x1A8
-    racer_character: int = 0x2C8
-    racer_machine_skin_index: int = 0x2CC
-
-
-@dataclass(frozen=True, slots=True)
-class RaceStartGameIds:
-    """Game enum values needed by the RAM-backed race-start materializer."""
-
-    time_attack_game_mode: int = 0x0E
-    change_init: int = 3
-    time_attack_menu_mode: int = 1
-    no_ghost: int = 0
-    single_player: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,8 +33,6 @@ class RaceStartMenuTiming:
     race_init_frame_limit: int = 1_500
 
 
-RAM_LAYOUT = RaceStartRamLayout()
-GAME_IDS = RaceStartGameIds()
 RACE_DEFAULTS = RaceStartDefaults()
 MENU_TIMING = RaceStartMenuTiming()
 
@@ -130,7 +94,7 @@ def materialize_time_attack_race_start_from_boot(
 
     _press_until_mode(emulator, target_mode="main_menu")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-    _write_i32(emulator, RAM_LAYOUT.selected_mode, GAME_IDS.time_attack_menu_mode)
+    _write_machine_settings(emulator, variant)
     _press_until_mode(emulator, target_mode="course_select")
 
     _select_time_attack_course(emulator, variant.course_index)
@@ -166,62 +130,27 @@ def _validate_variant(variant: RaceStartVariant) -> None:
 
 
 def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
-    engine_value = variant.engine_setting_raw_value / 100.0
-    engine_curve = _engine_to_curve_value(engine_value)
-
-    _write_i32(emulator, RAM_LAYOUT.num_players, GAME_IDS.single_player)
-    _write_i32(emulator, RAM_LAYOUT.total_lap_count, variant.total_lap_count)
-    _write_i32(emulator, RAM_LAYOUT.selected_mode, GAME_IDS.time_attack_menu_mode)
-    _write_i32(emulator, RAM_LAYOUT.current_ghost_type, GAME_IDS.no_ghost)
-    _write_i32(emulator, RAM_LAYOUT.course_index, variant.course_index)
-
-    _write_i16(emulator, RAM_LAYOUT.player_characters, variant.character_index)
-    _write_i16(emulator, RAM_LAYOUT.player_machine_skins, variant.machine_skin_index)
-    _write_f32(emulator, RAM_LAYOUT.player_engine, engine_value)
-    _write_f32(
-        emulator,
-        RAM_LAYOUT.character_last_engine + (variant.character_index * 4),
-        engine_value,
-    )
-
-    _write_i8(
-        emulator,
-        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_character,
-        variant.character_index,
-    )
-    _write_i16(
-        emulator,
-        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_machine_skin_index,
-        variant.machine_skin_index,
-    )
-    _write_f32(
-        emulator,
-        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_engine_curve,
-        engine_curve,
+    emulator.patch_time_attack_race_start_setup(
+        course_index=variant.course_index,
+        character_index=variant.character_index,
+        machine_skin_index=variant.machine_skin_index,
+        engine_setting_raw_value=variant.engine_setting_raw_value,
+        total_lap_count=variant.total_lap_count,
     )
 
 
 def _write_machine_settings(emulator: Emulator, variant: RaceStartVariant) -> None:
-    engine_value = variant.engine_setting_raw_value / 100.0
-    _write_i32(emulator, RAM_LAYOUT.num_players, GAME_IDS.single_player)
-    _write_i32(emulator, RAM_LAYOUT.total_lap_count, variant.total_lap_count)
-    _write_i32(emulator, RAM_LAYOUT.selected_mode, GAME_IDS.time_attack_menu_mode)
-    _write_i32(emulator, RAM_LAYOUT.current_ghost_type, GAME_IDS.no_ghost)
-    _write_i32(emulator, RAM_LAYOUT.course_index, variant.course_index)
-    _write_i16(emulator, RAM_LAYOUT.player_characters, variant.character_index)
-    _write_i16(emulator, RAM_LAYOUT.player_machine_skins, variant.machine_skin_index)
-    _write_f32(emulator, RAM_LAYOUT.player_engine, engine_value)
-    _write_f32(
-        emulator,
-        RAM_LAYOUT.character_last_engine + (variant.character_index * 4),
-        engine_value,
+    emulator.patch_time_attack_machine_settings(
+        course_index=variant.course_index,
+        character_index=variant.character_index,
+        machine_skin_index=variant.machine_skin_index,
+        engine_setting_raw_value=variant.engine_setting_raw_value,
+        total_lap_count=variant.total_lap_count,
     )
 
 
 def _force_time_attack_reinit(emulator: Emulator) -> None:
-    _write_i32(emulator, RAM_LAYOUT.game_mode, GAME_IDS.time_attack_game_mode)
-    _write_i32(emulator, RAM_LAYOUT.queued_game_mode, GAME_IDS.time_attack_game_mode)
-    _write_i16(emulator, RAM_LAYOUT.game_mode_change_state, GAME_IDS.change_init)
+    emulator.force_time_attack_reinit()
 
 
 def _step_until_ready(emulator: Emulator, variant: RaceStartVariant) -> None:
@@ -357,118 +286,22 @@ def _release_input(emulator: Emulator) -> None:
     emulator.set_controller_state(ControllerState())
 
 
-def _engine_to_curve_value(engine_value: float) -> float:
-    if engine_value == 0.0:
-        return 0.0
-    return 1.0 / (((1.0 + 0.6899998) / engine_value) - 0.6899998)
-
-
 def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
-    engine_value = variant.engine_setting_raw_value / 100.0
-    engine_curve = _engine_to_curve_value(engine_value)
-    mismatches: list[str] = []
-    for label, actual, expected in (
-        ("course_index", _read_i32(emulator, RAM_LAYOUT.course_index), variant.course_index),
-        (
-            "selected_mode",
-            _read_i32(emulator, RAM_LAYOUT.selected_mode),
-            GAME_IDS.time_attack_menu_mode,
-        ),
-        (
-            "current_ghost_type",
-            _read_i32(emulator, RAM_LAYOUT.current_ghost_type),
-            GAME_IDS.no_ghost,
-        ),
-        (
-            "player_character",
-            _read_i16(emulator, RAM_LAYOUT.player_characters),
-            variant.character_index,
-        ),
-        (
-            "racer_character",
-            _read_i8(emulator, RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_character),
-            variant.character_index,
-        ),
-        (
-            "racer_machine_skin",
-            _read_i16(
-                emulator,
-                RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_machine_skin_index,
-            ),
-            variant.machine_skin_index,
-        ),
-    ):
-        if actual != expected:
-            mismatches.append(f"{label}: expected {expected!r}, got {actual!r}")
-
-    actual_engine = _read_f32(emulator, RAM_LAYOUT.player_engine)
-    if abs(actual_engine - engine_value) > 0.001:
-        mismatches.append(f"player_engine: expected {engine_value:.3f}, got {actual_engine:.3f}")
-    actual_engine_curve = _read_f32(
-        emulator,
-        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_engine_curve,
+    emulator.validate_time_attack_race_start_setup(
+        course_index=variant.course_index,
+        character_index=variant.character_index,
+        machine_skin_index=variant.machine_skin_index,
+        engine_setting_raw_value=variant.engine_setting_raw_value,
+        total_lap_count=variant.total_lap_count,
     )
-    if abs(actual_engine_curve - engine_curve) > 0.001:
-        mismatches.append(
-            f"racer_engine_curve: expected {engine_curve:.3f}, got {actual_engine_curve:.3f}"
-        )
-
-    if mismatches:
-        raise RuntimeError(
-            "Race-start baseline materialization produced inconsistent RAM state: "
-            + "; ".join(mismatches)
-        )
 
 
 def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
-    engine_value = variant.engine_setting_raw_value / 100.0
-    engine_curve = _engine_to_curve_value(engine_value)
     mismatches: list[str] = []
-    for label, actual, expected in (
-        ("course_index", _read_i32(emulator, RAM_LAYOUT.course_index), variant.course_index),
-        (
-            "selected_mode",
-            _read_i32(emulator, RAM_LAYOUT.selected_mode),
-            GAME_IDS.time_attack_menu_mode,
-        ),
-        (
-            "current_ghost_type",
-            _read_i32(emulator, RAM_LAYOUT.current_ghost_type),
-            GAME_IDS.no_ghost,
-        ),
-        (
-            "player_character",
-            _read_i16(emulator, RAM_LAYOUT.player_characters),
-            variant.character_index,
-        ),
-        (
-            "racer_character",
-            _read_i8(emulator, RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_character),
-            variant.character_index,
-        ),
-        (
-            "racer_machine_skin",
-            _read_i16(
-                emulator,
-                RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_machine_skin_index,
-            ),
-            variant.machine_skin_index,
-        ),
-    ):
-        if actual != expected:
-            mismatches.append(f"{label}: expected {expected!r}, got {actual!r}")
-
-    actual_engine = _read_f32(emulator, RAM_LAYOUT.player_engine)
-    if abs(actual_engine - engine_value) > 0.001:
-        mismatches.append(f"player_engine: expected {engine_value:.3f}, got {actual_engine:.3f}")
-    actual_engine_curve = _read_f32(
-        emulator,
-        RAM_LAYOUT.player_racer_base + RAM_LAYOUT.racer_engine_curve,
-    )
-    if abs(actual_engine_curve - engine_curve) > 0.001:
-        mismatches.append(
-            f"racer_engine_curve: expected {engine_curve:.3f}, got {actual_engine_curve:.3f}"
-        )
+    try:
+        _validate_materialized_setup(emulator, variant)
+    except RuntimeError as error:
+        mismatches.append(str(error))
 
     telemetry = emulator.try_read_telemetry()
     if telemetry is None:
@@ -489,35 +322,3 @@ def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVari
             "Boot-menu baseline materialization produced inconsistent RAM state: "
             + "; ".join(mismatches)
         )
-
-
-def _read_i8(emulator: Emulator, offset: int) -> int:
-    return int(struct.unpack("<b", emulator.read_system_ram(offset, 1))[0])
-
-
-def _read_i16(emulator: Emulator, offset: int) -> int:
-    return int(struct.unpack("<h", emulator.read_system_ram(offset, 2))[0])
-
-
-def _read_i32(emulator: Emulator, offset: int) -> int:
-    return int(struct.unpack("<i", emulator.read_system_ram(offset, 4))[0])
-
-
-def _read_f32(emulator: Emulator, offset: int) -> float:
-    return float(struct.unpack("<f", emulator.read_system_ram(offset, 4))[0])
-
-
-def _write_i8(emulator: Emulator, offset: int, value: int) -> None:
-    emulator.write_system_ram(offset, struct.pack("<b", int(value)))
-
-
-def _write_i16(emulator: Emulator, offset: int, value: int) -> None:
-    emulator.write_system_ram(offset, struct.pack("<h", int(value)))
-
-
-def _write_i32(emulator: Emulator, offset: int, value: int) -> None:
-    emulator.write_system_ram(offset, struct.pack("<i", int(value)))
-
-
-def _write_f32(emulator: Emulator, offset: int, value: float) -> None:
-    emulator.write_system_ram(offset, struct.pack("<f", float(value)))
