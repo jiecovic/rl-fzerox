@@ -7,6 +7,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.ui.watch.view.panels.format import (
     _float_info,
+    _format_checkpoint_experience,
     _format_control_rate,
     _format_env_step,
     _format_episode_frames,
@@ -52,6 +53,7 @@ def _build_panel_columns(
     policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    policy_num_timesteps: int | None = None,
     gas_level: float = 0.0,
     thrust_warning_threshold: float | None = None,
     boost_active: bool = False,
@@ -78,6 +80,10 @@ def _build_panel_columns(
     observation_state: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
 ) -> PanelColumns:
+    curriculum_stage = _format_curriculum_stage(
+        checkpoint_stage=policy_curriculum_stage,
+        info=info,
+    )
     return PanelColumns(
         left=[
             PanelSection(
@@ -89,15 +95,10 @@ def _build_panel_columns(
                         PALETTE.text_warning if paused else PALETTE.text_accent,
                     ),
                     _panel_line(
-                        "Checkpoint stage",
-                        policy_curriculum_stage if policy_curriculum_stage is not None else "-",
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Env stage",
-                        _format_env_curriculum_stage(info),
+                        "Stage",
+                        curriculum_stage,
                         PALETTE.text_primary
-                        if _format_env_curriculum_stage(info) != "-"
+                        if curriculum_stage != "-"
                         else PALETTE.text_muted,
                     ),
                     _panel_line(
@@ -116,6 +117,16 @@ def _build_panel_columns(
                         "Reload",
                         _format_reload_age(policy_reload_age_seconds),
                         PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Experience",
+                        _format_checkpoint_experience(
+                            policy_num_timesteps,
+                            action_repeat=action_repeat,
+                        ),
+                        PALETTE.text_primary
+                        if policy_num_timesteps is not None
+                        else PALETTE.text_muted,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line(
@@ -334,6 +345,12 @@ def _format_env_curriculum_stage(info: dict[str, object]) -> str:
     if isinstance(stage_index, int):
         return str(stage_index)
     return "-"
+
+
+def _format_curriculum_stage(*, checkpoint_stage: str | None, info: dict[str, object]) -> str:
+    if checkpoint_stage is not None and checkpoint_stage:
+        return checkpoint_stage
+    return _format_env_curriculum_stage(info)
 
 
 def _format_best_position(value: int | None) -> str:

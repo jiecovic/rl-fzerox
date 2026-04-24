@@ -4,6 +4,7 @@ from __future__ import annotations
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import (
+    continue_run_paths,
     ensure_run_dirs,
     reserve_run_paths,
     resolve_policy_artifact_path,
@@ -32,9 +33,13 @@ def run_training(config: TrainAppConfig) -> None:
     """Run one training session from the composed train config."""
 
     seed_process(config.seed)
-    run_paths = reserve_run_paths(
-        output_root=config.train.output_root,
-        run_name=config.train.run_name,
+    run_paths = (
+        continue_run_paths(config.train.continue_run_dir)
+        if config.train.continue_run_dir is not None
+        else reserve_run_paths(
+            output_root=config.train.output_root,
+            run_name=config.train.run_name,
+        )
     )
     validate_training_algorithm_config(config)
     train_env = None
@@ -74,7 +79,7 @@ def run_training(config: TrainAppConfig) -> None:
         save_latest_artifacts(
             model,
             run_paths,
-            policy_metadata=current_policy_artifact_metadata(train_env),
+            policy_metadata=current_policy_artifact_metadata(train_env, model),
         )
         callbacks = build_callbacks(
             train_config=run_config.train,
@@ -97,19 +102,19 @@ def run_training(config: TrainAppConfig) -> None:
                 save_latest_artifacts(
                     model,
                     run_paths,
-                    policy_metadata=current_policy_artifact_metadata(train_env),
+                    policy_metadata=current_policy_artifact_metadata(train_env, model),
                 )
             raise
         save_artifacts_atomically(
             model=model,
             model_path=run_paths.final_model_path,
             policy_path=run_paths.final_policy_path,
-            policy_metadata=current_policy_artifact_metadata(train_env),
+            policy_metadata=current_policy_artifact_metadata(train_env, model),
         )
         save_latest_artifacts(
             model,
             run_paths,
-            policy_metadata=current_policy_artifact_metadata(train_env),
+            policy_metadata=current_policy_artifact_metadata(train_env, model),
         )
     except Exception:
         cleanup_failed_run(run_paths, model)

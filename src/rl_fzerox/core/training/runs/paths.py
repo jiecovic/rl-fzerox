@@ -57,6 +57,7 @@ class RunPaths:
     """Filesystem layout for one training run."""
 
     run_dir: Path
+    fresh_run: bool
     runtime_root: Path
     tensorboard_dir: Path
     latest_model_path: Path
@@ -88,7 +89,7 @@ def build_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
 
     resolved_output_root = output_root.expanduser().resolve()
     run_dir = _next_run_dir(resolved_output_root, run_name)
-    return _run_paths(run_dir)
+    return _run_paths(run_dir, fresh_run=True)
 
 
 def reserve_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
@@ -111,12 +112,22 @@ def reserve_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
         except FileExistsError:
             next_index += 1
             continue
-        return _run_paths(run_dir)
+        return _run_paths(run_dir, fresh_run=True)
 
 
-def _run_paths(run_dir: Path) -> RunPaths:
+def continue_run_paths(run_dir: Path) -> RunPaths:
+    """Reuse one existing training run directory for in-place continuation."""
+
+    resolved_run_dir = run_dir.expanduser().resolve()
+    if not resolved_run_dir.is_dir():
+        raise FileNotFoundError(f"Continue run directory not found: {resolved_run_dir}")
+    return _run_paths(resolved_run_dir, fresh_run=False)
+
+
+def _run_paths(run_dir: Path, *, fresh_run: bool) -> RunPaths:
     return RunPaths(
         run_dir=run_dir,
+        fresh_run=fresh_run,
         runtime_root=run_dir / RUN_LAYOUT.runtime_dirname,
         tensorboard_dir=run_dir / RUN_LAYOUT.tensorboard_dirname,
         latest_model_path=run_dir / RUN_LAYOUT.model_artifacts.latest,

@@ -184,6 +184,43 @@ def test_run_training_removes_empty_run_dir_when_config_resolution_fails(
     assert not (tmp_path / "runs" / "cleanup_probe_0001").exists()
 
 
+def test_run_training_keeps_existing_run_dir_when_in_place_continue_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "cleanup_probe_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    (run_dir / "keep.txt").write_text("keep", encoding="utf-8")
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(
+            output_root=tmp_path / "runs",
+            run_name="cleanup_probe",
+            continue_run_dir=run_dir,
+            resume_run_dir=run_dir,
+            resume_mode="full_model",
+        ),
+    )
+
+    def fail_config_resolution(**_: object) -> TrainAppConfig:
+        raise RuntimeError("materialization failed")
+
+    monkeypatch.setattr(runner, "resolve_train_run_config", fail_config_resolution)
+
+    with pytest.raises(RuntimeError, match="materialization failed"):
+        runner.run_training(config)
+
+    assert run_dir.exists()
+    assert (run_dir / "keep.txt").read_text(encoding="utf-8") == "keep"
+
+
 def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None:
     accumulator = RolloutInfoAccumulator()
     infos = [
@@ -329,6 +366,7 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
     assert load_policy_artifact_metadata(run_paths.latest_policy_path) == PolicyArtifactMetadata(
         curriculum_stage_index=None,
         curriculum_stage_name=None,
+        num_timesteps=0,
     )
 
 

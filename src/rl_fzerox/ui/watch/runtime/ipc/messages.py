@@ -68,6 +68,7 @@ class WatchSnapshot:
     policy_action: ActionValue | None
     policy_label: str | None
     policy_curriculum_stage: str | None
+    policy_num_timesteps: int | None
     policy_deterministic: bool | None
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None

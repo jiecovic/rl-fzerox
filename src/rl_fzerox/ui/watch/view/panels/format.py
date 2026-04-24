@@ -57,6 +57,26 @@ def _format_reload_age(reload_age_seconds: float | None) -> str:
     return f"{hours}h {minutes:02d}m"
 
 
+def _format_checkpoint_experience(
+    num_timesteps: int | None,
+    *,
+    action_repeat: int,
+) -> str:
+    if num_timesteps is None:
+        return "-"
+
+    total_frames = max(0, int(num_timesteps)) * max(1, int(action_repeat))
+    total_seconds = total_frames // 60
+    minutes, _ = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    days, hours = divmod(hours, 24)
+    if days > 0:
+        return f"{days}d {hours:02d}h {minutes:02d}m"
+    if hours > 0:
+        return f"{hours}h {minutes:02d}m"
+    return f"{minutes}m"
+
+
 def _display_aspect_ratio(info: dict[str, object]) -> float:
     value = info.get("display_aspect_ratio")
     if isinstance(value, int | float):

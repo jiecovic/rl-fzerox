@@ -534,6 +534,10 @@ class LazyMaskableReplayBuffer(LazyImageStateReplayBuffer):
         )
 
 
+# Backward-compatible checkpoint alias for runs saved before the replay buffer rename.
+LazyMaskableHybridActionDictReplayBuffer = LazyMaskableReplayBuffer
+
+
 def _current_slice_channels(stack_mode: ObservationStackMode) -> int:
     if stack_mode == "rgb":
         return 3

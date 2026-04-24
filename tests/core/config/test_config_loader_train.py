@@ -716,6 +716,70 @@ def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
     assert config.train.resume_mode == "weights_only"
 
 
+def test_load_train_app_config_resolves_continue_run_dir(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "train:",
+            "  total_timesteps: 1000",
+            f"  continue_run_dir: {run_dir}",
+            f"  resume_run_dir: {run_dir}",
+            "  resume_artifact: latest",
+            "  resume_mode: full_model",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.train.continue_run_dir == run_dir.resolve()
+    assert config.train.resume_run_dir == run_dir.resolve()
+    assert config.train.resume_mode == "full_model"
+
+
+def test_load_train_app_config_rejects_continue_run_dir_without_full_model_resume(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "train:",
+            "  total_timesteps: 1000",
+            f"  continue_run_dir: {run_dir}",
+            f"  resume_run_dir: {run_dir}",
+            "  resume_artifact: latest",
+            "  resume_mode: weights_only",
+        ],
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="train.continue_run_dir requires train.resume_mode=full_model",
+    ):
+        load_train_app_config(config_path)
+
+
 def test_load_train_app_config_migrates_legacy_init_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
