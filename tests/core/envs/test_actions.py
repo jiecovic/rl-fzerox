@@ -355,12 +355,12 @@ def test_continuous_steer_drive_adapter_applies_steer_curve() -> None:
     assert control_state == ControllerState(joypad_mask=0, left_stick_x=0.5)
 
 
-def test_continuous_steer_drive_adapter_coasts_inside_drive_deadzone() -> None:
+def test_continuous_steer_drive_adapter_coasts_inside_min_thrust_zone() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
     )
 
-    control_state = adapter.decode(np.array([2.0, 0.1], dtype=np.float32))
+    control_state = adapter.decode(np.array([2.0, -0.95], dtype=np.float32))
 
     assert control_state == ControllerState(joypad_mask=0, left_stick_x=1.0)
     assert adapter.action_mask().tolist() == []
@@ -370,8 +370,9 @@ def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(
             name="continuous_steer_drive",
-            continuous_drive_mode="pwm",
             continuous_drive_deadzone=0.0,
+            continuous_drive_full_threshold=1.0,
+            continuous_drive_min_thrust=0.0,
         )
     )
 
@@ -380,8 +381,8 @@ def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
         adapter.decode(np.array([0.0, -0.5], dtype=np.float32)).joypad_mask for _ in range(4)
     ]
     adapter.reset()
-    neutral_accelerate_masks = [
-        adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask for _ in range(3)
+    mid_accelerate_masks = [
+        adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask for _ in range(4)
     ]
     adapter.reset()
     full_accelerate_masks = [
@@ -389,12 +390,8 @@ def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
     ]
 
     assert coast_mask == 0
-    assert partial_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
-    assert neutral_accelerate_masks == [
-        ACCELERATE_MASK,
-        ACCELERATE_MASK,
-        ACCELERATE_MASK,
-    ]
+    assert partial_accelerate_masks == [0, 0, 0, ACCELERATE_MASK]
+    assert mid_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
     assert full_accelerate_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
 
 
@@ -402,7 +399,6 @@ def test_continuous_drive_pwm_supports_deadzone_and_full_zone() -> None:
     assert (
         continuous_drive_gas_level(
             -0.95,
-            mode="pwm",
             deadzone=0.10,
             full_threshold=0.80,
         )
@@ -410,14 +406,12 @@ def test_continuous_drive_pwm_supports_deadzone_and_full_zone() -> None:
     )
     assert continuous_drive_gas_level(
         -0.45,
-        mode="pwm",
         deadzone=0.10,
         full_threshold=0.80,
-    ) == pytest.approx((0.55 - 0.10) / (0.80 - 0.10))
+    ) == pytest.approx((0.275 - 0.10) / (0.80 - 0.10))
     assert (
         continuous_drive_gas_level(
-            -0.20,
-            mode="pwm",
+            0.60,
             deadzone=0.10,
             full_threshold=0.80,
         )
@@ -425,38 +419,35 @@ def test_continuous_drive_pwm_supports_deadzone_and_full_zone() -> None:
     )
 
 
-def test_continuous_drive_pwm_applies_min_level_inside_deadzone() -> None:
+def test_continuous_drive_curve_applies_min_thrust_inside_deadzone() -> None:
     assert continuous_drive_gas_level(
         -0.95,
-        mode="pwm",
         deadzone=0.10,
         full_threshold=0.80,
-        min_level=0.25,
+        min_thrust=0.25,
     ) == pytest.approx(0.25)
     assert continuous_drive_gas_level(
         -0.45,
-        mode="pwm",
         deadzone=0.10,
         full_threshold=0.80,
-        min_level=0.25,
-    ) == pytest.approx(0.25 + (0.75 * ((0.55 - 0.10) / (0.80 - 0.10))))
+        min_thrust=0.25,
+    ) == pytest.approx(0.25 + (0.75 * ((0.275 - 0.10) / (0.80 - 0.10))))
     assert (
         continuous_drive_gas_level(
-            -0.20,
-            mode="pwm",
+            0.60,
             deadzone=0.10,
             full_threshold=0.80,
-            min_level=0.25,
+            min_thrust=0.25,
         )
         == 1.0
     )
 
 
-def test_continuous_steer_drive_adapter_can_force_full_accelerate() -> None:
+def test_continuous_steer_drive_adapter_can_force_full_thrust() -> None:
     adapter = ContinuousSteerDriveActionAdapter(
         ActionConfig(
             name="continuous_steer_drive",
-            continuous_drive_mode="always_accelerate",
+            continuous_drive_min_thrust=1.0,
         )
     )
 

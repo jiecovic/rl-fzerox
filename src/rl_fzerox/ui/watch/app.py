@@ -95,6 +95,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
             )
+    except KeyboardInterrupt:
+        return
     finally:
         worker.shutdown()
         pygame.quit()

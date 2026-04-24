@@ -49,10 +49,9 @@ class HybridSteerDriveLeanActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
-            mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
             full_threshold=float(config.continuous_drive_full_threshold),
-            min_level=float(config.continuous_drive_min_level),
+            min_thrust=float(config.continuous_drive_min_thrust),
         )
         self._action_space = hybrid_action_space(STEER_DRIVE_LEAN_LAYOUT)
 
@@ -115,10 +114,9 @@ class HybridSteerDriveBoostLeanActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
-            mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
             full_threshold=float(config.continuous_drive_full_threshold),
-            min_level=float(config.continuous_drive_min_level),
+            min_thrust=float(config.continuous_drive_min_thrust),
         )
         self._action_space = hybrid_action_space(STEER_DRIVE_BOOST_LEAN_LAYOUT)
 
@@ -183,10 +181,9 @@ class HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
-            mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
             full_threshold=float(config.continuous_drive_full_threshold),
-            min_level=float(config.continuous_drive_min_level),
+            min_thrust=float(config.continuous_drive_min_thrust),
         )
         self._action_space = hybrid_action_space(STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT)
 
@@ -373,10 +370,9 @@ class HybridSteerDriveBoostLeanPrimitiveActionAdapter:
     def __init__(self, config: ActionConfig | ActionRuntimeConfig) -> None:
         self._steer_response_power = float(config.steer_response_power)
         self._drive_decoder = ContinuousDriveDecoder(
-            mode=config.continuous_drive_mode,
             deadzone=float(config.continuous_drive_deadzone),
             full_threshold=float(config.continuous_drive_full_threshold),
-            min_level=float(config.continuous_drive_min_level),
+            min_thrust=float(config.continuous_drive_min_thrust),
         )
         self._air_brake_decoder = ContinuousButtonPwmDecoder(
             deadzone=float(config.continuous_drive_deadzone),

@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/state_observation/api.py
+# src/rl_fzerox/core/envs/observations/state/api.py
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
@@ -8,28 +8,29 @@ import numpy as np
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.domain.observation_components import StateComponentsSettings
-from rl_fzerox.core.envs.state_observation.components import (
+
+from .components import (
     action_history_settings_for_observation,
     component_state_values,
     state_vector_spec_from_components,
 )
-from rl_fzerox.core.envs.state_observation.contexts import (
+from .contexts import (
     course_context_features,
     course_context_values,
     ground_effect_context_features,
     ground_effect_context_values,
 )
-from rl_fzerox.core.envs.state_observation.history import (
+from .history import (
     action_history_feature_names,
     action_history_features,
     action_history_values,
 )
-from rl_fzerox.core.envs.state_observation.profiles import (
+from .profiles import (
     DEFAULT_STATE_VECTOR_SPEC,
     STATE_VECTOR_SPECS,
     state_profile_values,
 )
-from rl_fzerox.core.envs.state_observation.types import (
+from .types import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     ObservationCourseContext,

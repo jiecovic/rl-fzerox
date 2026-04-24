@@ -20,8 +20,10 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
 )
-from rl_fzerox.core.envs.observations import ObservationStackMode
-from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
+from rl_fzerox.core.envs.observations import (
+    DEFAULT_STATE_VECTOR_SPEC,
+    ObservationStackMode,
+)
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -91,13 +93,18 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
             action_repeat=1,
             action=ActionConfig(
                 name="continuous_steer_drive",
-                continuous_drive_mode="pwm",
                 continuous_drive_deadzone=0.0,
+                continuous_drive_full_threshold=1.0,
+                continuous_drive_min_thrust=0.0,
             ),
         ),
     )
 
     env.reset(seed=7)
+    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    assert backend.last_controller_state.joypad_mask == 0
+    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    assert backend.last_controller_state.joypad_mask == 0
     env.step(np.array([0.0, -0.5], dtype=np.float32))
     assert backend.last_controller_state.joypad_mask == 0
     env.step(np.array([0.0, -0.5], dtype=np.float32))
@@ -470,7 +477,6 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
             action_repeat=1,
             action=ActionConfig(
                 name="hybrid_steer_drive_boost_lean_primitive",
-                continuous_drive_mode="pwm",
                 continuous_drive_deadzone=0.0,
                 continuous_air_brake_mode="disable_on_ground",
             ),
@@ -559,7 +565,7 @@ def test_step_suppresses_air_only_controls_until_airborne() -> None:
     )
 
 
-def test_step_forces_accelerate_when_drive_mode_always_accelerate() -> None:
+def test_step_forces_accelerate_when_min_thrust_is_full() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -576,7 +582,7 @@ def test_step_forces_accelerate_when_drive_mode_always_accelerate() -> None:
             action_repeat=1,
             action=ActionConfig(
                 name="hybrid_steer_drive_boost_lean_primitive",
-                continuous_drive_mode="always_accelerate",
+                continuous_drive_min_thrust=1.0,
                 continuous_air_brake_mode="off",
             ),
         ),
@@ -613,8 +619,9 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
             action_repeat=1,
             action=ActionConfig(
                 name="continuous_steer_drive",
-                continuous_drive_mode="pwm",
                 continuous_drive_deadzone=0.0,
+                continuous_drive_full_threshold=1.0,
+                continuous_drive_min_thrust=0.0,
             ),
             observation=ObservationConfig(
                 mode="image_state",
@@ -628,7 +635,7 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
     env.reset(seed=21)
     obs, reward, _, _, info = env.step(np.array([0.0, -0.5], dtype=np.float32))
 
-    assert env.last_gas_level == pytest.approx(0.5)
+    assert env.last_gas_level == pytest.approx(0.25)
     assert env.last_requested_control_state == ControllerState()
     assert backend.last_controller_state == ControllerState()
     assert isinstance(obs, dict)
@@ -637,7 +644,7 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
     values = {
         name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
     }
-    assert values["prev_gas_1"] == pytest.approx(0.5)
+    assert values["prev_gas_1"] == pytest.approx(0.25)
     assert reward == 0.0
     assert "reward_breakdown" not in info
 

@@ -19,15 +19,13 @@ class ContinuousDriveDecoder:
     def __init__(
         self,
         *,
-        mode: str,
         deadzone: float,
         full_threshold: float = 1.0,
-        min_level: float = 0.0,
+        min_thrust: float = 0.0,
     ) -> None:
-        self._mode = mode
         self._deadzone = deadzone
         self._full_threshold = full_threshold
-        self._min_level = min_level
+        self._min_thrust = min_thrust
         self._pwm_phase = 0.0
 
     def reset(self) -> None:
@@ -36,32 +34,14 @@ class ContinuousDriveDecoder:
         self._pwm_phase = 0.0
 
     def decode(self, drive: float) -> int:
-        if self._mode == "always_accelerate":
-            return ACCELERATE_MASK
-        if self._mode == "threshold":
-            return (
-                ACCELERATE_MASK
-                if continuous_drive_gas_level(
-                    drive,
-                    mode=self._mode,
-                    deadzone=self._deadzone,
-                    full_threshold=self._full_threshold,
-                    min_level=self._min_level,
-                )
-                > 0.0
-                else 0
+        return self._pwm_drive_mask(
+            continuous_drive_gas_level(
+                drive,
+                deadzone=self._deadzone,
+                full_threshold=self._full_threshold,
+                min_thrust=self._min_thrust,
             )
-        if self._mode == "pwm":
-            return self._pwm_drive_mask(
-                continuous_drive_gas_level(
-                    drive,
-                    mode=self._mode,
-                    deadzone=self._deadzone,
-                    full_threshold=self._full_threshold,
-                    min_level=self._min_level,
-                )
-            )
-        raise ValueError(f"Unsupported continuous drive mode: {self._mode!r}")
+        )
 
     def _pwm_drive_mask(self, duty: float) -> int:
         if duty <= 0.0:
@@ -167,45 +147,36 @@ def hybrid_branch(
 def continuous_drive_gas_level(
     drive: float,
     *,
-    mode: str,
     deadzone: float,
     full_threshold: float = 1.0,
-    min_level: float = 0.0,
+    min_thrust: float = 0.0,
 ) -> float:
-    """Return normalized gas intent for one continuous drive axis."""
+    """Return normalized thrust intent for one continuous drive axis."""
 
-    if mode == "always_accelerate":
-        return 1.0
-    if mode == "threshold":
-        return 1.0 if drive > deadzone else _clamp_unit(min_level)
-    if mode == "pwm":
-        return _pwm_duty_cycle(
-            drive,
-            deadzone=deadzone,
-            full_threshold=full_threshold,
-            min_level=min_level,
-        )
-    raise ValueError(f"Unsupported continuous drive mode: {mode!r}")
+    return _continuous_drive_thrust_curve(
+        drive,
+        deadzone=deadzone,
+        full_threshold=full_threshold,
+        min_thrust=min_thrust,
+    )
 
 
 def requested_gas_level(
     *,
     control_state: ControllerState,
     drive_axis: float | None,
-    continuous_drive_mode: str,
     continuous_drive_deadzone: float,
     continuous_drive_full_threshold: float = 1.0,
-    continuous_drive_min_level: float = 0.0,
+    continuous_drive_min_thrust: float = 0.0,
 ) -> float:
     """Return one canonical 0..1 gas intent for reward and HUD consumers."""
 
     if drive_axis is not None:
         return continuous_drive_gas_level(
             drive_axis,
-            mode=continuous_drive_mode,
             deadzone=continuous_drive_deadzone,
             full_threshold=continuous_drive_full_threshold,
-            min_level=continuous_drive_min_level,
+            min_thrust=continuous_drive_min_thrust,
         )
     return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
 
@@ -233,16 +204,16 @@ def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float 
     return float(np.clip(values[1], -1.0, 1.0))
 
 
-def _pwm_duty_cycle(
+def _continuous_drive_thrust_curve(
     drive: float,
     *,
     deadzone: float,
     full_threshold: float,
-    min_level: float,
+    min_thrust: float,
 ) -> float:
-    # F-Zero X usually wants full gas: negative values reduce duty, 0+ holds full throttle.
-    duty = min(max(drive + 1.0, 0.0), 1.0)
-    minimum = _clamp_unit(min_level)
+    # Map the centered policy output evenly into a 0..1 thrust duty.
+    duty = min(max((drive + 1.0) / 2.0, 0.0), 1.0)
+    minimum = _clamp_unit(min_thrust)
     if duty <= deadzone or bool(np.isclose(duty, deadzone)):
         return minimum
     if duty >= full_threshold or bool(np.isclose(duty, full_threshold)):

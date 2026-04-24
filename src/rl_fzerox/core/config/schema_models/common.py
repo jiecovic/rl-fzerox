@@ -21,5 +21,4 @@ ObservationPresetName: TypeAlias = Literal[
     "crop_64x64",
 ]
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
-ContinuousDriveMode: TypeAlias = Literal["threshold", "pwm", "always_accelerate"]
 ContinuousAirBrakeMode: TypeAlias = Literal["always", "disable_on_ground", "off"]

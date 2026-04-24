@@ -22,7 +22,6 @@ from rl_fzerox.core.config.action_branches import (
 from rl_fzerox.core.config.schema_models.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,
-    ContinuousDriveMode,
 )
 from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
 from rl_fzerox.core.domain.action_values import (
@@ -87,10 +86,9 @@ class ActionRuntimeConfig:
     name: ActionAdapterName
     steer_buckets: int
     steer_response_power: float
-    continuous_drive_mode: ContinuousDriveMode
     continuous_drive_deadzone: float
     continuous_drive_full_threshold: float
-    continuous_drive_min_level: float
+    continuous_drive_min_thrust: float
     continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
@@ -106,10 +104,9 @@ class ActionRuntimeConfig:
             name=config.name,
             steer_buckets=int(config.steer_buckets),
             steer_response_power=float(config.steer_response_power),
-            continuous_drive_mode=config.continuous_drive_mode,
             continuous_drive_deadzone=float(config.continuous_drive_deadzone),
             continuous_drive_full_threshold=float(config.continuous_drive_full_threshold),
-            continuous_drive_min_level=float(config.continuous_drive_min_level),
+            continuous_drive_min_thrust=float(config.continuous_drive_min_thrust),
             continuous_air_brake_mode=config.continuous_air_brake_mode,
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
@@ -142,11 +139,6 @@ class ActionRuntimeConfig:
                 if compilation.steer_response_power is None
                 else compilation.steer_response_power
             ),
-            continuous_drive_mode=(
-                config.continuous_drive_mode
-                if compilation.continuous_drive_mode is None
-                else compilation.continuous_drive_mode
-            ),
             continuous_drive_deadzone=float(
                 config.continuous_drive_deadzone
                 if compilation.continuous_drive_deadzone is None
@@ -157,10 +149,10 @@ class ActionRuntimeConfig:
                 if compilation.continuous_drive_full_threshold is None
                 else compilation.continuous_drive_full_threshold
             ),
-            continuous_drive_min_level=float(
-                config.continuous_drive_min_level
-                if compilation.continuous_drive_min_level is None
-                else compilation.continuous_drive_min_level
+            continuous_drive_min_thrust=float(
+                config.continuous_drive_min_thrust
+                if compilation.continuous_drive_min_thrust is None
+                else compilation.continuous_drive_min_thrust
             ),
             continuous_air_brake_mode=(
                 config.continuous_air_brake_mode
@@ -185,10 +177,9 @@ class ActionConfig(BaseModel):
     name: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
     steer_buckets: int = Field(default=7, ge=3)
     steer_response_power: PositiveFloat = 1.0
-    continuous_drive_mode: ContinuousDriveMode = "threshold"
-    continuous_drive_deadzone: float = Field(default=0.2, ge=0.0, lt=1.0)
-    continuous_drive_full_threshold: float = Field(default=1.0, gt=0.0, le=1.0)
-    continuous_drive_min_level: float = Field(default=0.0, ge=0.0, lt=1.0)
+    continuous_drive_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
+    continuous_drive_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
+    continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
@@ -219,8 +210,6 @@ class ActionConfig(BaseModel):
             raise ValueError(
                 "continuous_drive_deadzone must be lower than continuous_drive_full_threshold"
             )
-        if self.continuous_drive_min_level > 0.0 and self.continuous_drive_mode != "pwm":
-            raise ValueError("continuous_drive_min_level requires continuous_drive_mode='pwm'")
         if self.branches is not None:
             compile_action_branches(self.branches)
         return self

@@ -78,12 +78,11 @@ class EngineStepAssembler:
         gas_level = requested_gas_level(
             control_state=requested_control_state,
             drive_axis=request.action_drive_axis,
-            continuous_drive_mode=self.action_config.continuous_drive_mode,
             continuous_drive_deadzone=float(self.action_config.continuous_drive_deadzone),
             continuous_drive_full_threshold=float(
                 self.action_config.continuous_drive_full_threshold
             ),
-            continuous_drive_min_level=float(self.action_config.continuous_drive_min_level),
+            continuous_drive_min_thrust=float(self.action_config.continuous_drive_min_thrust),
         )
 
         boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)

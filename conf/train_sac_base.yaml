@@ -6,10 +6,10 @@ env:
   action:
     # SAC uses continuous steering/accelerate axes; boost and lean stay disabled here.
     name: continuous_steer_drive
-    # PWM maps -1 to coast, negative values to partial gas, and 0+ to full gas.
-    continuous_drive_mode: pwm
-    # Low-end duty threshold before the accelerate button starts pulsing.
-    continuous_drive_deadzone: 0.0
+    # -1 coasts, +1 saturates to full throttle, and the thresholds shape the ramp.
+    continuous_drive_deadzone: 0.05
+    continuous_drive_full_threshold: 0.85
+    continuous_drive_min_thrust: 0.25
 
 train:
   algorithm: sac

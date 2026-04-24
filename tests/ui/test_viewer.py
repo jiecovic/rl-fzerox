@@ -19,8 +19,10 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.envs.observations import state_feature_names
-from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
+from rl_fzerox.core.envs.observations import (
+    DEFAULT_STATE_VECTOR_SPEC,
+    state_feature_names,
+)
 from rl_fzerox.ui.watch.input import _point_in_rect
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,

@@ -165,7 +165,6 @@ def test_hybrid_steer_drive_boost_lean_primitive_adapter_decodes_air_brake_axis(
     adapter = HybridSteerDriveBoostLeanPrimitiveActionAdapter(
         ActionConfig(
             name="hybrid_steer_drive_boost_lean_primitive",
-            continuous_drive_mode="pwm",
             continuous_drive_deadzone=0.0,
         )
     )
@@ -187,7 +186,6 @@ def test_hybrid_steer_drive_boost_lean_primitive_adapter_can_disable_air_brake()
     adapter = HybridSteerDriveBoostLeanPrimitiveActionAdapter(
         ActionConfig(
             name="hybrid_steer_drive_boost_lean_primitive",
-            continuous_drive_mode="pwm",
             continuous_drive_deadzone=0.0,
             continuous_air_brake_mode="off",
         )
@@ -207,7 +205,6 @@ def test_hybrid_steer_drive_boost_lean_primitive_adapter_keeps_neutral_air_brake
     adapter = HybridSteerDriveBoostLeanPrimitiveActionAdapter(
         ActionConfig(
             name="hybrid_steer_drive_boost_lean_primitive",
-            continuous_drive_mode="pwm",
             continuous_drive_deadzone=0.0,
         )
     )

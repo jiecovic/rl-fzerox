@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
+from rl_fzerox.core.envs.observations import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 
 AlphaColor = tuple[int, int, int, int]

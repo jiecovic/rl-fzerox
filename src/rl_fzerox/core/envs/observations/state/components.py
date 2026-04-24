@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/state_observation/components.py
+# src/rl_fzerox/core/envs/observations/state/components.py
 from __future__ import annotations
 
 from collections.abc import Callable, Collection, Mapping
@@ -10,26 +10,27 @@ from rl_fzerox.core.domain.observation_components import (
     StateComponentsSettings,
 )
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
-from rl_fzerox.core.envs.state_observation.contexts import (
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+
+from .contexts import (
     course_component_features,
     course_component_values,
 )
-from rl_fzerox.core.envs.state_observation.history import (
+from .history import (
     action_history_control_name,
     component_action_history_features,
     component_action_history_values,
     control_history_source_control,
     validate_action_history_controls,
 )
-from rl_fzerox.core.envs.state_observation.profiles import DEFAULT_STATE_VECTOR_SPEC
-from rl_fzerox.core.envs.state_observation.types import (
+from .profiles import DEFAULT_STATE_VECTOR_SPEC
+from .types import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     StateFeature,
     StateVectorSpec,
 )
-from rl_fzerox.core.envs.state_observation.utils import clamp
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from .utils import clamp
 
 
 @dataclass(frozen=True, slots=True)
