@@ -371,14 +371,14 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     assert backend.render_observation_calls == [("crop_116x164", 4, "rgb", False)]
 
 
-def test_env_reset_uses_rgb_gray_stack_shape() -> None:
+def test_env_reset_uses_rgb_stack_shape() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
                 preset="crop_98x130",
                 frame_stack=4,
-                stack_mode="rgb_gray",
+                stack_mode="rgb",
             ),
         ),
     )
@@ -386,11 +386,11 @@ def test_env_reset_uses_rgb_gray_stack_shape() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (98, 130, 6)
+    assert obs.shape == (98, 130, 12)
     assert isinstance(env.observation_space, Box)
-    assert env.observation_space.shape == (98, 130, 6)
+    assert env.observation_space.shape == (98, 130, 12)
     assert info["observation_stack"] == 4
-    assert info["observation_stack_mode"] == "rgb_gray"
+    assert info["observation_stack_mode"] == "rgb"
 
 
 def test_env_reset_uses_optional_minimap_layer_shape() -> None:
@@ -400,7 +400,7 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
             observation=ObservationConfig(
                 preset="crop_66x82",
                 frame_stack=4,
-                stack_mode="rgb_gray",
+                stack_mode="rgb",
                 minimap_layer=True,
             ),
         ),
@@ -409,9 +409,9 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (66, 82, 7)
+    assert obs.shape == (66, 82, 13)
     assert isinstance(env.observation_space, Box)
-    assert env.observation_space.shape == (66, 82, 7)
+    assert env.observation_space.shape == (66, 82, 13)
     assert info["observation_minimap_layer"] is True
 
 

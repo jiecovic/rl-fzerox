@@ -25,6 +25,10 @@ from rl_fzerox.core.training.session.model import (
     training_requires_action_masks,
     validate_training_algorithm_config,
 )
+from rl_fzerox.core.training.session.model.replay import (
+    LazyImageStateReplayBuffer,
+    LazyMaskableReplayBuffer,
+)
 from tests.support.fakes import SyntheticBackend
 
 
@@ -308,6 +312,10 @@ def test_build_training_model_can_construct_sac() -> None:
     try:
         model = build_training_model(
             train_env=env,
+            env_config=EnvConfig(
+                action=ActionConfig(name="continuous_steer_drive_lean"),
+                observation=ObservationConfig(mode="image_state"),
+            ),
             train_config=TrainConfig(
                 algorithm="sac",
                 buffer_size=4,
@@ -343,6 +351,10 @@ def test_build_training_model_can_construct_hybrid_action_sac() -> None:
     try:
         model = build_training_model(
             train_env=env,
+            env_config=EnvConfig(
+                action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
+                observation=ObservationConfig(mode="image_state"),
+            ),
             train_config=TrainConfig(
                 algorithm="hybrid_action_sac",
                 buffer_size=4,
@@ -378,6 +390,10 @@ def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None
     try:
         model = build_training_model(
             train_env=env,
+            env_config=EnvConfig(
+                action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
+                observation=ObservationConfig(mode="image_state"),
+            ),
             train_config=TrainConfig(
                 algorithm="maskable_hybrid_action_sac",
                 buffer_size=4,
@@ -392,6 +408,88 @@ def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None
         env.close()
 
     assert isinstance(model, MaskableHybridActionSAC)
+
+
+def test_build_training_model_uses_lazy_replay_buffer_for_sac() -> None:
+    from stable_baselines3 import SAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env_config = EnvConfig(
+        action=ActionConfig(name="continuous_steer_drive_lean"),
+        observation=ObservationConfig(mode="image_state", stack_mode="gray"),
+    )
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=env_config,
+            )
+        ]
+    )
+
+    try:
+        model = build_training_model(
+            train_env=env,
+            env_config=env_config,
+            train_config=TrainConfig(
+                algorithm="sac",
+                buffer_size=4,
+                learning_starts=0,
+                ent_coef="auto",
+                optimize_memory_usage=True,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    if not isinstance(model, SAC):
+        raise AssertionError(f"unexpected model type: {type(model).__name__}")
+    replay_buffer = getattr(model, "replay_buffer", None)  # noqa: B009
+    assert isinstance(replay_buffer, LazyImageStateReplayBuffer)
+
+
+def test_build_training_model_uses_lazy_replay_buffer_for_maskable_hybrid_sac() -> None:
+    from sb3x import MaskableHybridActionSAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env_config = EnvConfig(
+        action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
+        observation=ObservationConfig(mode="image_state", stack_mode="gray"),
+    )
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=env_config,
+            )
+        ]
+    )
+
+    try:
+        model = build_training_model(
+            train_env=env,
+            env_config=env_config,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_action_sac",
+                buffer_size=4,
+                learning_starts=0,
+                ent_coef="auto",
+                optimize_memory_usage=True,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    if not isinstance(model, MaskableHybridActionSAC):
+        raise AssertionError(f"unexpected model type: {type(model).__name__}")
+    replay_buffer = getattr(model, "replay_buffer", None)  # noqa: B009
+    assert isinstance(replay_buffer, LazyMaskableReplayBuffer)
 
 
 def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:

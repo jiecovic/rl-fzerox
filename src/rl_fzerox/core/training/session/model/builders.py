@@ -1,9 +1,11 @@
 # src/rl_fzerox/core/training/session/model/builders.py
 from __future__ import annotations
 
+from typing import Any
+
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
+from rl_fzerox.core.config.schema import EnvConfig, PolicyConfig, TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
@@ -14,6 +16,7 @@ from rl_fzerox.core.training.session.model.policy import (
     build_policy_kwargs,
     resolve_policy_name,
 )
+from rl_fzerox.core.training.session.model.replay import resolve_sac_replay_buffer
 from rl_fzerox.core.training.session.model.validation import (
     validate_masking_configuration,
     validate_recurrent_configuration_alignment,
@@ -23,6 +26,7 @@ from rl_fzerox.core.training.session.model.validation import (
 def build_training_model(
     *,
     train_env: VecEnv,
+    env_config: EnvConfig,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
@@ -35,6 +39,7 @@ def build_training_model(
     if effective_algorithm in TRAINING_ALGORITHMS.sac_family:
         return _build_sac_model(
             train_env=train_env,
+            env_config=env_config,
             train_config=train_config,
             policy_config=policy_config,
             tensorboard_log=tensorboard_log,
@@ -135,6 +140,7 @@ def _build_ppo_family_model(
 def _build_sac_model(
     *,
     train_env: VecEnv,
+    env_config: EnvConfig,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
     tensorboard_log: str | None,
@@ -166,6 +172,11 @@ def _build_sac_model(
         value_head_key="qf",
     )
     algorithm_class = resolve_sac_training_algorithm_class(effective_algorithm)
+    replay_buffer_class, replay_buffer_kwargs = resolve_sac_replay_buffer(
+        train_config=train_config,
+        env_config=env_config,
+        effective_algorithm=effective_algorithm,
+    )
     return algorithm_class(
         policy=policy_name,
         env=train_env,
@@ -185,6 +196,10 @@ def _build_sac_model(
         tensorboard_log=tensorboard_log,
         verbose=train_config.verbose,
         device=train_config.device,
+        **_sac_replay_kwargs(
+            replay_buffer_class=replay_buffer_class,
+            replay_buffer_kwargs=replay_buffer_kwargs,
+        ),
     )
 
 
@@ -193,3 +208,16 @@ def _ppo_ent_coef(train_config: TrainConfig) -> float:
     if ent_coef == "auto":
         raise RuntimeError("PPO-family algorithms require a numeric train.ent_coef")
     return float(ent_coef)
+
+
+def _sac_replay_kwargs(
+    *,
+    replay_buffer_class: object | None,
+    replay_buffer_kwargs: dict[str, object],
+) -> dict[str, Any]:
+    if replay_buffer_class is None:
+        return {}
+    return {
+        "replay_buffer_class": replay_buffer_class,
+        "replay_buffer_kwargs": replay_buffer_kwargs,
+    }

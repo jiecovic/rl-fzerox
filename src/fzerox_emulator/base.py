@@ -41,7 +41,7 @@ class ObservationSpec:
     display_height: int
 
 
-ObservationStackMode: TypeAlias = Literal["rgb", "rgb_gray", "gray", "luma_chroma"]
+ObservationStackMode: TypeAlias = Literal["rgb", "gray", "luma_chroma"]
 ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 
 
@@ -59,10 +59,6 @@ def stacked_observation_channels(
     extra_channels = 1 if minimap_layer else 0
     if stack_mode == "rgb":
         return (single_frame_channels * frame_stack) + extra_channels
-    if stack_mode == "rgb_gray":
-        if frame_stack == 1:
-            return single_frame_channels + extra_channels
-        return (frame_stack - 1) + single_frame_channels + extra_channels
     if stack_mode == "gray":
         return frame_stack + extra_channels
     if stack_mode == "luma_chroma":

@@ -136,31 +136,6 @@ impl StackedObservationBuffer {
             return;
         }
 
-        if self.stack_mode == ObservationStackMode::RgbGray && self.channels_per_pixel == 3 {
-            for pixel_index in 0..pixel_count {
-                let pixel_src = pixel_index * 3;
-                let pixel_dst = pixel_index * total_channels;
-                for stack_index in 0..self.frame_stack {
-                    let slot = (self.next_slot + stack_index) % self.frame_stack;
-                    let src = (slot * self.frame_len) + pixel_src;
-                    let dst = pixel_dst + stack_index;
-                    if stack_index + 1 == self.frame_stack {
-                        self.bytes[dst] = self.frames[src];
-                        self.bytes[dst + 1] = self.frames[src + 1];
-                        self.bytes[dst + 2] = self.frames[src + 2];
-                    } else {
-                        self.bytes[dst] = rgb_to_luma(
-                            self.frames[src],
-                            self.frames[src + 1],
-                            self.frames[src + 2],
-                        );
-                    }
-                }
-            }
-            self.write_extra_frame(extra_frame, pixel_count);
-            return;
-        }
-
         if self.stack_mode == ObservationStackMode::Gray && self.channels_per_pixel == 3 {
             for pixel_index in 0..pixel_count {
                 let pixel_src = pixel_index * 3;
@@ -225,22 +200,19 @@ mod tests {
 
     #[test]
     fn minimap_extra_channel_is_appended_after_existing_stack_channels() {
-        let mut stack = StackedObservationBuffer::new(6, 2, 3, ObservationStackMode::RgbGray, 1);
+        let mut stack = StackedObservationBuffer::new(6, 2, 3, ObservationStackMode::Gray, 1);
 
         stack
             .update(&[10, 20, 30, 40, 50, 60], 1, Some(&[90, 120]))
             .expect("initial stack should accept minimap layer");
 
-        assert_eq!(stack.as_slice(), &[18, 10, 20, 30, 90, 48, 40, 50, 60, 120]);
+        assert_eq!(stack.as_slice(), &[18, 18, 90, 48, 48, 120]);
 
         stack
             .update(&[70, 80, 90, 100, 110, 120], 2, Some(&[130, 160]))
             .expect("next stack should update minimap layer");
 
-        assert_eq!(
-            stack.as_slice(),
-            &[18, 70, 80, 90, 130, 48, 100, 110, 120, 160]
-        );
+        assert_eq!(stack.as_slice(), &[18, 78, 130, 48, 108, 160]);
     }
 
     #[test]

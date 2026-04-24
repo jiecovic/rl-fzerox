@@ -525,10 +525,6 @@ def _materialize_observation_stack(
     if stack_mode == "rgb":
         stacked = np.concatenate(frames, axis=2)
         return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
-    if stack_mode == "rgb_gray":
-        grayscale_history = [_rgb_luma(frame) for frame in frames[:-1]]
-        stacked = np.concatenate([*grayscale_history, frames[-1]], axis=2)
-        return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     if stack_mode == "gray":
         stacked = np.concatenate([_rgb_luma(frame) for frame in frames], axis=2)
         return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked

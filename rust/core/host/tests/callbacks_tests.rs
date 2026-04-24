@@ -117,36 +117,6 @@ fn stacked_observation_interleaves_frames_per_pixel_for_multi_pixel_images() {
     assert_eq!(stacked, vec![1, 2, 3, 10, 11, 12, 4, 5, 6, 13, 14, 15,]);
 }
 
-#[test]
-fn rgb_gray_stack_encodes_history_as_luma_and_latest_as_rgb() {
-    let mut state = callback_state();
-    state.set_frame(rgb_row_frame([[10, 20, 30], [40, 50, 60]]));
-    let _ = state
-        .stacked_observation_frame(stacked_observation_request(
-            2,
-            1,
-            4,
-            ObservationStackMode::RgbGray,
-        ))
-        .expect("initial stacked observation should render");
-
-    state.set_frame_for_test_without_reset(rgb_row_frame([[70, 80, 90], [100, 110, 120]]));
-    let stacked = state
-        .stacked_observation_frame(stacked_observation_request(
-            2,
-            1,
-            4,
-            ObservationStackMode::RgbGray,
-        ))
-        .expect("stacked observation should render")
-        .to_vec();
-
-    assert_eq!(
-        stacked,
-        vec![18, 18, 18, 70, 80, 90, 48, 48, 48, 100, 110, 120,]
-    );
-}
-
 fn callback_state() -> CallbackState {
     let runtime_dir = std::env::temp_dir().join(format!(
         "rl_fzerox_callbacks_tests_{}_{}",

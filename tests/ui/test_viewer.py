@@ -343,32 +343,6 @@ def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:
     assert np.array_equal(preview[:, 3:, :], second)
 
 
-def test_preview_frame_shows_rgb_gray_observations_as_grid() -> None:
-    history = np.zeros((2, 3, 3), dtype=np.uint8)
-    history[:, :, 0] = 32
-    history[:, :, 1] = 96
-    history[:, :, 2] = 160
-    current = np.full((2, 3, 3), 255, dtype=np.uint8)
-    stacked = np.concatenate((history, current), axis=2)
-    info = {"observation_stack": 4, "observation_stack_mode": "rgb_gray"}
-
-    preview = _preview_frame(stacked, info=info)
-
-    assert preview.shape == (2, 12, 3)
-    assert np.array_equal(preview[:2, :3, :], np.repeat(history[:, :, 0:1], 3, axis=2))
-    assert np.array_equal(preview[:2, 3:6, :], np.repeat(history[:, :, 1:2], 3, axis=2))
-    assert np.array_equal(preview[:2, 6:9, :], np.repeat(history[:, :, 2:3], 3, axis=2))
-    assert np.array_equal(preview[:2, 9:12, :], current)
-    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
-    assert (
-        _format_observation_summary(
-            stacked.shape,
-            info=info,
-        )
-        == "3x2 rgb+gray x4 strip"
-    )
-
-
 def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
     stacked = np.zeros((2, 3, 4), dtype=np.uint8)
     stacked[:, :, 0] = 32

@@ -47,8 +47,6 @@ pub enum ObservationPreset {
 pub enum ObservationStackMode {
     /// Keep every stacked frame as RGB: `3 * frame_stack` channels.
     Rgb,
-    /// Encode history as grayscale and keep the latest frame RGB.
-    RgbGray,
     /// Encode every stacked frame as grayscale: `frame_stack` channels.
     Gray,
     /// Encode every frame as luminance plus a yellow-vs-purple chroma cue.
@@ -203,7 +201,6 @@ impl ObservationStackMode {
     pub fn parse(name: &str) -> Result<Self, CoreError> {
         match name {
             "rgb" => Ok(Self::Rgb),
-            "rgb_gray" => Ok(Self::RgbGray),
             "gray" => Ok(Self::Gray),
             "luma_chroma" => Ok(Self::LumaChroma),
             _ => Err(CoreError::InvalidObservationPreset {
@@ -215,13 +212,6 @@ impl ObservationStackMode {
     pub fn stacked_channels(self, single_frame_channels: usize, frame_stack: usize) -> usize {
         match self {
             Self::Rgb => single_frame_channels * frame_stack,
-            Self::RgbGray => {
-                if frame_stack <= 1 {
-                    single_frame_channels
-                } else {
-                    (frame_stack - 1) + single_frame_channels
-                }
-            }
             Self::Gray => frame_stack,
             Self::LumaChroma => frame_stack * 2,
         }
@@ -348,10 +338,8 @@ mod tests {
     }
 
     #[test]
-    fn rgb_gray_stack_keeps_latest_rgb_and_grays_history() {
+    fn supported_stack_modes_report_expected_channel_counts() {
         assert_eq!(ObservationStackMode::Rgb.stacked_channels(3, 4), 12);
-        assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 4), 6);
-        assert_eq!(ObservationStackMode::RgbGray.stacked_channels(3, 1), 3);
         assert_eq!(ObservationStackMode::Gray.stacked_channels(3, 4), 4);
         assert_eq!(ObservationStackMode::LumaChroma.stacked_channels(3, 4), 8);
     }
