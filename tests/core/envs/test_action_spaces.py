@@ -155,18 +155,6 @@ def test_continuous_action_env_exposes_box_action_space() -> None:
     assert env.action_space.shape == (2,)
     assert env.action_masks().tolist() == []
 
-
-def test_continuous_lean_action_env_exposes_box_action_space() -> None:
-    env = FZeroXEnv(
-        backend=SyntheticBackend(),
-        config=EnvConfig(action=ActionConfig(name="continuous_steer_drive_lean")),
-    )
-
-    assert isinstance(env.action_space, Box)
-    assert env.action_space.shape == (3,)
-    assert env.action_masks().tolist() == []
-
-
 def test_hybrid_lean_action_env_exposes_dict_action_space() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),

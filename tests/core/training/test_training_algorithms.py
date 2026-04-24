@@ -65,7 +65,7 @@ def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
 
     config = TrainAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive_lean")),
+        env=EnvConfig(action=ActionConfig(name="continuous_steer_drive")),
         policy=PolicyConfig(),
         curriculum=CurriculumConfig(),
         train=TrainConfig(algorithm="sac", ent_coef="auto"),
@@ -302,7 +302,7 @@ def test_build_training_model_can_construct_sac() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(name="continuous_steer_drive_lean"),
+                    action=ActionConfig(name="continuous_steer_drive"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
@@ -313,7 +313,7 @@ def test_build_training_model_can_construct_sac() -> None:
         model = build_training_model(
             train_env=env,
             env_config=EnvConfig(
-                action=ActionConfig(name="continuous_steer_drive_lean"),
+                action=ActionConfig(name="continuous_steer_drive"),
                 observation=ObservationConfig(mode="image_state"),
             ),
             train_config=TrainConfig(
@@ -415,7 +415,7 @@ def test_build_training_model_uses_lazy_replay_buffer_for_sac() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env_config = EnvConfig(
-        action=ActionConfig(name="continuous_steer_drive_lean"),
+        action=ActionConfig(name="continuous_steer_drive"),
         observation=ObservationConfig(mode="image_state", stack_mode="gray"),
     )
     env = DummyVecEnv(

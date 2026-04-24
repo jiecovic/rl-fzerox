@@ -495,7 +495,7 @@ def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "continuous_steer_drive_lean"}},
+                "env": {"action": {"name": "continuous_steer_drive"}},
                 "policy": {},
                 "train": {
                     "algorithm": "sac",

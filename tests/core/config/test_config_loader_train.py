@@ -1004,11 +1004,10 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: continuous_steer_drive_lean",
+            "    name: continuous_steer_drive",
             "    steer_response_power: 0.7",
             "    continuous_drive_mode: always_accelerate",
             "    continuous_drive_deadzone: 0.15",
-            "    continuous_lean_deadzone: 0.25",
             "train:",
             "  algorithm: sac",
             "  total_timesteps: 1000",
@@ -1022,11 +1021,10 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "continuous_steer_drive_lean"
+    assert config.env.action.name == "continuous_steer_drive"
     assert config.env.action.steer_response_power == 0.7
     assert config.env.action.continuous_drive_mode == "always_accelerate"
     assert config.env.action.continuous_drive_deadzone == 0.15
-    assert config.env.action.continuous_lean_deadzone == 0.25
     assert config.train.algorithm == "sac"
     assert config.train.buffer_size == 30_000
     assert config.train.learning_starts == 5_000
