@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/observations.py
+# src/rl_fzerox/core/envs/observations/value.py
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
@@ -9,8 +9,9 @@ from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec, ObservationStackMode
 from fzerox_emulator.arrays import ObservationFrame, StateVector
-from rl_fzerox.core.envs.observation_image import build_image_observation_space
-from rl_fzerox.core.envs.observation_state import (
+
+from .image import build_image_observation_space
+from .state import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     ObservationCourseContext,
@@ -18,12 +19,6 @@ from rl_fzerox.core.envs.observation_state import (
     ObservationMode,
     ObservationStateProfile,
     StateComponentsSettings,
-    StateFeature,
-    StateVectorSpec,
-    action_history_feature_names,
-    action_history_settings_for_observation,
-    state_feature_count,
-    state_feature_names,
     state_vector_spec,
     telemetry_state_vector,
 )
@@ -39,30 +34,13 @@ class ImageStateObservation(TypedDict):
 ObservationValue: TypeAlias = ImageObservation | ImageStateObservation
 
 __all__ = [
-    "ActionHistoryControl",
     "ImageObservation",
     "ImageStateObservation",
-    "OBSERVATION_STATE_DEFAULTS",
-    "ObservationCourseContext",
-    "ObservationGroundEffectContext",
-    "ObservationMode",
-    "ObservationStackMode",
-    "ObservationStateProfile",
     "ObservationValue",
-    "StateComponentsSettings",
-    "StateFeature",
-    "StateVectorSpec",
-    "action_history_feature_names",
-    "action_history_settings_for_observation",
-    "build_image_observation_space",
     "build_observation",
     "build_observation_space",
     "observation_image",
     "observation_state",
-    "state_feature_count",
-    "state_feature_names",
-    "state_vector_spec",
-    "telemetry_state_vector",
 ]
 
 

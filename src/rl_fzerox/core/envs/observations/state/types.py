@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/state_observation/types.py
+# src/rl_fzerox/core/envs/observations/state/types.py
 from __future__ import annotations
 
 from dataclasses import dataclass

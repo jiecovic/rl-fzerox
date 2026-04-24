@@ -18,7 +18,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
 )
-from rl_fzerox.core.envs.state_observation import (
+from rl_fzerox.core.envs.observations import (
     DEFAULT_STATE_VECTOR_SPEC,
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,

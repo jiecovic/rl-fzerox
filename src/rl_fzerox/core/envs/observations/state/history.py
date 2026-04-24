@@ -1,10 +1,10 @@
-# src/rl_fzerox/core/envs/state_observation/history.py
+# src/rl_fzerox/core/envs/observations/state/history.py
 from __future__ import annotations
 
 from collections.abc import Mapping
 
-from rl_fzerox.core.envs.state_observation.types import ActionHistoryControl, StateFeature
-from rl_fzerox.core.envs.state_observation.utils import clamp
+from .types import ActionHistoryControl, StateFeature
+from .utils import clamp
 
 ACTION_HISTORY_FEATURE_BOUNDS: dict[ActionHistoryControl, StateFeature] = {
     "steer": StateFeature("steer", 1.0, low=-1.0),

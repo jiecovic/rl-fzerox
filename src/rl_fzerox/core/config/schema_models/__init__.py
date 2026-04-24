@@ -14,7 +14,6 @@ from rl_fzerox.core.config.schema_models.apps import (
 from rl_fzerox.core.config.schema_models.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,
-    ContinuousDriveMode,
     ObservationPresetName,
     TrackSamplingMode,
     WatchFpsSetting,
@@ -55,7 +54,6 @@ __all__ = [
     "ActionMaskOverrides",
     "ActionRuntimeConfig",
     "ContinuousAirBrakeMode",
-    "ContinuousDriveMode",
     "CurriculumConfig",
     "CurriculumStageConfig",
     "CurriculumTrainOverridesConfig",

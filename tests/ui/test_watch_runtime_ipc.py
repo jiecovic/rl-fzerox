@@ -3,11 +3,16 @@ from __future__ import annotations
 
 from queue import Empty
 
+from pytest import MonkeyPatch
+
 from fzerox_emulator import ControllerState
 from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
+    WatchWorker,
+    WorkerClosed,
     drain_worker_commands,
 )
+from rl_fzerox.ui.watch.runtime.worker import run_simulation_worker
 
 
 class _CommandQueue:
@@ -18,6 +23,46 @@ class _CommandQueue:
         if not self._commands:
             raise Empty
         return self._commands.pop(0)
+
+
+class _ShutdownQueue:
+    def __init__(self) -> None:
+        self.items: list[object] = []
+        self.cancelled = False
+        self.closed = False
+
+    def put(self, obj: object) -> None:
+        self.items.append(obj)
+
+    def cancel_join_thread(self) -> None:
+        self.cancelled = True
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _InterruptingProcess:
+    def __init__(self) -> None:
+        self._alive = True
+        self.join_calls: list[float | None] = []
+        self.terminate_calls = 0
+        self.kill_calls = 0
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_calls.append(timeout)
+        if len(self.join_calls) == 1:
+            raise KeyboardInterrupt
+
+    def is_alive(self) -> bool:
+        return self._alive
+
+    def terminate(self) -> None:
+        self.terminate_calls += 1
+        self._alive = False
+
+    def kill(self) -> None:
+        self.kill_calls += 1
+        self._alive = False
 
 
 def test_drain_worker_commands_coalesces_force_reset() -> None:
@@ -52,3 +97,53 @@ def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
     assert commands.toggle_deterministic_policy is True
     assert paused is False
     assert control_state == ControllerState()
+
+
+def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
+    command_queue = _ShutdownQueue()
+    snapshot_queue = _ShutdownQueue()
+    process = _InterruptingProcess()
+    worker = WatchWorker(
+        process=process,
+        command_queue=command_queue,  # type: ignore[arg-type]  # queue test double
+        snapshot_queue=snapshot_queue,  # type: ignore[arg-type]  # queue test double
+    )
+
+    worker.shutdown()
+
+    assert len(command_queue.items) == 1
+    command = command_queue.items[0]
+    assert isinstance(command, ViewerCommand)
+    assert command.quit_requested is True
+    assert process.terminate_calls == 1
+    assert command_queue.cancelled is True
+    assert command_queue.closed is True
+    assert snapshot_queue.cancelled is True
+    assert snapshot_queue.closed is True
+
+
+def test_run_simulation_worker_swallows_keyboard_interrupt(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    published: list[object] = []
+
+    def _raise_keyboard_interrupt(*_args: object, **_kwargs: object) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.worker._run_simulation_loop",
+        _raise_keyboard_interrupt,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.runtime.worker.publish_worker_message",
+        lambda _queue, message: published.append(message),
+    )
+
+    run_simulation_worker(
+        config=object(),  # type: ignore[arg-type]
+        command_queue=object(),  # type: ignore[arg-type]
+        snapshot_queue=object(),  # type: ignore[arg-type]
+    )
+
+    assert len(published) == 1
+    assert isinstance(published[0], WorkerClosed)

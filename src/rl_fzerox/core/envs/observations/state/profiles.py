@@ -1,16 +1,17 @@
-# src/rl_fzerox/core/envs/state_observation/profiles.py
+# src/rl_fzerox/core/envs/observations/state/profiles.py
 from __future__ import annotations
 
 from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.envs.state_observation.types import (
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+
+from .types import (
     ObservationStateProfile,
     StateFeature,
     StateVectorSpec,
 )
-from rl_fzerox.core.envs.state_observation.utils import clamp
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from .utils import clamp
 
 DEFAULT_STATE_VECTOR_SPEC = StateVectorSpec(
     features=(

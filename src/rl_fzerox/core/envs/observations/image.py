@@ -1,10 +1,16 @@
 # src/rl_fzerox/core/envs/observation_image.py
+# src/rl_fzerox/core/envs/observations/image.py
 from __future__ import annotations
 
 import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ObservationSpec, ObservationStackMode, stacked_observation_channels
+
+__all__ = [
+    "build_image_observation_space",
+    "image_observation_shape",
+]
 
 
 def build_image_observation_space(

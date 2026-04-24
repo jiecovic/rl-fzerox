@@ -1,9 +1,10 @@
-# src/rl_fzerox/core/envs/state_observation/contexts.py
+# src/rl_fzerox/core/envs/observations/state/contexts.py
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.envs.course_effects import GROUND_EFFECT_FEATURES, ground_effect_flags
-from rl_fzerox.core.envs.state_observation.types import (
+
+from .types import (
     OBSERVATION_STATE_DEFAULTS,
     ObservationCourseContext,
     ObservationGroundEffectContext,

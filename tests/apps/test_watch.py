@@ -1,8 +1,10 @@
 # tests/apps/test_watch.py
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -21,6 +23,7 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.ui.watch.app import run_viewer
 from rl_fzerox.ui.watch.runtime.policy import _load_policy_runner, _sync_policy_curriculum_stage
 
 
@@ -380,3 +383,54 @@ def test_sync_policy_curriculum_stage_resets_when_checkpoint_stage_is_missing() 
 
     assert policy_runner.refresh_calls == 1
     assert env.stage_indices == [None]
+
+
+def test_run_viewer_exits_quietly_on_keyboard_interrupt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = WatchAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        watch=WatchConfig(),
+    )
+
+    calls: list[str] = []
+
+    class _FakeClock:
+        def tick(self, _limit: int) -> None:
+            raise KeyboardInterrupt
+
+    fake_pygame = SimpleNamespace(
+        init=lambda: calls.append("init"),
+        quit=lambda: calls.append("quit"),
+        time=SimpleNamespace(Clock=lambda: _FakeClock()),
+    )
+
+    class _FakeWorker:
+        def shutdown(self) -> None:
+            calls.append("shutdown")
+
+    monkeypatch.setitem(sys.modules, "pygame", fake_pygame)
+    monkeypatch.setattr("rl_fzerox.ui.watch.app.start_watch_worker", lambda _config: _FakeWorker())
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.app.wait_initial_snapshot",
+        lambda _worker: (SimpleNamespace(native_fps=30.0), False),
+    )
+    monkeypatch.setattr("rl_fzerox.ui.watch.app._create_fonts", lambda _pygame: object())
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.app._watch_game_display_size",
+        lambda: (640, 480),
+    )
+
+    run_viewer(config)
+
+    assert calls == ["init", "shutdown", "quit"]

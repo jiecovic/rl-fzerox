@@ -54,6 +54,8 @@ def run_simulation_worker(
 
     try:
         _run_simulation_loop(config, command_queue, snapshot_queue)
+    except KeyboardInterrupt:
+        pass
     except Exception as exc:
         publish_worker_message(snapshot_queue, WorkerError(message=str(exc)))
     finally:

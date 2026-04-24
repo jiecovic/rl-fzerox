@@ -1,8 +1,9 @@
-# src/rl_fzerox/core/envs/state_observation/__init__.py
+# src/rl_fzerox/core/envs/observations/state/__init__.py
 from __future__ import annotations
 
 from rl_fzerox.core.domain.observation_components import StateComponentsSettings
-from rl_fzerox.core.envs.state_observation.api import (
+
+from .api import (
     action_history_feature_names,
     action_history_settings_for_observation,
     state_feature_count,
@@ -10,13 +11,13 @@ from rl_fzerox.core.envs.state_observation.api import (
     state_vector_spec,
     telemetry_state_vector,
 )
-from rl_fzerox.core.envs.state_observation.profiles import (
+from .profiles import (
     DEFAULT_STATE_VECTOR_SPEC,
     RACE_CORE_STATE_VECTOR_SPEC,
     STATE_VECTOR_SPECS,
     STEER_HISTORY_STATE_VECTOR_SPEC,
 )
-from rl_fzerox.core.envs.state_observation.types import (
+from .types import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     ObservationCourseContext,

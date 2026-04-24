@@ -4,7 +4,6 @@ from __future__ import annotations
 import multiprocessing as mp
 import os
 from dataclasses import dataclass
-from multiprocessing.process import BaseProcess
 from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
 from typing import Protocol
@@ -30,22 +29,38 @@ class WorkerMessageQueue(Protocol):
     def get_nowait(self) -> object: ...
 
 
+class WatchWorkerProcess(Protocol):
+    def join(self, timeout: float | None = None) -> None: ...
+
+    def is_alive(self) -> bool: ...
+
+    def terminate(self) -> None: ...
+
+    def kill(self) -> None: ...
+
+
 @dataclass
 class WatchWorker:
     """Process handle plus queues used by the watch UI."""
 
-    process: BaseProcess
+    process: WatchWorkerProcess
     command_queue: ProcessQueue
     snapshot_queue: ProcessQueue
 
     def shutdown(self) -> None:
-        send_command(self.command_queue, ViewerCommand(quit_requested=True))
-        self.process.join(timeout=0.25)
+        try:
+            send_command(self.command_queue, ViewerCommand(quit_requested=True))
+        except (BrokenPipeError, EOFError, OSError, ValueError):
+            pass
+
+        interrupted = _safe_join(self.process, timeout=0.25)
         if self.process.is_alive():
-            self.process.terminate()
-            self.process.join(timeout=0.5)
+            interrupted = _force_stop_process(self.process) or interrupted
+
         _close_queue(self.command_queue)
         _close_queue(self.snapshot_queue)
+        if interrupted:
+            return
 
 
 def start_watch_worker(config: WatchAppConfig) -> WatchWorker:
@@ -78,6 +93,24 @@ def _multiprocessing_context():
 def _close_queue(queue: ProcessQueue) -> None:
     queue.cancel_join_thread()
     queue.close()
+
+
+def _safe_join(process: WatchWorkerProcess, *, timeout: float) -> bool:
+    try:
+        process.join(timeout=timeout)
+    except KeyboardInterrupt:
+        return True
+    return False
+
+
+def _force_stop_process(process: WatchWorkerProcess) -> bool:
+    interrupted = False
+    process.terminate()
+    interrupted = _safe_join(process, timeout=0.5) or interrupted
+    if process.is_alive():
+        process.kill()
+        interrupted = _safe_join(process, timeout=0.25) or interrupted
+    return interrupted
 
 
 def send_command(command_queue: ProcessQueue, command: ViewerCommand) -> None:

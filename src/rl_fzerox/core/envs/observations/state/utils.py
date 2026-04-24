@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/state_observation/utils.py
+# src/rl_fzerox/core/envs/observations/state/utils.py
 from __future__ import annotations
 
 

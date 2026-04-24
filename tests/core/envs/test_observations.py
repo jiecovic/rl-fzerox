@@ -7,14 +7,14 @@ from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 from rl_fzerox.core.envs.course_effects import CourseEffect
-from rl_fzerox.core.envs.observation_image import build_image_observation_space
 from rl_fzerox.core.envs.observations import (
+    DEFAULT_STATE_VECTOR_SPEC,
     action_history_settings_for_observation,
+    build_image_observation_space,
     build_observation_space,
     state_feature_names,
     telemetry_state_vector,
 )
-from rl_fzerox.core.envs.state_observation import DEFAULT_STATE_VECTOR_SPEC
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import encode_state_flags, make_telemetry
 

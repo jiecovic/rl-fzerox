@@ -28,7 +28,6 @@ from rl_fzerox.core.domain.lean import LeanMode
 
 ActionBranchType: TypeAlias = Literal["continuous", "discrete"]
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
-CompiledDriveMode: TypeAlias = Literal["threshold", "pwm", "always_accelerate"]
 CompiledAirBrakeMode: TypeAlias = Literal["always", "off", "disable_on_ground"]
 
 
@@ -69,7 +68,7 @@ class ActionBranchConfig(BaseModel):
     response_power: PositiveFloat | None = None
     deadzone: float | None = Field(default=None, ge=0.0, lt=1.0)
     full_threshold: float | None = Field(default=None, gt=0.0, le=1.0)
-    min_level: float | None = Field(default=None, ge=0.0, lt=1.0)
+    min_thrust: float | None = Field(default=None, ge=0.0, le=1.0)
     mode: LeanMode | None = None
     unmask_max_speed_kph: NonNegativeFloat | None = None
     unmask_min_speed_kph: NonNegativeFloat | None = None
@@ -104,10 +103,9 @@ class ActionBranchCompilation:
 
     name: ActionAdapterName
     steer_response_power: float | None = None
-    continuous_drive_mode: CompiledDriveMode | None = None
     continuous_drive_deadzone: float | None = None
     continuous_drive_full_threshold: float | None = None
-    continuous_drive_min_level: float | None = None
+    continuous_drive_min_thrust: float | None = None
     continuous_air_brake_mode: CompiledAirBrakeMode | None = None
     mask_overrides: ActionMaskOverrides | None = None
     boost_unmask_max_speed_kph: float | None = None
@@ -149,25 +147,25 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         names = ", ".join(branch_names) or "none"
         raise ValueError(f"Unsupported action branch combination: {names}")
 
-    continuous_drive_mode: CompiledDriveMode | None = None
     continuous_drive_deadzone: float | None = None
     continuous_drive_full_threshold: float | None = None
-    continuous_drive_min_level: float | None = None
+    continuous_drive_min_thrust: float | None = None
     continuous_air_brake_mode: CompiledAirBrakeMode | None = None
     if continuous_gas:
         if continuous_gas_branch is None:
             raise ValueError("continuous gas branch is missing")
-        continuous_drive_mode = "pwm"
         continuous_drive_deadzone = float(
-            0.0 if continuous_gas_branch.deadzone is None else continuous_gas_branch.deadzone
+            0.05 if continuous_gas_branch.deadzone is None else continuous_gas_branch.deadzone
         )
         continuous_drive_full_threshold = float(
-            1.0
+            0.85
             if continuous_gas_branch.full_threshold is None
             else continuous_gas_branch.full_threshold
         )
-        continuous_drive_min_level = float(
-            0.0 if continuous_gas_branch.min_level is None else continuous_gas_branch.min_level
+        continuous_drive_min_thrust = float(
+            0.25
+            if continuous_gas_branch.min_thrust is None
+            else continuous_gas_branch.min_thrust
         )
         if continuous_drive_deadzone >= continuous_drive_full_threshold:
             raise ValueError("continuous gas deadzone must be lower than full_threshold")
@@ -195,10 +193,9 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         steer_response_power=(
             None if steer_branch.response_power is None else float(steer_branch.response_power)
         ),
-        continuous_drive_mode=continuous_drive_mode,
         continuous_drive_deadzone=continuous_drive_deadzone,
         continuous_drive_full_threshold=continuous_drive_full_threshold,
-        continuous_drive_min_level=continuous_drive_min_level,
+        continuous_drive_min_thrust=continuous_drive_min_thrust,
         continuous_air_brake_mode=continuous_air_brake_mode,
         mask_overrides=mask or None,
         boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
@@ -262,8 +259,8 @@ def _validate_branch_specific_fields(branch_name: str, branch: ActionBranchConfi
         raise ValueError("deadzone is only valid for a continuous gas branch")
     if branch.full_threshold is not None and not gas_shape_allowed:
         raise ValueError("full_threshold is only valid for a continuous gas branch")
-    if branch.min_level is not None and not gas_shape_allowed:
-        raise ValueError("min_level is only valid for a continuous gas branch")
+    if branch.min_thrust is not None and not gas_shape_allowed:
+        raise ValueError("min_thrust is only valid for a continuous gas branch")
     if branch.mode is not None and branch_name != "lean":
         raise ValueError(f"action branch {branch_name!r} cannot define mode")
     if branch.unmask_max_speed_kph is not None and branch_name != "boost":
