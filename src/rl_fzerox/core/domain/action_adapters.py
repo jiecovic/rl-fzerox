@@ -7,7 +7,6 @@ from typing import Final, Literal, TypeAlias
 
 ActionAdapterName: TypeAlias = Literal[
     "continuous_steer_drive",
-    "continuous_steer_drive_lean",
     "hybrid_steer_drive_boost_lean",
     "hybrid_steer_drive_boost_lean_primitive",
     "hybrid_steer_drive_air_brake_boost_lean_pitch",
@@ -21,7 +20,6 @@ ActionAdapterName: TypeAlias = Literal[
 ]
 
 ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE: Final[ActionAdapterName] = "continuous_steer_drive"
-ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN: Final[ActionAdapterName] = "continuous_steer_drive_lean"
 ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: Final[ActionAdapterName] = (
     "hybrid_steer_drive_boost_lean"
 )
@@ -53,7 +51,6 @@ def _adapter_set(*names: ActionAdapterName) -> frozenset[ActionAdapterName]:
 
 SAC_ACTION_ADAPTERS: Final = _adapter_set(
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN,
 )
 HYBRID_ACTION_ADAPTERS: Final = _adapter_set(
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
@@ -66,7 +63,6 @@ HYBRID_ACTION_ADAPTERS: Final = _adapter_set(
 
 CONTINUOUS_DRIVE_ACTION_ADAPTERS: Final = _adapter_set(
     ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,

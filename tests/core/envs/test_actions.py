@@ -9,10 +9,8 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
     BOOST_MASK,
-    LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
     ContinuousSteerDriveActionAdapter,
-    ContinuousSteerDriveLeanActionAdapter,
     HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
@@ -467,81 +465,4 @@ def test_continuous_steer_drive_adapter_can_force_full_accelerate() -> None:
     assert control_state == ControllerState(
         joypad_mask=ACCELERATE_MASK,
         left_stick_x=-0.5,
-    )
-
-
-def test_continuous_steer_drive_lean_adapter_uses_three_axis_box_space() -> None:
-    adapter = ContinuousSteerDriveLeanActionAdapter(
-        ActionConfig(name="continuous_steer_drive_lean")
-    )
-
-    assert isinstance(adapter.action_space, Box)
-    assert adapter.action_space.shape == (3,)
-    assert adapter.action_space.dtype == np.float32
-    assert np.array_equal(
-        adapter.action_space.low,
-        np.array([-1.0, -1.0, -1.0], dtype=np.float32),
-    )
-    assert np.array_equal(
-        adapter.action_space.high,
-        np.array([1.0, 1.0, 1.0], dtype=np.float32),
-    )
-    assert np.array_equal(adapter.idle_action, np.zeros(3, dtype=np.float32))
-
-
-def test_continuous_steer_drive_lean_adapter_decodes_right_lean() -> None:
-    adapter = ContinuousSteerDriveLeanActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive_lean",
-            continuous_drive_deadzone=1.0 / 3.0,
-            continuous_lean_deadzone=1.0 / 3.0,
-        )
-    )
-
-    control_state = adapter.decode(np.array([0.25, 0.75, 0.75], dtype=np.float32))
-
-    assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=0.25,
-    )
-
-
-def test_continuous_steer_drive_lean_adapter_negative_drive_coasts() -> None:
-    adapter = ContinuousSteerDriveLeanActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive_lean",
-            continuous_drive_deadzone=1.0 / 3.0,
-            continuous_lean_deadzone=1.0 / 3.0,
-        )
-    )
-
-    control_state = adapter.decode(np.array([-0.25, -0.75, -0.75], dtype=np.float32))
-
-    assert control_state == ControllerState(
-        joypad_mask=LEAN_LEFT_MASK,
-        left_stick_x=-0.25,
-    )
-    assert adapter.action_mask().tolist() == []
-
-
-def test_continuous_steer_drive_lean_adapter_pwm_preserves_lean_hold() -> None:
-    adapter = ContinuousSteerDriveLeanActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive_lean",
-            continuous_drive_mode="pwm",
-            continuous_drive_deadzone=0.0,
-            continuous_lean_deadzone=1.0 / 3.0,
-        )
-    )
-
-    first_state = adapter.decode(np.array([0.25, 0.5, 0.75], dtype=np.float32))
-    second_state = adapter.decode(np.array([0.25, 0.5, 0.75], dtype=np.float32))
-
-    assert first_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=0.25,
-    )
-    assert second_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=0.25,
     )
