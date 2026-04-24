@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
 TrainAlgorithmName: TypeAlias = Literal[
-    "auto",
     "maskable_ppo",
     "maskable_recurrent_ppo",
     "maskable_hybrid_action_ppo",
@@ -22,7 +21,6 @@ TrainAlgorithmName: TypeAlias = Literal[
 class TrainingAlgorithmRegistry:
     """Stable YAML names plus capability groups for supported trainers."""
 
-    auto: TrainAlgorithmName = "auto"
     maskable_ppo: TrainAlgorithmName = "maskable_ppo"
     maskable_recurrent_ppo: TrainAlgorithmName = "maskable_recurrent_ppo"
     maskable_hybrid_action_ppo: TrainAlgorithmName = "maskable_hybrid_action_ppo"
@@ -39,7 +37,6 @@ class TrainingAlgorithmRegistry:
     def maskable(self) -> frozenset[TrainAlgorithmName]:
         return frozenset(
             (
-                self.auto,
                 self.maskable_ppo,
                 self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
@@ -84,16 +81,5 @@ class TrainingAlgorithmRegistry:
                 self.maskable_hybrid_action_sac,
             )
         )
-
-    @property
-    def saved_policy(self) -> frozenset[TrainAlgorithmName]:
-        return frozenset(
-            (
-                *self.full_model_policy,
-                self.maskable_ppo,
-                self.sac,
-            )
-        )
-
 
 TRAINING_ALGORITHMS = TrainingAlgorithmRegistry()

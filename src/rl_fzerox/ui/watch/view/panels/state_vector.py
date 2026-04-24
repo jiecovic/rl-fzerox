@@ -74,7 +74,7 @@ def _state_vector_groups(names: tuple[str, ...]) -> tuple[tuple[str, str | None,
         and not name.startswith("prev_")
     )
     if legacy_names:
-        return (*groups, ("Legacy", None, "legacy_state"))
+        return (*groups, ("State", None, None))
     return groups
 
 

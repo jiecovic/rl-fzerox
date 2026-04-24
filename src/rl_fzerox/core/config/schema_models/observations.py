@@ -4,10 +4,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from rl_fzerox.core.config.schema_models.common import (
-    LEGACY_OBSERVATION_PRESET_ALIASES,
     ObservationPresetName,
     ObservationResizeFilter,
 )
@@ -76,12 +82,12 @@ class ObservationStateComponentConfig(BaseModel):
         match self.name:
             case "course_context":
                 return frozenset({"encoding"})
-            case "legacy_state":
-                return frozenset({"state_profile"})
             case "control_history":
                 return frozenset({"length", "controls"})
             case "vehicle_state" | "machine_context" | "track_position" | "surface_state":
                 return frozenset()
+            case _:
+                raise ValueError(f"Unsupported state component: {self.name!r}")
 
     def data(self) -> ObservationStateComponentSettings:
         """Return the compact ordered form consumed by env code."""
@@ -123,14 +129,6 @@ class ObservationConfig(BaseModel):
     )
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
     zeroed_state_components: tuple[ObservationStateComponentName, ...] = ()
-
-    @field_validator("preset", mode="before")
-    @classmethod
-    def _migrate_legacy_observation_preset(cls, value: object) -> object:
-        # V4 LEGACY SHIM: old run manifests used native_crop_v* names.
-        if isinstance(value, str):
-            return LEGACY_OBSERVATION_PRESET_ALIASES.get(value, value)
-        return value
 
     @field_validator("action_history_controls")
     @classmethod

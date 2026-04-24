@@ -488,12 +488,6 @@ def _canonical_observation_preset(preset: str) -> str | None:
         "crop_84x84": "crop_84x84",
         "crop_76x100": "crop_76x100",
         "crop_64x64": "crop_64x64",
-        # V4 LEGACY SHIM: tests can still load stale run manifests.
-        "native_crop_v1": "crop_84x116",
-        "native_crop_v2": "crop_92x124",
-        "native_crop_v3": "crop_116x164",
-        "native_crop_v4": "crop_98x130",
-        "native_crop_v6": "crop_66x82",
     }
     return aliases.get(preset)
 

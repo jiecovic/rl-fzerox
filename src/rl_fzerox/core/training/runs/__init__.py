@@ -16,10 +16,6 @@ from rl_fzerox.core.training.runs.config import (
     materialize_watch_session_config,
     save_train_run_config,
 )
-from rl_fzerox.core.training.runs.migration import (
-    TrainConfigScrubResult,
-    scrub_obsolete_train_run_config,
-)
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -55,6 +51,4 @@ __all__ = [
     "resolve_train_run_config_path",
     "reserve_run_paths",
     "save_train_run_config",
-    "scrub_obsolete_train_run_config",
-    "TrainConfigScrubResult",
 ]

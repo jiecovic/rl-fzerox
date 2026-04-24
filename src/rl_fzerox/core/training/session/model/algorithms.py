@@ -43,14 +43,8 @@ def resolve_effective_training_algorithm(
     *,
     train_config: TrainConfig,
 ) -> str:
-    """Resolve the configured train.algorithm into the concrete algorithm used.
+    """Resolve the configured train.algorithm into the concrete algorithm used."""
 
-    `auto` is now a backwards-compatible alias for `maskable_ppo`. Recurrent
-    training must be selected explicitly so the saved run config is unambiguous.
-    """
-
-    if train_config.algorithm == TRAINING_ALGORITHMS.auto:
-        return TRAINING_ALGORITHMS.maskable_ppo
     return train_config.algorithm
 
 

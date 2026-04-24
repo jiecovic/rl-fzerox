@@ -126,54 +126,16 @@ def test_watch_allows_run_dir_overrides_without_config(
             str(run_dir),
             "--",
             "watch.deterministic_policy=false",
-            "watch.fps=30",
+            "watch.control_fps=30",
+            "watch.render_fps=30",
         ]
     )
 
     config = captured["config"]
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.deterministic_policy is False
-    assert config.watch.fps == 30.0
     assert config.watch.control_fps == 30.0
     assert config.watch.render_fps == 30.0
-
-
-def test_watch_loads_v4_stale_saved_manifest_through_legacy_scrub(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-    (run_dir / "train_config.yaml").write_text(
-        "\n".join(
-            [
-                "seed: 7",
-                "emulator:",
-                f"  core_path: {core_path}",
-                f"  rom_path: {rom_path}",
-                "env: {}",
-                "reward:",
-                "  energy_gain_reward_scale: 12.0",
-                "policy: {}",
-                "curriculum: {}",
-                "train:",
-                "  algorithm: maskable_ppo",
-                "  total_timesteps: 1000",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    config = resolve_watch_app_config(
-        config_path=None,
-        policy_run_dir=run_dir,
-        policy_artifact="latest",
-        overrides=[],
-    )
-
-    assert config.watch.policy_run_dir == run_dir.resolve()
-    assert "energy_gain_reward_scale" not in config.reward.model_dump()
 
 
 def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
@@ -303,12 +265,17 @@ def test_watch_cli_overrides_apply_after_run_manifest(
             rom_path=rom_path,
         ),
         env=EnvConfig(action_repeat=1, camera_setting="close_behind"),
-        watch=WatchConfig(fps=30.0),
+        watch=WatchConfig(control_fps=30.0, render_fps=30.0),
     )
     overridden_watch_config = watch_config.model_copy(
         update={
             "env": watch_config.env.model_copy(update={"camera_setting": "close_behind"}),
-            "watch": watch_config.watch.model_copy(update={"fps": 15.0}),
+            "watch": watch_config.watch.model_copy(
+                update={
+                    "control_fps": 15.0,
+                    "render_fps": 15.0,
+                }
+            ),
         }
     )
     train_config = TrainAppConfig(
@@ -353,7 +320,8 @@ def test_watch_cli_overrides_apply_after_run_manifest(
             str(run_dir),
             "--",
             "env.camera_setting=close_behind",
-            "watch.fps=15",
+            "watch.control_fps=15",
+            "watch.render_fps=15",
         ]
     )
 
@@ -361,7 +329,6 @@ def test_watch_cli_overrides_apply_after_run_manifest(
     assert config.seed == 7
     assert config.env.action_repeat == 3
     assert config.env.camera_setting == "close_behind"
-    assert config.watch.fps == 15.0
     assert config.watch.control_fps == 15.0
     assert config.watch.render_fps == 15.0
     assert config.watch.policy_run_dir == run_dir.resolve()

@@ -185,10 +185,7 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     from rl_fzerox.core.config import load_train_app_config
 
     config = load_train_app_config(config_path)
-    algorithm = config.train.algorithm
-    if algorithm in TRAINING_ALGORITHMS.saved_policy:
-        return algorithm
-    raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
+    return config.train.algorithm
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:

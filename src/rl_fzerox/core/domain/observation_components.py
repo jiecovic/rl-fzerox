@@ -26,7 +26,6 @@ ObservationStateComponentName: TypeAlias = Literal[
     "track_position",
     "surface_state",
     "course_context",
-    "legacy_state",
     "control_history",
 ]
 
