@@ -13,6 +13,7 @@ from torch import nn
 ConvProfile = Literal[
     "auto",
     "nature",
+    "nature_extra_k3",
     "compact_deep",
     "compact_bottleneck",
     "tiny_256",
@@ -42,6 +43,10 @@ def _conv_layer(out_channels: int, *, kernel_size: int, stride: int) -> ConvLaye
 NATURE_CNN_CONV_SPEC: ConvSpec = (
     _conv_layer(32, kernel_size=8, stride=4),
     _conv_layer(64, kernel_size=4, stride=2),
+    _conv_layer(64, kernel_size=3, stride=1),
+)
+NATURE_EXTRA_K3_CONV_SPEC: ConvSpec = (
+    *NATURE_CNN_CONV_SPEC,
     _conv_layer(64, kernel_size=3, stride=1),
 )
 LEGACY_DEEP_CONV_SPEC: ConvSpec = (
@@ -75,6 +80,7 @@ SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
     (116, 164): LEGACY_DEEP_CONV_SPEC,
     (98, 130): COMPACT_DEEP_CONV_SPEC,
     (66, 82): COMPACT_DEEP_CONV_SPEC,
+    (60, 76): NATURE_CNN_CONV_SPEC,
     (68, 68): NATURE_CNN_CONV_SPEC,
     (84, 84): NATURE_CNN_CONV_SPEC,
     (76, 100): NATURE_CNN_CONV_SPEC,
@@ -309,6 +315,8 @@ def _resolve_conv_spec(
         return SUPPORTED_POLICY_GEOMETRIES[geometry]
     if conv_profile == "nature":
         return NATURE_CNN_CONV_SPEC
+    if conv_profile == "nature_extra_k3":
+        return NATURE_EXTRA_K3_CONV_SPEC
     if conv_profile == "compact_deep":
         return COMPACT_DEEP_CONV_SPEC
     if conv_profile == "compact_bottleneck":

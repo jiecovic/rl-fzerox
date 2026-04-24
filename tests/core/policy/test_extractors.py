@@ -161,6 +161,20 @@ def test_observation_extractor_nature_profile_supports_compact_aspect_geometry()
     assert tuple(features.shape) == (2, 3_456)
 
 
+def test_observation_extractor_nature_extra_k3_compresses_aspect_geometry() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(84, 116, 13), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="nature_extra_k3",
+    )
+
+    observations = torch.zeros((2, 84, 116, 13), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 2_880
+    assert tuple(features.shape) == (2, 2_880)
+
+
 def test_observation_extractor_compact_bottleneck_profile_uses_compact_input() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(98, 130, 6), dtype=np.uint8),
@@ -186,6 +200,19 @@ def test_observation_extractor_compact_deep_supports_tiny_geometry() -> None:
 
     assert extractor._flatten_dim == 768
     assert tuple(features.shape) == (2, 768)
+
+
+def test_observation_extractor_nature_profile_supports_clean_compact_aspect_geometry() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 5), dtype=np.uint8),
+        features_dim="auto",
+    )
+
+    observations = torch.zeros((2, 60, 76, 5), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 1_536
+    assert tuple(features.shape) == (2, 1_536)
 
 
 def test_observation_extractor_nature_profile_supports_clean_square_geometry() -> None:

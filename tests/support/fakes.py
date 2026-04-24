@@ -140,6 +140,8 @@ class SyntheticBackend:
             width, height = (130, 98)
         elif canonical_preset == "crop_66x82":
             width, height = (82, 66)
+        elif canonical_preset == "crop_60x76":
+            width, height = (76, 60)
         elif canonical_preset == "crop_68x68":
             width, height = (68, 68)
         elif canonical_preset == "crop_84x84":
@@ -481,6 +483,7 @@ def _canonical_observation_preset(preset: str) -> str | None:
         "crop_116x164": "crop_116x164",
         "crop_98x130": "crop_98x130",
         "crop_66x82": "crop_66x82",
+        "crop_60x76": "crop_60x76",
         "crop_68x68": "crop_68x68",
         "crop_84x84": "crop_84x84",
         "crop_76x100": "crop_76x100",
