@@ -103,7 +103,7 @@ def _format_observation_summary(
         color_mode = "gray"
     if _observation_minimap_layer(info):
         color_mode = f"{color_mode}+map"
-    return f"{width}x{height} {color_mode} x{stack_size} strip"
+    return f"{width}x{height} {color_mode} x{stack_size} stack"
 
 
 def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
@@ -251,4 +251,4 @@ def _observation_minimap_layer(info: Mapping[str, object] | None) -> bool:
 
 
 def _observation_preview_grid(stack_size: int) -> tuple[int, int]:
-    return stack_size, 1
+    return 1, stack_size

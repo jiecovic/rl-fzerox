@@ -20,10 +20,15 @@ from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 def _window_size(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
+    *,
+    panel_tab_index: int = 0,
 ) -> tuple[int, int]:
+    panel_min_height = (
+        LAYOUT.panel_min_height if panel_tab_index % 3 == 0 else LAYOUT.panel_state_min_height
+    )
     return (
         game_display_size[0] + LAYOUT.preview_gap + LAYOUT.panel_width,
-        max(game_display_size[1], LAYOUT.panel_min_height),
+        max(game_display_size[1], panel_min_height),
     )
 
 
@@ -37,7 +42,7 @@ def _preview_frame(
     frames = _preview_frames(observation, info=info)
     if len(frames) == 1:
         return np.ascontiguousarray(frames[0])
-    return _preview_frame_grid(frames)
+    return _preview_frame_grid(_preview_frames_display_order(frames, observation.shape, info=info))
 
 
 def _preview_frames(
@@ -128,6 +133,18 @@ def _preview_frame_grid(frames: tuple[RgbFrame, ...]) -> RgbFrame:
         x = column * tile_width
         grid[y : y + tile_height, x : x + tile_width, :] = frame
     return np.ascontiguousarray(grid)
+
+
+def _preview_frames_display_order(
+    frames: tuple[RgbFrame, ...],
+    observation_shape: tuple[int, ...],
+    *,
+    info: dict[str, object] | None,
+) -> tuple[RgbFrame, ...]:
+    stack_size = min(len(frames), max(1, _observation_stack_size(observation_shape, info=info)))
+    stack_frames = frames[:stack_size]
+    extra_frames = frames[stack_size:]
+    return (*reversed(stack_frames), *extra_frames)
 
 
 def _observation_preview_size(

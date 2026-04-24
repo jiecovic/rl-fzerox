@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import WatchAppConfig
-from rl_fzerox.ui.watch.input import _poll_viewer_input
+from rl_fzerox.ui.watch.input import ViewerInput, _poll_viewer_input
 from rl_fzerox.ui.watch.runtime import (
     apply_viewer_input,
     drain_snapshot_queue,
@@ -22,6 +22,8 @@ from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
 from rl_fzerox.ui.watch.view.screen.types import ViewerHitboxes
 
 __all__ = ["run_viewer"]
+
+_PANEL_TAB_COUNT = 3
 
 
 def run_viewer(config: WatchAppConfig) -> None:
@@ -49,6 +51,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         screen = None
         fonts = _create_fonts(pygame)
         paused = False
+        panel_tab_index = 0
         hitboxes = ViewerHitboxes()
 
         while True:
@@ -58,7 +61,9 @@ def run_viewer(config: WatchAppConfig) -> None:
             viewer_input = _poll_viewer_input(
                 pygame,
                 deterministic_toggle_rect=hitboxes.deterministic_toggle,
+                panel_tab_rects=hitboxes.panel_tabs,
             )
+            panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
             paused = apply_viewer_input(
                 worker.command_queue,
                 viewer_input,
@@ -83,6 +88,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 screen,
                 game_display_size,
                 snapshot.observation_image.shape,
+                panel_tab_index=panel_tab_index,
             )
             render_rate.tick()
             hitboxes = draw_watch_frame(
@@ -94,9 +100,19 @@ def run_viewer(config: WatchAppConfig) -> None:
                 paused=paused,
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
+                panel_tab_index=panel_tab_index,
             )
     except KeyboardInterrupt:
         return
     finally:
         worker.shutdown()
         pygame.quit()
+
+
+def _next_panel_tab_index(current_index: int, viewer_input: ViewerInput) -> int:
+    selected_index = viewer_input.panel_tab_index
+    if selected_index is not None:
+        return max(0, min(_PANEL_TAB_COUNT - 1, selected_index))
+    if viewer_input.panel_tab_delta == 0:
+        return current_index
+    return (current_index + viewer_input.panel_tab_delta) % _PANEL_TAB_COUNT

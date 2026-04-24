@@ -4,10 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from rl_fzerox.ui.watch.view.components.cockpit import (
-    _control_viz_panel_height,
-    _draw_control_viz,
-)
+from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.game_view import _glass_overlay_surface
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
@@ -40,6 +37,7 @@ _OBSERVATION_GLASS_STYLE = _ObservationGlassStyle()
 
 class _RectLike(Protocol):
     left: int
+    right: int
     top: int
     bottom: int
     size: tuple[int, int]
@@ -82,24 +80,49 @@ class _PygameLike(Protocol):
     def Rect(self, left: int, top: int, width: int, height: int) -> _RectLike: ...
 
 
-def _draw_observation_preview_below_game(
+def _draw_control_viz_below_game(
     *,
     pygame: _PygameLike,
     screen: _ScreenLike,
     fonts: ViewerFonts,
-    surface: _SurfaceLike,
     game_display_size: tuple[int, int],
-    observation_shape: tuple[int, ...],
-    info: dict[str, object],
     control_viz: ControlViz,
 ) -> ViewerHitboxes:
     x = LAYOUT.preview_padding
     y = game_display_size[1] + LAYOUT.preview_gap
     width = game_display_size[0] - (2 * LAYOUT.preview_padding)
-    height = screen.get_height() - y - LAYOUT.preview_padding
-    if width <= 0 or height <= 0:
+    if width <= 0 or y >= screen.get_height():
         return ViewerHitboxes()
 
+    _, deterministic_toggle_rect = _draw_control_viz(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=x,
+        y=y,
+        width=width,
+        control_viz=control_viz,
+    )
+    return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect)
+
+
+def _draw_observation_preview_in_rect(
+    *,
+    pygame: _PygameLike,
+    screen: _ScreenLike,
+    fonts: ViewerFonts,
+    surface: _SurfaceLike,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    observation_shape: tuple[int, ...],
+    info: dict[str, object],
+) -> None:
+    if width <= 0 or height <= 0:
+        return
+
+    bottom = y + height
     title_surface = fonts.section.render("Policy Obs", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render(
         _format_observation_summary(observation_shape, info=info),
@@ -112,54 +135,49 @@ def _draw_observation_preview_below_game(
     y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
 
     preview_width, preview_height = surface.get_size()
-    frame_count = _observation_tile_count(observation_shape, info=info)
-    label_rail_height = 0
-    if frame_count > 1:
-        label_rail_height = fonts.body.render("0", True, PALETTE.text_primary).get_height() + 8
     glass_padding = 8
-    label_gap = 5 if frame_count > 1 else 0
-    chrome_height = (2 * glass_padding) + label_rail_height + label_gap
-    control_gap = 10
-    control_height = _control_viz_panel_height(width)
-    available_height = (
-        screen.get_height()
-        - y
-        - chrome_height
-        - control_gap
-        - control_height
-        - LAYOUT.preview_padding
+    label_column_width = _observation_label_column_width(
+        font=fonts.body,
+        observation_shape=observation_shape,
+        info=info,
     )
-    scale = min(width / preview_width, available_height / preview_height)
+    label_gap = 7 if label_column_width > 0 else 0
+    max_preview_width = width - (2 * glass_padding) - label_column_width - label_gap
+    max_preview_height = bottom - y - (2 * glass_padding)
+    if max_preview_width <= 0 or max_preview_height <= 0:
+        return
+
+    scale = min(1.0, max_preview_width / preview_width, max_preview_height / preview_height)
     if scale <= 0:
-        return ViewerHitboxes()
+        return
 
     scaled_size = (
         max(1, round(preview_width * scale)),
         max(1, round(preview_height * scale)),
     )
     glass_size = (
-        scaled_size[0] + (2 * glass_padding),
-        scaled_size[1] + chrome_height,
+        label_column_width + label_gap + scaled_size[0] + (2 * glass_padding),
+        scaled_size[1] + (2 * glass_padding),
     )
     glass_x = x + max(0, (width - glass_size[0]) // 2)
     glass_rect = pygame.Rect(glass_x, y, *glass_size)
     _draw_observation_glass_box(pygame=pygame, screen=screen, rect=glass_rect)
 
-    preview_x = glass_rect.left + glass_padding
-    label_y = glass_rect.top + glass_padding
-    preview_y = label_y + label_rail_height + label_gap
-    preview_rect = pygame.Rect(preview_x, preview_y, *scaled_size)
-    _draw_observation_tile_labels(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        label_y=label_y,
-        rect=preview_rect,
-        observation_shape=observation_shape,
-        info=info,
+    preview_y = glass_rect.top + glass_padding
+    label_rect = pygame.Rect(
+        glass_rect.left + glass_padding,
+        preview_y,
+        label_column_width,
+        scaled_size[1],
     )
+    preview_x = label_rect.right + label_gap if label_column_width > 0 else label_rect.left
+    preview_rect = pygame.Rect(preview_x, preview_y, *scaled_size)
     pygame.draw.rect(screen, PALETTE.panel_background, preview_rect)
-    preview_surface = pygame.transform.scale(surface, scaled_size)
+    preview_surface = (
+        surface
+        if surface.get_size() == scaled_size
+        else pygame.transform.scale(surface, scaled_size)
+    )
     screen.blit(preview_surface, preview_rect.topleft)
     _draw_observation_tile_borders(
         pygame=pygame,
@@ -173,16 +191,15 @@ def _draw_observation_preview_below_game(
         _glass_overlay_surface(pygame, glass_rect.size, 10),
         glass_rect.topleft,
     )
-    _, deterministic_toggle_rect = _draw_control_viz(
+    _draw_observation_tile_labels(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        x=x,
-        y=glass_rect.bottom + control_gap,
-        width=width,
-        control_viz=control_viz,
+        label_rect=label_rect,
+        rect=preview_rect,
+        observation_shape=observation_shape,
+        info=info,
     )
-    return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect)
 
 
 def _draw_outer_preview_border(
@@ -226,37 +243,27 @@ def _draw_observation_tile_labels(
     pygame: _PygameLike,
     screen: _ScreenLike,
     fonts: ViewerFonts,
-    label_y: int,
+    label_rect: _RectLike,
     rect: _RectLike,
     observation_shape: tuple[int, ...],
     info: dict[str, object],
 ) -> None:
-    stack_size = _observation_stack_size(observation_shape, info=info)
-    frame_count = _observation_tile_count(observation_shape, info=info)
-    if frame_count <= 1:
+    labels = _observation_tile_label_texts(observation_shape, info=info)
+    if not labels:
         return
 
-    columns, _ = _observation_preview_grid(frame_count)
-    newest_index = stack_size - 1
-    for index in range(frame_count):
-        _, column = divmod(index, columns)
-        tile_left = rect.left + round((column * rect.size[0]) / columns)
-        tile_right = rect.left + round(((column + 1) * rect.size[0]) / columns)
-        tile_center_x = tile_left + ((tile_right - tile_left) // 2)
-        is_newest = index == newest_index
-        is_minimap = index >= stack_size
+    for index, label in enumerate(labels):
+        tile_rect = _observation_tile_rect(pygame=pygame, rect=rect, index=index, count=len(labels))
+        is_newest = index == 0
+        is_minimap = label == "map"
         color = _observation_tile_label_color(is_newest=is_newest, is_minimap=is_minimap)
         _draw_observation_tile_label(
             pygame=pygame,
             screen=screen,
             font=fonts.body,
-            label=(
-                "map"
-                if is_minimap
-                else _observation_tile_time_label(index=index, stack_size=stack_size)
-            ),
-            center_x=tile_center_x,
-            y=label_y,
+            label=label,
+            center_x=label_rect.left + (label_rect.size[0] // 2),
+            center_y=tile_rect.top + (tile_rect.size[1] // 2),
             color=color,
             active=is_newest,
         )
@@ -283,26 +290,13 @@ def _draw_observation_tile_borders(
     observation_shape: tuple[int, ...],
     info: dict[str, object],
 ) -> None:
-    stack_size = _observation_stack_size(observation_shape, info=info)
     frame_count = _observation_tile_count(observation_shape, info=info)
     if frame_count <= 1:
         return
 
-    columns, rows = _observation_preview_grid(frame_count)
-    newest_index = stack_size - 1
     for index in range(frame_count):
-        row, column = divmod(index, columns)
-        tile_left = rect.left + round((column * rect.size[0]) / columns)
-        tile_right = rect.left + round(((column + 1) * rect.size[0]) / columns)
-        tile_top = rect.top + round((row * rect.size[1]) / rows)
-        tile_bottom = rect.top + round(((row + 1) * rect.size[1]) / rows)
-        tile_rect = pygame.Rect(
-            tile_left,
-            tile_top,
-            tile_right - tile_left,
-            tile_bottom - tile_top,
-        )
-        is_newest = index == newest_index
+        tile_rect = _observation_tile_rect(pygame=pygame, rect=rect, index=index, count=frame_count)
+        is_newest = index == 0
         border_color = PALETTE.text_accent if is_newest else PALETTE.panel_border
         pygame.draw.rect(screen, border_color, tile_rect, width=2 if is_newest else 1)
 
@@ -316,6 +310,61 @@ def _observation_tile_count(
     return stack_size + (1 if _observation_minimap_layer(info) else 0)
 
 
+def _observation_tile_label_texts(
+    observation_shape: tuple[int, ...],
+    *,
+    info: dict[str, object],
+) -> tuple[str, ...]:
+    stack_size = _observation_stack_size(observation_shape, info=info)
+    frame_count = _observation_tile_count(observation_shape, info=info)
+    if frame_count <= 1:
+        return ()
+    return tuple(
+        "map"
+        if index >= stack_size
+        else _observation_tile_time_label(index=(stack_size - 1) - index, stack_size=stack_size)
+        for index in range(frame_count)
+    )
+
+
+def _observation_label_column_width(
+    *,
+    font: RenderFont,
+    observation_shape: tuple[int, ...],
+    info: dict[str, object],
+) -> int:
+    labels = _observation_tile_label_texts(observation_shape, info=info)
+    if not labels:
+        return 0
+
+    label_padding_x = 7
+    return max(
+        font.render(label, True, PALETTE.text_primary).get_width() + (2 * label_padding_x)
+        for label in labels
+    )
+
+
+def _observation_tile_rect(
+    *,
+    pygame: _PygameLike,
+    rect: _RectLike,
+    index: int,
+    count: int,
+) -> _RectLike:
+    columns, rows = _observation_preview_grid(count)
+    row, column = divmod(index, columns)
+    tile_left = rect.left + round((column * rect.size[0]) / columns)
+    tile_right = rect.left + round(((column + 1) * rect.size[0]) / columns)
+    tile_top = rect.top + round((row * rect.size[1]) / rows)
+    tile_bottom = rect.top + round(((row + 1) * rect.size[1]) / rows)
+    return pygame.Rect(
+        tile_left,
+        tile_top,
+        tile_right - tile_left,
+        tile_bottom - tile_top,
+    )
+
+
 def _draw_observation_tile_label(
     *,
     pygame: _PygameLike,
@@ -323,7 +372,7 @@ def _draw_observation_tile_label(
     font: RenderFont,
     label: str,
     center_x: int,
-    y: int,
+    center_y: int,
     color: Color,
     active: bool,
 ) -> None:
@@ -332,7 +381,7 @@ def _draw_observation_tile_label(
     pad_y = 3
     label_rect = pygame.Rect(
         center_x - ((text_surface.get_width() + (2 * pad_x)) // 2),
-        y,
+        center_y - ((text_surface.get_height() + (2 * pad_y)) // 2),
         text_surface.get_width() + (2 * pad_x),
         text_surface.get_height() + (2 * pad_y),
     )

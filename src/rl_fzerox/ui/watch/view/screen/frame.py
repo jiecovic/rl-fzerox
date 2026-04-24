@@ -12,18 +12,20 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
-    _draw_observation_preview_below_game,
+    _draw_control_viz_below_game,
+    _draw_observation_preview_in_rect,
 )
 from rl_fzerox.ui.watch.view.panels.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.model import (
     _observation_preview_size,
+    _panel_preview_width,
     _preview_frame,
     _window_size,
 )
 from rl_fzerox.ui.watch.view.panels.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
-from rl_fzerox.ui.watch.view.screen.types import ViewerFonts, ViewerHitboxes
+from rl_fzerox.ui.watch.view.screen.types import PygameRect, ViewerFonts, ViewerHitboxes
 
 
 def _create_fonts(pygame) -> ViewerFonts:
@@ -51,9 +53,17 @@ def _create_screen(
     pygame,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
+    *,
+    panel_tab_index: int = 0,
 ):
     _apply_window_position_hint()
-    screen = pygame.display.set_mode(_window_size(game_display_size, observation_shape))
+    screen = pygame.display.set_mode(
+        _window_size(
+            game_display_size,
+            observation_shape,
+            panel_tab_index=panel_tab_index,
+        )
+    )
     pygame.display.set_caption("F-Zero X Watch")
     return screen
 
@@ -63,12 +73,28 @@ def _ensure_screen(
     screen,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
+    *,
+    panel_tab_index: int = 0,
 ):
     if screen is None:
-        return _create_screen(pygame, game_display_size, observation_shape)
-    if screen.get_size() == _window_size(game_display_size, observation_shape):
+        return _create_screen(
+            pygame,
+            game_display_size,
+            observation_shape,
+            panel_tab_index=panel_tab_index,
+        )
+    if screen.get_size() == _window_size(
+        game_display_size,
+        observation_shape,
+        panel_tab_index=panel_tab_index,
+    ):
         return screen
-    return _create_screen(pygame, game_display_size, observation_shape)
+    return _create_screen(
+        pygame,
+        game_display_size,
+        observation_shape,
+        panel_tab_index=panel_tab_index,
+    )
 
 
 def _watch_game_display_size() -> tuple[int, int]:
@@ -109,6 +135,7 @@ def _draw_frame(
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     track_pool_records: tuple[dict[str, object], ...],
+    panel_tab_index: int,
     continuous_drive_deadzone: float,
     continuous_air_brake_mode: str,
     continuous_air_brake_disabled: bool,
@@ -137,40 +164,42 @@ def _draw_frame(
         surface=game_surface,
         outer_size=game_display_size,
     )
-    hitboxes = _draw_observation_preview_below_game(
+    control_viz = _control_viz(
+        control_state,
+        gas_level=gas_level,
+        thrust_warning_threshold=thrust_warning_threshold,
+        thrust_deadzone_threshold=thrust_deadzone_threshold,
+        thrust_full_threshold=thrust_full_threshold,
+        engine_setting_level=_engine_setting_level(info),
+        speed_kph=_speed_kph(telemetry),
+        energy_fraction=_energy_fraction(telemetry),
+        boost_active=boost_active,
+        boost_lamp_level=boost_lamp_level,
+        policy_deterministic=policy_deterministic,
+        policy_action=policy_action,
+        action_mask_branches=action_mask_branches,
+        continuous_drive_deadzone=continuous_drive_deadzone,
+        continuous_air_brake_mode=continuous_air_brake_mode,
+        continuous_air_brake_disabled=continuous_air_brake_disabled,
+    )
+    control_hitboxes = _draw_control_viz_below_game(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        surface=observation_surface,
         game_display_size=game_display_size,
-        observation_shape=observation.shape,
-        info=info,
-        control_viz=_control_viz(
-            control_state,
-            gas_level=gas_level,
-            thrust_warning_threshold=thrust_warning_threshold,
-            thrust_deadzone_threshold=thrust_deadzone_threshold,
-            thrust_full_threshold=thrust_full_threshold,
-            engine_setting_level=_engine_setting_level(info),
-            speed_kph=_speed_kph(telemetry),
-            energy_fraction=_energy_fraction(telemetry),
-            boost_active=boost_active,
-            boost_lamp_level=boost_lamp_level,
-            policy_deterministic=policy_deterministic,
-            policy_action=policy_action,
-            action_mask_branches=action_mask_branches,
-            continuous_drive_deadzone=continuous_drive_deadzone,
-            continuous_air_brake_mode=continuous_air_brake_mode,
-            continuous_air_brake_disabled=continuous_air_brake_disabled,
-        ),
+        control_viz=control_viz,
     )
     panel_rect = pygame.Rect(
         game_display_size[0] + LAYOUT.preview_gap,
         0,
         LAYOUT.panel_width,
-        _window_size(game_display_size, observation.shape)[1],
+        _window_size(
+            game_display_size,
+            observation.shape,
+            panel_tab_index=panel_tab_index,
+        )[1],
     )
-    _draw_side_panel(
+    side_panel_hitboxes = _draw_side_panel(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -199,6 +228,7 @@ def _draw_frame(
             latest_finish_times=latest_finish_times,
             latest_finish_deltas_ms=latest_finish_deltas_ms,
             track_pool_records=track_pool_records,
+            panel_tab_index=panel_tab_index,
             continuous_drive_deadzone=continuous_drive_deadzone,
             continuous_air_brake_mode=continuous_air_brake_mode,
             continuous_air_brake_disabled=continuous_air_brake_disabled,
@@ -213,8 +243,28 @@ def _draw_frame(
             telemetry=telemetry,
         ),
     )
+    side_panel_body_y = _side_panel_body_y(
+        fonts=fonts,
+        panel_top=panel_rect.y,
+        policy_label=policy_label,
+    )
+    _draw_observation_preview_in_rect(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        x=panel_rect.x + LAYOUT.panel_padding,
+        y=side_panel_body_y,
+        width=_side_panel_preview_width(panel_rect=panel_rect),
+        height=panel_rect.bottom - side_panel_body_y - LAYOUT.panel_padding,
+        observation_shape=observation.shape,
+        info=info,
+    )
     pygame.display.flip()
-    return hitboxes
+    return ViewerHitboxes(
+        deterministic_toggle=control_hitboxes.deterministic_toggle,
+        panel_tabs=side_panel_hitboxes.panel_tabs,
+    )
 
 
 def _rgb_surface(pygame, frame: RgbFrame):
@@ -223,6 +273,39 @@ def _rgb_surface(pygame, frame: RgbFrame):
     if channels != 3:
         raise ValueError(f"Expected an RGB frame for display, got shape {frame.shape!r}")
     return pygame.image.frombuffer(rgb_frame.tobytes(), (width, height), "RGB")
+
+
+def _side_panel_body_y(
+    *,
+    fonts: ViewerFonts,
+    panel_top: int,
+    policy_label: str | None,
+) -> int:
+    title_surface = fonts.title.render("F-Zero X Watch", True, PALETTE.text_primary)
+    subtitle_surface = fonts.small.render(
+        _side_panel_subtitle(policy_label),
+        True,
+        PALETTE.text_muted,
+    )
+    return (
+        panel_top
+        + LAYOUT.panel_padding
+        + title_surface.get_height()
+        + LAYOUT.title_gap
+        + subtitle_surface.get_height()
+        + LAYOUT.title_section_gap
+    )
+
+
+def _side_panel_preview_width(*, panel_rect: PygameRect) -> int:
+    panel_width = panel_rect.width - (2 * LAYOUT.panel_padding)
+    return _panel_preview_width(panel_width)
+
+
+def _side_panel_subtitle(policy_label: str | None) -> str:
+    if policy_label is None:
+        return "manual control"
+    return f"policy: {policy_label}"
 
 
 def _engine_setting_level(info: dict[str, object]) -> float | None:
