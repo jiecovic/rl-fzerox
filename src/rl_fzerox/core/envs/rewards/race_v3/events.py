@@ -13,7 +13,7 @@ _FAILURE_TERMINATION_REASONS = frozenset(
 
 
 class BoostPadRewardTracker:
-    """Reward dash-pad entries once per unwrapped progress window."""
+    """Reward dash-surface entries once per unwrapped progress window."""
 
     def __init__(self) -> None:
         self._rewarded_progress_windows: set[int] = set()
@@ -30,10 +30,13 @@ class BoostPadRewardTracker:
         summary: StepSummary,
         *,
         relative_progress: float,
+        frontier_distance_before_step: float,
         weights: RaceV3RewardWeights,
     ) -> float:
         reward = weights.boost_pad_reward
-        if reward <= 0.0 or not summary.entered_dash_pad_boost or summary.reverse_active_frames > 0:
+        if reward <= 0.0 or not summary.entered_dash_surface or summary.reverse_active_frames > 0:
+            return 0.0
+        if relative_progress < frontier_distance_before_step:
             return 0.0
         progress_window = weights.boost_pad_reward_progress_window
         if progress_window <= 0.0:

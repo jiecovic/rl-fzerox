@@ -8,6 +8,9 @@ use crate::core::telemetry::StepTelemetrySample;
 use crate::core::video::VideoResizeFilter;
 
 const AIRBORNE_FLAG: u32 = 1 << 26;
+const ACTIVE_FLAG: u32 = 1 << 30;
+const COURSE_EFFECT_DASH: u32 = 3;
+const COURSE_EFFECT_DIRT: u32 = 2;
 
 #[test]
 fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
@@ -109,6 +112,36 @@ fn step_accumulator_counts_airborne_frames() {
 
     assert_eq!(summary.frames_run, 3);
     assert_eq!(summary.airborne_frames, 2);
+}
+
+#[test]
+fn step_accumulator_tracks_entered_course_effects() {
+    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry(101.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        21,
+    );
+    accumulator.observe(
+        &telemetry(102.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        22,
+    );
+    accumulator.observe(
+        &telemetry(103.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DIRT, 0, 0),
+        23,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(
+        summary.entered_course_effects & (1 << COURSE_EFFECT_DASH),
+        1 << COURSE_EFFECT_DASH
+    );
+    assert_eq!(
+        summary.entered_course_effects & (1 << COURSE_EFFECT_DIRT),
+        1 << COURSE_EFFECT_DIRT
+    );
 }
 
 #[test]

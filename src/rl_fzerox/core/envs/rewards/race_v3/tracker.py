@@ -113,6 +113,7 @@ class RaceV3RewardTracker:
             reward += low_speed_time_penalty
             breakdown["low_speed_time"] = low_speed_time_penalty
 
+        frontier_distance_before_step = self._progress.frontier_distance
         ground_effect_key, progress_multiplier = _ground_effect_progress_modifier(
             telemetry,
             weights=self._weights,
@@ -139,6 +140,7 @@ class RaceV3RewardTracker:
         boost_pad_reward = self._boost_pads.reward(
             summary,
             relative_progress=self._progress.relative_distance(summary.max_race_distance),
+            frontier_distance_before_step=frontier_distance_before_step,
             weights=self._weights,
         )
         if boost_pad_reward:

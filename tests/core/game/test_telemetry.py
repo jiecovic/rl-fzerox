@@ -168,6 +168,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         damage_taken_frames=1,
         consecutive_low_speed_frames=2,
         entered_state_flags=(1 << 13) | (1 << 25),
+        entered_course_effects=1 << 3,
         final_frame_index=12,
     )
 
@@ -179,6 +180,8 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.reverse_active_frames == 1
     assert summary.low_speed_frames == 2
     assert summary.entered_state_labels == ("collision_recoil", "finished")
+    assert summary.entered_course_effects == 1 << 3
+    assert summary.entered_dash_surface is True
 
 
 def test_encode_state_flags_builds_bitmask_from_labels() -> None:

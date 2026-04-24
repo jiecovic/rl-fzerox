@@ -212,6 +212,7 @@ def make_step_summary(
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     entered_state_flags: int | None = None,
+    entered_course_effects: int = 0,
     final_frame_index: int = 1,
 ) -> StepSummary:
     resolved_entered_state_flags = (
@@ -229,6 +230,7 @@ def make_step_summary(
         damage_taken_frames=damage_taken_frames,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_flags=resolved_entered_state_flags,
+        entered_course_effects=entered_course_effects,
         final_frame_index=final_frame_index,
     )
 

@@ -4,7 +4,9 @@
 //! The accumulator is reset once per outer env step, then updated from each
 //! internal telemetry sample the host observes while holding the chosen action.
 
-use crate::core::telemetry::StepTelemetrySample;
+use crate::core::telemetry::{
+    CourseEffect, StepTelemetrySample, course_effect_raw_from_state_flags,
+};
 
 use super::step::{RepeatedStepConfig, StepSummary};
 
@@ -71,6 +73,7 @@ impl StepAccumulator {
         }
 
         self.summary.entered_state_flags |= telemetry.state_flags & !self.previous_state_flags;
+        self.record_entered_course_effect(telemetry.state_flags);
 
         self.previous_energy = telemetry.energy;
         self.previous_state_flags = telemetry.state_flags;
@@ -79,5 +82,14 @@ impl StepAccumulator {
     /// Finish the current repeated env step and return the collected summary.
     pub(super) fn finish(self) -> StepSummary {
         self.summary
+    }
+
+    fn record_entered_course_effect(&mut self, state_flags: u32) {
+        let previous = course_effect_raw_from_state_flags(self.previous_state_flags);
+        let current = course_effect_raw_from_state_flags(state_flags);
+        if current == previous || current == CourseEffect::None as u32 {
+            return;
+        }
+        self.summary.entered_course_effects |= 1 << current;
     }
 }

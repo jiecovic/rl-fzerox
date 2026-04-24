@@ -20,6 +20,7 @@ from tests.support.native_objects import encode_state_flags, make_step_summary, 
 
 _COURSE_EFFECT_PIT = 1
 _COURSE_EFFECT_DIRT = 2
+_COURSE_EFFECT_DASH = 3
 _COURSE_EFFECT_ICE = 4
 
 
@@ -531,19 +532,31 @@ def test_race_v3_rewards_dash_pad_boost_entries_once_per_progress_window() -> No
     tracker.reset(_telemetry(race_distance=0.0))
 
     first = tracker.step_summary(
-        _summary(max_race_distance=100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _summary(
+            max_race_distance=100.0,
+            frames_run=1,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
         _status(step_count=1),
-        _telemetry(race_distance=100.0, state_labels=("active", "dash_pad_boost")),
+        _telemetry(race_distance=100.0, course_effect_raw=_COURSE_EFFECT_DASH),
     )
     blocked_same_window = tracker.step_summary(
-        _summary(max_race_distance=900.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _summary(
+            max_race_distance=900.0,
+            frames_run=1,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
         _status(step_count=2),
-        _telemetry(race_distance=900.0, state_labels=("active", "dash_pad_boost")),
+        _telemetry(race_distance=900.0, course_effect_raw=_COURSE_EFFECT_DASH),
     )
     rewarded_next_window = tracker.step_summary(
-        _summary(max_race_distance=1100.0, frames_run=1, entered_state_labels=("dash_pad_boost",)),
+        _summary(
+            max_race_distance=1100.0,
+            frames_run=1,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
         _status(step_count=3),
-        _telemetry(race_distance=1100.0, state_labels=("active", "dash_pad_boost")),
+        _telemetry(race_distance=1100.0, course_effect_raw=_COURSE_EFFECT_DASH),
     )
 
     assert first.breakdown["boost_pad"] == 0.5
@@ -551,6 +564,39 @@ def test_race_v3_rewards_dash_pad_boost_entries_once_per_progress_window() -> No
     assert rewarded_next_window.breakdown["boost_pad"] == 0.5
     info = tracker.info(_telemetry(race_distance=1100.0))
     assert info["rewarded_boost_pad_progress_windows"] == 2
+
+
+def test_race_v3_blocks_dash_pad_reward_behind_progress_frontier() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            boost_pad_reward=0.5,
+            boost_pad_reward_progress_window=1000.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=1200.0, frames_run=1),
+        _status(step_count=1),
+        _telemetry(race_distance=1200.0),
+    )
+    missed_then_backtracked = tracker.step_summary(
+        _summary(
+            max_race_distance=900.0,
+            frames_run=1,
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
+        ),
+        _status(step_count=2),
+        _telemetry(race_distance=900.0, course_effect_raw=_COURSE_EFFECT_DASH),
+    )
+
+    assert "boost_pad" not in missed_then_backtracked.breakdown
+    assert tracker.info(_telemetry(race_distance=900.0))["rewarded_boost_pad_progress_windows"] == 0
 
 
 def test_race_v3_blocks_dash_pad_boost_reward_while_reversing() -> None:
@@ -570,10 +616,10 @@ def test_race_v3_blocks_dash_pad_boost_reward_while_reversing() -> None:
         _summary(
             max_race_distance=0.0,
             reverse_active_frames=1,
-            entered_state_labels=("dash_pad_boost",),
+            entered_course_effects=_entered_course_effects(_COURSE_EFFECT_DASH),
         ),
         _status(step_count=1),
-        _telemetry(race_distance=0.0, state_labels=("active", "dash_pad_boost")),
+        _telemetry(race_distance=0.0, course_effect_raw=_COURSE_EFFECT_DASH),
     )
 
     assert step.reward == 0.0
@@ -661,6 +707,7 @@ def _summary(
     energy_gain_total: float = 0.0,
     damage_taken_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
+    entered_course_effects: int = 0,
 ) -> StepSummary:
     return make_step_summary(
         frames_run=frames_run,
@@ -671,6 +718,7 @@ def _summary(
         energy_gain_total=energy_gain_total,
         damage_taken_frames=damage_taken_frames,
         entered_state_labels=entered_state_labels,
+        entered_course_effects=entered_course_effects,
         final_frame_index=frames_run,
     )
 
@@ -690,3 +738,10 @@ def _status(
         termination_reason=termination_reason,
         truncation_reason=truncation_reason,
     )
+
+
+def _entered_course_effects(*effects: int) -> int:
+    bitset = 0
+    for effect in effects:
+        bitset |= 1 << effect
+    return bitset
