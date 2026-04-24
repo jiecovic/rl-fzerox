@@ -38,6 +38,8 @@ pub struct StepSummary {
     pub consecutive_low_speed_frames: usize,
     /// OR of state flags newly entered at least once during this env step.
     pub entered_state_flags: u32,
+    /// Bitset of course-effect values newly entered at least once during this env step.
+    pub entered_course_effects: u32,
     /// Frame index after the repeated step completed.
     pub final_frame_index: usize,
 }

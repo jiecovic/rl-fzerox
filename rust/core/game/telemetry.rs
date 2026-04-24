@@ -11,10 +11,11 @@ mod model;
 mod read;
 
 pub(crate) use layout::{player_r_button_timer_offset, player_z_button_timer_offset};
-pub(crate) use model::StepTelemetrySample;
 pub use model::{
-    MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry, TelemetrySnapshot,
+    CourseEffect, MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry,
+    TelemetrySnapshot,
 };
+pub(crate) use model::{StepTelemetrySample, course_effect_raw_from_state_flags};
 pub use read::read_snapshot;
 pub(crate) use read::read_step_sample;
 

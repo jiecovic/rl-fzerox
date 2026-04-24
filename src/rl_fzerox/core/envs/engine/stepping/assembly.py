@@ -110,7 +110,7 @@ class EngineStepAssembler:
         truncated = step_result.status.truncated
 
         episode_boost_pad_entries = request.episode_boost_pad_entries
-        boost_pad_entered = bool(step_result.summary.entered_dash_pad_boost)
+        boost_pad_entered = bool(step_result.summary.entered_dash_surface)
         if boost_pad_entered:
             episode_boost_pad_entries += 1
 

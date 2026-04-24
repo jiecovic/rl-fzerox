@@ -6,6 +6,7 @@ use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
 use crate::core::host::{StepStatus, StepSummary};
+use crate::core::telemetry::CourseEffect;
 
 #[pyclass(
     name = "StepSummary",
@@ -31,6 +32,7 @@ impl PyStepSummary {
         damage_taken_frames=0,
         consecutive_low_speed_frames=0,
         entered_state_flags=0,
+        entered_course_effects=0,
         final_frame_index=0,
         airborne_frames=0,
     ))]
@@ -48,6 +50,7 @@ impl PyStepSummary {
         damage_taken_frames: usize,
         consecutive_low_speed_frames: usize,
         entered_state_flags: u32,
+        entered_course_effects: u32,
         final_frame_index: usize,
         airborne_frames: usize,
     ) -> Self {
@@ -63,6 +66,7 @@ impl PyStepSummary {
                 airborne_frames,
                 consecutive_low_speed_frames,
                 entered_state_flags,
+                entered_course_effects,
                 final_frame_index,
             },
         }
@@ -119,6 +123,11 @@ impl PyStepSummary {
     }
 
     #[getter]
+    fn entered_course_effects(&self) -> u32 {
+        self.inner.entered_course_effects
+    }
+
+    #[getter]
     fn entered_state_labels<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyTuple>> {
         PyTuple::new(py, state_flag_labels(self.inner.entered_state_flags))
     }
@@ -171,6 +180,12 @@ impl PyStepSummary {
     }
 
     #[getter]
+    fn entered_dash_surface(&self) -> bool {
+        let dash_bit = 1 << (CourseEffect::Dash as u32);
+        (self.inner.entered_course_effects & dash_bit) != 0
+    }
+
+    #[getter]
     fn final_frame_index(&self) -> usize {
         self.inner.final_frame_index
     }
@@ -191,6 +206,7 @@ impl PyStepSummary {
         )?;
         dict.set_item("entered_state_flags", self.entered_state_flags())?;
         dict.set_item("entered_state_labels", self.entered_state_labels(py)?)?;
+        dict.set_item("entered_course_effects", self.entered_course_effects())?;
         dict.set_item("final_frame_index", self.final_frame_index())?;
         Ok(dict)
     }
