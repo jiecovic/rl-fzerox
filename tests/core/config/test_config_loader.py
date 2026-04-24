@@ -48,8 +48,6 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "  reset_to_race: true",
             "  camera_setting: close_behind",
             "  terminate_on_energy_depleted: false",
-            "  stuck_truncation_enabled: false",
-            "  wrong_way_truncation_enabled: false",
             "watch:",
             "  episodes: 2",
             "  control_fps: 30",
@@ -70,8 +68,6 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.env.reset_to_race is True
     assert config.env.camera_setting == "close_behind"
     assert config.env.terminate_on_energy_depleted is False
-    assert config.env.stuck_truncation_enabled is False
-    assert config.env.wrong_way_truncation_enabled is False
     assert config.watch.episodes == 2
     assert config.watch.control_fps == 30
     assert config.watch.render_fps == 30

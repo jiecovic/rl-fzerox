@@ -30,11 +30,7 @@ class EnvConfig(BaseModel):
     # The step-like env limits below are counted per internal telemetry sample,
     # i.e. once per emulated frame, not once per outer env.step().
     max_episode_steps: PositiveInt = 12_000
-    stuck_truncation_enabled: bool = True
-    stuck_step_limit: PositiveInt = 240
     stuck_min_speed_kph: NonNegativeFloat = 50.0
-    wrong_way_truncation_enabled: bool = True
-    wrong_way_timer_limit: PositiveInt = 300
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
     boost_min_energy_fraction: float = Field(default=0.1, ge=0.0, le=1.0)

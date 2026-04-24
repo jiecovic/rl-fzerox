@@ -31,8 +31,6 @@ class ScriptedStepBackend(SyntheticBackend):
         self._results = list(results)
         self._reset_telemetry = reset_telemetry
         self.last_lean_timer_assist: bool | None = None
-        self.last_stuck_step_limit: int | None = None
-        self.last_wrong_way_timer_limit: int | None = None
 
     def step_repeat_raw(
         self,
@@ -48,8 +46,6 @@ class ScriptedStepBackend(SyntheticBackend):
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
-        stuck_step_limit: int,
-        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
@@ -59,8 +55,6 @@ class ScriptedStepBackend(SyntheticBackend):
             stuck_min_speed_kph,
             energy_loss_epsilon,
             max_episode_steps,
-            stuck_step_limit,
-            wrong_way_timer_limit,
             progress_frontier_stall_limit_frames,
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
@@ -70,8 +64,6 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         self.set_controller_state(controller_state)
         self.last_lean_timer_assist = lean_timer_assist
-        self.last_stuck_step_limit = stuck_step_limit
-        self.last_wrong_way_timer_limit = wrong_way_timer_limit
         result = self._results.pop(0)
         frames_run = result.summary.frames_run
         self._capture_video_flags.extend([False] * max(frames_run - 1, 0))

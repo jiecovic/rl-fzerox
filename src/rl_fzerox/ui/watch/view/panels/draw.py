@@ -57,8 +57,6 @@ class SidePanelData:
     continuous_air_brake_disabled: bool
     action_repeat: int
     max_episode_steps: int
-    stuck_step_limit: int | None
-    wrong_way_timer_limit: int | None
     progress_frontier_stall_limit_frames: int | None
     stuck_min_speed_kph: float
     game_display_size: tuple[int, int]
@@ -117,8 +115,6 @@ def _draw_side_panel(
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
         action_repeat=data.action_repeat,
         max_episode_steps=data.max_episode_steps,
-        stuck_step_limit=data.stuck_step_limit,
-        wrong_way_timer_limit=data.wrong_way_timer_limit,
         progress_frontier_stall_limit_frames=data.progress_frontier_stall_limit_frames,
         stuck_min_speed_kph=data.stuck_min_speed_kph,
         game_display_size=data.game_display_size,

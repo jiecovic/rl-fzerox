@@ -82,24 +82,10 @@ def draw_watch_frame(
         continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
         action_repeat=config.env.action_repeat,
         max_episode_steps=config.env.max_episode_steps,
-        stuck_step_limit=_display_stuck_step_limit(config),
-        wrong_way_timer_limit=_display_wrong_way_timer_limit(config),
         progress_frontier_stall_limit_frames=config.env.progress_frontier_stall_limit_frames,
         stuck_min_speed_kph=config.env.stuck_min_speed_kph,
         telemetry=telemetry,
     )
-
-
-def _display_wrong_way_timer_limit(config: WatchAppConfig) -> int | None:
-    if not config.env.wrong_way_truncation_enabled:
-        return None
-    return config.env.wrong_way_timer_limit
-
-
-def _display_stuck_step_limit(config: WatchAppConfig) -> int | None:
-    if not config.env.stuck_truncation_enabled:
-        return None
-    return config.env.stuck_step_limit
 
 
 def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:

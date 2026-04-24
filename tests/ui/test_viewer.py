@@ -215,7 +215,6 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             policy_reload_age_seconds=None,
             policy_reload_error=None,
             action_repeat=3,
-            stuck_step_limit=240,
             stuck_min_speed_kph=50.0,
             game_display_size=(592, 444),
             observation_shape=(84, 116, 12),
@@ -247,7 +246,6 @@ def test_side_panel_drops_cockpit_control_section() -> None:
         policy_reload_age_seconds=None,
         policy_reload_error=None,
         action_repeat=3,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -283,8 +281,6 @@ def test_session_section_shows_episode_step_counter() -> None:
         policy_reload_error=None,
         action_repeat=3,
         max_episode_steps=50_000,
-        stuck_step_limit=240,
-        wrong_way_timer_limit=120,
         progress_frontier_stall_limit_frames=900,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
@@ -297,18 +293,21 @@ def test_session_section_shows_episode_step_counter() -> None:
         line for line in session_section.lines if line.label == "Episode frame"
     )
     env_step_line = next(line for line in session_section.lines if line.label == "Env step")
-    reverse_line = next(line for line in session_section.lines if line.label == "Reverse frames")
     frontier_line = next(line for line in session_section.lines if line.label == "Frontier frames")
     assert episode_frame_line.value == "123 / 50000"
     assert env_step_line.value == "41 / 16667"
-    assert reverse_line.value == "45 / 120"
     assert frontier_line.value == "300 / 900"
 
 
-def test_session_section_marks_reverse_truncation_as_off() -> None:
+def test_session_section_omits_reverse_and_stuck_counters() -> None:
     columns = _build_panel_columns(
         episode=0,
-        info={"frame_index": 0, "native_fps": 60.0, "reverse_timer": 45},
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "reverse_timer": 45,
+            "stalled_steps": 17,
+        },
         reset_info={},
         episode_reward=0.0,
         paused=False,
@@ -319,8 +318,6 @@ def test_session_section_marks_reverse_truncation_as_off() -> None:
         policy_reload_error=None,
         action_repeat=3,
         max_episode_steps=50_000,
-        stuck_step_limit=240,
-        wrong_way_timer_limit=None,
         progress_frontier_stall_limit_frames=900,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
@@ -329,8 +326,9 @@ def test_session_section_marks_reverse_truncation_as_off() -> None:
     )
 
     session_section = columns.left[0]
-    reverse_line = next(line for line in session_section.lines if line.label == "Reverse frames")
-    assert reverse_line.value == "45 / off"
+    labels = {line.label for line in session_section.lines}
+    assert "Reverse frames" not in labels
+    assert "Stuck frames" not in labels
 
 
 def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:
@@ -428,7 +426,6 @@ def test_display_section_includes_action_repeat() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=2,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -460,7 +457,6 @@ def test_keys_section_lists_watch_hotkeys() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=2,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -504,7 +500,6 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -550,7 +545,6 @@ def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(98, 130, 9),
@@ -606,7 +600,6 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(98, 130, 9),
@@ -654,7 +647,6 @@ def test_side_panel_marks_zeroed_state_components() -> None:
         policy_reload_age_seconds=0.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(98, 130, 9),
@@ -693,7 +685,6 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
             policy_reload_age_seconds=0.0,
             policy_reload_error=None,
             action_repeat=1,
-            stuck_step_limit=240,
             stuck_min_speed_kph=60.0,
             game_display_size=(592, 444),
             observation_shape=observation_shape,
@@ -714,32 +705,6 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
         pygame.quit()
 
 
-def test_session_section_includes_stuck_counter() -> None:
-    columns = _build_panel_columns(
-        episode=0,
-        info={"frame_index": 0, "native_fps": 60.0, "stalled_steps": 17},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_curriculum_stage="lean_enabled",
-        policy_action=np.array([2, 1, 0], dtype=np.int64),
-        policy_reload_age_seconds=5.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_step_limit=240,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
-    )
-
-    session_section = next(section for section in columns.left if section.title == "Session")
-    stuck_line = next(line for line in session_section.lines if line.label == "Stuck frames")
-
-    assert stuck_line.value == "17 / 240"
-
-
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -756,7 +721,6 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -786,7 +750,6 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=2,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -813,7 +776,6 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -845,7 +807,6 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -875,7 +836,6 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -904,7 +864,6 @@ def test_session_section_shows_best_finish_position() -> None:
         policy_reload_error=None,
         best_finish_position=8,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
@@ -932,7 +891,6 @@ def test_session_section_shows_na_before_successful_finish() -> None:
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
         action_repeat=1,
-        stuck_step_limit=240,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),

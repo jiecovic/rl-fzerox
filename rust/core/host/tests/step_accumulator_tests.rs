@@ -130,7 +130,7 @@ fn step_accumulator_tracks_summary_needed_for_stop_state_derivation() {
     assert_eq!(summary.entered_state_flags, 1 << 25);
 }
 
-fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> RepeatedStepConfig {
+fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> RepeatedStepConfig {
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
@@ -143,8 +143,6 @@ fn repeated_step_config(max_episode_steps: usize, stuck_step_limit: usize) -> Re
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
-        stuck_step_limit,
-        wrong_way_timer_limit: Some(180),
         progress_frontier_stall_limit_frames: Some(900),
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
