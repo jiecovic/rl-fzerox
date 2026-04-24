@@ -732,6 +732,36 @@ def test_load_train_app_config_reads_nature_extra_k3_profile(tmp_path: Path) -> 
     assert config.policy.extractor.conv_profile == "nature_extra_k3"
 
 
+def test_load_train_app_config_reads_nature_wide_profile(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: crop_60x76",
+            "policy:",
+            "  extractor:",
+            "    conv_profile: nature_wide",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.observation.preset == "crop_60x76"
+    assert config.policy.extractor.conv_profile == "nature_wide"
+
+
 def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -824,6 +854,7 @@ def test_load_train_app_config_rejects_continue_run_dir_without_full_model_resum
         match="train.continue_run_dir requires train.resume_mode=full_model",
     ):
         load_train_app_config(config_path)
+
 
 def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"

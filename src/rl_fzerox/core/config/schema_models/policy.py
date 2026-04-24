@@ -23,6 +23,7 @@ class ExtractorConfig(BaseModel):
     conv_profile: Literal[
         "auto",
         "nature",
+        "nature_wide",
         "nature_extra_k3",
         "compact_deep",
         "compact_bottleneck",

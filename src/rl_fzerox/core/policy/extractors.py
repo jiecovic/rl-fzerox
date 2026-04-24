@@ -13,6 +13,7 @@ from torch import nn
 ConvProfile = Literal[
     "auto",
     "nature",
+    "nature_wide",
     "nature_extra_k3",
     "compact_deep",
     "compact_bottleneck",
@@ -44,6 +45,11 @@ NATURE_CNN_CONV_SPEC: ConvSpec = (
     _conv_layer(32, kernel_size=8, stride=4),
     _conv_layer(64, kernel_size=4, stride=2),
     _conv_layer(64, kernel_size=3, stride=1),
+)
+NATURE_WIDE_CONV_SPEC: ConvSpec = (
+    _conv_layer(64, kernel_size=8, stride=4),
+    _conv_layer(128, kernel_size=4, stride=2),
+    _conv_layer(128, kernel_size=3, stride=1),
 )
 NATURE_EXTRA_K3_CONV_SPEC: ConvSpec = (
     *NATURE_CNN_CONV_SPEC,
@@ -315,6 +321,8 @@ def _resolve_conv_spec(
         return SUPPORTED_POLICY_GEOMETRIES[geometry]
     if conv_profile == "nature":
         return NATURE_CNN_CONV_SPEC
+    if conv_profile == "nature_wide":
+        return NATURE_WIDE_CONV_SPEC
     if conv_profile == "nature_extra_k3":
         return NATURE_EXTRA_K3_CONV_SPEC
     if conv_profile == "compact_deep":
