@@ -93,6 +93,76 @@ def test_load_train_app_config_reads_maskable_hybrid_recurrent_ppo_fields(
     assert config.policy.recurrent.enabled is True
 
 
+def test_load_train_app_config_reads_hybrid_action_sac_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_boost_lean",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.05",
+            "train:",
+            "  algorithm: hybrid_action_sac",
+            "  ent_coef: auto",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_boost_lean"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.05
+    assert config.train.algorithm == "hybrid_action_sac"
+
+
+def test_load_train_app_config_reads_maskable_hybrid_action_sac_fields(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_boost_lean",
+            "    continuous_drive_mode: pwm",
+            "    continuous_drive_deadzone: 0.05",
+            "train:",
+            "  algorithm: maskable_hybrid_action_sac",
+            "  ent_coef: auto",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.action.name == "hybrid_steer_drive_boost_lean"
+    assert config.env.action.continuous_drive_mode == "pwm"
+    assert config.env.action.continuous_drive_deadzone == 0.05
+    assert config.train.algorithm == "maskable_hybrid_action_sac"
+
+
 def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"

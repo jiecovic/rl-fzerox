@@ -14,10 +14,7 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
-from rl_fzerox.core.domain.training_algorithms import (
-    TRAIN_ALGORITHM_AUTO,
-    TRAIN_ALGORITHM_MASKABLE_PPO,
-)
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
 from rl_fzerox.core.training.runs.migration import scrub_obsolete_train_config_data
 from rl_fzerox.core.training.runs.paths import (
@@ -85,8 +82,8 @@ def materialize_train_run_config(
             "train": materialized_config.train.model_copy(
                 update={
                     "algorithm": (
-                        TRAIN_ALGORITHM_MASKABLE_PPO
-                        if materialized_config.train.algorithm == TRAIN_ALGORITHM_AUTO
+                        TRAINING_ALGORITHMS.maskable_ppo
+                        if materialized_config.train.algorithm == TRAINING_ALGORITHMS.auto
                         else materialized_config.train.algorithm
                     )
                 }

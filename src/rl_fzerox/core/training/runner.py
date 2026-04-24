@@ -145,6 +145,21 @@ def _learn_model(
     from sb3_contrib import MaskablePPO
     from stable_baselines3 import SAC
 
+    try:
+        from sb3x import MaskableHybridActionSAC
+    except ImportError:
+        MaskableHybridActionSAC = None
+
+    if MaskableHybridActionSAC is not None and isinstance(model, MaskableHybridActionSAC):
+        model.learn(
+            total_timesteps=total_timesteps,
+            callback=callback,
+            use_masking=use_masking,
+            progress_bar=progress_bar,
+            reset_num_timesteps=reset_num_timesteps,
+        )
+        return
+
     if isinstance(model, SAC):
         model.learn(
             total_timesteps=total_timesteps,

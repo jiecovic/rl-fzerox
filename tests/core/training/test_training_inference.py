@@ -239,6 +239,7 @@ def test_policy_runner_preserves_hybrid_action_dict(tmp_path: Path) -> None:
     observation = np.zeros((84, 116, 12), dtype=np.uint8)
     action = runner.predict(observation)
 
+    assert runner.supports_action_masks is False
     assert isinstance(action, dict)
     assert _array_action(action["continuous"]).tolist() == [0.25, 0.5]
     assert _array_action(action["discrete"]).tolist() == [1]
@@ -261,6 +262,7 @@ def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) 
     observation = np.zeros((84, 116, 12), dtype=np.uint8)
     action_masks = np.array([True, False, True], dtype=bool)
 
+    assert runner.supports_action_masks is True
     assert _array_action(runner.predict(observation, action_masks=action_masks)).tolist() == [2, 0]
     assert len(fake_policy.action_masks_calls) == 1
     recorded_masks = fake_policy.action_masks_calls[0]
@@ -505,6 +507,37 @@ def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
     assert _load_saved_policy_algorithm(tmp_path) == "sac"
 
 
+def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_sac(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "policy": {},
+                "train": {
+                    "algorithm": "maskable_hybrid_action_sac",
+                    "ent_coef": "auto",
+                    "total_timesteps": 1000,
+                },
+            }
+        ),
+        f=str(config_path),
+    )
+
+    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_action_sac"
+
+
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
     tmp_path: Path,
 ) -> None:
@@ -694,6 +727,72 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
 
     assert isinstance(loaded, _FakeLoadedMaskableHybridModel)
+    assert captured == {
+        "path": str(model_path.resolve()),
+        "device": "cpu",
+    }
+
+
+def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_sac_runs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config_path = tmp_path / "train_config.yaml"
+    OmegaConf.save(
+        config=OmegaConf.create(
+            {
+                "seed": 7,
+                "emulator": {
+                    "core_path": str(core_path),
+                    "rom_path": str(rom_path),
+                },
+                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "policy": {},
+                "train": {
+                    "algorithm": "maskable_hybrid_action_sac",
+                    "ent_coef": "auto",
+                    "total_timesteps": 1000,
+                },
+            }
+        ),
+        f=str(config_path),
+    )
+    policy_path = tmp_path / "latest_policy.zip"
+    policy_path.write_bytes(b"policy")
+    model_path = tmp_path / "latest_model.zip"
+    model_path.write_bytes(b"model")
+
+    captured: dict[str, object] = {}
+
+    class _FakeLoadedMaskableHybridSacModel:
+        def predict(
+            self,
+            observation: ObservationValue,
+            state: PolicyState = None,
+            episode_start: BoolArray | None = None,
+            deterministic: bool = True,
+            action_masks: ActionMask | None = None,
+        ) -> tuple[dict[str, NumpyArray], PolicyState]:
+            _ = (observation, state, episode_start, deterministic, action_masks)
+            return {
+                "continuous": np.array([0.0, 0.0], dtype=np.float32),
+                "discrete": np.array([0, 0], dtype=np.int64),
+            }, None
+
+    def _fake_load(path: str, *, device: str) -> _FakeLoadedMaskableHybridSacModel:
+        captured["path"] = path
+        captured["device"] = device
+        return _FakeLoadedMaskableHybridSacModel()
+
+    monkeypatch.setattr("sb3x.MaskableHybridActionSAC.load", _fake_load)
+
+    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
+
+    assert isinstance(loaded, _FakeLoadedMaskableHybridSacModel)
     assert captured == {
         "path": str(model_path.resolve()),
         "device": "cpu",

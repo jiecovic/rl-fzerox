@@ -13,7 +13,7 @@ from rl_fzerox.core.config.schema_models.env import EmulatorConfig, EnvConfig, R
 from rl_fzerox.core.config.schema_models.policy import PolicyConfig
 from rl_fzerox.core.config.schema_models.tracks import TrackConfig
 from rl_fzerox.core.config.schema_models.training import TrainConfig
-from rl_fzerox.core.domain.training_algorithms import RECURRENT_TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 
 
 class WatchConfig(BaseModel):
@@ -86,8 +86,8 @@ class TrainAppConfig(BaseModel):
     def _validate_recurrent_algorithm_alignment(self) -> TrainAppConfig:
         recurrent_enabled = self.policy.recurrent.enabled
         algorithm = self.train.algorithm
-        if recurrent_enabled and algorithm not in RECURRENT_TRAINING_ALGORITHMS:
+        if recurrent_enabled and algorithm not in TRAINING_ALGORITHMS.recurrent:
             raise ValueError("policy.recurrent.enabled=true requires a recurrent train.algorithm")
-        if not recurrent_enabled and algorithm in RECURRENT_TRAINING_ALGORITHMS:
+        if not recurrent_enabled and algorithm in TRAINING_ALGORITHMS.recurrent:
             raise ValueError(f"train.algorithm={algorithm} requires policy.recurrent.enabled=true")
         return self
