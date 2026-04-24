@@ -14,6 +14,7 @@ ObservationPresetName: TypeAlias = Literal[
     "crop_116x164",
     "crop_98x130",
     "crop_66x82",
+    "crop_60x76",
     "crop_68x68",
     "crop_84x84",
     "crop_76x100",

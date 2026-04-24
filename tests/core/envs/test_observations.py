@@ -90,6 +90,19 @@ def test_crop_66x82_uses_small_aspect_correct_shape() -> None:
     assert observation.shape == (66, 82, 6)
 
 
+def test_crop_60x76_uses_compact_nature_shape() -> None:
+    backend = SyntheticBackend()
+    backend.reset()
+
+    observation = backend.render_observation(
+        preset="crop_60x76",
+        frame_stack=4,
+        stack_mode="rgb_gray",
+    )
+
+    assert observation.shape == (60, 76, 6)
+
+
 def test_crop_64x64_uses_square_grayscale_minimap_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
