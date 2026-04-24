@@ -212,16 +212,22 @@ def _run_simulation_loop(
                 else:
                     _sync_policy_curriculum_stage(policy_runner, env)
                     decision_action_mask = env.action_mask_snapshot()
+                    policy_action_mask = (
+                        decision_action_mask if policy_runner.supports_action_masks else None
+                    )
                     action = policy_runner.predict(
                         observation,
                         deterministic=deterministic_policy,
-                        action_masks=decision_action_mask.flat,
+                        action_masks=(
+                            policy_action_mask.flat if policy_action_mask is not None else None
+                        ),
                         refresh=False,
                     )
-                    violations = action_mask_violations(decision_action_mask.branches, action)
-                    if violations:
-                        details = ", ".join(violations)
-                        raise RuntimeError(f"Policy selected masked action values: {details}")
+                    if policy_action_mask is not None:
+                        violations = action_mask_violations(policy_action_mask.branches, action)
+                        if violations:
+                            details = ", ".join(violations)
+                            raise RuntimeError(f"Policy selected masked action values: {details}")
                     current_policy_action = action
                     watch_step = env.step_watch(action)
                     observation, reward, terminated, truncated, info = watch_step.gym_result()

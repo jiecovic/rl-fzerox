@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
-from rl_fzerox.core.domain.training_algorithms import TRAIN_ALGORITHM_SAC
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.model.algorithms import resolve_effective_training_algorithm
 
@@ -132,7 +132,7 @@ def _training_summary_parts(
     ]
     if train_config.resume_run_dir is not None:
         parts.append(f"resume={train_config.resume_mode}:{train_config.resume_artifact}")
-    if effective_algorithm == TRAIN_ALGORITHM_SAC:
+    if effective_algorithm in TRAINING_ALGORITHMS.sac_family:
         parts.extend(
             [
                 f"buffer_size={train_config.buffer_size}",

@@ -656,6 +656,36 @@ def test_load_train_app_config_reads_compact_nature_observation_profile(tmp_path
     assert config.policy.extractor.conv_profile == "nature"
 
 
+def test_load_train_app_config_reads_nature_extra_k3_profile(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: crop_84x116",
+            "policy:",
+            "  extractor:",
+            "    conv_profile: nature_extra_k3",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.observation.preset == "crop_84x116"
+    assert config.policy.extractor.conv_profile == "nature_extra_k3"
+
+
 def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"

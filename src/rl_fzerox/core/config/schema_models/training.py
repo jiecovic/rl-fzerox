@@ -17,8 +17,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.training_algorithms import (
-    DEFAULT_TRAIN_ALGORITHM,
-    TRAIN_ALGORITHM_SAC,
+    TRAINING_ALGORITHMS,
     TrainAlgorithmName,
 )
 
@@ -31,7 +30,7 @@ class TrainConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    algorithm: TrainAlgorithmName = DEFAULT_TRAIN_ALGORITHM
+    algorithm: TrainAlgorithmName = TRAINING_ALGORITHMS.default
     vec_env: Literal["dummy", "subproc"] = "dummy"
     num_envs: PositiveInt = 1
     total_timesteps: PositiveInt = 1_000_000
@@ -82,8 +81,8 @@ class TrainConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_algorithm_specific_values(self) -> TrainConfig:
-        if self.ent_coef == "auto" and self.algorithm != TRAIN_ALGORITHM_SAC:
-            raise ValueError("train.ent_coef=auto is only supported with train.algorithm=sac")
+        if self.ent_coef == "auto" and self.algorithm not in TRAINING_ALGORITHMS.sac_family:
+            raise ValueError("train.ent_coef=auto is only supported with SAC-family algorithms")
         if self.resume_run_dir is None and self.resume_mode == "full_model":
             raise ValueError("train.resume_mode=full_model requires train.resume_run_dir")
         return self

@@ -76,6 +76,54 @@ def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
     )
 
 
+def test_training_requires_no_action_masks_for_hybrid_action_sac(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_lean")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="hybrid_action_sac", ent_coef="auto"),
+    )
+
+    assert training_requires_action_masks(config) is False
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+        )
+        == "hybrid_action_sac"
+    )
+
+
+def test_training_requires_action_masks_for_maskable_hybrid_action_sac(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(action=ActionConfig(name="hybrid_steer_drive_boost_lean")),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="maskable_hybrid_action_sac", ent_coef="auto"),
+    )
+
+    assert training_requires_action_masks(config) is True
+    assert (
+        resolve_effective_training_algorithm(
+            train_config=config.train,
+        )
+        == "maskable_hybrid_action_sac"
+    )
+
+
 def test_training_requires_action_masks_for_maskable_hybrid_action_ppo(
     tmp_path: Path,
 ) -> None:
@@ -166,6 +214,55 @@ def test_validate_training_algorithm_config_rejects_maskable_hybrid_ppo_without_
         validate_training_algorithm_config(config)
 
 
+def test_validate_training_algorithm_config_rejects_hybrid_sac_masks(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            action=ActionConfig(
+                name="hybrid_steer_drive_boost_lean",
+                mask=ActionMaskConfig(boost=(0,)),
+            )
+        ),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="hybrid_action_sac", ent_coef="auto"),
+    )
+
+    with pytest.raises(RuntimeError, match="not maskable yet"):
+        validate_training_algorithm_config(config)
+
+
+def test_validate_training_algorithm_config_accepts_maskable_hybrid_sac_masks(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config = TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            action=ActionConfig(
+                name="hybrid_steer_drive_boost_lean",
+                mask=ActionMaskConfig(boost=(0,), lean=(0, 1, 2)),
+            )
+        ),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(algorithm="maskable_hybrid_action_sac", ent_coef="auto"),
+    )
+
+    validate_training_algorithm_config(config)
+
+
 def test_build_ppo_model_can_construct_maskable_ppo() -> None:
     from sb3_contrib import MaskablePPO
     from stable_baselines3.common.vec_env import DummyVecEnv
@@ -225,6 +322,76 @@ def test_build_training_model_can_construct_sac() -> None:
         env.close()
 
     assert isinstance(model, SAC)
+
+
+def test_build_training_model_can_construct_hybrid_action_sac() -> None:
+    from sb3x import HybridActionSAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_training_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="hybrid_action_sac",
+                buffer_size=4,
+                learning_starts=0,
+                ent_coef="auto",
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, HybridActionSAC)
+
+
+def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None:
+    from sb3x import MaskableHybridActionSAC
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_training_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_action_sac",
+                buffer_size=4,
+                learning_starts=0,
+                ent_coef="auto",
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionSAC)
 
 
 def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:

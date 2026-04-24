@@ -30,6 +30,10 @@ class _FakePolicyRunner:
         self.refresh_calls = 0
         self.reset_calls = 0
 
+    @property
+    def supports_action_masks(self) -> bool:
+        return True
+
     def refresh(self) -> None:
         self.refresh_calls += 1
 

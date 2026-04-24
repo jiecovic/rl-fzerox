@@ -8,15 +8,7 @@ from pathlib import Path
 from typing import Protocol, TypeGuard
 
 from fzerox_emulator.arrays import ActionMask, BoolArray, PolicyState
-from rl_fzerox.core.domain.training_algorithms import (
-    FULL_MODEL_POLICY_ALGORITHMS,
-    SAVED_POLICY_ALGORITHMS,
-    TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO,
-    TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO,
-    TRAIN_ALGORITHM_MASKABLE_PPO,
-    TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO,
-    TRAIN_ALGORITHM_SAC,
-)
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.training.runs import RUN_LAYOUT, resolve_model_artifact_path
@@ -57,7 +49,7 @@ def _load_saved_policy(
     _ensure_policy_dependencies_loaded()
 
     algorithm = _load_saved_policy_algorithm(run_dir)
-    if algorithm in FULL_MODEL_POLICY_ALGORITHMS:
+    if algorithm in TRAINING_ALGORITHMS.full_model_policy:
         if run_dir is None:
             raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
         algorithm_class = _full_model_class_for_algorithm(algorithm)
@@ -141,11 +133,11 @@ def _has_maskable_predict(policy: object) -> TypeGuard[_HasMaskablePredict]:
 
 
 def _policy_classes_for_algorithm(*, algorithm: str):
-    if algorithm == TRAIN_ALGORITHM_MASKABLE_PPO:
+    if algorithm == TRAINING_ALGORITHMS.maskable_ppo:
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == TRAIN_ALGORITHM_SAC:
+    if algorithm == TRAINING_ALGORITHMS.sac:
         from stable_baselines3.sac import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
@@ -155,18 +147,26 @@ def _policy_classes_for_algorithm(*, algorithm: str):
 
 def _full_model_class_for_algorithm(algorithm: str):
     try:
-        if algorithm == TRAIN_ALGORITHM_MASKABLE_RECURRENT_PPO:
+        if algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
             from sb3x import MaskableRecurrentPPO
 
             return MaskableRecurrentPPO
-        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_ACTION_PPO:
+        if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
             from sb3x import MaskableHybridActionPPO
 
             return MaskableHybridActionPPO
-        if algorithm == TRAIN_ALGORITHM_MASKABLE_HYBRID_RECURRENT_PPO:
+        if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo:
             from sb3x import MaskableHybridRecurrentPPO
 
             return MaskableHybridRecurrentPPO
+        if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_sac:
+            from sb3x import MaskableHybridActionSAC
+
+            return MaskableHybridActionSAC
+        if algorithm == TRAINING_ALGORITHMS.hybrid_action_sac:
+            from sb3x import HybridActionSAC
+
+            return HybridActionSAC
     except ImportError as exc:
         raise RuntimeError(
             f"Loading {algorithm} checkpoints requires sb3x in the active environment."
@@ -186,7 +186,7 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
 
     config = load_train_app_config(config_path)
     algorithm = config.train.algorithm
-    if algorithm in SAVED_POLICY_ALGORITHMS:
+    if algorithm in TRAINING_ALGORITHMS.saved_policy:
         return algorithm
     raise RuntimeError(f"Unsupported saved policy algorithm: {algorithm!r}")
 

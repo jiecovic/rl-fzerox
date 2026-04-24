@@ -86,6 +86,12 @@ class PolicyRunner:
 
         return self._loaded_policy.curriculum_stage_index
 
+    @property
+    def supports_action_masks(self) -> bool:
+        """Return whether the loaded policy accepts action_masks during prediction."""
+
+        return self._supports_action_masks
+
     def refresh(self) -> None:
         """Reload artifact metadata if the watched policy checkpoint changed on disk."""
 
