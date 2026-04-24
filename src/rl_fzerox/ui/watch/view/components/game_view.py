@@ -110,7 +110,7 @@ def _draw_glass_game_view(
 
 def _rounded_game_surface(pygame, surface, size: tuple[int, int], radius: int):
     if surface.get_size() != size:
-        surface = pygame.transform.scale(surface, size)
+        surface = pygame.transform.smoothscale(surface, size)
 
     clipped = pygame.Surface(size, pygame.SRCALPHA)
     clipped.blit(surface, (0, 0))

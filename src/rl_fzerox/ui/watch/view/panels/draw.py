@@ -9,11 +9,13 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
-from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_column_widths
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_tab_width
 from rl_fzerox.ui.watch.view.panels.viz import _wrap_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import (
+    MouseRect,
+    PanelColumns,
     PanelLine,
     PanelSection,
     PygameModule,
@@ -22,6 +24,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     RenderFont,
     TextSurface,
     ViewerFonts,
+    ViewerHitboxes,
 )
 
 
@@ -52,6 +55,7 @@ class SidePanelData:
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
     track_pool_records: tuple[dict[str, object], ...]
+    panel_tab_index: int
     continuous_drive_deadzone: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
@@ -73,7 +77,7 @@ def _draw_side_panel(
     fonts: ViewerFonts,
     panel_rect: PygameRect,
     data: SidePanelData,
-) -> None:
+) -> ViewerHitboxes:
     pygame.draw.rect(screen, PALETTE.panel_background, panel_rect)
     pygame.draw.line(
         screen,
@@ -124,6 +128,10 @@ def _draw_side_panel(
         telemetry=data.telemetry,
     )
 
+    selected_tab_index = data.panel_tab_index % len(_PANEL_TABS)
+    selected_tab_width = _panel_tab_width(panel_width)
+    selected_tab_x = panel_rect.right - LAYOUT.panel_padding - selected_tab_width
+
     y = _draw_panel_title(
         screen=screen,
         fonts=fonts,
@@ -134,58 +142,27 @@ def _draw_side_panel(
         subtitle=_panel_subtitle(data.policy_label),
     )
     y += LAYOUT.title_section_gap
-
-    content_width = panel_width
-    left_column_width, middle_column_width, stats_column_width = _panel_column_widths(content_width)
-    left_x = x
-    middle_x = x + left_column_width + LAYOUT.column_gap
-    stats_x = middle_x + middle_column_width + LAYOUT.column_gap
-    _draw_column_separator(
+    y, tab_rects = _draw_panel_tabs(
         pygame=pygame,
         screen=screen,
-        x=middle_x - (LAYOUT.column_gap // 2),
+        fonts=fonts,
+        x=selected_tab_x,
         y=y,
-        bottom=panel_rect.bottom - LAYOUT.panel_padding,
+        width=selected_tab_width,
+        selected_index=selected_tab_index,
     )
-    _draw_column_separator(
-        pygame=pygame,
-        screen=screen,
-        x=stats_x - (LAYOUT.column_gap // 2),
-        y=y,
-        bottom=panel_rect.bottom - LAYOUT.panel_padding,
-    )
+    y += LAYOUT.title_section_gap
 
     _draw_column(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        x=left_x,
+        x=selected_tab_x,
         y=y,
-        width=left_column_width,
-        sections=columns.left,
+        width=selected_tab_width,
+        sections=_panel_tab_sections(columns, selected_tab_index),
     )
-    _draw_column(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        x=middle_x,
-        y=y,
-        width=middle_column_width,
-        sections=columns.middle,
-    )
-    _draw_column(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        x=stats_x,
-        y=y,
-        width=stats_column_width,
-        sections=columns.stats,
-    )
-
-
-def _draw_column_separator(*, pygame, screen, x: int, y: int, bottom: int) -> None:
-    pygame.draw.line(screen, PALETTE.panel_border, (x, y), (x, bottom), width=1)
+    return ViewerHitboxes(panel_tabs=tab_rects)
 
 
 def _draw_column(
@@ -218,6 +195,102 @@ def _panel_subtitle(policy_label: str | None) -> str:
     if policy_label is None:
         return "manual control"
     return f"policy: {policy_label}"
+
+
+_PANEL_TABS: tuple[str, ...] = (
+    "Session",
+    "Game",
+    "State",
+)
+
+
+def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[PanelSection]:
+    tabs = (columns.left, columns.middle, columns.stats)
+    return tabs[selected_index % len(tabs)]
+
+
+def _draw_panel_tabs(
+    *,
+    pygame,
+    screen,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    selected_index: int,
+) -> tuple[int, tuple[MouseRect | None, ...]]:
+    gap = max(2, LAYOUT.inline_value_gap // 2)
+    tab_height = _font_line_height(fonts.small) + 10
+    tab_y = y
+    current_x = x
+    baseline_y = tab_y + tab_height
+    pygame.draw.line(
+        screen,
+        PALETTE.panel_border,
+        (x, baseline_y),
+        (x + width, baseline_y),
+        width=1,
+    )
+    tab_rects: list[MouseRect | None] = []
+    for index, label in enumerate(_PANEL_TABS):
+        active = index == (selected_index % len(_PANEL_TABS))
+        label_surface = fonts.small.render(
+            label,
+            True,
+            PALETTE.text_primary if active else PALETTE.text_muted,
+        )
+        tab_width = max(64, label_surface.get_width() + 16)
+        rect = pygame.Rect(current_x, tab_y, tab_width, tab_height)
+        pygame.draw.rect(
+            screen,
+            PALETTE.panel_background if active else PALETTE.app_background,
+            rect,
+        )
+        pygame.draw.rect(
+            screen,
+            PALETTE.text_accent if active else PALETTE.panel_border,
+            rect,
+            width=1,
+        )
+        if active:
+            pygame.draw.line(
+                screen,
+                PALETTE.panel_background,
+                (rect.left + 1, baseline_y),
+                (rect.right - 1, baseline_y),
+                width=2,
+            )
+        screen.blit(
+            label_surface,
+            (
+                rect.x + max(0, (rect.width - label_surface.get_width()) // 2),
+                rect.y + max(0, (rect.height - label_surface.get_height()) // 2),
+            ),
+        )
+        tab_rects.append((rect.x, rect.y, rect.width, rect.height))
+        current_x += tab_width + gap
+        if current_x > x + width:
+            tab_rects.extend((None,) * (len(_PANEL_TABS) - len(tab_rects)))
+            break
+    hint_surface = fonts.small.render(
+        _panel_tab_hint(selected_index),
+        True,
+        PALETTE.text_muted,
+    )
+    hint_x = x + width - hint_surface.get_width()
+    if hint_x > current_x:
+        screen.blit(
+            hint_surface,
+            (hint_x, tab_y + max(0, (tab_height - hint_surface.get_height()) // 2)),
+        )
+    while len(tab_rects) < len(_PANEL_TABS):
+        tab_rects.append(None)
+    return tab_y + tab_height, tuple(tab_rects)
+
+
+def _panel_tab_hint(selected_index: int) -> str:
+    tab_number = (selected_index % len(_PANEL_TABS)) + 1
+    return f"Tab {tab_number}/{len(_PANEL_TABS)}"
 
 
 def _draw_panel_title(

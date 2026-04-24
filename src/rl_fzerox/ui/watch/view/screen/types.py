@@ -125,3 +125,4 @@ class ViewerHitboxes:
     """Clickable regions from the most recently drawn watch frame."""
 
     deterministic_toggle: MouseRect | None = None
+    panel_tabs: tuple[MouseRect | None, ...] = ()

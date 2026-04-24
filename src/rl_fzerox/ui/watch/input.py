@@ -29,6 +29,8 @@ class ViewerInput:
     force_reset: bool = False
     toggle_deterministic_policy: bool = False
     control_fps_delta: int = 0
+    panel_tab_delta: int = 0
+    panel_tab_index: int | None = None
     control_state: ControllerState = ControllerState()
 
 
@@ -36,6 +38,7 @@ def _poll_viewer_input(
     pygame,
     *,
     deterministic_toggle_rect: MouseRect | None = None,
+    panel_tab_rects: tuple[MouseRect | None, ...] = (),
 ) -> ViewerInput:
     quit_requested = False
     toggle_pause = False
@@ -44,6 +47,8 @@ def _poll_viewer_input(
     force_reset = False
     toggle_deterministic_policy = False
     control_fps_delta = 0
+    panel_tab_delta = 0
+    panel_tab_index = None
 
     mouse_button_down = getattr(pygame, "MOUSEBUTTONDOWN", None)
     for event in pygame.event.get():
@@ -52,8 +57,22 @@ def _poll_viewer_input(
         elif event.type == mouse_button_down and event.button == 1:
             if _point_in_rect(event.pos, deterministic_toggle_rect):
                 toggle_deterministic_policy = True
+            else:
+                selected_tab = _clicked_panel_tab_index(event.pos, panel_tab_rects)
+                if selected_tab is not None:
+                    panel_tab_index = selected_tab
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
+            if event.key == pygame.K_ESCAPE:
+                quit_requested = True
+            elif event.key == pygame.K_TAB:
+                panel_tab_delta += 1
+            elif event.key == pygame.K_1:
+                panel_tab_index = 0
+            elif event.key == pygame.K_2:
+                panel_tab_index = 1
+            elif event.key == pygame.K_3:
+                panel_tab_index = 2
+            elif event.key == pygame.K_p:
                 toggle_pause = True
             elif event.key == pygame.K_n:
                 step_once = True
@@ -101,6 +120,8 @@ def _poll_viewer_input(
         force_reset=force_reset,
         toggle_deterministic_policy=toggle_deterministic_policy,
         control_fps_delta=control_fps_delta,
+        panel_tab_delta=panel_tab_delta,
+        panel_tab_index=panel_tab_index,
         control_state=ControllerState(
             joypad_mask=joypad_mask(*pressed_buttons),
             left_stick_x=left_stick_x,
@@ -118,3 +139,13 @@ def _point_in_rect(position: object, rect: MouseRect | None) -> bool:
         return False
     rect_x, rect_y, rect_width, rect_height = rect
     return rect_x <= x < rect_x + rect_width and rect_y <= y < rect_y + rect_height
+
+
+def _clicked_panel_tab_index(
+    position: object,
+    rects: tuple[MouseRect | None, ...],
+) -> int | None:
+    for index, rect in enumerate(rects):
+        if _point_in_rect(position, rect):
+            return index
+    return None

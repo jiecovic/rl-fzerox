@@ -31,11 +31,18 @@ def _panel_content_height(
     y += LAYOUT.title_section_gap
 
     content_width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
-    left_width, middle_width, stats_width = _panel_column_widths(content_width)
-    left_height = _column_content_height(fonts, columns.left, width=left_width)
-    middle_height = _column_content_height(fonts, columns.middle, width=middle_width)
-    stats_height = _column_content_height(fonts, columns.stats, width=stats_width)
-    return y + max(left_height, middle_height, stats_height) + LAYOUT.panel_padding
+    tab_width = _panel_tab_width(content_width)
+    tab_height = fonts.small.render("Session", True, PALETTE.text_primary).get_height() + 10
+    left_height = _column_content_height(fonts, columns.left, width=tab_width)
+    middle_height = _column_content_height(fonts, columns.middle, width=tab_width)
+    stats_height = _column_content_height(fonts, columns.stats, width=tab_width)
+    return (
+        y
+        + tab_height
+        + LAYOUT.title_section_gap
+        + max(left_height, middle_height, stats_height)
+        + LAYOUT.panel_padding
+    )
 
 
 def _panel_column_widths(content_width: int) -> tuple[int, int, int]:
@@ -48,3 +55,16 @@ def _panel_column_widths(content_width: int) -> tuple[int, int, int]:
         base_width + (1 if remainder >= 1 else 0),
         base_width + (1 if remainder >= 2 else 0),
     )
+
+
+def _panel_tab_width(content_width: int) -> int:
+    """Return the fixed-width selected HUD tab column."""
+
+    return max(1, min(LAYOUT.panel_tab_width, content_width))
+
+
+def _panel_preview_width(content_width: int) -> int:
+    """Return the width reserved for the observation preview column."""
+
+    tab_width = _panel_tab_width(content_width)
+    return max(0, content_width - tab_width - LAYOUT.column_gap)

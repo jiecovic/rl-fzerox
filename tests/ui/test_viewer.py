@@ -23,7 +23,8 @@ from rl_fzerox.core.envs.observations import (
     DEFAULT_STATE_VECTOR_SPEC,
     state_feature_names,
 )
-from rl_fzerox.ui.watch.input import _point_in_rect
+from rl_fzerox.ui.watch.app import _next_panel_tab_index
+from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
@@ -36,7 +37,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
-from rl_fzerox.ui.watch.view.panels.draw import _draw_labeled_value_line
+from rl_fzerox.ui.watch.view.panels.draw import _draw_labeled_value_line, _panel_tab_hint
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _format_policy_action,
@@ -176,8 +177,25 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
     assert corrected_display_size == (640, 240)
 
 
+def test_next_panel_tab_index_cycles_tabs() -> None:
+    assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
+    assert _next_panel_tab_index(2, ViewerInput(panel_tab_delta=1)) == 0
+
+
+def test_next_panel_tab_index_honors_direct_selection() -> None:
+    assert _next_panel_tab_index(0, ViewerInput(panel_tab_index=2)) == 2
+
+
+def test_panel_tab_hint_shows_active_tab_position() -> None:
+    assert _panel_tab_hint(0) == "Tab 1/3"
+    assert _panel_tab_hint(2) == "Tab 3/3"
+    assert _panel_tab_hint(3) == "Tab 1/3"
+
+
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1504, 980)
+    assert _window_size((592, 444), (84, 116, 12)) == (1064, 700)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1064, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1064, 980)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -227,7 +245,7 @@ def test_side_panel_fits_default_watch_window_height() -> None:
                 columns,
                 observation_shape=(84, 116, 12),
             )
-            <= _window_size((592, 444), (84, 116, 12))[1]
+            <= _window_size((592, 444), (84, 116, 12), panel_tab_index=1)[1]
         )
     finally:
         pygame.quit()
@@ -338,9 +356,9 @@ def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked)
 
-    assert preview.shape == (2, 6, 3)
-    assert np.array_equal(preview[:, :3, :], first)
-    assert np.array_equal(preview[:, 3:, :], second)
+    assert preview.shape == (4, 3, 3)
+    assert np.array_equal(preview[:2, :, :], second)
+    assert np.array_equal(preview[2:4, :, :], first)
 
 
 def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
@@ -353,18 +371,18 @@ def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked, info=info)
 
-    assert preview.shape == (2, 12, 3)
-    assert np.array_equal(preview[:2, :3, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
-    assert np.array_equal(preview[:2, 3:6, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
-    assert np.array_equal(preview[:2, 6:9, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
-    assert np.array_equal(preview[:2, 9:12, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
-    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
+    assert preview.shape == (8, 3, 3)
+    assert np.array_equal(preview[:2, :, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
+    assert np.array_equal(preview[2:4, :, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
+    assert np.array_equal(preview[4:6, :, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
+    assert np.array_equal(preview[6:8, :, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
+    assert _observation_preview_size(stacked.shape, info=info) == (3, 8)
     assert (
         _format_observation_summary(
             stacked.shape,
             info=info,
         )
-        == "3x2 gray x4 strip"
+        == "3x2 gray x4 stack"
     )
 
 
@@ -376,14 +394,14 @@ def test_preview_frame_shows_luma_chroma_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked, info=info)
 
-    assert preview.shape == (2, 12, 3)
-    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
+    assert preview.shape == (8, 3, 3)
+    assert _observation_preview_size(stacked.shape, info=info) == (3, 8)
     assert (
         _format_observation_summary(
             stacked.shape,
             info=info,
         )
-        == "3x2 y+c x4 strip"
+        == "3x2 y+c x4 stack"
     )
 
 
@@ -699,7 +717,7 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
                 columns,
                 observation_shape=observation_shape,
             )
-            <= _window_size((592, 444), observation_shape)[1]
+            <= _window_size((592, 444), observation_shape, panel_tab_index=2)[1]
         )
     finally:
         pygame.quit()
