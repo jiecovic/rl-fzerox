@@ -6,7 +6,6 @@ from gymnasium import spaces
 from fzerox_emulator.arrays import NumpyArray, UInt8Array
 from rl_fzerox.core.training.session.model.replay import (
     LazyImageStateReplayBuffer,
-    LazyMaskableHybridActionDictReplayBuffer,
     LazyMaskableReplayBuffer,
     LazyReplayStackMode,
 )
@@ -192,11 +191,6 @@ def test_lazy_maskable_hybrid_action_dict_replay_buffer_returns_masks() -> None:
         samples.next_action_masks.cpu().numpy(),
         np.array([[0, 1, 0, 1, 0]], dtype=np.float32),
     )
-
-
-def test_lazy_maskable_replay_buffer_keeps_legacy_checkpoint_alias() -> None:
-    assert LazyMaskableHybridActionDictReplayBuffer is LazyMaskableReplayBuffer
-
 
 def _observation_space(*, image_channels: int) -> spaces.Dict:
     return spaces.Dict(

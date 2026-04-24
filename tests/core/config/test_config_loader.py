@@ -52,7 +52,8 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
             "  wrong_way_truncation_enabled: false",
             "watch:",
             "  episodes: 2",
-            "  fps: 30",
+            "  control_fps: 30",
+            "  render_fps: 30",
             "  deterministic_policy: false",
             "  device: cuda",
         ],
@@ -72,7 +73,6 @@ def test_load_watch_app_config_reads_yaml_file(tmp_path: Path) -> None:
     assert config.env.stuck_truncation_enabled is False
     assert config.env.wrong_way_truncation_enabled is False
     assert config.watch.episodes == 2
-    assert config.watch.fps == 30
     assert config.watch.control_fps == 30
     assert config.watch.render_fps == 30
     assert config.watch.deterministic_policy is False
@@ -95,7 +95,7 @@ def test_load_watch_app_config_accepts_larger_observation_preset(tmp_path: Path)
             "  observation:",
             "    preset: crop_92x124",
             "watch:",
-            "  fps: auto",
+            "  control_fps: auto",
         ],
     )
 
@@ -120,38 +120,13 @@ def test_load_watch_app_config_accepts_default_large_observation_preset(tmp_path
             "  observation:",
             "    preset: crop_116x164",
             "watch:",
-            "  fps: auto",
+            "  control_fps: auto",
         ],
     )
 
     config = load_watch_app_config(config_path)
 
     assert config.env.observation.preset == "crop_116x164"
-
-
-def test_load_watch_app_config_canonicalizes_legacy_observation_preset(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    config_path = tmp_path / "watch.yaml"
-    core_path.touch()
-    rom_path.touch()
-    _write_yaml(
-        config_path,
-        [
-            "emulator:",
-            f"  core_path: {core_path}",
-            f"  rom_path: {rom_path}",
-            "env:",
-            "  observation:",
-            "    preset: native_crop_v4",
-            "watch:",
-            "  fps: auto",
-        ],
-    )
-
-    config = load_watch_app_config(config_path)
-
-    assert config.env.observation.preset == "crop_98x130"
 
 
 def test_load_watch_app_config_accepts_image_state_observation_mode(tmp_path: Path) -> None:
@@ -178,7 +153,7 @@ def test_load_watch_app_config_accepts_image_state_observation_mode(tmp_path: Pa
     assert config.env.observation.mode == "image_state"
 
 
-def test_load_watch_app_config_accepts_auto_watch_fps(tmp_path: Path) -> None:
+def test_load_watch_app_config_accepts_split_watch_fps(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     config_path = tmp_path / "watch.yaml"
@@ -192,15 +167,36 @@ def test_load_watch_app_config_accepts_auto_watch_fps(tmp_path: Path) -> None:
             f"  core_path: {core_path}",
             f"  rom_path: {rom_path}",
             "watch:",
-            "  fps: auto",
+            "  control_fps: auto",
+            "  render_fps: auto",
         ],
     )
 
     config = load_watch_app_config(config_path)
 
-    assert config.watch.fps == "auto"
     assert config.watch.control_fps == "auto"
     assert config.watch.render_fps == "auto"
+
+
+def test_load_watch_app_config_rejects_removed_legacy_watch_fps(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "watch.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "watch:",
+            "  fps: 30",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="fps"):
+        load_watch_app_config(config_path)
 
 
 def test_load_watch_app_config_allows_missing_baseline_state_path(
@@ -224,7 +220,8 @@ def test_load_watch_app_config_allows_missing_baseline_state_path(
             "  action_repeat: 3",
             "watch:",
             "  episodes: 1",
-            "  fps: 30",
+            "  control_fps: 30",
+            "  render_fps: 30",
         ],
     )
 
@@ -262,7 +259,8 @@ def test_load_watch_app_config_resolves_relative_paths_against_config_file(
             "  action_repeat: 3",
             "watch:",
             "  episodes: 2",
-            "  fps: 30",
+            "  control_fps: 30",
+            "  render_fps: 30",
         ],
     )
 
@@ -361,7 +359,8 @@ def test_load_watch_app_config_applies_hydra_overrides(tmp_path: Path) -> None:
             "  action_repeat: 2",
             "watch:",
             "  episodes: 1",
-            "  fps: 30",
+            "  control_fps: 30",
+            "  render_fps: 30",
         ],
     )
 

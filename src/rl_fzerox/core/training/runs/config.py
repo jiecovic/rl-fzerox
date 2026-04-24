@@ -14,9 +14,7 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
-from rl_fzerox.core.training.runs.migration import scrub_obsolete_train_config_data
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -77,15 +75,9 @@ def materialize_train_run_config(
     )
     return materialized_config.model_copy(
         update={
-            # Persist the concrete training algorithm so future watch/inference
-            # does not need to guess what one historical `auto` meant.
             "train": materialized_config.train.model_copy(
                 update={
-                    "algorithm": (
-                        TRAINING_ALGORITHMS.maskable_ppo
-                        if materialized_config.train.algorithm == TRAINING_ALGORITHMS.auto
-                        else materialized_config.train.algorithm
-                    )
+                    "algorithm": materialized_config.train.algorithm
                 }
             ),
         }
@@ -110,10 +102,6 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
         loaded,
         config_root=config_root_dir().resolve(),
     )
-    # V4 LEGACY SHIM: old local run manifests may contain fields that were
-    # deliberately removed from the canonical schema. Keep this isolated so it
-    # can be deleted with the migration tool when v4 checkpoints are obsolete.
-    scrub_obsolete_train_config_data(loaded)
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
 
@@ -127,10 +115,7 @@ def load_train_run_config_for_watch(run_dir: Path) -> TrainAppConfig:
         resolved_run_dir = run_dir.expanduser().resolve()
         raise RuntimeError(
             "Saved train config is not compatible with the current schema: "
-            f"{resolved_run_dir}. Run "
-            "`python -m rl_fzerox.apps.scrub_train_config --run-dir "
-            f"{resolved_run_dir} --in-place` to rewrite a stale local manifest, "
-            "or restart the run with the current config schema."
+            f"{resolved_run_dir}. Restart the run with the current config schema."
         ) from exc
 
 
@@ -231,7 +216,6 @@ def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: P
                 "output_root",
                 "continue_run_dir",
                 "resume_run_dir",
-                "init_run_dir",
             ),
         },
     )

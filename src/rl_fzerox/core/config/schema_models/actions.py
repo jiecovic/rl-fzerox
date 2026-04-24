@@ -1,7 +1,6 @@
 # src/rl_fzerox/core/config/schema_models/actions.py
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
 
 from pydantic import (
@@ -198,54 +197,8 @@ class ActionConfig(BaseModel):
     mask: ActionMaskConfig | None = None
     branches: ActionBranchesConfig | None = None
 
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_action_fields(cls, data: object) -> object:
-        # V4 LEGACY SHIM: legacy action config field names.
-        # Early run manifests used `boost_unmask_min_speed_kph`, but the intended
-        # boost gate is a max-speed cap: allow boost while slower, mask it when
-        # already fast. Older air-brake booleans existed before
-        # `continuous_air_brake_mode`.
-        if not isinstance(data, Mapping):
-            return data
-        values: dict[str, object] = {str(key): value for key, value in data.items()}
-        missing = object()
-        legacy_gate = values.pop("boost_unmask_min_speed_kph", missing)
-        if legacy_gate is not missing and "boost_unmask_max_speed_kph" not in values:
-            values["boost_unmask_max_speed_kph"] = legacy_gate
-        values.pop("boost_decision_interval_frames", missing)
-        values.pop("boost_request_lockout_frames", missing)
-
-        branches = values.get("branches")
-        if isinstance(branches, Mapping):
-            branch_values = {str(key): value for key, value in branches.items()}
-            boost_branch = branch_values.get("boost")
-            if isinstance(boost_branch, Mapping):
-                boost_values = {str(key): value for key, value in boost_branch.items()}
-                boost_values.pop("decision_interval_frames", missing)
-                boost_values.pop("request_lockout_frames", missing)
-                branch_values["boost"] = boost_values
-                values["branches"] = branch_values
-
-        legacy_air_brake_enabled = values.pop("continuous_air_brake_enabled", missing)
-        legacy_disable_on_ground = values.pop(
-            "continuous_air_brake_disable_on_ground",
-            missing,
-        )
-        legacy_airborne_only = values.pop("continuous_air_brake_airborne_only", missing)
-        if "continuous_air_brake_mode" not in values:
-            if legacy_air_brake_enabled is False:
-                values["continuous_air_brake_mode"] = "off"
-            elif legacy_disable_on_ground is True or legacy_airborne_only is True:
-                values["continuous_air_brake_mode"] = "disable_on_ground"
-
-        return values
-
     def runtime(self) -> ActionRuntimeConfig:
         """Return the concrete adapter config consumed by env/runtime code.
-
-        Branch-style YAML is the canonical user-facing config for new runs. Old
-        adapter fields remain on this model only so v4 manifests can still load.
         """
 
         if self.branches is None:

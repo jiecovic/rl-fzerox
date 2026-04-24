@@ -10,9 +10,8 @@ from rl_fzerox.core.config.vehicle_catalog import (
     vehicle_by_id,
 )
 
-from .common import optional_str, optional_weight, safe_id
-from .legacy import baseline_variant_from_generated_entry_id, looks_like_legacy_generated_entry
-from .registry import iter_course_configs, load_course_config, registry_track_by_id
+from .common import optional_str, safe_id
+from .registry import load_course_config, registry_track_by_id
 
 
 def enrich_concrete_entries(section: dict[str, object], config_root: Path) -> None:
@@ -96,46 +95,7 @@ def enrich_entry_with_registry_metadata(
                 "records",
             }:
                 enriched.setdefault(key, value)
-    elif looks_like_legacy_generated_entry(enriched):
-        legacy_metadata = legacy_generated_entry_metadata_from_id(
-            enriched,
-            config_root=config_root,
-        )
-        if legacy_metadata is not None:
-            for key, value in legacy_metadata.items():
-                enriched.setdefault(key, value)
     return enriched
-
-
-def legacy_generated_entry_metadata_from_id(
-    entry: dict[str, object],
-    *,
-    config_root: Path,
-) -> dict[str, object] | None:
-    """Recover metadata from old generated IDs."""
-
-    raw_id = entry.get("id")
-    if not isinstance(raw_id, str) or not raw_id:
-        return None
-
-    for course_ref, course in iter_course_configs(config_root=config_root):
-        course_id = optional_str(course.get("id")) or safe_id(course_ref)
-        prefix = f"{course_id}_"
-        if not raw_id.startswith(prefix):
-            continue
-        variant = baseline_variant_from_generated_entry_id(
-            raw_id.removeprefix(prefix),
-            config_root=config_root,
-        )
-        if variant is None:
-            continue
-        return entry_from_course_variant(
-            course_ref=course_ref,
-            variant=variant,
-            weight=optional_weight(entry.get("weight"), label="entry weight"),
-            config_root=config_root,
-        )
-    return None
 
 
 def enrich_track_with_registry_metadata(

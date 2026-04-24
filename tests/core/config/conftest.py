@@ -35,7 +35,8 @@ def isolated_repo_layout(
             "  action_repeat: 2",
             "watch:",
             "  episodes: 1",
-            "  fps: null",
+            "  control_fps: auto",
+            "  render_fps: 60",
         ],
     )
 

@@ -390,32 +390,6 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_num_timesteps == 660_000
 
 
-def test_load_saved_policy_algorithm_rejects_auto_manifest(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
-                "policy": {},
-                "train": {"algorithm": "auto", "total_timesteps": 1000},
-            }
-        ),
-        f=str(config_path),
-    )
-
-    with pytest.raises(RuntimeError, match="Unsupported saved policy algorithm"):
-        _load_saved_policy_algorithm(tmp_path)
-
-
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"

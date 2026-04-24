@@ -69,7 +69,6 @@ def load_train_app_config(
                 "output_root",
                 "continue_run_dir",
                 "resume_run_dir",
-                "init_run_dir",
             ),
         },
     )

@@ -32,31 +32,6 @@ from rl_fzerox.core.training.session.model.replay import (
 from tests.support.fakes import SyntheticBackend
 
 
-def test_resolve_effective_training_algorithm_uses_maskable_auto_mode(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    core_path.touch()
-    rom_path.touch()
-
-    config = TrainAppConfig(
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(algorithm="auto"),
-    )
-
-    assert training_requires_action_masks(config) is True
-    assert (
-        resolve_effective_training_algorithm(
-            train_config=config.train,
-        )
-        == "maskable_ppo"
-    )
-
-
 def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -283,7 +258,7 @@ def test_build_ppo_model_can_construct_maskable_ppo() -> None:
     try:
         model = build_ppo_model(
             train_env=env,
-            train_config=TrainConfig(algorithm="auto"),
+            train_config=TrainConfig(algorithm="maskable_ppo"),
             policy_config=PolicyConfig(),
             tensorboard_log=None,
         )

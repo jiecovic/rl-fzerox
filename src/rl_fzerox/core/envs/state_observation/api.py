@@ -24,10 +24,10 @@ from rl_fzerox.core.envs.state_observation.history import (
     action_history_features,
     action_history_values,
 )
-from rl_fzerox.core.envs.state_observation.legacy import (
+from rl_fzerox.core.envs.state_observation.profiles import (
     DEFAULT_STATE_VECTOR_SPEC,
     STATE_VECTOR_SPECS,
-    legacy_state_profile_values,
+    state_profile_values,
 )
 from rl_fzerox.core.envs.state_observation.types import (
     OBSERVATION_STATE_DEFAULTS,
@@ -71,7 +71,7 @@ def telemetry_state_vector(
             state_components=state_components,
             zeroed_state_components=zeroed_state_components,
             action_history=action_history or {},
-            legacy_fields={
+            profile_fields={
                 "left_lean_held": left_lean_held,
                 "right_lean_held": right_lean_held,
                 "left_press_age_norm": left_press_age_norm,
@@ -90,10 +90,10 @@ def telemetry_state_vector(
             )
         return np.array(values, dtype=np.float32)
 
-    values = legacy_state_profile_values(
+    values = state_profile_values(
         telemetry,
         profile=state_profile,
-        legacy_fields={
+        profile_fields={
             "left_lean_held": left_lean_held,
             "right_lean_held": right_lean_held,
             "left_press_age_norm": left_press_age_norm,

@@ -517,7 +517,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
     state_vector_section = next(
         section for section in columns.stats if section.title == "State Vector"
     )
-    values = _panel_group_values(state_vector_section, "Legacy")
+    values = _panel_group_values(state_vector_section, "State")
 
     assert values == {
         "speed_norm": "0.500",
@@ -534,7 +534,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
     }
 
 
-def test_side_panel_splits_legacy_action_history_from_state_vector() -> None:
+def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
     feature_names = state_feature_names("race_core", action_history_len=2)
     columns = _build_panel_columns(
         episode=0,
@@ -561,7 +561,7 @@ def test_side_panel_splits_legacy_action_history_from_state_vector() -> None:
         section for section in columns.stats if section.title == "State Vector"
     )
 
-    assert _panel_group_labels(state_vector_section, "Legacy") == [
+    assert _panel_group_labels(state_vector_section, "State") == [
         "speed_norm",
         "energy_frac",
         "reverse_active",

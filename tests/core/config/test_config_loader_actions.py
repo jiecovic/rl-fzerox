@@ -163,6 +163,46 @@ def test_load_train_app_config_reads_maskable_hybrid_action_sac_fields(
     assert config.train.algorithm == "maskable_hybrid_action_sac"
 
 
+@pytest.mark.parametrize(
+    ("legacy_field", "legacy_value"),
+    (
+        ("continuous_air_brake_enabled", "true"),
+        ("continuous_air_brake_disable_on_ground", "true"),
+        ("boost_unmask_min_speed_kph", "700.0"),
+    ),
+)
+def test_load_train_app_config_rejects_removed_legacy_action_fields(
+    tmp_path: Path,
+    legacy_field: str,
+    legacy_value: str,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    name: hybrid_steer_drive_boost_lean",
+            f"    {legacy_field}: {legacy_value}",
+            "train:",
+            "  algorithm: hybrid_action_sac",
+            "  ent_coef: auto",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    with pytest.raises(ValueError, match=legacy_field):
+        load_train_app_config(config_path)
+
+
 def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
@@ -488,71 +528,6 @@ def test_load_train_app_config_rejects_masked_continuous_action_branch(
 
     with pytest.raises(ValueError, match="continuous action branch 'steer' cannot define a mask"):
         load_train_app_config(config_path)
-
-
-def test_load_train_app_config_migrates_legacy_air_brake_fields(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    core_path.touch()
-    rom_path.touch()
-
-    disabled_config_path = tmp_path / "disabled.yaml"
-    _write_yaml(
-        disabled_config_path,
-        [
-            "emulator:",
-            f"  core_path: {core_path}",
-            f"  rom_path: {rom_path}",
-            "env:",
-            "  action:",
-            "    continuous_air_brake_enabled: false",
-        ],
-    )
-    ground_gate_config_path = tmp_path / "ground_gate.yaml"
-    _write_yaml(
-        ground_gate_config_path,
-        [
-            "emulator:",
-            f"  core_path: {core_path}",
-            f"  rom_path: {rom_path}",
-            "env:",
-            "  action:",
-            "    continuous_air_brake_disable_on_ground: true",
-        ],
-    )
-
-    disabled_config = load_train_app_config(disabled_config_path)
-    ground_gate_config = load_train_app_config(ground_gate_config_path)
-
-    assert disabled_config.env.action.continuous_air_brake_mode == "off"
-    assert ground_gate_config.env.action.continuous_air_brake_mode == "disable_on_ground"
-
-
-def test_load_train_app_config_migrates_legacy_boost_speed_gate(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    config_path = tmp_path / "train.yaml"
-    core_path.touch()
-    rom_path.touch()
-    _write_yaml(
-        config_path,
-        [
-            "seed: 7",
-            "emulator:",
-            f"  core_path: {core_path}",
-            f"  rom_path: {rom_path}",
-            "env:",
-            "  action:",
-            "    boost_unmask_min_speed_kph: 800.0",
-            "train:",
-            "  total_timesteps: 1000",
-        ],
-    )
-
-    config = load_train_app_config(config_path)
-
-    assert config.env.action.boost_unmask_max_speed_kph == 800.0
-
 
 def test_load_train_app_config_accepts_lean_fields(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"

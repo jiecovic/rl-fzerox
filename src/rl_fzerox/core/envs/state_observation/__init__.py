@@ -10,7 +10,7 @@ from rl_fzerox.core.envs.state_observation.api import (
     state_vector_spec,
     telemetry_state_vector,
 )
-from rl_fzerox.core.envs.state_observation.legacy import (
+from rl_fzerox.core.envs.state_observation.profiles import (
     DEFAULT_STATE_VECTOR_SPEC,
     RACE_CORE_STATE_VECTOR_SPEC,
     STATE_VECTOR_SPECS,

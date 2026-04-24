@@ -21,12 +21,7 @@ from rl_fzerox.core.envs.state_observation.history import (
     control_history_source_control,
     validate_action_history_controls,
 )
-from rl_fzerox.core.envs.state_observation.legacy import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    STATE_VECTOR_SPECS,
-    legacy_state_profile_values,
-    state_profile_name,
-)
+from rl_fzerox.core.envs.state_observation.profiles import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.core.envs.state_observation.types import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
@@ -91,7 +86,7 @@ def component_state_values(
     state_components: StateComponentsSettings,
     zeroed_state_components: Collection[str] = (),
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
@@ -104,7 +99,7 @@ def component_state_values(
                     telemetry,
                     component,
                     action_history,
-                    legacy_fields,
+                    profile_fields,
                 )
             )
 
@@ -197,9 +192,9 @@ def _vehicle_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history, legacy_fields
+    del component, action_history, profile_fields
     return _vehicle_state_values(telemetry)
 
 
@@ -214,9 +209,9 @@ def _track_position_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history, legacy_fields
+    del component, action_history, profile_fields
     return _track_position_values(telemetry)
 
 
@@ -231,9 +226,9 @@ def _machine_context_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history, legacy_fields
+    del component, action_history, profile_fields
     return _machine_context_values(telemetry)
 
 
@@ -248,9 +243,9 @@ def _surface_state_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history, legacy_fields
+    del component, action_history, profile_fields
     return _surface_state_values(telemetry)
 
 
@@ -265,35 +260,11 @@ def _course_context_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del action_history, legacy_fields
+    del action_history, profile_fields
     encoding = component_str(component, "encoding", default="one_hot_builtin")
     return course_component_values(telemetry, encoding=encoding)
-
-
-def _legacy_state_component_features(
-    component: ObservationStateComponentSettings,
-) -> tuple[StateFeature, ...]:
-    # V4 LEGACY SHIM: old runs can still request compact legacy state profiles.
-    profile = component_str(component, "state_profile", default="race_core")
-    return STATE_VECTOR_SPECS[state_profile_name(profile)].features
-
-
-def _legacy_state_component_values(
-    telemetry: FZeroXTelemetry | None,
-    component: ObservationStateComponentSettings,
-    action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
-) -> list[float]:
-    del action_history
-    # V4 LEGACY SHIM: old runs can still request compact legacy state profiles.
-    profile = state_profile_name(component_str(component, "state_profile", default="race_core"))
-    return legacy_state_profile_values(
-        telemetry,
-        profile=profile,
-        legacy_fields=legacy_fields,
-    )
 
 
 def _control_history_component_features(
@@ -311,9 +282,9 @@ def _control_history_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del telemetry, legacy_fields
+    del telemetry, profile_fields
     length = component_int(component, "length", default=2)
     controls = component_controls(
         component,
@@ -346,10 +317,6 @@ STATE_COMPONENT_DEFINITIONS: dict[str, StateComponentDefinition] = {
     "course_context": StateComponentDefinition(
         features=_course_context_component_features,
         values=_course_context_component_values,
-    ),
-    "legacy_state": StateComponentDefinition(
-        features=_legacy_state_component_features,
-        values=_legacy_state_component_values,
     ),
     "control_history": StateComponentDefinition(
         features=_control_history_component_features,

@@ -257,6 +257,52 @@ def test_load_train_app_config_expands_course_registry_selection(
     assert entry.baseline_state_path is None
 
 
+def test_load_train_app_config_rejects_removed_legacy_resume_field(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "train:",
+            "  algorithm: maskable_ppo",
+            "  init_run_dir: local/runs/old_run",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="init_run_dir"):
+        load_train_app_config(config_path)
+
+
+def test_load_train_app_config_rejects_removed_legacy_observation_preset(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: native_crop_v4",
+        ],
+    )
+
+    with pytest.raises(ValueError, match="native_crop_v4"):
+        load_train_app_config(config_path)
+
+
 def test_load_train_app_config_derives_engine_variant_from_source_baseline(
     isolated_repo_layout: tuple[Path, Path],
 ) -> None:
@@ -778,36 +824,6 @@ def test_load_train_app_config_rejects_continue_run_dir_without_full_model_resum
         match="train.continue_run_dir requires train.resume_mode=full_model",
     ):
         load_train_app_config(config_path)
-
-
-def test_load_train_app_config_migrates_legacy_init_run_dir(tmp_path: Path) -> None:
-    core_path = tmp_path / "mupen64plus_next_libretro.so"
-    rom_path = tmp_path / "fzerox.n64"
-    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
-    config_path = tmp_path / "train.yaml"
-    core_path.touch()
-    rom_path.touch()
-    run_dir.mkdir(parents=True)
-    _write_yaml(
-        config_path,
-        [
-            "seed: 7",
-            "emulator:",
-            f"  core_path: {core_path}",
-            f"  rom_path: {rom_path}",
-            "train:",
-            "  total_timesteps: 1000",
-            f"  init_run_dir: {run_dir}",
-            "  init_artifact: best",
-        ],
-    )
-
-    config = load_train_app_config(config_path)
-
-    assert config.train.resume_run_dir == run_dir.resolve()
-    assert config.train.resume_artifact == "best"
-    assert config.train.resume_mode == "weights_only"
-
 
 def test_load_train_app_config_reads_state_extractor_features_dim(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"

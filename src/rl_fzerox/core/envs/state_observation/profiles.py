@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/envs/state_observation/legacy.py
+# src/rl_fzerox/core/envs/state_observation/profiles.py
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -79,20 +79,20 @@ def state_profile_name(value: str) -> ObservationStateProfile:
     raise ValueError(f"Unsupported observation state profile: {value!r}")
 
 
-def legacy_state_profile_values(
+def state_profile_values(
     telemetry: FZeroXTelemetry | None,
     *,
     profile: ObservationStateProfile,
-    legacy_fields: Mapping[str, float],
+    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    left_held = clamp(float(legacy_fields.get("left_lean_held", 0.0)), 0.0, 1.0)
-    right_held = clamp(float(legacy_fields.get("right_lean_held", 0.0)), 0.0, 1.0)
-    left_age = clamp(float(legacy_fields.get("left_press_age_norm", 1.0)), 0.0, 1.0)
-    right_age = clamp(float(legacy_fields.get("right_press_age_norm", 1.0)), 0.0, 1.0)
-    boost_pressure = clamp(float(legacy_fields.get("recent_boost_pressure", 0.0)), 0.0, 1.0)
-    steer_left = clamp(float(legacy_fields.get("steer_left_held", 0.0)), 0.0, 1.0)
-    steer_right = clamp(float(legacy_fields.get("steer_right_held", 0.0)), 0.0, 1.0)
-    steer_pressure = clamp(float(legacy_fields.get("recent_steer_pressure", 0.0)), -1.0, 1.0)
+    left_held = clamp(float(profile_fields.get("left_lean_held", 0.0)), 0.0, 1.0)
+    right_held = clamp(float(profile_fields.get("right_lean_held", 0.0)), 0.0, 1.0)
+    left_age = clamp(float(profile_fields.get("left_press_age_norm", 1.0)), 0.0, 1.0)
+    right_age = clamp(float(profile_fields.get("right_press_age_norm", 1.0)), 0.0, 1.0)
+    boost_pressure = clamp(float(profile_fields.get("recent_boost_pressure", 0.0)), 0.0, 1.0)
+    steer_left = clamp(float(profile_fields.get("steer_left_held", 0.0)), 0.0, 1.0)
+    steer_right = clamp(float(profile_fields.get("steer_right_held", 0.0)), 0.0, 1.0)
+    steer_pressure = clamp(float(profile_fields.get("recent_steer_pressure", 0.0)), -1.0, 1.0)
 
     race_core_values = _race_core_values(telemetry, spec=STATE_VECTOR_SPECS[profile])
     if profile == "race_core":
