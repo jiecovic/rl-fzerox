@@ -108,7 +108,7 @@ class ObservationConfig(BaseModel):
     ] = "default"
     preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
-    stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb"
+    stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb"
     minimap_layer: bool = False
     resize_filter: ObservationResizeFilter = "nearest"
     minimap_resize_filter: ObservationResizeFilter = "nearest"

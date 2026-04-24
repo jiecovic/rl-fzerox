@@ -84,10 +84,10 @@ def test_crop_66x82_uses_small_aspect_correct_shape() -> None:
     observation = backend.render_observation(
         preset="crop_66x82",
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
     )
 
-    assert observation.shape == (66, 82, 6)
+    assert observation.shape == (66, 82, 12)
 
 
 def test_crop_60x76_uses_compact_nature_shape() -> None:
@@ -97,10 +97,10 @@ def test_crop_60x76_uses_compact_nature_shape() -> None:
     observation = backend.render_observation(
         preset="crop_60x76",
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
     )
 
-    assert observation.shape == (60, 76, 6)
+    assert observation.shape == (60, 76, 12)
 
 
 def test_crop_64x64_uses_square_grayscale_minimap_shape() -> None:
@@ -117,20 +117,20 @@ def test_crop_64x64_uses_square_grayscale_minimap_shape() -> None:
     assert observation.shape == (64, 64, 5)
 
 
-def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
+def test_rgb_observation_stack_keeps_all_frames_rgb() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
     observation = backend.render_observation(
         preset="crop_98x130",
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
     )
     spec = backend.observation_spec("crop_98x130")
     image_space = build_image_observation_space(
         spec,
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
     )
     current_frame = backend.render_observation(
         preset="crop_98x130",
@@ -138,11 +138,9 @@ def test_rgb_gray_observation_stack_keeps_current_frame_rgb() -> None:
         stack_mode="rgb",
     )
 
-    assert observation.shape == (98, 130, 6)
-    assert image_space.shape == (98, 130, 6)
-    assert stacked_observation_channels(3, frame_stack=4, stack_mode="rgb_gray") == 6
-    assert np.array_equal(observation[:, :, 0], observation[:, :, 1])
-    assert np.array_equal(observation[:, :, 1], observation[:, :, 2])
+    assert observation.shape == (98, 130, 12)
+    assert image_space.shape == (98, 130, 12)
+    assert stacked_observation_channels(3, frame_stack=4, stack_mode="rgb") == 12
     assert np.array_equal(observation[:, :, -3:], current_frame)
 
 
@@ -229,27 +227,27 @@ def test_minimap_layer_appends_single_channel_after_frame_stack() -> None:
     observation = backend.render_observation(
         preset="crop_66x82",
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
         minimap_layer=True,
     )
     spec = backend.observation_spec("crop_66x82")
     image_space = build_image_observation_space(
         spec,
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
         minimap_layer=True,
     )
 
-    assert observation.shape == (66, 82, 7)
-    assert image_space.shape == (66, 82, 7)
+    assert observation.shape == (66, 82, 13)
+    assert image_space.shape == (66, 82, 13)
     assert (
         stacked_observation_channels(
             3,
             frame_stack=4,
-            stack_mode="rgb_gray",
+            stack_mode="rgb",
             minimap_layer=True,
         )
-        == 7
+        == 13
     )
 
 
@@ -642,7 +640,7 @@ def test_state_components_define_observation_space_shape_and_bounds() -> None:
     observation_space = build_observation_space(
         spec,
         frame_stack=4,
-        stack_mode="rgb_gray",
+        stack_mode="rgb",
         mode="image_state",
         state_components=components,
     )
@@ -652,7 +650,7 @@ def test_state_components_define_observation_space_shape_and_bounds() -> None:
     assert isinstance(image_space, spaces.Box)
     assert isinstance(state_space, spaces.Box)
 
-    assert image_space.shape == (66, 82, 6)
+    assert image_space.shape == (66, 82, 12)
     assert state_space.shape == (51,)
     feature_names = state_feature_names("race_core", state_components=components)
     lateral_index = feature_names.index("vehicle_state.lateral_velocity_norm")

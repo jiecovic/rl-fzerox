@@ -50,11 +50,6 @@ def _preview_frames(
     minimap_layer = _observation_minimap_layer(info)
     base_observation = observation[:, :, :-1] if minimap_layer else observation
 
-    if stack_mode == "rgb_gray":
-        frames = _rgb_gray_preview_frames(base_observation, stack_size=stack_size)
-        return (
-            (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
-        )
     if stack_mode == "gray":
         frames = _grayscale_preview_frames(base_observation, stack_size=stack_size)
         return (
@@ -82,23 +77,6 @@ def _preview_frames(
         frames = (_grayscale_preview_frame(latest_channel),)
 
     return (*frames, _grayscale_preview_frame(observation[:, :, -1:])) if minimap_layer else frames
-
-
-def _rgb_gray_preview_frames(
-    observation: ObservationFrame,
-    *,
-    stack_size: int,
-) -> tuple[RgbFrame, ...]:
-    channels = observation.shape[2]
-    if stack_size <= 1 or channels <= 3:
-        return (np.ascontiguousarray(observation[:, :, -3:]),)
-
-    history_count = max(0, min(stack_size - 1, channels - 3))
-    frames = [
-        np.repeat(observation[:, :, index : index + 1], 3, axis=2) for index in range(history_count)
-    ]
-    frames.append(np.ascontiguousarray(observation[:, :, -3:]))
-    return tuple(frames)
 
 
 def _grayscale_preview_frames(

@@ -13,7 +13,7 @@ class ObservationSpecDict(TypedDict):
     display_height: int
 
 class FrameObservationOptionsDict(TypedDict):
-    stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"]
+    stack_mode: Literal["rgb", "gray", "luma_chroma"]
     minimap_layer: bool
     resize_filter: Literal["nearest", "bilinear"]
     minimap_resize_filter: Literal["nearest", "bilinear"]
@@ -332,7 +332,7 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
+        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
         minimap_layer: bool = False,
         resize_filter: Literal["nearest", "bilinear"] = "nearest",
         minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
@@ -356,7 +356,7 @@ class Emulator:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool = True,
         lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "rgb_gray", "gray", "luma_chroma"] = "rgb",
+        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
         minimap_layer: bool = False,
         resize_filter: Literal["nearest", "bilinear"] = "nearest",
         minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",

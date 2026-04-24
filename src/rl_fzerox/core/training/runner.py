@@ -47,6 +47,7 @@ def run_training(config: TrainAppConfig) -> None:
         train_env = build_training_env(run_config, run_paths)
         model = build_training_model(
             train_env=train_env,
+            env_config=run_config.env,
             train_config=run_config.train,
             policy_config=run_config.policy,
             tensorboard_log=None,

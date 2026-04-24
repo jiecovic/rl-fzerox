@@ -77,8 +77,6 @@ def _format_observation_summary(
         color_mode = "gray"
     elif stack_mode == "luma_chroma":
         color_mode = "y+c"
-    elif stack_mode == "rgb_gray":
-        color_mode = "rgb+gray"
     else:
         color_mode = "rgb"
     if channels == 1:

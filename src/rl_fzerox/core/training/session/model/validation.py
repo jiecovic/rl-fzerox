@@ -4,6 +4,7 @@ from __future__ import annotations
 from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
 from rl_fzerox.core.domain.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.training.session.model.replay import SUPPORTED_LAZY_REPLAY_STACK_MODES
 
 
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
@@ -16,13 +17,13 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
         _validate_hybrid_action_sac_training_config(config)
         return
     if config.train.algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_sac:
-        _validate_maskable_hybrid_action_sac_training_config(config)
+        _validate_maskable_hybrid_sac_config(config)
         return
     if config.train.algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
-        _validate_maskable_hybrid_action_ppo_training_config(config)
+        _validate_maskable_hybrid_ppo_config(config)
         return
     if config.train.algorithm == TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo:
-        _validate_maskable_hybrid_recurrent_ppo_training_config(config)
+        _validate_maskable_recurrent_hybrid_ppo_config(config)
 
 
 def validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
@@ -57,10 +58,7 @@ def _validate_sac_training_config(config: TrainAppConfig) -> None:
         raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
     if config.curriculum.enabled:
         raise RuntimeError("SAC does not support curriculum stages")
-    if config.env.observation.mode == "image_state" and config.train.optimize_memory_usage:
-        raise RuntimeError(
-            "SAC optimize_memory_usage is not supported with Dict image_state observations"
-        )
+    _validate_sac_lazy_replay_support(config)
 
 
 def _validate_hybrid_action_sac_training_config(config: TrainAppConfig) -> None:
@@ -75,33 +73,25 @@ def _validate_hybrid_action_sac_training_config(config: TrainAppConfig) -> None:
         )
     if config.curriculum.enabled:
         raise RuntimeError("Hybrid action SAC does not support curriculum stages yet")
-    if config.env.observation.mode == "image_state" and config.train.optimize_memory_usage:
-        raise RuntimeError(
-            "Hybrid action SAC optimize_memory_usage is not supported with "
-            "Dict image_state observations"
-        )
+    _validate_sac_lazy_replay_support(config)
 
 
-def _validate_maskable_hybrid_action_ppo_training_config(config: TrainAppConfig) -> None:
+def _validate_maskable_hybrid_ppo_config(config: TrainAppConfig) -> None:
     _validate_hybrid_action_adapter(
         config,
         algorithm_label="Maskable hybrid action PPO",
     )
 
 
-def _validate_maskable_hybrid_action_sac_training_config(config: TrainAppConfig) -> None:
+def _validate_maskable_hybrid_sac_config(config: TrainAppConfig) -> None:
     _validate_hybrid_action_adapter(
         config,
         algorithm_label="Maskable hybrid action SAC",
     )
-    if config.env.observation.mode == "image_state" and config.train.optimize_memory_usage:
-        raise RuntimeError(
-            "Maskable hybrid action SAC optimize_memory_usage is not supported with "
-            "Dict image_state observations"
-        )
+    _validate_sac_lazy_replay_support(config)
 
 
-def _validate_maskable_hybrid_recurrent_ppo_training_config(
+def _validate_maskable_recurrent_hybrid_ppo_config(
     config: TrainAppConfig,
 ) -> None:
     _validate_hybrid_action_adapter(
@@ -120,4 +110,17 @@ def _validate_hybrid_action_adapter(
         raise RuntimeError(
             f"{algorithm_label} requires a hybrid steer-drive action adapter "
             "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"
+        )
+
+
+def _validate_sac_lazy_replay_support(config: TrainAppConfig) -> None:
+    if config.env.observation.mode != "image_state" or not config.train.optimize_memory_usage:
+        return
+
+    stack_mode = config.env.observation.stack_mode
+    if stack_mode not in SUPPORTED_LAZY_REPLAY_STACK_MODES:
+        supported = ", ".join(sorted(SUPPORTED_LAZY_REPLAY_STACK_MODES))
+        raise RuntimeError(
+            "SAC lazy replay does not support "
+            f"observation.stack_mode={stack_mode!r}; use one of: {supported}"
         )
