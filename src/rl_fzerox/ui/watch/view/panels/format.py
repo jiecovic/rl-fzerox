@@ -111,26 +111,6 @@ def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
     return f"{width}x{height}x{channels}"
 
 
-def _format_stuck_counter(
-    info: dict[str, object],
-    *,
-    stuck_step_limit: int | None,
-) -> str:
-    if stuck_step_limit is None:
-        return f"{_int_info(info, 'stalled_steps')} / off"
-    return f"{_int_info(info, 'stalled_steps')} / {stuck_step_limit}"
-
-
-def _format_reverse_counter(
-    info: dict[str, object],
-    *,
-    wrong_way_timer_limit: int | None,
-) -> str:
-    if wrong_way_timer_limit is None:
-        return f"{_int_info(info, 'reverse_timer')} / off"
-    return f"{_int_info(info, 'reverse_timer')} / {wrong_way_timer_limit}"
-
-
 def _format_progress_frontier_counter(
     info: dict[str, object],
     *,

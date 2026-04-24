@@ -17,8 +17,6 @@ from rl_fzerox.ui.watch.view.panels.format import (
     _format_progress_frontier_counter,
     _format_reload_age,
     _format_render_rate,
-    _format_reverse_counter,
-    _format_stuck_counter,
     _int_info,
 )
 from rl_fzerox.ui.watch.view.panels.game import game_section
@@ -68,14 +66,12 @@ def _build_panel_columns(
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
     action_repeat: int,
-    stuck_step_limit: int | None,
     stuck_min_speed_kph: float,
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
     policy_deterministic: bool | None = None,
     max_episode_steps: int = 50_000,
-    wrong_way_timer_limit: int | None = 300,
     progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
@@ -149,23 +145,6 @@ def _build_panel_columns(
                             max_episode_steps=max_episode_steps,
                         ),
                         PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Stuck frames",
-                        _format_stuck_counter(info, stuck_step_limit=stuck_step_limit),
-                        PALETTE.text_warning
-                        if _int_info(info, "stalled_steps") > 0
-                        else PALETTE.text_muted,
-                    ),
-                    _panel_line(
-                        "Reverse frames",
-                        _format_reverse_counter(
-                            info,
-                            wrong_way_timer_limit=wrong_way_timer_limit,
-                        ),
-                        PALETTE.text_warning
-                        if _int_info(info, "reverse_timer") > 0
-                        else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Frontier frames",

@@ -36,7 +36,7 @@ lap_position_scale: 0.25
 # Game-ending failures: spin-out/death, crash, fall-off, or retire.
 # Raw energy depletion stays an env fallback, not a v3 failure reward event.
 failure_penalty: -50.0
-# Training guard endings: stuck/slow-speed, wrong-way, progress-stalled, or timeout.
+# Training guard endings: progress-stalled or timeout.
 truncation_penalty: -50.0
 
 # Damage: continuous anti-wall-grinding pressure.

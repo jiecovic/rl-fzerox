@@ -12,15 +12,8 @@ emulator:
 env:
   action_repeat: 1
   max_episode_steps: 50000
-  # If false, low-speed/stuck detection is still visible in info/HUD but no
-  # longer ends the episode directly.
-  stuck_truncation_enabled: true
-  stuck_step_limit: 240
+  # Low-speed threshold used for reward/HUD diagnostics.
   stuck_min_speed_kph: 60.0
-  # If false, reverse driving no longer truncates directly; progress-frontier
-  # stall can still stop episodes that stop making useful forward progress.
-  wrong_way_truncation_enabled: true
-  wrong_way_timer_limit: 240
   # Truncate if this many internal frames pass without beating the best race-distance frontier.
   progress_frontier_stall_limit_frames: 400
   # Require at least this much new race-distance to reset the frontier stall timer.

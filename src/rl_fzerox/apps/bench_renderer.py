@@ -210,8 +210,6 @@ def _step(
         stuck_min_speed_kph=60.0,
         energy_loss_epsilon=0.01,
         max_episode_steps=100_000,
-        stuck_step_limit=100_000,
-        wrong_way_timer_limit=None,
         progress_frontier_stall_limit_frames=None,
         progress_frontier_epsilon=100.0,
         terminate_on_energy_depleted=False,

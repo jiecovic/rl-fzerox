@@ -79,8 +79,6 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
             "energy_depleted",
         ),
         truncation=(
-            "stuck",
-            "wrong_way",
             "progress_stalled",
             "timeout",
         ),

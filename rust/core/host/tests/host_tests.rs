@@ -145,7 +145,7 @@ fn step_status_truncates_when_progress_frontier_stall_limit_is_reached() {
 }
 
 #[test]
-fn step_status_uses_configured_reverse_timer_limit_for_wrong_way() {
+fn step_status_tracks_reverse_timer_without_truncating() {
     let status = StepStatus::from_step(
         StepCounters::default(),
         &StepSummary {
@@ -157,7 +157,7 @@ fn step_status_uses_configured_reverse_timer_limit_for_wrong_way() {
     );
 
     assert_eq!(status.reverse_timer, 180);
-    assert_eq!(status.truncation_reason, Some("wrong_way"));
+    assert_eq!(status.truncation_reason, None);
 }
 
 #[test]
@@ -173,25 +173,6 @@ fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
     );
 
     assert_eq!(status.reverse_timer, 100);
-    assert_eq!(status.truncation_reason, None);
-}
-
-#[test]
-fn step_status_allows_disabling_wrong_way_truncation() {
-    let mut config = repeated_step_config(100, 5, 180);
-    config.wrong_way_timer_limit = None;
-
-    let status = StepStatus::from_step(
-        StepCounters::default(),
-        &StepSummary {
-            frames_run: 1,
-            ..StepSummary::default()
-        },
-        &telemetry(true, 0, 10_000),
-        config,
-    );
-
-    assert_eq!(status.reverse_timer, 10_000);
     assert_eq!(status.truncation_reason, None);
 }
 
@@ -272,8 +253,8 @@ fn step_status_ignores_energy_depletion_outside_active_race_state() {
 
 fn repeated_step_config(
     max_episode_steps: usize,
-    stuck_step_limit: usize,
-    wrong_way_timer_limit: usize,
+    _legacy_stall_limit: usize,
+    _legacy_reverse_limit: usize,
 ) -> RepeatedStepConfig {
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
@@ -287,8 +268,6 @@ fn repeated_step_config(
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
-        stuck_step_limit,
-        wrong_way_timer_limit: Some(wrong_way_timer_limit),
         progress_frontier_stall_limit_frames: Some(900),
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,

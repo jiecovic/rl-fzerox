@@ -40,6 +40,10 @@ class Emulator:
             baseline_state_path.resolve() if baseline_state_path is not None else None
         )
         self._renderer = renderer
+        if not self._core_path.is_file():
+            raise FileNotFoundError(f"Libretro core not found: {self._core_path}")
+        if not self._rom_path.is_file():
+            raise FileNotFoundError(f"ROM not found: {self._rom_path}")
         self._native = NativeEmulator(
             str(self._core_path),
             str(self._rom_path),
@@ -208,8 +212,6 @@ class Emulator:
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
-        stuck_step_limit: int,
-        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
@@ -229,8 +231,6 @@ class Emulator:
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
-            stuck_step_limit=stuck_step_limit,
-            wrong_way_timer_limit=wrong_way_timer_limit,
             progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
             progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
@@ -276,8 +276,6 @@ class Emulator:
         stuck_min_speed_kph: float,
         energy_loss_epsilon: float,
         max_episode_steps: int,
-        stuck_step_limit: int,
-        wrong_way_timer_limit: int | None,
         progress_frontier_stall_limit_frames: int | None,
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
@@ -298,8 +296,6 @@ class Emulator:
                 stuck_min_speed_kph=stuck_min_speed_kph,
                 energy_loss_epsilon=energy_loss_epsilon,
                 max_episode_steps=max_episode_steps,
-                stuck_step_limit=stuck_step_limit,
-                wrong_way_timer_limit=wrong_way_timer_limit,
                 progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
                 progress_frontier_epsilon=progress_frontier_epsilon,
                 terminate_on_energy_depleted=terminate_on_energy_depleted,

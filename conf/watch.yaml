@@ -12,9 +12,7 @@ emulator:
 env:
   action_repeat: 2
   max_episode_steps: 50000
-  stuck_step_limit: 120
   stuck_min_speed_kph: 60.0
-  wrong_way_timer_limit: 120
   # Truncate if this many internal frames pass without beating the best race-distance frontier.
   progress_frontier_stall_limit_frames: 900
   # Require at least this much new race-distance to reset the frontier stall timer.
