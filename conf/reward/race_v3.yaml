@@ -7,9 +7,9 @@
 name: race_v3
 
 # Spline coverage: distance between equally spaced reward points on the game spline.
-progress_bucket_distance: 50.0
+progress_bucket_distance: 25.0
 # Spline coverage: reward for each newly covered point.
-progress_bucket_reward: 0.1
+progress_bucket_reward: 0.05
 # Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
 progress_reward_interval_frames: 1
 # Spline coverage: when true, airborne steps do not advance/pay frontier buckets.

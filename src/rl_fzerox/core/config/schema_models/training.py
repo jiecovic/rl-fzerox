@@ -57,6 +57,7 @@ class TrainConfig(BaseModel):
     save_freq: PositiveInt = 1_000
     output_root: Path = Path("local/runs")
     run_name: str = "ppo_cnn"
+    continue_run_dir: Path | None = None
     resume_run_dir: Path | None = None
     resume_artifact: ResumeArtifact = "latest"
     resume_mode: ResumeMode = "weights_only"
@@ -85,4 +86,16 @@ class TrainConfig(BaseModel):
             raise ValueError("train.ent_coef=auto is only supported with SAC-family algorithms")
         if self.resume_run_dir is None and self.resume_mode == "full_model":
             raise ValueError("train.resume_mode=full_model requires train.resume_run_dir")
+        if self.continue_run_dir is not None:
+            if self.resume_run_dir is None:
+                raise ValueError("train.continue_run_dir requires train.resume_run_dir")
+            if self.resume_run_dir != self.continue_run_dir:
+                raise ValueError(
+                    "train.continue_run_dir must match train.resume_run_dir "
+                    "for in-place continuation"
+                )
+            if self.resume_mode != "full_model":
+                raise ValueError(
+                    "train.continue_run_dir requires train.resume_mode=full_model"
+                )
         return self

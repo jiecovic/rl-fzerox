@@ -22,6 +22,7 @@ from rl_fzerox.ui.watch.runtime.policy import (
     _policy_curriculum_stage,
     _policy_deterministic,
     _policy_label,
+    _policy_num_timesteps,
     _policy_reload_age_seconds,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import (
@@ -188,6 +189,7 @@ def _build_snapshot(
         policy_action=policy_action,
         policy_label=_policy_label(policy_runner),
         policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
+        policy_num_timesteps=_policy_num_timesteps(policy_runner),
         policy_deterministic=_policy_deterministic(
             policy_runner,
             deterministic_policy,

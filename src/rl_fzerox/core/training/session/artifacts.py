@@ -19,6 +19,7 @@ class PolicyArtifactMetadata:
 
     curriculum_stage_index: int | None
     curriculum_stage_name: str | None
+    num_timesteps: int | None
 
 
 def resolve_train_run_config(
@@ -116,15 +117,17 @@ def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata |
     return PolicyArtifactMetadata(
         curriculum_stage_index=_coerce_optional_int(data.get("curriculum_stage_index")),
         curriculum_stage_name=_coerce_optional_str(data.get("curriculum_stage_name")),
+        num_timesteps=_coerce_optional_int(data.get("num_timesteps")),
     )
 
 
-def current_policy_artifact_metadata(train_env) -> PolicyArtifactMetadata:
+def current_policy_artifact_metadata(train_env, model) -> PolicyArtifactMetadata:
     """Read the currently active curriculum stage from the vector env."""
 
     return PolicyArtifactMetadata(
         curriculum_stage_index=_first_env_attr(train_env, "curriculum_stage_index"),
         curriculum_stage_name=_first_env_attr(train_env, "curriculum_stage_name"),
+        num_timesteps=_current_num_timesteps(model),
     )
 
 
@@ -160,7 +163,14 @@ def _coerce_optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _current_num_timesteps(model: object) -> int | None:
+    value = getattr(model, "num_timesteps", None)
+    return value if isinstance(value, int) else None
+
+
 def cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:
+    if not run_paths.fresh_run:
+        return
     if not run_paths.run_dir.exists():
         return
 

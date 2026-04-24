@@ -60,6 +60,12 @@ def _policy_curriculum_stage(policy_runner: PolicyRunner | None) -> str | None:
     return policy_runner.checkpoint_curriculum_stage
 
 
+def _policy_num_timesteps(policy_runner: PolicyRunner | None) -> int | None:
+    if policy_runner is None:
+        return None
+    return policy_runner.checkpoint_num_timesteps
+
+
 def _policy_deterministic(policy_runner: PolicyRunner | None, deterministic: bool) -> bool | None:
     if policy_runner is None:
         return None

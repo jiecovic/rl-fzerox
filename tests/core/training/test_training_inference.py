@@ -369,6 +369,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
 
     assert runner.checkpoint_curriculum_stage_index is None
     assert runner.checkpoint_curriculum_stage is None
+    assert runner.checkpoint_num_timesteps is None
 
     metadata_path = tmp_path / "latest_policy.metadata.json"
     metadata_path.write_text(
@@ -376,6 +377,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
             {
                 "curriculum_stage_index": 1,
                 "curriculum_stage_name": "lean_enabled",
+                "num_timesteps": 660_000,
             }
         ),
         encoding="utf-8",
@@ -385,6 +387,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
 
     assert runner.checkpoint_curriculum_stage_index == 1
     assert runner.checkpoint_curriculum_stage == "lean_enabled"
+    assert runner.checkpoint_num_timesteps == 660_000
 
 
 def test_load_saved_policy_algorithm_rejects_auto_manifest(tmp_path: Path) -> None:

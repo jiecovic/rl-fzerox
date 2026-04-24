@@ -67,6 +67,7 @@ def draw_watch_frame(
         action_mask_branches=snapshot.action_mask_branches,
         policy_label=snapshot.policy_label,
         policy_curriculum_stage=snapshot.policy_curriculum_stage,
+        policy_num_timesteps=snapshot.policy_num_timesteps,
         policy_deterministic=snapshot.policy_deterministic,
         policy_action=snapshot.policy_action,
         policy_reload_age_seconds=snapshot.policy_reload_age_seconds,

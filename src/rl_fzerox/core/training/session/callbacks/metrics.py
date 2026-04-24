@@ -1,21 +1,9 @@
-# src/rl_fzerox/core/training/session/callbacks.py
+# src/rl_fzerox/core/training/session/callbacks/metrics.py
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
-
-from rl_fzerox.core.config.schema import (
-    CurriculumConfig,
-    CurriculumTrainOverridesConfig,
-    TrainConfig,
-)
-from rl_fzerox.core.training.runs import RunPaths
-from rl_fzerox.core.training.session.artifacts import (
-    current_policy_artifact_metadata,
-    save_artifacts_atomically,
-)
-from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
+from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,28 +88,7 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
 )
 
 
-@runtime_checkable
-class _PpoTunableModel(Protocol):
-    learning_rate: float | Callable[[float], float]
-    lr_schedule: Callable[[float], float]
-    clip_range: Callable[[float], float]
-    n_epochs: int
-    batch_size: int
-    ent_coef: float
-    policy: object
-
-
-@runtime_checkable
-class _OptimizerLike(Protocol):
-    param_groups: list[dict[str, object]]
-
-
-@runtime_checkable
-class _PolicyWithOptimizer(Protocol):
-    optimizer: _OptimizerLike
-
-
-class _LoggerLike(Protocol):
+class CallbackLogger(Protocol):
     def record(self, key: str, value: object) -> None: ...
 
 
@@ -232,14 +199,14 @@ class RolloutInfoAccumulator:
             ):
                 self.frame_ratios[spec.log_key].add(numerator, denominator)
 
-        episodes = _episode_dicts(infos)
+        episodes = episode_dicts(infos)
         self.episode_count += len(episodes)
         for spec in ROLLOUT_INFO_LOG_SPECS.episode_metrics:
             values = _numeric_episode_values(episodes, spec.info_key)
             if values:
                 self.episode_metrics[spec.info_key].add_many(values)
 
-        finished_episodes = _finished_episode_dicts(episodes)
+        finished_episodes = finished_episode_dicts(episodes)
         for spec in ROLLOUT_INFO_LOG_SPECS.finished_episode_metrics:
             values = _numeric_episode_values(finished_episodes, spec.info_key)
             if values:
@@ -259,7 +226,7 @@ class RolloutInfoAccumulator:
             if isinstance(truncation_reason, str) and truncation_reason in self.truncation_counts:
                 self.truncation_counts[truncation_reason] += 1
 
-    def record_to(self, logger: _LoggerLike) -> None:
+    def record_to(self, logger: CallbackLogger) -> None:
         for spec in ROLLOUT_INFO_LOG_SPECS.state_metrics:
             mean = self.state_metrics[spec.info_key].mean()
             if mean is not None:
@@ -304,7 +271,7 @@ class RolloutInfoAccumulator:
             )
 
     def _add_course_finish_time(self, episode: dict[str, object]) -> None:
-        course_key = _course_log_key(episode)
+        course_key = course_log_key(episode)
         if course_key is None:
             return
         race_time_ms = episode.get("race_time_ms")
@@ -315,164 +282,37 @@ class RolloutInfoAccumulator:
         )
 
 
-def build_callbacks(
-    *,
-    train_config: TrainConfig,
-    curriculum_config: CurriculumConfig,
-    run_paths: RunPaths,
-    initial_curriculum_stage_index: int | None = None,
-):
-    """Construct the SB3 callback list used during training."""
+def info_sequence(infos: object) -> Sequence[object] | None:
+    if isinstance(infos, list | tuple):
+        return infos
+    return None
 
-    try:
-        from stable_baselines3.common.callbacks import BaseCallback, CallbackList
-    except ImportError as exc:
-        raise RuntimeError(
-            "stable-baselines3 is required for training. "
-            "Install with `python -m pip install -e .[train]`."
-        ) from exc
 
-    # Keep the SB3-specific classes local so this module stays importable for
-    # tests and tooling even when the optional training extras are not present.
-    class InfoLoggingCallback(BaseCallback):
-        """Log rollout-aggregated state means and episode outcomes."""
+def episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
+    episodes: list[dict[str, object]] = []
+    for info in infos:
+        if not isinstance(info, dict):
+            continue
+        episode = info.get("episode")
+        if isinstance(episode, dict):
+            episodes.append(episode)
+    return episodes
 
-        def __init__(self) -> None:
-            super().__init__(verbose=0)
-            self._rollout_info = RolloutInfoAccumulator()
 
-        def _on_rollout_start(self) -> None:
-            self._rollout_info = RolloutInfoAccumulator()
+def finished_episode_dicts(episodes: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+    return [episode for episode in episodes if episode.get("termination_reason") == "finished"]
 
-        def _on_step(self) -> bool:
-            infos = info_sequence(self.locals.get("infos"))
-            if infos is None:
-                return True
 
-            self._rollout_info.add_infos(infos)
-            return True
-
-        def _on_rollout_end(self) -> None:
-            self._rollout_info.record_to(self.logger)
-
-    class RollingArtifactCallback(BaseCallback):
-        """Maintain rolling latest and best training artifacts."""
-
-        def __init__(self, *, save_freq: int, run_paths: RunPaths) -> None:
-            super().__init__(verbose=0)
-            self._save_freq = save_freq
-            self._run_paths = run_paths
-            self._best_episode_return: float | None = None
-
-        def _save_latest(self) -> None:
-            save_artifacts_atomically(
-                model=self.model,
-                model_path=self._run_paths.latest_model_path,
-                policy_path=self._run_paths.latest_policy_path,
-                policy_metadata=current_policy_artifact_metadata(self.training_env),
-            )
-
-        def _save_best(self, episode_return: float) -> None:
-            if (
-                self._best_episode_return is not None
-                and episode_return <= self._best_episode_return
-            ):
-                return
-            self._best_episode_return = episode_return
-            save_artifacts_atomically(
-                model=self.model,
-                model_path=self._run_paths.best_model_path,
-                policy_path=self._run_paths.best_policy_path,
-                policy_metadata=current_policy_artifact_metadata(self.training_env),
-            )
-
-        def _on_training_start(self) -> None:
-            self._save_latest()
-
-        def _on_step(self) -> bool:
-            if self.n_calls % self._save_freq == 0:
-                self._save_latest()
-
-            infos = info_sequence(self.locals.get("infos"))
-            if infos is None:
-                return True
-
-            for info in infos:
-                if not isinstance(info, dict):
-                    continue
-                episode = info.get("episode")
-                if not isinstance(episode, dict):
-                    continue
-                episode_return = episode.get("r")
-                if isinstance(episode_return, int | float):
-                    self._save_best(float(episode_return))
-            return True
-
-    class CurriculumCallback(BaseCallback):
-        """Promote curriculum stages and apply their rollout-time overrides."""
-
-        def __init__(
-            self,
-            curriculum: CurriculumConfig,
-            *,
-            initial_stage_index: int | None = None,
-        ) -> None:
-            super().__init__(verbose=0)
-            self._controller = ActionMaskCurriculumController(
-                curriculum,
-                initial_stage_index=initial_stage_index,
-            )
-
-        def _on_training_start(self) -> None:
-            self._apply_current_stage()
-
-        def _on_step(self) -> bool:
-            infos = info_sequence(self.locals.get("infos"))
-            if infos is None:
-                return True
-
-            promoted_stage = self._controller.record_episodes(_episode_dicts(infos))
-            if promoted_stage is not None:
-                self._apply_current_stage()
-            return True
-
-        def _on_rollout_end(self) -> None:
-            stage_index = self._controller.stage_index
-            self.logger.record(
-                "curriculum/stage",
-                -1 if stage_index is None else stage_index,
-            )
-            _record_stage_train_overrides(
-                logger=self.logger,
-                overrides=self._controller.stage_train_overrides,
-            )
-
-        def _apply_current_stage(self) -> None:
-            stage_index = self._controller.stage_index
-            if stage_index is None:
-                return
-            self.training_env.env_method("set_curriculum_stage", stage_index)
-            _apply_stage_train_overrides(
-                model=self.model,
-                overrides=self._controller.stage_train_overrides,
-            )
-
-    adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
-    callbacks: list[BaseCallback] = [
-        RollingArtifactCallback(
-            save_freq=adjusted_save_freq,
-            run_paths=run_paths,
-        ),
-        InfoLoggingCallback(),
-    ]
-    if curriculum_config.enabled:
-        callbacks.append(
-            CurriculumCallback(
-                curriculum_config,
-                initial_stage_index=initial_curriculum_stage_index,
-            )
-        )
-    return CallbackList(callbacks)
+def course_log_key(episode: dict[str, object]) -> str | None:
+    for key in ("track_course_id", "track_id", "track_course_name", "course_index"):
+        value = episode.get(key)
+        if isinstance(value, int):
+            return f"course_{value}"
+        if isinstance(value, str) and value.strip():
+            sanitized = _sanitize_log_component(value)
+            if sanitized:
+                return sanitized
+    return None
 
 
 def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
@@ -516,103 +356,6 @@ def _numeric_pair_values(
     return values
 
 
-def info_sequence(infos: object) -> Sequence[object] | None:
-    if isinstance(infos, list | tuple):
-        return infos
-    return None
-
-
-def _episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
-    episodes: list[dict[str, object]] = []
-    for info in infos:
-        if not isinstance(info, dict):
-            continue
-        episode = info.get("episode")
-        if isinstance(episode, dict):
-            episodes.append(episode)
-    return episodes
-
-
-def _finished_episode_dicts(episodes: Sequence[dict[str, object]]) -> list[dict[str, object]]:
-    return [episode for episode in episodes if episode.get("termination_reason") == "finished"]
-
-
-def _course_log_key(episode: dict[str, object]) -> str | None:
-    for key in ("track_course_id", "track_id", "track_course_name", "course_index"):
-        value = episode.get(key)
-        if isinstance(value, int):
-            return f"course_{value}"
-        if isinstance(value, str) and value.strip():
-            sanitized = _sanitize_log_component(value)
-            if sanitized:
-                return sanitized
-    return None
-
-
-def _sanitize_log_component(value: str) -> str:
-    normalized = value.strip().lower()
-    characters = [character if character.isalnum() else "_" for character in normalized]
-    collapsed = "_".join(part for part in "".join(characters).split("_") if part)
-    return collapsed
-
-
-def _apply_stage_train_overrides(
-    *,
-    model: object,
-    overrides: CurriculumTrainOverridesConfig | None,
-) -> None:
-    if overrides is None:
-        return
-    if not isinstance(model, _PpoTunableModel):
-        raise RuntimeError("Curriculum train overrides require a PPO-family model")
-    if overrides.learning_rate is not None:
-        _set_model_learning_rate(model, float(overrides.learning_rate))
-    if overrides.n_epochs is not None:
-        model.n_epochs = int(overrides.n_epochs)
-    if overrides.batch_size is not None:
-        model.batch_size = int(overrides.batch_size)
-    if overrides.clip_range is not None:
-        model.clip_range = _constant_schedule(float(overrides.clip_range))
-    if overrides.ent_coef is not None:
-        model.ent_coef = float(overrides.ent_coef)
-
-
-def _set_model_learning_rate(model: _PpoTunableModel, learning_rate: float) -> None:
-    model.learning_rate = learning_rate
-    model.lr_schedule = _constant_schedule(learning_rate)
-    policy = model.policy
-    if not isinstance(policy, _PolicyWithOptimizer):
-        return
-    for param_group in policy.optimizer.param_groups:
-        param_group["lr"] = learning_rate
-
-
-def _constant_schedule(value: float) -> Callable[[float], float]:
-    def schedule(_progress_remaining: float) -> float:
-        return value
-
-    return schedule
-
-
-def _record_stage_train_overrides(
-    *,
-    logger: _LoggerLike,
-    overrides: CurriculumTrainOverridesConfig | None,
-) -> None:
-    if overrides is None:
-        return
-    if overrides.learning_rate is not None:
-        logger.record("curriculum/learning_rate", float(overrides.learning_rate))
-    if overrides.n_epochs is not None:
-        logger.record("curriculum/n_epochs", int(overrides.n_epochs))
-    if overrides.batch_size is not None:
-        logger.record("curriculum/batch_size", int(overrides.batch_size))
-    if overrides.clip_range is not None:
-        logger.record("curriculum/clip_range", float(overrides.clip_range))
-    if overrides.ent_coef is not None:
-        logger.record("curriculum/ent_coef", float(overrides.ent_coef))
-
-
 def _numeric_episode_values(
     episodes: Sequence[dict[str, object]],
     key: str,
@@ -623,3 +366,10 @@ def _numeric_episode_values(
         if isinstance(value, int | float):
             values.append(float(value))
     return values
+
+
+def _sanitize_log_component(value: str) -> str:
+    normalized = value.strip().lower()
+    characters = [character if character.isalnum() else "_" for character in normalized]
+    collapsed = "_".join(part for part in "".join(characters).split("_") if part)
+    return collapsed

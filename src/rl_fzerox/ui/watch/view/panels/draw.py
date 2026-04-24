@@ -42,6 +42,7 @@ class SidePanelData:
     action_mask_branches: ActionMaskBranches
     policy_label: str | None
     policy_curriculum_stage: str | None
+    policy_num_timesteps: int | None
     policy_deterministic: bool | None
     policy_action: ActionValue | None
     policy_reload_age_seconds: float | None
@@ -101,6 +102,7 @@ def _draw_side_panel(
         action_mask_branches=data.action_mask_branches,
         policy_label=data.policy_label,
         policy_curriculum_stage=data.policy_curriculum_stage,
+        policy_num_timesteps=data.policy_num_timesteps,
         policy_deterministic=data.policy_deterministic,
         policy_action=data.policy_action,
         policy_reload_age_seconds=data.policy_reload_age_seconds,

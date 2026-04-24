@@ -33,6 +33,7 @@ class LoadedPolicy:
     device: str = "cpu"
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
+    num_timesteps: int | None = None
 
 
 class PolicyRunner:
@@ -85,6 +86,12 @@ class PolicyRunner:
         """Return the curriculum stage index saved with the current checkpoint, if any."""
 
         return self._loaded_policy.curriculum_stage_index
+
+    @property
+    def checkpoint_num_timesteps(self) -> int | None:
+        """Return the total timesteps saved with the current checkpoint, if any."""
+
+        return self._loaded_policy.num_timesteps
 
     @property
     def supports_action_masks(self) -> bool:
@@ -172,7 +179,7 @@ class PolicyRunner:
             policy_path=policy_path,
             artifact=self._loaded_policy.artifact,
             device=self._loaded_policy.device,
-            **_loaded_policy_metadata_fields(policy_path),
+            **_loaded_policy_metadata_fields(policy_path=policy_path),
         )
         self._policy_metadata_mtime_ns = policy_metadata_mtime_ns
 
@@ -198,7 +205,7 @@ def load_policy_runner(
             policy_path=policy_path,
             artifact=artifact,
             device=device,
-            **_loaded_policy_metadata_fields(policy_path),
+            **_loaded_policy_metadata_fields(policy_path=policy_path),
         ),
         policy=policy,
     )

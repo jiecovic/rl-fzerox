@@ -13,15 +13,20 @@ from rl_fzerox.core.training.session.artifacts import (
 class _LoadedPolicyMetadataFields(TypedDict):
     curriculum_stage_index: NotRequired[int | None]
     curriculum_stage_name: NotRequired[str | None]
+    num_timesteps: NotRequired[int | None]
 
 
-def _loaded_policy_metadata_fields(policy_path: Path) -> _LoadedPolicyMetadataFields:
+def _loaded_policy_metadata_fields(
+    *,
+    policy_path: Path,
+) -> _LoadedPolicyMetadataFields:
     metadata = load_policy_artifact_metadata(policy_path)
     if metadata is None:
         return {}
     return {
         "curriculum_stage_index": metadata.curriculum_stage_index,
         "curriculum_stage_name": metadata.curriculum_stage_name,
+        "num_timesteps": metadata.num_timesteps,
     }
 
 
