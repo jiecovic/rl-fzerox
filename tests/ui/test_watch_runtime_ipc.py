@@ -127,6 +127,19 @@ def test_drain_worker_commands_updates_cnn_visualization_state() -> None:
     assert commands.cnn_visualization_enabled is False
 
 
+def test_drain_worker_commands_toggles_manual_control_state() -> None:
+    command_queue = _CommandQueue([ViewerCommand(toggle_manual_control=True)])
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+        manual_control_enabled=False,
+    )
+
+    assert commands.manual_control_enabled is True
+
+
 def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
     command_queue = _ShutdownQueue()
     snapshot_queue = _ShutdownQueue()

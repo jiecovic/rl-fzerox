@@ -22,8 +22,12 @@ def expand_track_registry_metadata(
     """Expand compact course selections and enrich concrete track metadata."""
 
     expand_track_course_metadata(nested_mapping(config_data, "track"), config_root)
+    env_track_sampling = nested_mapping(config_data, "env", "track_sampling")
+    default_baseline_spec = (
+        None if env_track_sampling is None else env_track_sampling.get(REGISTRY.keys.baseline)
+    )
     expand_track_sampling_section(
-        nested_mapping(config_data, "env", "track_sampling"),
+        env_track_sampling,
         config_root,
     )
 
@@ -33,18 +37,24 @@ def expand_track_registry_metadata(
         return
     for stage in stages:
         if isinstance(stage, dict):
-            expand_track_sampling_section(nested_mapping(stage, "track_sampling"), config_root)
+            expand_track_sampling_section(
+                nested_mapping(stage, "track_sampling"),
+                config_root,
+                default_baseline_spec=default_baseline_spec,
+            )
 
 
 def expand_track_sampling_section(
     section: dict[str, object] | None,
     config_root: Path,
+    *,
+    default_baseline_spec: object = None,
 ) -> None:
     if section is None:
         return
 
     raw_courses = section.pop(REGISTRY.keys.courses, None)
-    raw_baseline_spec = section.pop(REGISTRY.keys.baseline, None)
+    raw_baseline_spec = section.pop(REGISTRY.keys.baseline, default_baseline_spec)
 
     if raw_courses is not None:
         if section.get(REGISTRY.keys.entries):

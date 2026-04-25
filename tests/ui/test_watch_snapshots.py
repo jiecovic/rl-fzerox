@@ -83,6 +83,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         policy_action=policy_action,
         policy_runner=None,
         deterministic_policy=True,
+        manual_control_enabled=True,
         policy_reload_error=None,
         cnn_activations=None,
         best_finish_position=None,
@@ -114,6 +115,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, policy_action)
+        assert snapshot.manual_control_enabled is True
         assert snapshot.action_mask_branches == {"lean": (True, False, True)}
         assert snapshot.best_finish_times == {"mute": 98_000}
         assert snapshot.latest_finish_times == {"mute": 101_000}

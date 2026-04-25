@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from rl_fzerox.core.config.schema import (
     ActionRuntimeConfig,
+    CurriculumStageConfig,
     TrackConfig,
+    TrackSamplingConfig,
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
@@ -46,7 +48,12 @@ def draw_watch_frame(
         target_control_fps=snapshot.target_control_fps,
         target_render_fps=target_render_fps,
     )
-    _add_config_track_info(draw_info, config)
+    track_pool_records = _track_pool_records(
+        config,
+        draw_info,
+        policy_stage_name=snapshot.policy_curriculum_stage,
+    )
+    _add_config_track_info(draw_info, config, track_pool_records=track_pool_records)
     return _draw_frame(
         pygame=pygame,
         screen=screen,
@@ -76,6 +83,7 @@ def draw_watch_frame(
             policy_curriculum_stage=snapshot.policy_curriculum_stage,
             policy_num_timesteps=snapshot.policy_num_timesteps,
             policy_deterministic=snapshot.policy_deterministic,
+            manual_control_enabled=snapshot.manual_control_enabled,
             policy_action=snapshot.policy_action,
             policy_reload_age_seconds=snapshot.policy_reload_age_seconds,
             policy_reload_error=snapshot.policy_reload_error,
@@ -84,7 +92,7 @@ def draw_watch_frame(
             best_finish_times=snapshot.best_finish_times,
             latest_finish_times=snapshot.latest_finish_times,
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
-            track_pool_records=_track_pool_records(config),
+            track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
@@ -118,8 +126,18 @@ def _thrust_full_threshold(action_config: ActionRuntimeConfig) -> float | None:
     return float(action_config.continuous_drive_full_threshold)
 
 
-def _add_config_track_info(info: dict[str, object], config: WatchAppConfig) -> None:
-    registry_match = _track_record_matching_info(info, _track_pool_records(config))
+def _add_config_track_info(
+    info: dict[str, object],
+    config: WatchAppConfig,
+    *,
+    track_pool_records: tuple[dict[str, object], ...] | None = None,
+) -> None:
+    records = (
+        _track_pool_records(config, info)
+        if track_pool_records is None
+        else track_pool_records
+    )
+    registry_match = _track_record_matching_info(info, records)
     if registry_match:
         for key, value in registry_match.items():
             info.setdefault(key, value)
@@ -129,11 +147,77 @@ def _add_config_track_info(info: dict[str, object], config: WatchAppConfig) -> N
     info.update(_track_config_record(config.track))
 
 
-def _track_pool_records(config: WatchAppConfig) -> tuple[dict[str, object], ...]:
-    if config.env.track_sampling.enabled and config.env.track_sampling.entries:
-        return tuple(_track_sampling_record(entry) for entry in config.env.track_sampling.entries)
+def _track_pool_records(
+    config: WatchAppConfig,
+    info: dict[str, object] | None = None,
+    *,
+    policy_stage_name: str | None = None,
+) -> tuple[dict[str, object], ...]:
+    track_sampling = _active_track_sampling(
+        config,
+        info,
+        policy_stage_name=policy_stage_name,
+    )
+    if track_sampling.enabled and track_sampling.entries:
+        return tuple(_track_sampling_record(entry) for entry in track_sampling.entries)
     track_record = _track_config_record(config.track)
     return (track_record,) if track_record else ()
+
+
+def _active_track_sampling(
+    config: WatchAppConfig,
+    info: dict[str, object] | None,
+    *,
+    policy_stage_name: str | None,
+) -> TrackSamplingConfig:
+    stage = _active_curriculum_stage(
+        config,
+        info,
+        policy_stage_name=policy_stage_name,
+    )
+    if stage is None or stage.track_sampling is None:
+        return config.env.track_sampling
+    return stage.track_sampling
+
+
+def _active_curriculum_stage(
+    config: WatchAppConfig,
+    info: dict[str, object] | None,
+    *,
+    policy_stage_name: str | None,
+) -> CurriculumStageConfig | None:
+    if not config.curriculum.enabled:
+        return None
+
+    stage_index = _curriculum_stage_index(info)
+    if stage_index is not None and 0 <= stage_index < len(config.curriculum.stages):
+        return config.curriculum.stages[stage_index]
+
+    stage_name = _curriculum_stage_name(info) or policy_stage_name
+    if stage_name is None:
+        return None
+    for stage in config.curriculum.stages:
+        if stage.name == stage_name:
+            return stage
+    return None
+
+
+def _curriculum_stage_index(info: dict[str, object] | None) -> int | None:
+    if info is None:
+        return None
+    value = info.get("curriculum_stage")
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _curriculum_stage_name(info: dict[str, object] | None) -> str | None:
+    if info is None:
+        return None
+    value = info.get("curriculum_stage_name")
+    if not isinstance(value, str) or not value:
+        return None
+    return value
 
 
 def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]:

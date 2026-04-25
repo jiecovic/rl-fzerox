@@ -61,6 +61,7 @@ class FrameRenderData:
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
     policy_deterministic: bool | None
+    manual_control_enabled: bool
     policy_action: ActionValue | None
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
@@ -250,6 +251,7 @@ def _draw_frame(
             policy_curriculum_stage=data.policy_curriculum_stage,
             policy_num_timesteps=data.policy_num_timesteps,
             policy_deterministic=data.policy_deterministic,
+            manual_control_enabled=data.manual_control_enabled,
             policy_action=data.policy_action,
             policy_reload_age_seconds=data.policy_reload_age_seconds,
             policy_reload_error=data.policy_reload_error,

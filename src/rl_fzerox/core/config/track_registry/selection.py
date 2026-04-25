@@ -10,7 +10,7 @@ from rl_fzerox.core.config.track_registry_types import (
     CourseSelection,
 )
 from rl_fzerox.core.config.vehicle_catalog import resolve_engine_setting
-from rl_fzerox.core.domain.courses import built_in_course_ref_by_id
+from rl_fzerox.core.domain.courses import built_in_course_ref_by_id, built_in_course_refs_by_cup
 
 from .common import optional_weight
 from .registry import iter_external_course_configs
@@ -28,35 +28,47 @@ def entries_from_courses(
     variant = baseline_variant(raw_baseline_spec, config_root=config_root)
     entries: list[dict[str, object]] = []
     for raw_course in raw_courses:
-        selection = course_selection(raw_course, config_root=config_root)
-        entries.append(
-            entry_from_course_variant(
-                course_ref=selection.ref,
-                variant=variant,
-                weight=selection.weight,
-                config_root=config_root,
+        for selection in course_selections(raw_course, config_root=config_root):
+            entries.append(
+                entry_from_course_variant(
+                    course_ref=selection.ref,
+                    variant=variant,
+                    weight=selection.weight,
+                    config_root=config_root,
+                )
             )
-        )
     return entries
 
 
-def course_selection(raw_course: object, *, config_root: Path) -> CourseSelection:
+def course_selections(raw_course: object, *, config_root: Path) -> tuple[CourseSelection, ...]:
+    """Resolve one course selector, including cup-wide selectors."""
+
     if isinstance(raw_course, str):
-        return CourseSelection(ref=course_ref_by_id(raw_course, config_root=config_root))
+        return (CourseSelection(ref=course_ref_by_id(raw_course, config_root=config_root)),)
     if not isinstance(raw_course, Mapping):
         raise TypeError("track_sampling.courses entries must be strings or mappings")
 
     course_id = raw_course.get(REGISTRY.keys.id)
-    if not isinstance(course_id, str) or not course_id:
-        raise ValueError("course selection mappings must define a non-empty id")
     cup = raw_course.get(REGISTRY.keys.cup)
     if cup is not None and (not isinstance(cup, str) or not cup):
         raise ValueError("course selection cup must be a non-empty string when set")
     weight = optional_weight(raw_course.get(REGISTRY.keys.weight), label="course weight")
-    return CourseSelection(
-        ref=course_ref_by_id(course_id, cup=cup, config_root=config_root),
-        weight=weight,
-    )
+
+    if isinstance(course_id, str) and course_id:
+        return (
+            CourseSelection(
+                ref=course_ref_by_id(course_id, cup=cup, config_root=config_root),
+                weight=weight,
+            ),
+        )
+    if course_id is not None:
+        raise ValueError("course selection id must be a non-empty string when set")
+    if isinstance(cup, str):
+        return tuple(
+            CourseSelection(ref=ref, weight=weight)
+            for ref in course_refs_by_cup(cup, config_root=config_root)
+        )
+    raise ValueError("course selection mappings must define a non-empty id or cup")
 
 
 def course_ref_by_id(
@@ -77,6 +89,18 @@ def course_ref_by_id(
     if len(matches) > 1:
         raise ValueError(f"Course id {course_id!r} is ambiguous; use a mapping with id and cup")
     return matches[0]
+
+
+def course_refs_by_cup(cup: str, *, config_root: Path) -> tuple[str, ...]:
+    matches = list(built_in_course_refs_by_cup(cup))
+    matches.extend(
+        ref
+        for ref, course in iter_external_course_configs(config_root=config_root)
+        if course.get("cup") == cup
+    )
+    if not matches:
+        raise FileNotFoundError(f"Course registry cup not found: {cup!r}")
+    return tuple(matches)
 
 
 def baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> BaselineVariant:

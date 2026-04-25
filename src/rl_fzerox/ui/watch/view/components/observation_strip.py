@@ -5,6 +5,10 @@ from dataclasses import dataclass
 
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.game_view import _glass_overlay_surface
+from rl_fzerox.ui.watch.view.components.macro_legend import (
+    _draw_macro_legend,
+    _macro_legend_height,
+)
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _observation_minimap_layer,
@@ -96,8 +100,18 @@ def _draw_observation_preview_in_rect(
     labels = _observation_tile_label_texts(observation_shape, info=info)
     label_gap = 5 if labels else 0
     label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
+    legend_height = _macro_legend_height(fonts=fonts, width=width)
+    legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
     max_preview_width = width - (2 * glass_padding)
-    max_preview_height = bottom - y - (2 * glass_padding) - label_gap - label_row_height
+    max_preview_height = (
+        bottom
+        - y
+        - (2 * glass_padding)
+        - label_gap
+        - label_row_height
+        - legend_gap
+        - legend_height
+    )
     if max_preview_width <= 0 or max_preview_height <= 0:
         return
 
@@ -149,6 +163,16 @@ def _draw_observation_preview_in_rect(
         observation_shape=observation_shape,
         info=info,
     )
+    legend_y = glass_rect.bottom + legend_gap
+    if legend_y + legend_height <= bottom:
+        _draw_macro_legend(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=legend_y,
+            width=width,
+        )
 
 
 def _draw_outer_preview_border(

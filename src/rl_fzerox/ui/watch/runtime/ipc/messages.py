@@ -20,6 +20,7 @@ class ViewerCommand:
     save_state: bool = False
     force_reset: bool = False
     toggle_deterministic_policy: bool = False
+    toggle_manual_control: bool = False
     control_fps_delta: int = 0
     cnn_visualization_enabled: bool = False
     control_state: ControllerState | None = None
@@ -35,6 +36,7 @@ class WorkerCommandBatch:
     save_requests: int
     reset_requested: bool
     toggle_deterministic_policy: bool
+    manual_control_enabled: bool
     control_fps_delta: int
     cnn_visualization_enabled: bool
     control_state: ControllerState
@@ -73,6 +75,7 @@ class WatchSnapshot:
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
     policy_deterministic: bool | None
+    manual_control_enabled: bool
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None

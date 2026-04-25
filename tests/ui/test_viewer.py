@@ -17,12 +17,19 @@ from rl_fzerox.core.envs.observations import (
     DEFAULT_STATE_VECTOR_SPEC,
     state_feature_names,
 )
+from rl_fzerox.ui.watch.view.components.macro_legend import (
+    MACRO_LEGEND_HINTS,
+    _macro_legend_rows,
+)
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_policy_action,
     _format_reload_age,
     _pressed_button_labels,
 )
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from tests.ui.viewer_support import (
+    fake_viewer_fonts,
+)
 from tests.ui.viewer_support import (
     panel_group_labels as _panel_group_labels,
 )
@@ -237,7 +244,7 @@ def test_display_section_includes_action_repeat() -> None:
     assert render_rate_line.value == "60.0 / 60.0"
 
 
-def test_keys_section_lists_watch_hotkeys() -> None:
+def test_macro_legend_replaces_side_panel_key_lines() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={},
@@ -258,10 +265,38 @@ def test_keys_section_lists_watch_hotkeys() -> None:
 
     display_section = next(section for section in columns.middle if section.title == "Display")
     key_map = {line.label: line.value for line in display_section.lines}
+    hint_map = {hint.keys: (hint.controller, hint.action) for hint in MACRO_LEGEND_HINTS}
 
-    assert key_map["Keys"] == "P pause  N step  +/- speed"
-    assert key_map["More keys"] == "R reset  K save  D/click policy"
-    assert "Manual" not in key_map
+    assert "Keys" not in key_map
+    assert "More keys" not in key_map
+    assert hint_map == {
+        "Esc": (None, "close"),
+        "P": (None, "pause"),
+        "N": (None, "step"),
+        "R": (None, "reset"),
+        "K": (None, "save"),
+        "M": (None, "manual"),
+        "D/click": (None, "policy"),
+        "Tab / 1-6": (None, "tabs"),
+        "+/-": (None, "speed"),
+        "<-/->": ("stick X", "steer"),
+        "up/down": ("stick Y", "pitch"),
+        "Z": ("A", "accelerate"),
+        "X": ("C-down", "air brake"),
+        "Space": ("B", "boost"),
+        "A": ("Z", "lean left"),
+        "S": ("R", "lean right"),
+        "Enter": ("Start", "start"),
+    }
+
+
+def test_macro_legend_wraps_inside_preview_column() -> None:
+    fonts = fake_viewer_fonts()
+    rows = _macro_legend_rows(font=fonts.small, width=568)
+
+    assert len(rows) > 1
+    assert tuple(hint for row in rows for hint in row) == MACRO_LEGEND_HINTS
+
 
 def test_side_panel_can_show_policy_observation_state_vector() -> None:
     columns = _build_panel_columns(
@@ -523,6 +558,34 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
     )
 
     assert deterministic_line.value == "stochastic"
+
+
+def test_session_section_shows_manual_driver_mode() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_label="latest",
+        policy_curriculum_stage=None,
+        policy_deterministic=False,
+        manual_control_enabled=True,
+        policy_action=None,
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Session")
+    driver_line = next(line for line in session_section.lines if line.label == "Driver")
+
+    assert driver_line.value == "manual"
 
 
 def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None:

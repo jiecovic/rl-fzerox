@@ -104,6 +104,7 @@ def _run_simulation_loop(
         latest_finish_deltas_ms: dict[str, int] = {}
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
+        manual_control_enabled = policy_runner is None
         manual_control_state = ControllerState()
         cnn_visualization_enabled = False
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
@@ -142,6 +143,7 @@ def _run_simulation_loop(
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     deterministic_policy=deterministic_policy,
+                    manual_control_enabled=manual_control_enabled,
                     policy_reload_error=policy_reload_error,
                     cnn_activations=None,
                     best_finish_position=best_finish_position,
@@ -156,7 +158,11 @@ def _run_simulation_loop(
                     command_queue,
                     paused=paused,
                     control_state=manual_control_state,
+                    manual_control_enabled=manual_control_enabled,
                     cnn_visualization_enabled=cnn_visualization_enabled,
+                )
+                manual_control_enabled = (
+                    True if policy_runner is None else commands.manual_control_enabled
                 )
                 cnn_visualization_enabled = commands.cnn_visualization_enabled
                 if commands.quit_requested:
@@ -179,7 +185,7 @@ def _run_simulation_loop(
                     )
                 if commands.toggle_deterministic_policy and policy_runner is not None:
                     deterministic_policy = not deterministic_policy
-                if policy_runner is None:
+                if manual_control_enabled:
                     current_control_state = commands.control_state
 
                 policy_reload_error = _policy_reload_error(policy_runner)
@@ -204,7 +210,7 @@ def _run_simulation_loop(
                 previous_episode_reward = episode_reward
                 previous_telemetry = _read_live_telemetry(emulator)
                 decision_action_mask = env.action_mask_snapshot()
-                if policy_runner is None:
+                if manual_control_enabled:
                     if single_frame_manual:
                         observation, reward, terminated, truncated, info = env.step_frame(
                             current_control_state
@@ -219,6 +225,7 @@ def _run_simulation_loop(
                     current_gas_level = env.last_gas_level
                     cnn_activations = None
                 else:
+                    assert policy_runner is not None
                     _sync_policy_curriculum_stage(policy_runner, env)
                     decision_action_mask = env.action_mask_snapshot()
                     policy_action_mask = (
@@ -310,6 +317,7 @@ def _run_simulation_loop(
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    manual_control_enabled=manual_control_enabled,
                 )
                 if target_control_seconds is not None:
                     now = time.perf_counter()

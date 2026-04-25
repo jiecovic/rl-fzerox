@@ -27,17 +27,31 @@ class CurriculumTrainOverridesConfig(BaseModel):
     ent_coef: NonNegativeFloat | None = None
 
 
+class PerTrackLapsCompletedTriggerConfig(BaseModel):
+    """Promotion gate requiring broad per-track lap progress."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mean_gte: NonNegativeFloat
+    min_track_fraction_gte: float = Field(default=0.75, gt=0.0, le=1.0)
+    min_episodes_per_track: PositiveInt = 1
+
+
 class CurriculumTriggerConfig(BaseModel):
     """Episode-smoothed promotion condition for one curriculum stage."""
 
     model_config = ConfigDict(extra="forbid")
 
     race_laps_completed_mean_gte: NonNegativeFloat | None = None
+    per_track_laps_completed: PerTrackLapsCompletedTriggerConfig | None = None
 
     @model_validator(mode="after")
-    def _validate_exactly_one_trigger(self) -> CurriculumTriggerConfig:
-        if self.race_laps_completed_mean_gte is None:
-            raise ValueError("Curriculum stage triggers must set race_laps_completed_mean_gte")
+    def _validate_has_trigger(self) -> CurriculumTriggerConfig:
+        if self.race_laps_completed_mean_gte is None and self.per_track_laps_completed is None:
+            raise ValueError(
+                "Curriculum stage triggers must set race_laps_completed_mean_gte "
+                "or per_track_laps_completed"
+            )
         return self
 
 

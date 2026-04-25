@@ -73,6 +73,7 @@ def _build_panel_columns(
     observation_shape: tuple[int, ...],
     telemetry: FZeroXTelemetry | None,
     policy_deterministic: bool | None = None,
+    manual_control_enabled: bool = False,
     max_episode_steps: int = 50_000,
     progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: StateVector | None = None,
@@ -98,6 +99,17 @@ def _build_panel_columns(
                         "Stage",
                         curriculum_stage,
                         PALETTE.text_primary if curriculum_stage != "-" else PALETTE.text_muted,
+                    ),
+                    _panel_line(
+                        "Driver",
+                        _format_driver_mode(
+                            policy_label=policy_label,
+                            manual_control_enabled=manual_control_enabled,
+                        ),
+                        _driver_mode_color(
+                            policy_label=policy_label,
+                            manual_control_enabled=manual_control_enabled,
+                        ),
                     ),
                     _panel_line(
                         "Deterministic",
@@ -212,8 +224,6 @@ def _build_panel_columns(
                         _format_render_rate(info),
                         PALETTE.text_primary,
                     ),
-                    _panel_line("Keys", "P pause  N step  +/- speed", PALETTE.text_muted),
-                    _panel_line("More keys", "R reset  K save  D/click policy", PALETTE.text_muted),
                 ],
             ),
             *track_geometry_sections(telemetry),
@@ -322,6 +332,24 @@ def _format_policy_deterministic(value: bool | None) -> str:
     if value is None:
         return "-"
     return "deterministic" if value else "stochastic"
+
+
+def _format_driver_mode(*, policy_label: str | None, manual_control_enabled: bool) -> str:
+    if policy_label is None or manual_control_enabled:
+        return "manual"
+    return "policy"
+
+
+def _driver_mode_color(
+    *,
+    policy_label: str | None,
+    manual_control_enabled: bool,
+) -> tuple[int, int, int]:
+    if manual_control_enabled:
+        return PALETTE.text_warning
+    if policy_label is not None:
+        return PALETTE.text_accent
+    return PALETTE.text_primary
 
 
 def _format_env_curriculum_stage(info: dict[str, object]) -> str:

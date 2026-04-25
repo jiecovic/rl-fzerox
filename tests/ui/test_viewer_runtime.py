@@ -2,8 +2,12 @@
 from pathlib import Path
 
 from rl_fzerox.core.config.schema import (
+    CurriculumConfig,
+    CurriculumStageConfig,
     EmulatorConfig,
     EnvConfig,
+    TrackRecordEntryConfig,
+    TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
     WatchAppConfig,
@@ -20,7 +24,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
-from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info
+from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info, _track_pool_records
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 
@@ -184,6 +188,75 @@ def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -
 
     assert info["track_id"] == "mute_city"
     assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Balanced"
+
+
+def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    mute_baseline_path = tmp_path / "mute.state"
+    port_baseline_path = tmp_path / "port.state"
+    white_land_baseline_path = tmp_path / "white_land.state"
+    core_path.touch()
+    rom_path.touch()
+    mute_baseline_path.write_bytes(b"mute")
+    port_baseline_path.write_bytes(b"port")
+    white_land_baseline_path.write_bytes(b"white")
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city",
+                        display_name="Mute City Time Attack - Blue Falcon Balanced",
+                        baseline_state_path=mute_baseline_path,
+                        course_index=0,
+                    ),
+                ),
+            )
+        ),
+        curriculum=CurriculumConfig(
+            enabled=True,
+            stages=(
+                CurriculumStageConfig(name="jack"),
+                CurriculumStageConfig(
+                    name="queen_seed",
+                    track_sampling=TrackSamplingConfig(
+                        enabled=True,
+                        entries=(
+                            TrackSamplingEntryConfig(
+                                id="port_town",
+                                display_name="Port Town Time Attack - Blue Falcon Balanced",
+                                baseline_state_path=port_baseline_path,
+                                course_index=7,
+                                records=TrackRecordsConfig(
+                                    non_agg_best=TrackRecordEntryConfig(time_ms=73_000),
+                                ),
+                            ),
+                            TrackSamplingEntryConfig(
+                                id="white_land",
+                                display_name="White Land Time Attack - Blue Falcon Balanced",
+                                baseline_state_path=white_land_baseline_path,
+                                course_index=8,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    info: dict[str, object] = {"course_index": 7, "curriculum_stage": 1}
+
+    _add_config_track_info(info, config)
+
+    assert [record["track_id"] for record in _track_pool_records(config, info)] == [
+        "port_town",
+        "white_land",
+    ]
+    assert info["track_id"] == "port_town"
+    assert info["track_display_name"] == "Port Town Time Attack - Blue Falcon Balanced"
+    assert info["track_non_agg_best_time_ms"] == 73_000
 
 
 def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:

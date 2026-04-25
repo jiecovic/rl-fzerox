@@ -16,6 +16,7 @@ from rl_fzerox.core.config.schema import (
     CurriculumTriggerConfig,
     EmulatorConfig,
     EnvConfig,
+    PerTrackLapsCompletedTriggerConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
     TrackSamplingConfig,
@@ -536,6 +537,97 @@ def test_curriculum_controller_promotes_after_smoothed_finish_threshold() -> Non
     assert promoted_stage == 1
     assert controller.stage_index == 1
     assert controller.stage_name == "lean_enabled"
+
+
+def test_curriculum_controller_requires_per_track_lap_coverage() -> None:
+    controller = ActionMaskCurriculumController(
+        CurriculumConfig(
+            enabled=True,
+            smoothing_episodes=4,
+            min_stage_episodes=3,
+            stages=(
+                CurriculumStageConfig(
+                    name="jack",
+                    until=CurriculumTriggerConfig(
+                        per_track_laps_completed=PerTrackLapsCompletedTriggerConfig(
+                            mean_gte=0.5,
+                            min_track_fraction_gte=1.0,
+                            min_episodes_per_track=1,
+                        )
+                    ),
+                    track_sampling=TrackSamplingConfig(
+                        enabled=True,
+                        entries=(
+                            TrackSamplingEntryConfig(id="a", course_id="a"),
+                            TrackSamplingEntryConfig(id="b", course_id="b"),
+                            TrackSamplingEntryConfig(id="c", course_id="c"),
+                        ),
+                    ),
+                ),
+                CurriculumStageConfig(name="queen_seed"),
+            ),
+        )
+    )
+
+    assert (
+        controller.record_episodes(
+            [
+                {"track_course_id": "a", "race_laps_completed": 1},
+                {"track_course_id": "b", "race_laps_completed": 1},
+                {"track_course_id": "a", "race_laps_completed": 1},
+            ]
+        )
+        is None
+    )
+
+    promoted_stage = controller.record_episodes(
+        [{"track_course_id": "c", "race_laps_completed": 1}]
+    )
+
+    assert promoted_stage == 1
+    assert controller.stage_name == "queen_seed"
+
+
+def test_curriculum_controller_allows_per_track_fraction_gate() -> None:
+    controller = ActionMaskCurriculumController(
+        CurriculumConfig(
+            enabled=True,
+            smoothing_episodes=4,
+            min_stage_episodes=3,
+            stages=(
+                CurriculumStageConfig(
+                    name="jack",
+                    until=CurriculumTriggerConfig(
+                        per_track_laps_completed=PerTrackLapsCompletedTriggerConfig(
+                            mean_gte=0.5,
+                            min_track_fraction_gte=0.5,
+                            min_episodes_per_track=1,
+                        )
+                    ),
+                    track_sampling=TrackSamplingConfig(
+                        enabled=True,
+                        entries=(
+                            TrackSamplingEntryConfig(id="a", course_id="a"),
+                            TrackSamplingEntryConfig(id="b", course_id="b"),
+                            TrackSamplingEntryConfig(id="c", course_id="c"),
+                            TrackSamplingEntryConfig(id="d", course_id="d"),
+                        ),
+                    ),
+                ),
+                CurriculumStageConfig(name="queen_seed"),
+            ),
+        )
+    )
+
+    promoted_stage = controller.record_episodes(
+        [
+            {"track_course_id": "a", "race_laps_completed": 1},
+            {"track_course_id": "b", "race_laps_completed": 1},
+            {"track_course_id": "c", "race_laps_completed": 0},
+        ]
+    )
+
+    assert promoted_stage == 1
 
 
 def test_curriculum_controller_exposes_active_train_overrides() -> None:

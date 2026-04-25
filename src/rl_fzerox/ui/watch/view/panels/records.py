@@ -1,9 +1,22 @@
 # src/rl_fzerox/ui/watch/view/panels/records.py
 from __future__ import annotations
 
-from rl_fzerox.ui.watch.view.panels.lines import panel_divider, panel_line
+from dataclasses import dataclass
+
+from rl_fzerox.ui.watch.view.panels.lines import panel_divider, panel_heading, panel_line
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, StatusIcon
+
+
+@dataclass(frozen=True, slots=True)
+class _RecordGroup:
+    cup: str | None
+    records: tuple[dict[str, object], ...]
+    first_index: int
+
+
+_BUILT_IN_CUP_ORDER = ("jack", "queen", "king", "joker")
+_BUILT_IN_COURSES_PER_CUP = 6
 
 
 def track_record_sections(
@@ -18,20 +31,77 @@ def track_record_sections(
     if not records and not best_finish_times and not latest_finish_times:
         return ()
     lines: list[PanelLine] = []
-    for index, record in enumerate(records):
-        if index > 0:
+    record_groups = _record_groups(records)
+    show_cup_headings = len(records) > 1 and any(group.cup is not None for group in record_groups)
+    for group_index, group in enumerate(record_groups):
+        if group_index > 0:
             lines.append(panel_divider())
-        lines.extend(
-            _track_record_pool_lines(
-                record,
-                best_finish_times=best_finish_times,
-                latest_finish_times=latest_finish_times,
-                latest_finish_deltas_ms=latest_finish_deltas_ms,
+        if show_cup_headings:
+            lines.append(panel_heading(_format_cup_label(group.cup)))
+        for record_index, record in enumerate(group.records):
+            if record_index > 0:
+                lines.append(panel_divider())
+            lines.extend(
+                _track_record_pool_lines(
+                    record,
+                    best_finish_times=best_finish_times,
+                    latest_finish_times=latest_finish_times,
+                    latest_finish_deltas_ms=latest_finish_deltas_ms,
+                )
             )
-        )
     if not lines:
         return ()
     return (PanelSection(title="Records", lines=lines),)
+
+
+def _record_groups(records: tuple[dict[str, object], ...]) -> tuple[_RecordGroup, ...]:
+    records_by_cup: dict[str | None, list[dict[str, object]]] = {}
+    first_index_by_cup: dict[str | None, int] = {}
+    for index, record in enumerate(records):
+        cup = _record_cup(record)
+        records_by_cup.setdefault(cup, []).append(record)
+        first_index_by_cup.setdefault(cup, index)
+
+    groups = tuple(
+        _RecordGroup(
+            cup=cup,
+            records=tuple(group_records),
+            first_index=first_index_by_cup[cup],
+        )
+        for cup, group_records in records_by_cup.items()
+    )
+    return tuple(sorted(groups, key=_record_group_sort_key))
+
+
+def _record_group_sort_key(group: _RecordGroup) -> tuple[int, int]:
+    if group.cup in _BUILT_IN_CUP_ORDER:
+        return (0, _BUILT_IN_CUP_ORDER.index(group.cup))
+    if group.cup is None:
+        return (2, group.first_index)
+    return (1, group.first_index)
+
+
+def _record_cup(record: dict[str, object]) -> str | None:
+    course_ref = record.get("track_course_ref")
+    if isinstance(course_ref, str) and "/" in course_ref:
+        cup = course_ref.split("/", maxsplit=1)[0].strip().lower()
+        if cup:
+            return cup
+
+    course_index = record.get("track_course_index", record.get("course_index"))
+    if isinstance(course_index, bool) or not isinstance(course_index, int):
+        return None
+    cup_index = course_index // _BUILT_IN_COURSES_PER_CUP
+    if 0 <= cup_index < len(_BUILT_IN_CUP_ORDER):
+        return _BUILT_IN_CUP_ORDER[cup_index]
+    return None
+
+
+def _format_cup_label(cup: str | None) -> str:
+    if cup is None:
+        return "Other"
+    label = _format_mode_name(cup)
+    return label if label.lower().endswith("cup") else f"{label} Cup"
 
 
 def _current_track_record_pool(info: dict[str, object]) -> tuple[dict[str, object], ...]:

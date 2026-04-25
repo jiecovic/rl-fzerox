@@ -85,6 +85,18 @@ def lean_low_speed_penalty(
     return max(int(summary.frames_run), 0) * penalty
 
 
+def lean_request_penalty(
+    summary: StepSummary,
+    action_context: RewardActionContext | None,
+    *,
+    weights: RaceV3RewardWeights,
+) -> float:
+    penalty = weights.lean_request_penalty
+    if penalty >= 0.0 or action_context is None or not action_context.lean_requested:
+        return 0.0
+    return max(int(summary.frames_run), 0) * penalty
+
+
 def manual_boost_reward(
     action_context: RewardActionContext | None,
     *,
