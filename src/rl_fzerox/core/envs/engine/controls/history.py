@@ -45,6 +45,7 @@ class ControlStateTracker:
     """
 
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
+    lean_initial_lockout_frames: int = 0
     boost_decision_interval_frames: int = 1
     boost_request_lockout_frames: int = 0
     action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len
@@ -194,6 +195,9 @@ class ControlStateTracker:
 
     def lean_action_mask_override(self) -> tuple[int, ...] | None:
         """Return live lean branch restrictions implied by the selected mode."""
+
+        if self._episode_frame_index < max(int(self.lean_initial_lockout_frames), 0):
+            return (0,)
 
         if self.lean_mode == LEAN_MODE_MINIMUM_HOLD:
             if self._lean_lock_remaining_frames <= 0 or self._lean_lock_index == 0:

@@ -226,6 +226,7 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
             "        mask: [idle, left, right]",
             "        mode: release_cooldown",
             "        unmask_min_speed_kph: null",
+            "        initial_lockout_frames: 6",
             "train:",
             "  algorithm: maskable_hybrid_recurrent_ppo",
             "  total_timesteps: 1000",
@@ -245,6 +246,7 @@ def test_load_train_app_config_compiles_action_branches(tmp_path: Path) -> None:
     assert action_config.boost_decision_interval_frames == 1
     assert action_config.boost_request_lockout_frames == 5
     assert action_config.lean_unmask_min_speed_kph is None
+    assert action_config.lean_initial_lockout_frames == 6
     assert action_config.lean_mode == "release_cooldown"
     assert action_config.mask_overrides == {
         "gas": (0, 1),
@@ -518,6 +520,7 @@ def test_load_train_app_config_rejects_masked_continuous_action_branch(
 
     with pytest.raises(ValueError, match="continuous action branch 'steer' cannot define a mask"):
         load_train_app_config(config_path)
+
 
 def test_load_train_app_config_accepts_lean_fields(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"

@@ -8,6 +8,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeFloat,
+    NonNegativeInt,
     PositiveFloat,
     ValidationInfo,
     field_validator,
@@ -96,6 +97,7 @@ class ActionRuntimeConfig:
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
     lean_unmask_min_speed_kph: float | None
+    lean_initial_lockout_frames: int
     mask_overrides: ActionMaskOverrides | None
 
     @classmethod
@@ -122,6 +124,7 @@ class ActionRuntimeConfig:
                 if config.lean_unmask_min_speed_kph is None
                 else float(config.lean_unmask_min_speed_kph)
             ),
+            lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
             mask_overrides=config.mask.branch_overrides() if config.mask is not None else None,
         )
 
@@ -165,6 +168,11 @@ class ActionRuntimeConfig:
             boost_decision_interval_frames=ACTION_RUNTIME_DEFAULTS.boost_decision_interval_frames,
             boost_request_lockout_frames=ACTION_RUNTIME_DEFAULTS.boost_request_lockout_frames,
             lean_unmask_min_speed_kph=compilation.lean_unmask_min_speed_kph,
+            lean_initial_lockout_frames=(
+                int(config.lean_initial_lockout_frames)
+                if compilation.lean_initial_lockout_frames is None
+                else int(compilation.lean_initial_lockout_frames)
+            ),
             mask_overrides=compilation.mask_overrides,
         )
 
@@ -185,12 +193,12 @@ class ActionConfig(BaseModel):
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
+    lean_initial_lockout_frames: NonNegativeInt = 0
     mask: ActionMaskConfig | None = None
     branches: ActionBranchesConfig | None = None
 
     def runtime(self) -> ActionRuntimeConfig:
-        """Return the concrete adapter config consumed by env/runtime code.
-        """
+        """Return the concrete adapter config consumed by env/runtime code."""
 
         if self.branches is None:
             return ActionRuntimeConfig.from_config(self)
