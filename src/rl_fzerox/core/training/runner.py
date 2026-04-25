@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/training/runner.py
 from __future__ import annotations
 
+from operator import attrgetter
+
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import (
@@ -82,6 +84,7 @@ def run_training(config: TrainAppConfig) -> None:
             policy_metadata=current_policy_artifact_metadata(train_env, model),
         )
         callbacks = build_callbacks(
+            env_config=run_config.env,
             train_config=run_config.train,
             curriculum_config=run_config.curriculum,
             run_paths=run_paths,
@@ -139,9 +142,9 @@ def _resume_curriculum_stage_index(config: TrainAppConfig) -> int | None:
 
 def _learn_model(
     *,
-    model,
+    model: object,
     total_timesteps: int,
-    callback,
+    callback: object,
     use_masking: bool,
     progress_bar: bool,
     reset_num_timesteps: bool,
@@ -157,7 +160,8 @@ def _learn_model(
         MaskableHybridActionSAC = None
 
     if MaskableHybridActionSAC is not None and isinstance(model, MaskableHybridActionSAC):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
@@ -167,7 +171,8 @@ def _learn_model(
         return
 
     if isinstance(model, SAC):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             progress_bar=progress_bar,
@@ -176,7 +181,8 @@ def _learn_model(
         return
 
     if isinstance(model, MaskablePPO):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
@@ -191,7 +197,8 @@ def _learn_model(
         MaskableRecurrentPPO = None
 
     if MaskableRecurrentPPO is not None and isinstance(model, MaskableRecurrentPPO):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
@@ -206,7 +213,8 @@ def _learn_model(
         MaskableHybridRecurrentPPO = None
 
     if MaskableHybridRecurrentPPO is not None and isinstance(model, MaskableHybridRecurrentPPO):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
@@ -221,7 +229,8 @@ def _learn_model(
         MaskableHybridActionPPO = None
 
     if MaskableHybridActionPPO is not None and isinstance(model, MaskableHybridActionPPO):
-        model.learn(
+        _call_learn(
+            model,
             total_timesteps=total_timesteps,
             callback=callback,
             use_masking=use_masking,
@@ -231,3 +240,10 @@ def _learn_model(
         return
 
     raise TypeError(f"Unsupported training model type: {type(model).__name__}")
+
+
+def _call_learn(model: object, **kwargs: object) -> None:
+    # SB3 and sb3x expose different typed learn signatures; runtime checks above
+    # select the compatible kwargs before crossing that dynamic boundary.
+    learn = attrgetter("learn")(model)
+    learn(**kwargs)

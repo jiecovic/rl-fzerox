@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
+import math
+
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
@@ -95,6 +97,7 @@ class FZeroXEnvEngine:
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
         )
+        self._track_sampling_weight_overrides: dict[str, float] = {}
         self._active_track_sampling = self._stage_track_sampling_config(
             self._mask_controller.stage_index
         )
@@ -164,6 +167,21 @@ class FZeroXEnvEngine:
         """Align watch-time stage masks with the loaded checkpoint metadata."""
 
         self._mask_controller.sync_checkpoint_stage(stage_index)
+        self._active_track_sampling = self._stage_track_sampling_config(
+            self._mask_controller.stage_index
+        )
+
+    def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
+        """Update adaptive reset weights used by step-balanced track sampling."""
+
+        self._track_sampling_weight_overrides = {
+            str(track_id): float(weight)
+            for track_id, weight in weights_by_track_id.items()
+            if isinstance(track_id, str)
+            and isinstance(weight, int | float)
+            and math.isfinite(float(weight))
+            and float(weight) > 0.0
+        }
         self._active_track_sampling = self._stage_track_sampling_config(
             self._mask_controller.stage_index
         )
@@ -387,9 +405,25 @@ class FZeroXEnvEngine:
             or not self._curriculum_config.enabled
             or stage_index is None
         ):
-            return self.config.track_sampling
+            return self._track_sampling_with_weight_overrides(self.config.track_sampling)
         stage = self._curriculum_config.stages[stage_index]
-        return stage.track_sampling or self.config.track_sampling
+        return self._track_sampling_with_weight_overrides(
+            stage.track_sampling or self.config.track_sampling
+        )
+
+    def _track_sampling_with_weight_overrides(
+        self,
+        config: TrackSamplingConfig,
+    ) -> TrackSamplingConfig:
+        if config.sampling_mode != "step_balanced" or not self._track_sampling_weight_overrides:
+            return config
+        entries = tuple(
+            entry.model_copy(
+                update={"weight": self._track_sampling_weight_overrides.get(entry.id, entry.weight)}
+            )
+            for entry in config.entries
+        )
+        return config.model_copy(update={"entries": entries})
 
     def _run_env_step(
         self,
