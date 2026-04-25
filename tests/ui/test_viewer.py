@@ -1,239 +1,37 @@
 # tests/ui/test_viewer.py
-import os
 from pathlib import Path
 
 import numpy as np
-import pygame
 
 from fzerox_emulator import (
     JOYPAD_A,
     JOYPAD_START,
     JOYPAD_UP,
     ControllerState,
-    display_size,
 )
 from rl_fzerox.core.config.schema import (
-    EmulatorConfig,
-    EnvConfig,
     PolicyConfig,
-    TrackSamplingConfig,
-    TrackSamplingEntryConfig,
     TrainConfig,
-    WatchAppConfig,
 )
 from rl_fzerox.core.envs.observations import (
     DEFAULT_STATE_VECTOR_SPEC,
     state_feature_names,
 )
-from rl_fzerox.ui.watch.app import _next_panel_tab_index
-from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
-from rl_fzerox.ui.watch.runtime.episode import (
-    _update_best_finish_position,
-    _update_best_finish_times,
-    _update_latest_finish_deltas_ms,
-    _update_latest_finish_times,
-)
-from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
-from rl_fzerox.ui.watch.runtime.timing import (
-    _adjust_control_fps,
-    _resolve_control_fps,
-    _resolve_render_fps,
-)
-from rl_fzerox.ui.watch.view.panels.draw import (
-    _draw_labeled_value_line,
-    _draw_panel_tabs,
-    _panel_tab_hint,
-)
 from rl_fzerox.ui.watch.view.panels.format import (
-    _format_observation_summary,
     _format_policy_action,
     _format_reload_age,
     _pressed_button_labels,
 )
-from rl_fzerox.ui.watch.view.panels.model import (
-    _build_panel_columns,
-    _observation_preview_size,
-    _panel_content_height,
-    _preview_frame,
-    _window_size,
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from tests.ui.viewer_support import (
+    panel_group_labels as _panel_group_labels,
 )
-from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
-from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
-from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info
-from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
-from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, ViewerFonts
-from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
-
-
-class _FakeTextSurface:
-    def __init__(self, text: str) -> None:
-        self._width = len(text) * 7
-        self._height = 18 if any(char in text for char in "Agyp") else 11
-
-    def get_width(self) -> int:
-        return self._width
-
-    def get_height(self) -> int:
-        return self._height
-
-
-class _FakeFont:
-    def render(self, text: str, antialias: bool, color: Color) -> _FakeTextSurface:
-        return _FakeTextSurface(text)
-
-
-class _FakeScreen:
-    def blit(self, surface: _FakeTextSurface, position: tuple[int, int]) -> None:
-        return None
-
-
-def _fake_viewer_fonts() -> ViewerFonts:
-    font = _FakeFont()
-    return ViewerFonts(
-        title=font,
-        section=font,
-        record_header=font,
-        body=font,
-        small=font,
-    )
-
-
-def _panel_group_labels(section: PanelSection, heading: str) -> list[str]:
-    labels: list[str] = []
-    in_group = False
-    for line in section.lines:
-        if line.divider:
-            if in_group:
-                break
-            continue
-        if line.heading:
-            if in_group:
-                break
-            in_group = line.label == heading
-            continue
-        if in_group and line.label:
-            labels.append(line.label)
-    return labels
-
-
-def _panel_group_values(section: PanelSection, heading: str) -> dict[str, str]:
-    values: dict[str, str] = {}
-    in_group = False
-    for line in section.lines:
-        if line.divider:
-            if in_group:
-                break
-            continue
-        if line.heading:
-            if in_group:
-                break
-            in_group = line.label == heading
-            continue
-        if in_group and line.label:
-            values[line.label] = line.value
-    return values
-
-
-def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None:
-    fonts = _fake_viewer_fonts()
-    screen = _FakeScreen()
-    common_kwargs = {
-        "pygame": None,
-        "screen": screen,
-        "fonts": fonts,
-        "x": 0,
-        "y": 10,
-        "width": 160,
-    }
-
-    no_y = _draw_labeled_value_line(
-        **common_kwargs,
-        line=PanelLine("Sliding", "no", PALETTE.text_muted),
-    )
-    yes_y = _draw_labeled_value_line(
-        **common_kwargs,
-        line=PanelLine("Sliding", "yes", PALETTE.text_warning),
-    )
-
-    assert no_y == yes_y
-
-
-def test_point_in_rect_matches_clickable_region_bounds() -> None:
-    rect = (10, 20, 30, 40)
-
-    assert _point_in_rect((10, 20), rect) is True
-    assert _point_in_rect((39, 59), rect) is True
-    assert _point_in_rect((40, 59), rect) is False
-    assert _point_in_rect((39, 60), rect) is False
-    assert _point_in_rect((10, 20), None) is False
-
-
-def test_target_display_size_applies_aspect_correction() -> None:
-    frame_shape = np.zeros((240, 640, 3), dtype=np.uint8).shape
-
-    corrected_display_size = display_size(frame_shape, 4.0 / 3.0)
-
-    assert corrected_display_size == (640, 480)
-
-
-def test_target_display_size_falls_back_to_raw_frame_size() -> None:
-    frame_shape = np.zeros((240, 640, 3), dtype=np.uint8).shape
-
-    corrected_display_size = display_size(frame_shape, 0.0)
-
-    assert corrected_display_size == (640, 240)
-
-
-def test_next_panel_tab_index_cycles_tabs() -> None:
-    assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
-    assert _next_panel_tab_index(5, ViewerInput(panel_tab_delta=1)) == 0
-
-
-def test_next_panel_tab_index_honors_direct_selection() -> None:
-    assert _next_panel_tab_index(0, ViewerInput(panel_tab_index=2)) == 2
-
-
-def test_panel_tab_hint_shows_active_tab_position() -> None:
-    assert _panel_tab_hint(0) == "Tab 1/6"
-    assert _panel_tab_hint(2) == "Tab 3/6"
-    assert _panel_tab_hint(3) == "Tab 4/6"
-    assert _panel_tab_hint(4) == "Tab 5/6"
-    assert _panel_tab_hint(5) == "Tab 6/6"
-    assert _panel_tab_hint(6) == "Tab 1/6"
-
-
-def test_panel_tabs_fit_side_panel_content_width() -> None:
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    pygame.init()
-    try:
-        fonts = _create_fonts(pygame)
-        width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
-        screen = pygame.Surface((LAYOUT.panel_width, 80))
-
-        _, tab_rects = _draw_panel_tabs(
-            pygame=pygame,
-            screen=screen,
-            fonts=fonts,
-            x=0,
-            y=0,
-            width=width,
-            selected_index=0,
-        )
-
-        assert all(rect is not None for rect in tab_rects)
-        assert max(rect[0] + rect[2] for rect in tab_rects if rect is not None) <= width
-    finally:
-        pygame.quit()
-
-
-def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1004, 980)
+from tests.ui.viewer_support import (
+    panel_group_values as _panel_group_values,
+)
+from tests.ui.viewer_support import (
+    sample_telemetry as _sample_telemetry,
+)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -242,51 +40,6 @@ def test_pressed_button_labels_are_human_readable() -> None:
         _pressed_button_labels((1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START))
         == "Up A Start"
     )
-
-
-def test_side_panel_fits_default_watch_window_height() -> None:
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    pygame.init()
-
-    try:
-        fonts = _create_fonts(pygame)
-        columns = _build_panel_columns(
-            episode=0,
-            info={
-                "frame_index": 1592,
-                "native_fps": 60.0,
-                "display_aspect_ratio": 4.0 / 3.0,
-                "observation_stack": 4,
-            },
-            reset_info={
-                "reset_mode": "boot",
-                "baseline_kind": "startup",
-                "boot_state": "gp_race",
-            },
-            episode_reward=0.0,
-            paused=False,
-            control_state=ControllerState(),
-            policy_curriculum_stage=None,
-            policy_action=None,
-            policy_reload_age_seconds=None,
-            policy_reload_error=None,
-            action_repeat=3,
-            stuck_min_speed_kph=50.0,
-            game_display_size=(592, 444),
-            observation_shape=(84, 116, 12),
-            telemetry=_sample_telemetry(),
-        )
-
-        assert (
-            _panel_content_height(
-                fonts,
-                columns,
-                observation_shape=(84, 116, 12),
-            )
-            <= _window_size((592, 444), (84, 116, 12), panel_tab_index=1)[1]
-        )
-    finally:
-        pygame.quit()
 
 
 def test_side_panel_drops_cockpit_control_section() -> None:
@@ -427,63 +180,6 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
     assert "Reverse frames" not in labels
     assert "Stuck frames" not in labels
 
-
-def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:
-    first = np.zeros((2, 3, 3), dtype=np.uint8)
-    second = np.full((2, 3, 3), 255, dtype=np.uint8)
-    stacked = np.concatenate((first, second), axis=2)
-
-    preview = _preview_frame(stacked)
-
-    assert preview.shape == (2, 6, 3)
-    assert np.array_equal(preview[:, :3, :], second)
-    assert np.array_equal(preview[:, 3:6, :], first)
-
-
-def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
-    stacked = np.zeros((2, 3, 4), dtype=np.uint8)
-    stacked[:, :, 0] = 32
-    stacked[:, :, 1] = 96
-    stacked[:, :, 2] = 160
-    stacked[:, :, 3] = 224
-    info = {"observation_stack": 4, "observation_stack_mode": "gray"}
-
-    preview = _preview_frame(stacked, info=info)
-
-    assert preview.shape == (2, 12, 3)
-    assert np.array_equal(preview[:, :3, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
-    assert np.array_equal(preview[:, 3:6, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
-    assert np.array_equal(preview[:, 6:9, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
-    assert np.array_equal(preview[:, 9:12, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
-    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
-    assert (
-        _format_observation_summary(
-            stacked.shape,
-            info=info,
-        )
-        == "3x2 gray x4 stack"
-    )
-
-
-def test_preview_frame_shows_luma_chroma_observations_as_grid() -> None:
-    stacked = np.zeros((2, 3, 8), dtype=np.uint8)
-    stacked[:, :, 0::2] = 96
-    stacked[:, :, 1::2] = 192
-    info = {"observation_stack": 4, "observation_stack_mode": "luma_chroma"}
-
-    preview = _preview_frame(stacked, info=info)
-
-    assert preview.shape == (2, 12, 3)
-    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
-    assert (
-        _format_observation_summary(
-            stacked.shape,
-            info=info,
-        )
-        == "3x2 y+c x4 stack"
-    )
-
-
 def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(None) == "manual"
     assert _format_policy_action(np.array([2, 0], dtype=np.int64)) == "[2,0]"
@@ -566,23 +262,6 @@ def test_keys_section_lists_watch_hotkeys() -> None:
     assert key_map["Keys"] == "P pause  N step  +/- speed"
     assert key_map["More keys"] == "R reset  K save  D/click policy"
     assert "Manual" not in key_map
-
-
-def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
-    assert _resolve_control_fps("auto", native_control_fps=30.0) == 30.0
-    assert _resolve_control_fps("unlimited", native_control_fps=30.0) is None
-    assert _resolve_control_fps(120.0, native_control_fps=30.0) == 120.0
-    assert _resolve_render_fps(None, native_fps=60.0) == 60.0
-    assert _resolve_render_fps("auto", native_fps=60.0) == 60.0
-    assert _resolve_render_fps("unlimited", native_fps=60.0) is None
-
-
-def test_watch_control_fps_adjustment_supports_uncapped_mode() -> None:
-    assert _adjust_control_fps(60.0, 1, native_control_fps=60.0) == 75.0
-    assert _adjust_control_fps(60.0, -1, native_control_fps=60.0) == 45.0
-    assert _adjust_control_fps(None, 1, native_control_fps=60.0) is None
-    assert _adjust_control_fps(None, -1, native_control_fps=60.0) == 45.0
-
 
 def test_side_panel_can_show_policy_observation_state_vector() -> None:
     columns = _build_panel_columns(
@@ -760,47 +439,6 @@ def test_side_panel_marks_zeroed_state_components() -> None:
         "// lap_progress",
         "// edge_ratio",
     ]
-
-
-def test_side_panel_fits_steer_history_observation_state_vector() -> None:
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    pygame.init()
-
-    try:
-        fonts = _create_fonts(pygame)
-        feature_names = state_feature_names("steer_history")
-        observation_shape = (84, 116, 3)
-        columns = _build_panel_columns(
-            episode=0,
-            info={"frame_index": 0, "native_fps": 60.0, "display_aspect_ratio": 4.0 / 3.0},
-            reset_info={},
-            episode_reward=0.0,
-            paused=False,
-            control_state=ControllerState(),
-            policy_curriculum_stage=None,
-            policy_action=np.array([1, 1, 0, 0, 0], dtype=np.int64),
-            policy_reload_age_seconds=0.0,
-            policy_reload_error=None,
-            action_repeat=1,
-            stuck_min_speed_kph=60.0,
-            game_display_size=(592, 444),
-            observation_shape=observation_shape,
-            observation_state=np.zeros((len(feature_names),), dtype=np.float32),
-            observation_state_feature_names=feature_names,
-            telemetry=_sample_telemetry(),
-        )
-
-        assert (
-            _panel_content_height(
-                fonts,
-                columns,
-                observation_shape=observation_shape,
-            )
-            <= _window_size((592, 444), observation_shape, panel_tab_index=2)[1]
-        )
-    finally:
-        pygame.quit()
-
 
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
@@ -1001,171 +639,8 @@ def test_session_section_shows_na_before_successful_finish() -> None:
 
     assert best_position_line.value == "n/a"
 
-
-def test_best_finish_position_tracks_only_finished_episodes() -> None:
-    best_position = _update_best_finish_position(
-        None,
-        {"termination_reason": "crashed", "position": 4},
-        _sample_telemetry(position=4),
-    )
-    assert best_position is None
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=8),
-    )
-    assert best_position == 8
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=12),
-    )
-    assert best_position == 8
-
-    best_position = _update_best_finish_position(
-        best_position,
-        {"termination_reason": "finished"},
-        _sample_telemetry(position=3),
-    )
-    assert best_position == 3
-
-
-def test_best_finish_times_track_successful_finishes_per_track() -> None:
-    best_times = _update_best_finish_times(
-        {},
-        {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    assert best_times == {}
-
-    best_times = _update_best_finish_times(
-        best_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        {"termination_reason": "finished", "track_id": "silence"},
-        _sample_telemetry(race_time_ms=105_000),
-    )
-    best_times = _update_best_finish_times(
-        best_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=95_000),
-    )
-
-    assert best_times == {"mute": 95_000, "silence": 105_000}
-
-
-def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
-    latest_times = _update_latest_finish_times(
-        {},
-        {"termination_reason": "crashed", "race_time_ms": 98_000, "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    assert latest_times == {}
-
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    latest_times = _update_latest_finish_times(
-        latest_times,
-        {"termination_reason": "finished", "track_id": "silence"},
-        _sample_telemetry(race_time_ms=105_000),
-    )
-
-    assert latest_times == {"mute": 101_000, "silence": 105_000}
-
-
-def test_latest_finish_delta_tracks_previous_pb_gap() -> None:
-    latest_deltas = _update_latest_finish_deltas_ms(
-        {},
-        {},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=98_000),
-    )
-    assert latest_deltas == {}
-
-    latest_deltas = _update_latest_finish_deltas_ms(
-        latest_deltas,
-        {"mute": 98_000},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=101_000),
-    )
-    assert latest_deltas == {"mute": 3_000}
-
-    latest_deltas = _update_latest_finish_deltas_ms(
-        latest_deltas,
-        {"mute": 98_000},
-        {"termination_reason": "finished", "track_id": "mute"},
-        _sample_telemetry(race_time_ms=95_000),
-    )
-    assert latest_deltas == {"mute": -3_000}
-
-
-def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    baseline_path = tmp_path / "mute.state"
-    core_path.touch()
-    rom_path.touch()
-    baseline_path.write_bytes(b"baseline")
-    config = WatchAppConfig(
-        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
-        env=EnvConfig(
-            track_sampling=TrackSamplingConfig(
-                enabled=True,
-                entries=(
-                    TrackSamplingEntryConfig(
-                        id="mute_city",
-                        display_name="Mute City Time Attack - Blue Falcon Balanced",
-                        baseline_state_path=baseline_path,
-                        course_index=0,
-                    ),
-                ),
-            )
-        ),
-    )
-    info: dict[str, object] = {"course_index": 0}
-
-    _add_config_track_info(info, config)
-
-    assert info["track_id"] == "mute_city"
-    assert info["track_display_name"] == "Mute City Time Attack - Blue Falcon Balanced"
-
-
 def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(None) == "manual"
     assert _format_reload_age(12.7) == "12s ago"
     assert _format_reload_age(125.0) == "2m 05s"
     assert _format_reload_age(3665.0) == "1h 01m"
-
-
-def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:
-    runtime_dir = tmp_path / "watch" / "runtime"
-    runtime_dir.mkdir(parents=True)
-
-    logged_error = _persist_reload_error(
-        reload_error="PyTorchStreamReader failed reading file data/0",
-        runtime_dir=runtime_dir,
-        last_logged_reload_error=None,
-    )
-
-    assert logged_error == "PyTorchStreamReader failed reading file data/0"
-    assert (tmp_path / "watch" / "reload_error.log").read_text(encoding="utf-8") == (
-        "PyTorchStreamReader failed reading file data/0\n"
-    )

@@ -1,6 +1,77 @@
 # tests/ui/viewer_support.py
 from fzerox_emulator import FZeroXTelemetry
+from rl_fzerox.ui.watch.view.screen.theme import Color
+from rl_fzerox.ui.watch.view.screen.types import PanelSection, ViewerFonts
 from tests.support.native_objects import make_telemetry
+
+
+class FakeTextSurface:
+    def __init__(self, text: str) -> None:
+        self._width = len(text) * 7
+        self._height = 18 if any(char in text for char in "Agyp") else 11
+
+    def get_width(self) -> int:
+        return self._width
+
+    def get_height(self) -> int:
+        return self._height
+
+
+class FakeFont:
+    def render(self, text: str, antialias: bool, color: Color) -> FakeTextSurface:
+        return FakeTextSurface(text)
+
+
+class FakeScreen:
+    def blit(self, surface: FakeTextSurface, position: tuple[int, int]) -> None:
+        return None
+
+
+def fake_viewer_fonts() -> ViewerFonts:
+    font = FakeFont()
+    return ViewerFonts(
+        title=font,
+        section=font,
+        record_header=font,
+        body=font,
+        small=font,
+    )
+
+
+def panel_group_labels(section: PanelSection, heading: str) -> list[str]:
+    labels: list[str] = []
+    in_group = False
+    for line in section.lines:
+        if line.divider:
+            if in_group:
+                break
+            continue
+        if line.heading:
+            if in_group:
+                break
+            in_group = line.label == heading
+            continue
+        if in_group and line.label:
+            labels.append(line.label)
+    return labels
+
+
+def panel_group_values(section: PanelSection, heading: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    in_group = False
+    for line in section.lines:
+        if line.divider:
+            if in_group:
+                break
+            continue
+        if line.heading:
+            if in_group:
+                break
+            in_group = line.label == heading
+            continue
+        if in_group and line.label:
+            values[line.label] = line.value
+    return values
 
 
 def sample_telemetry(
