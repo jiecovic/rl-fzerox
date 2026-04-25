@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
 
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.game_view import _glass_overlay_surface
@@ -16,6 +15,9 @@ from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import (
     ControlViz,
+    PygameModule,
+    PygameRect,
+    PygameSurface,
     RenderFont,
     ViewerFonts,
     ViewerHitboxes,
@@ -35,55 +37,10 @@ class _ObservationGlassStyle:
 _OBSERVATION_GLASS_STYLE = _ObservationGlassStyle()
 
 
-class _RectLike(Protocol):
-    left: int
-    right: int
-    top: int
-    bottom: int
-    size: tuple[int, int]
-    topleft: tuple[int, int]
-
-    def move(self, x: int, y: int) -> _RectLike: ...
-
-    def inflate(self, x: int, y: int) -> _RectLike: ...
-
-
-class _ScreenLike(Protocol):
-    def get_height(self) -> int: ...
-
-    def blit(self, source: object, dest: tuple[int, int]) -> object: ...
-
-
-class _SurfaceLike(Protocol):
-    def get_size(self) -> tuple[int, int]: ...
-
-
-class _PygameDrawLike(Protocol):
-    def rect(
-        self,
-        surface: _ScreenLike,
-        color: Color,
-        rect: _RectLike,
-        width: int = 0,
-        border_radius: int = 0,
-    ) -> object: ...
-
-
-class _PygameTransformLike(Protocol):
-    def scale(self, surface: object, size: tuple[int, int]) -> object: ...
-
-
-class _PygameLike(Protocol):
-    draw: _PygameDrawLike
-    transform: _PygameTransformLike
-
-    def Rect(self, left: int, top: int, width: int, height: int) -> _RectLike: ...
-
-
 def _draw_control_viz_below_game(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     game_display_size: tuple[int, int],
     control_viz: ControlViz,
@@ -108,10 +65,10 @@ def _draw_control_viz_below_game(
 
 def _draw_observation_preview_in_rect(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
-    surface: _SurfaceLike,
+    surface: PygameSurface,
     x: int,
     y: int,
     width: int,
@@ -196,9 +153,9 @@ def _draw_observation_preview_in_rect(
 
 def _draw_outer_preview_border(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
-    rect: _RectLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    rect: PygameRect,
 ) -> None:
     style = _OBSERVATION_GLASS_STYLE
     border_rect = rect.inflate(style.preview_border_width * 2, style.preview_border_width * 2)
@@ -213,9 +170,9 @@ def _draw_outer_preview_border(
 
 def _draw_observation_glass_box(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
-    rect: _RectLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    rect: PygameRect,
 ) -> None:
     style = _OBSERVATION_GLASS_STYLE
     pygame.draw.rect(screen, style.shadow, rect.move(0, 3), border_radius=13)
@@ -232,10 +189,10 @@ def _draw_observation_glass_box(
 
 def _draw_observation_tile_labels(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
-    rect: _RectLike,
+    rect: PygameRect,
     y: int,
     height: int,
     observation_shape: tuple[int, ...],
@@ -277,9 +234,9 @@ def _observation_tile_label_color(*, is_newest: bool, is_minimap: bool) -> Color
 
 def _draw_observation_tile_borders(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
-    rect: _RectLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    rect: PygameRect,
     observation_shape: tuple[int, ...],
     info: dict[str, object],
 ) -> None:
@@ -336,11 +293,11 @@ def _observation_label_row_height(
 
 def _observation_tile_rect(
     *,
-    pygame: _PygameLike,
-    rect: _RectLike,
+    pygame: PygameModule,
+    rect: PygameRect,
     index: int,
     count: int,
-) -> _RectLike:
+) -> PygameRect:
     columns, rows = _observation_preview_grid(count)
     row, column = divmod(index, columns)
     tile_left = rect.left + round((column * rect.size[0]) / columns)
@@ -357,8 +314,8 @@ def _observation_tile_rect(
 
 def _draw_observation_tile_label(
     *,
-    pygame: _PygameLike,
-    screen: _ScreenLike,
+    pygame: PygameModule,
+    screen: PygameSurface,
     font: RenderFont,
     label: str,
     center_x: int,
