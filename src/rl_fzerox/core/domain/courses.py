@@ -89,6 +89,12 @@ def built_in_course_ref_by_id(course_id: str, *, cup: str | None = None) -> tupl
     )
 
 
+def built_in_course_refs_by_cup(cup: str) -> tuple[str, ...]:
+    """Return refs for all built-in courses in one cup, preserving game order."""
+
+    return tuple(course.ref for course in BUILT_IN_COURSES if course.cup == cup)
+
+
 def _jack_record(
     track: str,
     *,

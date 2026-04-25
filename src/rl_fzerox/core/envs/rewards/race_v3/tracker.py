@@ -17,6 +17,7 @@ from rl_fzerox.core.envs.rewards.race_v3.controls import (
     SteerOscillationRewardTracker,
     gas_underuse_penalty,
     lean_low_speed_penalty,
+    lean_request_penalty,
     manual_boost_reward,
 )
 from rl_fzerox.core.envs.rewards.race_v3.energy import EnergyRefillRewardTracker
@@ -53,6 +54,7 @@ class RaceV3RewardTracker:
         self._damage = DamagePenaltyState()
         self._steering = SteerOscillationRewardTracker()
         self._previous_airborne = False
+        self._previous_height_above_ground: float | None = None
 
     def reset(
         self,
@@ -71,6 +73,7 @@ class RaceV3RewardTracker:
         self._damage.reset()
         self._steering.reset()
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
+        self._previous_height_above_ground = _height_above_ground(telemetry)
 
     def summary_config(self) -> RewardSummaryConfig:
         """Return native summary thresholds required by this reward."""
@@ -95,6 +98,7 @@ class RaceV3RewardTracker:
             self._damage.reset()
             self._steering.reset()
             self._previous_airborne = False
+            self._previous_height_above_ground = None
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
@@ -192,6 +196,15 @@ class RaceV3RewardTracker:
             reward += lean_penalty
             breakdown["lean_low_speed"] = lean_penalty
 
+        lean_penalty = lean_request_penalty(
+            summary,
+            action_context,
+            weights=self._weights,
+        )
+        if lean_penalty:
+            reward += lean_penalty
+            breakdown["lean"] = lean_penalty
+
         boost_reward = manual_boost_reward(action_context, weights=self._weights)
         if boost_reward:
             reward += boost_reward
@@ -234,6 +247,7 @@ class RaceV3RewardTracker:
         self._energy.advance_cooldown(summary.frames_run)
         self._energy.finish_step(telemetry)
         self._previous_airborne = telemetry.player.airborne
+        self._previous_height_above_ground = telemetry.player.height_above_ground
         return RewardStep(reward=reward, breakdown=breakdown)
 
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
@@ -252,6 +266,9 @@ class RaceV3RewardTracker:
             return info
         self._progress.ensure_origin(telemetry)
         info["race_laps_completed"] = completed_race_laps(telemetry)
+        info["airborne_progress_reward_enabled"] = self._airborne_progress_reward_enabled(
+            telemetry
+        )
         return info
 
     def _reverse_time_penalty(self, summary: StepSummary) -> float:
@@ -285,12 +302,26 @@ class RaceV3RewardTracker:
             status,
             weights=self._weights,
             progress_multiplier=progress_multiplier,
+            airborne=telemetry.player.airborne,
+            pay_reward=self._airborne_progress_reward_enabled(telemetry),
             energy_refill_bonus_for_progress=lambda progress_reward: self._energy.progress_bonus(
                 progress_reward,
                 summary,
                 telemetry,
                 weights=self._weights,
             ),
+        )
+
+    def _airborne_progress_reward_enabled(self, telemetry: FZeroXTelemetry) -> bool:
+        if (
+            not telemetry.player.airborne
+            or not self._weights.airborne_progress_requires_nonascending
+        ):
+            return True
+        if self._previous_height_above_ground is None:
+            return True
+        return telemetry.player.height_above_ground <= (
+            self._previous_height_above_ground + self._weights.airborne_progress_height_epsilon
         )
 
 
@@ -305,3 +336,7 @@ def _ground_effect_progress_modifier(
     if raw_effect == CourseEffect.ICE:
         return "ice", weights.ice_progress_multiplier
     return "ground_effect", 1.0
+
+
+def _height_above_ground(telemetry: FZeroXTelemetry | None) -> float | None:
+    return None if telemetry is None else float(telemetry.player.height_above_ground)

@@ -1,0 +1,151 @@
+# RGB wide-CNN PPO cup-expansion curriculum forked from the current Jack6 run.
+# Starts on Jack Cup, then adds representative tracks before each full new cup.
+defaults:
+  - /local/active/train.local.exp_ppo_jack6_rgb60x76_widecnn_fresh@_global_
+  - _self_
+
+env:
+  track_sampling:
+    enabled: true
+    sampling_mode: step_balanced
+    baseline:
+      mode: time_attack
+      vehicle: blue_falcon
+      engine_setting: 50
+    courses:
+      - cup: jack
+    step_balance_update_episodes: 50
+    step_balance_ema_alpha: 0.1
+    step_balance_max_weight_scale: 5.0
+
+curriculum:
+  enabled: true
+  smoothing_episodes: 80
+  min_stage_episodes: 80
+  stages:
+    - name: jack
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.35
+          min_track_fraction_gte: 0.75
+          min_episodes_per_track: 5
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: jack_queen_seed
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.4
+          min_track_fraction_gte: 0.75
+          min_episodes_per_track: 5
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          # Queen Cup seed: simple/open, familiar variant, technical.
+          - sector_alpha
+          - mute_city_2
+          - white_land
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: jack_queen
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.45
+          min_track_fraction_gte: 0.7
+          min_episodes_per_track: 5
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          - cup: queen
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: jack_queen_king_seed
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.5
+          min_track_fraction_gte: 0.7
+          min_episodes_per_track: 4
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          - cup: queen
+          # King Cup seed: speed pressure, precision, familiar variant.
+          - fire_field
+          - silence_2
+          - mute_city_3
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: jack_queen_king
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.55
+          min_track_fraction_gte: 0.7
+          min_episodes_per_track: 4
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          - cup: queen
+          - cup: king
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: all_cups_seed
+      until:
+        per_track_laps_completed:
+          mean_gte: 0.55
+          min_track_fraction_gte: 0.65
+          min_episodes_per_track: 3
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          - cup: queen
+          - cup: king
+          # Joker Cup seed: wide/simple, technical surface, hard finale.
+          - rainbow_road
+          - sand_ocean_2
+          - big_hand
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+    - name: all_cups
+      track_sampling:
+        enabled: true
+        sampling_mode: step_balanced
+        courses:
+          - cup: jack
+          - cup: queen
+          - cup: king
+          - cup: joker
+        step_balance_update_episodes: 50
+        step_balance_ema_alpha: 0.1
+        step_balance_max_weight_scale: 5.0
+
+train:
+  run_name: exp_ppo_cups_a2_rgb60x76_minimap_fullctrl_open_widecnn_curriculum
+  resume_run_dir: local/runs/exp_ppo_jack6_a2_rgb60x76_minimap_fullctrl_open_widecnn_fresh_0001
+  resume_artifact: latest
+  resume_mode: full_model

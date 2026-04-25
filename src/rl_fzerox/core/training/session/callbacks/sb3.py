@@ -113,11 +113,13 @@ def build_callbacks(
             self,
             curriculum: CurriculumConfig,
             *,
+            env_config: EnvConfig | None = None,
             initial_stage_index: int | None = None,
         ) -> None:
             super().__init__(verbose=0)
             self._controller = ActionMaskCurriculumController(
                 curriculum,
+                env_config=env_config,
                 initial_stage_index=initial_stage_index,
             )
 
@@ -195,6 +197,7 @@ def build_callbacks(
         callbacks.append(
             CurriculumCallback(
                 curriculum_config,
+                env_config=env_config,
                 initial_stage_index=initial_curriculum_stage_index,
             )
         )

@@ -23,6 +23,7 @@ from rl_fzerox.core.config.schema_models.curriculum import (
     CurriculumStageConfig,
     CurriculumTrainOverridesConfig,
     CurriculumTriggerConfig,
+    PerTrackLapsCompletedTriggerConfig,
 )
 from rl_fzerox.core.config.schema_models.env import (
     EmulatorConfig,
@@ -65,6 +66,7 @@ __all__ = [
     "ObservationConfig",
     "ObservationPresetName",
     "ObservationStateComponentConfig",
+    "PerTrackLapsCompletedTriggerConfig",
     "PolicyConfig",
     "PolicyRecurrentConfig",
     "RewardConfig",

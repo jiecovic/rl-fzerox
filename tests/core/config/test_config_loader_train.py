@@ -236,6 +236,15 @@ def test_load_train_app_config_expands_course_registry_selection(
             "      mode: time_attack",
             "      vehicle: blue_falcon",
             "      engine_setting: 50",
+            "curriculum:",
+            "  enabled: true",
+            "  stages:",
+            "    - name: queen",
+            "      track_sampling:",
+            "        enabled: true",
+            "        sampling_mode: balanced",
+            "        courses:",
+            "          - cup: queen",
         ],
     )
 
@@ -255,6 +264,67 @@ def test_load_train_app_config_expands_course_registry_selection(
     assert entry.source_engine_setting is None
     assert entry.source_engine_setting_raw_value is None
     assert entry.baseline_state_path is None
+
+
+def test_load_train_app_config_expands_cup_registry_selection(
+    isolated_repo_layout: tuple[Path, Path],
+) -> None:
+    project_root, config_root = isolated_repo_layout
+    artifacts_dir = project_root / "local" / "test-artifacts"
+    artifacts_dir.mkdir(parents=True)
+    core_path = artifacts_dir / "core.so"
+    rom_path = artifacts_dir / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    config_path = config_root / "local" / "train.cup.yaml"
+    _write_yaml(
+        config_path,
+        [
+            "emulator:",
+            "  core_path: local/test-artifacts/core.so",
+            "  rom_path: local/test-artifacts/rom.n64",
+            "env:",
+            "  track_sampling:",
+            "    enabled: true",
+            "    sampling_mode: balanced",
+            "    courses:",
+            "      - cup: jack",
+            "    baseline:",
+            "      mode: time_attack",
+            "      vehicle: blue_falcon",
+            "      engine_setting: 50",
+            "curriculum:",
+            "  enabled: true",
+            "  stages:",
+            "    - name: queen",
+            "      track_sampling:",
+            "        enabled: true",
+            "        sampling_mode: balanced",
+            "        courses:",
+            "          - cup: queen",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert [entry.course_id for entry in config.env.track_sampling.entries] == [
+        "mute_city",
+        "silence",
+        "sand_ocean",
+        "devils_forest",
+        "big_blue",
+        "port_town",
+    ]
+    assert config.curriculum.stages[0].track_sampling is not None
+    assert [entry.course_id for entry in config.curriculum.stages[0].track_sampling.entries] == [
+        "sector_alpha",
+        "red_canyon",
+        "devils_forest_2",
+        "mute_city_2",
+        "big_blue_2",
+        "white_land",
+    ]
 
 
 def test_load_train_app_config_rejects_removed_legacy_resume_field(tmp_path: Path) -> None:
@@ -959,6 +1029,10 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
             "    - name: basic_drive",
             "      until:",
             "        race_laps_completed_mean_gte: 3.0",
+            "        per_track_laps_completed:",
+            "          mean_gte: 0.5",
+            "          min_track_fraction_gte: 0.75",
+            "          min_episodes_per_track: 3",
             "      action_mask:",
             "        lean: [idle]",
             "      train:",
@@ -988,6 +1062,11 @@ def test_load_train_app_config_reads_maskable_curriculum_fields(tmp_path: Path) 
     assert len(config.curriculum.stages) == 2
     assert config.curriculum.stages[0].until is not None
     assert config.curriculum.stages[0].until.race_laps_completed_mean_gte == 3.0
+    per_track_trigger = config.curriculum.stages[0].until.per_track_laps_completed
+    assert per_track_trigger is not None
+    assert per_track_trigger.mean_gte == 0.5
+    assert per_track_trigger.min_track_fraction_gte == 0.75
+    assert per_track_trigger.min_episodes_per_track == 3
     assert config.curriculum.stages[0].train is not None
     assert config.curriculum.stages[0].train.learning_rate == 0.0001
     assert config.curriculum.stages[0].train.n_epochs == 3

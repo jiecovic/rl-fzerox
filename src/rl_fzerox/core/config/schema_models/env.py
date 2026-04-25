@@ -59,6 +59,9 @@ class RewardConfig(BaseModel):
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
     defer_progress_reward_while_airborne: bool = False
+    airborne_progress_bucket_distance: PositiveFloat | None = None
+    airborne_progress_requires_nonascending: bool = False
+    airborne_progress_height_epsilon: NonNegativeFloat = 0.0
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -76,6 +79,7 @@ class RewardConfig(BaseModel):
     steer_oscillation_deadzone: NonNegativeFloat = 0.0
     steer_oscillation_cap: PositiveFloat = 2.0
     steer_oscillation_power: PositiveFloat = 2.0
+    lean_request_penalty: float = Field(default=0.0, le=0.0)
     lean_low_speed_penalty: float = Field(default=0.0, le=0.0)
     lean_low_speed_penalty_max_speed_kph: NonNegativeFloat = 800.0
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)

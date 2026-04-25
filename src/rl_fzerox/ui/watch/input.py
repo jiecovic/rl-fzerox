@@ -4,16 +4,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator import (
-    JOYPAD_A,
-    JOYPAD_B,
-    JOYPAD_DOWN,
-    JOYPAD_LEFT,
-    JOYPAD_RIGHT,
     JOYPAD_SELECT,
     JOYPAD_START,
-    JOYPAD_UP,
     ControllerState,
     joypad_mask,
+)
+from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    BOOST_MASK,
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
 )
 from rl_fzerox.ui.watch.view.screen.types import MouseRect, PygameModule
 
@@ -28,6 +29,7 @@ class ViewerInput:
     save_state: bool = False
     force_reset: bool = False
     toggle_deterministic_policy: bool = False
+    toggle_manual_control: bool = False
     control_fps_delta: int = 0
     panel_tab_delta: int = 0
     panel_tab_index: int | None = None
@@ -46,6 +48,7 @@ def _poll_viewer_input(
     save_state = False
     force_reset = False
     toggle_deterministic_policy = False
+    toggle_manual_control = False
     control_fps_delta = 0
     panel_tab_delta = 0
     panel_tab_index = None
@@ -88,35 +91,43 @@ def _poll_viewer_input(
                 force_reset = True
             elif event.key == pygame.K_d:
                 toggle_deterministic_policy = True
+            elif event.key == pygame.K_m:
+                toggle_manual_control = True
             elif event.key in (pygame.K_PLUS, pygame.K_KP_PLUS):
                 control_fps_delta += 1
             elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
                 control_fps_delta -= 1
 
     keys = pygame.key.get_pressed()
-    pressed_buttons: list[int] = []
-    if keys[pygame.K_UP]:
-        pressed_buttons.append(JOYPAD_UP)
-    if keys[pygame.K_DOWN]:
-        pressed_buttons.append(JOYPAD_DOWN)
-    if keys[pygame.K_LEFT]:
-        pressed_buttons.append(JOYPAD_LEFT)
-    if keys[pygame.K_RIGHT]:
-        pressed_buttons.append(JOYPAD_RIGHT)
-    if keys[pygame.K_x]:
-        pressed_buttons.append(JOYPAD_A)
+    manual_mask = 0
     if keys[pygame.K_z]:
-        pressed_buttons.append(JOYPAD_B)
+        manual_mask |= ACCELERATE_MASK
+    if keys[pygame.K_x]:
+        manual_mask |= AIR_BRAKE_MASK
+    if keys[pygame.K_SPACE]:
+        manual_mask |= BOOST_MASK
+    if keys[pygame.K_a]:
+        manual_mask |= LEAN_LEFT_MASK
+    if keys[pygame.K_s]:
+        manual_mask |= LEAN_RIGHT_MASK
+    pressed_buttons: list[int] = []
     if keys[pygame.K_RETURN]:
         pressed_buttons.append(JOYPAD_START)
     if keys[pygame.K_BACKSPACE]:
         pressed_buttons.append(JOYPAD_SELECT)
+    manual_mask |= joypad_mask(*pressed_buttons)
 
     left_stick_x = 0.0
     if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
         left_stick_x = -1.0
     elif keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
         left_stick_x = 1.0
+
+    left_stick_y = 0.0
+    if keys[pygame.K_UP] and not keys[pygame.K_DOWN]:
+        left_stick_y = -1.0
+    elif keys[pygame.K_DOWN] and not keys[pygame.K_UP]:
+        left_stick_y = 1.0
 
     return ViewerInput(
         quit_requested=quit_requested,
@@ -125,12 +136,14 @@ def _poll_viewer_input(
         save_state=save_state,
         force_reset=force_reset,
         toggle_deterministic_policy=toggle_deterministic_policy,
+        toggle_manual_control=toggle_manual_control,
         control_fps_delta=control_fps_delta,
         panel_tab_delta=panel_tab_delta,
         panel_tab_index=panel_tab_index,
         control_state=ControllerState(
-            joypad_mask=joypad_mask(*pressed_buttons),
+            joypad_mask=manual_mask,
             left_stick_x=left_stick_x,
+            left_stick_y=left_stick_y,
         ),
     )
 

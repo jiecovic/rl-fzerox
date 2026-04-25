@@ -12,8 +12,14 @@ env:
     step_balance_ema_alpha: 0.1
     step_balance_max_weight_scale: 5.0
 
+reward:
+  progress_bucket_distance: 25.0
+  progress_bucket_reward: 0.05
+  defer_progress_reward_while_airborne: false
+  airborne_progress_bucket_distance: 100.0
+
 train:
   run_name: exp_ppo_jack6_a2_rgb60x76_minimap_fullctrl_open_widecnn_stepbalanced
-  resume_run_dir: local/runs/exp_ppo_jack6_a2_rgb60x76_minimap_fullctrl_open_widecnn_0001
+  resume_run_dir: local/runs/exp_ppo_jack6_a2_rgb60x76_minimap_fullctrl_open_widecnn_stepbalanced_0001
   resume_artifact: latest
   resume_mode: full_model

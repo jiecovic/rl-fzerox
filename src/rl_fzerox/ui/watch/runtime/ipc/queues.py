@@ -123,10 +123,12 @@ def drain_worker_commands(
     *,
     paused: bool,
     control_state: ControllerState,
+    manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
 ) -> tuple[WorkerCommandBatch, bool, ControllerState]:
     next_paused = paused
     next_control_state = control_state
+    next_manual_control_enabled = manual_control_enabled
     quit_requested = False
     step_requests = 0
     save_requests = 0
@@ -146,6 +148,7 @@ def drain_worker_commands(
                     save_requests=save_requests,
                     reset_requested=reset_requested,
                     toggle_deterministic_policy=toggle_deterministic_policy,
+                    manual_control_enabled=next_manual_control_enabled,
                     control_fps_delta=control_fps_delta,
                     cnn_visualization_enabled=next_cnn_visualization_enabled,
                     control_state=next_control_state,
@@ -167,6 +170,8 @@ def drain_worker_commands(
             reset_requested = True
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
+        if command.toggle_manual_control:
+            next_manual_control_enabled = not next_manual_control_enabled
         control_fps_delta += command.control_fps_delta
         next_cnn_visualization_enabled = command.cnn_visualization_enabled
         if command.control_state is not None:
@@ -190,6 +195,7 @@ def apply_viewer_input(
             save_state=viewer_input.save_state,
             force_reset=viewer_input.force_reset,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
+            toggle_manual_control=viewer_input.toggle_manual_control,
             control_fps_delta=viewer_input.control_fps_delta,
             cnn_visualization_enabled=cnn_visualization_enabled,
             control_state=viewer_input.control_state,

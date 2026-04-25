@@ -52,6 +52,9 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "progress_bucket_reward": 2.5,
         "progress_reward_interval_frames": 7,
         "defer_progress_reward_while_airborne": True,
+        "airborne_progress_bucket_distance": 500.0,
+        "airborne_progress_requires_nonascending": True,
+        "airborne_progress_height_epsilon": 2.0,
         "time_penalty_per_frame": -0.002,
         "reverse_time_penalty_scale": 1.25,
         "low_speed_time_penalty_scale": 1.5,
@@ -77,6 +80,7 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
         "steer_oscillation_deadzone": 0.05,
         "steer_oscillation_cap": 1.5,
         "steer_oscillation_power": 1.5,
+        "lean_request_penalty": -0.002,
         "lean_low_speed_penalty": -0.01,
         "lean_low_speed_penalty_max_speed_kph": 800.0,
         "airborne_landing_reward": 5.0,
@@ -189,6 +193,80 @@ def test_race_v3_can_defer_frontier_rewards_until_landing() -> None:
     assert landing.breakdown == {"frontier_progress": 3.0}
     info = tracker.info(_telemetry(race_distance=350.0))
     assert info["frontier_progress_bucket_index"] == 3
+
+
+def test_race_v3_can_use_coarser_airborne_progress_buckets() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            airborne_progress_bucket_distance=300.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    airborne = tracker.step_summary(
+        _summary(max_race_distance=350.0),
+        _status(step_count=1),
+        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+    )
+    landing = tracker.step_summary(
+        _summary(max_race_distance=400.0),
+        _status(step_count=2),
+        _telemetry(race_distance=400.0),
+    )
+
+    assert airborne.breakdown == {"frontier_progress": 1.0}
+    assert landing.breakdown == {"frontier_progress": 1.0}
+    info = tracker.info(_telemetry(race_distance=400.0))
+    assert info["frontier_progress_distance"] == 400.0
+    assert info["frontier_progress_bucket_index"] == 4
+    assert info["airborne_progress_bucket_distance"] == 300.0
+
+
+def test_race_v3_can_gate_airborne_progress_reward_while_climbing() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            airborne_progress_bucket_distance=100.0,
+            airborne_progress_requires_nonascending=True,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, height_above_ground=0.0))
+
+    climbing = tracker.step_summary(
+        _summary(max_race_distance=300.0),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=300.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=10.0,
+        ),
+    )
+    descending = tracker.step_summary(
+        _summary(max_race_distance=450.0),
+        _status(step_count=2),
+        _telemetry(
+            race_distance=450.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=5.0,
+        ),
+    )
+
+    assert climbing.reward == 0.0
+    assert climbing.breakdown == {}
+    assert descending.reward == 1.0
+    assert descending.breakdown == {"frontier_progress": 1.0}
+    info = tracker.info(_telemetry(race_distance=450.0, height_above_ground=5.0))
+    assert info["frontier_progress_distance"] == 400.0
+    assert info["airborne_progress_reward_enabled"] is True
 
 
 def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:
@@ -677,6 +755,7 @@ def _telemetry(
     reverse_timer: int = 0,
     on_energy_refill: bool = False,
     course_effect_raw: int = 0,
+    height_above_ground: float = 0.0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
     state_flags |= course_effect_raw
@@ -694,6 +773,7 @@ def _telemetry(
         laps_completed=laps_completed,
         lap=max(laps_completed + 1, 1) if lap is None else lap,
         reverse_timer=reverse_timer,
+        height_above_ground=height_above_ground,
     )
 
 

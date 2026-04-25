@@ -458,6 +458,48 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     assert latest_line.value == "1:41.234 (+2.5s)"
 
 
+def test_records_section_groups_track_pool_by_cup() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        track_pool_records=(
+            {
+                "track_id": "port_town_2",
+                "track_course_ref": "queen/port_town_2",
+                "track_course_name": "Port Town II",
+            },
+            {
+                "track_id": "mute_city",
+                "track_course_ref": "jack/mute_city",
+                "track_course_name": "Mute City",
+            },
+            {
+                "track_id": "silence",
+                "track_course_ref": "jack/silence",
+                "track_course_name": "Silence",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    headings = [line.label for line in records_section.lines if line.heading]
+
+    assert headings == ["Jack Cup", "Mute City", "Silence", "Queen Cup", "Port Town II"]
+
+
 def test_records_section_shows_latest_improvement_against_previous_pb() -> None:
     columns = _build_panel_columns(
         episode=0,

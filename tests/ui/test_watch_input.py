@@ -3,12 +3,22 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    BOOST_MASK,
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
+)
 from rl_fzerox.ui.watch.input import _poll_viewer_input
 
 
-class _InactiveKeys:
+class _PressedKeys:
+    def __init__(self, pressed: tuple[int, ...] = ()) -> None:
+        self._pressed = frozenset(pressed)
+
     def __getitem__(self, _key: int) -> bool:
-        return False
+        return _key in self._pressed
 
 
 class _FakePygame:
@@ -27,6 +37,10 @@ class _FakePygame:
     K_EQUALS = 17
     K_r = 26
     K_d = 27
+    K_m = 35
+    K_a = 36
+    K_s = 37
+    K_SPACE = 38
     K_UP = 18
     K_DOWN = 19
     K_LEFT = 20
@@ -46,6 +60,7 @@ class _FakePygame:
         self,
         key_events: tuple[int, ...],
         *,
+        pressed_keys: tuple[int, ...] = (),
         mouse_click: tuple[int, int] | None = None,
     ) -> None:
         events = [SimpleNamespace(type=self.KEYDOWN, key=key) for key in key_events]
@@ -58,7 +73,7 @@ class _FakePygame:
                 )
             )
         self.event = SimpleNamespace(get=lambda: events)
-        self.key = SimpleNamespace(get_pressed=lambda: _InactiveKeys())
+        self.key = SimpleNamespace(get_pressed=lambda: _PressedKeys(pressed_keys))
 
 
 def test_poll_viewer_input_adjusts_control_fps_with_plus_keys() -> None:
@@ -91,6 +106,12 @@ def test_poll_viewer_input_maps_d_to_policy_mode_toggle() -> None:
     assert viewer_input.toggle_deterministic_policy is True
 
 
+def test_poll_viewer_input_maps_m_to_manual_control_toggle() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_m,)))
+
+    assert viewer_input.toggle_manual_control is True
+
+
 def test_poll_viewer_input_maps_escape_to_quit() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_ESCAPE,)))
 
@@ -119,3 +140,29 @@ def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:
     )
 
     assert viewer_input.panel_tab_index == 0
+
+
+def test_poll_viewer_input_maps_manual_keys_to_n64_controls() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame(
+            (),
+            pressed_keys=(
+                _FakePygame.K_LEFT,
+                _FakePygame.K_UP,
+                _FakePygame.K_z,
+                _FakePygame.K_x,
+                _FakePygame.K_SPACE,
+                _FakePygame.K_a,
+                _FakePygame.K_s,
+            ),
+        )
+    )
+
+    state = viewer_input.control_state
+    assert state.left_stick_x == -1.0
+    assert state.left_stick_y == -1.0
+    assert state.joypad_mask & ACCELERATE_MASK
+    assert state.joypad_mask & AIR_BRAKE_MASK
+    assert state.joypad_mask & BOOST_MASK
+    assert state.joypad_mask & LEAN_LEFT_MASK
+    assert state.joypad_mask & LEAN_RIGHT_MASK

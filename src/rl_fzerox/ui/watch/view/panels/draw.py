@@ -47,6 +47,7 @@ class SidePanelData:
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
     policy_deterministic: bool | None
+    manual_control_enabled: bool
     policy_action: ActionValue | None
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
@@ -109,6 +110,7 @@ def _draw_side_panel(
         policy_curriculum_stage=data.policy_curriculum_stage,
         policy_num_timesteps=data.policy_num_timesteps,
         policy_deterministic=data.policy_deterministic,
+        manual_control_enabled=data.manual_control_enabled,
         policy_action=data.policy_action,
         policy_reload_age_seconds=data.policy_reload_age_seconds,
         policy_reload_error=data.policy_reload_error,
@@ -142,7 +144,10 @@ def _draw_side_panel(
         y=y,
         width=panel_width,
         title="F-Zero X Watch",
-        subtitle=_panel_subtitle(data.policy_label),
+        subtitle=_panel_subtitle(
+            data.policy_label,
+            manual_control_enabled=data.manual_control_enabled,
+        ),
     )
     y += LAYOUT.title_section_gap
     y, tab_rects = _draw_panel_tabs(
@@ -179,9 +184,11 @@ def _draw_side_panel(
     return ViewerHitboxes(panel_tabs=tab_rects)
 
 
-def _panel_subtitle(policy_label: str | None) -> str:
+def _panel_subtitle(policy_label: str | None, *, manual_control_enabled: bool) -> str:
     if policy_label is None:
         return "manual control"
+    if manual_control_enabled:
+        return f"manual control (policy loaded: {policy_label})"
     return f"policy: {policy_label}"
 
 
