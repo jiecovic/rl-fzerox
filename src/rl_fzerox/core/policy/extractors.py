@@ -165,6 +165,26 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         """Convert either NHWC or NCHW observations into shared PPO features."""
 
+        channels_first = self._channels_first_observations(observations)
+        return self._layer_norm(self._linear(self._cnn(channels_first)))
+
+    def convolution_activations(
+        self,
+        observations: torch.Tensor,
+    ) -> tuple[tuple[str, torch.Tensor], ...]:
+        """Return post-ReLU activation maps for each convolutional layer."""
+
+        activations: list[tuple[str, torch.Tensor]] = []
+        output = self._channels_first_observations(observations)
+        conv_index = 0
+        for layer in self._cnn:
+            output = layer(output)
+            if isinstance(layer, nn.ReLU):
+                conv_index += 1
+                activations.append((f"conv{conv_index}", output.detach()))
+        return tuple(activations)
+
+    def _channels_first_observations(self, observations: torch.Tensor) -> torch.Tensor:
         if observations.ndim != 4:
             raise ValueError(f"Expected a 4D observation tensor, got {tuple(observations.shape)!r}")
 
@@ -178,7 +198,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
                 f"{tuple(observations.shape)!r}"
             )
 
-        return self._layer_norm(self._linear(self._cnn(channels_first)))
+        return channels_first.float()
 
 
 class FZeroXImageStateExtractor(BaseFeaturesExtractor):

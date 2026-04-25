@@ -15,8 +15,10 @@ from fzerox_emulator import (
 from rl_fzerox.core.config.schema import (
     EmulatorConfig,
     EnvConfig,
+    PolicyConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    TrainConfig,
     WatchAppConfig,
 )
 from rl_fzerox.core.envs.observations import (
@@ -37,7 +39,11 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
-from rl_fzerox.ui.watch.view.panels.draw import _draw_labeled_value_line, _panel_tab_hint
+from rl_fzerox.ui.watch.view.panels.draw import (
+    _draw_labeled_value_line,
+    _draw_panel_tabs,
+    _panel_tab_hint,
+)
 from rl_fzerox.ui.watch.view.panels.format import (
     _format_observation_summary,
     _format_policy_action,
@@ -52,6 +58,7 @@ from rl_fzerox.ui.watch.view.panels.model import (
     _window_size,
 )
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
+from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, ViewerFonts
@@ -179,7 +186,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 def test_next_panel_tab_index_cycles_tabs() -> None:
     assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
-    assert _next_panel_tab_index(2, ViewerInput(panel_tab_delta=1)) == 0
+    assert _next_panel_tab_index(5, ViewerInput(panel_tab_delta=1)) == 0
 
 
 def test_next_panel_tab_index_honors_direct_selection() -> None:
@@ -187,15 +194,46 @@ def test_next_panel_tab_index_honors_direct_selection() -> None:
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:
-    assert _panel_tab_hint(0) == "Tab 1/3"
-    assert _panel_tab_hint(2) == "Tab 3/3"
-    assert _panel_tab_hint(3) == "Tab 1/3"
+    assert _panel_tab_hint(0) == "Tab 1/6"
+    assert _panel_tab_hint(2) == "Tab 3/6"
+    assert _panel_tab_hint(3) == "Tab 4/6"
+    assert _panel_tab_hint(4) == "Tab 5/6"
+    assert _panel_tab_hint(5) == "Tab 6/6"
+    assert _panel_tab_hint(6) == "Tab 1/6"
+
+
+def test_panel_tabs_fit_side_panel_content_width() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+    try:
+        fonts = _create_fonts(pygame)
+        width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
+        screen = pygame.Surface((LAYOUT.panel_width, 80))
+
+        _, tab_rects = _draw_panel_tabs(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=0,
+            y=0,
+            width=width,
+            selected_index=0,
+        )
+
+        assert all(rect is not None for rect in tab_rects)
+        assert max(rect[0] + rect[2] for rect in tab_rects if rect is not None) <= width
+    finally:
+        pygame.quit()
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1064, 700)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1064, 980)
+    assert _window_size((592, 444), (84, 116, 12)) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1004, 980)
 
 
 def test_pressed_button_labels_are_human_readable() -> None:
@@ -279,6 +317,47 @@ def test_side_panel_drops_cockpit_control_section() -> None:
     ]
 
 
+def test_train_tab_shows_current_training_hparams() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        train_config=TrainConfig(
+            algorithm="maskable_hybrid_action_ppo",
+            total_timesteps=50_000_000,
+            learning_rate=2e-4,
+            n_steps=2048,
+            output_root=Path("local/runs"),
+            run_name="wide_ppo",
+        ),
+        policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature_wide"}}),
+    )
+
+    training_section = next(section for section in columns.train if section.title == "Training")
+    policy_section = next(section for section in columns.train if section.title == "Policy")
+    training_values = {line.label: line.value for line in training_section.lines}
+    policy_values = {line.label: line.value for line in policy_section.lines}
+
+    assert training_values["Algorithm"] == "maskable_hybrid_action_ppo"
+    assert "Run" not in training_values
+    assert training_values["Target steps"] == "50,000,000"
+    assert training_values["LR"] == "2e-04"
+    assert policy_values["Conv"] == "nature_wide"
+    assert policy_values["Pi net"] == "[256, 256]"
+
+
 def test_session_section_shows_episode_step_counter() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -356,9 +435,9 @@ def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked)
 
-    assert preview.shape == (4, 3, 3)
-    assert np.array_equal(preview[:2, :, :], second)
-    assert np.array_equal(preview[2:4, :, :], first)
+    assert preview.shape == (2, 6, 3)
+    assert np.array_equal(preview[:, :3, :], second)
+    assert np.array_equal(preview[:, 3:6, :], first)
 
 
 def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
@@ -371,12 +450,12 @@ def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked, info=info)
 
-    assert preview.shape == (8, 3, 3)
-    assert np.array_equal(preview[:2, :, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
-    assert np.array_equal(preview[2:4, :, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
-    assert np.array_equal(preview[4:6, :, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
-    assert np.array_equal(preview[6:8, :, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
-    assert _observation_preview_size(stacked.shape, info=info) == (3, 8)
+    assert preview.shape == (2, 12, 3)
+    assert np.array_equal(preview[:, :3, :], np.repeat(stacked[:, :, 3:4], 3, axis=2))
+    assert np.array_equal(preview[:, 3:6, :], np.repeat(stacked[:, :, 2:3], 3, axis=2))
+    assert np.array_equal(preview[:, 6:9, :], np.repeat(stacked[:, :, 1:2], 3, axis=2))
+    assert np.array_equal(preview[:, 9:12, :], np.repeat(stacked[:, :, 0:1], 3, axis=2))
+    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
     assert (
         _format_observation_summary(
             stacked.shape,
@@ -394,8 +473,8 @@ def test_preview_frame_shows_luma_chroma_observations_as_grid() -> None:
 
     preview = _preview_frame(stacked, info=info)
 
-    assert preview.shape == (8, 3, 3)
-    assert _observation_preview_size(stacked.shape, info=info) == (3, 8)
+    assert preview.shape == (2, 12, 3)
+    assert _observation_preview_size(stacked.shape, info=info) == (12, 2)
     assert (
         _format_observation_summary(
             stacked.shape,

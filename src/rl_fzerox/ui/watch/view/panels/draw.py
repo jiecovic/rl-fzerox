@@ -5,11 +5,15 @@ from dataclasses import dataclass
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
+from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
-from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns, _panel_tab_width
+from rl_fzerox.ui.watch.view.panels.cnn import _draw_cnn_tab
+from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.viz import _wrap_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
@@ -50,6 +54,7 @@ class SidePanelData:
     policy_action: ActionValue | None
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
+    cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
@@ -68,6 +73,8 @@ class SidePanelData:
     observation_state: StateVector | None
     observation_state_feature_names: tuple[str, ...]
     telemetry: FZeroXTelemetry | None
+    train_config: TrainConfig | None
+    policy_config: PolicyConfig | None
 
 
 def _draw_side_panel(
@@ -126,11 +133,11 @@ def _draw_side_panel(
         observation_state=data.observation_state,
         observation_state_feature_names=data.observation_state_feature_names,
         telemetry=data.telemetry,
+        train_config=data.train_config,
+        policy_config=data.policy_config,
     )
 
-    selected_tab_index = data.panel_tab_index % len(_PANEL_TABS)
-    selected_tab_width = _panel_tab_width(panel_width)
-    selected_tab_x = panel_rect.right - LAYOUT.panel_padding - selected_tab_width
+    selected_tab_index = PANEL_TABS.normalize(data.panel_tab_index)
 
     y = _draw_panel_title(
         screen=screen,
@@ -146,29 +153,40 @@ def _draw_side_panel(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        x=selected_tab_x,
+        x=x,
         y=y,
-        width=selected_tab_width,
+        width=panel_width,
         selected_index=selected_tab_index,
     )
     y += LAYOUT.title_section_gap
 
-    _draw_column(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        x=selected_tab_x,
-        y=y,
-        width=selected_tab_width,
-        sections=_panel_tab_sections(columns, selected_tab_index),
-    )
+    if selected_tab_index == PANEL_TABS.cnn_index:
+        _draw_cnn_tab(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            activations=data.cnn_activations,
+        )
+    else:
+        _draw_column(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            sections=_panel_tab_sections(columns, selected_tab_index),
+        )
     return ViewerHitboxes(panel_tabs=tab_rects)
 
 
 def _draw_column(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
@@ -197,29 +215,32 @@ def _panel_subtitle(policy_label: str | None) -> str:
     return f"policy: {policy_label}"
 
 
-_PANEL_TABS: tuple[str, ...] = (
-    "Session",
-    "Game",
-    "State",
-)
-
-
 def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[PanelSection]:
-    tabs = (columns.left, columns.middle, columns.stats)
-    return tabs[selected_index % len(tabs)]
+    tab_key = PANEL_TABS.key(selected_index)
+    if tab_key == "session":
+        return columns.left
+    if tab_key == "game":
+        return columns.middle
+    if tab_key == "state":
+        return columns.stats
+    if tab_key == "records":
+        return columns.records
+    if tab_key == "train":
+        return columns.train
+    return []
 
 
 def _draw_panel_tabs(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
     width: int,
     selected_index: int,
 ) -> tuple[int, tuple[MouseRect | None, ...]]:
-    gap = max(2, LAYOUT.inline_value_gap // 2)
+    gap = max(2, LAYOUT.inline_value_gap // 4)
     tab_height = _font_line_height(fonts.small) + 10
     tab_y = y
     current_x = x
@@ -232,14 +253,14 @@ def _draw_panel_tabs(
         width=1,
     )
     tab_rects: list[MouseRect | None] = []
-    for index, label in enumerate(_PANEL_TABS):
-        active = index == (selected_index % len(_PANEL_TABS))
+    for index, label in enumerate(PANEL_TABS.labels):
+        active = index == PANEL_TABS.normalize(selected_index)
         label_surface = fonts.small.render(
             label,
             True,
             PALETTE.text_primary if active else PALETTE.text_muted,
         )
-        tab_width = max(64, label_surface.get_width() + 16)
+        tab_width = max(32, label_surface.get_width() + 12)
         rect = pygame.Rect(current_x, tab_y, tab_width, tab_height)
         pygame.draw.rect(
             screen,
@@ -270,7 +291,7 @@ def _draw_panel_tabs(
         tab_rects.append((rect.x, rect.y, rect.width, rect.height))
         current_x += tab_width + gap
         if current_x > x + width:
-            tab_rects.extend((None,) * (len(_PANEL_TABS) - len(tab_rects)))
+            tab_rects.extend((None,) * (PANEL_TABS.count - len(tab_rects)))
             break
     hint_surface = fonts.small.render(
         _panel_tab_hint(selected_index),
@@ -283,14 +304,14 @@ def _draw_panel_tabs(
             hint_surface,
             (hint_x, tab_y + max(0, (tab_height - hint_surface.get_height()) // 2)),
         )
-    while len(tab_rects) < len(_PANEL_TABS):
+    while len(tab_rects) < PANEL_TABS.count:
         tab_rects.append(None)
     return tab_y + tab_height, tuple(tab_rects)
 
 
 def _panel_tab_hint(selected_index: int) -> str:
-    tab_number = (selected_index % len(_PANEL_TABS)) + 1
-    return f"Tab {tab_number}/{len(_PANEL_TABS)}"
+    tab_number = PANEL_TABS.normalize(selected_index) + 1
+    return f"Tab {tab_number}/{PANEL_TABS.count}"
 
 
 def _draw_panel_title(
@@ -314,8 +335,8 @@ def _draw_panel_title(
 
 def _draw_section(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
@@ -387,7 +408,14 @@ def _draw_section(
     return y
 
 
-def _draw_panel_divider(*, pygame, screen, x: int, y: int, width: int) -> int:
+def _draw_panel_divider(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    x: int,
+    y: int,
+    width: int,
+) -> int:
     line_y = y + max(1, LAYOUT.line_gap // 2)
     pygame.draw.line(screen, PALETTE.panel_border, (x, line_y), (x + width, line_y), width=1)
     return line_y + LAYOUT.line_gap + 1
@@ -395,14 +423,14 @@ def _draw_panel_divider(*, pygame, screen, x: int, y: int, width: int) -> int:
 
 def _draw_wrapped_line(
     *,
-    screen,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
     width: int,
     label: str,
     value: str,
-    color,
+    color: Color,
     min_value_lines: int,
 ) -> int:
     label_surface = fonts.small.render(label, True, PALETTE.text_muted)
@@ -433,8 +461,8 @@ def _draw_wrapped_line(
 
 def _draw_labeled_value_line(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: PygameSurface,
     fonts: ViewerFonts,
     x: int,
     y: int,
@@ -527,7 +555,7 @@ def _draw_status_icon(
         pygame.draw.circle(screen, color, (x, y + 3), 1)
 
 
-def _fit_text(font, text: str, max_width: int) -> str:
+def _fit_text(font: RenderFont, text: str, max_width: int) -> str:
     if font.render(text, True, PALETTE.text_primary).get_width() <= max_width:
         return text
 

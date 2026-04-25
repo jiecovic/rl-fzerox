@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
+from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.ui.watch.view.panels.format import (
@@ -21,6 +22,7 @@ from rl_fzerox.ui.watch.view.panels.format import (
 )
 from rl_fzerox.ui.watch.view.panels.game import game_section
 from rl_fzerox.ui.watch.view.panels.geometry import track_geometry_sections
+from rl_fzerox.ui.watch.view.panels.hparams import training_hparam_sections
 from rl_fzerox.ui.watch.view.panels.lines import panel_line as _panel_line
 from rl_fzerox.ui.watch.view.panels.records import track_record_sections
 from rl_fzerox.ui.watch.view.panels.state_vector import policy_state_sections
@@ -75,6 +77,8 @@ def _build_panel_columns(
     progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
+    train_config: TrainConfig | None = None,
+    policy_config: PolicyConfig | None = None,
 ) -> PanelColumns:
     curriculum_stage = _format_curriculum_stage(
         checkpoint_stage=policy_curriculum_stage,
@@ -93,9 +97,7 @@ def _build_panel_columns(
                     _panel_line(
                         "Stage",
                         curriculum_stage,
-                        PALETTE.text_primary
-                        if curriculum_stage != "-"
-                        else PALETTE.text_muted,
+                        PALETTE.text_primary if curriculum_stage != "-" else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Deterministic",
@@ -170,13 +172,6 @@ def _build_panel_columns(
                     ),
                 ],
             ),
-            *track_record_sections(
-                current_info=info,
-                track_pool_records=track_pool_records,
-                best_finish_times=best_finish_times or {},
-                latest_finish_times=latest_finish_times or {},
-                latest_finish_deltas_ms=latest_finish_deltas_ms or {},
-            ),
         ],
         middle=[
             game_section(
@@ -230,6 +225,19 @@ def _build_panel_columns(
                 zeroed_components=_zeroed_state_components(info),
             ),
         ],
+        records=[
+            *track_record_sections(
+                current_info=info,
+                track_pool_records=track_pool_records,
+                best_finish_times=best_finish_times or {},
+                latest_finish_times=latest_finish_times or {},
+                latest_finish_deltas_ms=latest_finish_deltas_ms or {},
+            ),
+        ],
+        train=training_hparam_sections(
+            train_config=train_config,
+            policy_config=policy_config,
+        ),
     )
 
 

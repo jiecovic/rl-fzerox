@@ -12,6 +12,7 @@ from rl_fzerox.core.envs import observations as observation_utils
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
     WatchSnapshot,
@@ -87,6 +88,7 @@ def _publish_step_snapshots(
     policy_runner: PolicyRunner | None,
     deterministic_policy: bool,
     policy_reload_error: str | None,
+    cnn_activations: CnnActivationSnapshot | None,
     best_finish_position: int | None,
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
@@ -123,6 +125,7 @@ def _publish_step_snapshots(
                 policy_runner=policy_runner,
                 deterministic_policy=deterministic_policy,
                 policy_reload_error=policy_reload_error,
+                cnn_activations=cnn_activations,
                 best_finish_position=best_finish_position,
                 best_finish_times=best_finish_times,
                 latest_finish_times=latest_finish_times,
@@ -157,6 +160,7 @@ def _build_snapshot(
     policy_runner: PolicyRunner | None,
     deterministic_policy: bool,
     policy_reload_error: str | None,
+    cnn_activations: CnnActivationSnapshot | None,
     best_finish_position: int | None,
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
@@ -196,6 +200,7 @@ def _build_snapshot(
         ),
         policy_reload_age_seconds=_policy_reload_age_seconds(policy_runner),
         policy_reload_error=policy_reload_error,
+        cnn_activations=cnn_activations,
         best_finish_position=best_finish_position,
         best_finish_times=dict(best_finish_times),
         latest_finish_times=dict(latest_finish_times),

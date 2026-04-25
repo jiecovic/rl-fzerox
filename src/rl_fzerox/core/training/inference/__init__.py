@@ -10,6 +10,10 @@ import numpy as np
 from fzerox_emulator.arrays import ActionMask, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.training.inference.activations import (
+    PolicyCnnActivation,
+    collect_policy_cnn_activations,
+)
 from rl_fzerox.core.training.inference.loader import (
     _load_saved_policy,
     _policy_mtime_ns,
@@ -134,6 +138,14 @@ class PolicyRunner:
         self._episode_start = np.array([False], dtype=bool)
         return action
 
+    def cnn_activations(
+        self,
+        observation: ObservationValue,
+    ) -> tuple[PolicyCnnActivation, ...]:
+        """Return watch/debug CNN activations for the current policy."""
+
+        return collect_policy_cnn_activations(self._policy, observation)
+
     def _maybe_reload(self) -> None:
         try:
             policy_path = resolve_policy_artifact_path(
@@ -213,6 +225,7 @@ def load_policy_runner(
 
 __all__ = [
     "LoadedPolicy",
+    "PolicyCnnActivation",
     "PolicyRunner",
     "load_policy_runner",
 ]

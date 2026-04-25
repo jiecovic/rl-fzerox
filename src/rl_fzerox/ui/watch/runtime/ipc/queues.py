@@ -10,6 +10,7 @@ from typing import Protocol
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import WatchAppConfig
+from rl_fzerox.ui.watch.input import ViewerInput
 from rl_fzerox.ui.watch.runtime.ipc.messages import (
     ViewerCommand,
     WatchSnapshot,
@@ -122,6 +123,7 @@ def drain_worker_commands(
     *,
     paused: bool,
     control_state: ControllerState,
+    cnn_visualization_enabled: bool = False,
 ) -> tuple[WorkerCommandBatch, bool, ControllerState]:
     next_paused = paused
     next_control_state = control_state
@@ -131,6 +133,7 @@ def drain_worker_commands(
     reset_requested = False
     toggle_deterministic_policy = False
     control_fps_delta = 0
+    next_cnn_visualization_enabled = cnn_visualization_enabled
     while True:
         try:
             command = command_queue.get_nowait()
@@ -144,6 +147,7 @@ def drain_worker_commands(
                     reset_requested=reset_requested,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     control_fps_delta=control_fps_delta,
+                    cnn_visualization_enabled=next_cnn_visualization_enabled,
                     control_state=next_control_state,
                 ),
                 next_paused,
@@ -164,15 +168,17 @@ def drain_worker_commands(
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
         control_fps_delta += command.control_fps_delta
+        next_cnn_visualization_enabled = command.cnn_visualization_enabled
         if command.control_state is not None:
             next_control_state = command.control_state
 
 
 def apply_viewer_input(
     command_queue: ProcessQueue,
-    viewer_input,
+    viewer_input: ViewerInput,
     *,
     paused: bool,
+    cnn_visualization_enabled: bool = False,
 ) -> bool:
     next_paused = not paused if viewer_input.toggle_pause else paused
     send_command(
@@ -185,6 +191,7 @@ def apply_viewer_input(
             force_reset=viewer_input.force_reset,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             control_fps_delta=viewer_input.control_fps_delta,
+            cnn_visualization_enabled=cnn_visualization_enabled,
             control_state=viewer_input.control_state,
         ),
     )

@@ -107,6 +107,8 @@ class PanelColumns:
     left: list[PanelSection]
     middle: list[PanelSection]
     stats: list[PanelSection]
+    records: list[PanelSection]
+    train: list[PanelSection]
 
 
 @dataclass(frozen=True)

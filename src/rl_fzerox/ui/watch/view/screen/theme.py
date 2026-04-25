@@ -17,6 +17,8 @@ class ViewerPalette:
     text_muted: Color = (155, 165, 178)
     text_accent: Color = (126, 214, 170)
     text_warning: Color = (241, 206, 108)
+    cnn_grid_separator: Color = (54, 132, 140)
+    cnn_grid_unused_hatch: Color = (47, 91, 96)
     control_track: Color = (39, 46, 56)
     control_lever_border: Color = (142, 153, 168)
     control_lever_border_width: int = 1

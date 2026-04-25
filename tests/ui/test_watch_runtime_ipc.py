@@ -99,6 +99,34 @@ def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
     assert control_state == ControllerState()
 
 
+def test_drain_worker_commands_preserves_cnn_visualization_state_without_commands() -> None:
+    command_queue = _CommandQueue([])
+
+    commands, paused, control_state = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+        cnn_visualization_enabled=True,
+    )
+
+    assert commands.cnn_visualization_enabled is True
+    assert paused is False
+    assert control_state == ControllerState()
+
+
+def test_drain_worker_commands_updates_cnn_visualization_state() -> None:
+    command_queue = _CommandQueue([ViewerCommand(cnn_visualization_enabled=False)])
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+        cnn_visualization_enabled=True,
+    )
+
+    assert commands.cnn_visualization_enabled is False
+
+
 def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
     command_queue = _ShutdownQueue()
     snapshot_queue = _ShutdownQueue()

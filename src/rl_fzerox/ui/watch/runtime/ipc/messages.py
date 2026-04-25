@@ -7,6 +7,7 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,7 @@ class ViewerCommand:
     force_reset: bool = False
     toggle_deterministic_policy: bool = False
     control_fps_delta: int = 0
+    cnn_visualization_enabled: bool = False
     control_state: ControllerState | None = None
 
 
@@ -34,6 +36,7 @@ class WorkerCommandBatch:
     reset_requested: bool
     toggle_deterministic_policy: bool
     control_fps_delta: int
+    cnn_visualization_enabled: bool
     control_state: ControllerState
 
 
@@ -72,6 +75,7 @@ class WatchSnapshot:
     policy_deterministic: bool | None
     policy_reload_age_seconds: float | None
     policy_reload_error: str | None
+    cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]

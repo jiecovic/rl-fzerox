@@ -13,6 +13,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _resolve_render_fps,
 )
+from rl_fzerox.ui.watch.view.panels.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.screen.frame import (
     _create_fonts,
     _ensure_screen,
@@ -22,8 +23,6 @@ from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
 from rl_fzerox.ui.watch.view.screen.types import ViewerHitboxes
 
 __all__ = ["run_viewer"]
-
-_PANEL_TAB_COUNT = 3
 
 
 def run_viewer(config: WatchAppConfig) -> None:
@@ -68,6 +67,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 worker.command_queue,
                 viewer_input,
                 paused=paused,
+                cnn_visualization_enabled=panel_tab_index == PANEL_TABS.cnn_index,
             )
             if viewer_input.quit_requested:
                 return
@@ -112,7 +112,7 @@ def run_viewer(config: WatchAppConfig) -> None:
 def _next_panel_tab_index(current_index: int, viewer_input: ViewerInput) -> int:
     selected_index = viewer_input.panel_tab_index
     if selected_index is not None:
-        return max(0, min(_PANEL_TAB_COUNT - 1, selected_index))
+        return max(0, min(PANEL_TABS.count - 1, selected_index))
     if viewer_input.panel_tab_delta == 0:
         return current_index
-    return (current_index + viewer_input.panel_tab_delta) % _PANEL_TAB_COUNT
+    return PANEL_TABS.normalize(current_index + viewer_input.panel_tab_delta)

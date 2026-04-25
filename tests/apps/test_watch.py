@@ -181,6 +181,8 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "best"
     assert config.emulator.core_path == core_path
+    assert config.train == train_config.train
+    assert config.policy == train_config.policy
 
 
 def test_watch_allows_run_dir_without_config(
@@ -245,6 +247,8 @@ def test_watch_allows_run_dir_without_config(
     assert config.reward.time_penalty_per_frame == -0.123
     assert config.curriculum.enabled is True
     assert config.curriculum.stages[0].name == "basic_drive"
+    assert config.train == train_config.train
+    assert config.policy == train_config.policy
     assert config.watch.device == "cpu"
     assert config.watch.policy_run_dir == run_dir.resolve()
     assert config.watch.policy_artifact == "latest"

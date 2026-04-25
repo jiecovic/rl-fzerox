@@ -15,7 +15,7 @@ from fzerox_emulator import (
     ControllerState,
     joypad_mask,
 )
-from rl_fzerox.ui.watch.view.screen.types import MouseRect
+from rl_fzerox.ui.watch.view.screen.types import MouseRect, PygameModule
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class ViewerInput:
 
 
 def _poll_viewer_input(
-    pygame,
+    pygame: PygameModule,
     *,
     deterministic_toggle_rect: MouseRect | None = None,
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
@@ -72,6 +72,12 @@ def _poll_viewer_input(
                 panel_tab_index = 1
             elif event.key == pygame.K_3:
                 panel_tab_index = 2
+            elif event.key == pygame.K_4:
+                panel_tab_index = 3
+            elif event.key == pygame.K_5:
+                panel_tab_index = 4
+            elif event.key == pygame.K_6:
+                panel_tab_index = 5
             elif event.key == pygame.K_p:
                 toggle_pause = True
             elif event.key == pygame.K_n:

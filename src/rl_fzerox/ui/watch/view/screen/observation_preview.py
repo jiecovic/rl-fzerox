@@ -23,9 +23,8 @@ def _window_size(
     *,
     panel_tab_index: int = 0,
 ) -> tuple[int, int]:
-    panel_min_height = (
-        LAYOUT.panel_min_height if panel_tab_index % 3 == 0 else LAYOUT.panel_state_min_height
-    )
+    del panel_tab_index
+    panel_min_height = max(LAYOUT.panel_min_height, LAYOUT.panel_state_min_height)
     return (
         game_display_size[0] + LAYOUT.preview_gap + LAYOUT.panel_width,
         max(game_display_size[1], panel_min_height),
