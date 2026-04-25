@@ -47,7 +47,9 @@ class WatchAppConfig(BaseModel):
     track: TrackConfig = Field(default_factory=TrackConfig)
     env: EnvConfig = Field(default_factory=EnvConfig)
     reward: RewardConfig = Field(default_factory=RewardConfig)
+    policy: PolicyConfig | None = None
     curriculum: CurriculumConfig = Field(default_factory=CurriculumConfig)
+    train: TrainConfig | None = None
     watch: WatchConfig = Field(default_factory=WatchConfig)
 
 

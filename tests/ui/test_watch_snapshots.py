@@ -84,6 +84,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         policy_runner=None,
         deterministic_policy=True,
         policy_reload_error=None,
+        cnn_activations=None,
         best_finish_position=None,
         best_finish_times={"mute": 98_000},
         latest_finish_times={"mute": 101_000},

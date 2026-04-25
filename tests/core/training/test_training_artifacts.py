@@ -158,6 +158,8 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.emulator.runtime_dir == watch_runtime_dir.resolve()
     assert merged_watch_config.env.action_repeat == 3
     assert merged_watch_config.reward.progress_bucket_reward == 9.0
+    assert merged_watch_config.policy == loaded_train_config.policy
+    assert merged_watch_config.train == loaded_train_config.train
     assert merged_watch_config.watch.policy_run_dir == run_paths.run_dir
     assert merged_watch_config.watch.control_fps == 30.0
     assert merged_watch_config.watch.render_fps == 30.0
@@ -233,6 +235,7 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
     assert action_config.name == "hybrid_steer_gas_boost_lean"
     assert action_config.boost_decision_interval_frames == 1
     assert action_config.boost_request_lockout_frames == 5
+
 
 def test_watch_inheritance_preserves_local_baseline_when_run_snapshot_lacks_it(
     tmp_path: Path,
@@ -314,6 +317,7 @@ def test_watch_inheritance_uses_train_camera_setting(tmp_path: Path) -> None:
 
     assert merged_watch_config.env.action_repeat == 3
     assert merged_watch_config.env.camera_setting == "regular"
+
 
 def test_materialize_train_run_config_preserves_resume_artifact_source(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"

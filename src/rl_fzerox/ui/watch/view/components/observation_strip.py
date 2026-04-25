@@ -87,14 +87,14 @@ def _draw_control_viz_below_game(
     fonts: ViewerFonts,
     game_display_size: tuple[int, int],
     control_viz: ControlViz,
-) -> ViewerHitboxes:
+) -> tuple[ViewerHitboxes, int]:
     x = LAYOUT.preview_padding
     y = game_display_size[1] + LAYOUT.preview_gap
     width = game_display_size[0] - (2 * LAYOUT.preview_padding)
     if width <= 0 or y >= screen.get_height():
-        return ViewerHitboxes()
+        return ViewerHitboxes(), y
 
-    _, deterministic_toggle_rect = _draw_control_viz(
+    bottom, deterministic_toggle_rect = _draw_control_viz(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
@@ -103,7 +103,7 @@ def _draw_control_viz_below_game(
         width=width,
         control_viz=control_viz,
     )
-    return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect)
+    return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect), bottom
 
 
 def _draw_observation_preview_in_rect(
@@ -136,14 +136,11 @@ def _draw_observation_preview_in_rect(
 
     preview_width, preview_height = surface.get_size()
     glass_padding = 8
-    label_column_width = _observation_label_column_width(
-        font=fonts.body,
-        observation_shape=observation_shape,
-        info=info,
-    )
-    label_gap = 7 if label_column_width > 0 else 0
-    max_preview_width = width - (2 * glass_padding) - label_column_width - label_gap
-    max_preview_height = bottom - y - (2 * glass_padding)
+    labels = _observation_tile_label_texts(observation_shape, info=info)
+    label_gap = 5 if labels else 0
+    label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
+    max_preview_width = width - (2 * glass_padding)
+    max_preview_height = bottom - y - (2 * glass_padding) - label_gap - label_row_height
     if max_preview_width <= 0 or max_preview_height <= 0:
         return
 
@@ -156,21 +153,15 @@ def _draw_observation_preview_in_rect(
         max(1, round(preview_height * scale)),
     )
     glass_size = (
-        label_column_width + label_gap + scaled_size[0] + (2 * glass_padding),
-        scaled_size[1] + (2 * glass_padding),
+        scaled_size[0] + (2 * glass_padding),
+        scaled_size[1] + label_gap + label_row_height + (2 * glass_padding),
     )
     glass_x = x + max(0, (width - glass_size[0]) // 2)
     glass_rect = pygame.Rect(glass_x, y, *glass_size)
     _draw_observation_glass_box(pygame=pygame, screen=screen, rect=glass_rect)
 
     preview_y = glass_rect.top + glass_padding
-    label_rect = pygame.Rect(
-        glass_rect.left + glass_padding,
-        preview_y,
-        label_column_width,
-        scaled_size[1],
-    )
-    preview_x = label_rect.right + label_gap if label_column_width > 0 else label_rect.left
+    preview_x = glass_rect.left + glass_padding
     preview_rect = pygame.Rect(preview_x, preview_y, *scaled_size)
     pygame.draw.rect(screen, PALETTE.panel_background, preview_rect)
     preview_surface = (
@@ -195,8 +186,9 @@ def _draw_observation_preview_in_rect(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        label_rect=label_rect,
         rect=preview_rect,
+        y=preview_rect.bottom + label_gap,
+        height=label_row_height,
         observation_shape=observation_shape,
         info=info,
     )
@@ -243,13 +235,14 @@ def _draw_observation_tile_labels(
     pygame: _PygameLike,
     screen: _ScreenLike,
     fonts: ViewerFonts,
-    label_rect: _RectLike,
     rect: _RectLike,
+    y: int,
+    height: int,
     observation_shape: tuple[int, ...],
     info: dict[str, object],
 ) -> None:
     labels = _observation_tile_label_texts(observation_shape, info=info)
-    if not labels:
+    if not labels or height <= 0:
         return
 
     for index, label in enumerate(labels):
@@ -262,8 +255,8 @@ def _draw_observation_tile_labels(
             screen=screen,
             font=fonts.body,
             label=label,
-            center_x=label_rect.left + (label_rect.size[0] // 2),
-            center_y=tile_rect.top + (tile_rect.size[1] // 2),
+            center_x=tile_rect.left + (tile_rect.size[0] // 2),
+            center_y=y + (height // 2),
             color=color,
             active=is_newest,
         )
@@ -327,20 +320,17 @@ def _observation_tile_label_texts(
     )
 
 
-def _observation_label_column_width(
+def _observation_label_row_height(
     *,
     font: RenderFont,
-    observation_shape: tuple[int, ...],
-    info: dict[str, object],
+    labels: tuple[str, ...],
 ) -> int:
-    labels = _observation_tile_label_texts(observation_shape, info=info)
     if not labels:
         return 0
 
-    label_padding_x = 7
-    return max(
-        font.render(label, True, PALETTE.text_primary).get_width() + (2 * label_padding_x)
-        for label in labels
+    label_padding_y = 3
+    return max(font.render(label, True, PALETTE.text_primary).get_height() for label in labels) + (
+        2 * label_padding_y
     )
 
 

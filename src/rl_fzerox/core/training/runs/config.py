@@ -76,9 +76,7 @@ def materialize_train_run_config(
     return materialized_config.model_copy(
         update={
             "train": materialized_config.train.model_copy(
-                update={
-                    "algorithm": materialized_config.train.algorithm
-                }
+                update={"algorithm": materialized_config.train.algorithm}
             ),
         }
     )
@@ -261,7 +259,9 @@ def apply_train_run_to_watch_config(
             "emulator": merged_emulator_config,
             "env": train_config.env,
             "reward": train_config.reward,
+            "policy": train_config.policy,
             "curriculum": train_config.curriculum,
+            "train": train_config.train,
             "watch": watch_config.watch.model_copy(
                 update={"policy_run_dir": run_dir.expanduser().resolve()}
             ),

@@ -175,6 +175,24 @@ def test_observation_extractor_nature_wide_doubles_nature_channels() -> None:
     assert tuple(features.shape) == (2, 3_072)
 
 
+def test_observation_extractor_reports_convolution_activations() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 5), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="nature_wide",
+    )
+
+    activations = extractor.convolution_activations(
+        torch.zeros((1, 60, 76, 5), dtype=torch.float32)
+    )
+
+    assert [(name, tuple(values.shape)) for name, values in activations] == [
+        ("conv1", (1, 64, 14, 18)),
+        ("conv2", (1, 128, 6, 8)),
+        ("conv3", (1, 128, 4, 6)),
+    ]
+
+
 def test_observation_extractor_nature_extra_k3_compresses_aspect_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(84, 116, 13), dtype=np.uint8),

@@ -8,8 +8,10 @@ import numpy as np
 
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
+from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
@@ -18,14 +20,13 @@ from rl_fzerox.ui.watch.view.components.observation_strip import (
 from rl_fzerox.ui.watch.view.panels.draw import SidePanelData, _draw_side_panel
 from rl_fzerox.ui.watch.view.panels.model import (
     _observation_preview_size,
-    _panel_preview_width,
     _preview_frame,
     _window_size,
 )
 from rl_fzerox.ui.watch.view.panels.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
-from rl_fzerox.ui.watch.view.screen.types import PygameRect, ViewerFonts, ViewerHitboxes
+from rl_fzerox.ui.watch.view.screen.types import ViewerFonts, ViewerHitboxes
 
 
 def _create_fonts(pygame) -> ViewerFonts:
@@ -130,6 +131,7 @@ def _draw_frame(
     policy_action: ActionValue | None,
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
+    cnn_activations: CnnActivationSnapshot | None,
     best_finish_position: int | None,
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
@@ -144,6 +146,8 @@ def _draw_frame(
     progress_frontier_stall_limit_frames: int | None,
     stuck_min_speed_kph: float,
     telemetry: FZeroXTelemetry | None,
+    train_config: TrainConfig | None,
+    policy_config: PolicyConfig | None,
 ) -> ViewerHitboxes:
     game_display_size = _watch_game_display_size()
     game_surface = _rgb_surface(pygame, raw_frame)
@@ -182,12 +186,24 @@ def _draw_frame(
         continuous_air_brake_mode=continuous_air_brake_mode,
         continuous_air_brake_disabled=continuous_air_brake_disabled,
     )
-    control_hitboxes = _draw_control_viz_below_game(
+    control_hitboxes, control_bottom = _draw_control_viz_below_game(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
         game_display_size=game_display_size,
         control_viz=control_viz,
+    )
+    _draw_observation_preview_in_rect(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        surface=observation_surface,
+        x=LAYOUT.preview_padding,
+        y=control_bottom + LAYOUT.preview_gap,
+        width=game_display_size[0] - (2 * LAYOUT.preview_padding),
+        height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
+        observation_shape=observation.shape,
+        info=info,
     )
     panel_rect = pygame.Rect(
         game_display_size[0] + LAYOUT.preview_gap,
@@ -223,6 +239,7 @@ def _draw_frame(
             policy_action=policy_action,
             policy_reload_age_seconds=policy_reload_age_seconds,
             policy_reload_error=policy_reload_error,
+            cnn_activations=cnn_activations,
             best_finish_position=best_finish_position,
             best_finish_times=best_finish_times,
             latest_finish_times=latest_finish_times,
@@ -241,24 +258,9 @@ def _draw_frame(
             observation_state=observation_state,
             observation_state_feature_names=observation_state_feature_names,
             telemetry=telemetry,
+            train_config=train_config,
+            policy_config=policy_config,
         ),
-    )
-    side_panel_body_y = _side_panel_body_y(
-        fonts=fonts,
-        panel_top=panel_rect.y,
-        policy_label=policy_label,
-    )
-    _draw_observation_preview_in_rect(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        surface=observation_surface,
-        x=panel_rect.x + LAYOUT.panel_padding,
-        y=side_panel_body_y,
-        width=_side_panel_preview_width(panel_rect=panel_rect),
-        height=panel_rect.bottom - side_panel_body_y - LAYOUT.panel_padding,
-        observation_shape=observation.shape,
-        info=info,
     )
     pygame.display.flip()
     return ViewerHitboxes(
@@ -273,39 +275,6 @@ def _rgb_surface(pygame, frame: RgbFrame):
     if channels != 3:
         raise ValueError(f"Expected an RGB frame for display, got shape {frame.shape!r}")
     return pygame.image.frombuffer(rgb_frame.tobytes(), (width, height), "RGB")
-
-
-def _side_panel_body_y(
-    *,
-    fonts: ViewerFonts,
-    panel_top: int,
-    policy_label: str | None,
-) -> int:
-    title_surface = fonts.title.render("F-Zero X Watch", True, PALETTE.text_primary)
-    subtitle_surface = fonts.small.render(
-        _side_panel_subtitle(policy_label),
-        True,
-        PALETTE.text_muted,
-    )
-    return (
-        panel_top
-        + LAYOUT.panel_padding
-        + title_surface.get_height()
-        + LAYOUT.title_gap
-        + subtitle_surface.get_height()
-        + LAYOUT.title_section_gap
-    )
-
-
-def _side_panel_preview_width(*, panel_rect: PygameRect) -> int:
-    panel_width = panel_rect.width - (2 * LAYOUT.panel_padding)
-    return _panel_preview_width(panel_width)
-
-
-def _side_panel_subtitle(policy_label: str | None) -> str:
-    if policy_label is None:
-        return "manual control"
-    return f"policy: {policy_label}"
 
 
 def _engine_setting_level(info: dict[str, object]) -> float | None:

@@ -12,6 +12,7 @@ from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSampler
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
@@ -104,6 +105,8 @@ def _run_simulation_loop(
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_state = ControllerState()
+        cnn_visualization_enabled = False
+        cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
 
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
@@ -140,6 +143,7 @@ def _run_simulation_loop(
                     policy_runner=policy_runner,
                     deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
+                    cnn_activations=None,
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
@@ -152,7 +156,9 @@ def _run_simulation_loop(
                     command_queue,
                     paused=paused,
                     control_state=manual_control_state,
+                    cnn_visualization_enabled=cnn_visualization_enabled,
                 )
+                cnn_visualization_enabled = commands.cnn_visualization_enabled
                 if commands.quit_requested:
                     return
                 if commands.reset_requested:
@@ -211,6 +217,7 @@ def _run_simulation_loop(
                     current_policy_action = None
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
+                    cnn_activations = None
                 else:
                     _sync_policy_curriculum_stage(policy_runner, env)
                     decision_action_mask = env.action_mask_snapshot()
@@ -231,6 +238,11 @@ def _run_simulation_loop(
                             details = ", ".join(violations)
                             raise RuntimeError(f"Policy selected masked action values: {details}")
                     current_policy_action = action
+                    cnn_activations = cnn_sampler.capture(
+                        enabled=commands.cnn_visualization_enabled,
+                        policy_runner=policy_runner,
+                        observation=observation,
+                    )
                     watch_step = env.step_watch(action)
                     observation, reward, terminated, truncated, info = watch_step.gym_result()
                     display_frames = watch_step.display_frames
@@ -293,6 +305,7 @@ def _run_simulation_loop(
                     policy_runner=policy_runner,
                     deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
+                    cnn_activations=cnn_activations,
                     best_finish_position=best_finish_position,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,

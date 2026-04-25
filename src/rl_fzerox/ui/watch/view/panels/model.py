@@ -31,40 +31,16 @@ def _panel_content_height(
     y += LAYOUT.title_section_gap
 
     content_width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
-    tab_width = _panel_tab_width(content_width)
     tab_height = fonts.small.render("Session", True, PALETTE.text_primary).get_height() + 10
-    left_height = _column_content_height(fonts, columns.left, width=tab_width)
-    middle_height = _column_content_height(fonts, columns.middle, width=tab_width)
-    stats_height = _column_content_height(fonts, columns.stats, width=tab_width)
+    left_height = _column_content_height(fonts, columns.left, width=content_width)
+    middle_height = _column_content_height(fonts, columns.middle, width=content_width)
+    stats_height = _column_content_height(fonts, columns.stats, width=content_width)
+    records_height = _column_content_height(fonts, columns.records, width=content_width)
+    train_height = _column_content_height(fonts, columns.train, width=content_width)
     return (
         y
         + tab_height
         + LAYOUT.title_section_gap
-        + max(left_height, middle_height, stats_height)
+        + max(left_height, middle_height, stats_height, records_height, train_height)
         + LAYOUT.panel_padding
     )
-
-
-def _panel_column_widths(content_width: int) -> tuple[int, int, int]:
-    """Return balanced widths for the three watch side-panel columns."""
-
-    available_width = content_width - (2 * LAYOUT.column_gap)
-    base_width, remainder = divmod(available_width, 3)
-    return (
-        base_width,
-        base_width + (1 if remainder >= 1 else 0),
-        base_width + (1 if remainder >= 2 else 0),
-    )
-
-
-def _panel_tab_width(content_width: int) -> int:
-    """Return the fixed-width selected HUD tab column."""
-
-    return max(1, min(LAYOUT.panel_tab_width, content_width))
-
-
-def _panel_preview_width(content_width: int) -> int:
-    """Return the width reserved for the observation preview column."""
-
-    tab_width = _panel_tab_width(content_width)
-    return max(0, content_width - tab_width - LAYOUT.column_gap)

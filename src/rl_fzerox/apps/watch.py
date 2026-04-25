@@ -155,7 +155,9 @@ def _default_watch_config_from_train_run(
         emulator=train_config.emulator,
         env=train_config.env,
         reward=train_config.reward,
+        policy=train_config.policy,
         curriculum=train_config.curriculum,
+        train=train_config.train,
         watch=WatchConfig(
             policy_run_dir=run_dir,
             policy_artifact=artifact,

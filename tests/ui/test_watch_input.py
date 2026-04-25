@@ -38,6 +38,9 @@ class _FakePygame:
     K_1 = 29
     K_2 = 30
     K_3 = 31
+    K_4 = 32
+    K_5 = 33
+    K_6 = 34
 
     def __init__(
         self,
@@ -104,6 +107,9 @@ def test_poll_viewer_input_selects_panel_tabs_with_number_keys() -> None:
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_1,))).panel_tab_index == 0
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_2,))).panel_tab_index == 1
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_3,))).panel_tab_index == 2
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_4,))).panel_tab_index == 3
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_5,))).panel_tab_index == 4
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_6,))).panel_tab_index == 5
 
 
 def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:

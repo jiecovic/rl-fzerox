@@ -403,7 +403,7 @@ def test_records_section_shows_non_agg_reference_records() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.left if section.title == "Records")
+    records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Big Blue")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
     wr_line = next(line for line in records_section.lines if line.label == "WR")
@@ -447,7 +447,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.left if section.title == "Records")
+    records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Silence")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
     latest_line = next(line for line in records_section.lines if line.label == "Latest")
@@ -492,7 +492,7 @@ def test_records_section_shows_latest_improvement_against_previous_pb() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.left if section.title == "Records")
+    records_section = next(section for section in columns.records if section.title == "Records")
     latest_line = next(line for line in records_section.lines if line.label == "Latest")
     assert latest_line.value == "1:37.530 (-1.2s)"
 
@@ -529,7 +529,7 @@ def test_records_section_marks_watch_best_inside_reference_range() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.left if section.title == "Records")
+    records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Silence")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
     assert header_line.value == ""
@@ -570,7 +570,7 @@ def test_records_section_formats_minute_scale_reference_gap() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.left if section.title == "Records")
+    records_section = next(section for section in columns.records if section.title == "Records")
     header_line = next(line for line in records_section.lines if line.label == "Silence")
     assert header_line.status_icon == "outside"
     assert header_line.status_text == "+1min 15.1s"

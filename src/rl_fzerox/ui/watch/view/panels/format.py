@@ -251,4 +251,4 @@ def _observation_minimap_layer(info: Mapping[str, object] | None) -> bool:
 
 
 def _observation_preview_grid(stack_size: int) -> tuple[int, int]:
-    return 1, stack_size
+    return stack_size, 1
