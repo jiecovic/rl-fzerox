@@ -102,6 +102,7 @@ class FZeroXEnvEngine:
         self._track_baseline_cache = TrackBaselineCache()
         self._control_state = ControlStateTracker(
             lean_mode=self._action_config.lean_mode,
+            lean_initial_lockout_frames=self._action_config.lean_initial_lockout_frames,
             boost_decision_interval_frames=self._action_config.boost_decision_interval_frames,
             boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
             action_history_len=self._observation_builder.action_history_len,
@@ -215,7 +216,9 @@ class FZeroXEnvEngine:
         info.update(backend_step_info(self.backend))
         self.backend.set_controller_state(self._episode.held_controller_state)
         self._control_state.reset()
-        self._mask_controller.set_lean_allowed_values(None)
+        self._mask_controller.set_lean_allowed_values(
+            self._control_state.lean_action_mask_override()
+        )
         sync_dynamic_action_masks(
             mask_controller=self._mask_controller,
             control_state=self._control_state,

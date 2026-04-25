@@ -9,6 +9,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeFloat,
+    NonNegativeInt,
     PositiveFloat,
     field_validator,
 )
@@ -72,6 +73,7 @@ class ActionBranchConfig(BaseModel):
     mode: LeanMode | None = None
     unmask_max_speed_kph: NonNegativeFloat | None = None
     unmask_min_speed_kph: NonNegativeFloat | None = None
+    initial_lockout_frames: NonNegativeInt | None = None
 
     @field_validator("mask")
     @classmethod
@@ -110,6 +112,7 @@ class ActionBranchCompilation:
     mask_overrides: ActionMaskOverrides | None = None
     boost_unmask_max_speed_kph: float | None = None
     lean_unmask_min_speed_kph: float | None = None
+    lean_initial_lockout_frames: int | None = None
     lean_mode: LeanMode | None = None
 
 
@@ -163,9 +166,7 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
             else continuous_gas_branch.full_threshold
         )
         continuous_drive_min_thrust = float(
-            0.25
-            if continuous_gas_branch.min_thrust is None
-            else continuous_gas_branch.min_thrust
+            0.25 if continuous_gas_branch.min_thrust is None else continuous_gas_branch.min_thrust
         )
         if continuous_drive_deadzone >= continuous_drive_full_threshold:
             raise ValueError("continuous gas deadzone must be lower than full_threshold")
@@ -183,9 +184,11 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
 
     lean_unmask_min_speed_kph: float | None = None
     lean_mode: LeanMode | None = None
+    lean_initial_lockout_frames: int | None = None
     lean_branch = branches.lean
     if lean_branch is not None:
         lean_unmask_min_speed_kph = lean_branch.unmask_min_speed_kph
+        lean_initial_lockout_frames = lean_branch.initial_lockout_frames
         lean_mode = lean_branch.mode
 
     return ActionBranchCompilation(
@@ -200,6 +203,7 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         mask_overrides=mask or None,
         boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
         lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+        lean_initial_lockout_frames=lean_initial_lockout_frames,
         lean_mode=lean_mode,
     )
 
@@ -267,6 +271,8 @@ def _validate_branch_specific_fields(branch_name: str, branch: ActionBranchConfi
         raise ValueError(f"action branch {branch_name!r} cannot define unmask_max_speed_kph")
     if branch.unmask_min_speed_kph is not None and branch_name != "lean":
         raise ValueError(f"action branch {branch_name!r} cannot define unmask_min_speed_kph")
+    if branch.initial_lockout_frames is not None and branch_name != "lean":
+        raise ValueError(f"action branch {branch_name!r} cannot define initial_lockout_frames")
 
 
 def _branch_mask_indices(

@@ -149,6 +149,68 @@ def test_hybrid_curriculum_stage_can_speed_gate_lean_temporarily() -> None:
     assert env.action_masks().tolist() == [True, True, True, True, True]
 
 
+def test_hybrid_env_action_masks_disable_lean_for_initial_episode_frames() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=20.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=20.0, frames_run=2),
+                status=make_step_status(step_count=2),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=ActionConfig.model_validate(
+                {
+                    "branches": {
+                        "steer": {"type": "continuous"},
+                        "gas": {"type": "continuous"},
+                        "boost": {"type": "discrete", "mask": ["idle", "engaged"]},
+                        "lean": {
+                            "type": "discrete",
+                            "mask": ["idle", "left", "right"],
+                            "initial_lockout_frames": 4,
+                        },
+                    }
+                }
+            )
+        ),
+    )
+    neutral_action = {
+        "continuous": np.zeros(2, dtype=np.float32),
+        "discrete": np.zeros(2, dtype=np.int64),
+    }
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == [True, False, False, True, True]
+
+    env.step(neutral_action)
+
+    assert env.action_masks().tolist() == [True, False, False, True, True]
+
+    env.step(neutral_action)
+
+    assert env.action_masks().tolist() == [True, True, True, True, True]
+
+
 def test_env_sync_checkpoint_curriculum_stage_resets_to_default_stage() -> None:
     env = FZeroXEnv(
         backend=SyntheticBackend(),
