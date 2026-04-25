@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import (
     BaseModel,
     ConfigDict,
+    Field,
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
@@ -95,11 +96,16 @@ class TrackSamplingConfig(BaseModel):
     enabled: bool = False
     sampling_mode: TrackSamplingMode = "random"
     entries: tuple[TrackSamplingEntryConfig, ...] = ()
+    step_balance_update_episodes: PositiveInt = 50
+    step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
+    step_balance_max_weight_scale: PositiveFloat = 5.0
 
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:
         if self.enabled and not self.entries:
             raise ValueError("env.track_sampling.entries must not be empty when enabled")
+        if self.step_balance_max_weight_scale < 1.0:
+            raise ValueError("track_sampling.step_balance_max_weight_scale must be >= 1.0")
         return self
 
 

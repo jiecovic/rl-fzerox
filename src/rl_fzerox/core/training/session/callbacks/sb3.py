@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import CurriculumConfig, TrainConfig
+from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,
@@ -10,11 +10,13 @@ from rl_fzerox.core.training.session.artifacts import (
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
+from .track_sampling import StepBalancedTrackSamplingController
 from .tuning import apply_stage_train_overrides, record_stage_train_overrides
 
 
 def build_callbacks(
     *,
+    env_config: EnvConfig | None = None,
     train_config: TrainConfig,
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
@@ -153,6 +155,27 @@ def build_callbacks(
                 overrides=self._controller.stage_train_overrides,
             )
 
+    class StepBalancedTrackSamplingCallback(BaseCallback):
+        """Refresh track sampling weights from completed-episode frame counts."""
+
+        def __init__(self, controller: StepBalancedTrackSamplingController) -> None:
+            super().__init__(verbose=0)
+            self._controller = controller
+
+        def _on_step(self) -> bool:
+            infos = info_sequence(self.locals.get("infos"))
+            if infos is None:
+                return True
+
+            weights = self._controller.record_episodes(episode_dicts(infos))
+            if weights is not None:
+                self.training_env.env_method("set_track_sampling_weights", weights)
+            return True
+
+        def _on_rollout_end(self) -> None:
+            for key, value in self._controller.log_values().items():
+                self.logger.record(key, value)
+
     adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
     callbacks: list[BaseCallback] = [
         RollingArtifactCallback(
@@ -161,6 +184,13 @@ def build_callbacks(
         ),
         InfoLoggingCallback(),
     ]
+    if env_config is not None:
+        track_balance_controller = StepBalancedTrackSamplingController.from_configs(
+            env_config=env_config,
+            curriculum_config=curriculum_config,
+        )
+        if track_balance_controller is not None:
+            callbacks.append(StepBalancedTrackSamplingCallback(track_balance_controller))
     if curriculum_config.enabled:
         callbacks.append(
             CurriculumCallback(

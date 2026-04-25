@@ -99,11 +99,16 @@ class TrackResetSelector:
     def select(self, config: TrackSamplingConfig, *, seed: int | None) -> SelectedTrack | None:
         if config.sampling_mode == "random":
             return select_reset_track(config, seed=seed)
-        if config.sampling_mode == "balanced":
-            return self._select_balanced(config)
+        if config.sampling_mode in ("balanced", "step_balanced"):
+            return self._select_balanced(config, sampling_mode=config.sampling_mode)
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
-    def _select_balanced(self, config: TrackSamplingConfig) -> SelectedTrack | None:
+    def _select_balanced(
+        self,
+        config: TrackSamplingConfig,
+        *,
+        sampling_mode: str,
+    ) -> SelectedTrack | None:
         if not config.enabled:
             return None
         if not config.entries:
@@ -114,7 +119,7 @@ class TrackResetSelector:
         self._cursor += 1
         return _selected_track_from_entry(
             entry,
-            sampling_mode="balanced",
+            sampling_mode=sampling_mode,
             cycle_position=position,
         )
 

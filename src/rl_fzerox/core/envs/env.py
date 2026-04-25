@@ -94,6 +94,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         self._engine.sync_checkpoint_curriculum_stage(stage_index)
 
+    def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
+        """Update adaptive reset weights used by step-balanced track sampling."""
+
+        self._engine.set_track_sampling_weights(weights_by_track_id)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""

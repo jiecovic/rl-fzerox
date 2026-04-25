@@ -6,7 +6,7 @@ from typing import Literal, TypeAlias
 from pydantic import PositiveFloat
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
-TrackSamplingMode: TypeAlias = Literal["random", "balanced"]
+TrackSamplingMode: TypeAlias = Literal["random", "balanced", "step_balanced"]
 ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 ObservationPresetName: TypeAlias = Literal[
     "crop_84x116",

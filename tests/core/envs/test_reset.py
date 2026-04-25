@@ -335,6 +335,38 @@ def test_balanced_track_sampling_respects_weights(tmp_path: Path) -> None:
     assert sampled_ids == ["mute", "silence", "mute", "mute", "silence", "mute"]
 
 
+def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: Path) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        baseline_state_path=baseline_paths["mute"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert env.reset(seed=123)[1]["track_id"] == "mute"
+
+    env.set_track_sampling_weights({"mute": 1.0, "silence": 3.0})
+    sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
+
+    assert sampled_ids == ["silence", "mute", "silence", "silence"]
+    assert env.reset(seed=123)[1]["track_sampling_mode"] == "step_balanced"
+
+
 def test_curriculum_stage_can_override_track_sampling(tmp_path: Path) -> None:
     stage_zero_path = tmp_path / "mute-city.state"
     stage_one_path = tmp_path / "silence.state"
