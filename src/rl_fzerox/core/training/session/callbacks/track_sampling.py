@@ -37,6 +37,8 @@ class StepBalancedTrackSamplingController:
         update_episodes: int,
         ema_alpha: float,
         max_weight_scale: float,
+        log_details: bool = False,
+        track_log_keys: dict[str, str] | None = None,
     ) -> None:
         self._stats = {
             track_id: _TrackStepStats(base_weight=weight, current_weight=weight)
@@ -46,6 +48,11 @@ class StepBalancedTrackSamplingController:
         self._update_episodes = max(1, int(update_episodes))
         self._ema_alpha = max(0.0, min(1.0, float(ema_alpha)))
         self._max_weight_scale = max(1.0, float(max_weight_scale))
+        self._log_details = log_details
+        self._track_log_keys = {
+            track_id: _sanitize_log_key((track_log_keys or {}).get(track_id, track_id))
+            for track_id in self._stats
+        }
         self._episodes_since_update = 0
         self.update_count = 0
 
@@ -61,9 +68,11 @@ class StepBalancedTrackSamplingController:
             return None
 
         base_weights: dict[str, float] = {}
+        requested_log_keys: dict[str, str] = {}
         for config in configs:
             for entry in config.entries:
                 base_weights.setdefault(entry.id, float(entry.weight))
+                requested_log_keys.setdefault(entry.id, entry.course_id or entry.id)
         if len(base_weights) <= 1:
             return None
 
@@ -74,6 +83,8 @@ class StepBalancedTrackSamplingController:
             update_episodes=settings.step_balance_update_episodes,
             ema_alpha=settings.step_balance_ema_alpha,
             max_weight_scale=settings.step_balance_max_weight_scale,
+            log_details=settings.step_balance_log_details,
+            track_log_keys=requested_log_keys,
         )
 
     def record_episodes(self, episodes: Sequence[dict[str, object]]) -> dict[str, float] | None:
@@ -100,29 +111,20 @@ class StepBalancedTrackSamplingController:
         return self._compute_weights()
 
     def log_values(self) -> dict[str, float]:
+        if not self._log_details:
+            return {}
+
         total_weight = sum(stats.current_weight for stats in self._stats.values())
-        total_episodes = sum(stats.episode_count for stats in self._stats.values())
-        total_frames = sum(stats.completed_frames for stats in self._stats.values())
-        values: dict[str, float] = {
-            "track_sampling/step_balance_updates": float(self.update_count),
-            "track_sampling/step_balance_episodes": float(total_episodes),
-        }
+        values: dict[str, float] = {}
+        course_weights: dict[str, float] = {}
+
         for track_id, stats in self._stats.items():
-            key = _sanitize_log_key(track_id)
-            values[f"track_sampling/{key}/weight"] = stats.current_weight
+            key = self._track_log_keys[track_id]
+            course_weights[key] = course_weights.get(key, 0.0) + stats.current_weight
+        for key, weight in course_weights.items():
             values[f"track_sampling/{key}/prob"] = (
-                stats.current_weight / total_weight if total_weight > 0.0 else 0.0
+                weight / total_weight if total_weight > 0.0 else 0.0
             )
-            values[f"track_sampling/{key}/episodes"] = float(stats.episode_count)
-            values[f"track_sampling/{key}/episode_share"] = (
-                stats.episode_count / total_episodes if total_episodes > 0 else 0.0
-            )
-            values[f"track_sampling/{key}/frames"] = float(stats.completed_frames)
-            values[f"track_sampling/{key}/frame_share"] = (
-                stats.completed_frames / total_frames if total_frames > 0 else 0.0
-            )
-            if stats.ema_episode_frames is not None:
-                values[f"track_sampling/{key}/ema_episode_frames"] = stats.ema_episode_frames
         return values
 
     def _compute_weights(self) -> dict[str, float]:

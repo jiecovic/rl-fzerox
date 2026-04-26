@@ -6,7 +6,7 @@ import gymnasium as gym
 from fzerox_emulator import ControllerState, EmulatorBackend
 from fzerox_emulator.arrays import ActionMask, RgbFrame
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, RewardConfig
-from rl_fzerox.core.envs.actions import ActionValue
+from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -84,6 +84,12 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         return self._engine.action_mask_snapshot()
 
+    @property
+    def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
+        """Return ordered discrete action branches for policy-head initialization."""
+
+        return self._engine.action_dimensions
+
     def set_curriculum_stage(self, stage_index: int) -> None:
         """Switch the active curriculum stage used for action masking."""
 
@@ -98,6 +104,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Update adaptive reset weights used by step-balanced track sampling."""
 
         self._engine.set_track_sampling_weights(weights_by_track_id)
+
+    def set_locked_reset_course(self, course_id: str | None) -> None:
+        """Lock subsequent sampled resets to one course for watch/manual inspection."""
+
+        self._engine.set_locked_reset_course(course_id)
 
     @property
     def curriculum_stage_index(self) -> int | None:

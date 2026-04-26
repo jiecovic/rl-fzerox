@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 from rl_fzerox.core.config import load_train_app_config
-from rl_fzerox.core.config.schema import ObservationConfig
+from rl_fzerox.core.config.schema import ObservationConfig, PolicyConfig
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
 
@@ -71,12 +71,50 @@ def test_observation_zeroed_state_components_must_be_active() -> None:
         )
 
 
+def test_observation_can_zero_track_position_fields_individually() -> None:
+    config = ObservationConfig.model_validate(
+        {
+            "mode": "image_state",
+            "state_components": ["vehicle_state", "track_position"],
+            "zeroed_state_features": [
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            ],
+        }
+    )
+
+    assert config.state_components_data() == (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="track_position"),
+    )
+    assert config.zeroed_state_features == (
+        "track_position.edge_ratio",
+        "track_position.outside_track_bounds",
+    )
+
+
+def test_policy_config_reads_action_bias() -> None:
+    config = PolicyConfig.model_validate({"action_bias": {"gas_on_logit": 0.5}})
+
+    assert config.action_bias.gas_on_logit == 0.5
+
+
 def test_builtin_course_catalog_covers_base_game_courses() -> None:
     assert len(BUILT_IN_COURSES) == 24
     assert [course.course_index for course in BUILT_IN_COURSES] == list(range(24))
     assert {course.cup for course in BUILT_IN_COURSES} == {"jack", "queen", "king", "joker"}
     assert BUILT_IN_COURSES[0].id == "mute_city"
     assert BUILT_IN_COURSES[-1].id == "big_hand"
+    assert all(course.records is not None for course in BUILT_IN_COURSES)
+
+    records_by_id = {course.id: course.records for course in BUILT_IN_COURSES}
+    red_canyon_2 = records_by_id["red_canyon_2"]
+    big_hand = records_by_id["big_hand"]
+    assert red_canyon_2 is not None
+    assert big_hand is not None
+    assert red_canyon_2.non_agg_best.time_ms == 60657
+    assert red_canyon_2.non_agg_best.player == "Jdizzle"
+    assert big_hand.non_agg_worst.time_ms == 113001
 
 
 def test_load_train_app_config_composes_track_registry_entry(
@@ -830,6 +868,36 @@ def test_load_train_app_config_reads_nature_wide_profile(tmp_path: Path) -> None
 
     assert config.env.observation.preset == "crop_60x76"
     assert config.policy.extractor.conv_profile == "nature_wide"
+
+
+def test_load_train_app_config_reads_nature_32_64_128_profile(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: crop_60x76",
+            "policy:",
+            "  extractor:",
+            "    conv_profile: nature_32_64_128",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.env.observation.preset == "crop_60x76"
+    assert config.policy.extractor.conv_profile == "nature_32_64_128"
 
 
 def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:

@@ -7,6 +7,7 @@ from stable_baselines3.common.vec_env import VecEnv
 
 from rl_fzerox.core.config.schema import EnvConfig, PolicyConfig, TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.training.session.model.action_bias import apply_initial_action_biases
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     resolve_ppo_training_algorithm_class,
@@ -117,7 +118,7 @@ def _build_ppo_family_model(
             }
         )
 
-    return algorithm_class(
+    model = algorithm_class(
         policy=policy_name,
         env=train_env,
         learning_rate=train_config.learning_rate,
@@ -135,6 +136,12 @@ def _build_ppo_family_model(
         verbose=train_config.verbose,
         device=train_config.device,
     )
+    apply_initial_action_biases(
+        model,
+        train_env=train_env,
+        policy_config=policy_config,
+    )
+    return model
 
 
 def _build_sac_model(
@@ -149,6 +156,9 @@ def _build_sac_model(
     """Construct a SAC-family model for continuous or hybrid-action experiments."""
 
     from gymnasium import spaces
+
+    if policy_config.action_bias.gas_on_logit != 0.0:
+        raise RuntimeError("policy.action_bias.gas_on_logit is only supported for PPO-family runs")
 
     validate_masking_configuration(
         train_env=train_env,

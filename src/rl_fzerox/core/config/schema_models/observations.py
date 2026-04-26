@@ -129,6 +129,7 @@ class ObservationConfig(BaseModel):
     )
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
     zeroed_state_components: tuple[ObservationStateComponentName, ...] = ()
+    zeroed_state_features: tuple[str, ...] = ()
 
     @field_validator("action_history_controls")
     @classmethod
@@ -164,6 +165,13 @@ class ObservationConfig(BaseModel):
     ) -> tuple[ObservationStateComponentName, ...]:
         if len(set(value)) != len(value):
             raise ValueError("observation.zeroed_state_components must not contain duplicates")
+        return value
+
+    @field_validator("zeroed_state_features")
+    @classmethod
+    def _validate_unique_zeroed_state_features(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("observation.zeroed_state_features must not contain duplicates")
         return value
 
     @model_validator(mode="after")

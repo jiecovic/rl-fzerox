@@ -16,6 +16,7 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.envs.actions import (
     ActionValue,
+    DiscreteActionDimension,
     ResettableActionAdapter,
     build_action_adapter,
 )
@@ -47,6 +48,7 @@ from .reset import (
     TrackResetSelector,
     load_track_baseline,
     reset_race_state,
+    select_reset_track_by_course_id,
     sync_camera_setting,
 )
 from .stepping import (
@@ -101,6 +103,7 @@ class FZeroXEnvEngine:
         self._active_track_sampling = self._stage_track_sampling_config(
             self._mask_controller.stage_index
         )
+        self._locked_reset_course_id: str | None = None
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
         self._control_state = ControlStateTracker(
@@ -127,6 +130,10 @@ class FZeroXEnvEngine:
     @property
     def action_space(self) -> spaces.Space:
         return self._action_space
+
+    @property
+    def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
+        return self._action_adapter.action_dimensions
 
     @property
     def observation_space(self) -> spaces.Space:
@@ -186,6 +193,11 @@ class FZeroXEnvEngine:
             self._mask_controller.stage_index
         )
 
+    def set_locked_reset_course(self, course_id: str | None) -> None:
+        """Lock subsequent sampled resets to one course for watch/manual inspection."""
+
+        self._locked_reset_course_id = course_id if course_id else None
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""
@@ -218,6 +230,8 @@ class FZeroXEnvEngine:
         )
         if selected_track is not None:
             info.update(selected_track.info())
+        if self._locked_reset_course_id is not None:
+            info["track_sampling_locked_course_id"] = self._locked_reset_course_id
         self._episode.uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
         telemetry = sync_camera_setting(
@@ -247,7 +261,10 @@ class FZeroXEnvEngine:
         self._reward_tracker.reset(
             telemetry,
             episode_seed=self._reward_episode_seed(seed),
+            course_id=None if selected_track is None else selected_track.course_id,
         )
+        self._reward_summary_config = self._reward_tracker.summary_config()
+        self._step_assembler.reward_summary_config = self._reward_summary_config
         if isinstance(self._action_adapter, ResettableActionAdapter):
             self._action_adapter.reset()
         info["seed"] = seed
@@ -394,6 +411,13 @@ class FZeroXEnvEngine:
         return self._reset_seeds.reward_episode_seed(seed)
 
     def _select_reset_track(self, seed: int | None) -> SelectedTrack | None:
+        if self._locked_reset_course_id is not None:
+            selected_track = select_reset_track_by_course_id(
+                self._active_track_sampling,
+                course_id=self._locked_reset_course_id,
+            )
+            if selected_track is not None:
+                return selected_track
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),

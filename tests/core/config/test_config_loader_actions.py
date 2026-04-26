@@ -357,6 +357,60 @@ def test_load_train_app_config_compiles_airborne_pitch_branch(tmp_path: Path) ->
     }
 
 
+def test_load_train_app_config_compiles_on_off_gas_airborne_pitch_branch(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  action:",
+            "    branches:",
+            "      steer:",
+            "        type: continuous",
+            "      gas:",
+            "        type: discrete",
+            "        mask: unrestricted",
+            "      air_brake:",
+            "        type: discrete",
+            "        mask: [idle]",
+            "      boost:",
+            "        type: discrete",
+            "        mask: [idle]",
+            "      lean:",
+            "        type: discrete",
+            "        mask: [idle, left, right]",
+            "      pitch:",
+            "        type: discrete",
+            "        mask: [down_full, down, neutral]",
+            "train:",
+            "  algorithm: maskable_hybrid_action_ppo",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+    action_config = config.env.action.runtime()
+
+    assert action_config.name == "hybrid_steer_gas_air_brake_boost_lean_pitch"
+    assert action_config.mask_overrides == {
+        "gas": (0, 1),
+        "air_brake": (0,),
+        "boost": (0,),
+        "lean": (0, 1, 2),
+        "pitch": (0, 1, 2),
+    }
+
+
 def test_load_train_app_config_compiles_neutral_pitch_mask(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"

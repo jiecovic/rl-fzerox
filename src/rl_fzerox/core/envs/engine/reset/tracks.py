@@ -132,6 +132,21 @@ class TrackResetSelector:
         self._cursor = self._env_index % len(self._cycle)
 
 
+def select_reset_track_by_course_id(
+    config: TrackSamplingConfig,
+    *,
+    course_id: str,
+) -> SelectedTrack | None:
+    """Select the first configured reset baseline for a specific course id."""
+
+    if not config.enabled:
+        return None
+    for entry in config.entries:
+        if entry.course_id == course_id:
+            return _selected_track_from_entry(entry, sampling_mode="locked")
+    return None
+
+
 def select_reset_track(
     config: TrackSamplingConfig,
     *,

@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.actions import (
     ContinuousSteerDriveActionAdapter,
     HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
+    HybridSteerGasAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
     SteerDriveActionAdapter,
     SteerGasAirBrakeBoostLeanActionAdapter,
@@ -313,6 +314,79 @@ def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_decodes_pitch() -
         left_stick_x=-0.25,
         left_stick_y=1.0,
     )
+
+
+def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:
+    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
+        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
+    )
+
+    assert isinstance(adapter.action_space, Dict)
+    assert isinstance(adapter.action_space.spaces["continuous"], Box)
+    assert adapter.action_space.spaces["continuous"].shape == (1,)
+    assert isinstance(adapter.action_space.spaces["discrete"], MultiDiscrete)
+    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2, 2, 3, 5]
+    assert adapter.idle_action["continuous"].tolist() == [0.0]
+    assert adapter.idle_action["discrete"].tolist() == [0, 0, 0, 0, 2]
+    assert tuple(dimension.label for dimension in adapter.action_dimensions) == (
+        "gas",
+        "air_brake",
+        "boost",
+        "lean",
+        "pitch",
+    )
+
+
+def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_decodes_buttons_and_pitch() -> None:
+    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
+        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
+    )
+
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([-0.25], dtype=np.float32),
+            "discrete": np.array([1, 1, 1, 2, 4], dtype=np.int64),
+        }
+    )
+
+    assert control_state == ControllerState(
+        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
+        left_stick_x=-0.25,
+        left_stick_y=1.0,
+    )
+
+
+def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_masks_discrete_heads() -> None:
+    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
+        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
+    )
+
+    mask = adapter.action_mask(
+        base_overrides={
+            "gas": (1,),
+            "air_brake": (0,),
+            "boost": (0,),
+            "lean": (0,),
+            "pitch": (0, 1, 2),
+        },
+    )
+
+    assert mask.tolist() == [
+        False,
+        True,
+        True,
+        False,
+        True,
+        False,
+        True,
+        False,
+        False,
+        True,
+        True,
+        True,
+        False,
+        False,
+    ]
 
 
 def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:

@@ -19,6 +19,7 @@ from rl_fzerox.core.envs.observations import (
     action_history_settings_for_observation,
     build_observation,
     build_observation_space,
+    state_feature_names,
 )
 
 
@@ -31,6 +32,7 @@ class EngineObservationBuilder:
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
     zeroed_state_components: tuple[str, ...]
+    zeroed_state_features: tuple[str, ...]
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -48,6 +50,12 @@ class EngineObservationBuilder:
             state_components=state_components,
             fallback_len=config.observation.action_history_len,
             fallback_controls=config.observation.action_history_controls,
+        )
+        zeroed_state_features = _validated_zeroed_state_features(
+            config=config,
+            state_components=state_components,
+            action_history_len=action_history_len,
+            action_history_controls=action_history_controls,
         )
         space = build_observation_space(
             spec,
@@ -68,6 +76,7 @@ class EngineObservationBuilder:
             spec=spec,
             state_components=state_components,
             zeroed_state_components=tuple(config.observation.zeroed_state_components),
+            zeroed_state_features=zeroed_state_features,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -104,6 +113,7 @@ class EngineObservationBuilder:
             action_history=control_state.action_history_fields(),
             state_components=self.state_components,
             zeroed_state_components=self.zeroed_state_components,
+            zeroed_state_features=self.zeroed_state_features,
             **control_state.observation_fields(),
         )
 
@@ -130,4 +140,38 @@ class EngineObservationBuilder:
             action_history_controls=self.action_history_controls,
             observation_state_components=self.state_components,
             observation_zeroed_state_components=self.zeroed_state_components,
+            observation_zeroed_state_features=self.zeroed_state_features,
         )
+
+
+def _validated_zeroed_state_features(
+    *,
+    config: EnvConfig,
+    state_components: StateComponentsSettings | None,
+    action_history_len: int | None,
+    action_history_controls: tuple[ActionHistoryControlName, ...],
+) -> tuple[str, ...]:
+    zeroed_state_features = tuple(config.observation.zeroed_state_features)
+    if not zeroed_state_features:
+        return ()
+
+    active_features = set(
+        state_feature_names(
+            config.observation.state_profile,
+            course_context=config.observation.course_context,
+            ground_effect_context=config.observation.ground_effect_context,
+            action_history_len=action_history_len,
+            action_history_controls=action_history_controls,
+            state_components=state_components,
+        )
+    )
+    unknown_features = sorted(
+        feature for feature in zeroed_state_features if feature not in active_features
+    )
+    if unknown_features:
+        joined = ", ".join(unknown_features)
+        raise ValueError(
+            "observation.zeroed_state_features must reference active state features: "
+            f"{joined}"
+        )
+    return zeroed_state_features

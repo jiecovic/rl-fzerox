@@ -24,6 +24,7 @@ from rl_fzerox.core.envs.actions.hybrid.layouts import (
     STEER_DRIVE_BOOST_LEAN_LAYOUT,
     STEER_DRIVE_LEAN_LAYOUT,
     STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT,
+    STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT,
     STEER_GAS_BOOST_LEAN_LAYOUT,
 )
 
@@ -91,6 +92,37 @@ def parse_hybrid_steer_gas_air_brake_boost_lean(
 
     steer = float(np.clip(continuous_values[0], -1.0, 1.0))
     return steer, gas, air_brake, boost, lean
+
+
+def parse_hybrid_steer_gas_air_brake_boost_lean_pitch(
+    action: ActionValue,
+) -> tuple[float, int, int, int, int, int]:
+    continuous_values, discrete_values = parse_hybrid_branches(
+        action,
+        continuous_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT.continuous_size,
+        continuous_field_labels=("steer",),
+        expected_size=STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT.discrete_size,
+        action_label="Hybrid steer-gas-air-brake-boost-lean-pitch discrete",
+        field_labels=("gas", "air_brake", "boost", "lean", "pitch"),
+    )
+    gas = int(discrete_values[0])
+    air_brake = int(discrete_values[1])
+    boost = int(discrete_values[2])
+    lean = int(discrete_values[3])
+    pitch = int(discrete_values[4])
+    if not 0 <= gas < 2:
+        raise ValueError(f"Invalid hybrid gas index {gas}")
+    if not 0 <= air_brake < 2:
+        raise ValueError(f"Invalid hybrid air-brake index {air_brake}")
+    if not 0 <= boost < 2:
+        raise ValueError(f"Invalid hybrid boost index {boost}")
+    if not 0 <= lean < 3:
+        raise ValueError(f"Invalid hybrid lean index {lean}")
+    if not 0 <= pitch < PITCH_BUCKETS.count:
+        raise ValueError(f"Invalid hybrid pitch index {pitch}")
+
+    steer = float(np.clip(continuous_values[0], -1.0, 1.0))
+    return steer, gas, air_brake, boost, lean, pitch
 
 
 def parse_hybrid_steer_drive_air_brake_boost_lean_pitch(

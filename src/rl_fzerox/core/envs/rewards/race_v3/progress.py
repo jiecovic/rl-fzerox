@@ -70,10 +70,11 @@ class FrontierProgressRewardTracker:
         weights: RaceV3RewardWeights,
         progress_multiplier: float,
         airborne: bool,
-        pay_reward: bool = True,
+        race_distance: float | None = None,
         energy_refill_bonus_for_progress: Callable[[float], float],
     ) -> FrontierReward:
-        max_relative_progress = self._progress.relative_distance(summary.max_race_distance)
+        progress_distance = summary.max_race_distance if race_distance is None else race_distance
+        relative_progress = self._progress.relative_distance(progress_distance)
         bucket_distance = _progress_bucket_distance(weights=weights, airborne=airborne)
         if bucket_distance <= 0.0:
             return FrontierReward(
@@ -82,7 +83,7 @@ class FrontierProgressRewardTracker:
                 energy_refill_bonus=0.0,
             )
         crossed_bucket_count = int(
-            (max_relative_progress - self._frontier_distance) // bucket_distance
+            (relative_progress - self._frontier_distance) // bucket_distance
         )
         if crossed_bucket_count <= 0:
             return FrontierReward(
@@ -95,13 +96,6 @@ class FrontierProgressRewardTracker:
         self._frontier_bucket_index = int(
             self._frontier_distance // weights.progress_bucket_distance
         )
-        if not pay_reward:
-            return FrontierReward(
-                progress=0.0,
-                ground_effect_adjustment=0.0,
-                energy_refill_bonus=0.0,
-            )
-
         progress_reward = crossed_bucket_count * weights.progress_bucket_reward
         ground_effect_adjustment = progress_reward * (max(float(progress_multiplier), 0.0) - 1.0)
         energy_refill_bonus = energy_refill_bonus_for_progress(progress_reward)
@@ -150,12 +144,11 @@ class FrontierProgressRewardTracker:
             "frontier_progress_bucket_index": self._frontier_bucket_index,
             "progress_bucket_distance": weights.progress_bucket_distance,
             "airborne_progress_bucket_distance": weights.airborne_progress_bucket_distance,
-            "airborne_progress_requires_nonascending": (
-                weights.airborne_progress_requires_nonascending
-            ),
-            "airborne_progress_height_epsilon": weights.airborne_progress_height_epsilon,
             "progress_bucket_reward": weights.progress_bucket_reward,
             "progress_reward_interval_frames": weights.progress_reward_interval_frames,
+            "outside_bounds_reentry_progress_distance_cap": (
+                weights.outside_bounds_reentry_progress_distance_cap
+            ),
             "pending_progress_reward_delta": self._pending_delta,
             "pending_progress_reward_frames": self._pending_frames,
         }

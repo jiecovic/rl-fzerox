@@ -46,6 +46,54 @@ class EnvConfig(BaseModel):
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
 
 
+class RewardCourseOverrideConfig(BaseModel):
+    """Course-local reward overrides for fields in :class:`RewardConfig`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    time_penalty_per_frame: float | None = None
+    reverse_time_penalty_scale: NonNegativeFloat | None = None
+    low_speed_time_penalty_scale: NonNegativeFloat | None = None
+    progress_bucket_distance: PositiveFloat | None = None
+    progress_bucket_reward: NonNegativeFloat | None = None
+    progress_reward_interval_frames: PositiveInt | None = None
+    airborne_progress_bucket_distance: PositiveFloat | None = None
+    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    airborne_offtrack_penalty_scale: NonNegativeFloat | None = None
+    airborne_offtrack_recovery_reward_scale: NonNegativeFloat | None = None
+    lap_completion_bonus: NonNegativeFloat | None = None
+    lap_position_scale: NonNegativeFloat | None = None
+    energy_loss_epsilon: NonNegativeFloat | None = None
+    energy_refill_progress_multiplier: float | None = Field(default=None, ge=1.0)
+    dirt_progress_multiplier: float | None = Field(default=None, ge=0.0)
+    ice_progress_multiplier: float | None = Field(default=None, ge=0.0)
+    dirt_entry_penalty: float | None = Field(default=None, le=0.0)
+    ice_entry_penalty: float | None = Field(default=None, le=0.0)
+    energy_refill_collision_cooldown_frames: NonNegativeInt | None = None
+    energy_full_refill_lap_bonus: NonNegativeFloat | None = None
+    energy_full_refill_min_gain_fraction: float | None = Field(default=None, ge=0.0, le=1.0)
+    gas_underuse_penalty: float | None = Field(default=None, le=0.0)
+    gas_underuse_threshold: float | None = Field(default=None, ge=0.0, le=1.0)
+    steer_oscillation_penalty: float | None = Field(default=None, le=0.0)
+    steer_oscillation_deadzone: NonNegativeFloat | None = None
+    steer_oscillation_cap: PositiveFloat | None = None
+    steer_oscillation_power: PositiveFloat | None = None
+    lean_request_penalty: float | None = Field(default=None, le=0.0)
+    airborne_pitch_up_penalty: float | None = Field(default=None, le=0.0)
+    lean_low_speed_penalty: float | None = Field(default=None, le=0.0)
+    lean_low_speed_penalty_max_speed_kph: NonNegativeFloat | None = None
+    damage_taken_frame_penalty: float | None = Field(default=None, le=0.0)
+    damage_taken_streak_ramp_penalty: float | None = Field(default=None, le=0.0)
+    damage_taken_streak_cap_frames: NonNegativeInt | None = None
+    airborne_landing_reward: float | None = None
+    manual_boost_reward: NonNegativeFloat | None = None
+    boost_pad_reward: NonNegativeFloat | None = None
+    boost_pad_reward_progress_window: PositiveFloat | None = None
+    collision_recoil_penalty: float | None = None
+    failure_penalty: float | None = None
+    truncation_penalty: float | None = None
+
+
 class RewardConfig(BaseModel):
     """Reward-shaping settings for the current env."""
 
@@ -58,10 +106,10 @@ class RewardConfig(BaseModel):
     progress_bucket_distance: PositiveFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
-    defer_progress_reward_while_airborne: bool = False
     airborne_progress_bucket_distance: PositiveFloat | None = None
-    airborne_progress_requires_nonascending: bool = False
-    airborne_progress_height_epsilon: NonNegativeFloat = 0.0
+    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    airborne_offtrack_penalty_scale: NonNegativeFloat = 0.0
+    airborne_offtrack_recovery_reward_scale: NonNegativeFloat = 0.0
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -80,6 +128,7 @@ class RewardConfig(BaseModel):
     steer_oscillation_cap: PositiveFloat = 2.0
     steer_oscillation_power: PositiveFloat = 2.0
     lean_request_penalty: float = Field(default=0.0, le=0.0)
+    airborne_pitch_up_penalty: float = Field(default=0.0, le=0.0)
     lean_low_speed_penalty: float = Field(default=0.0, le=0.0)
     lean_low_speed_penalty_max_speed_kph: NonNegativeFloat = 800.0
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
@@ -92,6 +141,7 @@ class RewardConfig(BaseModel):
     collision_recoil_penalty: float = -2.0
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
+    course_overrides: dict[str, RewardCourseOverrideConfig] = Field(default_factory=dict)
 
 
 class EmulatorConfig(BaseModel):

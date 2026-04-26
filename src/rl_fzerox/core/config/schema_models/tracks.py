@@ -99,6 +99,7 @@ class TrackSamplingConfig(BaseModel):
     step_balance_update_episodes: PositiveInt = 50
     step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
     step_balance_max_weight_scale: PositiveFloat = 5.0
+    step_balance_log_details: bool = False
 
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:

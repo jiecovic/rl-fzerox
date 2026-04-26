@@ -591,6 +591,37 @@ def test_state_components_can_zero_selected_components_without_changing_shape() 
     assert feature_names.index("track_position.lap_progress") == 13
 
 
+def test_state_components_can_keep_progress_while_zeroing_track_bounds_fields() -> None:
+    components = (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="machine_context"),
+        ObservationStateComponentSettings(name="track_position"),
+    )
+    telemetry = make_telemetry(
+        signed_lateral_offset=150.0,
+        current_radius_left=100.0,
+        lap_distance=20_000.0,
+        course_length=80_000.0,
+    )
+
+    vector = telemetry_state_vector(
+        telemetry,
+        state_components=components,
+        zeroed_state_features=frozenset(
+            {
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            }
+        ),
+    )
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert values["track_position.lap_progress"] == 0.25
+    assert values["track_position.edge_ratio"] == 0.0
+    assert values["track_position.outside_track_bounds"] == 0.0
+
+
 def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:
     components = _clean_state_components(control_history_enabled=False)
     telemetry = make_telemetry(

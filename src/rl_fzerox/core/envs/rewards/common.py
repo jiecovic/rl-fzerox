@@ -32,6 +32,7 @@ class RewardActionContext:
     air_brake_requested: bool = False
     gas_level: float | None = None
     steer_level: float | None = None
+    pitch_level: float | None = None
     drive_axis: float | None = None
 
 
@@ -43,6 +44,7 @@ class RewardTracker(Protocol):
         telemetry: FZeroXTelemetry | None,
         *,
         episode_seed: int | None = None,
+        course_id: str | None = None,
     ) -> None:
         """Initialize reward state for a new episode."""
         ...
