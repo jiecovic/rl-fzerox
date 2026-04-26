@@ -5,6 +5,7 @@ from rl_fzerox.core.envs.actions.hybrid.adapters import (
     HybridSteerDriveBoostLeanPrimitiveActionAdapter,
     HybridSteerDriveLeanActionAdapter,
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
+    HybridSteerGasAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
 )
 from rl_fzerox.core.envs.actions.hybrid.layouts import (
@@ -15,6 +16,7 @@ from rl_fzerox.core.envs.actions.hybrid.layouts import (
     STEER_DRIVE_BOOST_LEAN_LAYOUT,
     STEER_DRIVE_LEAN_LAYOUT,
     STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT,
+    STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT,
     STEER_GAS_BOOST_LEAN_LAYOUT,
     HybridActionLayout,
     LeanPrimitiveValues,
@@ -28,6 +30,7 @@ __all__ = [
     "HybridSteerDriveBoostLeanPrimitiveActionAdapter",
     "HybridSteerDriveLeanActionAdapter",
     "HybridSteerGasAirBrakeBoostLeanActionAdapter",
+    "HybridSteerGasAirBrakeBoostLeanPitchActionAdapter",
     "HybridSteerGasBoostLeanActionAdapter",
     "LEAN_PRIMITIVES",
     "LeanPrimitiveValues",
@@ -38,5 +41,6 @@ __all__ = [
     "STEER_DRIVE_BOOST_LEAN_LAYOUT",
     "STEER_DRIVE_LEAN_LAYOUT",
     "STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT",
+    "STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT",
     "STEER_GAS_BOOST_LEAN_LAYOUT",
 ]

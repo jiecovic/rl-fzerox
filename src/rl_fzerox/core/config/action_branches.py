@@ -18,6 +18,7 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
+    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH,
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
     ActionAdapterName,
 )
@@ -140,12 +141,17 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         continuous_gas = False
     elif branch_names == _SUPPORTED_BRANCH_SHAPES.steer_gas_air_brake_boost_lean_pitch:
         gas_branch = _required_branch(branches, "gas")
-        _validate_continuous_branch("gas", gas_branch)
         _validate_discrete_branch("air_brake", _required_branch(branches, "air_brake"))
         _validate_discrete_branch("pitch", _required_branch(branches, "pitch"))
-        adapter_name = ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH
-        continuous_gas = True
-        continuous_gas_branch = gas_branch
+        if gas_branch.type == "continuous":
+            _validate_continuous_branch("gas", gas_branch)
+            adapter_name = ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH
+            continuous_gas = True
+            continuous_gas_branch = gas_branch
+        else:
+            _validate_discrete_branch("gas", gas_branch)
+            adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH
+            continuous_gas = False
     else:
         names = ", ".join(branch_names) or "none"
         raise ValueError(f"Unsupported action branch combination: {names}")

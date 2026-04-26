@@ -64,6 +64,16 @@ STEER_GAS_AIR_BRAKE_BOOST_LEAN_LAYOUT = HybridActionLayout(
         DiscreteActionDimension("lean", 3),
     ),
 )
+STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT = HybridActionLayout(
+    continuous_size=1,
+    dimensions=(
+        DiscreteActionDimension("gas", 2),
+        DiscreteActionDimension("air_brake", 2),
+        DiscreteActionDimension("boost", 2),
+        DiscreteActionDimension("lean", 3),
+        DiscreteActionDimension("pitch", PITCH_BUCKETS.count),
+    ),
+)
 STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH_LAYOUT = HybridActionLayout(
     continuous_size=2,
     dimensions=(

@@ -63,6 +63,7 @@ def telemetry_state_vector(
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
     zeroed_state_components: Collection[str] = (),
+    zeroed_state_features: Collection[str] = (),
 ) -> StateVector:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
@@ -71,6 +72,7 @@ def telemetry_state_vector(
             telemetry,
             state_components=state_components,
             zeroed_state_components=zeroed_state_components,
+            zeroed_state_features=zeroed_state_features,
             action_history=action_history or {},
             profile_fields={
                 "left_lean_held": left_lean_held,

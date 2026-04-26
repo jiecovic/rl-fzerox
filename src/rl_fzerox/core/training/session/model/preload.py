@@ -206,7 +206,7 @@ def _require_progress_schedule(model: object) -> _ProgressSchedule:
 
         def _schedule(progress_remaining: float) -> float:
             value = raw_schedule(progress_remaining)
-            if isinstance(value, (int, float)):
+            if isinstance(value, int | float):
                 return float(value)
             raise TypeError("SAC lr_schedule must return a float")
 

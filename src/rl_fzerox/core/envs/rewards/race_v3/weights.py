@@ -12,10 +12,10 @@ class RaceV3RewardWeights:
     progress_bucket_distance: float = 1_000.0
     progress_bucket_reward: float = 1.0
     progress_reward_interval_frames: int = 1
-    defer_progress_reward_while_airborne: bool = False
     airborne_progress_bucket_distance: float | None = None
-    airborne_progress_requires_nonascending: bool = False
-    airborne_progress_height_epsilon: float = 0.0
+    outside_bounds_reentry_progress_distance_cap: float | None = None
+    airborne_offtrack_penalty_scale: float = 0.0
+    airborne_offtrack_recovery_reward_scale: float = 0.0
     time_penalty_per_frame: float = 0.0
     reverse_time_penalty_scale: float = 1.0
     low_speed_time_penalty_scale: float = 1.0
@@ -42,6 +42,7 @@ class RaceV3RewardWeights:
     steer_oscillation_cap: float = 2.0
     steer_oscillation_power: float = 2.0
     lean_request_penalty: float = 0.0
+    airborne_pitch_up_penalty: float = 0.0
     lean_low_speed_penalty: float = 0.0
     lean_low_speed_penalty_max_speed_kph: float = 800.0
     airborne_landing_reward: float = 0.0

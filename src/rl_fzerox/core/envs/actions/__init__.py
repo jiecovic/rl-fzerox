@@ -9,6 +9,7 @@ from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
+    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH,
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
     ACTION_ADAPTER_STEER_DRIVE,
     ACTION_ADAPTER_STEER_DRIVE_BOOST,
@@ -17,7 +18,12 @@ from rl_fzerox.core.domain.action_adapters import (
     DEFAULT_ACTION_ADAPTER_NAME,
     ActionAdapterName,
 )
-from rl_fzerox.core.envs.actions.base import ActionAdapter, ActionValue, ResettableActionAdapter
+from rl_fzerox.core.envs.actions.base import (
+    ActionAdapter,
+    ActionValue,
+    DiscreteActionDimension,
+    ResettableActionAdapter,
+)
 from rl_fzerox.core.envs.actions.continuous_steer_drive import (
     ContinuousSteerDriveActionAdapter,
 )
@@ -27,6 +33,7 @@ from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
     HybridSteerDriveBoostLeanPrimitiveActionAdapter,
     HybridSteerDriveLeanActionAdapter,
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
+    HybridSteerGasAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
 )
 from rl_fzerox.core.envs.actions.steer_drive import (
@@ -59,6 +66,9 @@ ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
     ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: HybridSteerGasBoostLeanActionAdapter,
     ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: (
         HybridSteerGasAirBrakeBoostLeanActionAdapter
+    ),
+    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH: (
+        HybridSteerGasAirBrakeBoostLeanPitchActionAdapter
     ),
     ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN: HybridSteerDriveLeanActionAdapter,
     ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_LEAN: SteerGasAirBrakeBoostLeanActionAdapter,
@@ -95,6 +105,7 @@ __all__ = [
     "BOOST_MASK",
     "ContinuousSteerDriveActionAdapter",
     "DEFAULT_ACTION_NAME",
+    "DiscreteActionDimension",
     "LEAN_LEFT_MASK",
     "LEAN_RIGHT_MASK",
     "HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter",
@@ -103,6 +114,7 @@ __all__ = [
     "HybridSteerDriveLeanActionAdapter",
     "HybridSteerGasBoostLeanActionAdapter",
     "HybridSteerGasAirBrakeBoostLeanActionAdapter",
+    "HybridSteerGasAirBrakeBoostLeanPitchActionAdapter",
     "ResettableActionAdapter",
     "SteerDriveActionAdapter",
     "SteerDriveBoostActionAdapter",

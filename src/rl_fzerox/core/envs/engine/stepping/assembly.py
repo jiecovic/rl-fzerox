@@ -101,6 +101,10 @@ class EngineStepAssembler:
                     -1.0,
                     min(1.0, float(requested_control_state.left_stick_x)),
                 ),
+                pitch_level=max(
+                    -1.0,
+                    min(1.0, float(applied_control_state.left_stick_y)),
+                ),
                 drive_axis=request.action_drive_axis,
             ),
         )

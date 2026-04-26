@@ -12,6 +12,7 @@ from rl_fzerox.core.config.schema import (
     EmulatorConfig,
     EnvConfig,
     ObservationConfig,
+    PolicyActionBiasConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
     TrainAppConfig,
@@ -540,6 +541,49 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
 
     assert isinstance(model, MaskableHybridRecurrentPPO)
     assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
+
+
+def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        [
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=ActionConfig(
+                        name="hybrid_steer_gas_air_brake_boost_lean_pitch"
+                    ),
+                    observation=ObservationConfig(mode="image_state"),
+                ),
+            )
+        ]
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=PolicyConfig(
+                recurrent=PolicyRecurrentConfig(
+                    enabled=True,
+                    hidden_size=512,
+                    n_lstm_layers=1,
+                ),
+                action_bias=PolicyActionBiasConfig(gas_on_logit=0.5),
+            ),
+            tensorboard_log=None,
+        )
+    finally:
+        env.close()
+
+    bias = model.policy.state_dict()["action_net.discrete_net.bias"].detach().cpu()
+    assert float(bias[1] - bias[0]) == pytest.approx(0.5)
 
 
 def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -> None:

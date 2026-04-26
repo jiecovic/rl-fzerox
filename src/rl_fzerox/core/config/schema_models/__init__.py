@@ -29,6 +29,7 @@ from rl_fzerox.core.config.schema_models.env import (
     EmulatorConfig,
     EnvConfig,
     RewardConfig,
+    RewardCourseOverrideConfig,
 )
 from rl_fzerox.core.config.schema_models.observations import (
     ObservationConfig,
@@ -37,6 +38,7 @@ from rl_fzerox.core.config.schema_models.observations import (
 from rl_fzerox.core.config.schema_models.policy import (
     ExtractorConfig,
     NetArchConfig,
+    PolicyActionBiasConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
 )
@@ -67,9 +69,11 @@ __all__ = [
     "ObservationPresetName",
     "ObservationStateComponentConfig",
     "PerTrackLapsCompletedTriggerConfig",
+    "PolicyActionBiasConfig",
     "PolicyConfig",
     "PolicyRecurrentConfig",
     "RewardConfig",
+    "RewardCourseOverrideConfig",
     "TrackConfig",
     "TrackRecordEntryConfig",
     "TrackRecordsConfig",

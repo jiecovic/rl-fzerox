@@ -69,6 +69,7 @@ def build_observation(
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
     zeroed_state_components: Collection[str] = (),
+    zeroed_state_features: Collection[str] = (),
 ) -> ObservationValue:
     if mode == "image":
         return image
@@ -93,6 +94,7 @@ def build_observation(
                 action_history=action_history,
                 state_components=state_components,
                 zeroed_state_components=zeroed_state_components,
+                zeroed_state_features=zeroed_state_features,
             ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")

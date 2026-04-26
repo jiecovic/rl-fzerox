@@ -97,6 +97,28 @@ def lean_request_penalty(
     return max(int(summary.frames_run), 0) * penalty
 
 
+def airborne_pitch_up_penalty(
+    summary: StepSummary,
+    telemetry: FZeroXTelemetry,
+    action_context: RewardActionContext | None,
+    *,
+    weights: RaceV3RewardWeights,
+) -> float:
+    penalty = weights.airborne_pitch_up_penalty
+    if (
+        penalty >= 0.0
+        or not telemetry.player.airborne
+        or action_context is None
+        or action_context.pitch_level is None
+    ):
+        return 0.0
+
+    pitch_up_level = max(0.0, min(1.0, float(action_context.pitch_level)))
+    if pitch_up_level <= 0.0:
+        return 0.0
+    return max(int(summary.frames_run), 0) * penalty * pitch_up_level
+
+
 def manual_boost_reward(
     action_context: RewardActionContext | None,
     *,

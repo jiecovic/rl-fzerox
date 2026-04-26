@@ -11,6 +11,7 @@ from rl_fzerox.core.domain.observation_components import (
 )
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.envs.track_bounds import track_edge_state
 
 from .contexts import (
     course_component_features,
@@ -86,6 +87,7 @@ def component_state_values(
     *,
     state_components: StateComponentsSettings,
     zeroed_state_components: Collection[str] = (),
+    zeroed_state_features: Collection[str] = (),
     action_history: Mapping[str, float],
     profile_fields: Mapping[str, float],
 ) -> list[float]:
@@ -95,13 +97,16 @@ def component_state_values(
         if component.name in zeroed_state_components:
             values.extend([0.0] * len(definition.features(component)))
         else:
+            component_features = definition.features(component)
+            component_values = definition.values(
+                telemetry,
+                component,
+                action_history,
+                profile_fields,
+            )
             values.extend(
-                definition.values(
-                    telemetry,
-                    component,
-                    action_history,
-                    profile_fields,
-                )
+                0.0 if feature.name in zeroed_state_features else value
+                for feature, value in zip(component_features, component_values, strict=True)
             )
 
     return values
@@ -379,13 +384,16 @@ def _track_position_features() -> tuple[StateFeature, ...]:
 
 def _track_position_values(telemetry: FZeroXTelemetry | None) -> list[float]:
     lap_progress = _lap_progress_fraction(telemetry)
-    edge_ratio = _raw_edge_ratio(telemetry)
+    if telemetry is None:
+        return [lap_progress, 0.0, 0.0]
+    edge_state = track_edge_state(telemetry.player)
+    edge_ratio = edge_state.ratio
     if edge_ratio is None:
         return [lap_progress, 0.0, 0.0]
     return [
         lap_progress,
         clamp(edge_ratio, -1.0, 1.0),
-        1.0 if abs(edge_ratio) > 1.0 else 0.0,
+        1.0 if edge_state.outside_bounds else 0.0,
     ]
 
 
@@ -397,19 +405,6 @@ def _lap_progress_fraction(telemetry: FZeroXTelemetry | None) -> float:
         0.0,
         1.0,
     )
-
-
-def _raw_edge_ratio(telemetry: FZeroXTelemetry | None) -> float | None:
-    if telemetry is None:
-        return None
-    player = telemetry.player
-    offset = float(player.signed_lateral_offset)
-    radius = (
-        float(player.current_radius_left) if offset >= 0.0 else float(player.current_radius_right)
-    )
-    if radius <= 0.0:
-        return None
-    return offset / radius
 
 
 def _machine_context_features() -> tuple[StateFeature, ...]:
