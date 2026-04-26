@@ -14,6 +14,7 @@ def policy_state_sections(
     observation_state: StateVector | None,
     feature_names: tuple[str, ...],
     zeroed_components: frozenset[str] = frozenset(),
+    zeroed_features: frozenset[str] = frozenset(),
 ) -> list[PanelSection]:
     if observation_state is None:
         return []
@@ -32,6 +33,7 @@ def policy_state_sections(
             values=values,
             group_prefix=group_prefix,
             zeroed=group_zeroed,
+            zeroed_features=zeroed_features,
         )
         if group_lines:
             if section_lines:
@@ -84,16 +86,41 @@ def _state_vector_group_lines(
     values: StateVector,
     group_prefix: str | None,
     zeroed: bool,
+    zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     if group_prefix == "course_context.":
-        return _course_context_state_lines(names=names, values=values, zeroed=zeroed)
+        return _course_context_state_lines(
+            names=names,
+            values=values,
+            zeroed=zeroed,
+            zeroed_features=zeroed_features,
+        )
     if group_prefix == "control_history.":
-        return _control_history_state_lines(names=names, values=values, zeroed=zeroed)
+        return _control_history_state_lines(
+            names=names,
+            values=values,
+            zeroed=zeroed,
+            zeroed_features=zeroed_features,
+        )
     return [
         panel_line(
-            _state_vector_line_label(name, group_prefix=group_prefix, zeroed=zeroed),
+            _state_vector_line_label(
+                name,
+                group_prefix=group_prefix,
+                zeroed=_state_vector_entry_zeroed(
+                    name,
+                    zeroed=zeroed,
+                    zeroed_features=zeroed_features,
+                ),
+            ),
             f"{float(value):.3f}",
-            _state_vector_line_color(zeroed),
+            _state_vector_line_color(
+                _state_vector_entry_zeroed(
+                    name,
+                    zeroed=zeroed,
+                    zeroed_features=zeroed_features,
+                )
+            ),
         )
         for name, value in zip(names, values, strict=True)
         if _state_vector_name_matches_group(name, group_prefix)
@@ -105,16 +132,27 @@ def _control_history_state_lines(
     names: tuple[str, ...],
     values: StateVector,
     zeroed: bool,
+    zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     return [
         panel_line(
             _state_vector_line_label(
                 name,
                 group_prefix="control_history.",
-                zeroed=zeroed,
+                zeroed=_state_vector_entry_zeroed(
+                    name,
+                    zeroed=zeroed,
+                    zeroed_features=zeroed_features,
+                ),
             ),
             f"{float(value):.3f}",
-            _state_vector_line_color(zeroed),
+            _state_vector_line_color(
+                _state_vector_entry_zeroed(
+                    name,
+                    zeroed=zeroed,
+                    zeroed_features=zeroed_features,
+                )
+            ),
         )
         for name, value in zip(names, values, strict=True)
         if name.startswith("control_history.") or name.startswith("prev_")
@@ -126,6 +164,7 @@ def _course_context_state_lines(
     names: tuple[str, ...],
     values: StateVector,
     zeroed: bool,
+    zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     course_bits = [
         float(value)
@@ -138,11 +177,16 @@ def _course_context_state_lines(
     active_index = _one_hot_active_index(course_bits)
     encoded_bits = "".join("1" if value >= 0.5 else "0" for value in course_bits)
     value = f"-- | {encoded_bits}" if active_index is None else f"{active_index} | {encoded_bits}"
+    feature_zeroed = _state_vector_entry_zeroed(
+        "course_context",
+        zeroed=zeroed,
+        zeroed_features=zeroed_features,
+    )
     return [
         panel_line(
-            _zeroed_label("course", zeroed=zeroed),
+            _zeroed_label("course", zeroed=feature_zeroed),
             value,
-            _state_vector_line_color(zeroed),
+            _state_vector_line_color(feature_zeroed),
         ),
     ]
 
@@ -170,6 +214,15 @@ def _state_vector_label(name: str, *, group_prefix: str | None) -> str:
 
 def _state_vector_group_title(title: str, zeroed: bool) -> str:
     return f"// {title}" if zeroed else title
+
+
+def _state_vector_entry_zeroed(
+    name: str,
+    *,
+    zeroed: bool,
+    zeroed_features: frozenset[str],
+) -> bool:
+    return zeroed or name in zeroed_features
 
 
 def _state_vector_line_label(

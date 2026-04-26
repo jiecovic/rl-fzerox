@@ -9,6 +9,10 @@ from rl_fzerox.ui.watch.runtime import (
     start_watch_worker,
     wait_initial_snapshot,
 )
+from rl_fzerox.ui.watch.runtime.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    next_cnn_activation_normalization,
+)
 from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _resolve_render_fps,
@@ -51,6 +55,8 @@ def run_viewer(config: WatchAppConfig) -> None:
         fonts = _create_fonts(pygame)
         paused = False
         panel_tab_index = 0
+        record_tab_index = 0
+        cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         hitboxes = ViewerHitboxes()
 
         while True:
@@ -61,13 +67,20 @@ def run_viewer(config: WatchAppConfig) -> None:
                 pygame,
                 deterministic_toggle_rect=hitboxes.deterministic_toggle,
                 panel_tab_rects=hitboxes.panel_tabs,
+                record_tab_rects=hitboxes.record_tabs,
+                record_course_hitboxes=hitboxes.record_courses,
             )
             panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
+            if viewer_input.record_tab_index is not None:
+                record_tab_index = viewer_input.record_tab_index
+            if viewer_input.toggle_cnn_normalization:
+                cnn_normalization = next_cnn_activation_normalization(cnn_normalization)
             paused = apply_viewer_input(
                 worker.command_queue,
                 viewer_input,
                 paused=paused,
                 cnn_visualization_enabled=panel_tab_index == PANEL_TABS.cnn_index,
+                cnn_normalization=cnn_normalization,
             )
             if viewer_input.quit_requested:
                 return
@@ -101,6 +114,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
                 panel_tab_index=panel_tab_index,
+                record_tab_index=record_tab_index,
             )
     except KeyboardInterrupt:
         return

@@ -16,6 +16,8 @@ def panel_line(
     heading: bool = False,
     status_icon: StatusIcon | None = None,
     status_text: str = "",
+    label_color: Color | None = None,
+    click_course_id: str | None = None,
 ) -> PanelLine:
     return PanelLine(
         label=label,
@@ -27,6 +29,8 @@ def panel_line(
         heading=heading,
         status_icon=status_icon,
         status_text=status_text,
+        label_color=label_color,
+        click_course_id=click_course_id,
     )
 
 

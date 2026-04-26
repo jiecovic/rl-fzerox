@@ -45,6 +45,16 @@ class PanelLine:
     heading: bool = False
     status_icon: StatusIcon | None = None
     status_text: str = ""
+    label_color: Color | None = None
+    click_course_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RecordCourseHitbox:
+    """Clickable record-row region for locking watch resets to one course."""
+
+    rect: MouseRect
+    course_id: str
 
 
 @dataclass(frozen=True)
@@ -128,3 +138,5 @@ class ViewerHitboxes:
 
     deterministic_toggle: MouseRect | None = None
     panel_tabs: tuple[MouseRect | None, ...] = ()
+    record_tabs: tuple[MouseRect | None, ...] = ()
+    record_courses: tuple[RecordCourseHitbox, ...] = ()

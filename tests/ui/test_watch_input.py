@@ -11,6 +11,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
 )
 from rl_fzerox.ui.watch.input import _poll_viewer_input
+from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox
 
 
 class _PressedKeys:
@@ -38,6 +39,7 @@ class _FakePygame:
     K_r = 26
     K_d = 27
     K_m = 35
+    K_c = 39
     K_a = 36
     K_s = 37
     K_SPACE = 38
@@ -112,6 +114,12 @@ def test_poll_viewer_input_maps_m_to_manual_control_toggle() -> None:
     assert viewer_input.toggle_manual_control is True
 
 
+def test_poll_viewer_input_maps_c_to_cnn_normalization_toggle() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_c,)))
+
+    assert viewer_input.toggle_cnn_normalization is True
+
+
 def test_poll_viewer_input_maps_escape_to_quit() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_ESCAPE,)))
 
@@ -140,6 +148,29 @@ def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:
     )
 
     assert viewer_input.panel_tab_index == 0
+
+
+def test_poll_viewer_input_selects_record_tab_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 42)),
+        panel_tab_rects=((0, 0, 40, 20),),
+        record_tab_rects=((0, 30, 40, 20), (50, 30, 40, 20)),
+    )
+
+    assert viewer_input.record_tab_index == 1
+
+
+def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 72)),
+        panel_tab_rects=((0, 0, 40, 20),),
+        record_tab_rects=((0, 30, 40, 20),),
+        record_course_hitboxes=(
+            RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),
+        ),
+    )
+
+    assert viewer_input.toggle_record_course_lock_id == "mute_city"
 
 
 def test_poll_viewer_input_maps_manual_keys_to_n64_controls() -> None:

@@ -72,6 +72,7 @@ class FrameRenderData:
     latest_finish_deltas_ms: dict[str, int]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    record_tab_index: int
     continuous_drive_deadzone: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
@@ -180,8 +181,10 @@ def _draw_frame(
     _draw_glass_game_view(
         pygame=pygame,
         screen=screen,
+        fonts=fonts,
         surface=game_surface,
         outer_size=game_display_size,
+        course_label=_game_course_overlay_label(data.info),
     )
     control_viz = _control_viz(
         data.control_state,
@@ -262,6 +265,7 @@ def _draw_frame(
             latest_finish_deltas_ms=data.latest_finish_deltas_ms,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,
+            record_tab_index=data.record_tab_index,
             continuous_drive_deadzone=data.continuous_drive_deadzone,
             continuous_air_brake_mode=data.continuous_air_brake_mode,
             continuous_air_brake_disabled=data.continuous_air_brake_disabled,
@@ -282,6 +286,8 @@ def _draw_frame(
     return ViewerHitboxes(
         deterministic_toggle=control_hitboxes.deterministic_toggle,
         panel_tabs=side_panel_hitboxes.panel_tabs,
+        record_tabs=side_panel_hitboxes.record_tabs,
+        record_courses=side_panel_hitboxes.record_courses,
     )
 
 
@@ -322,6 +328,69 @@ def _energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None:
     if not math.isfinite(energy) or not math.isfinite(max_energy):
         return None
     return max(0.0, min(1.0, energy / max_energy))
+
+
+def _game_course_overlay_label(info: dict[str, object]) -> str | None:
+    course_name = info.get("track_course_name")
+    if not isinstance(course_name, str) or not course_name:
+        course_name = _fallback_course_name(info)
+    if course_name is None:
+        return None
+
+    cup = _course_cup_name(info)
+    if cup is None:
+        return course_name
+    return f"{cup} : {course_name}"
+
+
+def _course_cup_name(info: dict[str, object]) -> str | None:
+    course_ref = info.get("track_course_ref")
+    if isinstance(course_ref, str) and "/" in course_ref:
+        cup = course_ref.split("/", maxsplit=1)[0].strip()
+        if cup:
+            cup_label = _format_track_label(cup)
+            return cup_label if cup_label.lower().endswith("cup") else f"{cup_label} Cup"
+
+    course_index = info.get("track_course_index", info.get("course_index"))
+    if isinstance(course_index, bool) or not isinstance(course_index, int):
+        return None
+    cups = ("Jack", "Queen", "King", "Joker")
+    cup_index = course_index // 6
+    if 0 <= cup_index < len(cups):
+        return f"{cups[cup_index]} Cup"
+    return None
+
+
+def _fallback_course_name(info: dict[str, object]) -> str | None:
+    display_name = info.get("track_display_name")
+    if isinstance(display_name, str) and display_name:
+        return _short_track_name(display_name)
+
+    course_id = info.get("track_course_id")
+    if isinstance(course_id, str) and course_id:
+        return _format_track_label(course_id)
+
+    course_index = info.get("track_course_index", info.get("course_index"))
+    if isinstance(course_index, bool):
+        return None
+    if isinstance(course_index, int):
+        return f"course {course_index}"
+    return None
+
+
+def _short_track_name(value: str) -> str:
+    suffixes = (
+        " Time Attack - Blue Falcon Balanced",
+        " time attack blue falcon balanced",
+    )
+    for suffix in suffixes:
+        if value.endswith(suffix):
+            return value[: -len(suffix)]
+    return value
+
+
+def _format_track_label(value: str) -> str:
+    return value.replace("_", " ").title()
 
 
 def _apply_window_position_hint() -> None:

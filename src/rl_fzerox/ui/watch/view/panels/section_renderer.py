@@ -16,6 +16,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PanelSection,
     PygameModule,
     PygameSurface,
+    RecordCourseHitbox,
     ViewerFonts,
 )
 
@@ -29,10 +30,11 @@ def _draw_column(
     y: int,
     width: int,
     sections: list[PanelSection],
-) -> int:
+) -> tuple[int, tuple[RecordCourseHitbox, ...]]:
     current_y = y
+    record_course_hitboxes: list[RecordCourseHitbox] = []
     for section_index, section in enumerate(sections):
-        current_y = _draw_section(
+        current_y, section_hitboxes = _draw_section(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -41,9 +43,10 @@ def _draw_column(
             width=width,
             section=section,
         )
+        record_course_hitboxes.extend(section_hitboxes)
         if section_index < len(sections) - 1:
             current_y += LAYOUT.section_gap
-    return current_y
+    return current_y, tuple(record_course_hitboxes)
 
 
 def _draw_section(
@@ -55,7 +58,8 @@ def _draw_section(
     y: int,
     width: int,
     section: PanelSection,
-) -> int:
+) -> tuple[int, tuple[RecordCourseHitbox, ...]]:
+    record_course_hitboxes: list[RecordCourseHitbox] = []
     section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
     screen.blit(section_title, (x, y))
     y += section_title.get_height() + LAYOUT.section_title_gap
@@ -80,7 +84,7 @@ def _draw_section(
             )
             continue
         if line.label:
-            y = _draw_labeled_value_line(
+            y, hitbox = _draw_labeled_value_line(
                 pygame=pygame,
                 screen=screen,
                 fonts=fonts,
@@ -89,6 +93,8 @@ def _draw_section(
                 width=width,
                 line=line,
             )
+            if hitbox is not None:
+                record_course_hitboxes.append(hitbox)
             continue
 
         value_surface = fonts.small.render(line.value, True, line.color)
@@ -118,7 +124,7 @@ def _draw_section(
             flag_viz=section.flag_viz,
         )
 
-    return y
+    return y, tuple(record_course_hitboxes)
 
 
 def _draw_panel_divider(
@@ -181,9 +187,9 @@ def _draw_labeled_value_line(
     y: int,
     width: int,
     line: PanelLine,
-) -> int:
+) -> tuple[int, RecordCourseHitbox | None]:
     label_font = fonts.record_header if line.heading else fonts.small
-    label_color = PALETTE.text_primary if line.heading else PALETTE.text_muted
+    label_color = line.label_color or (PALETTE.text_primary if line.heading else PALETTE.text_muted)
     label_surface = label_font.render(line.label, True, label_color)
     label_height = _font_line_height(label_font)
 
@@ -192,6 +198,13 @@ def _draw_labeled_value_line(
     status_text_surface = fonts.small.render(line.status_text, True, line.color)
     status_text_height = _font_line_height(fonts.small)
     row_height = max(label_height, value_height, status_text_height)
+    hitbox = _record_course_hitbox(
+        line=line,
+        x=x,
+        y=y,
+        width=width,
+        row_height=row_height,
+    )
 
     screen.blit(label_surface, (x, _centered_text_y(y, row_height, label_surface)))
 
@@ -226,13 +239,29 @@ def _draw_labeled_value_line(
             color=line.color,
             center=center,
         )
-        return y + row_height + LAYOUT.line_gap
+        return y + row_height + LAYOUT.line_gap, hitbox
 
     fitted_value = _fit_text(value_font, line.value, inline_value_space)
     value_surface = value_font.render(fitted_value, True, line.color)
     value_x = x + width - value_surface.get_width()
     screen.blit(value_surface, (value_x, _centered_text_y(y, row_height, value_surface)))
-    return y + row_height + LAYOUT.line_gap
+    return y + row_height + LAYOUT.line_gap, hitbox
+
+
+def _record_course_hitbox(
+    *,
+    line: PanelLine,
+    x: int,
+    y: int,
+    width: int,
+    row_height: int,
+) -> RecordCourseHitbox | None:
+    if line.click_course_id is None:
+        return None
+    return RecordCourseHitbox(
+        rect=(x, y, width, row_height + LAYOUT.line_gap),
+        course_id=line.click_course_id,
+    )
 
 
 def _draw_status_icon(

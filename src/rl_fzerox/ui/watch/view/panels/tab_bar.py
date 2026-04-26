@@ -23,6 +23,31 @@ def _draw_panel_tabs(
     width: int,
     selected_index: int,
 ) -> tuple[int, tuple[MouseRect | None, ...]]:
+    return _draw_text_tabs(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=x,
+        y=y,
+        width=width,
+        labels=PANEL_TABS.labels,
+        selected_index=selected_index,
+        hint_text=_panel_tab_hint(selected_index),
+    )
+
+
+def _draw_text_tabs(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    x: int,
+    y: int,
+    width: int,
+    labels: tuple[str, ...],
+    selected_index: int,
+    hint_text: str | None = None,
+) -> tuple[int, tuple[MouseRect | None, ...]]:
     gap = max(2, LAYOUT.inline_value_gap // 4)
     tab_height = _font_line_height(fonts.small) + 10
     tab_y = y
@@ -36,8 +61,9 @@ def _draw_panel_tabs(
         width=1,
     )
     tab_rects: list[MouseRect | None] = []
-    for index, label in enumerate(PANEL_TABS.labels):
-        active = index == PANEL_TABS.normalize(selected_index)
+    normalized_index = selected_index % len(labels) if labels else 0
+    for index, label in enumerate(labels):
+        active = index == normalized_index
         label_surface = fonts.small.render(
             label,
             True,
@@ -74,20 +100,21 @@ def _draw_panel_tabs(
         tab_rects.append((rect.x, rect.y, rect.width, rect.height))
         current_x += tab_width + gap
         if current_x > x + width:
-            tab_rects.extend((None,) * (PANEL_TABS.count - len(tab_rects)))
+            tab_rects.extend((None,) * (len(labels) - len(tab_rects)))
             break
-    hint_surface = fonts.small.render(
-        _panel_tab_hint(selected_index),
-        True,
-        PALETTE.text_muted,
-    )
-    hint_x = x + width - hint_surface.get_width()
-    if hint_x > current_x:
-        screen.blit(
-            hint_surface,
-            (hint_x, tab_y + max(0, (tab_height - hint_surface.get_height()) // 2)),
+    if hint_text:
+        hint_surface = fonts.small.render(
+            hint_text,
+            True,
+            PALETTE.text_muted,
         )
-    while len(tab_rects) < PANEL_TABS.count:
+        hint_x = x + width - hint_surface.get_width()
+        if hint_x > current_x:
+            screen.blit(
+                hint_surface,
+                (hint_x, tab_y + max(0, (tab_height - hint_surface.get_height()) // 2)),
+            )
+    while len(tab_rects) < len(labels):
         tab_rects.append(None)
     return tab_y + tab_height, tuple(tab_rects)
 

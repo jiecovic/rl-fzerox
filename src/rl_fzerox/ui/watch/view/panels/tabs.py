@@ -49,8 +49,8 @@ class PanelTabRegistry:
 
 PANEL_TABS = PanelTabRegistry(
     tabs=(
-        PanelTab(key="session", label="Session"),
-        PanelTab(key="game", label="Game"),
+        PanelTab(key="run", label="Run"),
+        PanelTab(key="details", label="Details"),
         PanelTab(key="state", label="State"),
         PanelTab(key="cnn", label="CNN"),
         PanelTab(key="records", label="Records"),

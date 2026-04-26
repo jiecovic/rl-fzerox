@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.view.panels.lines import panel_divider, panel_heading, panel_line
+from rl_fzerox.ui.watch.view.panels.lines import panel_divider, panel_line
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, StatusIcon
 
@@ -30,28 +30,60 @@ def track_record_sections(
     records = track_pool_records or _current_track_record_pool(current_info)
     if not records and not best_finish_times and not latest_finish_times:
         return ()
-    lines: list[PanelLine] = []
     record_groups = _record_groups(records)
-    show_cup_headings = len(records) > 1 and any(group.cup is not None for group in record_groups)
-    for group_index, group in enumerate(record_groups):
-        if group_index > 0:
-            lines.append(panel_divider())
-        if show_cup_headings:
-            lines.append(panel_heading(_format_cup_label(group.cup)))
-        for record_index, record in enumerate(group.records):
-            if record_index > 0:
-                lines.append(panel_divider())
-            lines.extend(
-                _track_record_pool_lines(
-                    record,
+    if _should_split_cup_sections(record_groups):
+        return tuple(
+            PanelSection(
+                title=_format_cup_label(group.cup),
+                lines=_record_group_lines(
+                    group.records,
+                    current_info=current_info,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
-                )
+                ),
             )
+            for group in record_groups
+        )
+
+    lines = _record_group_lines(
+        records,
+        current_info=current_info,
+        best_finish_times=best_finish_times,
+        latest_finish_times=latest_finish_times,
+        latest_finish_deltas_ms=latest_finish_deltas_ms,
+    )
     if not lines:
         return ()
     return (PanelSection(title="Records", lines=lines),)
+
+
+def _should_split_cup_sections(record_groups: tuple[_RecordGroup, ...]) -> bool:
+    return len(record_groups) > 1 and any(group.cup is not None for group in record_groups)
+
+
+def _record_group_lines(
+    records: tuple[dict[str, object], ...],
+    *,
+    current_info: dict[str, object],
+    best_finish_times: dict[str, int],
+    latest_finish_times: dict[str, int],
+    latest_finish_deltas_ms: dict[str, int],
+) -> list[PanelLine]:
+    lines: list[PanelLine] = []
+    for record_index, record in enumerate(records):
+        if record_index > 0:
+            lines.append(panel_divider())
+        lines.extend(
+            _track_record_pool_lines(
+                record,
+                current_info=current_info,
+                best_finish_times=best_finish_times,
+                latest_finish_times=latest_finish_times,
+                latest_finish_deltas_ms=latest_finish_deltas_ms,
+            )
+        )
+    return lines
 
 
 def _record_groups(records: tuple[dict[str, object], ...]) -> tuple[_RecordGroup, ...]:
@@ -116,10 +148,12 @@ def _current_track_record_pool(info: dict[str, object]) -> tuple[dict[str, objec
 def _track_record_pool_lines(
     record: dict[str, object],
     *,
+    current_info: dict[str, object],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
 ) -> tuple[PanelLine, ...]:
+    is_current_track = _is_current_track_record(record, current_info)
     watch_best = _watch_track_value(record, best_finish_times)
     watch_latest = _watch_track_value(record, latest_finish_times)
     watch_latest_delta = _watch_track_value(record, latest_finish_deltas_ms)
@@ -137,12 +171,14 @@ def _track_record_pool_lines(
     )
     return (
         panel_line(
-            _format_track_record_label(record),
+            _format_track_record_heading(record, is_current_track=is_current_track),
             "",
             status_color,
             heading=True,
             status_icon=status_icon,
-            status_text=status_text,
+            status_text="LIVE" if is_current_track and not status_text else status_text,
+            label_color=PALETTE.text_accent if is_current_track else None,
+            click_course_id=_record_course_id(record),
         ),
         panel_line(
             "PB",
@@ -170,6 +206,43 @@ def _track_record_pool_lines(
             else PALETTE.text_muted,
         ),
     )
+
+
+def _format_track_record_heading(record: dict[str, object], *, is_current_track: bool) -> str:
+    label = _format_track_record_label(record)
+    return f"> {label}" if is_current_track else label
+
+
+def _record_course_id(record: dict[str, object]) -> str | None:
+    course_id = record.get("track_course_id")
+    if isinstance(course_id, str) and course_id:
+        return course_id
+    return None
+
+
+def _is_current_track_record(
+    record: dict[str, object],
+    current_info: dict[str, object],
+) -> bool:
+    current_key = _track_best_key(current_info)
+    record_key = _track_best_key(record)
+    if current_key is not None and record_key is not None:
+        return current_key == record_key
+
+    current_course_id = current_info.get("track_course_id")
+    record_course_id = record.get("track_course_id")
+    if (
+        isinstance(current_course_id, str)
+        and current_course_id
+        and current_course_id == record_course_id
+    ):
+        return True
+
+    current_index = current_info.get("track_course_index", current_info.get("course_index"))
+    record_index = record.get("track_course_index", record.get("course_index"))
+    if isinstance(current_index, bool) or isinstance(record_index, bool):
+        return False
+    return isinstance(current_index, int) and current_index == record_index
 
 
 def _format_track_record_label(record: dict[str, object]) -> str:

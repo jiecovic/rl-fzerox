@@ -31,7 +31,7 @@ def _panel_content_height(
     y += LAYOUT.title_section_gap
 
     content_width = LAYOUT.panel_width - (2 * LAYOUT.panel_padding)
-    tab_height = fonts.small.render("Session", True, PALETTE.text_primary).get_height() + 10
+    tab_height = fonts.small.render("Details", True, PALETTE.text_primary).get_height() + 10
     left_height = _column_content_height(fonts, columns.left, width=content_width)
     middle_height = _column_content_height(fonts, columns.middle, width=content_width)
     stats_height = _column_content_height(fonts, columns.stats, width=content_width)

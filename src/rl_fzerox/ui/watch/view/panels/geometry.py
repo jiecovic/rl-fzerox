@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, PlayerTelemetry
+from rl_fzerox.core.envs.track_bounds import TrackEdgeState, track_edge_state
 from rl_fzerox.ui.watch.view.panels.lines import panel_line
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import PanelSection
@@ -14,9 +15,8 @@ def track_geometry_sections(
         return ()
     player = telemetry.player
     sliding = _sliding_active(player)
-    edge_side, edge_ratio = _lateral_edge_ratio(player)
-    near_edge = _near_edge_side(edge_ratio)
-    edge_color = _edge_warning_color(edge_ratio)
+    edge_state = track_edge_state(player)
+    edge_color = _edge_warning_color(edge_state)
     return (
         PanelSection(
             title="Track Geometry",
@@ -63,13 +63,15 @@ def track_geometry_sections(
                 ),
                 panel_line(
                     "Edge ratio",
-                    _format_edge_ratio(edge_side, edge_ratio),
+                    _format_edge_ratio(edge_state),
                     edge_color,
                 ),
                 panel_line(
                     "Near edge",
-                    near_edge if near_edge is not None else "no",
-                    PALETTE.text_warning if near_edge is not None else PALETTE.text_muted,
+                    edge_state.near_side if edge_state.near_side is not None else "no",
+                    PALETTE.text_warning
+                    if edge_state.near_side is not None
+                    else PALETTE.text_muted,
                 ),
                 panel_line(
                     "Disp mag",
@@ -140,41 +142,14 @@ def _sliding_active(
     return not player.airborne and abs(player.local_lateral_velocity) > lateral_velocity_threshold
 
 
-def _lateral_edge_ratio(player: PlayerTelemetry) -> tuple[str, float | None]:
-    offset = player.signed_lateral_offset
-    if offset >= 0.0:
-        return "left", _safe_ratio(offset, player.current_radius_left)
-    return "right", _safe_ratio(offset, player.current_radius_right)
-
-
-def _safe_ratio(value: float, denominator: float) -> float | None:
-    if denominator <= 0.0:
-        return None
-    return value / denominator
-
-
-def _format_edge_ratio(side: str, ratio: float | None) -> str:
-    if ratio is None:
+def _format_edge_ratio(edge_state: TrackEdgeState) -> str:
+    if edge_state.ratio is None:
         return "--"
-    return f"{side} {ratio:+.2f}"
+    return f"{edge_state.side} {edge_state.ratio:+.2f}"
 
 
-def _near_edge_side(
-    edge_ratio: float | None,
-    *,
-    near_edge_ratio_threshold: float = 0.8,
-) -> str | None:
-    if edge_ratio is None:
-        return None
-    if edge_ratio >= near_edge_ratio_threshold:
-        return "left"
-    if edge_ratio <= -near_edge_ratio_threshold:
-        return "right"
-    return None
-
-
-def _edge_warning_color(edge_ratio: float | None) -> Color:
-    return PALETTE.text_warning if _near_edge_side(edge_ratio) is not None else PALETTE.text_primary
+def _edge_warning_color(edge_state: TrackEdgeState) -> Color:
+    return PALETTE.text_warning if edge_state.near_side is not None else PALETTE.text_primary
 
 
 def _format_impact_debug(player: PlayerTelemetry) -> str:

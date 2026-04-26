@@ -256,6 +256,8 @@ _FLAG_DISPLAY_LABELS = {
     "ground_ice": "ice",
     "energy_loss": "energy loss",
     "damage_taken": "damage taken",
+    "track_edge": "edge",
+    "outside_track_bounds": "outside",
     "airborne": "airborne",
     "collision_recoil": "recoil",
     "spinning_out": "spin",
@@ -267,7 +269,7 @@ _FLAG_DISPLAY_LABELS = {
 }
 
 _FLAG_ROWS = (
-    ("reverse_detected", "low_speed_detected"),
+    ("reverse_detected", "low_speed_detected", "track_edge", "outside_track_bounds"),
     ("can_boost", "boost_active", "airborne"),
     ("energy_refill", "ground_dirt", "ground_ice"),
     ("energy_loss", "damage_taken"),
@@ -286,6 +288,8 @@ def _flag_viz(
     energy_refill_detected: bool = False,
     dirt_detected: bool = False,
     ice_detected: bool = False,
+    track_edge_detected: bool = False,
+    outside_track_bounds: bool = False,
     energy_loss_detected: bool = False,
     damage_taken_detected: bool = False,
 ) -> FlagViz:
@@ -304,6 +308,10 @@ def _flag_viz(
         active_flags.add("ground_dirt")
     if ice_detected:
         active_flags.add("ground_ice")
+    if track_edge_detected:
+        active_flags.add("track_edge")
+    if outside_track_bounds:
+        active_flags.add("outside_track_bounds")
     if energy_loss_detected:
         active_flags.add("energy_loss")
     if damage_taken_detected:
