@@ -27,6 +27,7 @@ from rl_fzerox.ui.watch.view.panels.format import (
     _pressed_button_labels,
 )
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.screen.frame import _game_course_overlay_label
 from tests.ui.viewer_support import (
     fake_viewer_fonts,
 )
@@ -46,6 +47,18 @@ def test_pressed_button_labels_are_human_readable() -> None:
     assert (
         _pressed_button_labels((1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START))
         == "Up A Start"
+    )
+
+
+def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
+    assert (
+        _game_course_overlay_label(
+            {
+                "track_course_ref": "joker/big_hand",
+                "track_course_name": "Big Hand",
+            }
+        )
+        == "Joker Cup : Big Hand"
     )
 
 
@@ -69,10 +82,15 @@ def test_side_panel_drops_cockpit_control_section() -> None:
     )
 
     assert "Cockpit Control" not in [section.title for section in columns.left]
-    assert [section.title for section in columns.left] == ["Session"]
-    assert [section.title for section in columns.middle] == [
-        "Game",
+    assert [section.title for section in columns.left] == [
+        "Run",
+        "Policy Details",
+        "Race",
+        "Game Details",
+        "Timing",
         "Display",
+    ]
+    assert [section.title for section in columns.middle] == [
         "Track Geometry",
     ]
 
@@ -232,16 +250,50 @@ def test_display_section_includes_action_repeat() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    display_section = next(section for section in columns.middle if section.title == "Display")
-    repeat_line = next(line for line in display_section.lines if line.label == "Action repeat")
-    control_rate_line = next(line for line in display_section.lines if line.label == "Control FPS")
-    game_rate_line = next(line for line in display_section.lines if line.label == "Game FPS")
-    render_rate_line = next(line for line in display_section.lines if line.label == "Render FPS")
+    timing_section = next(section for section in columns.left if section.title == "Timing")
+    repeat_line = next(line for line in timing_section.lines if line.label == "Action repeat")
+    control_rate_line = next(line for line in timing_section.lines if line.label == "Control FPS")
+    speed_line = next(line for line in timing_section.lines if line.label == "Game speed")
+    game_rate_line = next(line for line in timing_section.lines if line.label == "Game FPS")
+    render_rate_line = next(line for line in timing_section.lines if line.label == "Render FPS")
 
     assert repeat_line.value == "2"
     assert control_rate_line.value == "30.0 / 120.0"
+    assert speed_line.value == "1.00x"
     assert game_rate_line.value == "60.0 / 240.0"
     assert render_rate_line.value == "60.0 / 60.0"
+
+
+def test_timing_section_shows_game_speed_multiplier() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "control_fps": 60.0,
+            "control_fps_target": 60.0,
+            "render_fps": 60.0,
+            "render_fps_target": 60.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=2,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    timing_section = next(section for section in columns.left if section.title == "Timing")
+    speed_line = next(line for line in timing_section.lines if line.label == "Game speed")
+
+    assert speed_line.value == "2.00x"
 
 
 def test_macro_legend_replaces_side_panel_key_lines() -> None:
@@ -263,7 +315,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    display_section = next(section for section in columns.middle if section.title == "Display")
+    display_section = next(section for section in columns.left if section.title == "Display")
     key_map = {line.label: line.value for line in display_section.lines}
     hint_map = {hint.keys: (hint.controller, hint.action) for hint in MACRO_LEGEND_HINTS}
 
@@ -436,6 +488,51 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
     ]
 
 
+def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "track_position.lap_progress",
+        "track_position.edge_ratio",
+        "track_position.outside_track_bounds",
+    )
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "observation_zeroed_state_features": (
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            ),
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=0.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(60, 76, 12),
+        observation_state=np.array([0.5, 0.25, 0.0, 0.0], dtype=np.float32),
+        observation_state_feature_names=feature_names,
+        telemetry=_sample_telemetry(),
+    )
+
+    state_vector_section = next(
+        section for section in columns.stats if section.title == "State Vector"
+    )
+
+    assert _panel_group_labels(state_vector_section, "Track Position") == [
+        "lap_progress",
+        "// edge_ratio",
+        "// outside_track_bounds",
+    ]
+
+
 def test_side_panel_marks_zeroed_state_components() -> None:
     feature_names = (
         "vehicle_state.speed_norm",
@@ -497,7 +594,7 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     curriculum_line = next(line for line in session_section.lines if line.label == "Stage")
 
     assert curriculum_line.value == "lean_enabled"
@@ -526,7 +623,7 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     experience_line = next(line for line in session_section.lines if line.label == "Experience")
 
     assert experience_line.value == "6h 06m"
@@ -552,7 +649,7 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Policy Details")
     deterministic_line = next(
         line for line in session_section.lines if line.label == "Deterministic"
     )
@@ -582,7 +679,7 @@ def test_session_section_shows_manual_driver_mode() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     driver_line = next(line for line in session_section.lines if line.label == "Driver")
 
     assert driver_line.value == "manual"
@@ -611,7 +708,7 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Policy Details")
     action_line = next(line for line in session_section.lines if line.label == "Action")
 
     assert action_line.value == "c=[+0.00,+0.50,-0.50] d=[0,0]"
@@ -640,7 +737,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     step_line = next(line for line in session_section.lines if line.label == "Step")
     return_line = next(line for line in session_section.lines if line.label == "Return")
 
@@ -668,7 +765,7 @@ def test_session_section_shows_best_finish_position() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     best_position_line = next(
         line for line in session_section.lines if line.label == "Best position"
     )
@@ -695,7 +792,7 @@ def test_session_section_shows_na_before_successful_finish() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Session")
+    session_section = next(section for section in columns.left if section.title == "Run")
     best_position_line = next(
         line for line in session_section.lines if line.label == "Best position"
     )

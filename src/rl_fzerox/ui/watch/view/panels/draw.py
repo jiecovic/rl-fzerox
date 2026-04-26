@@ -12,7 +12,7 @@ from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.panels.cnn import _draw_cnn_tab
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.section_renderer import _draw_column
-from rl_fzerox.ui.watch.view.panels.tab_bar import _draw_panel_tabs
+from rl_fzerox.ui.watch.view.panels.tab_bar import _draw_panel_tabs, _draw_text_tabs
 from rl_fzerox.ui.watch.view.panels.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.text import _fit_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
@@ -23,6 +23,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
     PygameRect,
     PygameSurface,
+    RecordCourseHitbox,
     ViewerFonts,
     ViewerHitboxes,
 )
@@ -58,6 +59,7 @@ class SidePanelData:
     latest_finish_deltas_ms: dict[str, int]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    record_tab_index: int
     continuous_drive_deadzone: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
@@ -161,6 +163,8 @@ def _draw_side_panel(
     )
     y += LAYOUT.title_section_gap
 
+    record_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
+    record_course_hitboxes: tuple[RecordCourseHitbox, ...] = ()
     if selected_tab_index == PANEL_TABS.cnn_index:
         _draw_cnn_tab(
             pygame=pygame,
@@ -170,6 +174,30 @@ def _draw_side_panel(
             y=y,
             width=panel_width,
             activations=data.cnn_activations,
+        )
+    elif selected_tab_index == PANEL_TABS.records_index:
+        record_sections = columns.records
+        if len(record_sections) > 1:
+            y, record_tab_rects = _draw_text_tabs(
+                pygame=pygame,
+                screen=screen,
+                fonts=fonts,
+                x=x,
+                y=y,
+                width=panel_width,
+                labels=tuple(_record_tab_label(section.title) for section in record_sections),
+                selected_index=data.record_tab_index,
+            )
+            y += LAYOUT.title_section_gap
+            record_sections = _record_tab_sections(record_sections, data.record_tab_index)
+        _, record_course_hitboxes = _draw_column(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            sections=record_sections,
         )
     else:
         _draw_column(
@@ -181,7 +209,11 @@ def _draw_side_panel(
             width=panel_width,
             sections=_panel_tab_sections(columns, selected_tab_index),
         )
-    return ViewerHitboxes(panel_tabs=tab_rects)
+    return ViewerHitboxes(
+        panel_tabs=tab_rects,
+        record_tabs=record_tab_rects,
+        record_courses=record_course_hitboxes,
+    )
 
 
 def _panel_subtitle(policy_label: str | None, *, manual_control_enabled: bool) -> str:
@@ -194,9 +226,9 @@ def _panel_subtitle(policy_label: str | None, *, manual_control_enabled: bool) -
 
 def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[PanelSection]:
     tab_key = PANEL_TABS.key(selected_index)
-    if tab_key == "session":
+    if tab_key == "run":
         return columns.left
-    if tab_key == "game":
+    if tab_key == "details":
         return columns.middle
     if tab_key == "state":
         return columns.stats
@@ -205,6 +237,19 @@ def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[Pane
     if tab_key == "train":
         return columns.train
     return []
+
+
+def _record_tab_sections(
+    sections: list[PanelSection],
+    selected_index: int,
+) -> list[PanelSection]:
+    if not sections:
+        return []
+    return [sections[selected_index % len(sections)]]
+
+
+def _record_tab_label(section_title: str) -> str:
+    return section_title.removesuffix(" Cup")
 
 
 def _draw_panel_title(

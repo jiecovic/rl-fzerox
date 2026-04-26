@@ -12,7 +12,10 @@ from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
-from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSampler
+from rl_fzerox.ui.watch.runtime.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationSampler,
+)
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
@@ -107,7 +110,9 @@ def _run_simulation_loop(
         manual_control_enabled = policy_runner is None
         manual_control_state = ControllerState()
         cnn_visualization_enabled = False
+        cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
+        locked_reset_course_id: str | None = None
 
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
@@ -160,13 +165,22 @@ def _run_simulation_loop(
                     control_state=manual_control_state,
                     manual_control_enabled=manual_control_enabled,
                     cnn_visualization_enabled=cnn_visualization_enabled,
+                    cnn_normalization=cnn_normalization,
                 )
                 manual_control_enabled = (
                     True if policy_runner is None else commands.manual_control_enabled
                 )
                 cnn_visualization_enabled = commands.cnn_visualization_enabled
+                cnn_normalization = commands.cnn_normalization
                 if commands.quit_requested:
                     return
+                if commands.toggle_track_course_lock_id is not None:
+                    locked_reset_course_id = _toggle_locked_reset_course(
+                        env,
+                        locked_reset_course_id=locked_reset_course_id,
+                        requested_course_id=commands.toggle_track_course_lock_id,
+                    )
+                    break
                 if commands.reset_requested:
                     break
                 if commands.control_fps_delta:
@@ -249,6 +263,7 @@ def _run_simulation_loop(
                         enabled=commands.cnn_visualization_enabled,
                         policy_runner=policy_runner,
                         observation=observation,
+                        normalization=commands.cnn_normalization,
                     )
                     watch_step = env.step_watch(action)
                     observation, reward, terminated, truncated, info = watch_step.gym_result()
@@ -325,3 +340,14 @@ def _run_simulation_loop(
             episode += 1
     finally:
         env.close()
+
+
+def _toggle_locked_reset_course(
+    env: FZeroXEnv,
+    *,
+    locked_reset_course_id: str | None,
+    requested_course_id: str,
+) -> str | None:
+    next_course_id = None if requested_course_id == locked_reset_course_id else requested_course_id
+    env.set_locked_reset_course(next_course_id)
+    return next_course_id

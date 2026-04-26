@@ -11,6 +11,10 @@ from typing import Protocol
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import ViewerInput
+from rl_fzerox.ui.watch.runtime.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationNormalizationMode,
+)
 from rl_fzerox.ui.watch.runtime.ipc.messages import (
     ViewerCommand,
     WatchSnapshot,
@@ -125,6 +129,7 @@ def drain_worker_commands(
     control_state: ControllerState,
     manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
+    cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> tuple[WorkerCommandBatch, bool, ControllerState]:
     next_paused = paused
     next_control_state = control_state
@@ -134,8 +139,10 @@ def drain_worker_commands(
     save_requests = 0
     reset_requested = False
     toggle_deterministic_policy = False
+    toggle_track_course_lock_id: str | None = None
     control_fps_delta = 0
     next_cnn_visualization_enabled = cnn_visualization_enabled
+    next_cnn_normalization = cnn_normalization
     while True:
         try:
             command = command_queue.get_nowait()
@@ -149,8 +156,10 @@ def drain_worker_commands(
                     reset_requested=reset_requested,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     manual_control_enabled=next_manual_control_enabled,
+                    toggle_track_course_lock_id=toggle_track_course_lock_id,
                     control_fps_delta=control_fps_delta,
                     cnn_visualization_enabled=next_cnn_visualization_enabled,
+                    cnn_normalization=next_cnn_normalization,
                     control_state=next_control_state,
                 ),
                 next_paused,
@@ -172,8 +181,11 @@ def drain_worker_commands(
             toggle_deterministic_policy = not toggle_deterministic_policy
         if command.toggle_manual_control:
             next_manual_control_enabled = not next_manual_control_enabled
+        if command.toggle_track_course_lock_id is not None:
+            toggle_track_course_lock_id = command.toggle_track_course_lock_id
         control_fps_delta += command.control_fps_delta
         next_cnn_visualization_enabled = command.cnn_visualization_enabled
+        next_cnn_normalization = command.cnn_normalization
         if command.control_state is not None:
             next_control_state = command.control_state
 
@@ -184,6 +196,7 @@ def apply_viewer_input(
     *,
     paused: bool,
     cnn_visualization_enabled: bool = False,
+    cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> bool:
     next_paused = not paused if viewer_input.toggle_pause else paused
     send_command(
@@ -196,8 +209,10 @@ def apply_viewer_input(
             force_reset=viewer_input.force_reset,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             toggle_manual_control=viewer_input.toggle_manual_control,
+            toggle_track_course_lock_id=viewer_input.toggle_record_course_lock_id,
             control_fps_delta=viewer_input.control_fps_delta,
             cnn_visualization_enabled=cnn_visualization_enabled,
+            cnn_normalization=cnn_normalization,
             control_state=viewer_input.control_state,
         ),
     )

@@ -35,6 +35,7 @@ def draw_watch_frame(
     render_rate: RateMeter,
     target_render_fps: float | None,
     panel_tab_index: int = 0,
+    record_tab_index: int = 0,
 ) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
 
@@ -94,6 +95,7 @@ def draw_watch_frame(
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
             track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,
+            record_tab_index=record_tab_index,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
             continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,

@@ -1,8 +1,19 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import ControllerState
+from rl_fzerox.ui.watch.view.panels.draw import _record_tab_sections
 from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.screen.theme import PALETTE
+from rl_fzerox.ui.watch.view.screen.types import PanelColumns, PanelSection
 from tests.support.native_objects import encode_state_flags
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+def _race_section(columns: PanelColumns) -> PanelSection:
+    return next(section for section in columns.left if section.title == "Race")
+
+
+def _game_details_section(columns: PanelColumns) -> PanelSection:
+    return next(section for section in columns.left if section.title == "Game Details")
 
 
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
@@ -32,7 +43,7 @@ def test_game_flags_are_rendered_in_fixed_rows() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     assert len(game_section.flag_viz.rows) == 6
     active_labels = {
@@ -67,7 +78,7 @@ def test_energy_refill_course_effect_lights_refill_flag() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
@@ -98,12 +109,41 @@ def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
     assert "refill" not in active_labels
+
+
+def test_game_section_shows_current_and_max_progress() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            race_distance=100_000.0,
+            lap_distance=20_000.0,
+            course_length=80_000.0,
+            total_lap_count=3,
+        ),
+    )
+
+    values = {line.label: line.value for line in _race_section(columns).lines}
+    assert values["Total progress"] == "100,000.0 / 240,000.0"
+    assert values["Lap progress"] == "20,000.0 / 80,000.0"
 
 
 def test_dirt_course_effect_lights_dirt_flag() -> None:
@@ -127,7 +167,7 @@ def test_dirt_course_effect_lights_dirt_flag() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
@@ -157,13 +197,77 @@ def test_ice_course_effect_lights_ice_flag() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
     assert "ice" in active_labels
     assert "dirt" not in active_labels
+
+
+def test_near_track_edge_lights_edge_flag() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            signed_lateral_offset=90.0,
+            current_radius_left=100.0,
+            current_radius_right=120.0,
+        ),
+    )
+
+    game_section = _race_section(columns)
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "edge" in active_labels
+    assert "outside" not in active_labels
+
+
+def test_outside_track_bounds_lights_outside_flag() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(
+            signed_lateral_offset=-130.0,
+            current_radius_left=100.0,
+            current_radius_right=120.0,
+        ),
+    )
+
+    game_section = _race_section(columns)
+    assert game_section.flag_viz is not None
+    active_labels = {
+        token.label for row in game_section.flag_viz.rows for token in row if token.active
+    }
+    assert "edge" in active_labels
+    assert "outside" in active_labels
 
 
 def test_track_geometry_section_shows_racer_geometry() -> None:
@@ -240,7 +344,7 @@ def test_game_section_shows_race_difficulty() -> None:
         telemetry=_sample_telemetry(difficulty_raw=2, difficulty_name="expert"),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     difficulty_line = next(line for line in game_section.lines if line.label == "Difficulty")
     assert difficulty_line.value == "expert"
 
@@ -264,7 +368,7 @@ def test_game_section_shows_unknown_difficulty_raw_value() -> None:
         telemetry=_sample_telemetry(difficulty_raw=99, difficulty_name="unknown"),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     difficulty_line = next(line for line in game_section.lines if line.label == "Difficulty")
     assert difficulty_line.value == "unknown (99)"
 
@@ -293,7 +397,7 @@ def test_game_section_hides_difficulty_for_time_attack() -> None:
         ),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert all(line.label != "Difficulty" for line in game_section.lines)
 
 
@@ -316,7 +420,7 @@ def test_game_section_shows_camera_setting() -> None:
         telemetry=_sample_telemetry(camera_setting_raw=1, camera_setting_name="close_behind"),
     )
 
-    game_section = columns.middle[0]
+    game_section = _game_details_section(columns)
     camera_line = next(line for line in game_section.lines if line.label == "Camera")
     assert camera_line.value == "close behind"
 
@@ -340,7 +444,7 @@ def test_game_section_shows_unknown_camera_setting_raw_value() -> None:
         telemetry=_sample_telemetry(camera_setting_raw=99, camera_setting_name="unknown"),
     )
 
-    game_section = columns.middle[0]
+    game_section = _game_details_section(columns)
     camera_line = next(line for line in game_section.lines if line.label == "Camera")
     assert camera_line.value == "unknown (99)"
 
@@ -364,7 +468,7 @@ def test_game_section_shows_position_out_of_total_racers() -> None:
         telemetry=_sample_telemetry(position=1, total_racers=30),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     position_line = next(line for line in game_section.lines if line.label == "Position")
     assert position_line.value == "1 / 30"
 
@@ -448,7 +552,7 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     )
 
     records_section = next(section for section in columns.records if section.title == "Records")
-    header_line = next(line for line in records_section.lines if line.label == "Silence")
+    header_line = next(line for line in records_section.lines if line.label == "> Silence")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
     latest_line = next(line for line in records_section.lines if line.label == "Latest")
     assert header_line.value == ""
@@ -494,10 +598,57 @@ def test_records_section_groups_track_pool_by_cup() -> None:
         ),
     )
 
-    records_section = next(section for section in columns.records if section.title == "Records")
-    headings = [line.label for line in records_section.lines if line.heading]
+    assert [section.title for section in columns.records] == ["Jack Cup", "Queen Cup"]
+    assert [line.label for line in columns.records[0].lines if line.heading] == [
+        "Mute City",
+        "Silence",
+    ]
+    assert [line.label for line in columns.records[1].lines if line.heading] == ["Port Town II"]
+    assert [section.title for section in _record_tab_sections(columns.records, 1)] == [
+        "Queen Cup"
+    ]
 
-    assert headings == ["Jack Cup", "Mute City", "Silence", "Queen Cup", "Port Town II"]
+
+def test_records_section_highlights_current_track_heading() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_id": "silence",
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        track_pool_records=(
+            {
+                "track_id": "mute_city",
+                "track_course_name": "Mute City",
+            },
+            {
+                "track_id": "silence",
+                "track_course_name": "Silence",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    mute_line = next(line for line in records_section.lines if line.label == "Mute City")
+    silence_line = next(line for line in records_section.lines if line.label == "> Silence")
+
+    assert mute_line.label_color is None
+    assert silence_line.label_color == PALETTE.text_accent
+    assert silence_line.status_text == "LIVE"
 
 
 def test_records_section_shows_latest_improvement_against_previous_pb() -> None:
@@ -572,7 +723,7 @@ def test_records_section_marks_watch_best_inside_reference_range() -> None:
     )
 
     records_section = next(section for section in columns.records if section.title == "Records")
-    header_line = next(line for line in records_section.lines if line.label == "Silence")
+    header_line = next(line for line in records_section.lines if line.label == "> Silence")
     pb_line = next(line for line in records_section.lines if line.label == "PB")
     assert header_line.value == ""
     assert header_line.status_icon == "in_range"
@@ -613,7 +764,7 @@ def test_records_section_formats_minute_scale_reference_gap() -> None:
     )
 
     records_section = next(section for section in columns.records if section.title == "Records")
-    header_line = next(line for line in records_section.lines if line.label == "Silence")
+    header_line = next(line for line in records_section.lines if line.label == "> Silence")
     assert header_line.status_icon == "outside"
     assert header_line.status_text == "+1min 15.1s"
 
@@ -637,7 +788,7 @@ def test_dash_pad_boost_lights_single_boost_pill() -> None:
         telemetry=_sample_telemetry(state_labels=("active", "dash_pad_boost"), boost_timer=12),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
@@ -665,7 +816,7 @@ def test_manual_boost_timer_lights_boost_pill() -> None:
         telemetry=_sample_telemetry(boost_timer=12),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
@@ -692,7 +843,7 @@ def test_signed_boost_timer_lights_generic_boost_pill() -> None:
         telemetry=_sample_telemetry(boost_timer=-1),
     )
 
-    game_section = columns.middle[0]
+    game_section = _race_section(columns)
     assert game_section.flag_viz is not None
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active

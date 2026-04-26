@@ -4,6 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
+from rl_fzerox.ui.watch.view.screen.types import (
+    PygameModule,
+    PygameRect,
+    PygameSurface,
+    ViewerFonts,
+)
 
 
 @dataclass(frozen=True)
@@ -23,16 +29,18 @@ class _GlassViewStyle:
 
 
 _GLASS_VIEW_STYLE = _GlassViewStyle()
-_GLASS_OVERLAY_CACHE: dict[tuple[int, int, int], object] = {}
-_GLASS_MASK_CACHE: dict[tuple[int, int, int], object] = {}
+_GLASS_OVERLAY_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
+_GLASS_MASK_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
 
 
 def _draw_glass_game_view(
     *,
-    pygame,
-    screen,
-    surface,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    surface: PygameSurface,
     outer_size: tuple[int, int],
+    course_label: str | None = None,
 ) -> None:
     style = _GLASS_VIEW_STYLE
     outer_rect = pygame.Rect(0, 0, *outer_size)
@@ -79,6 +87,14 @@ def _draw_glass_game_view(
         _glass_overlay_surface(pygame, viewport_rect.size, style.viewport_radius),
         viewport_rect.topleft,
     )
+    if course_label:
+        _draw_course_overlay(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            viewport_rect=viewport_rect,
+            label=course_label,
+        )
 
     pygame.draw.rect(
         screen,
@@ -108,7 +124,54 @@ def _draw_glass_game_view(
     )
 
 
-def _rounded_game_surface(pygame, surface, size: tuple[int, int], radius: int):
+def _draw_course_overlay(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    viewport_rect: PygameRect,
+    label: str,
+) -> None:
+    text_color = (108, 255, 178)
+    border_color = (62, 224, 154)
+    label_surface = fonts.small.render(label, True, text_color)
+    pad_x = 8
+    pad_y = 5
+    overlay_width = label_surface.get_width() + (2 * pad_x)
+    overlay_height = label_surface.get_height() + (2 * pad_y)
+    overlay_rect = pygame.Rect(
+        viewport_rect.left + 12,
+        viewport_rect.bottom - overlay_height - 12,
+        overlay_width,
+        overlay_height,
+    )
+    shadow_rect = overlay_rect.move(0, 2)
+    pygame.draw.rect(screen, (0, 0, 0), shadow_rect, border_radius=7)
+
+    overlay = pygame.Surface(overlay_rect.size, pygame.SRCALPHA)
+    pygame.draw.rect(
+        overlay,
+        (5, 18, 13, 184),
+        pygame.Rect(0, 0, *overlay_rect.size),
+        border_radius=7,
+    )
+    pygame.draw.rect(
+        overlay,
+        (*border_color, 190),
+        pygame.Rect(0, 0, *overlay_rect.size),
+        width=1,
+        border_radius=7,
+    )
+    screen.blit(overlay, overlay_rect.topleft)
+    screen.blit(label_surface, (overlay_rect.left + pad_x, overlay_rect.top + pad_y))
+
+
+def _rounded_game_surface(
+    pygame: PygameModule,
+    surface: PygameSurface,
+    size: tuple[int, int],
+    radius: int,
+) -> PygameSurface:
     if surface.get_size() != size:
         surface = pygame.transform.smoothscale(surface, size)
 
@@ -122,7 +185,11 @@ def _rounded_game_surface(pygame, surface, size: tuple[int, int], radius: int):
     return clipped
 
 
-def _rounded_alpha_mask(pygame, size: tuple[int, int], radius: int):
+def _rounded_alpha_mask(
+    pygame: PygameModule,
+    size: tuple[int, int],
+    radius: int,
+) -> PygameSurface:
     cache_key = (*size, radius)
     cached = _GLASS_MASK_CACHE.get(cache_key)
     if cached is not None:
@@ -134,7 +201,11 @@ def _rounded_alpha_mask(pygame, size: tuple[int, int], radius: int):
     return mask
 
 
-def _glass_overlay_surface(pygame, size: tuple[int, int], radius: int):
+def _glass_overlay_surface(
+    pygame: PygameModule,
+    size: tuple[int, int],
+    radius: int,
+) -> PygameSurface:
     cache_key = (*size, radius)
     cached = _GLASS_OVERLAY_CACHE.get(cache_key)
     if cached is not None:
@@ -174,7 +245,14 @@ def _glass_overlay_surface(pygame, size: tuple[int, int], radius: int):
     return overlay
 
 
-def _draw_glass_vignette(*, pygame, overlay, width: int, height: int, radius: int) -> None:
+def _draw_glass_vignette(
+    *,
+    pygame: PygameModule,
+    overlay: PygameSurface,
+    width: int,
+    height: int,
+    radius: int,
+) -> None:
     max_inset = min(28, width // 9, height // 9)
     for inset in range(max_inset):
         alpha = round(30 * ((max_inset - inset) / max_inset) ** 1.8)

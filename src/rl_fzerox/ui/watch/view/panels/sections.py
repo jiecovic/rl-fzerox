@@ -13,6 +13,7 @@ from rl_fzerox.ui.watch.view.panels.format import (
     _format_env_step,
     _format_episode_frames,
     _format_game_rate,
+    _format_game_speed,
     _format_observation_shape,
     _format_policy_action,
     _format_progress_frontier_counter,
@@ -20,7 +21,10 @@ from rl_fzerox.ui.watch.view.panels.format import (
     _format_render_rate,
     _int_info,
 )
-from rl_fzerox.ui.watch.view.panels.game import game_section
+from rl_fzerox.ui.watch.view.panels.game import (
+    game_detail_section,
+    game_overview_section,
+)
 from rl_fzerox.ui.watch.view.panels.geometry import track_geometry_sections
 from rl_fzerox.ui.watch.view.panels.hparams import training_hparam_sections
 from rl_fzerox.ui.watch.view.panels.lines import panel_line as _panel_line
@@ -88,7 +92,7 @@ def _build_panel_columns(
     return PanelColumns(
         left=[
             PanelSection(
-                title="Session",
+                title="Run",
                 lines=[
                     _panel_line(
                         "State",
@@ -112,23 +116,6 @@ def _build_panel_columns(
                         ),
                     ),
                     _panel_line(
-                        "Deterministic",
-                        _format_policy_deterministic(policy_deterministic),
-                        PALETTE.text_primary
-                        if policy_deterministic is not None
-                        else PALETTE.text_muted,
-                    ),
-                    _panel_line(
-                        "Action",
-                        _format_policy_action(policy_action),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Reload",
-                        _format_reload_age(policy_reload_age_seconds),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
                         "Experience",
                         _format_checkpoint_experience(
                             policy_num_timesteps,
@@ -137,6 +124,11 @@ def _build_panel_columns(
                         PALETTE.text_primary
                         if policy_num_timesteps is not None
                         else PALETTE.text_muted,
+                    ),
+                    _panel_line(
+                        "Reload",
+                        _format_reload_age(policy_reload_age_seconds),
+                        PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line(
@@ -184,26 +176,32 @@ def _build_panel_columns(
                     ),
                 ],
             ),
-        ],
-        middle=[
-            game_section(
+            PanelSection(
+                title="Policy Details",
+                lines=[
+                    _panel_line(
+                        "Deterministic",
+                        _format_policy_deterministic(policy_deterministic),
+                        PALETTE.text_primary
+                        if policy_deterministic is not None
+                        else PALETTE.text_muted,
+                    ),
+                    _panel_line(
+                        "Action",
+                        _format_policy_action(policy_action),
+                        PALETTE.text_primary,
+                    ),
+                ],
+            ),
+            game_overview_section(
                 info,
                 telemetry,
                 stuck_min_speed_kph=stuck_min_speed_kph,
             ),
+            game_detail_section(info, telemetry),
             PanelSection(
-                title="Display",
+                title="Timing",
                 lines=[
-                    _panel_line(
-                        "Game",
-                        f"{game_display_size[0]}x{game_display_size[1]}",
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Obs",
-                        _format_observation_shape(observation_shape),
-                        PALETTE.text_primary,
-                    ),
                     _panel_line(
                         "Action repeat",
                         str(action_repeat),
@@ -212,6 +210,11 @@ def _build_panel_columns(
                     _panel_line(
                         "Control FPS",
                         _format_control_rate(info),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Game speed",
+                        _format_game_speed(info, action_repeat=action_repeat),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
@@ -226,6 +229,23 @@ def _build_panel_columns(
                     ),
                 ],
             ),
+            PanelSection(
+                title="Display",
+                lines=[
+                    _panel_line(
+                        "Game",
+                        f"{game_display_size[0]}x{game_display_size[1]}",
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Obs",
+                        _format_observation_shape(observation_shape),
+                        PALETTE.text_primary,
+                    ),
+                ],
+            ),
+        ],
+        middle=[
             *track_geometry_sections(telemetry),
         ],
         stats=[
@@ -233,6 +253,7 @@ def _build_panel_columns(
                 observation_state=observation_state,
                 feature_names=observation_state_feature_names,
                 zeroed_components=_zeroed_state_components(info),
+                zeroed_features=_zeroed_state_features(info),
             ),
         ],
         records=[
@@ -258,6 +279,13 @@ def _zeroed_state_components(info: dict[str, object]) -> frozenset[str]:
     return frozenset(
         component for component in raw_components if isinstance(component, str) and component
     )
+
+
+def _zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
+    raw_features = info.get("observation_zeroed_state_features")
+    if isinstance(raw_features, tuple | list):
+        return frozenset(str(feature) for feature in raw_features)
+    return frozenset()
 
 
 def _column_content_height(

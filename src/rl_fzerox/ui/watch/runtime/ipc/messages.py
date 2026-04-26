@@ -7,7 +7,11 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
-from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.runtime.cnn import (
+    DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationNormalizationMode,
+    CnnActivationSnapshot,
+)
 
 
 @dataclass(frozen=True)
@@ -21,8 +25,10 @@ class ViewerCommand:
     force_reset: bool = False
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
+    toggle_track_course_lock_id: str | None = None
     control_fps_delta: int = 0
     cnn_visualization_enabled: bool = False
+    cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
     control_state: ControllerState | None = None
 
 
@@ -37,8 +43,10 @@ class WorkerCommandBatch:
     reset_requested: bool
     toggle_deterministic_policy: bool
     manual_control_enabled: bool
+    toggle_track_course_lock_id: str | None
     control_fps_delta: int
     cnn_visualization_enabled: bool
+    cnn_normalization: CnnActivationNormalizationMode
     control_state: ControllerState
 
 

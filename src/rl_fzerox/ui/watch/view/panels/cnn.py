@@ -27,6 +27,7 @@ def _draw_cnn_tab(
         x=x,
         y=y,
         width=width,
+        activations=activations,
     )
     if activations is None:
         return _draw_note(
@@ -89,12 +90,25 @@ def _draw_heading(
     x: int,
     y: int,
     width: int,
+    activations: CnnActivationSnapshot | None,
 ) -> int:
     title = fonts.section.render("CNN Activations", True, PALETTE.text_primary)
     screen.blit(title, (x, y))
+    mode_label = _normalization_label(activations)
+    if mode_label is not None:
+        mode_surface = fonts.small.render(mode_label, True, PALETTE.text_muted)
+        screen.blit(mode_surface, (x + width - mode_surface.get_width(), y + 2))
     y += title.get_height() + LAYOUT.section_title_gap
     pygame.draw.line(screen, PALETTE.panel_border, (x, y), (x + width, y), width=1)
     return y + LAYOUT.section_rule_gap
+
+
+def _normalization_label(activations: CnnActivationSnapshot | None) -> str | None:
+    if activations is None:
+        return "C toggles norm"
+    if activations.normalization == "layer_percentile":
+        return "norm: layer p99"
+    return "norm: channel"
 
 
 def _draw_note(
