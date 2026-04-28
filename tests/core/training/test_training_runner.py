@@ -231,6 +231,11 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "position": 5,
             "lap": 1,
             "race_laps_completed": 0,
+            "step_reward_raw": 100.0,
+            "step_reward_clipped": True,
+            "step_reward_clip_abs_excess": 25.0,
+            "step_reward_clip_positive": True,
+            "step_reward_clip_negative": False,
             "damage_taken_frames": 0,
             "frames_run": 2,
             "airborne_frames": 1,
@@ -256,6 +261,11 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "position": 7,
             "lap": 1,
             "race_laps_completed": 0,
+            "step_reward_raw": -50.0,
+            "step_reward_clipped": False,
+            "step_reward_clip_abs_excess": 0.0,
+            "step_reward_clip_positive": False,
+            "step_reward_clip_negative": False,
             "damage_taken_frames": 2,
             "frames_run": 3,
             "airborne_frames": 3,
@@ -281,11 +291,16 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["race_distance"].mean() == 12.0
     assert accumulator.state_metrics["speed_kph"].mean() == 110.0
     assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
+    assert accumulator.state_metrics["step_reward_raw"].mean() == 25.0
+    assert accumulator.state_metrics["step_reward_clip_abs_excess"].mean() == 12.5
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
     assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
+    assert accumulator.step_rates["step_reward_clipped"].rate() == 0.5
+    assert accumulator.step_rates["step_reward_clip_positive"].rate() == 0.5
+    assert accumulator.step_rates["step_reward_clip_negative"].rate() == 0.0
     assert accumulator.frame_ratios["state/airborne_frame_ratio"].ratio() == 0.8
     assert accumulator.episode_metrics["position"].mean() == 5.0
     assert accumulator.episode_metrics["race_laps_completed"].mean() == 2.0
@@ -308,6 +323,11 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["state/airborne_frame_ratio"] == 0.8
     assert logger.records["action/boost_used_step_rate"] == 0.5
     assert logger.records["action/lean_used_step_rate"] == 0.5
+    assert logger.records["reward/step_raw_mean"] == 25.0
+    assert logger.records["reward_clip/abs_excess_mean"] == 12.5
+    assert logger.records["reward_clip/any_step_rate"] == 0.5
+    assert logger.records["reward_clip/positive_step_rate"] == 0.5
+    assert logger.records["reward_clip/negative_step_rate"] == 0.0
     assert logger.records["episode/boost_pad_entries_mean"] == 3.5
     assert logger.records["episode/boost_pad_entries_per_lap_mean"] == 1.5
     assert logger.records["episode/finish_time_s_mean"] == 123.4

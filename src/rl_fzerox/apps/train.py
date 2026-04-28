@@ -5,8 +5,11 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from omegaconf import OmegaConf
+
 from rl_fzerox.apps._cli import normalize_hydra_overrides
 from rl_fzerox.core.config import load_train_app_config
+from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.training.runner import run_training
 from rl_fzerox.core.training.runs import load_train_run_config
 
@@ -72,29 +75,49 @@ def main(argv: Sequence[str] | None = None) -> None:
                 overrides=overrides,
             )
         else:
-            if args.overrides:
-                raise SystemExit(
-                    "Hydra overrides require --config; saved-run continuation without --config "
-                    "reuses the stored run config as-is."
-                )
             resolved_continue_run_dir = args.continue_run_dir.expanduser().resolve()
             base_config = load_train_run_config(resolved_continue_run_dir)
-            config = base_config.model_copy(
-                update={
-                    "train": base_config.train.model_copy(
-                        update={
-                            "continue_run_dir": resolved_continue_run_dir,
-                            "resume_run_dir": resolved_continue_run_dir,
-                            "resume_artifact": args.continue_artifact,
-                            "resume_mode": "full_model",
-                        }
-                    )
-                }
+            config = _continue_saved_run_config(
+                base_config,
+                continue_run_dir=resolved_continue_run_dir,
+                continue_artifact=args.continue_artifact,
+                overrides=normalize_hydra_overrides(args.overrides),
             )
     except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
 
     run_training(config)
+
+
+def _continue_saved_run_config(
+    config: TrainAppConfig,
+    *,
+    continue_run_dir: Path,
+    continue_artifact: str,
+    overrides: Sequence[str],
+) -> TrainAppConfig:
+    """Apply optional dotlist overrides to a saved config, then force in-place resume."""
+
+    data = config.model_dump(mode="json", exclude_unset=True)
+    if overrides:
+        merged = OmegaConf.merge(OmegaConf.create(data), OmegaConf.from_dotlist(list(overrides)))
+        loaded = OmegaConf.to_container(merged, resolve=True)
+        if not isinstance(loaded, dict):
+            raise ValueError("Saved-run overrides must resolve to a mapping")
+        data = loaded
+
+    train_data = data.setdefault("train", {})
+    if not isinstance(train_data, dict):
+        raise ValueError("Saved train config must contain a train mapping")
+    train_data.update(
+        {
+            "continue_run_dir": continue_run_dir,
+            "resume_run_dir": continue_run_dir,
+            "resume_artifact": continue_artifact,
+            "resume_mode": "full_model",
+        }
+    )
+    return TrainAppConfig.model_validate(data)
 
 
 if __name__ == "__main__":

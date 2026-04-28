@@ -51,6 +51,7 @@ class TrainConfig(BaseModel):
     target_update_interval: PositiveInt = 1
     target_entropy: float | Literal["auto"] = "auto"
     optimize_memory_usage: bool = False
+    course_context_dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
     verbose: int = Field(default=0, ge=0, le=2)
     device: str = "auto"
     save_freq: PositiveInt = 1_000

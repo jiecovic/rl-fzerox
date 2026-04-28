@@ -43,6 +43,8 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("position", "state/position_mean"),
         _MetricLogSpec("lap", "state/lap_mean"),
         _MetricLogSpec("race_laps_completed", "state/race_laps_completed_mean"),
+        _MetricLogSpec("step_reward_raw", "reward/step_raw_mean"),
+        _MetricLogSpec("step_reward_clip_abs_excess", "reward_clip/abs_excess_mean"),
     ),
     step_rates=(
         _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
@@ -50,6 +52,9 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("boost_pad_entered", "state/boost_pad_entry_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
+        _MetricLogSpec("step_reward_clipped", "reward_clip/any_step_rate"),
+        _MetricLogSpec("step_reward_clip_positive", "reward_clip/positive_step_rate"),
+        _MetricLogSpec("step_reward_clip_negative", "reward_clip/negative_step_rate"),
     ),
     frame_ratios=(
         _FrameRatioLogSpec(

@@ -31,6 +31,10 @@ airborne_offtrack_penalty_scale: 0.0
 # the edge gives positive reward. Closed loops net zero before the absolute
 # penalty above, so this cannot be farmed by oscillating.
 airborne_offtrack_recovery_reward_scale: 0.0
+# Airborne off-track recovery: optionally only pay the positive recovery side
+# while descending. Negative movement farther off-track still applies.
+airborne_offtrack_recovery_requires_descending: false
+airborne_offtrack_recovery_descend_epsilon: 1.0
 
 # Time pressure: optional per-internal-frame penalty. Negative values make
 # elapsed game time costly. The tracker multiplies this by the native
@@ -40,6 +44,12 @@ time_penalty_per_frame: -0.001
 # low-speed guard. These only matter when time_penalty_per_frame is non-zero.
 reverse_time_penalty_scale: 2.0
 low_speed_time_penalty_scale: 2.0
+# Smooth low-speed time pressure. Disabled by default. When enabled, this adds
+# another time-penalty term below the start speed:
+# `frames_run * time_penalty_per_frame * scale * deficit_fraction ** power`.
+slow_speed_time_penalty_scale: 0.0
+slow_speed_time_penalty_start_kph: 0.0
+slow_speed_time_penalty_power: 1.0
 
 # Lap rewards: flat per-lap marker plus small position pressure. The finish line is
 # just the final lap completion, not a separate bonus event.
@@ -54,6 +64,10 @@ lap_position_scale: 0.25
 failure_penalty: -50.0
 # Training guard endings: progress-stalled or timeout.
 truncation_penalty: -50.0
+# Final per-env-step safety guard. Null disables each side. When enabled, the
+# env returns/logs the clipped reward but also exposes raw reward diagnostics.
+step_reward_clip_min: null
+step_reward_clip_max: null
 
 # Damage: continuous anti-wall-grinding pressure.
 damage_taken_frame_penalty: -0.02
