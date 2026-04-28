@@ -1,7 +1,9 @@
 # src/rl_fzerox/ui/watch/input.py
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
+from typing import Protocol
 
 from fzerox_emulator import (
     JOYPAD_SELECT,
@@ -17,6 +19,10 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
 )
 from rl_fzerox.ui.watch.view.screen.types import MouseRect, PygameModule, RecordCourseHitbox
+
+
+class _PressedKeyState(Protocol):
+    def __getitem__(self, key: int, /) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -39,6 +45,36 @@ class ViewerInput:
     control_state: ControllerState = ControllerState()
 
 
+@dataclass
+class SpeedKeyRepeat:
+    """Repeat timer for held watch speed-adjustment keys."""
+
+    initial_delay_seconds: float = 0.25
+    interval_seconds: float = 0.08
+    _held_direction: int = 0
+    _next_repeat_at: float = 0.0
+
+    def delta(self, direction: int, *, now_seconds: float) -> int:
+        """Return repeated speed steps for the currently held direction."""
+
+        direction = _sign(direction)
+        if direction == 0:
+            self._held_direction = 0
+            self._next_repeat_at = 0.0
+            return 0
+        if direction != self._held_direction:
+            self._held_direction = direction
+            self._next_repeat_at = now_seconds + max(0.0, self.initial_delay_seconds)
+            return 0
+        if now_seconds < self._next_repeat_at:
+            return 0
+
+        interval = max(0.001, self.interval_seconds)
+        count = 1 + int((now_seconds - self._next_repeat_at) // interval)
+        self._next_repeat_at += count * interval
+        return direction * count
+
+
 def _poll_viewer_input(
     pygame: PygameModule,
     *,
@@ -46,6 +82,8 @@ def _poll_viewer_input(
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
     record_tab_rects: tuple[MouseRect | None, ...] = (),
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
+    speed_repeat: SpeedKeyRepeat | None = None,
+    now_seconds: float | None = None,
 ) -> ViewerInput:
     quit_requested = False
     toggle_pause = False
@@ -117,7 +155,7 @@ def _poll_viewer_input(
             elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
                 control_fps_delta -= 1
 
-    keys = pygame.key.get_pressed()
+    keys: _PressedKeyState = pygame.key.get_pressed()
     manual_mask = 0
     if keys[pygame.K_z]:
         manual_mask |= ACCELERATE_MASK
@@ -148,6 +186,12 @@ def _poll_viewer_input(
     elif keys[pygame.K_DOWN] and not keys[pygame.K_UP]:
         left_stick_y = 1.0
 
+    if speed_repeat is not None:
+        control_fps_delta += speed_repeat.delta(
+            _held_speed_direction(pygame, keys),
+            now_seconds=time.perf_counter() if now_seconds is None else now_seconds,
+        )
+
     return ViewerInput(
         quit_requested=quit_requested,
         toggle_pause=toggle_pause,
@@ -168,6 +212,24 @@ def _poll_viewer_input(
             left_stick_y=left_stick_y,
         ),
     )
+
+
+def _held_speed_direction(pygame: PygameModule, keys: _PressedKeyState) -> int:
+    plus_held = keys[pygame.K_PLUS] or keys[pygame.K_KP_PLUS]
+    minus_held = keys[pygame.K_MINUS] or keys[pygame.K_KP_MINUS]
+    if plus_held and not minus_held:
+        return 1
+    if minus_held and not plus_held:
+        return -1
+    return 0
+
+
+def _sign(value: int) -> int:
+    if value > 0:
+        return 1
+    if value < 0:
+        return -1
+    return 0
 
 
 def _point_in_rect(position: object, rect: MouseRect | None) -> bool:
@@ -200,3 +262,21 @@ def _clicked_record_course_id(
         if _point_in_rect(position, hitbox.rect):
             return hitbox.course_id
     return None
+
+
+def mouse_over_clickable(
+    position: object,
+    *,
+    deterministic_toggle_rect: MouseRect | None = None,
+    panel_tab_rects: tuple[MouseRect | None, ...] = (),
+    record_tab_rects: tuple[MouseRect | None, ...] = (),
+    record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
+) -> bool:
+    """Return whether the mouse position is over a clickable watch UI target."""
+
+    return (
+        _point_in_rect(position, deterministic_toggle_rect)
+        or _clicked_panel_tab_index(position, panel_tab_rects) is not None
+        or _clicked_panel_tab_index(position, record_tab_rects) is not None
+        or _clicked_record_course_id(position, record_course_hitboxes) is not None
+    )
