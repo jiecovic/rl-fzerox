@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Literal, NamedTuple
+from typing import Any, NamedTuple
 
 import numpy as np
 import torch as th
@@ -10,14 +9,17 @@ from stable_baselines3.common.buffers import BaseBuffer
 from stable_baselines3.common.type_aliases import DictReplayBufferSamples, TensorDict
 from stable_baselines3.common.vec_env import VecNormalize
 
-from fzerox_emulator import ObservationStackMode, stacked_observation_channels
+from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import Float32Array, Int64Array, NumpyArray, UInt8Array
 from rl_fzerox.core.config.schema import EnvConfig, TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
-
-LazyReplayStackMode = Literal["rgb", "gray", "luma_chroma"]
-SUPPORTED_LAZY_REPLAY_STACK_MODES: frozenset[LazyReplayStackMode] = frozenset(
-    {"rgb", "gray", "luma_chroma"}
+from rl_fzerox.core.training.session.model.replay_layout import (
+    LazyImageReplayLayout,
+    LazyReplayStackMode,
+    action_storage_dtype,
+    current_slice_channels,
+    image_shape,
+    is_channels_first,
 )
 
 
@@ -32,59 +34,6 @@ class LazyMaskableReplaySamples(NamedTuple):
     action_masks: th.Tensor
     next_action_masks: th.Tensor
     discounts: th.Tensor | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class LazyImageReplayLayout:
-    """Static image-layout metadata needed to compress and rebuild stacks."""
-
-    image_shape: tuple[int, int, int]
-    state_shape: tuple[int, ...]
-    frame_stack: int
-    stack_mode: LazyReplayStackMode
-    minimap_layer: bool
-    current_slice_channels: int
-    channels_first: bool
-
-    @property
-    def height(self) -> int:
-        return self.image_shape[1] if self.channels_first else self.image_shape[0]
-
-    @property
-    def width(self) -> int:
-        return self.image_shape[2] if self.channels_first else self.image_shape[1]
-
-    @property
-    def image_channels(self) -> int:
-        return self.image_shape[0] if self.channels_first else self.image_shape[2]
-
-    @property
-    def minimap_channels(self) -> int:
-        return 1 if self.minimap_layer else 0
-
-    @property
-    def stacked_frame_channels(self) -> int:
-        return self.image_channels - self.minimap_channels
-
-    def split_image_batch(
-        self,
-        image_batch: NumpyArray,
-    ) -> tuple[UInt8Array, UInt8Array | None]:
-        """Return the per-step image slice and optional minimap slice."""
-
-        frame_end = self.stacked_frame_channels
-        current_start = frame_end - self.current_slice_channels
-        if self.channels_first:
-            current_slice = _as_uint8(image_batch[:, current_start:frame_end, :, :])
-        else:
-            current_slice = _as_uint8(image_batch[..., current_start:frame_end])
-        if not self.minimap_layer:
-            return current_slice, None
-        if self.channels_first:
-            minimap_slice = _as_uint8(image_batch[:, frame_end : frame_end + 1, :, :])
-        else:
-            minimap_slice = _as_uint8(image_batch[..., frame_end : frame_end + 1])
-        return current_slice, minimap_slice
 
 
 def resolve_sac_replay_buffer(
@@ -139,7 +88,7 @@ class LazyImageStateReplayBuffer(BaseBuffer):
         self.optimize_memory_usage = bool(optimize_memory_usage)
         image_space = self._image_space()
         state_space = self._state_space()
-        image_shape = _image_shape(image_space)
+        resolved_image_shape = image_shape(image_space)
         expected_channels = stacked_observation_channels(
             3,
             frame_stack=frame_stack,
@@ -147,13 +96,13 @@ class LazyImageStateReplayBuffer(BaseBuffer):
             minimap_layer=minimap_layer,
         )
         self.layout = LazyImageReplayLayout(
-            image_shape=image_shape,
+            image_shape=resolved_image_shape,
             state_shape=state_space.shape,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
-            current_slice_channels=_current_slice_channels(stack_mode),
-            channels_first=_is_channels_first(image_shape, expected_channels),
+            current_slice_channels=current_slice_channels(stack_mode),
+            channels_first=is_channels_first(resolved_image_shape, expected_channels),
         )
         if self.layout.image_channels != expected_channels:
             raise RuntimeError(
@@ -179,7 +128,7 @@ class LazyImageStateReplayBuffer(BaseBuffer):
         )
         self.actions = np.zeros(
             (self.buffer_size, self.n_envs, self.action_dim),
-            dtype=_action_storage_dtype(action_space.dtype),
+            dtype=action_storage_dtype(action_space.dtype),
         )
         self.rewards = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
         self.dones = np.zeros((self.buffer_size, self.n_envs), dtype=np.float32)
@@ -533,19 +482,6 @@ class LazyMaskableReplayBuffer(LazyImageStateReplayBuffer):
             next_action_masks=self.to_torch(self.next_action_masks[batch_inds, env_indices]),
         )
 
-def _current_slice_channels(stack_mode: ObservationStackMode) -> int:
-    if stack_mode == "rgb":
-        return 3
-    if stack_mode == "gray":
-        return 1
-    if stack_mode == "luma_chroma":
-        return 2
-    supported = ", ".join(sorted(SUPPORTED_LAZY_REPLAY_STACK_MODES))
-    raise RuntimeError(
-        f"lazy SAC replay does not support observation.stack_mode={stack_mode!r}; "
-        f"use one of: {supported}"
-    )
-
 
 def _normalize_masks(
     action_masks: NumpyArray | None,
@@ -556,28 +492,3 @@ def _normalize_masks(
     if action_masks is None:
         return np.ones((n_envs, mask_dims), dtype=np.float32)
     return np.asarray(action_masks, dtype=np.float32).reshape((n_envs, mask_dims))
-
-
-def _action_storage_dtype(dtype: np.dtype | type | None) -> np.dtype | type | None:
-    if dtype == np.float64:
-        return np.float32
-    return dtype
-
-
-def _is_channels_first(image_shape: tuple[int, int, int], expected_channels: int) -> bool:
-    if image_shape[0] == expected_channels and image_shape[2] != expected_channels:
-        return True
-    if image_shape[2] == expected_channels and image_shape[0] != expected_channels:
-        return False
-    return image_shape[0] <= image_shape[2]
-
-
-def _image_shape(image_space: spaces.Box) -> tuple[int, int, int]:
-    shape = image_space.shape
-    if len(shape) != 3:
-        raise RuntimeError("lazy SAC replay requires 3D image observations")
-    return int(shape[0]), int(shape[1]), int(shape[2])
-
-
-def _as_uint8(array: NumpyArray) -> UInt8Array:
-    return np.ascontiguousarray(array, dtype=np.uint8)

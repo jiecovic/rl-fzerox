@@ -1,29 +1,25 @@
 # src/rl_fzerox/core/envs/engine/controls/masks.py
 from __future__ import annotations
 
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TypeAlias
-
-import numpy as np
 
 from fzerox_emulator.arrays import ActionMask
 from rl_fzerox.core.config.schema import CurriculumConfig
-from rl_fzerox.core.domain.hybrid_action import HYBRID_DISCRETE_ACTION_KEY
-from rl_fzerox.core.envs.actions import ActionAdapter, ActionValue
-from rl_fzerox.core.envs.actions.base import DiscreteActionDimension
+from rl_fzerox.core.envs.actions import ActionAdapter
 from rl_fzerox.core.envs.actions.hybrid.layouts import PITCH_BUCKETS
 
-ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
-ActionMaskBranches: TypeAlias = dict[str, tuple[bool, ...]]
-
-
-@dataclass(frozen=True, slots=True)
-class ActionMaskSnapshot:
-    """One decision-time action mask and its branch view."""
-
-    flat: ActionMask
-    branches: ActionMaskBranches
+from .mask_config import (
+    ActionMaskBranches,
+    ActionMaskOverrides,
+    ActionMaskSnapshot,
+    curriculum_stage_boost_energy_gates,
+    curriculum_stage_boost_speed_gates,
+    curriculum_stage_lean_gates,
+    curriculum_stage_names,
+    curriculum_stage_overrides,
+    validate_configured_overrides,
+)
+from .mask_queries import split_action_mask_by_branch
 
 
 @dataclass(slots=True)
@@ -56,8 +52,8 @@ class ActionMaskController:
         boost_unmask_max_speed_kph: float | None = None,
         lean_unmask_min_speed_kph: float | None = None,
     ) -> ActionMaskController:
-        stage_overrides = _curriculum_stage_overrides(curriculum_config)
-        _validate_configured_overrides(
+        stage_overrides = curriculum_stage_overrides(curriculum_config)
+        validate_configured_overrides(
             adapter=adapter,
             base_overrides=base_overrides,
             stage_overrides=stage_overrides,
@@ -66,10 +62,10 @@ class ActionMaskController:
             adapter=adapter,
             base_overrides=base_overrides,
             stage_overrides=stage_overrides,
-            stage_names=_curriculum_stage_names(curriculum_config),
-            stage_lean_unmask_min_speed_kph=_curriculum_stage_lean_gates(curriculum_config),
-            stage_boost_unmask_max_speed_kph=_curriculum_stage_boost_speed_gates(curriculum_config),
-            stage_boost_min_energy_fraction=_curriculum_stage_boost_energy_gates(curriculum_config),
+            stage_names=curriculum_stage_names(curriculum_config),
+            stage_lean_unmask_min_speed_kph=curriculum_stage_lean_gates(curriculum_config),
+            stage_boost_unmask_max_speed_kph=curriculum_stage_boost_speed_gates(curriculum_config),
+            stage_boost_min_energy_fraction=curriculum_stage_boost_energy_gates(curriculum_config),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             _stage_index=0 if stage_overrides else None,
@@ -185,201 +181,6 @@ class ActionMaskController:
             return float(default)
         stage_gate = self.stage_boost_min_energy_fraction[self._stage_index]
         return float(default if stage_gate is None else stage_gate)
-
-
-def _curriculum_stage_overrides(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[ActionMaskOverrides | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(
-        stage.action_mask.branch_overrides() if stage.action_mask is not None else None
-        for stage in curriculum_config.stages
-    )
-
-
-def _curriculum_stage_names(curriculum_config: CurriculumConfig | None) -> tuple[str, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.name for stage in curriculum_config.stages)
-
-
-def _curriculum_stage_lean_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.lean_unmask_min_speed_kph for stage in curriculum_config.stages)
-
-
-def _curriculum_stage_boost_speed_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.boost_unmask_max_speed_kph for stage in curriculum_config.stages)
-
-
-def _curriculum_stage_boost_energy_gates(
-    curriculum_config: CurriculumConfig | None,
-) -> tuple[float | None, ...]:
-    if curriculum_config is None or not curriculum_config.enabled:
-        return ()
-    return tuple(stage.boost_min_energy_fraction for stage in curriculum_config.stages)
-
-
-def _validate_configured_overrides(
-    *,
-    adapter: ActionAdapter,
-    base_overrides: ActionMaskOverrides | None,
-    stage_overrides: tuple[ActionMaskOverrides | None, ...],
-) -> None:
-    """Reject mask branches that the active action adapter cannot consume."""
-
-    valid_labels = frozenset(dimension.label for dimension in adapter.action_dimensions)
-    _validate_override_branches(
-        overrides=base_overrides,
-        valid_labels=valid_labels,
-        source_label="env.action.mask",
-    )
-    for stage_index, overrides in enumerate(stage_overrides):
-        _validate_override_branches(
-            overrides=overrides,
-            valid_labels=valid_labels,
-            source_label=f"curriculum.stages[{stage_index}].action_mask",
-        )
-
-
-def _validate_override_branches(
-    *,
-    overrides: ActionMaskOverrides | None,
-    valid_labels: frozenset[str],
-    source_label: str,
-) -> None:
-    if overrides is None:
-        return
-
-    unknown_labels = sorted(set(overrides) - valid_labels)
-    if not unknown_labels:
-        return
-
-    unknown = ", ".join(repr(label) for label in unknown_labels)
-    valid = ", ".join(repr(label) for label in sorted(valid_labels)) or "none"
-    raise ValueError(
-        f"Unsupported action mask branch in {source_label}: {unknown}. "
-        f"Valid branches for this action adapter: {valid}."
-    )
-
-
-def split_action_mask_by_branch(
-    dimensions: tuple[DiscreteActionDimension, ...],
-    mask: ActionMask,
-) -> ActionMaskBranches:
-    """Split one flattened MultiDiscrete mask into stable branch labels."""
-
-    flat_mask = tuple(bool(value) for value in mask.reshape(-1).tolist())
-    branches: ActionMaskBranches = {}
-    cursor = 0
-    for dimension in dimensions:
-        next_cursor = cursor + dimension.size
-        branches[dimension.label] = flat_mask[cursor:next_cursor]
-        cursor = next_cursor
-    if cursor != len(flat_mask):
-        raise RuntimeError(
-            "Action mask length does not match adapter dimensions: "
-            f"mask={len(flat_mask)}, dimensions={cursor}"
-        )
-    return branches
-
-
-def action_branch_value_allowed(
-    branches: ActionMaskBranches | None,
-    label: str,
-    index: int,
-    *,
-    missing_allowed: bool,
-) -> bool:
-    """Return whether one discrete branch value is selectable.
-
-    `missing_allowed` is explicit because a missing branch means different
-    things at different call sites: continuous gas has no discrete branch but is
-    still available, while optional cockpit buttons with no branch are not wired
-    into the policy at all.
-    """
-
-    if branches is None:
-        return True
-    branch = branches.get(label)
-    if branch is None:
-        return missing_allowed
-    if not 0 <= index < len(branch):
-        return False
-    return branch[index]
-
-
-def action_branch_non_neutral_allowed(
-    branches: ActionMaskBranches | None,
-    label: str,
-    *,
-    neutral_index: int,
-    missing_allowed: bool,
-) -> bool:
-    """Return whether any non-neutral value is selectable for one branch."""
-
-    if branches is None:
-        return True
-    branch = branches.get(label)
-    if branch is None:
-        return missing_allowed
-    return any(allowed for index, allowed in enumerate(branch) if index != neutral_index)
-
-
-def selected_action_branches(
-    branches: ActionMaskBranches,
-    action: ActionValue | None,
-) -> dict[str, int]:
-    """Return selected discrete branch values in action-mask branch order."""
-
-    if action is None or not branches:
-        return {}
-    discrete_values = _discrete_action_values(action)
-    if discrete_values is None:
-        return {}
-    labels = tuple(branches)
-    return {
-        label: int(discrete_values[index])
-        for index, label in enumerate(labels)
-        if index < len(discrete_values)
-    }
-
-
-def action_mask_violations(
-    branches: ActionMaskBranches,
-    action: ActionValue | None,
-) -> tuple[str, ...]:
-    """Return branch/value pairs where an action selects a masked value."""
-
-    selected = selected_action_branches(branches, action)
-    violations: list[str] = []
-    for label, value in selected.items():
-        branch = branches[label]
-        if not 0 <= value < len(branch) or not branch[value]:
-            violations.append(f"{label}={value}")
-    return tuple(violations)
-
-
-def _discrete_action_values(action: ActionValue) -> tuple[int, ...] | None:
-    source: object
-    if isinstance(action, Mapping):
-        source = action.get(HYBRID_DISCRETE_ACTION_KEY)
-        if source is None:
-            return None
-    else:
-        source = action
-    values = np.asarray(source).reshape(-1)
-    if values.size == 0:
-        return None
-    return tuple(int(value) for value in values)
 
 
 def _dynamic_action_mask_overrides(

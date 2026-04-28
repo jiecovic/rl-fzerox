@@ -1,8 +1,8 @@
 # tests/ui/test_viewer_preview.py
 import numpy as np
 
-from rl_fzerox.ui.watch.view.panels.format import _format_observation_summary
-from rl_fzerox.ui.watch.view.panels.model import _observation_preview_size, _preview_frame
+from rl_fzerox.ui.watch.view.panels.core.format import _format_observation_summary
+from rl_fzerox.ui.watch.view.panels.core.model import _observation_preview_size, _preview_frame
 
 
 def test_preview_frame_shows_stacked_rgb_observations_as_grid() -> None:

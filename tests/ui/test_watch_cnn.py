@@ -10,7 +10,10 @@ from rl_fzerox.ui.watch.runtime.cnn import (
     _activation_grid,
     next_cnn_activation_normalization,
 )
-from rl_fzerox.ui.watch.view.panels.cnn import _separator_positions, _unused_tile_rects
+from rl_fzerox.ui.watch.view.panels.visuals.cnn import (
+    _separator_positions,
+    _unused_tile_rects,
+)
 
 
 class _PolicyRunner:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from rl_fzerox.ui.watch.view.panels.format import (
+from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_observation_summary,
     _observation_minimap_layer,
     _observation_preview_grid,

@@ -21,12 +21,12 @@ from rl_fzerox.ui.watch.view.components.macro_legend import (
     MACRO_LEGEND_HINTS,
     _macro_legend_rows,
 )
-from rl_fzerox.ui.watch.view.panels.format import (
+from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_policy_action,
     _format_reload_age,
     _pressed_button_labels,
 )
-from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.screen.frame import _game_course_overlay_label
 from tests.ui.viewer_support import (
     fake_viewer_fonts,
