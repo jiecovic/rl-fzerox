@@ -10,7 +10,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
 )
-from rl_fzerox.ui.watch.input import _poll_viewer_input
+from rl_fzerox.ui.watch.input import SpeedKeyRepeat, _poll_viewer_input, mouse_over_clickable
 from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox
 
 
@@ -96,6 +96,65 @@ def test_poll_viewer_input_does_not_treat_equals_as_plus() -> None:
     assert viewer_input.control_fps_delta == 0
 
 
+def test_poll_viewer_input_repeats_control_fps_delta_while_plus_is_held() -> None:
+    repeat = SpeedKeyRepeat(initial_delay_seconds=0.2, interval_seconds=0.1)
+
+    first = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_PLUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.0,
+    )
+    before_delay = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_PLUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.19,
+    )
+    after_delay = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_PLUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.2,
+    )
+    later = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_PLUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.45,
+    )
+
+    assert first.control_fps_delta == 0
+    assert before_delay.control_fps_delta == 0
+    assert after_delay.control_fps_delta == 1
+    assert later.control_fps_delta == 2
+
+
+def test_poll_viewer_input_repeats_control_fps_delta_while_minus_is_held() -> None:
+    repeat = SpeedKeyRepeat(initial_delay_seconds=0.0, interval_seconds=0.1)
+    _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_MINUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.0,
+    )
+
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), pressed_keys=(_FakePygame.K_MINUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.0,
+    )
+
+    assert viewer_input.control_fps_delta == -1
+
+
+def test_poll_viewer_input_does_not_double_count_initial_held_speed_key() -> None:
+    repeat = SpeedKeyRepeat(initial_delay_seconds=0.2, interval_seconds=0.1)
+
+    viewer_input = _poll_viewer_input(
+        _FakePygame((_FakePygame.K_PLUS,), pressed_keys=(_FakePygame.K_PLUS,)),
+        speed_repeat=repeat,
+        now_seconds=1.0,
+    )
+
+    assert viewer_input.control_fps_delta == 1
+
+
 def test_poll_viewer_input_maps_r_to_force_reset() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_r,)))
 
@@ -171,6 +230,27 @@ def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
     )
 
     assert viewer_input.toggle_record_course_lock_id == "mute_city"
+
+
+def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
+    record_hitbox = RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city")
+
+    assert mouse_over_clickable(
+        (25, 12),
+        deterministic_toggle_rect=(0, 0, 40, 20),
+    )
+    assert mouse_over_clickable(
+        (75, 42),
+        record_tab_rects=((50, 30, 40, 20),),
+    )
+    assert mouse_over_clickable((75, 72), record_course_hitboxes=(record_hitbox,))
+    assert not mouse_over_clickable(
+        (500, 500),
+        deterministic_toggle_rect=(0, 0, 40, 20),
+        panel_tab_rects=((0, 30, 40, 20),),
+        record_tab_rects=((50, 30, 40, 20),),
+        record_course_hitboxes=(record_hitbox,),
+    )
 
 
 def test_poll_viewer_input_maps_manual_keys_to_n64_controls() -> None:

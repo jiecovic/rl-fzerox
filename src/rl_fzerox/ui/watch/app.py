@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 from rl_fzerox.core.config.schema import WatchAppConfig
-from rl_fzerox.ui.watch.input import ViewerInput, _poll_viewer_input
+from rl_fzerox.ui.watch.input import (
+    SpeedKeyRepeat,
+    ViewerInput,
+    _poll_viewer_input,
+    mouse_over_clickable,
+)
 from rl_fzerox.ui.watch.runtime import (
     apply_viewer_input,
     drain_snapshot_queue,
@@ -24,7 +29,7 @@ from rl_fzerox.ui.watch.view.screen.frame import (
     _watch_game_display_size,
 )
 from rl_fzerox.ui.watch.view.screen.render import draw_watch_frame
-from rl_fzerox.ui.watch.view.screen.types import ViewerHitboxes
+from rl_fzerox.ui.watch.view.screen.types import PygameModule, ViewerHitboxes
 
 __all__ = ["run_viewer"]
 
@@ -58,6 +63,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         record_tab_index = 0
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         hitboxes = ViewerHitboxes()
+        speed_repeat = SpeedKeyRepeat()
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -69,6 +75,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 panel_tab_rects=hitboxes.panel_tabs,
                 record_tab_rects=hitboxes.record_tabs,
                 record_course_hitboxes=hitboxes.record_courses,
+                speed_repeat=speed_repeat,
             )
             panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
             if viewer_input.record_tab_index is not None:
@@ -116,6 +123,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 panel_tab_index=panel_tab_index,
                 record_tab_index=record_tab_index,
             )
+            _sync_mouse_cursor(pygame, hitboxes)
     except KeyboardInterrupt:
         return
     finally:
@@ -130,3 +138,26 @@ def _next_panel_tab_index(current_index: int, viewer_input: ViewerInput) -> int:
     if viewer_input.panel_tab_delta == 0:
         return current_index
     return PANEL_TABS.normalize(current_index + viewer_input.panel_tab_delta)
+
+
+def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
+    """Use a hand cursor over clickable viewer chrome when pygame supports it."""
+
+    mouse_pos = pygame.mouse.get_pos()
+    hover_clickable = mouse_over_clickable(
+        mouse_pos,
+        deterministic_toggle_rect=hitboxes.deterministic_toggle,
+        panel_tab_rects=hitboxes.panel_tabs,
+        record_tab_rects=hitboxes.record_tabs,
+        record_course_hitboxes=hitboxes.record_courses,
+    )
+    cursor = _system_cursor(
+        pygame,
+        "SYSTEM_CURSOR_HAND" if hover_clickable else "SYSTEM_CURSOR_ARROW",
+    )
+    if cursor is not None:
+        pygame.mouse.set_cursor(cursor)
+
+
+def _system_cursor(pygame: PygameModule, name: str) -> object | None:
+    return getattr(pygame, name, None)
