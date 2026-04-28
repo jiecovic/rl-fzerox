@@ -16,9 +16,14 @@ class RaceV3RewardWeights:
     outside_bounds_reentry_progress_distance_cap: float | None = None
     airborne_offtrack_penalty_scale: float = 0.0
     airborne_offtrack_recovery_reward_scale: float = 0.0
+    airborne_offtrack_recovery_requires_descending: bool = False
+    airborne_offtrack_recovery_descend_epsilon: float = 1.0
     time_penalty_per_frame: float = 0.0
     reverse_time_penalty_scale: float = 1.0
     low_speed_time_penalty_scale: float = 1.0
+    slow_speed_time_penalty_scale: float = 0.0
+    slow_speed_time_penalty_start_kph: float = 0.0
+    slow_speed_time_penalty_power: float = 1.0
     lap_completion_bonus: float = 5.0
     lap_position_scale: float = 0.25
     damage_taken_frame_penalty: float = -0.02
@@ -49,3 +54,5 @@ class RaceV3RewardWeights:
     collision_recoil_penalty: float = -0.25
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
+    step_reward_clip_min: float | None = None
+    step_reward_clip_max: float | None = None

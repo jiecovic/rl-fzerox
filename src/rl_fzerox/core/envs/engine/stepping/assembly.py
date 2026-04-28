@@ -109,6 +109,7 @@ class EngineStepAssembler:
             ),
         )
         reward = reward_step.reward
+        raw_reward = reward if reward_step.raw_reward is None else reward_step.raw_reward
         reward_breakdown = dict(reward_step.breakdown)
         terminated = step_result.status.terminated
         truncated = step_result.status.truncated
@@ -119,6 +120,12 @@ class EngineStepAssembler:
             episode_boost_pad_entries += 1
 
         info["step_reward"] = reward
+        info["step_reward_raw"] = raw_reward
+        info["step_reward_clipped"] = raw_reward != reward
+        info["step_reward_clip_delta"] = reward - raw_reward
+        info["step_reward_clip_abs_excess"] = abs(reward - raw_reward)
+        info["step_reward_clip_positive"] = raw_reward > reward
+        info["step_reward_clip_negative"] = raw_reward < reward
         info["frames_run"] = int(step_result.summary.frames_run)
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)

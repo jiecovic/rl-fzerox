@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import multiprocessing as mp
+from collections.abc import Callable
 from pathlib import Path
+from typing import Protocol
+
+import gymnasium as gym
 
 from fzerox_emulator import Emulator
 from rl_fzerox.core.config.schema import TrainAppConfig
@@ -10,8 +14,22 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.seed import derive_seed
 from rl_fzerox.core.training.runs import RunPaths
+from rl_fzerox.core.training.session.observation_augmentation import (
+    maybe_wrap_training_observation_augmentation,
+)
 
 _DOMAIN_TRAIN_ENV = 0xA4C4F4B7A62D1131
+
+
+class MonitorWrapper(Protocol):
+    """Callable surface needed from SB3's Monitor class."""
+
+    def __call__(
+        self,
+        env: gym.Env,
+        *,
+        info_keywords: tuple[str, ...],
+    ) -> gym.Env: ...
 
 
 def build_training_env(config: TrainAppConfig, run_paths: RunPaths):
@@ -56,8 +74,8 @@ def _make_env_factory(
     config: TrainAppConfig,
     env_index: int,
     runtime_dir: Path,
-    monitor_cls,
-):
+    monitor_cls: MonitorWrapper,
+) -> Callable[[], gym.Env]:
     """Build one worker-local env factory for SB3 vectorized training."""
 
     def _make_env():
@@ -74,6 +92,11 @@ def _make_env_factory(
             reward_config=config.reward,
             curriculum_config=config.curriculum,
             env_index=env_index,
+        )
+        env = maybe_wrap_training_observation_augmentation(
+            env,
+            env_config=config.env,
+            train_config=config.train,
         )
         wrapped = monitor_cls(env, info_keywords=MONITOR_INFO_KEYS)
         initial_seed = derive_seed(

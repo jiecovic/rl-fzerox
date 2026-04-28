@@ -85,6 +85,44 @@ def test_watch_step_captures_each_repeated_display_frame():
     assert watch_step.info["repeat_index"] == 2
 
 
+def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
+        reward_config=RewardConfig(
+            progress_bucket_distance=1.0,
+            progress_bucket_reward=1.0,
+            step_reward_clip_max=5.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        ),
+    )
+
+    env.reset(seed=7)
+    _, reward, _, _, info = env.step(np.array([2, 0], dtype=np.int64))
+
+    assert reward == 5.0
+    assert info["step_reward"] == 5.0
+    assert info["step_reward_raw"] == 10.0
+    assert info["step_reward_clipped"] is True
+    assert info["step_reward_clip_delta"] == -5.0
+    assert info["step_reward_clip_abs_excess"] == 5.0
+    assert info["step_reward_clip_positive"] is True
+    assert info["step_reward_clip_negative"] is False
+    assert info["episode_return"] == 5.0
+
+
 def test_reset_resets_continuous_drive_pwm_phase() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(

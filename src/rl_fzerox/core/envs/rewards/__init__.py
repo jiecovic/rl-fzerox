@@ -46,7 +46,7 @@ def _race_v3_course_weights(config: RewardConfig) -> dict[str, RaceV3RewardWeigh
         if not course_id:
             raise ValueError("reward course override keys must be non-empty course ids")
         values = dict(base_values)
-        values.update(override.model_dump(include=override.model_fields_set))
+        values.update(override.model_dump(include=override.model_fields_set, exclude_none=True))
         course_weights[course_id] = RaceV3RewardWeights(**values)
     return course_weights
 

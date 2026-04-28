@@ -72,7 +72,7 @@ def test_main_loads_saved_run_config_for_in_place_continue_without_config(
     assert config.train.resume_mode == "full_model"
 
 
-def test_main_rejects_overrides_without_config_for_saved_run_continue(
+def test_main_applies_overrides_to_saved_run_continue_without_config(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -83,6 +83,7 @@ def test_main_rejects_overrides_without_config_for_saved_run_continue(
     rom_path.touch()
     run_dir.mkdir(parents=True)
 
+    captured: dict[str, TrainAppConfig] = {}
     monkeypatch.setattr(
         "rl_fzerox.apps.train.load_train_run_config",
         lambda _path: TrainAppConfig(
@@ -95,13 +96,27 @@ def test_main_rejects_overrides_without_config_for_saved_run_continue(
             ),
         ),
     )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.train.run_training",
+        lambda config: captured.setdefault("config", config),
+    )
 
-    with pytest.raises(SystemExit, match="Hydra overrides require --config"):
-        main(
-            [
-                "--continue-run-dir",
-                str(run_dir),
-                "--",
-                "train.total_timesteps=2000",
-            ]
-        )
+    main(
+        [
+            "--continue-run-dir",
+            str(run_dir),
+            "--continue-artifact",
+            "best",
+            "--",
+            "train.total_timesteps=2000",
+            "train.num_envs=10",
+        ]
+    )
+
+    config = captured["config"]
+    assert config.train.continue_run_dir == run_dir.resolve()
+    assert config.train.resume_run_dir == run_dir.resolve()
+    assert config.train.resume_artifact == "best"
+    assert config.train.resume_mode == "full_model"
+    assert config.train.total_timesteps == 2000
+    assert config.train.num_envs == 10

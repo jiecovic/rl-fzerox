@@ -61,6 +61,7 @@ class RaceV3RewardTracker:
         self._previous_airborne = False
         self._deferred_outside_bounds_progress = False
         self._previous_airborne_offtrack_excess: float | None = None
+        self._previous_airborne_height: float | None = None
         self._course_id: str | None = None
 
     def reset(
@@ -85,6 +86,7 @@ class RaceV3RewardTracker:
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
         self._deferred_outside_bounds_progress = telemetry_outside_track_bounds(telemetry)
         self._previous_airborne_offtrack_excess = _airborne_offtrack_excess(telemetry)
+        self._previous_airborne_height = _airborne_height_above_ground(telemetry)
 
     def summary_config(self) -> RewardSummaryConfig:
         """Return native summary thresholds required by this reward."""
@@ -111,11 +113,17 @@ class RaceV3RewardTracker:
             self._previous_airborne = False
             self._deferred_outside_bounds_progress = False
             self._previous_airborne_offtrack_excess = None
+            self._previous_airborne_height = None
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
         outside_track_bounds = telemetry_outside_track_bounds(telemetry)
         airborne_offtrack_excess = _airborne_offtrack_excess(telemetry)
+        airborne_descending = _airborne_descending(
+            previous_height=self._previous_airborne_height,
+            telemetry=telemetry,
+            weights=self._weights,
+        )
         defer_outside_bounds_progress = (
             outside_track_bounds
             or (self._deferred_outside_bounds_progress and telemetry.player.airborne)
@@ -139,6 +147,10 @@ class RaceV3RewardTracker:
         if low_speed_time_penalty:
             reward += low_speed_time_penalty
             breakdown["low_speed_time"] = low_speed_time_penalty
+        slow_speed_penalty = self._slow_speed_time_penalty(summary, telemetry)
+        if slow_speed_penalty:
+            reward += slow_speed_penalty
+            breakdown["slow_speed_time"] = slow_speed_penalty
 
         frontier_distance_before_step = self._progress.frontier_distance
         ground_effect_key, progress_multiplier = _ground_effect_progress_modifier(
@@ -173,6 +185,7 @@ class RaceV3RewardTracker:
         airborne_offtrack_recovery = _airborne_offtrack_recovery_reward(
             previous_excess=self._previous_airborne_offtrack_excess,
             current_excess=airborne_offtrack_excess,
+            descending=airborne_descending,
             weights=self._weights,
         )
         if airborne_offtrack_recovery:
@@ -299,6 +312,10 @@ class RaceV3RewardTracker:
         )
         if terminal_penalty:
             reward += terminal_penalty
+        raw_reward = reward
+        reward = _clip_step_reward(raw_reward, weights=self._weights)
+        if reward != raw_reward:
+            breakdown["step_reward_clip"] = reward - raw_reward
 
         self._energy.advance_cooldown(summary.frames_run)
         self._energy.finish_step(telemetry)
@@ -307,7 +324,8 @@ class RaceV3RewardTracker:
             defer_outside_bounds_progress and not returning_grounded_inside_track_bounds
         )
         self._previous_airborne_offtrack_excess = airborne_offtrack_excess
-        return RewardStep(reward=reward, breakdown=breakdown)
+        self._previous_airborne_height = _airborne_height_above_ground(telemetry)
+        return RewardStep(reward=reward, breakdown=breakdown, raw_reward=raw_reward)
 
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
         """Expose lightweight frontier reward state for watch/logging."""
@@ -342,6 +360,23 @@ class RaceV3RewardTracker:
         if summary.low_speed_frames <= 0 or extra_scale == 0.0:
             return 0.0
         return summary.low_speed_frames * self._weights.time_penalty_per_frame * extra_scale
+
+    def _slow_speed_time_penalty(self, summary: StepSummary, telemetry: FZeroXTelemetry) -> float:
+        scale = self._weights.slow_speed_time_penalty_scale
+        start_kph = self._weights.slow_speed_time_penalty_start_kph
+        if scale == 0.0 or start_kph <= 0.0 or self._weights.time_penalty_per_frame == 0.0:
+            return 0.0
+        speed_deficit = max(start_kph - float(telemetry.player.speed_kph), 0.0)
+        if speed_deficit <= 0.0:
+            return 0.0
+        deficit_fraction = speed_deficit / start_kph
+        shaped_deficit = deficit_fraction**self._weights.slow_speed_time_penalty_power
+        return (
+            max(int(summary.frames_run), 1)
+            * self._weights.time_penalty_per_frame
+            * scale
+            * shaped_deficit
+        )
 
     def _frontier_reward(
         self,
@@ -411,6 +446,14 @@ def _cap_outside_bounds_reentry_reward(
     )
 
 
+def _clip_step_reward(reward: float, *, weights: RaceV3RewardWeights) -> float:
+    if weights.step_reward_clip_min is not None:
+        reward = max(reward, float(weights.step_reward_clip_min))
+    if weights.step_reward_clip_max is not None:
+        reward = min(reward, float(weights.step_reward_clip_max))
+    return reward
+
+
 def _ground_effect_progress_modifier(
     telemetry: FZeroXTelemetry,
     *,
@@ -441,6 +484,25 @@ def _airborne_offtrack_excess(telemetry: FZeroXTelemetry | None) -> float | None
     return outside_excess
 
 
+def _airborne_height_above_ground(telemetry: FZeroXTelemetry | None) -> float | None:
+    if telemetry is None or not telemetry.player.airborne:
+        return None
+    return float(telemetry.player.height_above_ground)
+
+
+def _airborne_descending(
+    *,
+    previous_height: float | None,
+    telemetry: FZeroXTelemetry,
+    weights: RaceV3RewardWeights,
+) -> bool:
+    current_height = _airborne_height_above_ground(telemetry)
+    if previous_height is None or current_height is None:
+        return False
+    epsilon = float(weights.airborne_offtrack_recovery_descend_epsilon)
+    return current_height < previous_height - epsilon
+
+
 def _airborne_offtrack_penalty(
     summary: StepSummary,
     outside_excess: float | None,
@@ -457,9 +519,17 @@ def _airborne_offtrack_recovery_reward(
     *,
     previous_excess: float | None,
     current_excess: float | None,
+    descending: bool,
     weights: RaceV3RewardWeights,
 ) -> float:
     scale = weights.airborne_offtrack_recovery_reward_scale
     if scale <= 0.0 or current_excess is None:
         return 0.0
-    return scale * ((previous_excess or 0.0) - current_excess)
+    reward = scale * ((previous_excess or 0.0) - current_excess)
+    if (
+        reward > 0.0
+        and weights.airborne_offtrack_recovery_requires_descending
+        and not descending
+    ):
+        return 0.0
+    return reward

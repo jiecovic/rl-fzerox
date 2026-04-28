@@ -13,6 +13,7 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    model_validator,
 )
 
 from rl_fzerox.core.config.schema_models.actions import ActionConfig
@@ -54,6 +55,9 @@ class RewardCourseOverrideConfig(BaseModel):
     time_penalty_per_frame: float | None = None
     reverse_time_penalty_scale: NonNegativeFloat | None = None
     low_speed_time_penalty_scale: NonNegativeFloat | None = None
+    slow_speed_time_penalty_scale: NonNegativeFloat | None = None
+    slow_speed_time_penalty_start_kph: NonNegativeFloat | None = None
+    slow_speed_time_penalty_power: PositiveFloat | None = None
     progress_bucket_distance: PositiveFloat | None = None
     progress_bucket_reward: NonNegativeFloat | None = None
     progress_reward_interval_frames: PositiveInt | None = None
@@ -61,6 +65,8 @@ class RewardCourseOverrideConfig(BaseModel):
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
     airborne_offtrack_penalty_scale: NonNegativeFloat | None = None
     airborne_offtrack_recovery_reward_scale: NonNegativeFloat | None = None
+    airborne_offtrack_recovery_requires_descending: bool | None = None
+    airborne_offtrack_recovery_descend_epsilon: NonNegativeFloat | None = None
     lap_completion_bonus: NonNegativeFloat | None = None
     lap_position_scale: NonNegativeFloat | None = None
     energy_loss_epsilon: NonNegativeFloat | None = None
@@ -92,6 +98,16 @@ class RewardCourseOverrideConfig(BaseModel):
     collision_recoil_penalty: float | None = None
     failure_penalty: float | None = None
     truncation_penalty: float | None = None
+    step_reward_clip_min: float | None = None
+    step_reward_clip_max: float | None = None
+
+    @model_validator(mode="after")
+    def _validate_step_reward_clip_bounds(self) -> RewardCourseOverrideConfig:
+        _validate_step_reward_clip_bounds(
+            min_value=self.step_reward_clip_min,
+            max_value=self.step_reward_clip_max,
+        )
+        return self
 
 
 class RewardConfig(BaseModel):
@@ -103,6 +119,9 @@ class RewardConfig(BaseModel):
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
+    slow_speed_time_penalty_scale: NonNegativeFloat = 0.0
+    slow_speed_time_penalty_start_kph: NonNegativeFloat = 0.0
+    slow_speed_time_penalty_power: PositiveFloat = 1.0
     progress_bucket_distance: PositiveFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
@@ -110,6 +129,8 @@ class RewardConfig(BaseModel):
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
     airborne_offtrack_penalty_scale: NonNegativeFloat = 0.0
     airborne_offtrack_recovery_reward_scale: NonNegativeFloat = 0.0
+    airborne_offtrack_recovery_requires_descending: bool = False
+    airborne_offtrack_recovery_descend_epsilon: NonNegativeFloat = 1.0
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -141,7 +162,26 @@ class RewardConfig(BaseModel):
     collision_recoil_penalty: float = -2.0
     failure_penalty: float = -20.0
     truncation_penalty: float = -20.0
+    step_reward_clip_min: float | None = None
+    step_reward_clip_max: float | None = None
     course_overrides: dict[str, RewardCourseOverrideConfig] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_step_reward_clip_bounds(self) -> RewardConfig:
+        _validate_step_reward_clip_bounds(
+            min_value=self.step_reward_clip_min,
+            max_value=self.step_reward_clip_max,
+        )
+        return self
+
+
+def _validate_step_reward_clip_bounds(
+    *,
+    min_value: float | None,
+    max_value: float | None,
+) -> None:
+    if min_value is not None and max_value is not None and min_value > max_value:
+        raise ValueError("step_reward_clip_min must be <= step_reward_clip_max")
 
 
 class EmulatorConfig(BaseModel):
