@@ -8,6 +8,10 @@ from rl_fzerox.core.envs.engine.reset.seeding import (
     EngineResetSeeds,
     EngineSeedDomains,
 )
+from rl_fzerox.core.envs.engine.reset.session import (
+    EngineResetCoordinator,
+    EngineResetResult,
+)
 from rl_fzerox.core.envs.engine.reset.tracks import (
     SelectedTrack,
     TrackBaselineCache,
@@ -22,6 +26,8 @@ __all__ = [
     "ENGINE_SEED_DOMAINS",
     "EngineResetSeeds",
     "EngineSeedDomains",
+    "EngineResetCoordinator",
+    "EngineResetResult",
     "TrackBaselineCache",
     "TrackResetSelector",
     "TrackSamplingLimits",

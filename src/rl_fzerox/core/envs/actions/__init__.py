@@ -24,10 +24,27 @@ from rl_fzerox.core.envs.actions.base import (
     DiscreteActionDimension,
     ResettableActionAdapter,
 )
-from rl_fzerox.core.envs.actions.continuous_steer_drive import (
+from rl_fzerox.core.envs.actions.continuous.steer_drive import (
     ContinuousSteerDriveActionAdapter,
 )
-from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
+from rl_fzerox.core.envs.actions.discrete.steer_drive import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    BRAKE_MASK,
+    THROTTLE_MASK,
+    SteerDriveActionAdapter,
+)
+from rl_fzerox.core.envs.actions.discrete.steer_drive_boost import (
+    SteerDriveBoostActionAdapter,
+)
+from rl_fzerox.core.envs.actions.discrete.steer_drive_boost_lean import (
+    BOOST_MASK,
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
+    SteerDriveBoostLeanActionAdapter,
+    SteerGasAirBrakeBoostLeanActionAdapter,
+)
+from rl_fzerox.core.envs.actions.hybrid.facade import (
     HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerDriveBoostLeanActionAdapter,
     HybridSteerDriveBoostLeanPrimitiveActionAdapter,
@@ -35,21 +52,6 @@ from rl_fzerox.core.envs.actions.hybrid_steer_drive import (
     HybridSteerGasAirBrakeBoostLeanActionAdapter,
     HybridSteerGasAirBrakeBoostLeanPitchActionAdapter,
     HybridSteerGasBoostLeanActionAdapter,
-)
-from rl_fzerox.core.envs.actions.steer_drive import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BRAKE_MASK,
-    THROTTLE_MASK,
-    SteerDriveActionAdapter,
-)
-from rl_fzerox.core.envs.actions.steer_drive_boost import SteerDriveBoostActionAdapter
-from rl_fzerox.core.envs.actions.steer_drive_boost_lean import (
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-    SteerDriveBoostLeanActionAdapter,
-    SteerGasAirBrakeBoostLeanActionAdapter,
 )
 
 ActionAdapterFactory = Callable[[ActionRuntimeConfig], ActionAdapter]

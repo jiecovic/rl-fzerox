@@ -20,7 +20,7 @@ from rl_fzerox.ui.watch.view.components.cockpit.speed import (
     _speed_color,
 )
 from rl_fzerox.ui.watch.view.components.cockpit.style import SPEED_GAUGE_STYLE
-from rl_fzerox.ui.watch.view.panels.viz import _control_viz
+from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
 
 
 def test_control_viz_includes_visualized_control_state() -> None:

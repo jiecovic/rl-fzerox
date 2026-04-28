@@ -22,7 +22,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _resolve_render_fps,
 )
-from rl_fzerox.ui.watch.view.panels.tabs import PANEL_TABS
+from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.screen.frame import (
     _create_fonts,
     _ensure_screen,

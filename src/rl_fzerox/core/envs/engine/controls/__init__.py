@@ -10,15 +10,17 @@ from rl_fzerox.core.envs.engine.controls.gates import (
     without_joypad_mask,
 )
 from rl_fzerox.core.envs.engine.controls.history import ControlStateTracker
-from rl_fzerox.core.envs.engine.controls.masks import (
+from rl_fzerox.core.envs.engine.controls.mask_config import (
     ActionMaskBranches,
-    ActionMaskController,
     ActionMaskSnapshot,
+)
+from rl_fzerox.core.envs.engine.controls.mask_queries import (
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
     action_mask_violations,
     selected_action_branches,
 )
+from rl_fzerox.core.envs.engine.controls.masks import ActionMaskController
 
 __all__ = [
     "ActionMaskBranches",

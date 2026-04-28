@@ -1,10 +1,12 @@
 # src/rl_fzerox/core/training/session/model/validation.py
 from __future__ import annotations
 
+from stable_baselines3.common.vec_env import VecEnv
+
 from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
 from rl_fzerox.core.domain.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
-from rl_fzerox.core.training.session.model.replay import SUPPORTED_LAZY_REPLAY_STACK_MODES
+from rl_fzerox.core.training.session.model.replay_layout import SUPPORTED_LAZY_REPLAY_STACK_MODES
 
 
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
@@ -26,7 +28,7 @@ def validate_training_algorithm_config(config: TrainAppConfig) -> None:
         _validate_maskable_recurrent_hybrid_ppo_config(config)
 
 
-def validate_masking_configuration(*, train_env, effective_algorithm: str) -> None:
+def validate_masking_configuration(*, train_env: VecEnv, effective_algorithm: str) -> None:
     if effective_algorithm not in TRAINING_ALGORITHMS.maskable:
         return
 

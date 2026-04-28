@@ -9,7 +9,7 @@ from rl_fzerox.ui.watch.view.components.macro_legend import (
     _draw_macro_legend,
     _macro_legend_height,
 )
-from rl_fzerox.ui.watch.view.panels.format import (
+from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_observation_summary,
     _observation_minimap_layer,
     _observation_preview_grid,

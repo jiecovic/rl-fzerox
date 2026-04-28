@@ -10,7 +10,7 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
-from rl_fzerox.core.envs.actions.steer_drive import ACCELERATE_MASK
+from rl_fzerox.core.envs.actions.discrete.steer_drive import ACCELERATE_MASK
 
 
 class ContinuousDriveDecoder:

@@ -1,18 +1,14 @@
 # src/rl_fzerox/core/envs/engine/runtime.py
 from __future__ import annotations
 
-import math
-
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, EmulatorBackend, FZeroXTelemetry
+from fzerox_emulator import ControllerState, EmulatorBackend
 from fzerox_emulator.arrays import ActionMask, RgbFrame
-from rl_fzerox.core.boot import sync_race_intro_target
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
     EnvConfig,
     RewardConfig,
-    TrackSamplingConfig,
 )
 from rl_fzerox.core.envs.actions import (
     ActionValue,
@@ -34,23 +30,11 @@ from .controls import (
 )
 from .episode import EngineEpisodeState
 from .info import (
-    backend_step_info,
-    has_custom_baseline,
-    read_live_telemetry,
     set_curriculum_info,
     telemetry_info,
 )
 from .observation import EngineObservationBuilder
-from .reset import (
-    EngineResetSeeds,
-    SelectedTrack,
-    TrackBaselineCache,
-    TrackResetSelector,
-    load_track_baseline,
-    reset_race_state,
-    select_reset_track_by_course_id,
-    sync_camera_setting,
-)
+from .reset import EngineResetCoordinator
 from .stepping import (
     EngineStepAssembler,
     EnvStepRequest,
@@ -99,13 +83,13 @@ class FZeroXEnvEngine:
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
         )
-        self._track_sampling_weight_overrides: dict[str, float] = {}
-        self._active_track_sampling = self._stage_track_sampling_config(
-            self._mask_controller.stage_index
+        self._reset_coordinator = EngineResetCoordinator(
+            backend=backend,
+            config=config,
+            curriculum_config=curriculum_config,
+            env_index=env_index,
         )
-        self._locked_reset_course_id: str | None = None
-        self._track_selector = TrackResetSelector(env_index=env_index)
-        self._track_baseline_cache = TrackBaselineCache()
+        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
         self._control_state = ControlStateTracker(
             lean_mode=self._action_config.lean_mode,
             lean_initial_lockout_frames=self._action_config.lean_initial_lockout_frames,
@@ -125,7 +109,6 @@ class FZeroXEnvEngine:
             control_state=self._control_state,
         )
         self._episode = EngineEpisodeState()
-        self._reset_seeds = EngineResetSeeds()
 
     @property
     def action_space(self) -> spaces.Space:
@@ -166,37 +149,23 @@ class FZeroXEnvEngine:
         """Switch the active curriculum stage for subsequent action masks."""
 
         self._mask_controller.set_curriculum_stage(stage_index)
-        self._active_track_sampling = self._stage_track_sampling_config(
-            self._mask_controller.stage_index
-        )
+        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
 
     def sync_checkpoint_curriculum_stage(self, stage_index: int | None) -> None:
         """Align watch-time stage masks with the loaded checkpoint metadata."""
 
         self._mask_controller.sync_checkpoint_stage(stage_index)
-        self._active_track_sampling = self._stage_track_sampling_config(
-            self._mask_controller.stage_index
-        )
+        self._reset_coordinator.set_curriculum_stage(self._mask_controller.stage_index)
 
     def set_track_sampling_weights(self, weights_by_track_id: dict[str, float]) -> None:
         """Update adaptive reset weights used by step-balanced track sampling."""
 
-        self._track_sampling_weight_overrides = {
-            str(track_id): float(weight)
-            for track_id, weight in weights_by_track_id.items()
-            if isinstance(track_id, str)
-            and isinstance(weight, int | float)
-            and math.isfinite(float(weight))
-            and float(weight) > 0.0
-        }
-        self._active_track_sampling = self._stage_track_sampling_config(
-            self._mask_controller.stage_index
-        )
+        self._reset_coordinator.set_track_sampling_weights(weights_by_track_id)
 
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""
 
-        self._locked_reset_course_id = course_id if course_id else None
+        self._reset_coordinator.set_locked_reset_course(course_id)
 
     @property
     def curriculum_stage_index(self) -> int | None:
@@ -213,39 +182,15 @@ class FZeroXEnvEngine:
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""
 
-        self._reset_seeds.remember_reset_seed(seed)
-        selected_track = self._select_reset_track(seed)
+        selected_track = self._reset_coordinator.select_episode_track(seed)
         self._episode.begin_reset(active_track=selected_track)
-        if selected_track is not None:
-            load_track_baseline(
-                backend=self.backend,
-                cache=self._track_baseline_cache,
-                selected_track=selected_track,
-                cache_enabled=self.config.cache_track_baselines,
-            )
-        _, info, telemetry = reset_race_state(
-            backend=self.backend,
-            config=self.config,
-            sampled_track_baseline=selected_track is not None,
+        reset_result = self._reset_coordinator.reset_race(
+            seed=seed,
+            selected_track=selected_track,
         )
-        if selected_track is not None:
-            info.update(selected_track.info())
-        if self._locked_reset_course_id is not None:
-            info["track_sampling_locked_course_id"] = self._locked_reset_course_id
-        self._episode.uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
-        telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-        telemetry = sync_camera_setting(
-            self.backend,
-            target_name=self.config.camera_setting,
-            telemetry=telemetry,
-            info=info,
-        )
-        race_intro_info, telemetry = sync_race_intro_target(
-            self.backend,
-            target_timer=self.config.race_intro_target_timer,
-        )
-        info.update(race_intro_info)
-        info.update(backend_step_info(self.backend))
+        info = reset_result.info
+        telemetry = reset_result.telemetry
+        self._episode.uses_custom_baseline = reset_result.uses_custom_baseline
         self.backend.set_controller_state(self._episode.held_controller_state)
         self._control_state.reset()
         self._mask_controller.set_lean_allowed_values(
@@ -260,7 +205,7 @@ class FZeroXEnvEngine:
         self._episode.last_telemetry = telemetry
         self._reward_tracker.reset(
             telemetry,
-            episode_seed=self._reward_episode_seed(seed),
+            episode_seed=self._reset_coordinator.reward_episode_seed(seed),
             course_id=None if selected_track is None else selected_track.course_id,
         )
         self._reward_summary_config = self._reward_tracker.summary_config()
@@ -291,7 +236,7 @@ class FZeroXEnvEngine:
             image_shape=tuple(int(value) for value in image_observation.shape),
         )
         self._episode.last_info = dict(info)
-        self._reset_seeds.advance_reset_count()
+        self._reset_coordinator.advance_reset_count()
         return observation, info
 
     def step(
@@ -382,72 +327,6 @@ class FZeroXEnvEngine:
 
     def close(self) -> None:
         self.backend.close()
-
-    def _maybe_randomize_game_rng(
-        self,
-        seed: int | None,
-        telemetry: FZeroXTelemetry | None,
-        info: dict[str, object],
-    ) -> FZeroXTelemetry | None:
-        if not self.config.randomize_game_rng_on_reset:
-            return telemetry
-        if self.config.randomize_game_rng_requires_race_mode and (
-            telemetry is None or not telemetry.in_race_mode
-        ):
-            info["rng_randomized"] = False
-            info["rng_randomization_skip_reason"] = "not_in_race"
-            return telemetry
-
-        rng_seed = self._reset_seeds.reset_rng_seed(seed)
-        if rng_seed is None:
-            return telemetry
-        rng_state = self.backend.randomize_game_rng(rng_seed)
-        info["rng_randomized"] = True
-        info["rng_seed"] = rng_seed
-        info["rng_state"] = rng_state
-        return read_live_telemetry(self.backend) or telemetry
-
-    def _reward_episode_seed(self, seed: int | None) -> int | None:
-        return self._reset_seeds.reward_episode_seed(seed)
-
-    def _select_reset_track(self, seed: int | None) -> SelectedTrack | None:
-        if self._locked_reset_course_id is not None:
-            selected_track = select_reset_track_by_course_id(
-                self._active_track_sampling,
-                course_id=self._locked_reset_course_id,
-            )
-            if selected_track is not None:
-                return selected_track
-        return self._track_selector.select(
-            self._active_track_sampling,
-            seed=self._reset_seeds.track_sampling_seed(seed),
-        )
-
-    def _stage_track_sampling_config(self, stage_index: int | None) -> TrackSamplingConfig:
-        if (
-            self._curriculum_config is None
-            or not self._curriculum_config.enabled
-            or stage_index is None
-        ):
-            return self._track_sampling_with_weight_overrides(self.config.track_sampling)
-        stage = self._curriculum_config.stages[stage_index]
-        return self._track_sampling_with_weight_overrides(
-            stage.track_sampling or self.config.track_sampling
-        )
-
-    def _track_sampling_with_weight_overrides(
-        self,
-        config: TrackSamplingConfig,
-    ) -> TrackSamplingConfig:
-        if config.sampling_mode != "step_balanced" or not self._track_sampling_weight_overrides:
-            return config
-        entries = tuple(
-            entry.model_copy(
-                update={"weight": self._track_sampling_weight_overrides.get(entry.id, entry.weight)}
-            )
-            for entry in config.entries
-        )
-        return config.model_copy(update={"entries": entries})
 
     def _run_env_step(
         self,

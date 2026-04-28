@@ -1,7 +1,7 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import ControllerState
-from rl_fzerox.ui.watch.view.panels.draw import _record_tab_sections
-from rl_fzerox.ui.watch.view.panels.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
+from rl_fzerox.ui.watch.view.panels.rendering.draw import _record_tab_sections
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelColumns, PanelSection
 from tests.support.native_objects import encode_state_flags

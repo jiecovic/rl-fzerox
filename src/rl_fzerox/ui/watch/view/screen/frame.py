@@ -18,13 +18,13 @@ from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
     _draw_observation_preview_in_rect,
 )
-from rl_fzerox.ui.watch.view.panels.draw import SidePanelData, _draw_side_panel
-from rl_fzerox.ui.watch.view.panels.model import (
+from rl_fzerox.ui.watch.view.panels.core.model import (
     _observation_preview_size,
     _preview_frame,
     _window_size,
 )
-from rl_fzerox.ui.watch.view.panels.viz import _control_viz
+from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
+from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (

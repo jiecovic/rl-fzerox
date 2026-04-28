@@ -1,10 +1,12 @@
 # src/rl_fzerox/core/training/session/model/policy.py
 from __future__ import annotations
 
+from stable_baselines3.common.vec_env import VecEnv
+
 from rl_fzerox.core.config.schema import PolicyConfig
 
 
-def resolve_policy_name(*, train_env, recurrent_enabled: bool) -> str:
+def resolve_policy_name(*, train_env: VecEnv, recurrent_enabled: bool) -> str:
     """Select the SB3 policy class name for the env observation shape."""
 
     from gymnasium import spaces
@@ -16,7 +18,7 @@ def resolve_policy_name(*, train_env, recurrent_enabled: bool) -> str:
 
 def build_policy_kwargs(
     *,
-    train_env,
+    train_env: VecEnv,
     policy_config: PolicyConfig,
     value_head_key: str,
 ) -> dict[str, object]:

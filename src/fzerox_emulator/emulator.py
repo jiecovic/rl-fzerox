@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
-
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
@@ -15,9 +13,15 @@ from fzerox_emulator.base import (
     ObservationSpec,
     ObservationStackMode,
     ResetState,
-    stacked_observation_channels,
 )
 from fzerox_emulator.control import ControllerState
+from fzerox_emulator.frames import (
+    expected_observation_shape,
+    validated_display_frame,
+    validated_observation_frame,
+    validated_raw_rgb_frame,
+)
+from fzerox_emulator.repeat import RepeatStepConfig, run_repeat_step, run_repeat_watch_step
 from fzerox_emulator.video import display_size
 
 
@@ -219,8 +223,7 @@ class Emulator:
     ) -> BackendStepResult:
         """Execute one repeated env step natively and return the final payload."""
 
-        state = controller_state.clamped()
-        observation, summary, status, telemetry = self._native.step_repeat_raw(
+        config = RepeatStepConfig(
             action_repeat=action_repeat,
             preset=preset,
             frame_stack=frame_stack,
@@ -235,31 +238,12 @@ class Emulator:
             progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
-            joypad_mask=state.joypad_mask,
-            left_stick_x=state.left_stick_x,
-            left_stick_y=state.left_stick_y,
-            right_stick_x=state.right_stick_x,
-            right_stick_y=state.right_stick_y,
         )
-        frame = np.asarray(observation, dtype=np.uint8)
-        spec = self.observation_spec(preset)
-        stacked_channels = stacked_observation_channels(
-            spec.channels,
-            frame_stack=frame_stack,
-            stack_mode=stack_mode,
-            minimap_layer=minimap_layer,
-        )
-        expected_shape = (spec.height, spec.width, stacked_channels)
-        if tuple(int(value) for value in frame.shape) != expected_shape:
-            raise RuntimeError(
-                "Unexpected repeated-step observation shape from native emulator: "
-                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
-            )
-        return BackendStepResult(
-            observation=np.ascontiguousarray(frame),
-            summary=summary,
-            status=status,
-            telemetry=telemetry,
+        return run_repeat_step(
+            self._native,
+            controller_state,
+            config=config,
+            spec=self.observation_spec(preset),
         )
 
     def step_repeat_watch_raw(
@@ -283,61 +267,27 @@ class Emulator:
     ) -> BackendStepResult:
         """Execute one repeated watch step and return per-frame display images."""
 
-        state = controller_state.clamped()
-        observation, display_frames, summary, status, telemetry = (
-            self._native.step_repeat_watch_raw(
-                action_repeat=action_repeat,
-                preset=preset,
-                frame_stack=frame_stack,
-                stack_mode=stack_mode,
-                minimap_layer=minimap_layer,
-                resize_filter=resize_filter,
-                minimap_resize_filter=minimap_resize_filter,
-                stuck_min_speed_kph=stuck_min_speed_kph,
-                energy_loss_epsilon=energy_loss_epsilon,
-                max_episode_steps=max_episode_steps,
-                progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
-                progress_frontier_epsilon=progress_frontier_epsilon,
-                terminate_on_energy_depleted=terminate_on_energy_depleted,
-                lean_timer_assist=lean_timer_assist,
-                joypad_mask=state.joypad_mask,
-                left_stick_x=state.left_stick_x,
-                left_stick_y=state.left_stick_y,
-                right_stick_x=state.right_stick_x,
-                right_stick_y=state.right_stick_y,
-            )
-        )
-        frame = np.asarray(observation, dtype=np.uint8)
-        spec = self.observation_spec(preset)
-        stacked_channels = stacked_observation_channels(
-            spec.channels,
+        config = RepeatStepConfig(
+            action_repeat=action_repeat,
+            preset=preset,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            energy_loss_epsilon=energy_loss_epsilon,
+            max_episode_steps=max_episode_steps,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=progress_frontier_epsilon,
+            terminate_on_energy_depleted=terminate_on_energy_depleted,
+            lean_timer_assist=lean_timer_assist,
         )
-        expected_observation_shape = (spec.height, spec.width, stacked_channels)
-        if tuple(int(value) for value in frame.shape) != expected_observation_shape:
-            raise RuntimeError(
-                "Unexpected repeated-step observation shape from native emulator: "
-                f"expected {expected_observation_shape!r}, got {tuple(frame.shape)!r}"
-            )
-
-        expected_display_shape = (spec.display_height, spec.display_width, 3)
-        validated_display_frames = tuple(
-            _validated_display_frame(display_frame, expected_shape=expected_display_shape)
-            for display_frame in display_frames
-        )
-        if len(validated_display_frames) != action_repeat:
-            raise RuntimeError(
-                "Unexpected display frame count from native watch step: "
-                f"expected {action_repeat}, got {len(validated_display_frames)}"
-            )
-        return BackendStepResult(
-            observation=np.ascontiguousarray(frame),
-            summary=summary,
-            status=status,
-            telemetry=telemetry,
-            display_frames=validated_display_frames,
+        return run_repeat_watch_step(
+            self._native,
+            controller_state,
+            config=config,
+            spec=self.observation_spec(preset),
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
@@ -382,16 +332,7 @@ class Emulator:
     def render(self) -> RgbFrame:
         """Return the latest raw RGB frame as a NumPy array."""
 
-        frame_bytes = self._native.frame_rgb()
-        frame_height, frame_width, channels = self.frame_shape
-        frame = np.frombuffer(frame_bytes, dtype=np.uint8)
-        expected_size = frame_height * frame_width * channels
-        if frame.size != expected_size:
-            raise RuntimeError(
-                "Unexpected frame size from native emulator: "
-                f"expected {expected_size} bytes, got {frame.size}"
-            )
-        return frame.reshape((frame_height, frame_width, channels))
+        return validated_raw_rgb_frame(self._native.frame_rgb(), self.frame_shape)
 
     def render_display(
         self,
@@ -401,20 +342,11 @@ class Emulator:
         """Return one native display frame for the requested observation preset."""
 
         spec = self.observation_spec(preset)
-        frame = np.asarray(self._native.frame_display(preset), dtype=np.uint8)
-        expected_size = spec.display_height * spec.display_width * 3
-        if frame.size != expected_size:
-            raise RuntimeError(
-                "Unexpected display frame size from native emulator: "
-                f"expected {expected_size} bytes, got {frame.size}"
-            )
         expected_shape = (spec.display_height, spec.display_width, 3)
-        if tuple(int(value) for value in frame.shape) != expected_shape:
-            raise RuntimeError(
-                "Unexpected display frame shape from native emulator: "
-                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
-            )
-        return np.ascontiguousarray(frame)
+        return validated_display_frame(
+            self._native.frame_display(preset),
+            expected_shape=expected_shape,
+        )
 
     def observation_spec(self, preset: str) -> ObservationSpec:
         """Return the resolved native observation spec for one preset."""
@@ -447,38 +379,27 @@ class Emulator:
         """Return one native stacked observation tensor for the requested preset."""
 
         spec = self.observation_spec(preset)
-        frame = np.asarray(
-            self._native.frame_observation(
-                preset,
-                frame_stack,
-                {
-                    "stack_mode": stack_mode,
-                    "minimap_layer": minimap_layer,
-                    "resize_filter": resize_filter,
-                    "minimap_resize_filter": minimap_resize_filter,
-                },
-            ),
-            dtype=np.uint8,
+        frame = self._native.frame_observation(
+            preset,
+            frame_stack,
+            {
+                "stack_mode": stack_mode,
+                "minimap_layer": minimap_layer,
+                "resize_filter": resize_filter,
+                "minimap_resize_filter": minimap_resize_filter,
+            },
         )
-        stacked_channels = stacked_observation_channels(
-            spec.channels,
+        expected_shape = expected_observation_shape(
+            spec,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
         )
-        expected_size = spec.height * spec.width * stacked_channels
-        if frame.size != expected_size:
-            raise RuntimeError(
-                "Unexpected observation size from native emulator: "
-                f"expected {expected_size} bytes, got {frame.size}"
-            )
-        expected_shape = (spec.height, spec.width, stacked_channels)
-        if tuple(int(value) for value in frame.shape) != expected_shape:
-            raise RuntimeError(
-                "Unexpected observation frame shape from native emulator: "
-                f"expected {expected_shape!r}, got {tuple(frame.shape)!r}"
-            )
-        return np.ascontiguousarray(frame)
+        return validated_observation_frame(
+            frame,
+            expected_shape=expected_shape,
+            source_label="native emulator",
+        )
 
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         """Return the latest telemetry snapshot from the native host, if available."""
@@ -504,13 +425,3 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
-
-
-def _validated_display_frame(frame: object, *, expected_shape: tuple[int, int, int]) -> RgbFrame:
-    display_frame = np.asarray(frame, dtype=np.uint8)
-    if tuple(int(value) for value in display_frame.shape) != expected_shape:
-        raise RuntimeError(
-            "Unexpected display frame shape from native watch step: "
-            f"expected {expected_shape!r}, got {tuple(display_frame.shape)!r}"
-        )
-    return np.ascontiguousarray(display_frame)

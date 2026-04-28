@@ -8,13 +8,18 @@ from fzerox_emulator import ControllerState, display_size
 from rl_fzerox.core.envs.observations import state_feature_names
 from rl_fzerox.ui.watch.app import _next_panel_tab_index
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
-from rl_fzerox.ui.watch.view.panels.model import (
+from rl_fzerox.ui.watch.view.panels.core.model import (
     _build_panel_columns,
     _panel_content_height,
     _window_size,
 )
-from rl_fzerox.ui.watch.view.panels.section_renderer import _draw_labeled_value_line
-from rl_fzerox.ui.watch.view.panels.tab_bar import _draw_panel_tabs, _panel_tab_hint
+from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import (
+    _draw_labeled_value_line,
+)
+from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
+    _draw_panel_tabs,
+    _panel_tab_hint,
+)
 from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE

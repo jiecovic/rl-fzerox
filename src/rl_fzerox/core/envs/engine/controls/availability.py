@@ -14,11 +14,11 @@ from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from ..info import telemetry_can_boost, telemetry_energy_fraction
 from .gates import with_left_stick_y, without_joypad_mask
 from .history import ControlStateTracker
-from .masks import (
-    ActionMaskController,
+from .mask_queries import (
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
 )
+from .masks import ActionMaskController
 
 
 def sync_dynamic_action_masks(
