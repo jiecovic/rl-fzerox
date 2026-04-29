@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Protocol
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.config.schema import WatchAppConfig
-from rl_fzerox.core.envs import observations as observation_utils
+from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
@@ -181,8 +181,8 @@ def _build_snapshot(
     best_finish_position = _update_best_finish_position(best_finish_position, info, telemetry)
     return WatchSnapshot(
         raw_frame=env.render() if raw_frame is None else raw_frame,
-        observation_image=observation_utils.observation_image(observation),
-        observation_state=observation_utils.observation_state(observation),
+        observation_image=observation_access.observation_image(observation),
+        observation_state=observation_access.observation_state(observation),
         info=dict(info),
         reset_info=dict(reset_info),
         episode=episode,
