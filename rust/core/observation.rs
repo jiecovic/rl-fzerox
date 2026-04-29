@@ -219,4 +219,5 @@ impl ObservationStackMode {
 }
 
 #[cfg(test)]
+#[path = "tests/observation_tests.rs"]
 mod tests;

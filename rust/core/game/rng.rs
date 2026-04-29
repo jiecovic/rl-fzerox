@@ -113,4 +113,5 @@ fn memory_error(offset: usize, length: usize, available: usize) -> CoreError {
 }
 
 #[cfg(test)]
+#[path = "tests/rng_tests.rs"]
 mod tests;

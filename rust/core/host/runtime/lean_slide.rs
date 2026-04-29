@@ -94,4 +94,5 @@ fn write_i16(system_ram: &mut [u8], offset: usize, value: i16) -> Result<(), Cor
 }
 
 #[cfg(test)]
+#[path = "../tests/runtime_lean_slide_tests.rs"]
 mod tests;

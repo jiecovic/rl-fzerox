@@ -105,5 +105,5 @@ fn header_byte(rom_bytes: &[u8], offset: usize, byte_order: N64ByteOrder) -> u8 
 }
 
 #[cfg(test)]
-#[path = "rom/tests.rs"]
+#[path = "tests/rom_tests.rs"]
 mod tests;
