@@ -365,7 +365,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "D": (None, "policy"),
         "Tab / 1-6": (None, "tabs"),
         "+/-": (None, "speed"),
-        "0": (None, "realtime"),
+        "0": (None, "reset speed"),
         "Arrow keys": ("stick X/Y", "steer/pitch"),
         "Z": ("A", "accelerate"),
         "X": ("C-down", "air brake"),
