@@ -194,4 +194,5 @@ impl StackedObservationBuffer {
 }
 
 #[cfg(test)]
+#[path = "../tests/callbacks_stack_tests.rs"]
 mod tests;
