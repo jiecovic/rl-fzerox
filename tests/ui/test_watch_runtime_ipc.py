@@ -170,6 +170,24 @@ def test_drain_worker_commands_coalesces_course_lock_toggle() -> None:
     assert commands.toggle_track_course_lock_id == "silence"
 
 
+def test_drain_worker_commands_coalesces_control_fps_reset() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(control_fps_delta=1),
+            ViewerCommand(reset_control_fps=True),
+        ]
+    )
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+    )
+
+    assert commands.control_fps_delta == 1
+    assert commands.reset_control_fps is True
+
+
 def test_watch_worker_shutdown_swallows_keyboard_interrupt_during_join() -> None:
     command_queue = _ShutdownQueue()
     snapshot_queue = _ShutdownQueue()

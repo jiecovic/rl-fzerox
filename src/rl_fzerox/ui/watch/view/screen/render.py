@@ -43,6 +43,7 @@ def draw_watch_frame(
     telemetry = _telemetry_from_data(snapshot.telemetry_data)
     draw_info = _with_viewer_rates(
         snapshot.info,
+        native_fps=snapshot.native_fps,
         action_repeat=config.env.action_repeat,
         current_control_fps=snapshot.control_fps,
         current_render_fps=render_rate.rate_hz(),
@@ -93,6 +94,7 @@ def draw_watch_frame(
             best_finish_times=snapshot.best_finish_times,
             latest_finish_times=snapshot.latest_finish_times,
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
+            failed_track_attempts=snapshot.failed_track_attempts,
             track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,
             record_tab_index=record_tab_index,
@@ -323,6 +325,7 @@ def _observation_state_feature_names(
 def _with_viewer_rates(
     info: dict[str, object],
     *,
+    native_fps: float,
     action_repeat: int,
     current_control_fps: float,
     current_render_fps: float,
@@ -334,6 +337,7 @@ def _with_viewer_rates(
     draw_info["render_fps"] = current_render_fps
     draw_info["control_fps"] = current_control_fps
     draw_info["game_fps"] = current_control_fps * float(action_repeat)
+    draw_info["native_fps"] = native_fps
     draw_info["control_fps_target"] = (
         "unlimited" if target_control_fps is None else target_control_fps
     )

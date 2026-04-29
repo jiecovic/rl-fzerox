@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -28,7 +29,36 @@ class _GlassViewStyle:
     shadow: Color = (2, 3, 4)
 
 
+@dataclass(frozen=True)
+class _ViewportBadgeStyle:
+    """Small translucent label drawn inside the game viewport."""
+
+    text: Color
+    border: Color
+    fill: tuple[int, int, int, int]
+    font: Literal["small", "body"] = "small"
+    fixed_size: tuple[int, int] | None = None
+    shadow: Color = (0, 0, 0)
+    pad_x: int = 8
+    pad_y: int = 5
+    margin: int = 12
+    radius: int = 7
+
+
 _GLASS_VIEW_STYLE = _GlassViewStyle()
+_COURSE_BADGE_STYLE = _ViewportBadgeStyle(
+    text=(108, 255, 178),
+    border=(62, 224, 154),
+    fill=(5, 18, 13, 184),
+)
+_SPEED_BADGE_STYLE = _ViewportBadgeStyle(
+    text=_COURSE_BADGE_STYLE.text,
+    border=_COURSE_BADGE_STYLE.border,
+    fill=_COURSE_BADGE_STYLE.fill,
+    font="body",
+    fixed_size=(42, 42),
+    radius=21,
+)
 _GLASS_OVERLAY_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
 _GLASS_MASK_CACHE: dict[tuple[int, int, int], PygameSurface] = {}
 
@@ -41,6 +71,7 @@ def _draw_glass_game_view(
     surface: PygameSurface,
     outer_size: tuple[int, int],
     course_label: str | None = None,
+    speed_label: str | None = None,
 ) -> None:
     style = _GLASS_VIEW_STYLE
     outer_rect = pygame.Rect(0, 0, *outer_size)
@@ -88,12 +119,26 @@ def _draw_glass_game_view(
         viewport_rect.topleft,
     )
     if course_label:
-        _draw_course_overlay(
+        _draw_viewport_badge(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
             viewport_rect=viewport_rect,
             label=course_label,
+            placement="bottom_left",
+            stack_index=0,
+            style=_COURSE_BADGE_STYLE,
+        )
+    if speed_label:
+        _draw_viewport_badge(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            viewport_rect=viewport_rect,
+            label=speed_label,
+            placement="bottom_left",
+            stack_index=1 if course_label else 0,
+            style=_SPEED_BADGE_STYLE,
         )
 
     pygame.draw.rect(
@@ -124,46 +169,80 @@ def _draw_glass_game_view(
     )
 
 
-def _draw_course_overlay(
+def _draw_viewport_badge(
     *,
     pygame: PygameModule,
     screen: PygameSurface,
     fonts: ViewerFonts,
     viewport_rect: PygameRect,
     label: str,
+    placement: Literal["bottom_left", "top_right"],
+    stack_index: int,
+    style: _ViewportBadgeStyle,
 ) -> None:
-    text_color = (108, 255, 178)
-    border_color = (62, 224, 154)
-    label_surface = fonts.small.render(label, True, text_color)
-    pad_x = 8
-    pad_y = 5
-    overlay_width = label_surface.get_width() + (2 * pad_x)
-    overlay_height = label_surface.get_height() + (2 * pad_y)
-    overlay_rect = pygame.Rect(
-        viewport_rect.left + 12,
-        viewport_rect.bottom - overlay_height - 12,
-        overlay_width,
-        overlay_height,
+    font = fonts.body if style.font == "body" else fonts.small
+    label_surface = font.render(label, True, style.text)
+    overlay_size = style.fixed_size or (
+        label_surface.get_width() + (2 * style.pad_x),
+        label_surface.get_height() + (2 * style.pad_y),
+    )
+    overlay_rect = _viewport_badge_rect(
+        pygame=pygame,
+        viewport_rect=viewport_rect,
+        size=overlay_size,
+        placement=placement,
+        margin=style.margin,
+        stack_index=max(0, stack_index),
     )
     shadow_rect = overlay_rect.move(0, 2)
-    pygame.draw.rect(screen, (0, 0, 0), shadow_rect, border_radius=7)
+    pygame.draw.rect(screen, style.shadow, shadow_rect, border_radius=style.radius)
 
     overlay = pygame.Surface(overlay_rect.size, pygame.SRCALPHA)
     pygame.draw.rect(
         overlay,
-        (5, 18, 13, 184),
+        style.fill,
         pygame.Rect(0, 0, *overlay_rect.size),
-        border_radius=7,
+        border_radius=style.radius,
     )
     pygame.draw.rect(
         overlay,
-        (*border_color, 190),
+        (*style.border, 190),
         pygame.Rect(0, 0, *overlay_rect.size),
         width=1,
-        border_radius=7,
+        border_radius=style.radius,
     )
     screen.blit(overlay, overlay_rect.topleft)
-    screen.blit(label_surface, (overlay_rect.left + pad_x, overlay_rect.top + pad_y))
+    label_x = overlay_rect.left + ((overlay_rect.width - label_surface.get_width()) // 2)
+    label_y = overlay_rect.top + ((overlay_rect.height - label_surface.get_height()) // 2)
+    screen.blit(
+        label_surface,
+        (label_x, label_y),
+    )
+
+
+def _viewport_badge_rect(
+    *,
+    pygame: PygameModule,
+    viewport_rect: PygameRect,
+    size: tuple[int, int],
+    placement: Literal["bottom_left", "top_right"],
+    margin: int,
+    stack_index: int,
+) -> PygameRect:
+    width, height = size
+    if placement == "top_right":
+        return pygame.Rect(
+            viewport_rect.right - width - margin,
+            viewport_rect.top + margin + (stack_index * (height + 6)),
+            width,
+            height,
+        )
+    return pygame.Rect(
+        viewport_rect.left + margin,
+        viewport_rect.bottom - height - margin - (stack_index * (height + 6)),
+        width,
+        height,
+    )
 
 
 def _rounded_game_surface(

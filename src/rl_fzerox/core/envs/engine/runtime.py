@@ -167,6 +167,11 @@ class FZeroXEnvEngine:
 
         self._reset_coordinator.set_locked_reset_course(course_id)
 
+    def set_sequential_track_sampling(self, enabled: bool) -> None:
+        """Use configured track order for watch resets instead of training sampling."""
+
+        self._reset_coordinator.set_sequential_track_sampling(enabled)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""
@@ -225,6 +230,7 @@ class FZeroXEnvEngine:
             info,
             episode_boost_pad_entries=self._episode.boost_pad_entries,
         )
+        info["episode_airborne_frames"] = self._episode.airborne_frames
         image_observation = self._observation_builder.render_image()
         observation = self._observation_builder.build_observation(
             image=image_observation,
@@ -363,6 +369,7 @@ class FZeroXEnvEngine:
                 active_track=self._episode.active_track,
                 episode_return=self._episode.return_value,
                 episode_boost_pad_entries=self._episode.boost_pad_entries,
+                episode_airborne_frames=self._episode.airborne_frames,
                 curriculum_stage_index=self.curriculum_stage_index,
                 curriculum_stage_name=self.curriculum_stage_name,
             )
@@ -373,6 +380,7 @@ class FZeroXEnvEngine:
             gas_level=assembly.gas_level,
             return_value=assembly.episode_return,
             boost_pad_entries=assembly.episode_boost_pad_entries,
+            airborne_frames=assembly.episode_airborne_frames,
             done=assembly.step.terminated or assembly.step.truncated,
             info=assembly.step.info,
         )

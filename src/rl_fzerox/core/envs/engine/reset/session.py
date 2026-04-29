@@ -50,6 +50,7 @@ class EngineResetCoordinator:
         self._track_sampling_weight_overrides: dict[str, float] = {}
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
         self._locked_reset_course_id: str | None = None
+        self._sequential_track_sampling = False
         self._track_selector = TrackResetSelector(env_index=env_index)
         self._track_baseline_cache = TrackBaselineCache()
         self._reset_seeds = EngineResetSeeds()
@@ -76,6 +77,11 @@ class EngineResetCoordinator:
 
         self._locked_reset_course_id = course_id if course_id else None
 
+    def set_sequential_track_sampling(self, enabled: bool) -> None:
+        """Use configured track order for watch resets instead of training sampling."""
+
+        self._sequential_track_sampling = bool(enabled)
+
     def select_episode_track(self, seed: int | None) -> SelectedTrack | None:
         self._reset_seeds.remember_reset_seed(seed)
         if self._locked_reset_course_id is not None:
@@ -85,6 +91,8 @@ class EngineResetCoordinator:
             )
             if selected_track is not None:
                 return selected_track
+        if self._sequential_track_sampling:
+            return self._track_selector.select_sequential(self._active_track_sampling)
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),

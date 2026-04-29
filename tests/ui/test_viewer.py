@@ -27,7 +27,10 @@ from rl_fzerox.ui.watch.view.panels.core.format import (
     _pressed_button_labels,
 )
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
-from rl_fzerox.ui.watch.view.screen.frame import _game_course_overlay_label
+from rl_fzerox.ui.watch.view.screen.frame import (
+    _game_course_overlay_label,
+    _game_speed_overlay_label,
+)
 from tests.ui.viewer_support import (
     fake_viewer_fonts,
 )
@@ -59,6 +62,37 @@ def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
             }
         )
         == "Joker Cup : Big Hand"
+    )
+
+
+def test_game_speed_overlay_label_formats_actual_speedup() -> None:
+    assert (
+        _game_speed_overlay_label(
+            {"native_fps": 60.0, "game_fps": 120.0},
+            action_repeat=2,
+        )
+        == "2.0x"
+    )
+    assert (
+        _game_speed_overlay_label(
+            {"native_fps": 60.0, "game_fps": 150.0},
+            action_repeat=2,
+        )
+        == "2.5x"
+    )
+    assert (
+        _game_speed_overlay_label(
+            {"native_fps": 60.0, "control_fps": 45.0},
+            action_repeat=2,
+        )
+        == "1.5x"
+    )
+    assert (
+        _game_speed_overlay_label(
+            {"native_fps": 60.0, "game_fps": 720.0},
+            action_repeat=2,
+        )
+        == "12.0x"
     )
 
 
@@ -328,11 +362,11 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "R": (None, "reset"),
         "K": (None, "save"),
         "M": (None, "manual"),
-        "D/click": (None, "policy"),
+        "D": (None, "policy"),
         "Tab / 1-6": (None, "tabs"),
         "+/-": (None, "speed"),
-        "<-/->": ("stick X", "steer"),
-        "up/down": ("stick Y", "pitch"),
+        "0": (None, "realtime"),
+        "Arrow keys": ("stick X/Y", "steer/pitch"),
         "Z": ("A", "accelerate"),
         "X": ("C-down", "air brake"),
         "Space": ("B", "boost"),

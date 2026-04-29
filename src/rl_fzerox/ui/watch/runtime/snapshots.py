@@ -94,6 +94,7 @@ def _publish_step_snapshots(
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    failed_track_attempts: frozenset[str],
 ) -> None:
     frames = display_frames or (env.render(),)
     frame_interval_seconds = (
@@ -132,6 +133,7 @@ def _publish_step_snapshots(
                 best_finish_times=best_finish_times,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
+                failed_track_attempts=failed_track_attempts,
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),
                 policy_decision_frame=is_final_frame,
@@ -168,6 +170,7 @@ def _build_snapshot(
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    failed_track_attempts: frozenset[str],
     telemetry: FZeroXTelemetry | None = None,
     action_hold_frame: int = 1,
     action_hold_frames: int = 1,
@@ -209,6 +212,7 @@ def _build_snapshot(
         best_finish_times=dict(best_finish_times),
         latest_finish_times=dict(latest_finish_times),
         latest_finish_deltas_ms=dict(latest_finish_deltas_ms),
+        failed_track_attempts=failed_track_attempts,
         continuous_air_brake_disabled=_continuous_air_brake_disabled(config, telemetry),
         telemetry_data=_telemetry_to_data(telemetry),
         action_hold_frame=max(1, int(action_hold_frame)),

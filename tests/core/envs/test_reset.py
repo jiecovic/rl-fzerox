@@ -335,6 +335,50 @@ def test_balanced_track_sampling_respects_weights(tmp_path: Path) -> None:
     assert sampled_ids == ["mute", "silence", "mute", "mute", "silence", "mute"]
 
 
+def test_sequential_track_sampling_uses_config_order_for_watch(tmp_path: Path) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        baseline_state_path=baseline_paths["mute"],
+                        weight=3.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand",
+                        baseline_state_path=baseline_paths["sand"],
+                        weight=2.0,
+                    ),
+                ),
+            ),
+        ),
+        env_index=2,
+    )
+
+    env.set_sequential_track_sampling(True)
+    sampled_infos = [env.reset(seed=123)[1] for _ in range(4)]
+
+    assert [info["track_id"] for info in sampled_infos] == [
+        "mute",
+        "silence",
+        "sand",
+        "mute",
+    ]
+    assert sampled_infos[0]["track_sampling_mode"] == "sequential"
+    assert sampled_infos[2]["track_sampling_cycle_position"] == 2
+
+
 def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: Path) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
     env = FZeroXEnv(

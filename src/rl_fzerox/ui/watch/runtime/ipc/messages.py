@@ -27,6 +27,7 @@ class ViewerCommand:
     toggle_manual_control: bool = False
     toggle_track_course_lock_id: str | None = None
     control_fps_delta: int = 0
+    reset_control_fps: bool = False
     cnn_visualization_enabled: bool = False
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
     control_state: ControllerState | None = None
@@ -45,6 +46,7 @@ class WorkerCommandBatch:
     manual_control_enabled: bool
     toggle_track_course_lock_id: str | None
     control_fps_delta: int
+    reset_control_fps: bool
     cnn_visualization_enabled: bool
     cnn_normalization: CnnActivationNormalizationMode
     control_state: ControllerState
@@ -91,6 +93,7 @@ class WatchSnapshot:
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
+    failed_track_attempts: frozenset[str]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
     action_hold_frame: int = 1

@@ -103,6 +103,23 @@ class TrackResetSelector:
             return self._select_balanced(config, sampling_mode=config.sampling_mode)
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
+    def select_sequential(self, config: TrackSamplingConfig) -> SelectedTrack | None:
+        """Select configured tracks in list order, ignoring training weights."""
+
+        if not config.enabled:
+            return None
+        if not config.entries:
+            raise ValueError("track sampling is enabled but has no entries")
+        self._sync_sequential_cycle(config)
+        position = self._cursor % len(self._cycle)
+        entry = self._cycle[position]
+        self._cursor += 1
+        return _selected_track_from_entry(
+            entry,
+            sampling_mode="sequential",
+            cycle_position=position,
+        )
+
     def _select_balanced(
         self,
         config: TrackSamplingConfig,
@@ -130,6 +147,14 @@ class TrackResetSelector:
         self._fingerprint = fingerprint
         self._cycle = _balanced_cycle(config.entries)
         self._cursor = self._env_index % len(self._cycle)
+
+    def _sync_sequential_cycle(self, config: TrackSamplingConfig) -> None:
+        fingerprint = ("sequential", *_track_sampling_fingerprint(config))
+        if fingerprint == self._fingerprint:
+            return
+        self._fingerprint = fingerprint
+        self._cycle = tuple(config.entries)
+        self._cursor = 0
 
 
 def select_reset_track_by_course_id(

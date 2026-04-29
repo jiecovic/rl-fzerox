@@ -171,6 +171,9 @@ class RolloutInfoAccumulator:
         }
     )
     course_finish_times_s: dict[str, _MeanAccumulator] = field(default_factory=dict)
+    airborne_episode_count: int = 0
+    airborne_finished_count: int = 0
+    airborne_failed_count: int = 0
     termination_counts: dict[str, int] = field(
         default_factory=lambda: {
             reason: 0 for reason in ROLLOUT_INFO_LOG_SPECS.episode_reasons.termination
@@ -219,6 +222,13 @@ class RolloutInfoAccumulator:
             self._add_course_finish_time(episode)
 
         for episode in episodes:
+            if _episode_was_airborne(episode):
+                self.airborne_episode_count += 1
+                if episode.get("termination_reason") == "finished":
+                    self.airborne_finished_count += 1
+                else:
+                    self.airborne_failed_count += 1
+
             termination_reason = episode.get("termination_reason")
             if (
                 isinstance(termination_reason, str)
@@ -272,6 +282,19 @@ class RolloutInfoAccumulator:
                 f"episode/{reason}_rate",
                 self.truncation_counts[reason] / self.episode_count,
             )
+        if self.airborne_episode_count > 0:
+            logger.record(
+                "episode/airborne_episode_rate",
+                self.airborne_episode_count / self.episode_count,
+            )
+            logger.record(
+                "episode/airborne_finish_rate",
+                self.airborne_finished_count / self.airborne_episode_count,
+            )
+            logger.record(
+                "episode/airborne_failure_rate",
+                self.airborne_failed_count / self.airborne_episode_count,
+            )
 
     def _add_course_finish_time(self, episode: dict[str, object]) -> None:
         course_key = course_log_key(episode)
@@ -304,6 +327,13 @@ def episode_dicts(infos: Sequence[object]) -> list[dict[str, object]]:
 
 def finished_episode_dicts(episodes: Sequence[dict[str, object]]) -> list[dict[str, object]]:
     return [episode for episode in episodes if episode.get("termination_reason") == "finished"]
+
+
+def _episode_was_airborne(episode: dict[str, object]) -> bool:
+    value = episode.get("episode_airborne_frames")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return False
+    return float(value) > 0.0
 
 
 def course_log_key(episode: dict[str, object]) -> str | None:

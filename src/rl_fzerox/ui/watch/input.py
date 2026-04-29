@@ -38,6 +38,7 @@ class ViewerInput:
     toggle_manual_control: bool = False
     toggle_cnn_normalization: bool = False
     control_fps_delta: int = 0
+    reset_control_fps: bool = False
     panel_tab_delta: int = 0
     panel_tab_index: int | None = None
     record_tab_index: int | None = None
@@ -94,6 +95,7 @@ def _poll_viewer_input(
     toggle_manual_control = False
     toggle_cnn_normalization = False
     control_fps_delta = 0
+    reset_control_fps = False
     panel_tab_delta = 0
     panel_tab_index = None
     record_tab_index = None
@@ -150,6 +152,8 @@ def _poll_viewer_input(
                 toggle_manual_control = True
             elif event.key == pygame.K_c:
                 toggle_cnn_normalization = True
+            elif event.key in (pygame.K_0, pygame.K_KP0):
+                reset_control_fps = True
             elif event.key in (pygame.K_PLUS, pygame.K_KP_PLUS):
                 control_fps_delta += 1
             elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
@@ -202,6 +206,7 @@ def _poll_viewer_input(
         toggle_manual_control=toggle_manual_control,
         toggle_cnn_normalization=toggle_cnn_normalization,
         control_fps_delta=control_fps_delta,
+        reset_control_fps=reset_control_fps,
         panel_tab_delta=panel_tab_delta,
         panel_tab_index=panel_tab_index,
         record_tab_index=record_tab_index,

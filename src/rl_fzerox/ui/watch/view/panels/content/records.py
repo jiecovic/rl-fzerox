@@ -26,9 +26,15 @@ def track_record_sections(
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    failed_track_attempts: frozenset[str] = frozenset(),
 ) -> tuple[PanelSection, ...]:
     records = track_pool_records or _current_track_record_pool(current_info)
-    if not records and not best_finish_times and not latest_finish_times:
+    if (
+        not records
+        and not best_finish_times
+        and not latest_finish_times
+        and not failed_track_attempts
+    ):
         return ()
     record_groups = _record_groups(records)
     if _should_split_cup_sections(record_groups):
@@ -41,6 +47,7 @@ def track_record_sections(
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    failed_track_attempts=failed_track_attempts,
                 ),
             )
             for group in record_groups
@@ -52,6 +59,7 @@ def track_record_sections(
         best_finish_times=best_finish_times,
         latest_finish_times=latest_finish_times,
         latest_finish_deltas_ms=latest_finish_deltas_ms,
+        failed_track_attempts=failed_track_attempts,
     )
     if not lines:
         return ()
@@ -69,6 +77,7 @@ def _record_group_lines(
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    failed_track_attempts: frozenset[str],
 ) -> list[PanelLine]:
     lines: list[PanelLine] = []
     for record_index, record in enumerate(records):
@@ -81,6 +90,7 @@ def _record_group_lines(
                 best_finish_times=best_finish_times,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
+                failed_track_attempts=failed_track_attempts,
             )
         )
     return lines
@@ -152,22 +162,26 @@ def _track_record_pool_lines(
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
+    failed_track_attempts: frozenset[str],
 ) -> tuple[PanelLine, ...]:
     is_current_track = _is_current_track_record(record, current_info)
     watch_best = _watch_track_value(record, best_finish_times)
     watch_latest = _watch_track_value(record, latest_finish_times)
     watch_latest_delta = _watch_track_value(record, latest_finish_deltas_ms)
+    failed_attempt = _has_failed_attempt(record, failed_track_attempts) and watch_best is None
     best_time = _optional_int_info(record, "track_non_agg_best_time_ms")
     worst_time = _optional_int_info(record, "track_non_agg_worst_time_ms")
     status_icon, status_color = _track_record_status(
         watch_best_ms=watch_best,
         best_time_ms=best_time,
         worst_time_ms=worst_time,
+        failed_attempt=failed_attempt,
     )
     status_text = _track_record_gap_text(
         watch_best_ms=watch_best,
         best_time_ms=best_time,
         worst_time_ms=worst_time,
+        failed_attempt=failed_attempt,
     )
     return (
         panel_line(
@@ -191,11 +205,13 @@ def _track_record_pool_lines(
                 watch_latest,
                 watch_best,
                 latest_delta_ms=watch_latest_delta,
+                failed_attempt=failed_attempt,
             ),
             _latest_time_color(
                 latest_time_ms=watch_latest,
                 best_time_ms=watch_best,
                 latest_delta_ms=watch_latest_delta,
+                failed_attempt=failed_attempt,
             ),
         ),
         panel_line(
@@ -211,6 +227,14 @@ def _track_record_pool_lines(
 def _format_track_record_heading(record: dict[str, object], *, is_current_track: bool) -> str:
     label = _format_track_record_label(record)
     return f"> {label}" if is_current_track else label
+
+
+def _has_failed_attempt(
+    record: dict[str, object],
+    failed_track_attempts: frozenset[str],
+) -> bool:
+    track_key = _track_best_key(record)
+    return track_key is not None and track_key in failed_track_attempts
 
 
 def _record_course_id(record: dict[str, object]) -> str | None:
@@ -282,7 +306,10 @@ def _track_record_status(
     watch_best_ms: int | None,
     best_time_ms: int | None,
     worst_time_ms: int | None,
+    failed_attempt: bool,
 ) -> tuple[StatusIcon, Color]:
+    if failed_attempt:
+        return "outside", PALETTE.text_warning
     if watch_best_ms is None:
         return "none", PALETTE.text_muted
 
@@ -299,7 +326,10 @@ def _track_record_gap_text(
     watch_best_ms: int | None,
     best_time_ms: int | None,
     worst_time_ms: int | None,
+    failed_attempt: bool,
 ) -> str:
+    if failed_attempt:
+        return "FAILED"
     if watch_best_ms is None:
         return ""
     range_cutoff_ms = worst_time_ms if worst_time_ms is not None else best_time_ms
@@ -323,9 +353,10 @@ def _format_latest_compact_time(
     best_time_ms: int | None,
     *,
     latest_delta_ms: int | None,
+    failed_attempt: bool,
 ) -> str:
     if latest_time_ms is None:
-        return "--"
+        return "failed" if failed_attempt else "--"
     latest = _format_compact_race_time_ms(latest_time_ms)
     if best_time_ms is None:
         return latest
@@ -343,7 +374,10 @@ def _latest_time_color(
     latest_time_ms: int | None,
     best_time_ms: int | None,
     latest_delta_ms: int | None,
+    failed_attempt: bool,
 ) -> Color:
+    if failed_attempt:
+        return PALETTE.text_warning
     if latest_time_ms is None:
         return PALETTE.text_muted
     if latest_delta_ms is not None:

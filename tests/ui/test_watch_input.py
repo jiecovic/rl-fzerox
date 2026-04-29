@@ -36,6 +36,8 @@ class _FakePygame:
     K_MINUS = 15
     K_KP_MINUS = 16
     K_EQUALS = 17
+    K_0 = 40
+    K_KP0 = 41
     K_r = 26
     K_d = 27
     K_m = 35
@@ -94,6 +96,12 @@ def test_poll_viewer_input_does_not_treat_equals_as_plus() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_EQUALS,)))
 
     assert viewer_input.control_fps_delta == 0
+
+
+def test_poll_viewer_input_maps_zero_to_realtime_control_fps() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_0, _FakePygame.K_KP0)))
+
+    assert viewer_input.reset_control_fps is True
 
 
 def test_poll_viewer_input_repeats_control_fps_delta_while_plus_is_held() -> None:

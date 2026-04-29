@@ -110,6 +110,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         self._engine.set_locked_reset_course(course_id)
 
+    def set_sequential_track_sampling(self, enabled: bool) -> None:
+        """Use configured track order for watch resets instead of training sampling."""
+
+        self._engine.set_sequential_track_sampling(enabled)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""

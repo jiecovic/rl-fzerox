@@ -141,6 +141,7 @@ def drain_worker_commands(
     toggle_deterministic_policy = False
     toggle_track_course_lock_id: str | None = None
     control_fps_delta = 0
+    reset_control_fps = False
     next_cnn_visualization_enabled = cnn_visualization_enabled
     next_cnn_normalization = cnn_normalization
     while True:
@@ -158,6 +159,7 @@ def drain_worker_commands(
                     manual_control_enabled=next_manual_control_enabled,
                     toggle_track_course_lock_id=toggle_track_course_lock_id,
                     control_fps_delta=control_fps_delta,
+                    reset_control_fps=reset_control_fps,
                     cnn_visualization_enabled=next_cnn_visualization_enabled,
                     cnn_normalization=next_cnn_normalization,
                     control_state=next_control_state,
@@ -184,6 +186,7 @@ def drain_worker_commands(
         if command.toggle_track_course_lock_id is not None:
             toggle_track_course_lock_id = command.toggle_track_course_lock_id
         control_fps_delta += command.control_fps_delta
+        reset_control_fps = reset_control_fps or command.reset_control_fps
         next_cnn_visualization_enabled = command.cnn_visualization_enabled
         next_cnn_normalization = command.cnn_normalization
         if command.control_state is not None:
@@ -211,6 +214,7 @@ def apply_viewer_input(
             toggle_manual_control=viewer_input.toggle_manual_control,
             toggle_track_course_lock_id=viewer_input.toggle_record_course_lock_id,
             control_fps_delta=viewer_input.control_fps_delta,
+            reset_control_fps=viewer_input.reset_control_fps,
             cnn_visualization_enabled=cnn_visualization_enabled,
             cnn_normalization=cnn_normalization,
             control_state=viewer_input.control_state,

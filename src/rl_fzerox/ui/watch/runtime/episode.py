@@ -6,6 +6,7 @@ from fzerox_emulator import FZeroXTelemetry
 TrackFinishTimes = dict[str, int]
 TrackBestFinishTimes = TrackFinishTimes
 TrackLatestFinishDeltas = dict[str, int]
+FailedTrackAttempts = frozenset[str]
 
 
 def _update_best_finish_position(
@@ -76,6 +77,28 @@ def _update_latest_finish_deltas_ms(
     else:
         updated[track_key] = finish_time_ms - previous_best
     return updated
+
+
+def _update_failed_track_attempts(
+    failed_track_attempts: FailedTrackAttempts,
+    info: dict[str, object],
+    *,
+    episode_done: bool,
+) -> FailedTrackAttempts:
+    """Track courses that ended in watch without a successful finish."""
+
+    if not episode_done:
+        return failed_track_attempts
+    track_key = _track_key(info)
+    if track_key is None:
+        return failed_track_attempts
+
+    updated = set(failed_track_attempts)
+    if info.get("termination_reason") == "finished":
+        updated.discard(track_key)
+    else:
+        updated.add(track_key)
+    return frozenset(updated)
 
 
 def _successful_finish_position(
