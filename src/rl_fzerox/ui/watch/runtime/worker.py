@@ -19,6 +19,7 @@ from rl_fzerox.ui.watch.runtime.cnn import (
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
@@ -85,6 +86,7 @@ def _run_simulation_loop(
         reward_config=config.reward,
         curriculum_config=config.curriculum,
     )
+    env.set_sequential_track_sampling(True)
     try:
         policy_runner = _load_policy_runner(
             config.watch.policy_run_dir,
@@ -105,6 +107,7 @@ def _run_simulation_loop(
         best_finish_times: dict[str, int] = {}
         latest_finish_times: dict[str, int] = {}
         latest_finish_deltas_ms: dict[str, int] = {}
+        failed_track_attempts: frozenset[str] = frozenset()
         paused = False
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_enabled = policy_runner is None
@@ -155,6 +158,7 @@ def _run_simulation_loop(
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    failed_track_attempts=failed_track_attempts,
                 ),
             )
 
@@ -183,7 +187,12 @@ def _run_simulation_loop(
                     break
                 if commands.reset_requested:
                     break
-                if commands.control_fps_delta:
+                if commands.reset_control_fps:
+                    target_control_fps = native_control_fps
+                    target_control_seconds = _target_seconds(target_control_fps)
+                    control_rate.trim_to_recent()
+                    next_step_time = time.perf_counter()
+                elif commands.control_fps_delta:
                     target_control_fps = _adjust_control_fps(
                         target_control_fps,
                         commands.control_fps_delta,
@@ -300,6 +309,11 @@ def _run_simulation_loop(
                     info,
                     live_telemetry,
                 )
+                failed_track_attempts = _update_failed_track_attempts(
+                    failed_track_attempts,
+                    info,
+                    episode_done=terminated or truncated,
+                )
                 _publish_step_snapshots(
                     config=config,
                     env=env,
@@ -332,6 +346,7 @@ def _run_simulation_loop(
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    failed_track_attempts=failed_track_attempts,
                     manual_control_enabled=manual_control_enabled,
                 )
                 if target_control_seconds is not None:

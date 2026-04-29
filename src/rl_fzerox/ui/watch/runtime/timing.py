@@ -9,7 +9,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class _TimingLimits:
     min_fps: float = 1.0
-    control_fps_adjust_step: float = 15.0
+    control_fps_adjust_step: float = 5.0
 
 
 _TIMING_LIMITS = _TimingLimits()

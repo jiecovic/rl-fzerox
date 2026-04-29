@@ -250,6 +250,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "boost_pad_entries_per_lap": 2.0,
                 "race_time_ms": 123_400,
                 "episode_step": 7_404,
+                "episode_airborne_frames": 2,
                 "termination_reason": "finished",
                 "truncation_reason": None,
                 "track_course_id": "mute_city",
@@ -280,6 +281,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
                 "boost_pad_entries_per_lap": 1.0,
                 "race_time_ms": 40_000,
                 "episode_step": 2_400,
+                "episode_airborne_frames": 3,
                 "termination_reason": None,
                 "truncation_reason": "progress_stalled",
             },
@@ -311,6 +313,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.finished_episode_metrics["position"].mean() == 2.0
     assert accumulator.course_finish_times_s["mute_city"].mean() == 123.4
     assert accumulator.episode_count == 2
+    assert accumulator.airborne_episode_count == 2
+    assert accumulator.airborne_finished_count == 1
+    assert accumulator.airborne_failed_count == 1
     assert accumulator.termination_counts["finished"] == 1
     assert accumulator.truncation_counts["progress_stalled"] == 1
 
@@ -334,6 +339,9 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["episode/by_course/mute_city/finish_time_s_mean"] == 123.4
     assert logger.records["episode/finish_steps_mean"] == 7404.0
     assert logger.records["episode/finish_position_mean"] == 2.0
+    assert logger.records["episode/airborne_episode_rate"] == 1.0
+    assert logger.records["episode/airborne_finish_rate"] == 0.5
+    assert logger.records["episode/airborne_failure_rate"] == 0.5
 
 
 def test_info_sequence_accepts_tuple_infos() -> None:
@@ -896,6 +904,7 @@ def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> No
     assert "collision_recoil_entered" in MONITOR_INFO_KEYS
     assert "boost_pad_entries" in MONITOR_INFO_KEYS
     assert "boost_pad_entries_per_lap" in MONITOR_INFO_KEYS
+    assert "episode_airborne_frames" in MONITOR_INFO_KEYS
 
 
 def test_monitor_info_keys_exclude_step_only_action_rates() -> None:

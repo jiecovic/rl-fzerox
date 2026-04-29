@@ -60,13 +60,13 @@ VIEWER_HOTKEY_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("R", "reset"),
     MacroLegendHint("K", "save"),
     MacroLegendHint("M", "manual"),
-    MacroLegendHint("D/click", "policy"),
+    MacroLegendHint("D", "policy"),
     MacroLegendHint("Tab / 1-6", "tabs"),
     MacroLegendHint("+/-", "speed"),
+    MacroLegendHint("0", "realtime"),
 )
 MANUAL_CONTROL_HINTS: tuple[MacroLegendHint, ...] = (
-    MacroLegendHint("<-/->", "steer", controller="stick X"),
-    MacroLegendHint("up/down", "pitch", controller="stick Y"),
+    MacroLegendHint("Arrow keys", "steer/pitch", controller="stick X/Y"),
     MacroLegendHint("Z", "accelerate", controller="A"),
     MacroLegendHint("X", "air brake", controller="C-down"),
     MacroLegendHint("Space", "boost", controller="B"),
@@ -74,9 +74,10 @@ MANUAL_CONTROL_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("S", "lean right", controller="R"),
     MacroLegendHint("Enter", "start", controller="Start"),
 )
+_LEGEND_SEPARATOR = "›"
 MACRO_LEGEND_GROUPS: tuple[MacroLegendGroup, ...] = (
-    MacroLegendGroup("Viewer", VIEWER_HOTKEY_HINTS),
-    MacroLegendGroup("Manual: key -> controller -> game", MANUAL_CONTROL_HINTS),
+    MacroLegendGroup("General", VIEWER_HOTKEY_HINTS),
+    MacroLegendGroup("Manual mode", MANUAL_CONTROL_HINTS),
 )
 MACRO_LEGEND_HINTS: tuple[MacroLegendHint, ...] = (
     *VIEWER_HOTKEY_HINTS,
@@ -241,7 +242,7 @@ def _draw_macro_hint(
     action_y = key_rect.centery - (action_surface.get_height() // 2)
     if hint.controller is not None:
         controller_surface = font.render(hint.controller, True, style.controller_text)
-        arrow_surface = font.render("->", True, style.action_text)
+        arrow_surface = font.render(_LEGEND_SEPARATOR, True, style.action_text)
         screen.blit(controller_surface, (action_x, action_y))
         arrow_x = action_x + controller_surface.get_width() + style.key_gap
         screen.blit(arrow_surface, (arrow_x, action_y))
@@ -265,7 +266,7 @@ def _macro_hint_width(*, font: RenderFont, hint: MacroLegendHint) -> int:
     action_width = font.render(_macro_hint_action_text(hint), True, style.action_text).get_width()
     if hint.controller is not None:
         controller_width = font.render(hint.controller, True, style.controller_text).get_width()
-        arrow_width = font.render("->", True, style.action_text).get_width()
+        arrow_width = font.render(_LEGEND_SEPARATOR, True, style.action_text).get_width()
         action_width += controller_width + arrow_width + (2 * style.key_gap)
     return key_width + style.key_gap + action_width + style.action_pad_right
 

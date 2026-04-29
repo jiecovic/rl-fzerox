@@ -17,6 +17,7 @@ class EngineEpisodeState:
     uses_custom_baseline: bool = False
     return_value: float = 0.0
     boost_pad_entries: int = 0
+    airborne_frames: int = 0
     held_controller_state: ControllerState = field(default_factory=ControllerState)
     last_requested_control_state: ControllerState = field(default_factory=ControllerState)
     last_gas_level: float = 0.0
@@ -30,6 +31,7 @@ class EngineEpisodeState:
         self.done = False
         self.return_value = 0.0
         self.boost_pad_entries = 0
+        self.airborne_frames = 0
         self.held_controller_state = ControllerState()
         self.last_requested_control_state = ControllerState()
         self.last_gas_level = 0.0
@@ -42,6 +44,7 @@ class EngineEpisodeState:
         gas_level: float,
         return_value: float,
         boost_pad_entries: int,
+        airborne_frames: int,
         done: bool,
         info: dict[str, object],
     ) -> None:
@@ -52,5 +55,6 @@ class EngineEpisodeState:
         self.last_gas_level = gas_level
         self.return_value = return_value
         self.boost_pad_entries = boost_pad_entries
+        self.airborne_frames = airborne_frames
         self.done = done
         self.last_info = dict(info)

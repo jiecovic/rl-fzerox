@@ -15,6 +15,7 @@ from rl_fzerox.core.config.schema import (
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
+    _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
@@ -24,6 +25,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _resolve_render_fps,
 )
+from rl_fzerox.ui.watch.view.panels.content.records import track_record_sections
 from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info, _track_pool_records
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
@@ -38,10 +40,10 @@ def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
 
 
 def test_watch_control_fps_adjustment_supports_uncapped_mode() -> None:
-    assert _adjust_control_fps(60.0, 1, native_control_fps=60.0) == 75.0
-    assert _adjust_control_fps(60.0, -1, native_control_fps=60.0) == 45.0
+    assert _adjust_control_fps(60.0, 1, native_control_fps=60.0) == 65.0
+    assert _adjust_control_fps(60.0, -1, native_control_fps=60.0) == 55.0
     assert _adjust_control_fps(None, 1, native_control_fps=60.0) is None
-    assert _adjust_control_fps(None, -1, native_control_fps=60.0) == 45.0
+    assert _adjust_control_fps(None, -1, native_control_fps=60.0) == 55.0
 
 
 def test_best_finish_position_tracks_only_finished_episodes() -> None:
@@ -157,6 +159,61 @@ def test_latest_finish_delta_tracks_previous_pb_gap() -> None:
         _sample_telemetry(race_time_ms=95_000),
     )
     assert latest_deltas == {"mute": -3_000}
+
+
+def test_failed_track_attempts_track_until_success() -> None:
+    failed_attempts = _update_failed_track_attempts(
+        frozenset(),
+        {"truncation_reason": "progress_stalled", "track_id": "mute"},
+        episode_done=True,
+    )
+    assert failed_attempts == frozenset({"mute"})
+
+    failed_attempts = _update_failed_track_attempts(
+        failed_attempts,
+        {"termination_reason": "crashed", "track_id": "silence"},
+        episode_done=False,
+    )
+    assert failed_attempts == frozenset({"mute"})
+
+    failed_attempts = _update_failed_track_attempts(
+        failed_attempts,
+        {"termination_reason": "finished", "track_id": "mute"},
+        episode_done=True,
+    )
+    assert failed_attempts == frozenset()
+
+
+def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
+    records: tuple[dict[str, object], ...] = (
+        {
+            "track_id": "mute",
+            "track_course_id": "mute_city",
+            "track_course_name": "Mute City",
+        },
+    )
+
+    failed_section = track_record_sections(
+        current_info={},
+        track_pool_records=records,
+        best_finish_times={},
+        latest_finish_times={},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset({"mute"}),
+    )[0]
+    success_section = track_record_sections(
+        current_info={},
+        track_pool_records=records,
+        best_finish_times={"mute": 95_000},
+        latest_finish_times={"mute": 95_000},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset({"mute"}),
+    )[0]
+
+    assert failed_section.lines[0].status_text == "FAILED"
+    assert failed_section.lines[2].value == "failed"
+    assert success_section.lines[0].status_text == ""
+    assert success_section.lines[2].value == "1:35.000"
 
 
 def test_config_track_info_uses_registry_name_for_course_index(tmp_path: Path) -> None:

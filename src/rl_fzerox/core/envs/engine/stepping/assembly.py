@@ -36,6 +36,7 @@ class EnvStepRequest:
     active_track: SelectedTrack | None
     episode_return: float
     episode_boost_pad_entries: int
+    episode_airborne_frames: int
     curriculum_stage_index: int | None
     curriculum_stage_name: str | None
 
@@ -50,6 +51,7 @@ class EnvStepAssembly:
     gas_level: float
     episode_return: float
     episode_boost_pad_entries: int
+    episode_airborne_frames: int
 
 
 @dataclass(slots=True)
@@ -118,6 +120,9 @@ class EngineStepAssembler:
         boost_pad_entered = bool(step_result.summary.entered_dash_surface)
         if boost_pad_entered:
             episode_boost_pad_entries += 1
+        episode_airborne_frames = request.episode_airborne_frames + int(
+            step_result.summary.airborne_frames
+        )
 
         info["step_reward"] = reward
         info["step_reward_raw"] = raw_reward
@@ -131,6 +136,7 @@ class EngineStepAssembler:
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
+        info["episode_airborne_frames"] = episode_airborne_frames
         info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
         info["boost_pad_entered"] = boost_pad_entered
         info["boost_used"] = boost_used
@@ -199,6 +205,7 @@ class EngineStepAssembler:
             gas_level=gas_level,
             episode_return=episode_return,
             episode_boost_pad_entries=episode_boost_pad_entries,
+            episode_airborne_frames=episode_airborne_frames,
         )
 
     def _native_step(

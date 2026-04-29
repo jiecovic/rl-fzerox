@@ -70,6 +70,7 @@ class FrameRenderData:
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
+    failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
     record_tab_index: int
@@ -185,6 +186,7 @@ def _draw_frame(
         surface=game_surface,
         outer_size=game_display_size,
         course_label=_game_course_overlay_label(data.info),
+        speed_label=_game_speed_overlay_label(data.info, action_repeat=data.action_repeat),
     )
     control_viz = _control_viz(
         data.control_state,
@@ -263,6 +265,7 @@ def _draw_frame(
             best_finish_times=data.best_finish_times,
             latest_finish_times=data.latest_finish_times,
             latest_finish_deltas_ms=data.latest_finish_deltas_ms,
+            failed_track_attempts=data.failed_track_attempts,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,
             record_tab_index=data.record_tab_index,
@@ -341,6 +344,30 @@ def _game_course_overlay_label(info: dict[str, object]) -> str | None:
     if cup is None:
         return course_name
     return f"{cup} : {course_name}"
+
+
+def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) -> str | None:
+    native_fps = _finite_float_info(info, "native_fps")
+    if native_fps is None or native_fps <= 0.0:
+        return None
+
+    actual_game_fps = _finite_float_info(info, "game_fps")
+    if actual_game_fps is None or actual_game_fps <= 0.0:
+        control_fps = _finite_float_info(info, "control_fps")
+        if control_fps is None or control_fps <= 0.0:
+            return None
+        actual_game_fps = control_fps * max(1, int(action_repeat))
+
+    speedup = min(99.9, max(0.0, actual_game_fps / native_fps))
+    return f"{speedup:.1f}x"
+
+
+def _finite_float_info(info: dict[str, object], key: str) -> float | None:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    number = float(value)
+    return number if math.isfinite(number) else None
 
 
 def _course_cup_name(info: dict[str, object]) -> str | None:
