@@ -35,19 +35,16 @@ class MacroLegendGroup:
 class _MacroLegendStyle:
     padding_x: int = 10
     padding_y: int = 8
-    row_gap: int = 5
-    hint_gap: int = 6
-    key_gap: int = 4
-    key_pad_x: int = 6
-    key_pad_y: int = 2
-    action_pad_right: int = 2
-    group_gap: int = 7
-    radius: int = 8
+    row_gap: int = 4
+    hint_gap: int = 14
+    key_gap: int = 5
+    group_gap: int = 8
+    title_gap: int = 5
+    radius: int = 6
     fill: Color = (12, 17, 23)
     border: Color = (42, 54, 66)
-    key_fill: Color = (23, 31, 39)
-    key_border: Color = (80, 99, 116)
     title: Color = PALETTE.text_muted
+    panel_title: Color = PALETTE.text_primary
     key_text: Color = PALETTE.text_primary
     controller_text: Color = PALETTE.text_accent
     action_text: Color = PALETTE.text_muted
@@ -63,7 +60,7 @@ VIEWER_HOTKEY_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("D", "policy"),
     MacroLegendHint("Tab / 1-6", "tabs"),
     MacroLegendHint("+/-", "speed"),
-    MacroLegendHint("0", "realtime"),
+    MacroLegendHint("0", "reset speed"),
 )
 MANUAL_CONTROL_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("Arrow keys", "steer/pitch", controller="stick X/Y"),
@@ -84,6 +81,7 @@ MACRO_LEGEND_HINTS: tuple[MacroLegendHint, ...] = (
     *MANUAL_CONTROL_HINTS,
 )
 _MACRO_LEGEND_STYLE = _MacroLegendStyle()
+_MACRO_LEGEND_TITLE = "Hotkeys"
 
 
 def _macro_legend_height(*, fonts: ViewerFonts, width: int) -> int:
@@ -103,7 +101,8 @@ def _macro_legend_height(*, fonts: ViewerFonts, width: int) -> int:
     if not visible_group_heights:
         return 0
 
-    return (2 * style.padding_y) + sum(visible_group_heights) + (
+    title_height = fonts.small.render(_MACRO_LEGEND_TITLE, True, style.panel_title).get_height()
+    return (2 * style.padding_y) + title_height + style.title_gap + sum(visible_group_heights) + (
         (len(visible_group_heights) - 1) * style.group_gap
     )
 
@@ -128,7 +127,9 @@ def _draw_macro_legend(
     content_x = x + style.padding_x
     content_y = y + style.padding_y
     content_width = width - (2 * style.padding_x)
-    row_y = content_y
+    title_surface = fonts.small.render(_MACRO_LEGEND_TITLE, True, style.panel_title)
+    screen.blit(title_surface, (content_x, content_y))
+    row_y = content_y + title_surface.get_height() + style.title_gap
     for group in MACRO_LEGEND_GROUPS:
         group_height = _macro_legend_group_height(
             font=fonts.small,
@@ -228,18 +229,10 @@ def _draw_macro_hint(
     style = _MACRO_LEGEND_STYLE
     key_surface = font.render(hint.keys, True, style.key_text)
     action_surface = font.render(_macro_hint_action_text(hint), True, style.action_text)
-    key_rect = pygame.Rect(
-        x,
-        y,
-        key_surface.get_width() + (2 * style.key_pad_x),
-        key_surface.get_height() + (2 * style.key_pad_y),
-    )
-    pygame.draw.rect(screen, style.key_fill, key_rect, border_radius=5)
-    pygame.draw.rect(screen, style.key_border, key_rect, width=1, border_radius=5)
-    screen.blit(key_surface, (key_rect.left + style.key_pad_x, key_rect.top + style.key_pad_y))
+    screen.blit(key_surface, (x, y))
 
-    action_x = key_rect.right + style.key_gap
-    action_y = key_rect.centery - (action_surface.get_height() // 2)
+    action_x = x + key_surface.get_width() + style.key_gap
+    action_y = y
     if hint.controller is not None:
         controller_surface = font.render(hint.controller, True, style.controller_text)
         arrow_surface = font.render(_LEGEND_SEPARATOR, True, style.action_text)
@@ -252,7 +245,7 @@ def _draw_macro_hint(
         x,
         y,
         _macro_hint_width(font=font, hint=hint),
-        key_rect.height,
+        _macro_hint_height(font=font),
     )
 
 
@@ -262,15 +255,14 @@ def _macro_hint_action_text(hint: MacroLegendHint) -> str:
 
 def _macro_hint_width(*, font: RenderFont, hint: MacroLegendHint) -> int:
     style = _MACRO_LEGEND_STYLE
-    key_width = font.render(hint.keys, True, style.key_text).get_width() + (2 * style.key_pad_x)
+    key_width = font.render(hint.keys, True, style.key_text).get_width()
     action_width = font.render(_macro_hint_action_text(hint), True, style.action_text).get_width()
     if hint.controller is not None:
         controller_width = font.render(hint.controller, True, style.controller_text).get_width()
         arrow_width = font.render(_LEGEND_SEPARATOR, True, style.action_text).get_width()
         action_width += controller_width + arrow_width + (2 * style.key_gap)
-    return key_width + style.key_gap + action_width + style.action_pad_right
+    return key_width + style.key_gap + action_width
 
 
 def _macro_hint_height(*, font: RenderFont) -> int:
-    style = _MACRO_LEGEND_STYLE
-    return font.render("Ag", True, style.key_text).get_height() + (2 * style.key_pad_y)
+    return font.render("Ag", True, _MACRO_LEGEND_STYLE.key_text).get_height()
