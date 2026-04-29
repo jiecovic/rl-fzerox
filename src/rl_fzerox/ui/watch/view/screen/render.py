@@ -10,7 +10,7 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.domain.action_adapters import CONTINUOUS_DRIVE_ACTION_ADAPTERS
-from rl_fzerox.core.envs import observations as observation_utils
+from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
@@ -312,7 +312,7 @@ def _observation_state_feature_names(
         return tuple(names)
     if config.env.observation.mode != "image_state":
         return ()
-    return observation_utils.state_feature_names(
+    return observation_access.state_feature_names(
         config.env.observation.state_profile,
         course_context=config.env.observation.course_context,
         ground_effect_context=config.env.observation.ground_effect_context,
