@@ -217,7 +217,7 @@ class ManagedPolicyConfig(BaseModel):
 
     conv_profile: ConvProfile = "nature_32_64_128"
     features_dim: FeatureDim = "auto"
-    state_features_dim: PositiveInt = 64
+    state_net_arch: tuple[PositiveInt, ...] = (64,)
     fusion_features_dim: PositiveInt = 768
     layer_norm: bool = True
     activation: ActivationName = "relu"
