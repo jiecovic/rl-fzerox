@@ -12,6 +12,7 @@
     "check": "tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json"
   },
   "dependencies": {
+    "elkjs": "^0.11.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "zod": "^4.4.1"
