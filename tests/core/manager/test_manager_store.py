@@ -83,6 +83,57 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     assert draft.config.reward.step_reward_clip_max == 100.0
 
 
+def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["observation"] = {
+        "frame_stack": 2,
+        "minimap_layer": False,
+        "preset": "crop_60x76",
+        "progress_source": "segment_progress",
+        "stack_mode": "rgb",
+        "zero_edge_ratio": True,
+        "zero_outside_track_bounds": True,
+    }
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-observation",
+                "Old Observation",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.observation.state_components[2].name == "track_position"
+    assert draft.config.observation.state_components[2].progress_source == "segment_progress"
+    assert tuple(
+        feature.model_dump(mode="json")
+        for feature in draft.config.observation.state_feature_modes
+    ) == (
+        {"name": "track_position.edge_ratio", "mode": "zero"},
+        {"name": "track_position.outside_track_bounds", "mode": "zero"},
+    )
+
+
+
 def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()

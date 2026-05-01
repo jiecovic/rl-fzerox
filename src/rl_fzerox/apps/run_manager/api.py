@@ -18,6 +18,10 @@ from rl_fzerox.core.manager import (
     ManagedRunTemplate,
     ManagerStore,
 )
+from rl_fzerox.core.manager.architecture import (
+    policy_architecture_preview,
+    run_manager_config_metadata,
+)
 
 
 class CreateDraftRequest(BaseModel):
@@ -64,6 +68,14 @@ def create_manager_api_app(store: ManagerStore) -> FastAPI:
     @app.get("/api/schema")
     def schema() -> dict[str, Mapping[str, object]]:
         return {"config": ManagedRunConfig.model_json_schema()}
+
+    @app.get("/api/config-metadata")
+    def config_metadata() -> dict[str, object]:
+        return run_manager_config_metadata().model_dump(mode="json")
+
+    @app.post("/api/policy-preview")
+    def policy_preview(config: ManagedRunConfig) -> dict[str, object]:
+        return policy_architecture_preview(config).model_dump(mode="json")
 
     @app.post("/api/drafts", status_code=201)
     def create_draft(request: CreateDraftRequest) -> dict[str, dict[str, object]]:
