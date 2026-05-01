@@ -45,6 +45,15 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS run_drafts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            config_json TEXT NOT NULL,
+            config_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS run_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             run_id TEXT NOT NULL,

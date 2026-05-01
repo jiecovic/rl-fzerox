@@ -10,12 +10,28 @@ def apply_style(st: StreamlitCommands) -> None:
     st.markdown(
         """
         <style>
+        [data-testid="stHeader"] {
+            background: transparent;
+        }
         .block-container { padding-top: 1.4rem; max-width: 1380px; }
         h1, h2, h3 { letter-spacing: -0.02em; }
         div[data-testid="stForm"] {
-            border: 1px solid rgba(120, 120, 120, 0.22);
             border-radius: 8px;
-            padding: 16px 18px 12px;
+            padding: 18px 20px 14px;
+        }
+        div[data-testid="stForm"] div[data-testid="stVerticalBlock"] {
+            gap: 0.65rem;
+        }
+        div[data-testid="stForm"] div[data-testid="stHorizontalBlock"] {
+            gap: 1.25rem;
+        }
+        .manager-muted {
+            opacity: 0.64;
+            font-size: 0.86rem;
+        }
+        [aria-label="Record a screencast"],
+        [title="Record a screencast"] {
+            display: none !important;
         }
         </style>
         """,
