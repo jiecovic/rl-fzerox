@@ -64,5 +64,5 @@ class PolicyConfig(BaseModel):
     extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
     recurrent: PolicyRecurrentConfig = Field(default_factory=PolicyRecurrentConfig)
     action_bias: PolicyActionBiasConfig = Field(default_factory=PolicyActionBiasConfig)
-    activation: Literal["tanh", "relu"] = "tanh"
+    activation: Literal["tanh", "relu", "gelu"] = "tanh"
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)

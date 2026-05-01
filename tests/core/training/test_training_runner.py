@@ -462,11 +462,12 @@ def test_resolve_policy_activation_fn_supports_known_names() -> None:
 
     assert resolve_policy_activation_fn("tanh") is nn.Tanh
     assert resolve_policy_activation_fn("relu") is nn.ReLU
+    assert resolve_policy_activation_fn("gelu") is nn.GELU
 
 
 def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unsupported policy activation"):
-        resolve_policy_activation_fn("gelu")
+        resolve_policy_activation_fn("silu")
 
 
 def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path) -> None:
