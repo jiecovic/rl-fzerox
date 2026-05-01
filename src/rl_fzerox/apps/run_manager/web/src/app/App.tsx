@@ -1,15 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { createDraft, deleteDraft, fetchDrafts, fetchRuns, fetchTemplates } from "@/api";
-import { Notice } from "@/components/ui/Panel";
-import { Tabs } from "@/components/ui/Tabs";
-import { type Theme, ThemeToggle } from "@/components/ui/ThemeToggle";
-import type { ManagedDraft, ManagedRun, ManagedRunConfig, ManagedTemplate } from "@/contract";
+import { loadManagerData } from "@/app/managerData";
 import { Configurator } from "@/features/configurator/Configurator";
+import { DraftInspector } from "@/features/drafts/DraftInspector";
+import { DraftsPanel } from "@/features/drafts/DraftsPanel";
 import { InspectBanner } from "@/features/inspect/InspectBanner";
-import { DraftInspector, RunInspector } from "@/features/inspect/Inspectors";
-import { DraftsPanel } from "@/features/registry/DraftsPanel";
-import { RunsPanel } from "@/features/registry/RunsPanel";
+import { RunInspector } from "@/features/runs/RunInspector";
+import { RunsPanel } from "@/features/runs/RunsPanel";
+import { createDraft, deleteDraft } from "@/shared/api/client";
+import type {
+  ManagedDraft,
+  ManagedRun,
+  ManagedRunConfig,
+  ManagedTemplate,
+} from "@/shared/api/contract";
+import { Notice } from "@/shared/ui/Panel";
+import { Tabs } from "@/shared/ui/Tabs";
+import { type Theme, ThemeToggle } from "@/shared/ui/ThemeToggle";
 
 type Page = "configure" | "drafts" | "runs";
 
@@ -28,14 +35,10 @@ export function App() {
     setIsLoading(true);
     setError(null);
     try {
-      const [nextTemplates, nextDrafts, nextRuns] = await Promise.all([
-        fetchTemplates(),
-        fetchDrafts(),
-        fetchRuns(),
-      ]);
-      setTemplates(nextTemplates);
-      setDrafts(nextDrafts);
-      setRuns(nextRuns);
+      const managerData = await loadManagerData();
+      setTemplates(managerData.templates);
+      setDrafts(managerData.drafts);
+      setRuns(managerData.runs);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to load run manager data");
     } finally {

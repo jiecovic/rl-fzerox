@@ -1,5 +1,5 @@
-import { Notice, Panel, PanelHeader } from "@/components/ui/Panel";
-import type { ManagedDraft } from "@/contract";
+import type { ManagedDraft } from "@/shared/api/contract";
+import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface DraftsPanelProps {
   drafts: ManagedDraft[];

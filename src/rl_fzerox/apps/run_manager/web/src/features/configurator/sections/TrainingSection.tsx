@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-
-import type { ManagedRunConfig } from "@/contract";
 import {
   BooleanField,
   DiscreteSliderNumberField,
@@ -10,6 +8,7 @@ import {
   RangeNumberField,
   ResetIcon,
 } from "@/features/configurator/fields";
+import type { ManagedRunConfig } from "@/shared/api/contract";
 
 interface ConfigSectionProps {
   config: ManagedRunConfig;

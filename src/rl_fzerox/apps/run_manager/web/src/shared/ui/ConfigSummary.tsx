@@ -1,4 +1,4 @@
-import type { ManagedRunConfig } from "@/contract";
+import type { ManagedRunConfig } from "@/shared/api/contract";
 
 export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
   return (

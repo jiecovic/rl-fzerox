@@ -7,7 +7,7 @@ import {
   type ManagedTemplate,
   runsResponseSchema,
   templatesResponseSchema,
-} from "@/contract";
+} from "@/shared/api/contract";
 
 export async function fetchTemplates(): Promise<ManagedTemplate[]> {
   const payload = templatesResponseSchema.parse(await getJson("/api/templates"));
