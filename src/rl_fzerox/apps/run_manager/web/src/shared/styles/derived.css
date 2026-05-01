@@ -349,7 +349,7 @@
 .architecture-svg {
   display: block;
   width: 100%;
-  min-height: 550px;
+  min-height: 310px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
 }
@@ -370,39 +370,28 @@
   fill: var(--border-strong);
 }
 
-.architecture-svg-node {
-  box-sizing: border-box;
-  display: grid;
-  align-content: center;
-  height: 100%;
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text);
-  padding: 8px 10px;
+.architecture-svg-node rect {
+  fill: var(--surface);
+  stroke: var(--border-strong);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .architecture-svg-node.muted {
   opacity: 0.5;
 }
 
-.architecture-svg-node strong,
-.architecture-svg-node span {
-  overflow: hidden;
-}
-
-.architecture-svg-node strong {
+.architecture-node-label {
+  fill: var(--text);
   font-size: 12px;
-  margin-bottom: 4px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 700;
 }
 
-.architecture-svg-node span {
-  color: var(--muted);
+.architecture-node-detail {
+  fill: var(--muted);
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
-  line-height: 1.28;
-  white-space: normal;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .architecture-merge-dot {

@@ -82,14 +82,14 @@ export function PolicyPreviewPanel({ preview }: { preview: PolicyArchitecturePre
 
 function ArchitectureDiagram({ preview }: { preview: PolicyArchitecturePreview }) {
   const [imageLane, stateLane, trunkLane] = preview.architecture_lanes;
-  const imageNodes = layoutHorizontal(imageLane?.nodes ?? [], 40, 48);
-  const stateNodes = layoutHorizontal(stateLane?.nodes ?? [], 40, 204);
-  const { headNodes, trunkNodes } = layoutFusionAndHeads(
+  const imageNodes = layoutBranch(imageLane?.nodes ?? [], 40, 44);
+  const stateNodes = layoutBranch(stateLane?.nodes ?? [], 40, 176);
+  const pipelineNodes = layoutFusionPipeline(
     (trunkLane?.nodes ?? []).filter((node) => node.id !== "concat"),
   );
   const mergePoint = {
-    x: 590,
-    y: trunkNodes[0] === undefined ? 155 : middleY(trunkNodes[0]),
+    x: 478,
+    y: pipelineNodes[0] === undefined ? 130 : middleY(pipelineNodes[0]),
   };
 
   return (
@@ -97,7 +97,7 @@ function ArchitectureDiagram({ preview }: { preview: PolicyArchitecturePreview }
       aria-label="Policy architecture diagram"
       className="architecture-svg"
       role="img"
-      viewBox="0 0 980 550"
+      viewBox="0 0 1000 310"
     >
       <defs>
         <marker
@@ -113,16 +113,15 @@ function ArchitectureDiagram({ preview }: { preview: PolicyArchitecturePreview }
         </marker>
       </defs>
       <DiagramLaneLabel label={imageLane?.label ?? "Image branch"} x={40} y={24} />
-      <DiagramLaneLabel label={stateLane?.label ?? "State branch"} x={40} y={180} />
-      <DiagramLaneLabel label={trunkLane?.label ?? "Fusion and heads"} x={660} y={102} />
+      <DiagramLaneLabel label={stateLane?.label ?? "State branch"} x={40} y={156} />
+      <DiagramLaneLabel label={trunkLane?.label ?? "Fusion and heads"} x={500} y={72} />
 
       {connectSequential(imageNodes)}
       {connectSequential(stateNodes)}
       {connectToMerge(imageNodes.at(-1), mergePoint, "image")}
       {connectToMerge(stateNodes.at(-1), mergePoint, "state")}
-      {connectPointToNode(mergePoint, trunkNodes[0], "concat")}
-      {connectVertical(trunkNodes)}
-      {connectHeadBranch(trunkNodes.at(-1), headNodes)}
+      {connectPointToNode(mergePoint, pipelineNodes[0], "concat")}
+      {connectSequential(pipelineNodes)}
 
       {imageNodes.map((item) => (
         <DiagramNode item={item} key={item.node.id} />
@@ -131,10 +130,7 @@ function ArchitectureDiagram({ preview }: { preview: PolicyArchitecturePreview }
         <DiagramNode item={item} key={item.node.id} />
       ))}
       <DiagramMergePoint point={mergePoint} />
-      {trunkNodes.map((item) => (
-        <DiagramNode item={item} key={item.node.id} />
-      ))}
-      {headNodes.map((item) => (
+      {pipelineNodes.map((item) => (
         <DiagramNode item={item} key={item.node.id} />
       ))}
     </svg>
@@ -150,17 +146,27 @@ function DiagramLaneLabel({ label, x, y }: { label: string; x: number; y: number
 }
 
 function DiagramNode({ item }: { item: DiagramNodeLayout }) {
+  const labelX = item.x + 12;
+  const detailLines = wrapNodeDetail(formatPreviewText(item.node.detail), item.width);
+
   return (
-    <foreignObject height={item.height} width={item.width} x={item.x} y={item.y}>
-      <div
-        className={
-          item.node.tone === "muted" ? "architecture-svg-node muted" : "architecture-svg-node"
-        }
-      >
-        <strong>{item.node.label}</strong>
-        <span>{formatPreviewText(item.node.detail)}</span>
-      </div>
-    </foreignObject>
+    <g
+      className={
+        item.node.tone === "muted" ? "architecture-svg-node muted" : "architecture-svg-node"
+      }
+    >
+      <rect height={item.height - 1} width={item.width - 1} x={item.x + 0.5} y={item.y + 0.5} />
+      <text className="architecture-node-label" x={labelX} y={item.y + 22}>
+        {item.node.label}
+      </text>
+      <text className="architecture-node-detail" x={labelX} y={item.y + 41}>
+        {detailLines.map((line, index) => (
+          <tspan dy={index === 0 ? 0 : 14} key={line} x={labelX}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
   );
 }
 
@@ -172,23 +178,69 @@ function DiagramMergePoint({ point }: { point: DiagramPoint }) {
   );
 }
 
-function layoutHorizontal(nodes: readonly ArchitectureNode[], startX: number, y: number) {
-  return nodes.map((node, index) => layoutNode(node, startX + index * 164, y, 146));
+function layoutBranch(nodes: readonly ArchitectureNode[], startX: number, y: number) {
+  return nodes.map((node, index) => layoutNode(node, startX + index * 146, y, 132, 88));
 }
 
-function layoutVertical(nodes: readonly ArchitectureNode[], x: number, startY: number) {
-  return nodes.map((node, index) => layoutNode(node, x, startY + index * 96, 250, 70));
+function layoutFusionPipeline(nodes: readonly ArchitectureNode[]) {
+  const headNodes = nodes.filter((node) => isHeadNode(node));
+  const pipelineNodes = nodes.filter((node) => !isHeadNode(node));
+  const combinedHead = combineHeadNodes(headNodes);
+  if (combinedHead !== null) {
+    pipelineNodes.push(combinedHead);
+  }
+  return layoutPipeline(pipelineNodes, 500, 92);
 }
 
-function layoutFusionAndHeads(nodes: readonly ArchitectureNode[]) {
-  const headSourceNodes = nodes.filter((node) => isHeadNode(node));
-  const trunkSourceNodes = nodes.filter((node) => !isHeadNode(node));
-  const trunkNodes = layoutVertical(trunkSourceNodes, 660, 126);
-  const headNodes =
-    headSourceNodes.length === 1
-      ? [layoutNode(headSourceNodes[0], 660, 424, 250, 70)]
-      : headSourceNodes.map((node, index) => layoutNode(node, 500 + index * 230, 424, 210, 70));
-  return { headNodes, trunkNodes };
+function layoutPipeline(nodes: readonly ArchitectureNode[], startX: number, y: number) {
+  let x = startX;
+  return nodes.map((node) => {
+    const item = layoutNode(node, x, y, pipelineNodeWidth(node), 96);
+    x += item.width + 14;
+    return item;
+  });
+}
+
+function pipelineNodeWidth(node: ArchitectureNode) {
+  if (node.id === "layer_norm") {
+    return 96;
+  }
+  if (isHeadNode(node)) {
+    return 120;
+  }
+  if (node.id === "lstm") {
+    return 122;
+  }
+  return 118;
+}
+
+function combineHeadNodes(nodes: readonly ArchitectureNode[]): ArchitectureNode | null {
+  if (nodes.length === 0) {
+    return null;
+  }
+  if (nodes.length === 1) {
+    return nodes[0] ?? null;
+  }
+  const policy = nodes.find((node) => node.id === "policy_head");
+  const value = nodes.find((node) => node.id === "value_head");
+  return {
+    id: "heads",
+    label: "Heads",
+    detail: `pi ${compactHeadDetail(policy)}\nvf ${compactHeadDetail(value)}`,
+    tone: "normal",
+  };
+}
+
+function compactHeadDetail(node: ArchitectureNode | undefined) {
+  if (node === undefined) {
+    return "";
+  }
+  const detail = formatPreviewText(node.detail);
+  const [, output] = detail.split("→");
+  return (output ?? detail)
+    .trim()
+    .replace(/,\s*[^,]+$/, "")
+    .replaceAll(", ", ",");
 }
 
 function isHeadNode(node: ArchitectureNode) {
@@ -222,8 +274,8 @@ function connectToMerge(from: DiagramNodeLayout | undefined, merge: DiagramPoint
   if (from === undefined) {
     return null;
   }
-  const elbowX = merge.x - 48;
-  return connectorPath(
+  const elbowX = merge.x - 28;
+  return connectorLine(
     `merge-${id}`,
     `M ${right(from)} ${middleY(from)} H ${elbowX} V ${merge.y} H ${merge.x}`,
   );
@@ -234,47 +286,6 @@ function connectPointToNode(from: DiagramPoint, to: DiagramNodeLayout | undefine
     return null;
   }
   return connectorPath(`point-${id}`, `M ${from.x} ${from.y} H ${to.x}`);
-}
-
-function connectVertical(nodes: readonly DiagramNodeLayout[]) {
-  return nodes.slice(0, -1).map((node, index) => {
-    const next = nodes[index + 1];
-    if (next === undefined) {
-      return null;
-    }
-    const x = node.x + node.width / 2;
-    return connectorPath(
-      `trunk-${node.node.id}-${next.node.id}`,
-      `M ${x} ${bottom(node)} V ${next.y}`,
-    );
-  });
-}
-
-function connectHeadBranch(
-  from: DiagramNodeLayout | undefined,
-  heads: readonly DiagramNodeLayout[],
-) {
-  if (from === undefined || heads.length === 0) {
-    return null;
-  }
-  const sourceX = from.x + from.width / 2;
-  const sourceY = bottom(from);
-  if (heads.length === 1) {
-    const [head] = heads;
-    return connectorPath("head-single", `M ${sourceX} ${sourceY} V ${head.y}`);
-  }
-  const branchY = sourceY + 28;
-  return (
-    <g>
-      {connectorLine("head-stem", `M ${sourceX} ${sourceY} V ${branchY}`)}
-      {heads.map((head) =>
-        connectorPath(
-          `head-${head.node.id}`,
-          `M ${sourceX} ${branchY} H ${head.x + head.width / 2} V ${head.y}`,
-        ),
-      )}
-    </g>
-  );
 }
 
 function connectorPath(key: string, d: string) {
@@ -295,10 +306,6 @@ function connectorLine(key: string, d: string) {
 
 function right(node: DiagramNodeLayout) {
   return node.x + node.width;
-}
-
-function bottom(node: DiagramNodeLayout) {
-  return node.y + node.height;
 }
 
 function middleY(node: DiagramNodeLayout) {
@@ -331,6 +338,42 @@ function ShapeMetric({ label, value }: { label: string; value: string }) {
 
 function formatPreviewText(value: string) {
   return value.replaceAll(" -> ", " → ");
+}
+
+function wrapNodeDetail(value: string, width: number) {
+  const maxChars = Math.max(12, Math.floor((width - 24) / 6.2));
+  const lines = value.split("\n").flatMap((line) => wrapTextLine(line, maxChars));
+
+  if (lines.length <= 3) {
+    return lines;
+  }
+  return [lines[0] ?? "", lines[1] ?? "", `${lines[2] ?? ""}…`];
+}
+
+function wrapTextLine(value: string, maxChars: number) {
+  const words = value.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const nextLine = currentLine.length === 0 ? word : `${currentLine} ${word}`;
+    if (nextLine.length <= maxChars) {
+      currentLine = nextLine;
+      continue;
+    }
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+      currentLine = word;
+      continue;
+    }
+    lines.push(word.slice(0, maxChars - 1));
+    currentLine = word.slice(maxChars - 1);
+  }
+
+  if (currentLine.length > 0) {
+    lines.push(currentLine);
+  }
+  return lines;
 }
 
 function formatParams(value: number) {
