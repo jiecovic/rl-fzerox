@@ -362,6 +362,16 @@ def _resolve_conv_spec(
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
 
 
+def resolve_conv_spec(
+    geometry: tuple[int, int],
+    *,
+    conv_profile: ConvProfile,
+) -> ConvSpec:
+    """Return the convolution stack used by the policy extractor for one geometry."""
+
+    return _resolve_conv_spec(geometry, conv_profile=conv_profile)
+
+
 def _image_flatten_dim(
     observation_space: spaces.Box,
     *,
@@ -384,3 +394,9 @@ def _image_flatten_dim(
 
 def _conv_output_size(input_size: int, kernel_size: int, stride: int) -> int:
     return ((input_size - kernel_size) // stride) + 1
+
+
+def conv_output_size(input_size: int, kernel_size: int, stride: int) -> int:
+    """Return the spatial output size for one valid convolution dimension."""
+
+    return _conv_output_size(input_size, kernel_size, stride)

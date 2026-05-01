@@ -58,6 +58,34 @@ def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
     assert response.json() == {"runs": []}
 
 
+def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = client.get("/api/config-metadata")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "crop_60x76" in {
+        preset["value"] for preset in payload["observation_presets"]
+    }
+    assert "nature_32_64_128" in {
+        profile["value"] for profile in payload["conv_profiles"]
+    }
+
+
+def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    config = default_managed_run_config().model_dump(mode="json")
+
+    response = client.post("/api/policy-preview", json=config)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["image_shape"] == {"height": 60, "width": 76, "channels": 6}
+    assert payload["total_params"] > 0
+    assert payload["architecture_lanes"][0]["label"] == "Image branch"
+
+
 def _client(tmp_path: Path) -> TestClient:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     return TestClient(create_manager_api_app(store))
