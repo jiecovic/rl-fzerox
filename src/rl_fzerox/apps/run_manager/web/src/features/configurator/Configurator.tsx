@@ -1,25 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FieldLabel } from "@/features/configurator/fields";
 import { LoggingSection } from "@/features/configurator/sections/LoggingSection";
-import { ModelSection } from "@/features/configurator/sections/ModelSection";
+import { ObservationSection } from "@/features/configurator/sections/ObservationSection";
+import { PolicySection } from "@/features/configurator/sections/PolicySection";
 import { RewardSection } from "@/features/configurator/sections/RewardSection";
 import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
-import type { ManagedRunConfig } from "@/shared/api/contract";
+import { fetchPolicyPreview } from "@/shared/api/client";
+import type {
+  ConfigMetadata,
+  ManagedRunConfig,
+  PolicyArchitecturePreview,
+} from "@/shared/api/contract";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface ConfiguratorProps {
   baseConfig: ManagedRunConfig;
+  metadata: ConfigMetadata;
   onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<void>;
 }
 
-type ConfigSection = "training" | "observation" | "reward" | "logging";
+type ConfigSection = "training" | "observation" | "policy" | "reward" | "logging";
 
-export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
+export function Configurator({ baseConfig, metadata, onSaveDraft }: ConfiguratorProps) {
   const [draftName, setDraftName] = useState("ppo_allcups_recurrent");
   const [config, setConfig] = useState(baseConfig);
   const [section, setSection] = useState<ConfigSection>("training");
+  const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ignore = false;
+    setPreviewError(null);
+    void fetchPolicyPreview(config)
+      .then((preview) => {
+        if (!ignore) {
+          setPolicyPreview(preview);
+        }
+      })
+      .catch((caught) => {
+        if (!ignore) {
+          setPolicyPreview(null);
+          setPreviewError(
+            caught instanceof Error ? caught.message : "failed to compute policy preview",
+          );
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [config]);
 
   async function saveDraft() {
     setIsSaving(true);
@@ -70,8 +101,8 @@ export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
           </div>
           <button
             aria-label="Randomize seed"
-            className="icon-button seed-randomize-button"
-            title="Randomize seed"
+            className="icon-button seed-randomize-button tooltip-anchor"
+            data-tooltip="Randomize seed"
             type="button"
             onClick={randomizeSeed}
           >
@@ -89,8 +120,13 @@ export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
           />
           <SectionButton
             active={section === "observation"}
-            label="Observation / policy"
+            label="Observation"
             onClick={() => setSection("observation")}
+          />
+          <SectionButton
+            active={section === "policy"}
+            label="Policy"
+            onClick={() => setSection("policy")}
           />
           <SectionButton
             active={section === "reward"}
@@ -122,7 +158,22 @@ export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
         <TrainingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
       ) : null}
       {section === "observation" ? (
-        <ModelSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
+        <ObservationSection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          preview={policyPreview}
+          setConfig={setConfig}
+        />
+      ) : null}
+      {section === "policy" ? (
+        <PolicySection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          preview={policyPreview}
+          setConfig={setConfig}
+        />
       ) : null}
       {section === "reward" ? (
         <RewardSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
@@ -132,6 +183,7 @@ export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
       ) : null}
 
       {error !== null ? <Notice tone="error">{error}</Notice> : null}
+      {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
     </Panel>
   );
 }

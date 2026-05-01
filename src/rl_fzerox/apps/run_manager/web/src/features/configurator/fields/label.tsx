@@ -16,8 +16,8 @@ export function FieldLabel({ help, label, onReset }: FieldLabelProps) {
       {onReset !== undefined ? (
         <button
           aria-label={`Reset ${label} to default`}
-          className="field-reset-button"
-          title="Reset to default"
+          className="field-reset-button tooltip-anchor"
+          data-tooltip="Reset to default"
           type="button"
           onClick={(event) => {
             event.preventDefault();

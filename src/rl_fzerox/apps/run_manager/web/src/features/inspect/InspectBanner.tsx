@@ -12,7 +12,13 @@ export function InspectBanner({ title, subtitle, onClose, onOpen }: InspectBanne
         <strong>{title}</strong>
         <span>{subtitle}</span>
       </button>
-      <button aria-label="Close inspector" className="icon-button" type="button" onClick={onClose}>
+      <button
+        aria-label="Close inspector"
+        className="icon-button tooltip-anchor"
+        data-tooltip="Close inspector"
+        type="button"
+        onClick={onClose}
+      >
         <CloseIcon />
       </button>
     </div>

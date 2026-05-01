@@ -9,6 +9,7 @@ import { RunInspector } from "@/features/runs/RunInspector";
 import { RunsPanel } from "@/features/runs/RunsPanel";
 import { createDraft, deleteDraft } from "@/shared/api/client";
 import type {
+  ConfigMetadata,
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
@@ -27,6 +28,7 @@ export function App() {
   const [templates, setTemplates] = useState<ManagedTemplate[]>([]);
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
+  const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +42,7 @@ export function App() {
       setTemplates(managerData.templates);
       setDrafts(managerData.drafts);
       setRuns(managerData.runs);
+      setMetadata(managerData.metadata);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to load run manager data");
     } finally {
@@ -129,8 +132,8 @@ export function App() {
         {error !== null ? <Notice tone="error">{error}</Notice> : null}
         {isLoading ? <Notice>Loading manager data...</Notice> : null}
 
-        {!isLoading && page === "configure" && defaultConfig !== null ? (
-          <Configurator baseConfig={defaultConfig} onSaveDraft={saveDraft} />
+        {!isLoading && page === "configure" && defaultConfig !== null && metadata !== null ? (
+          <Configurator baseConfig={defaultConfig} metadata={metadata} onSaveDraft={saveDraft} />
         ) : null}
         {!isLoading && page === "drafts" && selectedDraft === null ? (
           <DraftsPanel drafts={drafts} onOpenDraft={openDraft} />

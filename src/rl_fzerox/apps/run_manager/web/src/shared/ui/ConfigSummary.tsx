@@ -9,11 +9,11 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
       />
       <SummaryItem
         label="Observation"
-        value={`${config.observation.stack_mode} x${config.observation.frame_stack} · ${config.observation.progress_source}`}
+        value={`${config.observation.preset} · ${config.observation.stack_mode} x${config.observation.frame_stack}${config.observation.minimap_layer ? " · minimap" : ""}`}
       />
       <SummaryItem
         label="Policy"
-        value={`${config.policy.conv_profile} · LSTM ${config.policy.recurrent_hidden_size} · fusion ${config.policy.fusion_features_dim}`}
+        value={`${config.policy.conv_profile} · ${config.policy.recurrent_enabled ? `LSTM ${config.policy.recurrent_hidden_size}` : "no LSTM"} · fusion ${config.policy.fusion_features_dim}`}
       />
       <SummaryItem
         label="Reward"

@@ -20,7 +20,8 @@ export function ConfigPanel({
         {onReset !== undefined ? (
           <button
             aria-label={`Reset ${title} defaults`}
-            className="reset-button"
+            className="reset-button tooltip-anchor"
+            data-tooltip="Reset section defaults"
             type="button"
             onClick={onReset}
           >
