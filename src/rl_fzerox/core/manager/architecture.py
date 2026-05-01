@@ -366,7 +366,7 @@ def _architecture_lanes(
     image_projection_detail = (
         f"identity {flatten_dim}"
         if config.policy.features_dim == "auto"
-        else f"{flatten_dim} -> {config.policy.features_dim}"
+        else f"{flatten_dim} → {config.policy.features_dim}"
     )
     image_projection_tone = "muted" if config.policy.features_dim == "auto" else "normal"
     layer_norm_detail = "on" if config.policy.layer_norm else "off"
@@ -390,7 +390,7 @@ def _architecture_lanes(
                 ArchitectureNodePreview(
                     id="cnn",
                     label="CNN",
-                    detail=f"{config.policy.conv_profile} -> {flatten_dim}",
+                    detail=f"{config.policy.conv_profile} → {flatten_dim}",
                 ),
                 ArchitectureNodePreview(
                     id="image_projection",
@@ -412,7 +412,7 @@ def _architecture_lanes(
                 ArchitectureNodePreview(
                     id="state_mlp",
                     label="State MLP",
-                    detail=f"{state_dim} -> {config.policy.state_features_dim}",
+                    detail=f"{state_dim} → {config.policy.state_features_dim}",
                 ),
             ),
         ),
@@ -428,7 +428,7 @@ def _architecture_lanes(
                 ArchitectureNodePreview(
                     id="fusion",
                     label="Fusion MLP",
-                    detail=f"{fusion_input_dim} -> {extractor_output_dim}",
+                    detail=f"{fusion_input_dim} → {extractor_output_dim}",
                 ),
                 ArchitectureNodePreview(
                     id="layer_norm",
@@ -443,11 +443,19 @@ def _architecture_lanes(
                     tone=recurrent_tone,
                 ),
                 ArchitectureNodePreview(
-                    id="heads",
-                    label="Policy / value heads",
+                    id="policy_head",
+                    label="Policy head",
                     detail=(
-                        f"{policy_input_dim} -> pi {list(config.policy.pi_net_arch)} / "
-                        f"vf {list(config.policy.vf_net_arch)}, {config.policy.activation}"
+                        f"{policy_input_dim} → {list(config.policy.pi_net_arch)}, "
+                        f"{config.policy.activation}"
+                    ),
+                ),
+                ArchitectureNodePreview(
+                    id="value_head",
+                    label="Value head",
+                    detail=(
+                        f"{policy_input_dim} → {list(config.policy.vf_net_arch)}, "
+                        f"{config.policy.activation}"
                     ),
                 ),
             ),
@@ -463,7 +471,7 @@ def _recurrent_detail(config: ManagedRunConfig, extractor_output_dim: int) -> st
     else:
         topology = "actor only"
     return (
-        f"{extractor_output_dim} -> {config.policy.recurrent_hidden_size}, "
+        f"{extractor_output_dim} → {config.policy.recurrent_hidden_size}, "
         f"{config.policy.recurrent_n_lstm_layers} layer, {topology}"
     )
 

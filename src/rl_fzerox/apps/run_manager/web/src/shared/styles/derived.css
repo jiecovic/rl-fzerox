@@ -349,7 +349,7 @@
 .architecture-svg {
   display: block;
   width: 100%;
-  min-height: 384px;
+  min-height: 550px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
 }
@@ -388,19 +388,27 @@
 .architecture-svg-node strong,
 .architecture-svg-node span {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .architecture-svg-node strong {
   font-size: 12px;
   margin-bottom: 4px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .architecture-svg-node span {
   color: var(--muted);
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
+  line-height: 1.28;
+  white-space: normal;
+}
+
+.architecture-merge-dot {
+  fill: var(--accent);
+  stroke: var(--surface-muted);
+  stroke-width: 3;
 }
 
 .parameter-total {
