@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   BooleanField,
@@ -217,6 +218,9 @@ function LayerListField({
   value: number[];
   onChange: (value: number[]) => void;
 }) {
+  const rowIdsRef = useRef<string[]>([]);
+  syncLayerRowIds(rowIdsRef.current, value.length, label);
+
   function setLayer(index: number, nextValue: number) {
     if (!Number.isSafeInteger(nextValue) || nextValue <= 0) {
       return;
@@ -242,7 +246,7 @@ function LayerListField({
       <div className="layer-list-editor">
         {value.length === 0 ? <span className="layer-list-empty">No hidden layers</span> : null}
         {value.map((layer, index) => (
-          <div className="layer-list-row" key={layerRowKey(label, value, index)}>
+          <div className="layer-list-row" key={rowIdsRef.current[index]}>
             <span className="layer-index">L{index + 1}</span>
             <input
               aria-label={`${label} layer ${index + 1}`}
@@ -298,8 +302,11 @@ function sameLayerList(left: number[], right: number[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function layerRowKey(label: string, layers: number[], index: number) {
-  return `${label}-${layers.slice(0, index + 1).join("-")}`;
+function syncLayerRowIds(rowIds: string[], length: number, label: string) {
+  while (rowIds.length < length) {
+    rowIds.push(`${label}-${crypto.randomUUID()}`);
+  }
+  rowIds.length = length;
 }
 
 function AddLayerIcon() {

@@ -30,6 +30,27 @@ def test_manager_api_creates_draft(tmp_path: Path) -> None:
     assert payload["draft"]["name"] == "Draft"
 
 
+def test_manager_api_updates_draft(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    create_response = client.post(
+        "/api/drafts",
+        json={"name": "Draft", "config": default_managed_run_config().model_dump(mode="json")},
+    )
+    draft_id = create_response.json()["draft"]["id"]
+    updated_config = default_managed_run_config().model_dump(mode="json")
+    updated_config["seed"] = 999
+
+    response = client.put(
+        f"/api/drafts/{draft_id}",
+        json={"name": "Updated draft", "config": updated_config},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["draft"]["name"] == "Updated draft"
+    assert payload["draft"]["config"]["seed"] == 999
+
+
 def test_manager_api_rejects_invalid_json(tmp_path: Path) -> None:
     client = _client(tmp_path)
 

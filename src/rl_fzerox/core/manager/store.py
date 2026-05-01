@@ -216,6 +216,45 @@ class ManagerStore:
             )
         return cursor.rowcount > 0
 
+    def update_draft(
+        self,
+        *,
+        draft_id: str,
+        name: str,
+        config: ManagedRunConfig,
+    ) -> ManagedRunDraft | None:
+        """Update one SQLite-backed draft in place."""
+
+        self.initialize()
+        updated_at = _utc_now()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                UPDATE run_drafts
+                SET
+                    name = ?,
+                    config_json = ?,
+                    config_hash = ?,
+                    updated_at = ?
+                WHERE id = ?
+                RETURNING
+                    id,
+                    name,
+                    config_json,
+                    config_hash,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    name.strip() or draft_id,
+                    config_json(config),
+                    config_hash(config),
+                    updated_at,
+                    draft_id,
+                ),
+            ).fetchone()
+        return None if row is None else _draft_from_row(row)
+
     def list_templates(self) -> tuple[ManagedRunTemplate, ...]:
         """Return available DB-backed run templates."""
 

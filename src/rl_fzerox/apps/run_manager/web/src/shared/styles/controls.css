@@ -226,6 +226,53 @@ button:disabled {
   color: var(--danger);
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 16, 24, 0.72);
+  padding: 24px;
+}
+
+.dialog-dismiss-surface {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.dialog-panel {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 100%);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 22px;
+}
+
+.dialog-panel h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.dialog-panel p {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 .scroll-buttons {
   position: fixed;
   right: max(18px, calc((100vw - 1120px) / 2 - 54px));

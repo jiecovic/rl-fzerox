@@ -2,12 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import { loadManagerData } from "@/app/managerData";
 import { Configurator } from "@/features/configurator/Configurator";
-import { DraftInspector } from "@/features/drafts/DraftInspector";
 import { DraftsPanel } from "@/features/drafts/DraftsPanel";
 import { InspectBanner } from "@/features/inspect/InspectBanner";
 import { RunInspector } from "@/features/runs/RunInspector";
 import { RunsPanel } from "@/features/runs/RunsPanel";
-import { createDraft, deleteDraft } from "@/shared/api/client";
+import { createDraft, deleteDraft, updateDraft } from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -29,6 +28,7 @@ export function App() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
+  const [loadedDraft, setLoadedDraft] = useState<ManagedDraft | null>(null);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,13 +64,26 @@ export function App() {
 
   async function saveDraft(name: string, config: ManagedRunConfig) {
     const draft = await createDraft(name, config);
-    setDrafts((current) => [draft, ...current]);
+    await reloadManagerData();
+    setLoadedDraft(draft);
     setSelectedDraftId(draft.id);
+    return draft;
+  }
+
+  async function updateExistingDraft(id: string, name: string, config: ManagedRunConfig) {
+    const draft = await updateDraft(id, name, config);
+    await reloadManagerData();
+    setLoadedDraft(draft);
+    setSelectedDraftId(draft.id);
+    return draft;
   }
 
   async function removeDraft(id: string) {
     await deleteDraft(id);
-    setDrafts((current) => current.filter((draft) => draft.id !== id));
+    await reloadManagerData();
+    if (loadedDraft?.id === id) {
+      setLoadedDraft(null);
+    }
     setSelectedDraftId(null);
     setPage("drafts");
   }
@@ -133,15 +146,19 @@ export function App() {
         {isLoading ? <Notice>Loading manager data...</Notice> : null}
 
         {!isLoading && page === "configure" && defaultConfig !== null && metadata !== null ? (
-          <Configurator baseConfig={defaultConfig} metadata={metadata} onSaveDraft={saveDraft} />
+          <Configurator
+            baseConfig={defaultConfig}
+            loadedDraft={loadedDraft}
+            metadata={metadata}
+            onSaveDraft={saveDraft}
+            onUpdateDraft={updateExistingDraft}
+          />
         ) : null}
-        {!isLoading && page === "drafts" && selectedDraft === null ? (
-          <DraftsPanel drafts={drafts} onOpenDraft={openDraft} />
-        ) : null}
-        {!isLoading && page === "drafts" && selectedDraft !== null ? (
-          <DraftInspector
-            draft={selectedDraft}
-            onDelete={() => void removeDraft(selectedDraft.id)}
+        {!isLoading && page === "drafts" ? (
+          <DraftsPanel
+            drafts={drafts}
+            onDeleteDraft={(draft) => removeDraft(draft.id)}
+            onOpenDraft={openDraft}
           />
         ) : null}
         {!isLoading && page === "runs" && selectedRun === null ? (
@@ -157,11 +174,16 @@ export function App() {
 
   function openDraft(draft: ManagedDraft) {
     setSelectedDraftId(draft.id);
-    setPage("drafts");
+    loadDraftIntoConfigurator(draft);
   }
 
   function openRun(run: ManagedRun) {
     setSelectedRunId(run.id);
     setPage("runs");
+  }
+
+  function loadDraftIntoConfigurator(draft: ManagedDraft) {
+    setLoadedDraft(draft);
+    setPage("configure");
   }
 }

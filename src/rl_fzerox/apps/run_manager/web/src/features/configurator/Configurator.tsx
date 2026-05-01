@@ -8,6 +8,7 @@ import { TrainingSection } from "@/features/configurator/sections/TrainingSectio
 import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
   ConfigMetadata,
+  ManagedDraft,
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
@@ -15,20 +16,43 @@ import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface ConfiguratorProps {
   baseConfig: ManagedRunConfig;
+  loadedDraft: ManagedDraft | null;
   metadata: ConfigMetadata;
-  onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<void>;
+  onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
+  onUpdateDraft: (id: string, name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
 }
 
 type ConfigSection = "training" | "observation" | "policy" | "reward" | "logging";
 
-export function Configurator({ baseConfig, metadata, onSaveDraft }: ConfiguratorProps) {
+export function Configurator({
+  baseConfig,
+  loadedDraft,
+  metadata,
+  onSaveDraft,
+  onUpdateDraft,
+}: ConfiguratorProps) {
   const [draftName, setDraftName] = useState("ppo_allcups_recurrent");
   const [config, setConfig] = useState(baseConfig);
   const [section, setSection] = useState<ConfigSection>("training");
   const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (loadedDraft !== null) {
+      setDraftName(loadedDraft.name);
+      setConfig(loadedDraft.config);
+      setSection("training");
+      setError(null);
+      return;
+    }
+    setDraftName("ppo_allcups_recurrent");
+    setConfig(baseConfig);
+    setSection("training");
+    setError(null);
+  }, [baseConfig, loadedDraft]);
 
   useEffect(() => {
     let ignore = false;
@@ -64,6 +88,21 @@ export function Configurator({ baseConfig, metadata, onSaveDraft }: Configurator
     }
   }
 
+  async function updateDraft() {
+    if (loadedDraft === null) {
+      return;
+    }
+    setIsUpdating(true);
+    setError(null);
+    try {
+      await onUpdateDraft(loadedDraft.id, draftName, config);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "failed to update draft");
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
   function randomizeSeed() {
     const values = new Uint32Array(1);
     crypto.getRandomValues(values);
@@ -76,6 +115,11 @@ export function Configurator({ baseConfig, metadata, onSaveDraft }: Configurator
         title="Run configurator"
         subtitle="Configure a run, then save it as a draft or start training from here."
       />
+      {loadedDraft !== null ? (
+        <div className="configurator-status">
+          <Notice>Editing draft `{loadedDraft.name}`. Save as new or update in place.</Notice>
+        </div>
+      ) : null}
       <div className="form-grid run-identity-grid">
         <div className="field-shell">
           <FieldLabel help="Run name used when this configuration is launched." label="Run name" />
@@ -143,11 +187,21 @@ export function Configurator({ baseConfig, metadata, onSaveDraft }: Configurator
           <button
             className="secondary-button"
             type="button"
-            disabled={isSaving}
+            disabled={isSaving || isUpdating}
             onClick={() => void saveDraft()}
           >
-            {isSaving ? "Saving..." : "Save draft"}
+            {isSaving ? "Saving..." : loadedDraft === null ? "Save draft" : "Save as new draft"}
           </button>
+          {loadedDraft !== null ? (
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={isSaving || isUpdating}
+              onClick={() => void updateDraft()}
+            >
+              {isUpdating ? "Updating..." : "Update draft"}
+            </button>
+          ) : null}
           <button className="primary-button" type="button" disabled>
             Train
           </button>
