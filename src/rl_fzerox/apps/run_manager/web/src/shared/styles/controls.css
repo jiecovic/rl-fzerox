@@ -189,6 +189,27 @@ button:disabled {
   padding-bottom: 8px;
 }
 
+.draft-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draft-action-button svg {
+  flex: 0 0 auto;
+}
+
+.draft-update-button {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+
+.draft-update-button:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
+}
+
 .section-tab {
   border: 1px solid var(--border);
   border-bottom: 0;

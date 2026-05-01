@@ -185,21 +185,25 @@ export function Configurator({
         </div>
         <div className="section-actions">
           <button
-            className="secondary-button"
+            className="secondary-button draft-action-button"
             type="button"
             disabled={isSaving || isUpdating}
             onClick={() => void saveDraft()}
           >
-            {isSaving ? "Saving..." : loadedDraft === null ? "Save draft" : "Save as new draft"}
+            <SaveDraftIcon />
+            <span>
+              {isSaving ? "Saving..." : loadedDraft === null ? "Save draft" : "Save as new draft"}
+            </span>
           </button>
           {loadedDraft !== null ? (
             <button
-              className="secondary-button"
+              className="secondary-button draft-action-button draft-update-button"
               type="button"
               disabled={isSaving || isUpdating}
               onClick={() => void updateDraft()}
             >
-              {isUpdating ? "Updating..." : "Update draft"}
+              <UpdateDraftIcon />
+              <span>{isUpdating ? "Updating..." : "Update draft"}</span>
             </button>
           ) : null}
           <button className="primary-button" type="button" disabled>
@@ -277,6 +281,40 @@ function RandomizeIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function SaveDraftIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
+      <path
+        d="M4.5 3.5h8l3 3v10h-11zM7 3.5v5h6v-5M7 13h6"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function UpdateDraftIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
+      <path
+        d="M4 10a6 6 0 0 1 10.2-4.2M16 10a6 6 0 0 1-10.2 4.2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M12.8 3.9h1.9v1.9M7.2 16.1H5.3v-1.9"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
       />
     </svg>
   );
