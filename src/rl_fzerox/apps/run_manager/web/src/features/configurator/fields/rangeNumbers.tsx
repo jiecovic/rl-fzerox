@@ -50,6 +50,7 @@ export function RangeNumberField({
           step={rangeStep}
           ticks={ticks}
           value={clamp(value, min, max)}
+          valueLabel={String(value)}
           onChange={onChange}
         />
         <input
@@ -124,6 +125,7 @@ export function RangeIntegerField({
           step={rangeStep}
           ticks={ticks}
           value={clamp(value, min, max)}
+          valueLabel={formatInteger(value)}
           onChange={updateFromSlider}
         />
         <input
@@ -207,6 +209,7 @@ export function DiscreteSliderNumberField({
           step={1}
           ticks={ticks}
           value={sliderIndex}
+          valueLabel={String(value)}
           onChange={updateFromSlider}
         />
         <input
@@ -284,6 +287,7 @@ export function LogRangeNumberField({
           step={0.01}
           ticks={ticks.map((tick) => ({ label: tick.label, value: Math.log10(tick.value) }))}
           value={logValue}
+          valueLabel={rawValue}
           onChange={updateFromSlider}
         />
         <input
@@ -348,6 +352,7 @@ export function OptionalNumberField({
             { value: max, label: formatCompactDecimal(max) },
           ]}
           value={clamp(sliderValue, min, max)}
+          valueLabel={String(enabled ? value : defaultValue)}
           onChange={onChange}
         />
         <input

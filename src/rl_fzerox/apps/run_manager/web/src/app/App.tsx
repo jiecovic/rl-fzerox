@@ -15,6 +15,7 @@ import type {
   ManagedTemplate,
 } from "@/shared/api/contract";
 import { Notice } from "@/shared/ui/Panel";
+import { ScrollButtons } from "@/shared/ui/ScrollButtons";
 import { Tabs } from "@/shared/ui/Tabs";
 import { type Theme, ThemeToggle } from "@/shared/ui/ThemeToggle";
 
@@ -147,6 +148,7 @@ export function App() {
           <RunInspector run={selectedRun} />
         ) : null}
       </div>
+      <ScrollButtons />
     </main>
   );
 

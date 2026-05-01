@@ -126,7 +126,8 @@ textarea::selection {
 
 .range-field,
 .optional-number-field,
-.boolean-field {
+.boolean-field,
+.range-pair-field {
   min-width: 0;
 }
 
@@ -150,11 +151,41 @@ textarea::selection {
   align-items: center;
 }
 
+.reward-accordion-stack .optional-number-row {
+  grid-template-columns: 52px minmax(0, 1fr) 96px;
+}
+
 .slider-control {
+  position: relative;
   display: grid;
   gap: 4px;
   min-width: 0;
   padding-top: 4px;
+}
+
+.slider-value-bubble {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  display: none;
+  min-width: 34px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 3px 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  pointer-events: none;
+  text-align: center;
+}
+
+.slider-control.sliding .slider-value-bubble,
+.range-pair-thumb.sliding .slider-value-bubble {
+  display: block;
 }
 
 .optional-number-row.disabled .slider-control,
@@ -256,6 +287,85 @@ input[type="range"]:focus {
 
 .slider-ticks span:last-child::after {
   transform: translateX(-100%);
+}
+
+.range-pair-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 150px;
+  gap: 12px;
+  align-items: center;
+}
+
+.range-pair-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.range-pair-values input {
+  height: 34px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.range-pair-slider {
+  position: relative;
+  min-width: 0;
+  height: 44px;
+  padding-top: 4px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.range-pair-row.disabled .range-pair-slider,
+.range-pair-row.disabled input {
+  pointer-events: none;
+}
+
+.range-pair-rail,
+.range-pair-fill {
+  position: absolute;
+  top: 13px;
+  height: 4px;
+  border: 1px solid var(--border);
+}
+
+.range-pair-rail {
+  right: 7px;
+  left: 7px;
+  background: var(--surface);
+}
+
+.range-pair-fill {
+  z-index: 1;
+  background: color-mix(in srgb, var(--accent) 52%, var(--surface));
+}
+
+.range-pair-thumb {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%);
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--border-strong);
+  cursor: pointer;
+  padding: 0;
+}
+
+.range-pair-thumb:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.range-pair-slider .slider-ticks {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
 }
 
 .switch-button {

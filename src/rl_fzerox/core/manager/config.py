@@ -3,7 +3,16 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeFloat, PositiveFloat, PositiveInt
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeFloat,
+    NonNegativeInt,
+    PositiveFloat,
+    PositiveInt,
+    model_validator,
+)
 
 from rl_fzerox.core.domain.observation_components import TrackPositionProgressSourceName
 
@@ -69,15 +78,64 @@ class ManagedRewardConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    time_penalty_per_frame: float = -0.005
+    reverse_time_penalty_scale: NonNegativeFloat = 2.0
+    low_speed_time_penalty_scale: NonNegativeFloat = 2.0
+    slow_speed_time_penalty_scale: NonNegativeFloat = 3.0
+    slow_speed_time_penalty_start_kph: NonNegativeFloat = 760.0
+    slow_speed_time_penalty_power: PositiveFloat = 1.0
+    progress_bucket_distance: PositiveFloat = 1_000.0
+    progress_bucket_reward: NonNegativeFloat = 1.0
+    progress_reward_interval_frames: PositiveInt = 1
+    airborne_progress_bucket_distance: PositiveFloat | None = 100.0
+    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = 10_000.0
+    airborne_offtrack_penalty_scale: NonNegativeFloat = 0.05
+    airborne_offtrack_recovery_reward_scale: NonNegativeFloat = 0.05
+    airborne_offtrack_recovery_requires_descending: bool = True
+    airborne_offtrack_recovery_descend_epsilon: NonNegativeFloat = 1.0
+    lap_completion_bonus: NonNegativeFloat = 5.0
+    lap_position_scale: NonNegativeFloat = 1.0
+    energy_loss_epsilon: NonNegativeFloat = 0.01
+    energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
+    dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)
+    ice_progress_multiplier: float = Field(default=1.0, ge=0.0)
+    dirt_entry_penalty: float = Field(default=0.0, le=0.0)
+    ice_entry_penalty: float = Field(default=0.0, le=0.0)
+    energy_refill_collision_cooldown_frames: NonNegativeInt = 0
+    energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
+    energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
+    gas_underuse_penalty: float = Field(default=0.0, le=0.0)
+    gas_underuse_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    steer_oscillation_penalty: float = Field(default=0.0, le=0.0)
+    steer_oscillation_deadzone: NonNegativeFloat = 0.0
+    steer_oscillation_cap: PositiveFloat = 2.0
+    steer_oscillation_power: PositiveFloat = 2.0
     manual_boost_reward: NonNegativeFloat = 0.01
     boost_pad_reward: NonNegativeFloat = 10.0
+    boost_pad_reward_progress_window: PositiveFloat = 800.0
     lean_request_penalty: float = Field(default=-0.003, le=0.0)
     lean_low_speed_penalty: float = Field(default=-0.005, le=0.0)
     lean_low_speed_penalty_max_speed_kph: NonNegativeFloat = 750.0
     airborne_pitch_up_penalty: float = Field(default=-0.2, le=0.0)
+    damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
+    damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
+    damage_taken_streak_cap_frames: NonNegativeInt = 0
+    airborne_landing_reward: float = 0.0
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0
+    step_reward_clip_min: float | None = -100.0
+    step_reward_clip_max: float | None = 100.0
+
+    @model_validator(mode="after")
+    def _validate_step_reward_clip_bounds(self) -> ManagedRewardConfig:
+        if (
+            self.step_reward_clip_min is not None
+            and self.step_reward_clip_max is not None
+            and self.step_reward_clip_min > self.step_reward_clip_max
+        ):
+            raise ValueError("step_reward_clip_min must be <= step_reward_clip_max")
+        return self
 
 
 class ManagedRunConfig(BaseModel):

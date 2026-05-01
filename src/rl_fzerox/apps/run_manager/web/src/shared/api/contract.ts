@@ -42,17 +42,67 @@ const policyConfigSchema = z.object({
   gas_on_logit: z.number(),
 });
 
-const rewardConfigSchema = z.object({
-  manual_boost_reward: z.number().nonnegative(),
-  boost_pad_reward: z.number().nonnegative(),
-  lean_request_penalty: z.number().max(0),
-  lean_low_speed_penalty: z.number().max(0),
-  lean_low_speed_penalty_max_speed_kph: z.number().nonnegative(),
-  airborne_pitch_up_penalty: z.number().max(0),
-  collision_recoil_penalty: z.number(),
-  failure_penalty: z.number(),
-  truncation_penalty: z.number(),
-});
+const rewardConfigSchema = z
+  .object({
+    time_penalty_per_frame: z.number(),
+    reverse_time_penalty_scale: z.number().nonnegative(),
+    low_speed_time_penalty_scale: z.number().nonnegative(),
+    slow_speed_time_penalty_scale: z.number().nonnegative(),
+    slow_speed_time_penalty_start_kph: z.number().nonnegative(),
+    slow_speed_time_penalty_power: z.number().positive(),
+    progress_bucket_distance: z.number().positive(),
+    progress_bucket_reward: z.number().nonnegative(),
+    progress_reward_interval_frames: z.number().int().positive(),
+    airborne_progress_bucket_distance: z.number().positive().nullable(),
+    outside_bounds_reentry_progress_distance_cap: z.number().nonnegative().nullable(),
+    airborne_offtrack_penalty_scale: z.number().nonnegative(),
+    airborne_offtrack_recovery_reward_scale: z.number().nonnegative(),
+    airborne_offtrack_recovery_requires_descending: z.boolean(),
+    airborne_offtrack_recovery_descend_epsilon: z.number().nonnegative(),
+    lap_completion_bonus: z.number().nonnegative(),
+    lap_position_scale: z.number().nonnegative(),
+    energy_loss_epsilon: z.number().nonnegative(),
+    energy_refill_progress_multiplier: z.number().min(1),
+    dirt_progress_multiplier: z.number().nonnegative(),
+    ice_progress_multiplier: z.number().nonnegative(),
+    dirt_entry_penalty: z.number().max(0),
+    ice_entry_penalty: z.number().max(0),
+    energy_refill_collision_cooldown_frames: z.number().int().nonnegative(),
+    energy_full_refill_lap_bonus: z.number().nonnegative(),
+    energy_full_refill_min_gain_fraction: z.number().min(0).max(1),
+    gas_underuse_penalty: z.number().max(0),
+    gas_underuse_threshold: z.number().min(0).max(1),
+    steer_oscillation_penalty: z.number().max(0),
+    steer_oscillation_deadzone: z.number().nonnegative(),
+    steer_oscillation_cap: z.number().positive(),
+    steer_oscillation_power: z.number().positive(),
+    manual_boost_reward: z.number().nonnegative(),
+    boost_pad_reward: z.number().nonnegative(),
+    boost_pad_reward_progress_window: z.number().positive(),
+    lean_request_penalty: z.number().max(0),
+    lean_low_speed_penalty: z.number().max(0),
+    lean_low_speed_penalty_max_speed_kph: z.number().nonnegative(),
+    airborne_pitch_up_penalty: z.number().max(0),
+    damage_taken_frame_penalty: z.number().max(0),
+    damage_taken_streak_ramp_penalty: z.number().max(0),
+    damage_taken_streak_cap_frames: z.number().int().nonnegative(),
+    airborne_landing_reward: z.number(),
+    collision_recoil_penalty: z.number(),
+    failure_penalty: z.number(),
+    truncation_penalty: z.number(),
+    step_reward_clip_min: z.number().nullable(),
+    step_reward_clip_max: z.number().nullable(),
+  })
+  .refine(
+    (reward) =>
+      reward.step_reward_clip_min === null ||
+      reward.step_reward_clip_max === null ||
+      reward.step_reward_clip_min <= reward.step_reward_clip_max,
+    {
+      message: "step_reward_clip_min must be <= step_reward_clip_max",
+      path: ["step_reward_clip_min"],
+    },
+  );
 
 export const managedRunConfigSchema = z.object({
   version: z.literal(1),

@@ -1,6 +1,8 @@
 # tests/core/manager/test_manager_store.py
 from __future__ import annotations
 
+import json
+import sqlite3
 from pathlib import Path
 
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
@@ -43,6 +45,42 @@ def test_manager_store_deletes_draft(tmp_path: Path) -> None:
     assert store.delete_draft(draft.id)
 
     assert store.list_drafts() == ()
+
+
+def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"] = {"manual_boost_reward": 0.5}
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-draft",
+                "Old Draft",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.reward.manual_boost_reward == 0.5
+    assert draft.config.reward.time_penalty_per_frame == -0.005
+    assert draft.config.reward.step_reward_clip_max == 100.0
 
 
 def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path: Path) -> None:

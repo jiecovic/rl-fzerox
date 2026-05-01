@@ -12,4 +12,5 @@ export {
   RangeIntegerField,
   RangeNumberField,
 } from "@/features/configurator/fields/rangeNumbers";
+export { OptionalRangePairField } from "@/features/configurator/fields/rangePair";
 export { ResetIcon } from "@/features/configurator/fields/reset";
