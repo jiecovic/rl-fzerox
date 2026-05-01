@@ -256,7 +256,7 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
         </div>
       </ConfigPanel>
 
-      <ConfigPanel title="Update math" wide>
+      <ConfigPanel title="PPO update summary" wide>
         <table className="derived-table">
           <tbody>
             <DerivedRow

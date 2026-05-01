@@ -29,6 +29,10 @@ label,
   line-height: 1;
 }
 
+button.field-help:not(:disabled) {
+  cursor: help;
+}
+
 .field-help:hover,
 .field-help:focus-visible {
   border-color: var(--border-strong);
@@ -55,8 +59,7 @@ label,
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
-.field-help:hover::after,
-.field-help:focus-visible::after {
+.field-help:hover::after {
   display: block;
 }
 
@@ -167,6 +170,10 @@ input[type="range"] {
   background: transparent;
   margin: 0 7px;
   padding: 0;
+}
+
+input[type="range"]:not(:disabled) {
+  cursor: pointer;
 }
 
 input[type="range"]::-webkit-slider-runnable-track {
