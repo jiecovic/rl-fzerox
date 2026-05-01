@@ -20,7 +20,7 @@ export function NumberField({
   step?: string;
 }) {
   return (
-    <div className="field-shell">
+    <div className="field-shell compact-value-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <input
         aria-label={label}
@@ -65,7 +65,7 @@ export function IntegerField({
   }
 
   return (
-    <div className="field-shell">
+    <div className="field-shell compact-value-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <input
         aria-label={label}
@@ -109,7 +109,7 @@ export function ScientificNumberField({
   }
 
   return (
-    <div className="field-shell">
+    <div className="field-shell compact-value-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <input
         aria-label={label}
