@@ -346,42 +346,47 @@
   font-size: 15px;
 }
 
-.architecture-svg {
+.architecture-layout-pending {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.architecture-graph-svg {
   display: block;
   width: 100%;
-  min-height: 310px;
+  min-height: 280px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
 }
 
-.architecture-lane-title {
-  fill: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.architecture-connector {
+.architecture-edge {
   stroke: var(--border-strong);
   stroke-linecap: round;
-  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
 }
 
 .architecture-arrow-head {
   fill: var(--border-strong);
 }
 
-.architecture-svg-node rect {
+.architecture-node rect {
   fill: var(--surface);
   stroke: var(--border-strong);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
-.architecture-svg-node.muted {
+.architecture-node.muted {
   opacity: 0.5;
 }
 
-.architecture-node-label {
+.architecture-node-title {
   fill: var(--text);
   font-size: 12px;
   font-weight: 700;
@@ -394,10 +399,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-.architecture-merge-dot {
+.architecture-junction {
   fill: var(--accent);
   stroke: var(--surface-muted);
   stroke-width: 3;
+  vector-effect: non-scaling-stroke;
 }
 
 .parameter-total {
