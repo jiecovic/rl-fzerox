@@ -654,7 +654,7 @@ def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:
             "env:",
             "  action_repeat: 2",
             "policy:",
-            "  activation: relu",
+            "  activation: gelu",
             "train:",
             "  total_timesteps: 1000",
         ],
@@ -662,7 +662,7 @@ def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.policy.activation == "relu"
+    assert config.policy.activation == "gelu"
 
 
 def test_load_train_app_config_reads_course_context(tmp_path: Path) -> None:

@@ -63,4 +63,6 @@ def resolve_policy_activation_fn(name: str):
         return nn.Tanh
     if name == "relu":
         return nn.ReLU
+    if name == "gelu":
+        return nn.GELU
     raise ValueError(f"Unsupported policy activation: {name!r}")
