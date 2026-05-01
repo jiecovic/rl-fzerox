@@ -1,5 +1,5 @@
-import type { ManagedRunConfig } from "@/contract";
 import { RangeNumberField } from "@/features/configurator/fields";
+import type { ManagedRunConfig } from "@/shared/api/contract";
 
 interface LoggingSectionProps {
   config: ManagedRunConfig;

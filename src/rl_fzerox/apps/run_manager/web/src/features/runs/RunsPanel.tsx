@@ -1,5 +1,5 @@
-import { Notice, Panel, PanelHeader } from "@/components/ui/Panel";
-import type { ManagedRun } from "@/contract";
+import type { ManagedRun } from "@/shared/api/contract";
+import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface RunsPanelProps {
   runs: ManagedRun[];

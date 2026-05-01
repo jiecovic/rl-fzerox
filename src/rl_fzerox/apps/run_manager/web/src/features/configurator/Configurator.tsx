@@ -1,12 +1,11 @@
 import { useState } from "react";
-
-import { Notice, Panel, PanelHeader } from "@/components/ui/Panel";
-import type { ManagedRunConfig } from "@/contract";
 import { FieldLabel } from "@/features/configurator/fields";
-import { LoggingSection } from "@/features/configurator/LoggingSection";
-import { ModelSection } from "@/features/configurator/ModelSection";
-import { RewardSection } from "@/features/configurator/RewardSection";
-import { TrainingSection } from "@/features/configurator/TrainingSection";
+import { LoggingSection } from "@/features/configurator/sections/LoggingSection";
+import { ModelSection } from "@/features/configurator/sections/ModelSection";
+import { RewardSection } from "@/features/configurator/sections/RewardSection";
+import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
+import type { ManagedRunConfig } from "@/shared/api/contract";
+import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface ConfiguratorProps {
   baseConfig: ManagedRunConfig;
@@ -47,26 +46,28 @@ export function Configurator({ baseConfig, onSaveDraft }: ConfiguratorProps) {
         subtitle="Configure a run, then save it as a draft or start training from here."
       />
       <div className="form-grid run-identity-grid">
-        <label>
+        <div className="field-shell">
           <FieldLabel help="Run name used when this configuration is launched." label="Run name" />
           <input
+            aria-label="Run name"
             spellCheck={false}
             value={draftName}
             onChange={(event) => setDraftName(event.target.value)}
           />
-        </label>
+        </div>
         <div className="seed-control">
-          <label>
+          <div className="field-shell">
             <FieldLabel
               help="Base random seed used when the run config is generated."
               label="Seed"
             />
             <input
+              aria-label="Seed"
               type="number"
               value={config.seed}
               onChange={(event) => setConfig({ ...config, seed: Number(event.target.value) })}
             />
-          </label>
+          </div>
           <button
             aria-label="Randomize seed"
             className="icon-button seed-randomize-button"
