@@ -57,3 +57,14 @@ def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path:
 
     assert store.list_runs()[0].id == run.id
     assert not run.run_dir.exists()
+
+
+def test_manager_store_visible_runs_exclude_created_records(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.create_run(
+        name="Created Only",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "managed_runs",
+    )
+
+    assert store.list_visible_runs() == ()

@@ -180,6 +180,11 @@ class ManagerStore:
             ).fetchall()
         return tuple(_run_from_row(row) for row in rows)
 
+    def list_visible_runs(self) -> tuple[ManagedRun, ...]:
+        """Return runs that should appear in the current run registry UI."""
+
+        return tuple(run for run in self.list_runs() if run.status != "created")
+
     def list_drafts(self) -> tuple[ManagedRunDraft, ...]:
         """Return all SQLite-only drafts, newest first."""
 

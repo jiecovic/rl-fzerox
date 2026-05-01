@@ -1,0 +1,28 @@
+.record-list {
+  display: grid;
+  gap: 8px;
+}
+
+.record-row {
+  display: grid;
+  grid-template-columns: 2.2fr 1fr 1fr 1fr 1.3fr;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0 14px;
+  text-align: left;
+}
+
+.record-row:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.record-name {
+  color: var(--text);
+  font-weight: 650;
+}
