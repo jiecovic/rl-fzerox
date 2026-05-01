@@ -41,9 +41,21 @@ py-lint:
 py-test: native
     PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pytest
 
-# Launch the local Streamlit run manager. Requires the `manager` extra.
+# Install the local React run-manager frontend dependencies.
+run-manager-install:
+    npm install --prefix src/rl_fzerox/apps/run_manager/web
+
+# Verify the local React run-manager frontend.
+run-manager-check:
+    npm run --prefix src/rl_fzerox/apps/run_manager/web check
+
+# Build the local React run-manager frontend.
+run-manager-build:
+    npm run --prefix src/rl_fzerox/apps/run_manager/web build
+
+# Launch the local React run manager with the Python SQLite API.
 run-manager:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m streamlit run src/rl_fzerox/apps/run_manager/app.py --server.headless true --client.toolbarMode viewer --browser.gatherUsageStats false
+    PYTHON_BIN=${PYTHON:-$(if [ -x .venv/bin/python ]; then printf .venv/bin/python; else printf python; fi)}; PYTHONPATH=src "$PYTHON_BIN" -m rl_fzerox.apps.run_manager
 
 # Aggregate repo-wide quality tasks.
 fmt: rust-fmt py-fmt

@@ -134,6 +134,13 @@ def _sync_loaded_ppo_training_config(model: object, *, train_config: TrainConfig
     _set_attr_if_present(model, "vf_coef", train_config.vf_coef)
     _set_attr_if_present(model, "max_grad_norm", train_config.max_grad_norm)
     _set_attr_if_present(model, "clip_range", FloatSchedule(train_config.clip_range))
+    clip_range_vf = (
+        None if train_config.clip_range_vf is None else FloatSchedule(train_config.clip_range_vf)
+    )
+    _set_attr_if_present(model, "clip_range_vf", clip_range_vf)
+    _set_attr_if_present(model, "normalize_advantage", train_config.normalize_advantage)
+    _set_attr_if_present(model, "target_kl", train_config.target_kl)
+    _set_attr_if_present(model, "stats_window_size", train_config.stats_window_size)
     rollout_buffer = getattr(model, "rollout_buffer", None)
     if rollout_buffer is not None:
         _set_attr_if_present(rollout_buffer, "gamma", train_config.gamma)

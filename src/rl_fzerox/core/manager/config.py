@@ -27,9 +27,13 @@ class ManagedTrainConfig(BaseModel):
     gamma: float = Field(default=0.995, gt=0.0, le=1.0)
     gae_lambda: float = Field(default=0.95, gt=0.0, le=1.0)
     clip_range: PositiveFloat = 0.19
+    clip_range_vf: PositiveFloat | None = None
     ent_coef: NonNegativeFloat = 0.01
     vf_coef: PositiveFloat = 0.5
     max_grad_norm: PositiveFloat = 0.5
+    normalize_advantage: bool = True
+    target_kl: PositiveFloat | None = None
+    stats_window_size: PositiveInt = 100
     course_context_dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
