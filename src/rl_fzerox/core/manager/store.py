@@ -1,0 +1,238 @@
+# src/rl_fzerox/core/manager/store.py
+from __future__ import annotations
+
+import re
+import sqlite3
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+from rl_fzerox.core.manager.config import ManagedRunConfig
+from rl_fzerox.core.manager.manifest import write_run_manifest
+from rl_fzerox.core.manager.models import ManagedRun, ManagedRunTemplate, RunStatus
+from rl_fzerox.core.manager.schema import initialize_manager_schema
+from rl_fzerox.core.manager.serialization import config_hash, config_json, load_config_json
+
+
+def default_manager_db_path() -> Path:
+    """Return the default local manager registry path."""
+
+    return Path("local/manager/runs.db").resolve()
+
+
+class ManagerStore:
+    """SQLite-backed source of truth for managed training runs."""
+
+    def __init__(self, db_path: Path | None = None) -> None:
+        self.db_path = (db_path or default_manager_db_path()).expanduser().resolve()
+
+    def initialize(self) -> None:
+        """Create the manager database schema if needed."""
+
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as connection:
+            initialize_manager_schema(connection, applied_at=_utc_now())
+
+    def create_run(
+        self,
+        *,
+        name: str,
+        config: ManagedRunConfig,
+        managed_runs_root: Path | None = None,
+        parent_run_id: str | None = None,
+        source_run_id: str | None = None,
+        source_artifact: str | None = None,
+    ) -> ManagedRun:
+        """Create an immutable run record and write its non-authoritative manifest."""
+
+        self.initialize()
+        created_at = _utc_now()
+        run_id = _new_run_id(name)
+        root = (managed_runs_root or Path("local/managed_runs")).expanduser().resolve()
+        run_dir = root / run_id
+        run = ManagedRun(
+            id=run_id,
+            name=name.strip() or run_id,
+            status="created",
+            config=config,
+            config_hash=config_hash(config),
+            run_dir=run_dir,
+            parent_run_id=parent_run_id,
+            source_run_id=source_run_id,
+            source_artifact=source_artifact,
+            created_at=created_at,
+        )
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO runs(
+                    id,
+                    name,
+                    status,
+                    config_json,
+                    config_hash,
+                    run_dir,
+                    parent_run_id,
+                    source_run_id,
+                    source_artifact,
+                    created_at,
+                    started_at,
+                    stopped_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.id,
+                    run.name,
+                    run.status,
+                    config_json(run.config),
+                    run.config_hash,
+                    str(run.run_dir),
+                    run.parent_run_id,
+                    run.source_run_id,
+                    run.source_artifact,
+                    run.created_at,
+                    run.started_at,
+                    run.stopped_at,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO run_events(run_id, created_at, kind, message)
+                VALUES (?, ?, ?, ?)
+                """,
+                (run.id, created_at, "created", "run created from manager config"),
+            )
+
+            write_run_manifest(
+                run_id=run.id,
+                run_name=run.name,
+                run_dir=run.run_dir,
+                db_path=self.db_path,
+                config=run.config,
+                created_at=created_at,
+            )
+        return run
+
+    def list_runs(self) -> tuple[ManagedRun, ...]:
+        """Return all DB-managed runs, newest first."""
+
+        self.initialize()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    status,
+                    config_json,
+                    config_hash,
+                    run_dir,
+                    parent_run_id,
+                    source_run_id,
+                    source_artifact,
+                    created_at,
+                    started_at,
+                    stopped_at
+                FROM runs
+                ORDER BY created_at DESC, id DESC
+                """
+            ).fetchall()
+        return tuple(_run_from_row(row) for row in rows)
+
+    def list_templates(self) -> tuple[ManagedRunTemplate, ...]:
+        """Return available DB-backed run templates."""
+
+        self.initialize()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    config_json,
+                    config_hash,
+                    created_at,
+                    updated_at
+                FROM run_templates
+                ORDER BY name COLLATE NOCASE
+                """
+            ).fetchall()
+        return tuple(_template_from_row(row) for row in rows)
+
+    def default_template(self) -> ManagedRunTemplate:
+        """Return the first manager template, seeding the DB if needed."""
+
+        templates = self.list_templates()
+        if not templates:
+            raise RuntimeError("Manager DB did not initialize a default run template")
+        return templates[0]
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+
+def _run_from_row(row: sqlite3.Row) -> ManagedRun:
+    return ManagedRun(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        status=_run_status(row["status"]),
+        config=load_config_json(str(row["config_json"])),
+        config_hash=str(row["config_hash"]),
+        run_dir=Path(str(row["run_dir"])),
+        parent_run_id=_optional_str(row["parent_run_id"]),
+        source_run_id=_optional_str(row["source_run_id"]),
+        source_artifact=_optional_str(row["source_artifact"]),
+        created_at=str(row["created_at"]),
+        started_at=_optional_str(row["started_at"]),
+        stopped_at=_optional_str(row["stopped_at"]),
+    )
+
+
+def _template_from_row(row: sqlite3.Row) -> ManagedRunTemplate:
+    return ManagedRunTemplate(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        config=load_config_json(str(row["config_json"])),
+        config_hash=str(row["config_hash"]),
+        created_at=str(row["created_at"]),
+        updated_at=str(row["updated_at"]),
+    )
+
+
+def _run_status(value: object) -> RunStatus:
+    match value:
+        case "created":
+            return "created"
+        case "running":
+            return "running"
+        case "stopped":
+            return "stopped"
+        case "finished":
+            return "finished"
+        case "failed":
+            return "failed"
+    raise ValueError(f"Unsupported managed run status: {value!r}")
+
+
+def _optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
+def _new_run_id(name: str) -> str:
+    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+    slug = _slugify(name) or "run"
+    return f"{timestamp}-{slug}-{uuid4().hex[:8]}"
+
+
+def _slugify(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return slug.strip("-")[:48]
+
+
+def _utc_now() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")

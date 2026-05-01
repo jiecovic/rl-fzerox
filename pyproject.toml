@@ -35,6 +35,9 @@ train = [
   "tensorboard>=2.18,<3",
   "tqdm>=4.66,<5",
 ]
+manager = [
+  "streamlit>=1.40,<2",
+]
 
 [project.scripts]
 fzerox-probe = "rl_fzerox.apps.probe:main"
