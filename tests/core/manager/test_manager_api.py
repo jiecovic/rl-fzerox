@@ -84,6 +84,28 @@ def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
     assert payload["image_shape"] == {"height": 60, "width": 76, "channels": 6}
     assert payload["total_params"] > 0
     assert payload["architecture_lanes"][0]["label"] == "Image branch"
+    fusion_nodes = payload["architecture_lanes"][2]["nodes"]
+    assert {node["id"] for node in fusion_nodes} >= {
+        "action_net",
+        "policy_head",
+        "value_head",
+        "value_net",
+    }
+
+
+def test_manager_api_previews_raw_state_fusion_without_state_mlp(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    config = default_managed_run_config().model_dump(mode="json")
+    config["policy"]["state_net_arch"] = []
+
+    response = client.post("/api/policy-preview", json=config)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["state_features_dim"] == payload["state_dim"]
+    state_nodes = payload["architecture_lanes"][1]["nodes"]
+    state_mlp = next(node for node in state_nodes if node["id"] == "state_mlp")
+    assert state_mlp["tone"] == "muted"
 
 
 def _client(tmp_path: Path) -> TestClient:

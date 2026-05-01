@@ -47,7 +47,7 @@ export function PolicySection({
             updatePolicy({
               conv_profile: defaultConfig.policy.conv_profile,
               features_dim: defaultConfig.policy.features_dim,
-              state_features_dim: defaultConfig.policy.state_features_dim,
+              state_net_arch: defaultConfig.policy.state_net_arch,
               fusion_features_dim: defaultConfig.policy.fusion_features_dim,
               layer_norm: defaultConfig.policy.layer_norm,
             })
@@ -72,13 +72,12 @@ export function PolicySection({
                 updatePolicy({ features_dim: value === "auto" ? "auto" : Number(value) })
               }
             />
-            <IntegerField
-              help="State branch width before image/state fusion."
-              label="State features"
-              min={1}
-              resetValue={defaultConfig.policy.state_features_dim}
-              value={config.policy.state_features_dim}
-              onChange={(value) => updatePolicy({ state_features_dim: value })}
+            <LayerListField
+              help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
+              label="State MLP"
+              resetValue={defaultConfig.policy.state_net_arch}
+              value={config.policy.state_net_arch}
+              onChange={(value) => updatePolicy({ state_net_arch: value })}
             />
             <IntegerField
               help="Feature width after image/state fusion."

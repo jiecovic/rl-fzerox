@@ -91,7 +91,7 @@ const observationConfigSchema = z.object({
 const policyConfigSchema = z.object({
   conv_profile: convProfileSchema,
   features_dim: z.union([z.literal("auto"), z.number().int().positive()]),
-  state_features_dim: z.number().int().positive(),
+  state_net_arch: z.array(z.number().int().positive()),
   fusion_features_dim: z.number().int().positive(),
   layer_norm: z.boolean(),
   activation: z.enum(["relu", "gelu", "tanh"]).default("relu"),

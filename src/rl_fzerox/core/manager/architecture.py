@@ -212,8 +212,9 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
         if config.policy.features_dim == "auto"
         else linear_params(flatten_dim, image_features_dim)
     )
-    state_features_dim = int(config.policy.state_features_dim)
-    state_mlp_params = linear_params(state_dim, state_features_dim)
+    state_net_arch = tuple(int(width) for width in config.policy.state_net_arch)
+    state_features_dim = state_net_arch[-1] if state_net_arch else state_dim
+    state_mlp_params = mlp_params(state_dim, state_net_arch)
     fusion_input_dim = image_features_dim + state_features_dim
     extractor_output_dim = int(config.policy.fusion_features_dim)
     fusion_params = linear_params(fusion_input_dim, extractor_output_dim)
@@ -267,6 +268,8 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
             fusion_input_dim,
             extractor_output_dim,
             policy_input_dim,
+            int(pi_output_dim),
+            int(vf_output_dim),
         ),
     )
 
@@ -362,6 +365,8 @@ def _architecture_lanes(
     fusion_input_dim: int,
     extractor_output_dim: int,
     policy_input_dim: int,
+    pi_output_dim: int,
+    vf_output_dim: int,
 ) -> tuple[ArchitectureLanePreview, ...]:
     image_projection_detail = (
         f"identity {flatten_dim}"
@@ -412,7 +417,8 @@ def _architecture_lanes(
                 ArchitectureNodePreview(
                     id="state_mlp",
                     label="State MLP",
-                    detail=f"{state_dim} → {config.policy.state_features_dim}",
+                    detail=_state_mlp_detail(config, state_dim),
+                    tone="normal" if config.policy.state_net_arch else "muted",
                 ),
             ),
         ),
@@ -451,6 +457,14 @@ def _architecture_lanes(
                     ),
                 ),
                 ArchitectureNodePreview(
+                    id="action_net",
+                    label="Action net",
+                    detail=(
+                        f"{pi_output_dim} → {ACTION_CONTINUOUS_DIM} continuous"
+                        f" + {ACTION_DISCRETE_LOGITS} logits"
+                    ),
+                ),
+                ArchitectureNodePreview(
                     id="value_head",
                     label="Value head",
                     detail=(
@@ -458,9 +472,20 @@ def _architecture_lanes(
                         f"{config.policy.activation}"
                     ),
                 ),
+                ArchitectureNodePreview(
+                    id="value_net",
+                    label="Value net",
+                    detail=f"{vf_output_dim} → 1 value",
+                ),
             ),
         ),
     )
+
+
+def _state_mlp_detail(config: ManagedRunConfig, state_dim: int) -> str:
+    if not config.policy.state_net_arch:
+        return f"identity {state_dim}"
+    return f"{state_dim} → {list(config.policy.state_net_arch)}"
 
 
 def _recurrent_detail(config: ManagedRunConfig, extractor_output_dim: int) -> str:
