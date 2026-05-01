@@ -288,6 +288,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
         in_race_mode,
         total_racers: 30,
         course_index: 0,
+        course_segment_count: 64,
         course_length: 80_000.0,
         player: PlayerTelemetry {
             state_flags,

@@ -176,6 +176,7 @@ class FZeroXTelemetry:
         course_index: int,
         player: PlayerTelemetry,
         course_length: float = 0.0,
+        course_segment_count: int = 0,
         difficulty_raw: int = 0,
         difficulty_name: str | None = None,
         camera_setting_raw: int = 2,
@@ -204,6 +205,8 @@ class FZeroXTelemetry:
     def total_racers(self) -> int: ...
     @property
     def course_index(self) -> int: ...
+    @property
+    def course_segment_count(self) -> int: ...
     @property
     def course_length(self) -> float: ...
     @property

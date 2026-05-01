@@ -24,7 +24,7 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
             "state_components": [
                 "vehicle_state",
                 "machine_context",
-                "track_position",
+                {"track_position": {"progress_source": "segment_progress"}},
                 "surface_state",
                 {"course_context": {"encoding": "one_hot_builtin"}},
                 {"control_history": {"length": 2, "controls": ["steer", "thrust"]}},
@@ -35,7 +35,10 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
     assert config.state_components_data() == (
         ObservationStateComponentSettings(name="vehicle_state"),
         ObservationStateComponentSettings(name="machine_context"),
-        ObservationStateComponentSettings(name="track_position"),
+        ObservationStateComponentSettings(
+            name="track_position",
+            progress_source="segment_progress",
+        ),
         ObservationStateComponentSettings(name="surface_state"),
         ObservationStateComponentSettings(
             name="course_context",

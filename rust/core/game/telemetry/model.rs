@@ -242,6 +242,7 @@ pub struct TelemetrySnapshot {
     pub in_race_mode: bool,
     pub total_racers: i32,
     pub course_index: u32,
+    pub course_segment_count: i32,
     pub course_length: f32,
     pub player: PlayerTelemetry,
 }

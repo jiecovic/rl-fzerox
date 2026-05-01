@@ -622,6 +622,50 @@ def test_state_components_can_keep_progress_while_zeroing_track_bounds_fields() 
     assert values["track_position.outside_track_bounds"] == 0.0
 
 
+def test_state_components_can_feed_segment_progress_through_progress_slot() -> None:
+    components = (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(
+            name="track_position",
+            progress_source="segment_progress",
+        ),
+    )
+    telemetry = make_telemetry(
+        lap_distance=20_000.0,
+        course_length=80_000.0,
+        segment_index=16,
+        course_segment_count=65,
+    )
+
+    vector = telemetry_state_vector(telemetry, state_components=components)
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert values["track_position.lap_progress"] == 0.25
+
+
+def test_state_components_can_disable_progress_slot_without_changing_shape() -> None:
+    components = (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(
+            name="track_position",
+            progress_source="none",
+        ),
+    )
+    telemetry = make_telemetry(
+        lap_distance=20_000.0,
+        course_length=80_000.0,
+        segment_index=16,
+        course_segment_count=65,
+    )
+
+    vector = telemetry_state_vector(telemetry, state_components=components)
+    feature_names = state_feature_names("race_core", state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert values["track_position.lap_progress"] == 0.0
+
+
 def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:
     components = _clean_state_components(control_history_enabled=False)
     telemetry = make_telemetry(

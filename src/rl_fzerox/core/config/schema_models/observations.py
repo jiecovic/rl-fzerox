@@ -24,6 +24,7 @@ from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentName,
     ObservationStateComponentSettings,
     ObservationStateProfileName,
+    TrackPositionProgressSourceName,
 )
 
 
@@ -34,6 +35,7 @@ class ObservationStateComponentConfig(BaseModel):
 
     name: ObservationStateComponentName
     encoding: ObservationCourseContextName | None = None
+    progress_source: TrackPositionProgressSourceName | None = None
     state_profile: ObservationStateProfileName | None = None
     length: PositiveInt | None = Field(default=None, le=16)
     controls: tuple[ActionHistoryControlName, ...] | None = None
@@ -59,6 +61,7 @@ class ObservationStateComponentConfig(BaseModel):
             name
             for name in (
                 "encoding",
+                "progress_source",
                 "state_profile",
                 "length",
                 "controls",
@@ -84,7 +87,9 @@ class ObservationStateComponentConfig(BaseModel):
                 return frozenset({"encoding"})
             case "control_history":
                 return frozenset({"length", "controls"})
-            case "vehicle_state" | "machine_context" | "track_position" | "surface_state":
+            case "track_position":
+                return frozenset({"progress_source"})
+            case "vehicle_state" | "machine_context" | "surface_state":
                 return frozenset()
             case _:
                 raise ValueError(f"Unsupported state component: {self.name!r}")
@@ -95,6 +100,7 @@ class ObservationStateComponentConfig(BaseModel):
         return ObservationStateComponentSettings(
             name=self.name,
             encoding=self.encoding,
+            progress_source=self.progress_source,
             state_profile=self.state_profile,
             length=None if self.length is None else int(self.length),
             controls=self.controls,
