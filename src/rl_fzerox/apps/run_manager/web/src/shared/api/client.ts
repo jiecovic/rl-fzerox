@@ -66,6 +66,20 @@ export async function createDraft(name: string, config: ManagedRunConfig): Promi
   return payload.draft;
 }
 
+export async function updateDraft(
+  id: string,
+  name: string,
+  config: ManagedRunConfig,
+): Promise<ManagedDraft> {
+  const response = await fetch(`/api/drafts/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, config }),
+  });
+  const payload = createDraftResponseSchema.parse(await parseJson(response));
+  return payload.draft;
+}
+
 export async function deleteDraft(id: string): Promise<void> {
   const response = await fetch(`/api/drafts/${encodeURIComponent(id)}`, { method: "DELETE" });
   await parseJson(response);

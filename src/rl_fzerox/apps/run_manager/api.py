@@ -33,6 +33,15 @@ class CreateDraftRequest(BaseModel):
     config: ManagedRunConfig
 
 
+class UpdateDraftRequest(BaseModel):
+    """Request body for updating one SQLite-backed draft."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    config: ManagedRunConfig
+
+
 def create_manager_api_app(store: ManagerStore) -> FastAPI:
     """Create the local REST API app for the run manager."""
 
@@ -83,6 +92,19 @@ def create_manager_api_app(store: ManagerStore) -> FastAPI:
         if not name:
             raise HTTPException(status_code=400, detail="draft name is required")
         draft = store.create_draft(name=name, config=request.config)
+        return {"draft": _draft_payload(draft)}
+
+    @app.put("/api/drafts/{draft_id}")
+    def update_draft(
+        draft_id: Annotated[str, Path(min_length=1)],
+        request: UpdateDraftRequest,
+    ) -> dict[str, dict[str, object]]:
+        name = request.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="draft name is required")
+        draft = store.update_draft(draft_id=draft_id, name=name, config=request.config)
+        if draft is None:
+            raise HTTPException(status_code=404, detail="draft not found")
         return {"draft": _draft_payload(draft)}
 
     @app.delete("/api/drafts/{draft_id}")

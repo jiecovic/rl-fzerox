@@ -21,6 +21,10 @@
   gap: 14px;
 }
 
+.configurator-status {
+  margin-bottom: 16px;
+}
+
 .training-panel-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
