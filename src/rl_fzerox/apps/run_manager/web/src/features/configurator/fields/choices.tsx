@@ -37,6 +37,7 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
+  optionLabels = {},
   resetValue,
 }: {
   help: string;
@@ -44,6 +45,7 @@ export function SelectField<T extends string>({
   value: T;
   options: readonly T[];
   onChange: (value: T) => void;
+  optionLabels?: Partial<Record<T, string>>;
   resetValue?: T;
 }) {
   return (
@@ -56,7 +58,7 @@ export function SelectField<T extends string>({
       >
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {optionLabels[option] ?? option}
           </option>
         ))}
       </select>

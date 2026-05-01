@@ -12,8 +12,12 @@ label,
   gap: 6px;
 }
 
-.field-help {
+.field-help,
+.tooltip-anchor {
   position: relative;
+}
+
+.field-help {
   display: inline-grid;
   width: 16px;
   height: 16px;
@@ -39,14 +43,14 @@ button.field-help:not(:disabled) {
   color: var(--text);
 }
 
-.field-help::after {
+.field-help::after,
+.tooltip-anchor::after {
   content: attr(data-tooltip);
   position: absolute;
   z-index: 20;
   bottom: calc(100% + 8px);
   left: 50%;
   display: none;
-  width: 220px;
   transform: translateX(-50%);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
@@ -59,7 +63,27 @@ button.field-help:not(:disabled) {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
 }
 
-.field-help:hover::after {
+.field-help::after {
+  width: 220px;
+}
+
+.tooltip-anchor::after {
+  width: max-content;
+  max-width: 180px;
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+
+.tooltip-anchor[data-tooltip-position="left"]::after {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.field-help:hover::after,
+.field-help:focus-visible::after,
+.tooltip-anchor:hover::after,
+.tooltip-anchor:focus-visible::after {
   display: block;
 }
 

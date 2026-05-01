@@ -28,8 +28,9 @@ export function ScrollButtons() {
       {!position.atTop ? (
         <button
           aria-label="Scroll to top"
-          className="icon-button compact-icon-button"
-          title="Top"
+          className="icon-button compact-icon-button tooltip-anchor"
+          data-tooltip="Scroll to top"
+          data-tooltip-position="left"
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         >
@@ -39,8 +40,9 @@ export function ScrollButtons() {
       {!position.atBottom ? (
         <button
           aria-label="Scroll to bottom"
-          className="icon-button compact-icon-button"
-          title="Bottom"
+          className="icon-button compact-icon-button tooltip-anchor"
+          data-tooltip="Scroll to bottom"
+          data-tooltip-position="left"
           type="button"
           onClick={() =>
             window.scrollTo({

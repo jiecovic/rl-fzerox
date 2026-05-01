@@ -19,6 +19,7 @@ import {
   trackEventDefaults,
 } from "@/features/configurator/sections/rewardDefaults";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { CollapseAllIcon, ExpandAllIcon } from "@/shared/ui/DisclosureIcons";
 
 interface ConfigSectionProps {
   config: ManagedRunConfig;
@@ -55,8 +56,8 @@ export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectio
       <div className="reward-accordion-toolbar">
         <button
           aria-label="Expand all reward sections"
-          className="icon-button compact-icon-button"
-          title="Expand all"
+          className="icon-button compact-icon-button tooltip-anchor"
+          data-tooltip="Expand all"
           type="button"
           onClick={() => setOpenSections(allRewardSectionsOpen(true))}
         >
@@ -64,8 +65,8 @@ export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectio
         </button>
         <button
           aria-label="Collapse all reward sections"
-          className="icon-button compact-icon-button"
-          title="Collapse all"
+          className="icon-button compact-icon-button tooltip-anchor"
+          data-tooltip="Collapse all"
           type="button"
           onClick={() => setOpenSections(allRewardSectionsOpen(false))}
         >
@@ -566,32 +567,4 @@ function allRewardSectionsOpen(open: boolean): RewardDisclosureState {
     time: open,
     track: open,
   };
-}
-
-function ExpandAllIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 20 20" width="16">
-      <path
-        d="M5 8l5-5 5 5M5 12l5 5 5-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-function CollapseAllIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 20 20" width="16">
-      <path
-        d="M3 5l5 5-5 5M17 5l-5 5 5 5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
 }

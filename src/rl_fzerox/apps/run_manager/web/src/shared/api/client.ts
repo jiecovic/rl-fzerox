@@ -1,10 +1,14 @@
 import {
+  type ConfigMetadata,
+  configMetadataSchema,
   createDraftResponseSchema,
   draftsResponseSchema,
   type ManagedDraft,
   type ManagedRun,
   type ManagedRunConfig,
   type ManagedTemplate,
+  type PolicyArchitecturePreview,
+  policyArchitecturePreviewSchema,
   runsResponseSchema,
   templatesResponseSchema,
 } from "@/shared/api/contract";
@@ -22,6 +26,34 @@ export async function fetchDrafts(): Promise<ManagedDraft[]> {
 export async function fetchRuns(): Promise<ManagedRun[]> {
   const payload = runsResponseSchema.parse(await getJson("/api/runs"));
   return payload.runs;
+}
+
+export async function fetchConfigMetadata(): Promise<ConfigMetadata> {
+  return configMetadataSchema.parse(await getJson("/api/config-metadata"));
+}
+
+export async function fetchPolicyPreview(
+  config: ManagedRunConfig,
+): Promise<PolicyArchitecturePreview> {
+  let response = await postPolicyPreview(config);
+  if (!response.ok) {
+    response = await postPolicyPreview(legacyPreviewConfig(config));
+  }
+  return policyArchitecturePreviewSchema.parse(await parseJson(response));
+}
+
+async function postPolicyPreview(config: unknown): Promise<Response> {
+  return fetch("/api/policy-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config),
+  });
+}
+
+function legacyPreviewConfig(config: ManagedRunConfig): unknown {
+  const policy = { ...config.policy };
+  delete (policy as Partial<typeof policy>).activation;
+  return { ...config, policy };
 }
 
 export async function createDraft(name: string, config: ManagedRunConfig): Promise<ManagedDraft> {
