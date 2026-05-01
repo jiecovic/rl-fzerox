@@ -31,6 +31,12 @@ select,
   padding: 0;
 }
 
+.compact-icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+
 .icon-button:hover,
 .secondary-button:hover {
   border-color: var(--border-strong);
@@ -218,4 +224,18 @@ button:disabled {
 
 .notice.error {
   color: var(--danger);
+}
+
+.scroll-buttons {
+  position: fixed;
+  right: max(18px, calc((100vw - 1120px) / 2 - 54px));
+  bottom: 28px;
+  z-index: 10;
+  display: grid;
+  gap: 8px;
+}
+
+.scroll-buttons .icon-button {
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
 }

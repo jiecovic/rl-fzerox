@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   BooleanField,
   DiscreteSliderNumberField,
@@ -6,7 +6,6 @@ import {
   OptionalNumberField,
   RangeIntegerField,
   RangeNumberField,
-  ResetIcon,
 } from "@/features/configurator/fields";
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
@@ -286,37 +285,6 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
         </table>
       </ConfigPanel>
     </div>
-  );
-}
-
-function ConfigPanel({
-  children,
-  onReset,
-  title,
-  wide = false,
-}: {
-  children: ReactNode;
-  onReset?: () => void;
-  title: string;
-  wide?: boolean;
-}) {
-  return (
-    <section className={wide ? "config-group wide" : "config-group"}>
-      <div className="config-group-header">
-        <h3>{title}</h3>
-        {onReset !== undefined ? (
-          <button
-            aria-label={`Reset ${title} defaults`}
-            className="reset-button"
-            type="button"
-            onClick={onReset}
-          >
-            <ResetIcon />
-          </button>
-        ) : null}
-      </div>
-      {children}
-    </section>
   );
 }
 

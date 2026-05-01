@@ -36,12 +36,14 @@ export function NumberField({
 export function IntegerField({
   help,
   label,
+  min = 0,
   value,
   onChange,
   resetValue,
 }: {
   help: string;
   label: string;
+  min?: number;
   value: number;
   onChange: (value: number) => void;
   resetValue?: number;
@@ -54,7 +56,7 @@ export function IntegerField({
 
   function commitValue() {
     const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    if (!Number.isSafeInteger(parsed) || parsed < min) {
       setRawValue(formatInteger(value));
       return;
     }

@@ -1,6 +1,11 @@
 import type { CSSProperties } from "react";
+import { useState } from "react";
 
-import { clamp, formatCompactNumber } from "@/features/configurator/fields/format";
+import {
+  clamp,
+  formatCompactDecimal,
+  formatCompactNumber,
+} from "@/features/configurator/fields/format";
 import type { SliderTick } from "@/features/configurator/fields/types";
 
 export function Slider({
@@ -11,6 +16,7 @@ export function Slider({
   step,
   ticks,
   value,
+  valueLabel,
   onChange,
 }: {
   ariaLabel: string;
@@ -20,10 +26,14 @@ export function Slider({
   step: number;
   ticks: readonly SliderTick[];
   value: number;
+  valueLabel?: string;
   onChange: (value: number) => void;
 }) {
+  const [sliding, setSliding] = useState(false);
+  const valuePercent = tickPercent(value, min, max);
+
   return (
-    <div className="slider-control">
+    <div className={sliding ? "slider-control sliding" : "slider-control"}>
       <input
         aria-label={ariaLabel}
         disabled={disabled}
@@ -33,7 +43,14 @@ export function Slider({
         type="range"
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
+        onPointerDown={() => setSliding(true)}
+        onPointerUp={() => setSliding(false)}
+        onPointerCancel={() => setSliding(false)}
+        onBlur={() => setSliding(false)}
       />
+      <span className="slider-value-bubble" style={{ left: `${valuePercent}%` }} aria-hidden="true">
+        {valueLabel ?? formatCompactDecimal(value)}
+      </span>
       {ticks.length > 0 ? (
         <div className="slider-ticks" aria-hidden="true">
           {ticks.map((tick) => (
@@ -78,6 +95,10 @@ export function nearestOption(value: number, options: readonly number[]) {
 }
 
 function tickStyle(value: number, min: number, max: number): CSSProperties {
+  return { left: `${tickPercent(value, min, max)}%` };
+}
+
+function tickPercent(value: number, min: number, max: number) {
   const percent = ((value - min) / (max - min)) * 100;
-  return { left: `${clamp(percent, 0, 100)}%` };
+  return clamp(percent, 0, 100);
 }

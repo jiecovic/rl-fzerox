@@ -72,10 +72,85 @@
   color: var(--text);
 }
 
-.training-field-grid {
+.training-field-grid,
+.config-field-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+}
+
+.reward-accordion-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.reward-accordion-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.config-disclosure {
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.config-disclosure-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.config-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.config-disclosure-summary::before {
+  content: "";
+  position: absolute;
+}
+
+.config-disclosure-summary > span::before {
+  content: "▸";
+  display: inline-block;
+  width: 16px;
+  color: var(--muted);
+}
+
+.config-disclosure[open] .config-disclosure-summary > span::before {
+  content: "▾";
+}
+
+.config-disclosure-body {
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+
+.reward-accordion-stack .config-field-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 12px;
+}
+
+@media (min-width: 1180px) {
+  .reward-accordion-stack .config-field-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.reward-accordion-stack .optional-number-field {
+  grid-column: span 2;
+}
+
+.reward-accordion-stack .range-pair-field {
+  grid-column: 1 / -1;
 }
 
 .seed-control {
