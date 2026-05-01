@@ -118,6 +118,12 @@ input:disabled {
   opacity: 0.42;
 }
 
+.compact-value-field input:not([type="range"]) {
+  width: min(100%, 14ch);
+  min-width: 9ch;
+  justify-self: start;
+}
+
 input::selection,
 textarea::selection {
   background: var(--selection-background);
