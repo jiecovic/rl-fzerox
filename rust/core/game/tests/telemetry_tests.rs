@@ -31,6 +31,9 @@ fn read_snapshot_decodes_player_one_race_values() {
     let course_info_offset = (course_info_address as usize) - TELEMETRY_CONFIG.kseg0_base;
     memory[GLOBALS.current_course_info..GLOBALS.current_course_info + 4]
         .copy_from_slice(&course_info_address.to_le_bytes());
+    memory[course_info_offset + COURSE_INFO.segment_count
+        ..course_info_offset + COURSE_INFO.segment_count + 4]
+        .copy_from_slice(&64_i32.to_le_bytes());
     memory[course_info_offset + COURSE_INFO.length..course_info_offset + COURSE_INFO.length + 4]
         .copy_from_slice(&80_000.0_f32.to_le_bytes());
     memory[GLOBALS.cameras + CAMERA.race_setting..GLOBALS.cameras + CAMERA.race_setting + 4]
@@ -125,6 +128,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.camera_setting_name, "wide");
     assert_eq!(telemetry.total_racers, 30);
     assert_eq!(telemetry.course_index, 0);
+    assert_eq!(telemetry.course_segment_count, 64);
     assert!((telemetry.course_length - 80_000.0).abs() < f32::EPSILON);
     assert!(
         (telemetry.player.speed_kph - (123.5 * TELEMETRY_CONFIG.speed_to_kph)).abs() < f32::EPSILON

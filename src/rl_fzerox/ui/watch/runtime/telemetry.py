@@ -73,6 +73,7 @@ def _telemetry_from_data(data: dict[str, object] | None) -> FZeroXTelemetry | No
         in_race_mode=_mapping_bool(data, "in_race_mode"),
         total_racers=_mapping_int(data, "total_racers"),
         course_index=_mapping_int(data, "course_index"),
+        course_segment_count=_mapping_int(data, "course_segment_count"),
         course_length=_mapping_float(data, "course_length"),
         player=player,
         difficulty_raw=_mapping_int(data, "difficulty_raw"),

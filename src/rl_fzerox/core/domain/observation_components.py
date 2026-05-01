@@ -15,6 +15,11 @@ ActionHistoryControlName: TypeAlias = Literal[
 ]
 ObservationCourseContextName: TypeAlias = Literal["none", "one_hot_builtin"]
 ObservationGroundEffectContextName: TypeAlias = Literal["none", "effect_flags"]
+TrackPositionProgressSourceName: TypeAlias = Literal[
+    "lap_progress",
+    "segment_progress",
+    "none",
+]
 ObservationStateProfileName: TypeAlias = Literal[
     "default",
     "steer_history",
@@ -36,6 +41,7 @@ class ObservationStateComponentSettings:
 
     name: ObservationStateComponentName
     encoding: ObservationCourseContextName | None = None
+    progress_source: TrackPositionProgressSourceName | None = None
     state_profile: ObservationStateProfileName | None = None
     length: int | None = None
     controls: tuple[ActionHistoryControlName, ...] | None = None

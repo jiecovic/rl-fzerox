@@ -28,6 +28,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
     let camera_setting_raw = read_i32(system_ram, player_camera_setting_offset())?;
     let camera_setting = resolve_camera_setting(camera_setting_raw);
     let player_state_flags = read_u32(system_ram, player_base + RACER.state_flags)?;
+    let course_info = read_current_course_info(system_ram)?;
     let player = PlayerTelemetry {
         state_flags: player_state_flags,
         speed_kph: read_f32(system_ram, player_base + RACER.speed)? * TELEMETRY_CONFIG.speed_to_kph,
@@ -59,7 +60,8 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         in_race_mode: game_mode.is_some_and(GameMode::is_race),
         total_racers: read_i32(system_ram, GLOBALS.total_racers)?,
         course_index: read_u32(system_ram, GLOBALS.course_index)?,
-        course_length: read_current_course_length(system_ram)?,
+        course_segment_count: course_info.segment_count,
+        course_length: course_info.length,
         player,
     })
 }
@@ -208,16 +210,28 @@ fn read_current_segment_index(
     Ok(Some(read_i32(system_ram, segment_index_offset)?))
 }
 
-fn read_current_course_length(system_ram: &[u8]) -> Result<f32, CoreError> {
+#[derive(Clone, Copy, Debug, Default)]
+struct CurrentCourseInfo {
+    segment_count: i32,
+    length: f32,
+}
+
+fn read_current_course_info(system_ram: &[u8]) -> Result<CurrentCourseInfo, CoreError> {
     let pointer = read_u32(system_ram, GLOBALS.current_course_info)?;
     let Some(course_info_offset) = kseg0_pointer_to_offset(pointer, system_ram.len()) else {
-        return Ok(0.0);
+        return Ok(CurrentCourseInfo::default());
     };
+    let segment_count_offset = course_info_offset + COURSE_INFO.segment_count;
     let length_offset = course_info_offset + COURSE_INFO.length;
-    if length_offset + size_of::<f32>() > system_ram.len() {
-        return Ok(0.0);
+    if segment_count_offset + size_of::<i32>() > system_ram.len()
+        || length_offset + size_of::<f32>() > system_ram.len()
+    {
+        return Ok(CurrentCourseInfo::default());
     }
-    read_f32(system_ram, length_offset)
+    Ok(CurrentCourseInfo {
+        segment_count: read_i32(system_ram, segment_count_offset)?,
+        length: read_f32(system_ram, length_offset)?,
+    })
 }
 
 fn kseg0_pointer_to_offset(pointer: u32, memory_len: usize) -> Option<usize> {

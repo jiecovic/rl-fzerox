@@ -106,6 +106,7 @@ pub(crate) struct CourseSegmentOffsets {
 
 #[derive(Clone, Copy)]
 pub(crate) struct CourseInfoOffsets {
+    pub segment_count: usize,
     pub length: usize,
 }
 
@@ -201,8 +202,11 @@ pub(crate) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
 };
 
 // Byte offsets within `struct CourseInfo`, derived from the decomp's
-// `include/course.h`. `length` is the summed spline length for one lap.
-pub(crate) const COURSE_INFO: CourseInfoOffsets = CourseInfoOffsets { length: 0x00C };
+// `include/unk_structs.h`. `length` is the summed spline length for one lap.
+pub(crate) const COURSE_INFO: CourseInfoOffsets = CourseInfoOffsets {
+    segment_count: 0x008,
+    length: 0x00C,
+};
 
 pub(crate) const fn player_z_button_timer_offset() -> usize {
     player_racer_field_offset(RACER.z_button_timer)

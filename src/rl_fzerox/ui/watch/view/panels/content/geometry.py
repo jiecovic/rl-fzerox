@@ -23,7 +23,7 @@ def track_geometry_sections(
             lines=[
                 panel_line(
                     "Segment",
-                    _format_optional_int(player.segment_index),
+                    _format_segment(telemetry),
                     PALETTE.text_primary
                     if player.segment_index is not None
                     else PALETTE.text_muted,
@@ -108,8 +108,14 @@ def track_geometry_sections(
     )
 
 
-def _format_optional_int(value: int | None) -> str:
-    return "--" if value is None else str(value)
+def _format_segment(telemetry: FZeroXTelemetry) -> str:
+    segment_index = telemetry.player.segment_index
+    if segment_index is None:
+        return "--"
+    segment_count = telemetry.course_segment_count
+    if segment_count <= 0:
+        return str(segment_index)
+    return f"{segment_index} / {segment_count}"
 
 
 def _format_lap_progress(telemetry: FZeroXTelemetry) -> str:
