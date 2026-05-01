@@ -43,7 +43,7 @@ py-test: native
 
 # Launch the local Streamlit run manager. Requires the `manager` extra.
 run-manager:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m streamlit run src/rl_fzerox/apps/run_manager/app.py
+    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m streamlit run src/rl_fzerox/apps/run_manager/app.py --server.headless true --client.toolbarMode viewer --browser.gatherUsageStats false
 
 # Aggregate repo-wide quality tasks.
 fmt: rust-fmt py-fmt

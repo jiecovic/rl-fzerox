@@ -8,8 +8,12 @@ from pathlib import Path
 from uuid import uuid4
 
 from rl_fzerox.core.manager.config import ManagedRunConfig
-from rl_fzerox.core.manager.manifest import write_run_manifest
-from rl_fzerox.core.manager.models import ManagedRun, ManagedRunTemplate, RunStatus
+from rl_fzerox.core.manager.models import (
+    ManagedRun,
+    ManagedRunDraft,
+    ManagedRunTemplate,
+    RunStatus,
+)
 from rl_fzerox.core.manager.schema import initialize_manager_schema
 from rl_fzerox.core.manager.serialization import config_hash, config_json, load_config_json
 
@@ -43,7 +47,7 @@ class ManagerStore:
         source_run_id: str | None = None,
         source_artifact: str | None = None,
     ) -> ManagedRun:
-        """Create an immutable run record and write its non-authoritative manifest."""
+        """Create an immutable SQLite run record without filesystem side effects."""
 
         self.initialize()
         created_at = _utc_now()
@@ -104,16 +108,51 @@ class ManagerStore:
                 """,
                 (run.id, created_at, "created", "run created from manager config"),
             )
-
-            write_run_manifest(
-                run_id=run.id,
-                run_name=run.name,
-                run_dir=run.run_dir,
-                db_path=self.db_path,
-                config=run.config,
-                created_at=created_at,
-            )
         return run
+
+    def create_draft(
+        self,
+        *,
+        name: str,
+        config: ManagedRunConfig,
+    ) -> ManagedRunDraft:
+        """Persist a mutable draft in SQLite without creating filesystem artifacts."""
+
+        self.initialize()
+        created_at = _utc_now()
+        draft_id = _new_record_id(name)
+        draft = ManagedRunDraft(
+            id=draft_id,
+            name=name.strip() or draft_id,
+            config=config,
+            config_hash=config_hash(config),
+            created_at=created_at,
+            updated_at=created_at,
+        )
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO run_drafts(
+                    id,
+                    name,
+                    config_json,
+                    config_hash,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    draft.id,
+                    draft.name,
+                    config_json(draft.config),
+                    draft.config_hash,
+                    draft.created_at,
+                    draft.updated_at,
+                ),
+            )
+        return draft
 
     def list_runs(self) -> tuple[ManagedRun, ...]:
         """Return all DB-managed runs, newest first."""
@@ -140,6 +179,37 @@ class ManagerStore:
                 """
             ).fetchall()
         return tuple(_run_from_row(row) for row in rows)
+
+    def list_drafts(self) -> tuple[ManagedRunDraft, ...]:
+        """Return all SQLite-only drafts, newest first."""
+
+        self.initialize()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    config_json,
+                    config_hash,
+                    created_at,
+                    updated_at
+                FROM run_drafts
+                ORDER BY updated_at DESC, id DESC
+                """
+            ).fetchall()
+        return tuple(_draft_from_row(row) for row in rows)
+
+    def delete_draft(self, draft_id: str) -> bool:
+        """Delete one SQLite-only draft by id."""
+
+        self.initialize()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM run_drafts WHERE id = ?",
+                (draft_id,),
+            )
+        return cursor.rowcount > 0
 
     def list_templates(self) -> tuple[ManagedRunTemplate, ...]:
         """Return available DB-backed run templates."""
@@ -204,12 +274,25 @@ def _template_from_row(row: sqlite3.Row) -> ManagedRunTemplate:
     )
 
 
+def _draft_from_row(row: sqlite3.Row) -> ManagedRunDraft:
+    return ManagedRunDraft(
+        id=str(row["id"]),
+        name=str(row["name"]),
+        config=load_config_json(str(row["config_json"])),
+        config_hash=str(row["config_hash"]),
+        created_at=str(row["created_at"]),
+        updated_at=str(row["updated_at"]),
+    )
+
+
 def _run_status(value: object) -> RunStatus:
     match value:
         case "created":
             return "created"
         case "running":
             return "running"
+        case "paused":
+            return "paused"
         case "stopped":
             return "stopped"
         case "finished":
@@ -224,6 +307,10 @@ def _optional_str(value: object) -> str | None:
 
 
 def _new_run_id(name: str) -> str:
+    return _new_record_id(name)
+
+
+def _new_record_id(name: str) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     slug = _slugify(name) or "run"
     return f"{timestamp}-{slug}-{uuid4().hex[:8]}"

@@ -7,7 +7,7 @@ from typing import Literal
 
 from rl_fzerox.core.manager.config import ManagedRunConfig
 
-RunStatus = Literal["created", "running", "stopped", "finished", "failed"]
+RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +31,18 @@ class ManagedRun:
 @dataclass(frozen=True, slots=True)
 class ManagedRunTemplate:
     """One DB-backed editable starting point for future immutable runs."""
+
+    id: str
+    name: str
+    config: ManagedRunConfig
+    config_hash: str
+    created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedRunDraft:
+    """One SQLite-only editable run configuration draft."""
 
     id: str
     name: str
