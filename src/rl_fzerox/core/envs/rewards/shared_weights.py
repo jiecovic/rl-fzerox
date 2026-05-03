@@ -1,0 +1,62 @@
+# src/rl_fzerox/core/envs/rewards/shared_weights.py
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class SharedRewardWeights(Protocol):
+    """Common weight fields used by helper modules shared across reward profiles."""
+
+    @property
+    def progress_bucket_distance(self) -> float: ...
+
+    @property
+    def progress_bucket_reward(self) -> float: ...
+
+    @property
+    def progress_reward_interval_frames(self) -> int: ...
+
+    @property
+    def airborne_progress_bucket_distance(self) -> float | None: ...
+
+    @property
+    def outside_bounds_reentry_progress_distance_cap(self) -> float | None: ...
+
+    @property
+    def airborne_offtrack_penalty_scale(self) -> float: ...
+
+    @property
+    def airborne_offtrack_recovery_reward_scale(self) -> float: ...
+
+    @property
+    def airborne_offtrack_recovery_requires_descending(self) -> bool: ...
+
+    @property
+    def airborne_offtrack_recovery_descend_epsilon(self) -> float: ...
+
+    @property
+    def boost_pad_reward(self) -> float: ...
+
+    @property
+    def boost_pad_reward_progress_window(self) -> float: ...
+
+    @property
+    def dirt_entry_penalty(self) -> float: ...
+
+    @property
+    def ice_entry_penalty(self) -> float: ...
+
+    @property
+    def lap_completion_bonus(self) -> float: ...
+
+    @property
+    def lap_position_scale(self) -> float: ...
+
+    @property
+    def airborne_landing_reward(self) -> float: ...
+
+    @property
+    def failure_penalty(self) -> float: ...
+
+    @property
+    def truncation_penalty(self) -> float: ...

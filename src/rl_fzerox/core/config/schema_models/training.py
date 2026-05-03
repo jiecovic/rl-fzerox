@@ -47,6 +47,11 @@ class TrainConfig(BaseModel):
     normalize_advantage: bool = True
     target_kl: PositiveFloat | None = None
     stats_window_size: PositiveInt = 100
+    checkpoint_every_rollouts: PositiveInt | None = None
+    save_latest_checkpoint: bool = True
+    save_best_checkpoint: bool = True
+    save_recent_checkpoints: bool = False
+    recent_checkpoint_limit: PositiveInt | None = 5
     buffer_size: PositiveInt = 1_000_000
     learning_starts: NonNegativeInt = 100
     tau: PositiveFloat = Field(default=0.005, le=1.0)

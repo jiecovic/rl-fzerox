@@ -35,6 +35,7 @@ from rl_fzerox.core.config.schema_models import (
     WatchAppConfig,
     WatchConfig,
     WatchFpsSetting,
+    WatchXCupConfig,
 )
 
 __all__ = [
@@ -71,4 +72,5 @@ __all__ = [
     "WatchAppConfig",
     "WatchConfig",
     "WatchFpsSetting",
+    "WatchXCupConfig",
 ]

@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/policy/extractors.py
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -19,6 +20,7 @@ ConvProfile = Literal[
     "compact_deep",
     "compact_bottleneck",
     "tiny_256",
+    "custom",
 ]
 
 
@@ -29,16 +31,25 @@ class ConvLayerSpec:
     out_channels: int
     kernel_size: tuple[int, int]
     stride: tuple[int, int]
+    padding: tuple[int, int]
 
 
 ConvSpec = tuple[ConvLayerSpec, ...]
+CustomConvLayerConfig = Mapping[str, int]
 
 
-def _conv_layer(out_channels: int, *, kernel_size: int, stride: int) -> ConvLayerSpec:
+def _conv_layer(
+    out_channels: int,
+    *,
+    kernel_size: int,
+    stride: int,
+    padding: int = 0,
+) -> ConvLayerSpec:
     return ConvLayerSpec(
         out_channels=out_channels,
         kernel_size=(kernel_size, kernel_size),
         stride=(stride, stride),
+        padding=(padding, padding),
     )
 
 
@@ -108,12 +119,14 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         observation_space: spaces.Box,
         features_dim: int | Literal["auto"] = 512,
         conv_profile: ConvProfile = "auto",
+        custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         layer_norm: bool = False,
     ) -> None:
         image_geometry = _resolve_supported_image_geometry(
             observation_space,
             extractor_name=type(self).__name__,
             conv_profile=conv_profile,
+            custom_conv_layers=custom_conv_layers,
         )
         self._height = image_geometry.height
         self._width = image_geometry.width
@@ -162,6 +175,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
                     layer_spec.out_channels,
                     kernel_size=layer_spec.kernel_size,
                     stride=layer_spec.stride,
+                    padding=layer_spec.padding,
                 )
             )
             layers.append(nn.ReLU())
@@ -217,6 +231,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         state_features_dim: int = 64,
         fusion_features_dim: int | None = None,
         conv_profile: ConvProfile = "auto",
+        custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         layer_norm: bool = False,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
@@ -233,7 +248,11 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             raise ValueError(f"{type(self).__name__} requires 1D Box key 'state'")
 
         image_features_dim = (
-            _image_flatten_dim(image_space, conv_profile=conv_profile)
+            _image_flatten_dim(
+                image_space,
+                conv_profile=conv_profile,
+                custom_conv_layers=custom_conv_layers,
+            )
             if features_dim == "auto"
             else int(features_dim)
         )
@@ -254,6 +273,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             image_space,
             features_dim=features_dim,
             conv_profile=conv_profile,
+            custom_conv_layers=custom_conv_layers,
             layer_norm=False,
         )
         self._state_mlp = nn.Sequential(
@@ -306,6 +326,7 @@ def _resolve_supported_image_geometry(
     *,
     extractor_name: str,
     conv_profile: ConvProfile = "auto",
+    custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> _ImageGeometry:
     if len(observation_space.shape) != 3:
         raise ValueError(
@@ -322,13 +343,24 @@ def _resolve_supported_image_geometry(
     resolved_width = int(width)
     geometry = (resolved_height, resolved_width)
     try:
-        conv_spec = _resolve_conv_spec(geometry, conv_profile=conv_profile)
+        conv_spec = _resolve_conv_spec(
+            geometry,
+            conv_profile=conv_profile,
+            custom_conv_layers=custom_conv_layers,
+        )
     except KeyError as error:
         supported = ", ".join(f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES)
         raise ValueError(
             f"Unsupported observation geometry {resolved_height}x{resolved_width} for "
             f"{extractor_name}; supported presets: {supported}"
         ) from error
+
+    ensure_conv_spec_fits_geometry(
+        height=resolved_height,
+        width=resolved_width,
+        conv_spec=conv_spec,
+        profile_name=conv_profile,
+    )
 
     return _ImageGeometry(
         height=resolved_height,
@@ -342,6 +374,7 @@ def _resolve_conv_spec(
     geometry: tuple[int, int],
     *,
     conv_profile: ConvProfile,
+    custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> ConvSpec:
     if conv_profile == "auto":
         return SUPPORTED_POLICY_GEOMETRIES[geometry]
@@ -359,6 +392,8 @@ def _resolve_conv_spec(
         return COMPACT_BOTTLENECK_CONV_SPEC
     if conv_profile == "tiny_256":
         return TINY_256_CONV_SPEC
+    if conv_profile == "custom":
+        return _custom_conv_spec(custom_conv_layers)
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
 
 
@@ -366,37 +401,103 @@ def resolve_conv_spec(
     geometry: tuple[int, int],
     *,
     conv_profile: ConvProfile,
+    custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> ConvSpec:
     """Return the convolution stack used by the policy extractor for one geometry."""
 
-    return _resolve_conv_spec(geometry, conv_profile=conv_profile)
+    return _resolve_conv_spec(
+        geometry,
+        conv_profile=conv_profile,
+        custom_conv_layers=custom_conv_layers,
+    )
+
+
+def ensure_conv_spec_fits_geometry(
+    *,
+    height: int,
+    width: int,
+    conv_spec: ConvSpec,
+    profile_name: str,
+) -> None:
+    current_height = height
+    current_width = width
+    for index, layer in enumerate(conv_spec, start=1):
+        next_height = _conv_output_size(
+            current_height,
+            layer.kernel_size[0],
+            layer.stride[0],
+            padding=layer.padding[0],
+        )
+        next_width = _conv_output_size(
+            current_width,
+            layer.kernel_size[1],
+            layer.stride[1],
+            padding=layer.padding[1],
+        )
+        if next_height < 1 or next_width < 1:
+            raise ValueError(
+                f"CNN profile {profile_name!r} collapses {height}x{width} at conv{index}: "
+                f"{current_height}x{current_width} with k={layer.kernel_size[0]} "
+                f"s={layer.stride[0]} p={layer.padding[0]}"
+            )
+        current_height = next_height
+        current_width = next_width
+
+
+def _custom_conv_spec(
+    custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None,
+) -> ConvSpec:
+    if not custom_conv_layers:
+        raise ValueError("custom CNN profile requires at least one convolution layer")
+
+    return tuple(
+        _conv_layer(
+            int(layer["out_channels"]),
+            kernel_size=int(layer["kernel_size"]),
+            stride=int(layer["stride"]),
+            padding=int(layer.get("padding", 0)),
+        )
+        for layer in custom_conv_layers
+    )
 
 
 def _image_flatten_dim(
     observation_space: spaces.Box,
     *,
     conv_profile: ConvProfile = "auto",
+    custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> int:
     geometry = _resolve_supported_image_geometry(
         observation_space,
         extractor_name=FZeroXImageStateExtractor.__name__,
         conv_profile=conv_profile,
+        custom_conv_layers=custom_conv_layers,
     )
     height = geometry.height
     width = geometry.width
     output_channels = geometry.channels
     for layer_spec in geometry.conv_spec:
         output_channels = layer_spec.out_channels
-        height = _conv_output_size(height, layer_spec.kernel_size[0], layer_spec.stride[0])
-        width = _conv_output_size(width, layer_spec.kernel_size[1], layer_spec.stride[1])
+        height = _conv_output_size(
+            height,
+            layer_spec.kernel_size[0],
+            layer_spec.stride[0],
+            padding=layer_spec.padding[0],
+        )
+        width = _conv_output_size(
+            width,
+            layer_spec.kernel_size[1],
+            layer_spec.stride[1],
+            padding=layer_spec.padding[1],
+        )
     return output_channels * height * width
 
 
-def _conv_output_size(input_size: int, kernel_size: int, stride: int) -> int:
-    return ((input_size - kernel_size) // stride) + 1
+def _conv_output_size(input_size: int, kernel_size: int, stride: int, padding: int = 0) -> int:
+    return ((input_size + (2 * padding) - kernel_size) // stride) + 1
 
 
-def conv_output_size(input_size: int, kernel_size: int, stride: int) -> int:
+def conv_output_size(input_size: int, kernel_size: int, stride: int, padding: int = 0) -> int:
     """Return the spatial output size for one valid convolution dimension."""
 
-    return _conv_output_size(input_size, kernel_size, stride)
+    return _conv_output_size(input_size, kernel_size, stride, padding)

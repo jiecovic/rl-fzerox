@@ -903,6 +903,48 @@ def test_load_train_app_config_reads_nature_32_64_128_profile(tmp_path: Path) ->
     assert config.policy.extractor.conv_profile == "nature_32_64_128"
 
 
+def test_load_train_app_config_reads_custom_cnn_profile(tmp_path: Path) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    config_path = tmp_path / "train.yaml"
+    core_path.touch()
+    rom_path.touch()
+    _write_yaml(
+        config_path,
+        [
+            "seed: 7",
+            "emulator:",
+            f"  core_path: {core_path}",
+            f"  rom_path: {rom_path}",
+            "env:",
+            "  observation:",
+            "    preset: crop_60x76",
+            "policy:",
+            "  extractor:",
+            "    conv_profile: custom",
+            "    custom_conv_layers:",
+            "      - out_channels: 16",
+            "        kernel_size: 6",
+            "        stride: 3",
+            "        padding: 1",
+            "      - out_channels: 32",
+            "        kernel_size: 4",
+            "        stride: 2",
+            "        padding: 0",
+            "train:",
+            "  total_timesteps: 1000",
+        ],
+    )
+
+    config = load_train_app_config(config_path)
+
+    assert config.policy.extractor.conv_profile == "custom"
+    assert [
+        layer.out_channels for layer in config.policy.extractor.custom_conv_layers
+    ] == [16, 32]
+    assert [layer.padding for layer in config.policy.extractor.custom_conv_layers] == [1, 0]
+
+
 def test_load_train_app_config_resolves_resume_run_dir(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"

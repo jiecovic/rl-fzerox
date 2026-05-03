@@ -135,6 +135,7 @@ def resolve_watch_app_config(
     elif cli_override_delta:
         config = _apply_watch_config_delta(config, cli_override_delta)
 
+    config = _apply_x_cup_watch_overrides(config)
     config = materialize_watch_session_config(
         config,
         run_dir=config.watch.policy_run_dir,
@@ -162,6 +163,24 @@ def _default_watch_config_from_train_run(
             policy_run_dir=run_dir,
             policy_artifact=artifact,
         ),
+    )
+
+
+def _apply_x_cup_watch_overrides(config: WatchAppConfig) -> WatchAppConfig:
+    """Disable track-sampling inheritance for watch-only X Cup bootstraps."""
+
+    if not config.watch.x_cup.enabled or not config.env.track_sampling.enabled:
+        return config
+    return config.model_copy(
+        update={
+            "env": config.env.model_copy(
+                update={
+                    "track_sampling": config.env.track_sampling.model_copy(
+                        update={"enabled": False}
+                    )
+                }
+            )
+        }
     )
 
 

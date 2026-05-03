@@ -6,6 +6,7 @@ import os
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Protocol
 
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import RunPaths, materialize_train_run_config
@@ -20,6 +21,18 @@ class PolicyArtifactMetadata:
     curriculum_stage_index: int | None
     curriculum_stage_name: str | None
     num_timesteps: int | None
+
+
+class SaveArtifactFn(Protocol):
+    def __call__(self, path: str) -> object: ...
+
+
+class ModelSaveable(Protocol):
+    def save(self, path: str) -> object: ...
+
+
+class TrainingEnvAttrReader(Protocol):
+    def get_attr(self, attr_name: str) -> list[object]: ...
 
 
 def resolve_train_run_config(
@@ -68,7 +81,7 @@ def _configured_baseline_state_paths(config: TrainAppConfig) -> tuple[Path, ...]
 
 
 def save_latest_artifacts(
-    model,
+    model: ModelSaveable,
     run_paths: RunPaths,
     *,
     policy_metadata: PolicyArtifactMetadata | None = None,
@@ -81,20 +94,47 @@ def save_latest_artifacts(
     )
 
 
+def save_recent_checkpoint_artifacts(
+    model: ModelSaveable,
+    run_paths: RunPaths,
+    *,
+    num_timesteps: int,
+    policy_metadata: PolicyArtifactMetadata | None = None,
+) -> None:
+    checkpoint_dir = recent_checkpoint_dir(run_paths, num_timesteps=num_timesteps)
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    save_artifacts_atomically(
+        model=model,
+        model_path=checkpoint_dir / "model.zip",
+        policy_path=checkpoint_dir / "policy.zip",
+        policy_metadata=policy_metadata,
+    )
+
+
+def trim_recent_checkpoint_artifacts(run_paths: RunPaths, *, keep_last: int | None) -> None:
+    if keep_last is None:
+        return
+    checkpoints = list_recent_checkpoint_dirs(run_paths)
+    if len(checkpoints) <= keep_last:
+        return
+    for checkpoint_dir in checkpoints[: len(checkpoints) - keep_last]:
+        shutil.rmtree(checkpoint_dir, ignore_errors=True)
+
+
 def save_artifacts_atomically(
     *,
-    model,
+    model: ModelSaveable,
     model_path: Path,
     policy_path: Path,
     policy_metadata: PolicyArtifactMetadata | None = None,
 ) -> None:
     atomic_save_artifact(model.save, model_path)
-    atomic_save_artifact(model.policy.save, policy_path)
+    atomic_save_artifact(_policy_save_fn(model), policy_path)
     if policy_metadata is not None:
         _atomic_write_json(policy_artifact_metadata_path(policy_path), asdict(policy_metadata))
 
 
-def atomic_save_artifact(save_fn, target_path: Path) -> None:
+def atomic_save_artifact(save_fn: SaveArtifactFn, target_path: Path) -> None:
     tmp_path = target_path.with_name(f".{target_path.stem}.tmp{target_path.suffix}")
     tmp_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -121,17 +161,24 @@ def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata |
     )
 
 
-def current_policy_artifact_metadata(train_env, model) -> PolicyArtifactMetadata:
+def current_policy_artifact_metadata(
+    train_env: TrainingEnvAttrReader,
+    model: object,
+) -> PolicyArtifactMetadata:
     """Read the currently active curriculum stage from the vector env."""
 
     return PolicyArtifactMetadata(
-        curriculum_stage_index=_first_env_attr(train_env, "curriculum_stage_index"),
-        curriculum_stage_name=_first_env_attr(train_env, "curriculum_stage_name"),
+        curriculum_stage_index=_coerce_optional_int(
+            _first_env_attr(train_env, "curriculum_stage_index")
+        ),
+        curriculum_stage_name=_coerce_optional_str(
+            _first_env_attr(train_env, "curriculum_stage_name")
+        ),
         num_timesteps=_current_num_timesteps(model),
     )
 
 
-def _first_env_attr(train_env, attr_name: str):
+def _first_env_attr(train_env: TrainingEnvAttrReader, attr_name: str) -> object | None:
     values = train_env.get_attr(attr_name)
     if not values:
         return None
@@ -142,6 +189,26 @@ def policy_artifact_metadata_path(policy_path: Path) -> Path:
     """Return the sidecar JSON path stored next to one policy checkpoint."""
 
     return policy_path.with_name(f"{policy_path.stem}{POLICY_METADATA_SUFFIX}")
+
+
+def recent_checkpoint_dir(run_paths: RunPaths, *, num_timesteps: int) -> Path:
+    """Return the directory used for one numbered periodic checkpoint snapshot."""
+
+    return run_paths.checkpoints_dir / f"{num_timesteps:012d}"
+
+
+def list_recent_checkpoint_dirs(run_paths: RunPaths) -> tuple[Path, ...]:
+    """Return numbered checkpoint directories sorted from oldest to newest."""
+
+    if not run_paths.checkpoints_dir.is_dir():
+        return ()
+    checkpoints = [
+        child
+        for child in run_paths.checkpoints_dir.iterdir()
+        if child.is_dir() and child.name.isdigit()
+    ]
+    checkpoints.sort(key=lambda path: int(path.name))
+    return tuple(checkpoints)
 
 
 def _atomic_write_json(target_path: Path, data: dict[str, object]) -> None:
@@ -166,6 +233,16 @@ def _coerce_optional_str(value: object) -> str | None:
 def _current_num_timesteps(model: object) -> int | None:
     value = getattr(model, "num_timesteps", None)
     return value if isinstance(value, int) else None
+
+
+def _policy_save_fn(model: object) -> SaveArtifactFn:
+    """Resolve the policy saver from dynamic SB3-style model objects."""
+
+    policy = getattr(model, "policy", None)
+    save_fn = getattr(policy, "save", None)
+    if not callable(save_fn):
+        raise TypeError("Training model policy does not expose a callable save(path) method.")
+    return save_fn
 
 
 def cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:

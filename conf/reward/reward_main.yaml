@@ -1,0 +1,79 @@
+# Canonical reward profile for new runs:
+# - spline-bucket progress with modest terminal bonuses
+# - refill reward only while energy is not already full
+# - no separate full-refill lap jackpot
+# - action shaping for lean, pitch, boost, and optional air brake
+name: reward_main
+
+# Spline coverage: distance between equally spaced reward points on the game spline.
+progress_bucket_distance: 1000.0
+# Spline coverage: reward for each newly covered point.
+progress_bucket_reward: 1.0
+# Spline coverage: accumulate crossed-point rewards over this many internal frames before paying.
+progress_reward_interval_frames: 1
+airborne_progress_bucket_distance: 100.0
+outside_bounds_reentry_progress_distance_cap: 10000.0
+airborne_offtrack_penalty_scale: 0.05
+airborne_offtrack_recovery_reward_scale: 0.05
+airborne_offtrack_recovery_requires_descending: true
+airborne_offtrack_recovery_descend_epsilon: 1.0
+
+# Time pressure.
+# Reverse can scale the base time term further, and slow-speed adds a smooth
+# deficit-shaped term once speed falls below the configured threshold.
+time_penalty_per_frame: 0.0
+reverse_time_penalty_scale: 2.0
+slow_speed_time_penalty_scale: 3.0
+slow_speed_time_penalty_start_kph: 760.0
+slow_speed_time_penalty_power: 1.0
+
+# Lap rewards.
+lap_completion_bonus: 5.0
+lap_position_scale: 1.0
+
+# Episode endings and final safety clip.
+failure_penalty: -30.0
+truncation_penalty: -30.0
+step_reward_clip_min: -100.0
+step_reward_clip_max: 100.0
+
+# Damage and collision pressure.
+damage_taken_frame_penalty: 0.0
+damage_taken_streak_ramp_penalty: 0.0
+damage_taken_streak_cap_frames: 0
+collision_recoil_penalty: -4.0
+
+# Boost shaping.
+boost_pad_reward: 10.0
+boost_pad_reward_progress_window: 800.0
+manual_boost_reward: 0.01
+
+# Energy refill: boost progress only while the strip is active and energy is not already full.
+energy_refill_progress_multiplier: 3.0
+energy_refill_collision_cooldown_frames: 120
+
+# Surface modifiers.
+dirt_progress_multiplier: 1.0
+ice_progress_multiplier: 1.0
+dirt_entry_penalty: 0.0
+ice_entry_penalty: 0.0
+
+# Gas / steering shaping.
+gas_underuse_penalty: 0.0
+gas_underuse_threshold: 0.5
+steer_oscillation_penalty: 0.0
+steer_oscillation_deadzone: 0.0
+steer_oscillation_cap: 2.0
+steer_oscillation_power: 2.0
+
+# Control shaping.
+air_brake_request_penalty: 0.0
+lean_request_penalty: -0.003
+airborne_pitch_up_penalty: -0.2
+lean_low_speed_penalty: -0.005
+lean_low_speed_penalty_max_speed_kph: 750.0
+
+# Airborne landing transition.
+airborne_landing_reward: 0.0
+
+course_overrides: {}

@@ -84,6 +84,7 @@ class RewardCourseOverrideConfig(BaseModel):
     steer_oscillation_deadzone: NonNegativeFloat | None = None
     steer_oscillation_cap: PositiveFloat | None = None
     steer_oscillation_power: PositiveFloat | None = None
+    air_brake_request_penalty: float | None = Field(default=None, le=0.0)
     lean_request_penalty: float | None = Field(default=None, le=0.0)
     airborne_pitch_up_penalty: float | None = Field(default=None, le=0.0)
     lean_low_speed_penalty: float | None = Field(default=None, le=0.0)
@@ -115,7 +116,7 @@ class RewardConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: Literal["race_v3"] = "race_v3"
+    name: Literal["race_v3", "reward_main"] = "race_v3"
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
     low_speed_time_penalty_scale: NonNegativeFloat = 2.0
@@ -148,6 +149,7 @@ class RewardConfig(BaseModel):
     steer_oscillation_deadzone: NonNegativeFloat = 0.0
     steer_oscillation_cap: PositiveFloat = 2.0
     steer_oscillation_power: PositiveFloat = 2.0
+    air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     lean_request_penalty: float = Field(default=0.0, le=0.0)
     airborne_pitch_up_penalty: float = Field(default=0.0, le=0.0)
     lean_low_speed_penalty: float = Field(default=0.0, le=0.0)

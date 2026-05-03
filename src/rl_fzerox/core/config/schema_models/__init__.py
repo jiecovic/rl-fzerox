@@ -10,6 +10,7 @@ from rl_fzerox.core.config.schema_models.apps import (
     TrainAppConfig,
     WatchAppConfig,
     WatchConfig,
+    WatchXCupConfig,
 )
 from rl_fzerox.core.config.schema_models.common import (
     ActionMaskOverrides,
@@ -85,4 +86,5 @@ __all__ = [
     "WatchAppConfig",
     "WatchConfig",
     "WatchFpsSetting",
+    "WatchXCupConfig",
 ]

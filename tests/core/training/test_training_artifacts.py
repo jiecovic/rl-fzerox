@@ -22,6 +22,7 @@ from rl_fzerox.core.config.schema import (
     TrainConfig,
     WatchAppConfig,
     WatchConfig,
+    WatchXCupConfig,
 )
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
@@ -44,8 +45,11 @@ from rl_fzerox.core.training.runs import (
 from rl_fzerox.core.training.runs.baseline_race_start import RaceStartVariant
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
+    list_recent_checkpoint_dirs,
     load_policy_artifact_metadata,
     save_artifacts_atomically,
+    save_recent_checkpoint_artifacts,
+    trim_recent_checkpoint_artifacts,
 )
 
 
@@ -163,6 +167,48 @@ def test_train_run_config_round_trip_and_watch_inheritance(tmp_path: Path) -> No
     assert merged_watch_config.watch.policy_run_dir == run_paths.run_dir
     assert merged_watch_config.watch.control_fps == 30.0
     assert merged_watch_config.watch.render_fps == 30.0
+
+
+def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
+    tmp_path: Path,
+) -> None:
+    run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+    ensure_run_dirs(run_paths)
+    model = _FakeModel()
+    metadata = PolicyArtifactMetadata(
+        curriculum_stage_index=2,
+        curriculum_stage_name="all_open",
+        num_timesteps=61_440,
+    )
+
+    save_recent_checkpoint_artifacts(
+        model,
+        run_paths,
+        num_timesteps=20_480,
+        policy_metadata=metadata,
+    )
+    save_recent_checkpoint_artifacts(
+        model,
+        run_paths,
+        num_timesteps=40_960,
+        policy_metadata=metadata,
+    )
+    save_recent_checkpoint_artifacts(
+        model,
+        run_paths,
+        num_timesteps=61_440,
+        policy_metadata=metadata,
+    )
+    trim_recent_checkpoint_artifacts(run_paths, keep_last=2)
+
+    checkpoint_dirs = list_recent_checkpoint_dirs(run_paths)
+    assert [path.name for path in checkpoint_dirs] == [
+        "000000040960",
+        "000000061440",
+    ]
+    assert (checkpoint_dirs[-1] / "model.zip").is_file()
+    assert (checkpoint_dirs[-1] / "policy.zip").is_file()
+    assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
 
 
 def test_save_train_run_config_persists_action_branches_without_adapter_fields(
@@ -1044,6 +1090,38 @@ def test_materialize_watch_session_config_isolates_runtime_and_baseline(
     )
     assert materialized.emulator.baseline_state_path is not None
     assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
+
+
+def test_materialize_watch_session_config_allocates_x_cup_baseline_path(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    watch_config = WatchAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            runtime_dir=tmp_path / "runtime",
+            baseline_state_path=None,
+        ),
+        watch=WatchConfig(x_cup=WatchXCupConfig(enabled=True)),
+    )
+
+    materialized = materialize_watch_session_config(
+        watch_config,
+        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
+        session_name="session-001",
+    )
+
+    assert materialized.emulator.baseline_state_path == (
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
+    )
+    assert materialized.emulator.baseline_state_path is not None
+    assert not materialized.emulator.baseline_state_path.exists()
 
 
 def test_ensure_watch_session_dirs_creates_runtime_root(tmp_path: Path) -> None:

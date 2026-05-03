@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 from rl_fzerox.core.envs.rewards.progress import EpisodeProgressState
-from rl_fzerox.core.envs.rewards.race_v3.weights import RaceV3RewardWeights
+from rl_fzerox.core.envs.rewards.shared_weights import SharedRewardWeights
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +67,7 @@ class FrontierProgressRewardTracker:
         summary: StepSummary,
         status: StepStatus,
         *,
-        weights: RaceV3RewardWeights,
+        weights: SharedRewardWeights,
         progress_multiplier: float,
         airborne: bool,
         race_distance: float | None = None,
@@ -137,7 +137,7 @@ class FrontierProgressRewardTracker:
         self,
         telemetry: FZeroXTelemetry | None,
         *,
-        weights: RaceV3RewardWeights,
+        weights: SharedRewardWeights,
     ) -> dict[str, object]:
         info: dict[str, object] = {
             "frontier_progress_distance": self._frontier_distance,
@@ -168,7 +168,7 @@ class FrontierProgressRewardTracker:
 
 def _progress_bucket_distance(
     *,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
     airborne: bool,
 ) -> float:
     if airborne and weights.airborne_progress_bucket_distance is not None:

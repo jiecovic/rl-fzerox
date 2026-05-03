@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
 
 class NetArchConfig(BaseModel):
@@ -20,6 +20,14 @@ class ExtractorConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    class CustomConvLayer(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        out_channels: PositiveInt
+        kernel_size: PositiveInt
+        stride: PositiveInt
+        padding: int = Field(default=0, ge=0)
+
     conv_profile: Literal[
         "auto",
         "nature",
@@ -29,11 +37,19 @@ class ExtractorConfig(BaseModel):
         "compact_deep",
         "compact_bottleneck",
         "tiny_256",
+        "custom",
     ] = "auto"
+    custom_conv_layers: tuple[CustomConvLayer, ...] = ()
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     fusion_features_dim: PositiveInt | None = None
     layer_norm: bool = False
+
+    @model_validator(mode="after")
+    def _validate_custom_conv_layers(self) -> ExtractorConfig:
+        if self.conv_profile == "custom" and not self.custom_conv_layers:
+            raise ValueError("policy.extractor.custom_conv_layers must not be empty")
+        return self
 
 
 class PolicyRecurrentConfig(BaseModel):

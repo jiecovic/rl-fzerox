@@ -28,6 +28,7 @@ class RunLayout:
     watch_rootname: str
     runtime_dirname: str
     tensorboard_dirname: str
+    checkpoints_dirname: str
     model_artifacts: ArtifactFilenames
     policy_artifacts: ArtifactFilenames
 
@@ -39,6 +40,7 @@ RUN_LAYOUT = RunLayout(
     watch_rootname="watch",
     runtime_dirname="runtime",
     tensorboard_dirname="tensorboard",
+    checkpoints_dirname="checkpoints",
     model_artifacts=ArtifactFilenames(
         latest="latest_model.zip",
         best="best_model.zip",
@@ -60,6 +62,7 @@ class RunPaths:
     fresh_run: bool
     runtime_root: Path
     tensorboard_dir: Path
+    checkpoints_dir: Path
     latest_model_path: Path
     latest_policy_path: Path
     best_model_path: Path
@@ -130,6 +133,7 @@ def _run_paths(run_dir: Path, *, fresh_run: bool) -> RunPaths:
         fresh_run=fresh_run,
         runtime_root=run_dir / RUN_LAYOUT.runtime_dirname,
         tensorboard_dir=run_dir / RUN_LAYOUT.tensorboard_dirname,
+        checkpoints_dir=run_dir / RUN_LAYOUT.checkpoints_dirname,
         latest_model_path=run_dir / RUN_LAYOUT.model_artifacts.latest,
         latest_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.latest,
         best_model_path=run_dir / RUN_LAYOUT.model_artifacts.best,
@@ -147,6 +151,7 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     paths.run_dir.mkdir(parents=True, exist_ok=True)
     paths.runtime_root.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
+    paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
     paths.baselines_dir.mkdir(parents=True, exist_ok=True)
 
 
