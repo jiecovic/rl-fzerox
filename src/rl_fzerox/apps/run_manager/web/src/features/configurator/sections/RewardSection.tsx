@@ -1,11 +1,9 @@
-import { useState } from "react";
-
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
+import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 import {
   allRewardSectionsOpen,
-  initialRewardDisclosureState,
   type RewardDisclosureId,
   type RewardDisclosureState,
 } from "./reward/disclosureState";
@@ -18,8 +16,9 @@ interface ConfigSectionProps {
 }
 
 export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectionProps) {
-  const [openSections, setOpenSections] = useState<RewardDisclosureState>(
-    initialRewardDisclosureState,
+  const [openSections, setOpenSections] = usePersistentDisclosureMap<RewardDisclosureState>(
+    "run-manager:reward:sections",
+    allRewardSectionsOpen(false),
   );
   const updateReward = (patch: Partial<ManagedRunConfig["reward"]>) => {
     setConfig({ ...config, reward: { ...config.reward, ...patch } });

@@ -10,6 +10,7 @@
 .run-identity-grid {
   grid-template-columns: minmax(0, 1fr) 240px;
   align-items: end;
+  margin-bottom: 22px;
 }
 
 .form-grid.three {
@@ -19,10 +20,6 @@
 .config-stack {
   display: grid;
   gap: 14px;
-}
-
-.configurator-status {
-  margin-bottom: 16px;
 }
 
 .training-panel-grid {
@@ -81,6 +78,10 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+}
+
+.environment-note-field .field-note {
+  margin-top: 8px;
 }
 
 .dependent-fieldset {
@@ -167,15 +168,23 @@
   gap: 8px;
 }
 
-.reward-accordion-toolbar {
+.disclosure-toolbar {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
 }
 
+.section-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .config-disclosure {
   border: 1px solid var(--border);
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 
 .config-disclosure-summary {
@@ -183,11 +192,11 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  min-height: 42px;
+  min-height: 48px;
   padding: 0 12px;
   color: var(--text);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   list-style: none;
 }
@@ -196,23 +205,42 @@
   display: none;
 }
 
-.config-disclosure-summary::before {
-  content: "";
-  position: absolute;
+.config-disclosure-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 
-.config-disclosure-summary > span::before {
+.config-disclosure-title::before {
   content: "▸";
-  display: inline-block;
-  width: 16px;
+  flex: 0 0 16px;
   color: var(--muted);
 }
 
-.config-disclosure[open] .config-disclosure-summary > span::before {
+.config-disclosure[open] .config-disclosure-title::before {
   content: "▾";
 }
 
+.config-disclosure-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.config-disclosure-copy strong {
+  display: block;
+}
+
+.config-disclosure-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .config-disclosure-body {
+  display: grid;
+  gap: 10px;
   border-top: 1px solid var(--border);
   padding: 12px;
 }

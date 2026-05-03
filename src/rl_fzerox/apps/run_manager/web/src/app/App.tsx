@@ -3,7 +3,6 @@ import { useCallback, useEffect, useState } from "react";
 import { loadManagerData } from "@/app/managerData";
 import { Configurator } from "@/features/configurator/Configurator";
 import { DraftsPanel } from "@/features/drafts/DraftsPanel";
-import { InspectBanner } from "@/features/inspect/InspectBanner";
 import { RunInspector } from "@/features/runs/RunInspector";
 import { RunsPanel } from "@/features/runs/RunsPanel";
 import { createDraft, deleteDraft, updateDraft } from "@/shared/api/client";
@@ -12,24 +11,30 @@ import type {
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
-  ManagedTemplate,
 } from "@/shared/api/contract";
 import { Notice } from "@/shared/ui/Panel";
 import { ScrollButtons } from "@/shared/ui/ScrollButtons";
 import { Tabs } from "@/shared/ui/Tabs";
 import { type Theme, ThemeToggle } from "@/shared/ui/ThemeToggle";
 
-type Page = "configure" | "drafts" | "runs";
+type WorkspaceTabId = "drafts" | "runs" | `editor:${string}`;
+
+interface DraftEditorSession {
+  draftId: string | null;
+  initialDraftName: string;
+  loadedDraft: ManagedDraft | null;
+  sessionId: `editor:${string}`;
+  title: string;
+}
 
 export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
-  const [page, setPage] = useState<Page>("configure");
-  const [templates, setTemplates] = useState<ManagedTemplate[]>([]);
+  const [activeTabId, setActiveTabId] = useState<WorkspaceTabId>("drafts");
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
-  const [loadedDraft, setLoadedDraft] = useState<ManagedDraft | null>(null);
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [defaultConfig, setDefaultConfig] = useState<ManagedRunConfig | null>(null);
+  const [draftEditors, setDraftEditors] = useState<DraftEditorSession[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,10 +44,10 @@ export function App() {
     setError(null);
     try {
       const managerData = await loadManagerData();
-      setTemplates(managerData.templates);
       setDrafts(managerData.drafts);
       setRuns(managerData.runs);
       setMetadata(managerData.metadata);
+      setDefaultConfig((current) => current ?? managerData.templates[0]?.config ?? null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to load run manager data");
     } finally {
@@ -58,34 +63,58 @@ export function App() {
     void reloadManagerData();
   }, [reloadManagerData]);
 
-  const selectedDraft = drafts.find((draft) => draft.id === selectedDraftId) ?? null;
   const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
-  const defaultConfig = templates[0]?.config ?? null;
+  const activeDraftEditor =
+    activeTabId === "drafts" || activeTabId === "runs"
+      ? null
+      : (draftEditors.find((session) => session.sessionId === activeTabId) ?? null);
+  const workspaceTabs: Array<{ closable?: boolean; id: WorkspaceTabId; label: string }> = [
+    { id: "drafts", label: "Drafts" },
+    { id: "runs", label: "Runs" },
+    ...draftEditors.map((session) => ({
+      id: session.sessionId,
+      label: session.title,
+      closable: true,
+    })),
+  ];
 
-  async function saveDraft(name: string, config: ManagedRunConfig) {
+  async function saveDraft(
+    sessionId: DraftEditorSession["sessionId"],
+    name: string,
+    config: ManagedRunConfig,
+  ) {
     const draft = await createDraft(name, config);
-    await reloadManagerData();
-    setLoadedDraft(draft);
-    setSelectedDraftId(draft.id);
+    setDrafts((current) => upsertDraft(current, draft));
+    patchDraftEditor(sessionId, {
+      draftId: draft.id,
+      initialDraftName: draft.name,
+      loadedDraft: draft,
+      title: draft.name,
+    });
     return draft;
   }
 
-  async function updateExistingDraft(id: string, name: string, config: ManagedRunConfig) {
+  async function updateExistingDraft(
+    sessionId: DraftEditorSession["sessionId"],
+    id: string,
+    name: string,
+    config: ManagedRunConfig,
+  ) {
     const draft = await updateDraft(id, name, config);
-    await reloadManagerData();
-    setLoadedDraft(draft);
-    setSelectedDraftId(draft.id);
+    setDrafts((current) => upsertDraft(current, draft));
+    patchDraftEditor(sessionId, {
+      draftId: draft.id,
+      initialDraftName: draft.name,
+      loadedDraft: draft,
+      title: draft.name,
+    });
     return draft;
   }
 
   async function removeDraft(id: string) {
     await deleteDraft(id);
-    await reloadManagerData();
-    if (loadedDraft?.id === id) {
-      setLoadedDraft(null);
-    }
-    setSelectedDraftId(null);
-    setPage("drafts");
+    setDrafts((current) => current.filter((draft) => draft.id !== id));
+    closeEditorsForDraft(id);
   }
 
   return (
@@ -107,65 +136,53 @@ export function App() {
       <div className="navigation-strip">
         <Tabs
           label="Run manager sections"
-          activeId={page}
-          items={[
-            { id: "configure", label: "Configure" },
-            { id: "drafts", label: "Drafts" },
-            { id: "runs", label: "Runs" },
-          ]}
-          onSelect={setPage}
+          activeId={activeTabId}
+          items={workspaceTabs}
+          variant="workspace"
+          onClose={(id) => closeDraftEditor(id as DraftEditorSession["sessionId"])}
+          onSelect={(id) => setActiveTabId(id)}
         />
-        {selectedDraft !== null ? (
-          <InspectBanner
-            title={selectedDraft.name}
-            subtitle="draft"
-            onOpen={() => {
-              setPage("drafts");
-            }}
-            onClose={() => {
-              setSelectedDraftId(null);
-            }}
-          />
-        ) : null}
-        {selectedRun !== null ? (
-          <InspectBanner
-            title={selectedRun.name}
-            subtitle={selectedRun.status}
-            onOpen={() => {
-              setPage("runs");
-            }}
-            onClose={() => {
-              setSelectedRunId(null);
-            }}
-          />
-        ) : null}
       </div>
 
       <div className="workspace">
         {error !== null ? <Notice tone="error">{error}</Notice> : null}
         {isLoading ? <Notice>Loading manager data...</Notice> : null}
 
-        {!isLoading && page === "configure" && defaultConfig !== null && metadata !== null ? (
-          <Configurator
-            baseConfig={defaultConfig}
-            loadedDraft={loadedDraft}
-            metadata={metadata}
-            onSaveDraft={saveDraft}
-            onUpdateDraft={updateExistingDraft}
-          />
-        ) : null}
-        {!isLoading && page === "drafts" ? (
+        {!isLoading && activeTabId === "drafts" ? (
           <DraftsPanel
             drafts={drafts}
+            onCreateDraft={createNewDraft}
             onDeleteDraft={(draft) => removeDraft(draft.id)}
             onOpenDraft={openDraft}
           />
         ) : null}
-        {!isLoading && page === "runs" && selectedRun === null ? (
+        {!isLoading && activeTabId === "runs" && selectedRun === null ? (
           <RunsPanel runs={runs} onOpenRun={openRun} />
         ) : null}
-        {!isLoading && page === "runs" && selectedRun !== null ? (
+        {!isLoading && activeTabId === "runs" && selectedRun !== null ? (
           <RunInspector run={selectedRun} />
+        ) : null}
+        {!isLoading && activeDraftEditor !== null ? (
+          defaultConfig !== null && metadata !== null ? (
+            draftEditors.map((session) => (
+              <div hidden={activeTabId !== session.sessionId} key={session.sessionId}>
+                <Configurator
+                  baseConfig={defaultConfig}
+                  existingNames={reservedNamesForSession(session.sessionId)}
+                  initialDraftName={session.initialDraftName}
+                  loadedDraft={session.loadedDraft}
+                  metadata={metadata}
+                  onDraftNameChange={(name) => setDraftEditorTitle(session.sessionId, name)}
+                  onSaveDraft={(name, config) => saveDraft(session.sessionId, name, config)}
+                  onUpdateDraft={(id, name, config) =>
+                    updateExistingDraft(session.sessionId, id, name, config)
+                  }
+                />
+              </div>
+            ))
+          ) : (
+            <Notice tone="error">Run manager metadata is missing.</Notice>
+          )
         ) : null}
       </div>
       <ScrollButtons />
@@ -173,17 +190,158 @@ export function App() {
   );
 
   function openDraft(draft: ManagedDraft) {
-    setSelectedDraftId(draft.id);
-    loadDraftIntoConfigurator(draft);
+    const sessionId = editorSessionId(draft.id);
+    setDraftEditors((current) =>
+      current.some((session) => session.sessionId === sessionId)
+        ? current
+        : [
+            ...current,
+            {
+              draftId: draft.id,
+              initialDraftName: draft.name,
+              loadedDraft: draft,
+              sessionId,
+              title: draft.name,
+            },
+          ],
+    );
+    setActiveTabId(sessionId);
   }
 
   function openRun(run: ManagedRun) {
     setSelectedRunId(run.id);
-    setPage("runs");
+    setActiveTabId("runs");
   }
 
-  function loadDraftIntoConfigurator(draft: ManagedDraft) {
-    setLoadedDraft(draft);
-    setPage("configure");
+  function createNewDraft() {
+    const sessionId = editorSessionId(crypto.randomUUID());
+    const initialDraftName = nextAvailableDraftName(defaultDraftName(), allKnownNames());
+    setDraftEditors((current) => [
+      ...current,
+      { draftId: null, initialDraftName, loadedDraft: null, sessionId, title: initialDraftName },
+    ]);
+    setActiveTabId(sessionId);
   }
+
+  function closeDraftEditor(sessionId: DraftEditorSession["sessionId"]) {
+    const closingIndex = draftEditors.findIndex((session) => session.sessionId === sessionId);
+    if (closingIndex === -1) {
+      return;
+    }
+    const remaining = draftEditors.filter((session) => session.sessionId !== sessionId);
+    setDraftEditors(remaining);
+    if (activeTabId === sessionId) {
+      const fallbackSession =
+        remaining[closingIndex - 1] ?? remaining[closingIndex] ?? remaining.at(-1) ?? null;
+      setActiveTabId(fallbackSession?.sessionId ?? "drafts");
+    }
+  }
+
+  function setDraftEditorTitle(sessionId: DraftEditorSession["sessionId"], title: string) {
+    patchDraftEditor(sessionId, { title: normalizeDraftTabTitle(title) });
+  }
+
+  function patchDraftEditor(
+    sessionId: DraftEditorSession["sessionId"],
+    patch: Partial<Omit<DraftEditorSession, "sessionId">>,
+  ) {
+    setDraftEditors((current) => {
+      let changed = false;
+      const next = current.map((session) => {
+        if (session.sessionId !== sessionId) {
+          return session;
+        }
+        const updated = { ...session, ...patch };
+        changed =
+          updated.title !== session.title ||
+          updated.initialDraftName !== session.initialDraftName ||
+          updated.draftId !== session.draftId ||
+          updated.loadedDraft !== session.loadedDraft;
+        return changed ? updated : session;
+      });
+      return changed ? next : current;
+    });
+  }
+
+  function closeEditorsForDraft(id: string) {
+    const removedSessions = draftEditors.filter((session) => session.draftId === id);
+    if (removedSessions.length === 0) {
+      return;
+    }
+    const removedSessionIds = new Set(removedSessions.map((session) => session.sessionId));
+    const remaining = draftEditors.filter((session) => !removedSessionIds.has(session.sessionId));
+    setDraftEditors(remaining);
+    if (removedSessionIds.has(activeTabId as DraftEditorSession["sessionId"])) {
+      setActiveTabId("drafts");
+    }
+  }
+
+  function reservedNamesForSession(sessionId: DraftEditorSession["sessionId"]) {
+    const names = new Set<string>();
+    for (const draft of drafts) {
+      names.add(draft.name);
+    }
+    for (const run of runs) {
+      names.add(run.name);
+    }
+    for (const session of draftEditors) {
+      if (session.sessionId !== sessionId) {
+        names.add(session.title);
+      }
+    }
+    return [...names];
+  }
+
+  function allKnownNames() {
+    const names = new Set<string>();
+    for (const draft of drafts) {
+      names.add(draft.name);
+    }
+    for (const run of runs) {
+      names.add(run.name);
+    }
+    for (const session of draftEditors) {
+      names.add(session.title);
+    }
+    return names;
+  }
+}
+
+function editorSessionId(seed: string): `editor:${string}` {
+  return `editor:${seed}`;
+}
+
+function normalizeDraftTabTitle(title: string) {
+  const trimmed = title.trim();
+  return trimmed.length > 0 ? trimmed : "New draft";
+}
+
+function defaultDraftName() {
+  return "ppo_allcups_recurrent";
+}
+
+function nextAvailableDraftName(baseName: string, takenNames: Iterable<string>) {
+  const normalizedTaken = new Set(
+    [...takenNames].map((name) => name.trim().toLowerCase()).filter((name) => name.length > 0),
+  );
+  if (!normalizedTaken.has(baseName.toLowerCase())) {
+    return baseName;
+  }
+  let suffix = 2;
+  while (normalizedTaken.has(`${baseName} ${suffix}`.toLowerCase())) {
+    suffix += 1;
+  }
+  return `${baseName} ${suffix}`;
+}
+
+function upsertDraft(current: ManagedDraft[], nextDraft: ManagedDraft) {
+  const withoutPrevious = current.filter((draft) => draft.id !== nextDraft.id);
+  return [nextDraft, ...withoutPrevious].sort(compareDrafts);
+}
+
+function compareDrafts(left: ManagedDraft, right: ManagedDraft) {
+  if (left.updated_at !== right.updated_at) {
+    return right.updated_at.localeCompare(left.updated_at);
+  }
+  return right.id.localeCompare(left.id);
 }

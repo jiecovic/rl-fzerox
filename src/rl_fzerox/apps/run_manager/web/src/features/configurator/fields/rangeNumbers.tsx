@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import {
   clamp,
   formatCompactDecimal,
+  formatDecimalInput,
   formatInteger,
   roundSignificant,
+  roundToStepPrecision,
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
@@ -39,6 +41,29 @@ export function RangeNumberField({
   resetValue?: number;
   ticks?: readonly SliderTick[];
 }) {
+  const [rawValue, setRawValue] = useState(formatDecimalInput(value, numberStep));
+
+  useEffect(() => {
+    setRawValue(formatDecimalInput(value, numberStep));
+  }, [numberStep, value]);
+
+  function commitValue() {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      setRawValue(formatDecimalInput(value, numberStep));
+      return;
+    }
+    const normalized = roundToStepPrecision(parsed, numberStep);
+    onChange(normalized);
+    setRawValue(formatDecimalInput(normalized, numberStep));
+  }
+
+  function updateFromSlider(nextValue: number) {
+    const normalized = roundToStepPrecision(nextValue, rangeStep);
+    onChange(normalized);
+    setRawValue(formatDecimalInput(normalized, numberStep));
+  }
+
   return (
     <div className="field-shell range-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
@@ -50,8 +75,8 @@ export function RangeNumberField({
           step={rangeStep}
           ticks={ticks}
           value={clamp(value, min, max)}
-          valueLabel={String(value)}
-          onChange={onChange}
+          valueLabel={formatDecimalInput(value, numberStep)}
+          onChange={updateFromSlider}
         />
         <input
           aria-label={label}
@@ -59,8 +84,14 @@ export function RangeNumberField({
           min={min}
           step={numberStep}
           type="number"
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={rawValue}
+          onBlur={commitValue}
+          onChange={(event) => setRawValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+          }}
         />
       </div>
     </div>

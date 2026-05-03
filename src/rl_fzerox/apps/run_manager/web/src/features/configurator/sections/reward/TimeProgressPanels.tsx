@@ -30,7 +30,7 @@ export function TimeProgressPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Base reward added every emulator frame. Usually negative to apply time pressure."
+            help="Additional per-frame time pressure. Discounting already pushes faster progress, so this is best treated as an extra experiment rather than a canonical default."
             label="Time penalty / frame"
             resetValue={defaultConfig.reward.time_penalty_per_frame}
             step="0.001"
@@ -46,15 +46,7 @@ export function TimeProgressPanels({
             onChange={(value) => updateReward({ reverse_time_penalty_scale: value })}
           />
           <NumberField
-            help="Multiplier applied to time pressure while below the native low-speed threshold."
-            label="Low-speed multiplier"
-            resetValue={defaultConfig.reward.low_speed_time_penalty_scale}
-            step="0.1"
-            value={config.reward.low_speed_time_penalty_scale}
-            onChange={(value) => updateReward({ low_speed_time_penalty_scale: value })}
-          />
-          <NumberField
-            help="Additional multiplier applied near very low speed."
+            help="Extra multiplier for the smooth slow-speed ramp. The added term is time_penalty_per_frame × slow_speed_multiplier × ((max(start_kph - speed_kph, 0) / start_kph) ^ power)."
             label="Slow-speed multiplier"
             resetValue={defaultConfig.reward.slow_speed_time_penalty_scale}
             step="0.1"
@@ -70,7 +62,7 @@ export function TimeProgressPanels({
             onChange={(value) => updateReward({ slow_speed_time_penalty_start_kph: value })}
           />
           <NumberField
-            help="Exponent for the slow-speed time-pressure ramp."
+            help="Exponent in the slow-speed term ((max(start_kph - speed_kph, 0) / start_kph) ^ power). Higher values keep the penalty flatter until speed drops further below the threshold."
             label="Slow-speed power"
             resetValue={defaultConfig.reward.slow_speed_time_penalty_power}
             step="0.1"

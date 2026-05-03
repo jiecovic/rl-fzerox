@@ -14,14 +14,17 @@ export interface NodeVisual {
   height: number;
   kind: "junction" | "node";
   label: string;
+  paramLine?: string;
   tone: string;
   width: number;
 }
 
 export interface RenderedGraph {
   edges: RenderedEdge[];
+  height: number;
   nodes: RenderedNode[];
   viewBox: string;
+  width: number;
 }
 
 export interface RenderedEdge {

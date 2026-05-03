@@ -24,7 +24,11 @@ export function ConfigDisclosure({
       onToggle={(event) => onToggle?.(event.currentTarget.open)}
     >
       <summary className="config-disclosure-summary">
-        <span>{title}</span>
+        <span className="config-disclosure-title">
+          <span className="config-disclosure-copy">
+            <strong>{title}</strong>
+          </span>
+        </span>
         {onReset !== undefined ? (
           <button
             aria-label={`Reset ${title} defaults`}

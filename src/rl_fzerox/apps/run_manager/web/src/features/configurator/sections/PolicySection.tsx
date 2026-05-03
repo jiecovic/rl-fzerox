@@ -1,13 +1,8 @@
-import { useRef } from "react";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
-import {
-  BooleanField,
-  IntegerField,
-  NumberField,
-  SelectField,
-} from "@/features/configurator/fields";
-import { FieldLabel } from "@/features/configurator/fields/label";
+import { BooleanField, IntegerField, SelectField } from "@/features/configurator/fields";
 import { PolicyPreviewPanel } from "@/features/configurator/sections/PolicyPreviewPanel";
+import { FeatureDimField } from "@/features/configurator/sections/policy/FeatureDimField";
+import { LayerListField } from "@/features/configurator/sections/policy/LayerEditors";
 import type {
   ConfigMetadata,
   ManagedRunConfig,
@@ -32,6 +27,21 @@ export function PolicySection({
   const updatePolicy = (patch: Partial<ManagedRunConfig["policy"]>) => {
     setConfig({ ...config, policy: { ...config.policy, ...patch } });
   };
+  const updateConvProfile = (value: ManagedRunConfig["policy"]["conv_profile"]) => {
+    updatePolicy({
+      conv_profile: value,
+      custom_conv_layers:
+        value === "custom" && config.policy.custom_conv_layers.length === 0
+          ? defaultConfig.policy.custom_conv_layers
+          : config.policy.custom_conv_layers,
+    });
+  };
+  const jumpToCnnConfigurator = () => {
+    document.getElementById("policy-cnn-configurator")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
   const convProfileOptions = metadata.conv_profiles.map(
     (option) => option.value,
   ) as ManagedRunConfig["policy"]["conv_profile"][];
@@ -47,6 +57,7 @@ export function PolicySection({
           onReset={() =>
             updatePolicy({
               conv_profile: defaultConfig.policy.conv_profile,
+              custom_conv_layers: defaultConfig.policy.custom_conv_layers,
               features_dim: defaultConfig.policy.features_dim,
               state_net_arch: defaultConfig.policy.state_net_arch,
               fusion_features_dim: defaultConfig.policy.fusion_features_dim,
@@ -56,22 +67,27 @@ export function PolicySection({
         >
           <div className="training-field-grid">
             <SelectField
-              help="Convolution stack used for the image branch."
+              help="Convolution stack used for the image branch. Choose custom to edit the conv layers directly."
               label="CNN profile"
               options={convProfileOptions}
               resetValue={defaultConfig.policy.conv_profile}
               value={config.policy.conv_profile}
-              onChange={(value) => updatePolicy({ conv_profile: value })}
+              onChange={updateConvProfile}
             />
-            <SelectField
+            <button
+              className="secondary-button button-with-icon"
+              type="button"
+              onClick={jumpToCnnConfigurator}
+            >
+              <CnnConfigIcon />
+              {config.policy.conv_profile === "custom" ? "Edit CNN" : "Go to CNN"}
+            </button>
+            <FeatureDimField
               help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
               label="Image features"
-              options={["auto", "256", "512", "768", "1024"]}
-              resetValue={String(defaultConfig.policy.features_dim)}
-              value={String(config.policy.features_dim)}
-              onChange={(value) =>
-                updatePolicy({ features_dim: value === "auto" ? "auto" : Number(value) })
-              }
+              resetValue={defaultConfig.policy.features_dim}
+              value={config.policy.features_dim}
+              onChange={(value) => updatePolicy({ features_dim: value })}
             />
             <LayerListField
               help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
@@ -157,7 +173,6 @@ export function PolicySection({
           title="Heads"
           onReset={() =>
             updatePolicy({
-              gas_on_logit: defaultConfig.policy.gas_on_logit,
               pi_net_arch: defaultConfig.policy.pi_net_arch,
               vf_net_arch: defaultConfig.policy.vf_net_arch,
             })
@@ -186,141 +201,32 @@ export function PolicySection({
               value={config.policy.vf_net_arch}
               onChange={(value) => updatePolicy({ vf_net_arch: value })}
             />
-            <NumberField
-              help="Initial logit nudge for the gas-on action."
-              label="Gas-on logit"
-              resetValue={defaultConfig.policy.gas_on_logit}
-              step="0.1"
-              value={config.policy.gas_on_logit}
-              onChange={(value) => updatePolicy({ gas_on_logit: value })}
-            />
           </div>
         </ConfigPanel>
       </div>
 
       <ConfigPanel title="Architecture preview" wide>
-        <PolicyPreviewPanel preview={preview} />
+        <PolicyPreviewPanel
+          convProfile={config.policy.conv_profile}
+          customConvLayers={config.policy.custom_conv_layers}
+          preview={preview}
+          setCustomConvLayers={(value) => updatePolicy({ custom_conv_layers: value })}
+        />
       </ConfigPanel>
     </div>
   );
 }
 
-function LayerListField({
-  help,
-  label,
-  resetValue,
-  value,
-  onChange,
-}: {
-  help: string;
-  label: string;
-  resetValue: number[];
-  value: number[];
-  onChange: (value: number[]) => void;
-}) {
-  const rowIdsRef = useRef<string[]>([]);
-  syncLayerRowIds(rowIdsRef.current, value.length, label);
-
-  function setLayer(index: number, nextValue: number) {
-    if (!Number.isSafeInteger(nextValue) || nextValue <= 0) {
-      return;
-    }
-    onChange(value.map((layer, layerIndex) => (layerIndex === index ? nextValue : layer)));
-  }
-
-  function addLayer() {
-    onChange([...value, value.at(-1) ?? 256]);
-  }
-
-  function removeLayer(index: number) {
-    onChange(value.filter((_, layerIndex) => layerIndex !== index));
-  }
-
-  return (
-    <div className="field-shell layer-list-field">
-      <FieldLabel
-        help={help}
-        label={label}
-        onReset={layerListResetHandler(value, resetValue, onChange)}
-      />
-      <div className="layer-list-editor">
-        {value.length === 0 ? <span className="layer-list-empty">No hidden layers</span> : null}
-        {value.map((layer, index) => (
-          <div className="layer-list-row" key={rowIdsRef.current[index]}>
-            <span className="layer-index">L{index + 1}</span>
-            <input
-              aria-label={`${label} layer ${index + 1}`}
-              min={1}
-              step={1}
-              type="number"
-              value={layer}
-              onChange={(event) => setLayer(index, Number(event.target.value))}
-            />
-            <button
-              aria-label={`Remove ${label} layer ${index + 1}`}
-              className="field-reset-button tooltip-anchor"
-              data-tooltip="Remove layer"
-              type="button"
-              onClick={() => removeLayer(index)}
-            >
-              <RemoveLayerIcon />
-            </button>
-          </div>
-        ))}
-        <div className="layer-list-row layer-add-row">
-          <span className="layer-index">L{value.length + 1}</span>
-          <button className="layer-add-placeholder" type="button" onClick={addLayer}>
-            Add layer
-          </button>
-          <button
-            aria-label={`Add ${label} layer`}
-            className="field-reset-button layer-add-button tooltip-anchor"
-            data-tooltip="Add layer"
-            type="button"
-            onClick={addLayer}
-          >
-            <AddLayerIcon />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function layerListResetHandler(
-  value: number[],
-  resetValue: number[],
-  onChange: (value: number[]) => void,
-) {
-  if (sameLayerList(value, resetValue)) {
-    return undefined;
-  }
-  return () => onChange(resetValue);
-}
-
-function sameLayerList(left: number[], right: number[]) {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function syncLayerRowIds(rowIds: string[], length: number, label: string) {
-  while (rowIds.length < length) {
-    rowIds.push(`${label}-${crypto.randomUUID()}`);
-  }
-  rowIds.length = length;
-}
-
-function AddLayerIcon() {
+function CnnConfigIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path d="M10 4v12M4 10h12" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function RemoveLayerIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="12" viewBox="0 0 20 20" width="12">
-      <path d="M5 10h10" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+      <rect height="12" rx="2" stroke="currentColor" strokeWidth="1.4" width="12" x="4" y="4" />
+      <path
+        d="M8 8h4M8 12h7M12 8v4"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.4"
+      />
     </svg>
   );
 }

@@ -1,7 +1,6 @@
-import { useState } from "react";
-
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
-import { IntegerField } from "@/features/configurator/fields";
+import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
+import { IntegerField, ToggleSwitch } from "@/features/configurator/fields";
 import type {
   ConfigMetadata,
   ManagedRunConfig,
@@ -16,7 +15,6 @@ import {
   stateFeatureRows,
 } from "./featureRows";
 import { ProgressSourceToggle } from "./ProgressSourceToggle";
-import { StateSwitch } from "./StateSwitch";
 
 interface StateComponentPanelsProps {
   config: ManagedRunConfig;
@@ -29,7 +27,10 @@ export function StateComponentPanels({
   metadata,
   updateObservation,
 }: StateComponentPanelsProps) {
-  const [openSections, setOpenSections] = useState(() => allStateComponentsOpen(metadata, true));
+  const [openSections, setOpenSections] = usePersistentDisclosureMap(
+    "run-manager:observation:state-components",
+    allStateComponentsOpen(metadata, false),
+  );
 
   const setSectionOpen = (name: string, open: boolean) => {
     setOpenSections((current) => ({ ...current, [name]: open }));
@@ -106,25 +107,27 @@ export function StateComponentPanels({
         const allRowsEnabled = enabled && zeroedCount === 0;
         return (
           <details
-            className="state-component-panel"
+            className="config-disclosure state-component-panel"
             key={component.name}
-            open={openSections[component.name] ?? true}
+            open={openSections[component.name] ?? false}
             onToggle={(event) => setSectionOpen(component.name, event.currentTarget.open)}
           >
-            <summary className="state-component-summary">
-              <span>
-                <strong>{componentInfo.label}</strong>
-                <small>
-                  {componentSummary(
-                    component.name,
-                    rows.length,
-                    rows.reduce((count, row) => count + row.featureNames.length, 0),
-                    zeroedCount,
-                    enabled,
-                  )}
-                </small>
+            <summary className="config-disclosure-summary state-component-summary">
+              <span className="config-disclosure-title">
+                <span className="config-disclosure-copy">
+                  <strong>{componentInfo.label}</strong>
+                  <small>
+                    {componentSummary(
+                      component.name,
+                      rows.length,
+                      rows.reduce((count, row) => count + row.featureNames.length, 0),
+                      zeroedCount,
+                      enabled,
+                    )}
+                  </small>
+                </span>
               </span>
-              <StateSwitch
+              <ToggleSwitch
                 checked={enabled}
                 hideLabel
                 label="category enabled"
@@ -133,7 +136,7 @@ export function StateComponentPanels({
               />
             </summary>
 
-            <div className="state-component-body">
+            <div className="config-disclosure-body state-component-body">
               <ComponentSettings
                 component={component}
                 disabled={!enabled}
@@ -147,7 +150,7 @@ export function StateComponentPanels({
                     <th scope="col">Range / size</th>
                     <th scope="col">
                       <span className="state-feature-enabled-header">
-                        <StateSwitch
+                        <ToggleSwitch
                           checked={allRowsEnabled}
                           disabled={!enabled}
                           hideLabel
@@ -199,7 +202,7 @@ export function StateComponentPanels({
                         <td className="state-feature-kind">{row.kind}</td>
                         <td className="state-feature-range">{row.range}</td>
                         <td>
-                          <StateSwitch
+                          <ToggleSwitch
                             checked={rowEnabled}
                             disabled={!enabled}
                             hideLabel

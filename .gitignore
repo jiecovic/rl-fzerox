@@ -246,3 +246,6 @@ tmp/
 playwright-report/
 test-results/
 run-manager-*.png
+runmgr-*.png
+runmgr-*.md
+tracks-tab-*.png

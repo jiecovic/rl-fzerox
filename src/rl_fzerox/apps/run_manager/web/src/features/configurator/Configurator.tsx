@@ -1,10 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { ActionBar } from "@/features/configurator/configurator/ActionBar";
+import { configuratorDraftName } from "@/features/configurator/configurator/draftName";
+import { RandomizeIcon } from "@/features/configurator/configurator/icons";
+import {
+  CONFIG_SECTION_TABS,
+  type ConfigSection,
+} from "@/features/configurator/configurator/sections";
 import { FieldLabel } from "@/features/configurator/fields";
+import { ActionSection } from "@/features/configurator/sections/ActionSection";
+import { EnvironmentSection } from "@/features/configurator/sections/EnvironmentSection";
 import { LoggingSection } from "@/features/configurator/sections/LoggingSection";
 import { ObservationSection } from "@/features/configurator/sections/ObservationSection";
 import { PolicySection } from "@/features/configurator/sections/PolicySection";
 import { RewardSection } from "@/features/configurator/sections/RewardSection";
+import { TracksSection } from "@/features/configurator/sections/TracksSection";
 import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
+import { VehicleSection } from "@/features/configurator/sections/VehicleSection";
 import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
   ConfigMetadata,
@@ -12,47 +23,88 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
-import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
+import { Notice, Panel } from "@/shared/ui/Panel";
+import { Tabs } from "@/shared/ui/Tabs";
 
 interface ConfiguratorProps {
   baseConfig: ManagedRunConfig;
+  existingNames: string[];
+  initialDraftName?: string;
   loadedDraft: ManagedDraft | null;
   metadata: ConfigMetadata;
+  onDraftNameChange?: (name: string) => void;
   onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
   onUpdateDraft: (id: string, name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
 }
 
-type ConfigSection = "training" | "observation" | "policy" | "reward" | "logging";
-
 export function Configurator({
   baseConfig,
+  existingNames,
+  initialDraftName,
   loadedDraft,
   metadata,
+  onDraftNameChange,
   onSaveDraft,
   onUpdateDraft,
 }: ConfiguratorProps) {
-  const [draftName, setDraftName] = useState("ppo_allcups_recurrent");
+  const baselineConfig = loadedDraft?.config ?? baseConfig;
+  const baselineDraftName = configuratorDraftName(baseConfig, initialDraftName, loadedDraft);
+  const [draftName, setDraftName] = useState(baselineDraftName);
   const [config, setConfig] = useState(baseConfig);
-  const [section, setSection] = useState<ConfigSection>("training");
+  const [section, setSection] = useState<ConfigSection>("tracks");
   const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetSourceKeyRef = useRef<string | null>(null);
+  const normalizedDraftName = draftName.trim();
+  const normalizedBaselineDraftName = baselineDraftName.trim();
+  const normalizedLoadedDraftName = loadedDraft?.name.trim().toLowerCase() ?? null;
+  const reservedNames = useMemo(
+    () =>
+      new Set(
+        existingNames.map((name) => name.trim().toLowerCase()).filter((name) => name.length > 0),
+      ),
+    [existingNames],
+  );
+  const createNameConflict =
+    normalizedDraftName.length > 0 && reservedNames.has(normalizedDraftName.toLowerCase());
+  const updateNameConflict =
+    loadedDraft !== null &&
+    normalizedDraftName.length > 0 &&
+    normalizedDraftName.toLowerCase() !== normalizedLoadedDraftName &&
+    reservedNames.has(normalizedDraftName.toLowerCase());
+  const nameError =
+    normalizedDraftName.length === 0
+      ? "Run name is required."
+      : updateNameConflict
+        ? "This name is already used by another draft, run, or open editor."
+        : loadedDraft === null && createNameConflict
+          ? "This name is already used by another draft, run, or open editor."
+          : null;
+  const isDirty = useMemo(() => {
+    if (normalizedDraftName !== normalizedBaselineDraftName) {
+      return true;
+    }
+    return JSON.stringify(config) !== JSON.stringify(baselineConfig);
+  }, [baselineConfig, config, normalizedBaselineDraftName, normalizedDraftName]);
+  const notifyDraftNameChange = useEffectEvent((name: string) => {
+    onDraftNameChange?.(name);
+  });
+  const resetSourceKey = loadedDraft?.id ?? `new:${initialDraftName ?? baselineDraftName}`;
 
   useEffect(() => {
-    if (loadedDraft !== null) {
-      setDraftName(loadedDraft.name);
-      setConfig(loadedDraft.config);
-      setSection("training");
-      setError(null);
+    if (resetSourceKeyRef.current === resetSourceKey) {
       return;
     }
-    setDraftName("ppo_allcups_recurrent");
-    setConfig(baseConfig);
-    setSection("training");
+    resetSourceKeyRef.current = resetSourceKey;
+    setDraftName(baselineDraftName);
+    setConfig(baselineConfig);
+    setSection("tracks");
     setError(null);
-  }, [baseConfig, loadedDraft]);
+    setPreviewError(null);
+  }, [baselineConfig, baselineDraftName, resetSourceKey]);
 
   useEffect(() => {
     let ignore = false;
@@ -76,11 +128,18 @@ export function Configurator({
     };
   }, [config]);
 
+  useEffect(() => {
+    notifyDraftNameChange(draftName);
+  }, [draftName]);
+
   async function saveDraft() {
+    if (createNameConflict || normalizedDraftName.length === 0) {
+      return;
+    }
     setIsSaving(true);
     setError(null);
     try {
-      await onSaveDraft(draftName, config);
+      await onSaveDraft(normalizedDraftName, config);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to save draft");
     } finally {
@@ -92,10 +151,13 @@ export function Configurator({
     if (loadedDraft === null) {
       return;
     }
+    if (updateNameConflict || normalizedDraftName.length === 0) {
+      return;
+    }
     setIsUpdating(true);
     setError(null);
     try {
-      await onUpdateDraft(loadedDraft.id, draftName, config);
+      await onUpdateDraft(loadedDraft.id, normalizedDraftName, config);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to update draft");
     } finally {
@@ -109,21 +171,48 @@ export function Configurator({
     setConfig((currentConfig) => ({ ...currentConfig, seed: values[0] }));
   }
 
+  function resetToDefault() {
+    setConfig(baseConfig);
+    setError(null);
+    setPreviewError(null);
+  }
+
+  function resetToDraft() {
+    if (loadedDraft === null) {
+      return;
+    }
+    setDraftName(loadedDraft.name);
+    setConfig(loadedDraft.config);
+    setError(null);
+    setPreviewError(null);
+  }
+
   return (
     <Panel>
-      <PanelHeader
-        title="Run configurator"
-        subtitle="Configure a run, then save it as a draft or start training from here."
+      <ActionBar
+        canSave={!isSaving && !isUpdating && !createNameConflict && normalizedDraftName.length > 0}
+        canUpdate={
+          loadedDraft !== null &&
+          !isSaving &&
+          !isUpdating &&
+          !updateNameConflict &&
+          normalizedDraftName.length > 0
+        }
+        hasLoadedDraft={loadedDraft !== null}
+        isDirty={isDirty}
+        isSaving={isSaving}
+        isUpdating={isUpdating}
+        onResetToDefault={resetToDefault}
+        onResetToDraft={resetToDraft}
+        onSaveDraft={() => void saveDraft()}
+        onUpdateDraft={() => void updateDraft()}
       />
-      {loadedDraft !== null ? (
-        <div className="configurator-status">
-          <Notice>Editing draft `{loadedDraft.name}`. Save as new or update in place.</Notice>
-        </div>
-      ) : null}
+
       <div className="form-grid run-identity-grid">
         <div className="field-shell">
           <FieldLabel help="Run name used when this configuration is launched." label="Run name" />
           <input
+            aria-invalid={nameError !== null}
             aria-label="Run name"
             spellCheck={false}
             value={draftName}
@@ -154,64 +243,26 @@ export function Configurator({
           </button>
         </div>
       </div>
+      {nameError !== null ? <Notice tone="error">{nameError}</Notice> : null}
 
       <div className="section-tabs-row">
-        <div className="section-tabs">
-          <SectionButton
-            active={section === "training"}
-            label="Training"
-            onClick={() => setSection("training")}
-          />
-          <SectionButton
-            active={section === "observation"}
-            label="Observation"
-            onClick={() => setSection("observation")}
-          />
-          <SectionButton
-            active={section === "policy"}
-            label="Policy"
-            onClick={() => setSection("policy")}
-          />
-          <SectionButton
-            active={section === "reward"}
-            label="Reward"
-            onClick={() => setSection("reward")}
-          />
-          <SectionButton
-            active={section === "logging"}
-            label="Logging"
-            onClick={() => setSection("logging")}
-          />
-        </div>
-        <div className="section-actions">
-          <button
-            className="secondary-button draft-action-button"
-            type="button"
-            disabled={isSaving || isUpdating}
-            onClick={() => void saveDraft()}
-          >
-            <SaveDraftIcon />
-            <span>
-              {isSaving ? "Saving..." : loadedDraft === null ? "Save draft" : "Save as new draft"}
-            </span>
-          </button>
-          {loadedDraft !== null ? (
-            <button
-              className="secondary-button draft-action-button draft-update-button"
-              type="button"
-              disabled={isSaving || isUpdating}
-              onClick={() => void updateDraft()}
-            >
-              <UpdateDraftIcon />
-              <span>{isUpdating ? "Updating..." : "Update draft"}</span>
-            </button>
-          ) : null}
-          <button className="primary-button" type="button" disabled>
-            Train
-          </button>
-        </div>
+        <Tabs
+          label="Run configurator sections"
+          activeId={section}
+          items={CONFIG_SECTION_TABS}
+          variant="section"
+          onSelect={(id) => setSection(id)}
+        />
       </div>
 
+      {section === "tracks" ? (
+        <TracksSection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          setConfig={setConfig}
+        />
+      ) : null}
       {section === "training" ? (
         <TrainingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
       ) : null}
@@ -236,6 +287,25 @@ export function Configurator({
       {section === "reward" ? (
         <RewardSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
       ) : null}
+      {section === "vehicle" ? (
+        <VehicleSection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          setConfig={setConfig}
+        />
+      ) : null}
+      {section === "action" ? (
+        <ActionSection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          setConfig={setConfig}
+        />
+      ) : null}
+      {section === "environment" ? (
+        <EnvironmentSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
+      ) : null}
       {section === "logging" ? (
         <LoggingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
       ) : null}
@@ -243,79 +313,5 @@ export function Configurator({
       {error !== null ? <Notice tone="error">{error}</Notice> : null}
       {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
     </Panel>
-  );
-}
-
-function SectionButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={active ? "section-tab active" : "section-tab"}
-      type="button"
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  );
-}
-
-function RandomizeIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="18" viewBox="0 0 20 20" width="18">
-      <path
-        d="M15.2 7.2a5.6 5.6 0 0 0-9.7-1.4M4.8 12.8a5.6 5.6 0 0 0 9.7 1.4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.7"
-      />
-      <path
-        d="M15.6 3.8v3.6h-3.6M4.4 16.2v-3.6h3.6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-function SaveDraftIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M4.5 3.5h8l3 3v10h-11zM7 3.5v5h6v-5M7 13h6"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function UpdateDraftIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M4 10a6 6 0 0 1 10.2-4.2M16 10a6 6 0 0 1-10.2 4.2"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M12.8 3.9h1.9v1.9M7.2 16.1H5.3v-1.9"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
   );
 }

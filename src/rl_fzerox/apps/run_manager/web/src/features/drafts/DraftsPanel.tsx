@@ -5,17 +5,19 @@ import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface DraftsPanelProps {
   drafts: ManagedDraft[];
+  onCreateDraft: () => void;
   onDeleteDraft: (draft: ManagedDraft) => Promise<void>;
   onOpenDraft: (draft: ManagedDraft) => void;
 }
 
-export function DraftsPanel({ drafts, onDeleteDraft, onOpenDraft }: DraftsPanelProps) {
+export function DraftsPanel({
+  drafts,
+  onCreateDraft,
+  onDeleteDraft,
+  onOpenDraft,
+}: DraftsPanelProps) {
   const [pendingDelete, setPendingDelete] = useState<ManagedDraft | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  if (drafts.length === 0) {
-    return <Notice>No drafts yet. Configure a run and save it first.</Notice>;
-  }
 
   async function confirmDelete() {
     if (pendingDelete === null) {
@@ -33,28 +35,46 @@ export function DraftsPanel({ drafts, onDeleteDraft, onOpenDraft }: DraftsPanelP
   return (
     <>
       <Panel>
-        <PanelHeader title="Drafts" subtitle="Click a row to load it into the configurator." />
-        <div className="record-list">
-          {drafts.map((draft) => (
-            <div className="record-row" key={draft.id}>
-              <button className="record-row-main" type="button" onClick={() => onOpenDraft(draft)}>
-                <span className="record-name">{draft.name}</span>
-                <span>{draft.config.train.num_envs} envs</span>
-                <span>{draft.config.train.total_timesteps.toLocaleString()} steps</span>
-                <span>{draft.config.train.learning_rate.toExponential(2)}</span>
-                <span>{draft.config.policy.conv_profile}</span>
-              </button>
-              <button
-                aria-label={`Delete draft ${draft.name}`}
-                className="icon-button compact-icon-button danger"
-                type="button"
-                onClick={() => setPendingDelete(draft)}
-              >
-                <TrashIcon />
-              </button>
-            </div>
-          ))}
+        <div className="panel-header-row">
+          <PanelHeader title="Drafts" subtitle="Create a new draft or reopen one for editing." />
+          <button
+            className="secondary-button button-with-icon"
+            type="button"
+            onClick={onCreateDraft}
+          >
+            <PlusIcon />
+            <span>Create draft</span>
+          </button>
         </div>
+        {drafts.length === 0 ? (
+          <Notice>No drafts yet. Create one to open the configurator.</Notice>
+        ) : (
+          <div className="record-list">
+            {drafts.map((draft) => (
+              <div className="record-row" key={draft.id}>
+                <button
+                  className="record-row-main"
+                  type="button"
+                  onClick={() => onOpenDraft(draft)}
+                >
+                  <span className="record-name">{draft.name}</span>
+                  <span>{draft.config.train.num_envs} envs</span>
+                  <span>{draft.config.train.total_timesteps.toLocaleString()} steps</span>
+                  <span>{draft.config.train.learning_rate.toExponential(2)}</span>
+                  <span>{draft.config.policy.conv_profile}</span>
+                </button>
+                <button
+                  aria-label={`Delete draft ${draft.name}`}
+                  className="icon-button compact-icon-button danger"
+                  type="button"
+                  onClick={() => setPendingDelete(draft)}
+                >
+                  <TrashIcon />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </Panel>
       <ConfirmDialog
         busy={isDeleting}
@@ -74,6 +94,19 @@ export function DraftsPanel({ drafts, onDeleteDraft, onOpenDraft }: DraftsPanelP
         onConfirm={() => void confirmDelete()}
       />
     </>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
+      <path
+        d="M10 4.5v11M4.5 10h11"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.7"
+      />
+    </svg>
   );
 }
 

@@ -92,3 +92,15 @@ p {
 .panel-header {
   margin-bottom: 20px;
 }
+
+.panel-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel-header-row .panel-header {
+  margin-bottom: 0;
+}

@@ -9,12 +9,21 @@ describe("DraftsPanel", () => {
   it("opens drafts from the row and deletes them through confirmation", async () => {
     const user = userEvent.setup();
     const draft = draftFixture();
+    const onCreateDraft = vi.fn();
     const onOpenDraft = vi.fn();
     const onDeleteDraft = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <DraftsPanel drafts={[draft]} onDeleteDraft={onDeleteDraft} onOpenDraft={onOpenDraft} />,
+      <DraftsPanel
+        drafts={[draft]}
+        onCreateDraft={onCreateDraft}
+        onDeleteDraft={onDeleteDraft}
+        onOpenDraft={onOpenDraft}
+      />,
     );
+
+    await user.click(screen.getByRole("button", { name: "Create draft" }));
+    expect(onCreateDraft).toHaveBeenCalledTimes(1);
 
     await user.click(screen.getByRole("button", { name: /50,000,000 steps/i }));
     expect(onOpenDraft).toHaveBeenCalledWith(draft);

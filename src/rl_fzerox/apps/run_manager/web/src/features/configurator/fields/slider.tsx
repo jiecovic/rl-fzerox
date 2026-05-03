@@ -30,38 +30,46 @@ export function Slider({
   onChange: (value: number) => void;
 }) {
   const [sliding, setSliding] = useState(false);
-  const valuePercent = tickPercent(value, min, max);
+  const valueRatio = tickRatio(value, min, max);
 
   return (
     <div className={sliding ? "slider-control sliding" : "slider-control"}>
-      <input
-        aria-label={ariaLabel}
-        disabled={disabled}
-        max={max}
-        min={min}
-        step={step}
-        type="range"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        onPointerDown={() => setSliding(true)}
-        onPointerUp={() => setSliding(false)}
-        onPointerCancel={() => setSliding(false)}
-        onBlur={() => setSliding(false)}
-      />
-      <span className="slider-value-bubble" style={{ left: `${valuePercent}%` }} aria-hidden="true">
-        {valueLabel ?? formatCompactDecimal(value)}
-      </span>
-      {ticks.length > 0 ? (
-        <div className="slider-ticks" aria-hidden="true">
-          {ticks.map((tick) => (
-            <span
-              data-label={tick.label}
-              key={`${tick.value}-${tick.label}`}
-              style={tickStyle(tick.value, min, max)}
-            />
-          ))}
+      <div className="slider-track-shell">
+        <div className="slider-track-content">
+          <input
+            aria-label={ariaLabel}
+            disabled={disabled}
+            max={max}
+            min={min}
+            step={step}
+            type="range"
+            value={value}
+            onChange={(event) => onChange(Number(event.target.value))}
+            onPointerDown={() => setSliding(true)}
+            onPointerUp={() => setSliding(false)}
+            onPointerCancel={() => setSliding(false)}
+            onBlur={() => setSliding(false)}
+          />
+          <span
+            className="slider-value-bubble"
+            style={sliderBubbleStyle(valueRatio)}
+            aria-hidden="true"
+          >
+            {valueLabel ?? formatCompactDecimal(value)}
+          </span>
+          {ticks.length > 0 ? (
+            <div className="slider-ticks" aria-hidden="true">
+              {ticks.map((tick) => (
+                <span
+                  data-label={tick.label}
+                  key={`${tick.value}-${tick.label}`}
+                  style={tickStyle(tick.value, min, max)}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </div>
   );
 }
@@ -95,10 +103,14 @@ export function nearestOption(value: number, options: readonly number[]) {
 }
 
 function tickStyle(value: number, min: number, max: number): CSSProperties {
-  return { left: `${tickPercent(value, min, max)}%` };
+  return { "--slider-tick-ratio": `${tickRatio(value, min, max)}` } as CSSProperties;
 }
 
-function tickPercent(value: number, min: number, max: number) {
-  const percent = ((value - min) / (max - min)) * 100;
-  return clamp(percent, 0, 100);
+function sliderBubbleStyle(valueRatio: number): CSSProperties {
+  return { "--slider-value-ratio": `${valueRatio}` } as CSSProperties;
+}
+
+function tickRatio(value: number, min: number, max: number) {
+  const ratio = (value - min) / (max - min);
+  return clamp(ratio, 0, 1);
 }
