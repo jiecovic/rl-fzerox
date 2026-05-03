@@ -1,4 +1,4 @@
-# src/rl_fzerox/apps/bench_renderer.py
+# src/rl_fzerox/apps/dev/bench_renderer.py
 from __future__ import annotations
 
 import argparse
@@ -154,7 +154,7 @@ def _benchmark_renderer_isolated(args: argparse.Namespace, renderer: str) -> Ren
     command = [
         sys.executable,
         "-m",
-        "rl_fzerox.apps.bench_renderer",
+        "rl_fzerox.apps.dev.bench_renderer",
         "--renderer",
         renderer,
         "--frames",
