@@ -48,6 +48,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _target_seconds,
 )
+from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
 
 
 def run_simulation_worker(
@@ -73,6 +74,9 @@ def _run_simulation_loop(
     snapshot_queue: ProcessQueue,
 ) -> None:
     seed_process(config.seed)
+    x_cup_info = (
+        materialize_x_cup_watch_baseline(config) if config.watch.x_cup.enabled else None
+    )
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,
@@ -120,6 +124,8 @@ def _run_simulation_loop(
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
             observation, info = env.reset(seed=reset_seed)
+            if x_cup_info is not None:
+                info.update(x_cup_info)
             _reset_policy_runner(policy_runner)
             reset_info = dict(info)
             current_control_state = env.last_requested_control_state
@@ -279,6 +285,8 @@ def _run_simulation_loop(
                     display_frames = watch_step.display_frames
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
+                if x_cup_info is not None:
+                    info.update(x_cup_info)
                 live_telemetry = _read_live_telemetry(emulator)
                 boost_lamp_level = _next_boost_lamp_level(
                     previous=boost_lamp_level,

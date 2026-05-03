@@ -78,11 +78,12 @@ def run_training(config: TrainAppConfig) -> None:
             config=run_config,
             run_paths=run_paths,
         )
-        save_latest_artifacts(
-            model,
-            run_paths,
-            policy_metadata=current_policy_artifact_metadata(train_env, model),
-        )
+        if run_config.train.save_latest_checkpoint:
+            save_latest_artifacts(
+                model,
+                run_paths,
+                policy_metadata=current_policy_artifact_metadata(train_env, model),
+            )
         callbacks = build_callbacks(
             env_config=run_config.env,
             train_config=run_config.train,
@@ -101,7 +102,7 @@ def run_training(config: TrainAppConfig) -> None:
                 reset_num_timesteps=run_config.train.resume_mode != "full_model",
             )
         except Exception:
-            if model.num_timesteps > 0:
+            if model.num_timesteps > 0 and run_config.train.save_latest_checkpoint:
                 save_latest_artifacts(
                     model,
                     run_paths,
@@ -114,11 +115,12 @@ def run_training(config: TrainAppConfig) -> None:
             policy_path=run_paths.final_policy_path,
             policy_metadata=current_policy_artifact_metadata(train_env, model),
         )
-        save_latest_artifacts(
-            model,
-            run_paths,
-            policy_metadata=current_policy_artifact_metadata(train_env, model),
-        )
+        if run_config.train.save_latest_checkpoint:
+            save_latest_artifacts(
+                model,
+                run_paths,
+                policy_metadata=current_policy_artifact_metadata(train_env, model),
+            )
     except Exception:
         cleanup_failed_run(run_paths, model)
         raise

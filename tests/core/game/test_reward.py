@@ -10,9 +10,12 @@ import yaml
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 from rl_fzerox.core.config.schema import RewardConfig, RewardCourseOverrideConfig
 from rl_fzerox.core.envs.rewards import (
+    CANONICAL_REWARD_NAME,
     DEFAULT_REWARD_NAME,
     RaceV3RewardTracker,
     RaceV3RewardWeights,
+    RewardMainTracker,
+    RewardMainWeights,
     build_reward_tracker,
     reward_tracker_names,
 )
@@ -33,16 +36,27 @@ def test_reward_yamls_use_known_reward_config_keys() -> None:
         assert RewardConfig.model_validate(config_data).name in reward_tracker_names()
 
 
-def test_race_v3_is_the_only_registered_reward_profile() -> None:
+def test_registered_reward_profiles_include_legacy_and_canonical_names() -> None:
     assert DEFAULT_REWARD_NAME == "race_v3"
-    assert reward_tracker_names() == ("race_v3",)
+    assert CANONICAL_REWARD_NAME == "reward_main"
+    assert reward_tracker_names() == ("race_v3", "reward_main")
     assert isinstance(build_reward_tracker(), RaceV3RewardTracker)
+    assert isinstance(build_reward_tracker(RewardConfig(name="reward_main")), RewardMainTracker)
 
 
 def test_race_v3_weight_fields_match_reward_config_schema() -> None:
     weight_fields = {field.name for field in fields(RaceV3RewardWeights)}
+    schema_fields = set(RewardConfig.model_fields) - {"name", "course_overrides"}
+    assert weight_fields == schema_fields - {"air_brake_request_penalty"}
 
-    assert weight_fields == set(RewardConfig.model_fields) - {"name", "course_overrides"}
+
+def test_reward_main_weight_fields_match_reward_config_schema() -> None:
+    weight_fields = {field.name for field in fields(RewardMainWeights)}
+    schema_fields = set(RewardConfig.model_fields) - {"name", "course_overrides"}
+    assert weight_fields == schema_fields - {
+        "energy_full_refill_lap_bonus",
+        "energy_full_refill_min_gain_fraction",
+    }
 
 
 def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
@@ -103,6 +117,66 @@ def test_build_reward_tracker_wires_all_race_v3_weight_fields() -> None:
     assert isinstance(tracker, RaceV3RewardTracker)
     weights = tracker._weights
     actual = {field.name: getattr(weights, field.name) for field in fields(RaceV3RewardWeights)}
+    assert actual == overrides
+
+
+def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
+    overrides = {
+        "energy_loss_epsilon": 0.04,
+        "progress_bucket_distance": 123.0,
+        "progress_bucket_reward": 2.5,
+        "progress_reward_interval_frames": 7,
+        "airborne_progress_bucket_distance": 500.0,
+        "outside_bounds_reentry_progress_distance_cap": 300.0,
+        "airborne_offtrack_penalty_scale": 0.25,
+        "airborne_offtrack_recovery_reward_scale": 0.5,
+        "airborne_offtrack_recovery_requires_descending": True,
+        "airborne_offtrack_recovery_descend_epsilon": 2.0,
+        "time_penalty_per_frame": -0.002,
+        "reverse_time_penalty_scale": 1.25,
+        "low_speed_time_penalty_scale": 1.5,
+        "slow_speed_time_penalty_scale": 0.8,
+        "slow_speed_time_penalty_start_kph": 760.0,
+        "slow_speed_time_penalty_power": 2.0,
+        "lap_completion_bonus": 9.0,
+        "lap_position_scale": 0.33,
+        "damage_taken_frame_penalty": -0.02,
+        "damage_taken_streak_ramp_penalty": -0.001,
+        "damage_taken_streak_cap_frames": 120,
+        "manual_boost_reward": 0.25,
+        "boost_pad_reward": 10.0,
+        "boost_pad_reward_progress_window": 800.0,
+        "energy_refill_progress_multiplier": 3.0,
+        "dirt_progress_multiplier": 0.5,
+        "ice_progress_multiplier": 0.75,
+        "dirt_entry_penalty": -0.5,
+        "ice_entry_penalty": -0.25,
+        "energy_refill_collision_cooldown_frames": 17,
+        "gas_underuse_penalty": -0.03,
+        "gas_underuse_threshold": 0.25,
+        "steer_oscillation_penalty": -0.004,
+        "steer_oscillation_deadzone": 0.05,
+        "steer_oscillation_cap": 1.5,
+        "steer_oscillation_power": 1.5,
+        "air_brake_request_penalty": -0.005,
+        "lean_request_penalty": -0.002,
+        "airborne_pitch_up_penalty": -0.003,
+        "lean_low_speed_penalty": -0.01,
+        "lean_low_speed_penalty_max_speed_kph": 800.0,
+        "airborne_landing_reward": 5.0,
+        "collision_recoil_penalty": -0.25,
+        "failure_penalty": -30.0,
+        "truncation_penalty": -15.0,
+        "step_reward_clip_min": -12.0,
+        "step_reward_clip_max": 18.0,
+    }
+    assert set(overrides) == {field.name for field in fields(RewardMainWeights)}
+
+    tracker = build_reward_tracker(RewardConfig(name="reward_main", **overrides))
+
+    assert isinstance(tracker, RewardMainTracker)
+    weights = tracker._weights
+    actual = {field.name: getattr(weights, field.name) for field in fields(RewardMainWeights)}
     assert actual == overrides
 
 
@@ -730,6 +804,30 @@ def test_race_v3_suppresses_refill_multiplier_while_reversing() -> None:
     )
 
     assert step.reward == 1.0
+    assert step.breakdown == {"frontier_progress": 1.0}
+
+
+def test_reward_main_suppresses_refill_multiplier_at_full_energy() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="reward_main",
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            energy_refill_progress_multiplier=2.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=178.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, energy=178.0, on_energy_refill=True),
+    )
+
+    assert step.reward == pytest.approx(1.0)
     assert step.breakdown == {"frontier_progress": 1.0}
 
 

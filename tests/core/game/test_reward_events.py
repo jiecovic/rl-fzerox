@@ -302,6 +302,30 @@ def test_race_v3_scales_gas_underuse_penalty_below_threshold() -> None:
     assert at_threshold.breakdown == {}
 
 
+def test_reward_main_penalizes_air_brake_request() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            name="reward_main",
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            air_brake_request_penalty=-0.01,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(air_brake_requested=True),
+    )
+
+    assert step.reward == pytest.approx(-0.03)
+    assert step.breakdown == {"air_brake": -0.03}
+
+
 def test_race_v3_rewards_manual_boost_request_once_per_env_step() -> None:
     tracker = build_reward_tracker(
         RewardConfig(

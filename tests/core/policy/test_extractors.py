@@ -192,6 +192,61 @@ def test_observation_extractor_nature_32_64_128_widens_only_final_conv() -> None
     ] == [32, 64, 128]
 
 
+def test_observation_extractor_custom_profile_uses_configured_layers() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="custom",
+        custom_conv_layers=(
+            {"out_channels": 16, "kernel_size": 6, "stride": 3, "padding": 0},
+            {"out_channels": 32, "kernel_size": 4, "stride": 2, "padding": 0},
+            {"out_channels": 48, "kernel_size": 3, "stride": 1, "padding": 0},
+        ),
+    )
+
+    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 2_592
+    assert tuple(features.shape) == (2, 2_592)
+    assert [
+        module.out_channels for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)
+    ] == [16, 32, 48]
+
+
+def test_observation_extractor_custom_profile_supports_padding() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="custom",
+        custom_conv_layers=(
+            {"out_channels": 16, "kernel_size": 3, "stride": 2, "padding": 1},
+            {"out_channels": 24, "kernel_size": 3, "stride": 2, "padding": 1},
+        ),
+    )
+
+    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    features = extractor(observations)
+
+    assert extractor._flatten_dim == 6_840
+    assert tuple(features.shape) == (2, 6_840)
+    assert [
+        module.padding for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)
+    ] == [(1, 1), (1, 1)]
+
+
+def test_observation_extractor_rejects_custom_profile_that_collapses_geometry() -> None:
+    with pytest.raises(ValueError, match="collapses"):
+        FZeroXObservationCnnExtractor(
+            spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
+            features_dim="auto",
+            conv_profile="custom",
+            custom_conv_layers=(
+                {"out_channels": 32, "kernel_size": 64, "stride": 1},
+            ),
+        )
+
+
 def test_observation_extractor_reports_convolution_activations() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(60, 76, 5), dtype=np.uint8),

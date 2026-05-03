@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary
 from rl_fzerox.core.envs.rewards.race_v3.progress import FrontierReward
-from rl_fzerox.core.envs.rewards.race_v3.weights import RaceV3RewardWeights
+from rl_fzerox.core.envs.rewards.shared_weights import SharedRewardWeights
 from rl_fzerox.core.envs.track_bounds import track_edge_state
 
 
 def cap_outside_bounds_reentry_reward(
     frontier_reward: FrontierReward,
     *,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
 ) -> FrontierReward:
     """Cap deferred re-entry progress reward without moving the frontier backward."""
 
@@ -57,7 +57,7 @@ def airborne_descending(
     *,
     previous_height: float | None,
     telemetry: FZeroXTelemetry,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
 ) -> bool:
     """Return whether the player is descending enough to reward off-track recovery."""
 
@@ -72,7 +72,7 @@ def airborne_offtrack_penalty(
     summary: StepSummary,
     outside_excess: float | None,
     *,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
 ) -> float:
     """Penalize airborne distance beyond the lateral track edge."""
 
@@ -87,7 +87,7 @@ def airborne_offtrack_recovery_reward(
     previous_excess: float | None,
     current_excess: float | None,
     descending: bool,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
 ) -> float:
     """Shape airborne off-track recovery as a non-farmable potential delta."""
 

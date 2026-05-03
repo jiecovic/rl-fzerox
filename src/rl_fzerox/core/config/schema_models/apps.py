@@ -15,6 +15,14 @@ from rl_fzerox.core.config.schema_models.training import TrainConfig
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 
 
+class WatchXCupConfig(BaseModel):
+    """Optional watch-only cold-boot path into the unlockable X Cup."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+
+
 class WatchConfig(BaseModel):
     """Human-facing watch UI settings."""
 
@@ -27,6 +35,7 @@ class WatchConfig(BaseModel):
     device: Literal["auto", "cpu", "cuda"] = "cpu"
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
+    x_cup: WatchXCupConfig = Field(default_factory=WatchXCupConfig)
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:

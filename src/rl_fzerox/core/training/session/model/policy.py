@@ -30,6 +30,10 @@ def build_policy_kwargs(
         extractor_class = FZeroXImageStateExtractor
         extractor_kwargs = {
             "conv_profile": policy_config.extractor.conv_profile,
+            "custom_conv_layers": tuple(
+                layer.model_dump(mode="python")
+                for layer in policy_config.extractor.custom_conv_layers
+            ),
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
@@ -39,6 +43,10 @@ def build_policy_kwargs(
         extractor_class = FZeroXObservationCnnExtractor
         extractor_kwargs = {
             "conv_profile": policy_config.extractor.conv_profile,
+            "custom_conv_layers": tuple(
+                layer.model_dump(mode="python")
+                for layer in policy_config.extractor.custom_conv_layers
+            ),
             "features_dim": policy_config.extractor.features_dim,
             "layer_norm": policy_config.extractor.layer_norm,
         }

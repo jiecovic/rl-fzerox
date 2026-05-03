@@ -1,5 +1,5 @@
 defaults:
-  - reward: race_v3
+  - reward: reward_main
   - _self_
 
 seed: 123
@@ -52,3 +52,7 @@ watch:
   render_fps: 60
   deterministic_policy: true
   device: cpu
+  # Watch-only cold boot into the unlock cheat plus GP X Cup route. This does
+  # not affect training and currently uses the GP menu path, not Time Attack.
+  x_cup:
+    enabled: false

@@ -6,9 +6,12 @@ from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,
     save_artifacts_atomically,
+    save_recent_checkpoint_artifacts,
+    trim_recent_checkpoint_artifacts,
 )
 from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumController
 
+from .checkpoints import CheckpointPolicy, resolve_checkpoint_policy
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
 from .track_sampling import StepBalancedTrackSamplingController
 from .tuning import apply_stage_train_overrides, record_stage_train_overrides
@@ -56,11 +59,12 @@ def build_callbacks(
     class RollingArtifactCallback(BaseCallback):
         """Maintain rolling latest and best training artifacts."""
 
-        def __init__(self, *, save_freq: int, run_paths: RunPaths) -> None:
+        def __init__(self, *, policy: CheckpointPolicy, run_paths: RunPaths) -> None:
             super().__init__(verbose=0)
-            self._save_freq = save_freq
+            self._policy = policy
             self._run_paths = run_paths
             self._best_episode_return: float | None = None
+            self._rollout_count = 0
 
         def _save_latest(self) -> None:
             save_artifacts_atomically(
@@ -69,6 +73,27 @@ def build_callbacks(
                 policy_path=self._run_paths.latest_policy_path,
                 policy_metadata=current_policy_artifact_metadata(self.training_env, self.model),
             )
+
+        def _save_recent(self) -> None:
+            num_timesteps = getattr(self.model, "num_timesteps", None)
+            if not isinstance(num_timesteps, int):
+                return
+            save_recent_checkpoint_artifacts(
+                self.model,
+                self._run_paths,
+                num_timesteps=num_timesteps,
+                policy_metadata=current_policy_artifact_metadata(self.training_env, self.model),
+            )
+            trim_recent_checkpoint_artifacts(
+                self._run_paths,
+                keep_last=self._policy.recent_limit,
+            )
+
+        def _save_periodic(self) -> None:
+            if self._policy.save_latest:
+                self._save_latest()
+            if self._policy.save_recent:
+                self._save_recent()
 
         def _save_best(self, episode_return: float) -> None:
             if (
@@ -85,14 +110,21 @@ def build_callbacks(
             )
 
         def _on_training_start(self) -> None:
-            self._save_latest()
+            if self._policy.save_latest:
+                self._save_latest()
 
         def _on_step(self) -> bool:
-            if self.n_calls % self._save_freq == 0:
-                self._save_latest()
+            if (
+                self._policy.step_interval is not None
+                and self.n_calls % self._policy.step_interval == 0
+            ):
+                self._save_periodic()
 
             infos = info_sequence(self.locals.get("infos"))
             if infos is None:
+                return True
+
+            if not self._policy.save_best:
                 return True
 
             for info in infos:
@@ -105,6 +137,13 @@ def build_callbacks(
                 if isinstance(episode_return, int | float):
                     self._save_best(float(episode_return))
             return True
+
+        def _on_rollout_end(self) -> None:
+            if self._policy.rollout_interval is None:
+                return
+            self._rollout_count += 1
+            if self._rollout_count % self._policy.rollout_interval == 0:
+                self._save_periodic()
 
     class CurriculumCallback(BaseCallback):
         """Promote curriculum stages and apply their rollout-time overrides."""
@@ -178,10 +217,10 @@ def build_callbacks(
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
 
-    adjusted_save_freq = max(1, train_config.save_freq // train_config.num_envs)
+    checkpoint_policy = resolve_checkpoint_policy(train_config)
     callbacks: list[BaseCallback] = [
         RollingArtifactCallback(
-            save_freq=adjusted_save_freq,
+            policy=checkpoint_policy,
             run_paths=run_paths,
         ),
         InfoLoggingCallback(),

@@ -18,6 +18,8 @@ from rl_fzerox.core.config.schema import (
     EnvConfig,
     PolicyConfig,
     RewardConfig,
+    TrackSamplingConfig,
+    TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
@@ -183,6 +185,60 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     assert config.emulator.core_path == core_path
     assert config.train == train_config.train
     assert config.policy == train_config.policy
+
+
+def test_resolve_watch_app_config_disables_track_sampling_for_x_cup_watch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    baseline_state_path = tmp_path / "track.state"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    baseline_state_path.write_bytes(b"baseline")
+    run_dir.mkdir(parents=True)
+    train_config = TrainAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_state_path,
+                    ),
+                ),
+            )
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.load_train_run_config_for_watch",
+        lambda *_args, **_kwargs: train_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch.materialize_watch_session_config",
+        lambda config, **_kwargs: config,
+    )
+
+    config = resolve_watch_app_config(
+        config_path=None,
+        policy_run_dir=run_dir,
+        policy_artifact="latest",
+        overrides=["watch.x_cup.enabled=true"],
+    )
+
+    assert config.watch.x_cup.enabled is True
+    assert config.env.track_sampling.enabled is False
 
 
 def test_watch_allows_run_dir_without_config(

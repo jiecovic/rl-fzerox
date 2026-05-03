@@ -5,7 +5,7 @@ from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.rewards.common import finish_placement_bonus
-from rl_fzerox.core.envs.rewards.race_v3.weights import RaceV3RewardWeights
+from rl_fzerox.core.envs.rewards.shared_weights import SharedRewardWeights
 
 _FAILURE_TERMINATION_REASONS = frozenset(
     ("spinning_out", "crashed", "retired", "falling_off_track")
@@ -31,7 +31,7 @@ class BoostPadRewardTracker:
         *,
         relative_progress: float,
         frontier_distance_before_step: float,
-        weights: RaceV3RewardWeights,
+        weights: SharedRewardWeights,
     ) -> float:
         reward = weights.boost_pad_reward
         if reward <= 0.0 or not summary.entered_dash_surface or summary.reverse_active_frames > 0:
@@ -61,7 +61,7 @@ class BadSurfaceEntryPenaltyTracker:
         self,
         telemetry: FZeroXTelemetry,
         *,
-        weights: RaceV3RewardWeights,
+        weights: SharedRewardWeights,
         breakdown: dict[str, float],
     ) -> float:
         current_effect = course_effect_raw(telemetry)
@@ -105,7 +105,7 @@ class LapRewardTracker:
         self,
         telemetry: FZeroXTelemetry,
         *,
-        weights: RaceV3RewardWeights,
+        weights: SharedRewardWeights,
         breakdown: dict[str, float],
     ) -> float:
         race_laps_completed = completed_race_laps(telemetry)
@@ -132,7 +132,7 @@ def landing_reward(
     *,
     previous_airborne: bool,
     telemetry: FZeroXTelemetry,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
 ) -> float:
     reward = weights.airborne_landing_reward
     if reward == 0.0:
@@ -145,7 +145,7 @@ def landing_reward(
 def terminal_or_truncation_penalty(
     status: StepStatus,
     *,
-    weights: RaceV3RewardWeights,
+    weights: SharedRewardWeights,
     breakdown: dict[str, float],
 ) -> float:
     if status.termination_reason == "finished":

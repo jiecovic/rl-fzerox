@@ -7,9 +7,11 @@ LeanMode: TypeAlias = Literal[
     "minimum_hold",
     "release_cooldown",
     "timer_assist",
+    "raw",
 ]
 
 LEAN_MODE_MINIMUM_HOLD: Final[LeanMode] = "minimum_hold"
 LEAN_MODE_RELEASE_COOLDOWN: Final[LeanMode] = "release_cooldown"
 LEAN_MODE_TIMER_ASSIST: Final[LeanMode] = "timer_assist"
+LEAN_MODE_RAW: Final[LeanMode] = "raw"
 DEFAULT_LEAN_MODE: Final[LeanMode] = LEAN_MODE_RELEASE_COOLDOWN
