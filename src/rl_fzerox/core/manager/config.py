@@ -12,9 +12,13 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    field_validator,
     model_validator,
 )
 
+from rl_fzerox.core.config.vehicle_catalog import known_vehicle_ids
+from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
+from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
     ObservationCourseContextName,
@@ -25,6 +29,14 @@ from rl_fzerox.core.domain.observation_components import (
 
 ConfigVersion = Literal[1]
 StackMode = Literal["rgb", "gray", "luma_chroma"]
+RaceMode = Literal["time_attack", "gp_race"]
+TrackSamplingMode = Literal["equal", "step_balanced"]
+TrackPoolMode = Literal["built_in", "x_cup"]
+VehicleSelectionMode = Literal["fixed", "pool"]
+EngineSettingMode = Literal["fixed", "random_range"]
+ActionAxisMode = Literal["continuous", "discrete"]
+ActionDriveMode = Literal["pwm", "on_off"]
+LeanOutputMode = Literal["three_way", "independent_buttons"]
 ObservationPreset = Literal[
     "crop_84x116",
     "crop_92x124",
@@ -48,9 +60,19 @@ ConvProfile = Literal[
     "compact_deep",
     "compact_bottleneck",
     "tiny_256",
+    "custom",
 ]
 FeatureDim: TypeAlias = PositiveInt | Literal["auto"]
 ActivationName = Literal["relu", "tanh", "gelu"]
+
+_LEGACY_REMOVED_MANAGER_REWARD_FIELDS = frozenset(
+    (
+        "energy_full_refill_lap_bonus",
+        "energy_full_refill_min_gain_fraction",
+        "low_speed_time_penalty_scale",
+    )
+)
+_LEGACY_REMOVED_MANAGER_ENVIRONMENT_FIELDS = frozenset(("terminate_on_energy_depleted",))
 
 
 class ManagedTrainConfig(BaseModel):
@@ -75,7 +97,195 @@ class ManagedTrainConfig(BaseModel):
     normalize_advantage: bool = True
     target_kl: PositiveFloat | None = None
     stats_window_size: PositiveInt = 100
+    checkpoint_every_rollouts: PositiveInt = 5
+    save_latest_checkpoint: bool = True
+    save_best_checkpoint: bool = True
+    save_recent_checkpoints: bool = False
+    recent_checkpoint_limit: PositiveInt | None = 5
     course_context_dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class ManagedTracksConfig(BaseModel):
+    """Track pool and race-mode knobs exposed by the run manager."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    pool_mode: TrackPoolMode = "built_in"
+    race_mode: RaceMode = "time_attack"
+    sampling_mode: TrackSamplingMode = "step_balanced"
+    selected_course_ids: tuple[str, ...] = Field(
+        default_factory=lambda: tuple(course.id for course in BUILT_IN_COURSES)
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_x_cup_race_mode(cls, data: object) -> object:
+        if not isinstance(data, Mapping):
+            return data
+        migrated = dict(data)
+        if migrated.get("pool_mode") == "x_cup":
+            migrated["race_mode"] = "gp_race"
+        return migrated
+
+    @model_validator(mode="after")
+    def _validate_selected_course_ids(self) -> ManagedTracksConfig:
+        if self.pool_mode == "x_cup" and self.race_mode != "gp_race":
+            raise ValueError("tracks.pool_mode=x_cup requires tracks.race_mode=gp_race")
+        if self.pool_mode == "built_in" and not self.selected_course_ids:
+            raise ValueError("tracks.selected_course_ids must not be empty")
+        if len(set(self.selected_course_ids)) != len(self.selected_course_ids):
+            raise ValueError("tracks.selected_course_ids must not contain duplicates")
+        unknown_ids = sorted(set(self.selected_course_ids) - built_in_course_id_set())
+        if unknown_ids:
+            joined = ", ".join(unknown_ids)
+            raise ValueError(f"tracks.selected_course_ids contains unknown courses: {joined}")
+        return self
+
+
+class ManagedVehicleConfig(BaseModel):
+    """Vehicle selection knobs exposed by the run manager."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    selection_mode: VehicleSelectionMode = "pool"
+    selected_vehicle_ids: tuple[str, ...] = Field(
+        default_factory=lambda: ("blue_falcon",)
+    )
+    engine_mode: EngineSettingMode = "fixed"
+    engine_setting_raw_value: NonNegativeInt = Field(default=50, le=100)
+    engine_setting_min_raw_value: NonNegativeInt = Field(default=20, le=100)
+    engine_setting_max_raw_value: NonNegativeInt = Field(default=80, le=100)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_vehicle_fields(cls, data: object) -> object:
+        if not isinstance(data, Mapping):
+            return data
+
+        migrated = dict(data)
+        if "selected_vehicle_ids" in migrated or "selection_mode" in migrated:
+            return migrated
+
+        vehicle_id = str(migrated.pop("vehicle_id", "blue_falcon"))
+        raw_value = int(migrated.get("engine_setting_raw_value", 50))
+        migrated["selection_mode"] = "pool"
+        migrated["selected_vehicle_ids"] = [vehicle_id]
+        migrated.setdefault("engine_mode", "fixed")
+        migrated.setdefault("engine_setting_raw_value", raw_value)
+        migrated.setdefault("engine_setting_min_raw_value", raw_value)
+        migrated.setdefault("engine_setting_max_raw_value", raw_value)
+        return migrated
+
+    @model_validator(mode="after")
+    def _validate_vehicle_config(self) -> ManagedVehicleConfig:
+        if not self.selected_vehicle_ids:
+            raise ValueError("vehicle.selected_vehicle_ids must not be empty")
+        if len(set(self.selected_vehicle_ids)) != len(self.selected_vehicle_ids):
+            raise ValueError("vehicle.selected_vehicle_ids must not contain duplicates")
+        unknown_ids = sorted(set(self.selected_vehicle_ids) - set(known_vehicle_ids()))
+        if unknown_ids:
+            known = ", ".join(known_vehicle_ids())
+            joined = ", ".join(unknown_ids)
+            raise ValueError(
+                f"vehicle.selected_vehicle_ids contains unknown vehicles: {joined}; known: {known}"
+            )
+        if self.selection_mode == "fixed" and len(self.selected_vehicle_ids) != 1:
+            raise ValueError("vehicle.selection_mode=fixed requires exactly one selected vehicle")
+        if self.engine_setting_min_raw_value > self.engine_setting_max_raw_value:
+            raise ValueError(
+                "vehicle.engine_setting_min_raw_value must be <= "
+                "vehicle.engine_setting_max_raw_value"
+            )
+        return self
+
+
+class ManagedActionConfig(BaseModel):
+    """Action-space knobs exposed by the run manager."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action_repeat: PositiveInt = 2
+    steering_mode: ActionAxisMode = "continuous"
+    steer_buckets: int = Field(default=7, ge=3)
+    drive_mode: ActionDriveMode = "on_off"
+    force_full_throttle: bool = False
+    continuous_drive_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
+    continuous_drive_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
+    continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
+    include_air_brake: bool = True
+    enable_air_brake: bool = True
+    include_boost: bool = True
+    enable_boost: bool = True
+    boost_unmask_max_speed_kph: NonNegativeFloat | None = None
+    boost_min_energy_fraction: float = Field(default=0.1, ge=0.0, le=1.0)
+    include_lean: bool = True
+    enable_lean: bool = True
+    lean_output_mode: LeanOutputMode = "three_way"
+    lean_mode: LeanMode = DEFAULT_LEAN_MODE
+    lean_unmask_min_speed_kph: NonNegativeFloat | None = None
+    lean_initial_lockout_frames: NonNegativeInt = 0
+    include_pitch: bool = True
+    enable_pitch: bool = True
+    pitch_mode: ActionAxisMode = "discrete"
+    pitch_buckets: int = Field(default=5, ge=3)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_enable_flags(cls, data: object) -> object:
+        if not isinstance(data, Mapping):
+            return data
+        migrated = dict(data)
+        if migrated.get("drive_mode") == "always_full":
+            migrated["drive_mode"] = "on_off"
+            migrated["force_full_throttle"] = True
+        for branch_name in ("air_brake", "boost", "lean", "pitch"):
+            include_key = f"include_{branch_name}"
+            enable_key = f"enable_{branch_name}"
+            if enable_key not in migrated:
+                migrated[enable_key] = bool(migrated.get(include_key, True))
+        return migrated
+
+    @field_validator("steer_buckets", "pitch_buckets")
+    @classmethod
+    def _validate_odd_bucket_count(cls, value: int) -> int:
+        if value % 2 == 0:
+            raise ValueError("action bucket counts must be odd")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_supported_layout(self) -> ManagedActionConfig:
+        if self.continuous_drive_deadzone >= self.continuous_drive_full_threshold:
+            raise ValueError(
+                "continuous_drive_deadzone must be lower than continuous_drive_full_threshold"
+            )
+        if not self.include_air_brake:
+            self.enable_air_brake = False
+        if not self.include_boost:
+            self.enable_boost = False
+        if not self.include_lean:
+            self.enable_lean = False
+        elif self.lean_output_mode == "independent_buttons":
+            self.lean_mode = "raw"
+        if not self.include_pitch:
+            self.enable_pitch = False
+        elif self.pitch_mode == "continuous":
+            self.enable_pitch = True
+        return self
+
+
+class ManagedEnvironmentConfig(BaseModel):
+    """Episode-limit knobs exposed by the run manager."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_legacy_environment_fields(cls, data: object) -> object:
+        return _strip_legacy_manager_environment_fields(data)
+
+    max_episode_steps: PositiveInt = 12_000
+    progress_frontier_stall_limit_frames: PositiveInt | None = 900
+    progress_frontier_epsilon: NonNegativeFloat = 100.0
 
 
 class ManagedStateComponentConfig(BaseModel):
@@ -215,7 +425,18 @@ class ManagedPolicyConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    class CustomConvLayer(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+
+        out_channels: PositiveInt
+        kernel_size: PositiveInt
+        stride: PositiveInt
+        padding: NonNegativeInt = 0
+
     conv_profile: ConvProfile = "nature_32_64_128"
+    custom_conv_layers: tuple[CustomConvLayer, ...] = Field(
+        default_factory=lambda: default_custom_conv_layers()
+    )
     features_dim: FeatureDim = "auto"
     state_net_arch: tuple[PositiveInt, ...] = (64,)
     fusion_features_dim: PositiveInt = 768
@@ -230,15 +451,25 @@ class ManagedPolicyConfig(BaseModel):
     vf_net_arch: tuple[PositiveInt, ...] = (256, 128)
     gas_on_logit: float = 0.5
 
+    @model_validator(mode="after")
+    def _validate_custom_conv_layers(self) -> ManagedPolicyConfig:
+        if self.conv_profile == "custom" and not self.custom_conv_layers:
+            raise ValueError("policy.custom_conv_layers must not be empty for conv_profile=custom")
+        return self
+
 
 class ManagedRewardConfig(BaseModel):
     """Reward knobs exposed by the first run-manager slice."""
 
     model_config = ConfigDict(extra="forbid")
 
-    time_penalty_per_frame: float = -0.005
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_legacy_reward_fields(cls, data: object) -> object:
+        return _strip_legacy_manager_reward_fields(data)
+
+    time_penalty_per_frame: float = 0.0
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
-    low_speed_time_penalty_scale: NonNegativeFloat = 2.0
     slow_speed_time_penalty_scale: NonNegativeFloat = 3.0
     slow_speed_time_penalty_start_kph: NonNegativeFloat = 760.0
     slow_speed_time_penalty_power: PositiveFloat = 1.0
@@ -254,20 +485,19 @@ class ManagedRewardConfig(BaseModel):
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
-    energy_refill_progress_multiplier: float = Field(default=1.0, ge=1.0)
+    energy_refill_progress_multiplier: float = Field(default=3.0, ge=1.0)
     dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)
     ice_progress_multiplier: float = Field(default=1.0, ge=0.0)
     dirt_entry_penalty: float = Field(default=0.0, le=0.0)
     ice_entry_penalty: float = Field(default=0.0, le=0.0)
-    energy_refill_collision_cooldown_frames: NonNegativeInt = 0
-    energy_full_refill_lap_bonus: NonNegativeFloat = 0.0
-    energy_full_refill_min_gain_fraction: float = Field(default=0.0, ge=0.0, le=1.0)
+    energy_refill_collision_cooldown_frames: NonNegativeInt = 120
     gas_underuse_penalty: float = Field(default=0.0, le=0.0)
     gas_underuse_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     steer_oscillation_penalty: float = Field(default=0.0, le=0.0)
     steer_oscillation_deadzone: NonNegativeFloat = 0.0
     steer_oscillation_cap: PositiveFloat = 2.0
     steer_oscillation_power: PositiveFloat = 2.0
+    air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     manual_boost_reward: NonNegativeFloat = 0.01
     boost_pad_reward: NonNegativeFloat = 10.0
     boost_pad_reward_progress_window: PositiveFloat = 800.0
@@ -296,6 +526,24 @@ class ManagedRewardConfig(BaseModel):
         return self
 
 
+def _strip_legacy_manager_reward_fields(data: object) -> object:
+    if not isinstance(data, Mapping):
+        return data
+    normalized = dict(data)
+    for field_name in _LEGACY_REMOVED_MANAGER_REWARD_FIELDS:
+        normalized.pop(field_name, None)
+    return normalized
+
+
+def _strip_legacy_manager_environment_fields(data: object) -> object:
+    if not isinstance(data, Mapping):
+        return data
+    normalized = dict(data)
+    for field_name in _LEGACY_REMOVED_MANAGER_ENVIRONMENT_FIELDS:
+        normalized.pop(field_name, None)
+    return normalized
+
+
 class ManagedRunConfig(BaseModel):
     """DB-owned immutable config snapshot for one managed run."""
 
@@ -304,16 +552,66 @@ class ManagedRunConfig(BaseModel):
     version: ConfigVersion = 1
     seed: int = 123
     preset_name: str = "all-cups recurrent PPO"
+    tracks: ManagedTracksConfig = Field(default_factory=ManagedTracksConfig)
+    vehicle: ManagedVehicleConfig = Field(default_factory=ManagedVehicleConfig)
+    action: ManagedActionConfig = Field(default_factory=ManagedActionConfig)
+    environment: ManagedEnvironmentConfig = Field(default_factory=ManagedEnvironmentConfig)
     train: ManagedTrainConfig = Field(default_factory=ManagedTrainConfig)
     observation: ManagedObservationConfig = Field(default_factory=ManagedObservationConfig)
     policy: ManagedPolicyConfig = Field(default_factory=ManagedPolicyConfig)
     reward: ManagedRewardConfig = Field(default_factory=ManagedRewardConfig)
+
+    @model_validator(mode="after")
+    def _validate_custom_conv_geometry(self) -> ManagedRunConfig:
+        from rl_fzerox.core.manager.architecture_metadata import preset_geometry
+        from rl_fzerox.core.policy.extractors import (
+            ensure_conv_spec_fits_geometry,
+            resolve_conv_spec,
+        )
+
+        height, width = preset_geometry(self.observation.preset)
+        conv_spec = resolve_conv_spec(
+            (height, width),
+            conv_profile=self.policy.conv_profile,
+            custom_conv_layers=tuple(
+                layer.model_dump(mode="python") for layer in self.policy.custom_conv_layers
+            ),
+        )
+        ensure_conv_spec_fits_geometry(
+            height=height,
+            width=width,
+            conv_spec=conv_spec,
+            profile_name=self.policy.conv_profile,
+        )
+        return self
 
 
 def default_managed_run_config() -> ManagedRunConfig:
     """Return the first manager preset without reading any YAML files."""
 
     return ManagedRunConfig()
+
+
+def default_custom_conv_layers() -> tuple[ManagedPolicyConfig.CustomConvLayer, ...]:
+    """Return a sensible custom-CNN starting point for the manager."""
+
+    return (
+        ManagedPolicyConfig.CustomConvLayer(
+            out_channels=32, kernel_size=8, stride=4, padding=0
+        ),
+        ManagedPolicyConfig.CustomConvLayer(
+            out_channels=64, kernel_size=4, stride=2, padding=0
+        ),
+        ManagedPolicyConfig.CustomConvLayer(
+            out_channels=128, kernel_size=3, stride=1, padding=0
+        ),
+    )
+
+
+def default_selected_course_ids() -> tuple[str, ...]:
+    """Return the default manager course pool in game order."""
+
+    return tuple(course.id for course in BUILT_IN_COURSES)
 
 
 def default_state_components() -> tuple[ManagedStateComponentConfig, ...]:
@@ -369,3 +667,7 @@ def _state_component_feature_names(
         for feature in state_component_definition(settings).features(settings):
             names.add(feature.name)
     return frozenset(names)
+
+
+def built_in_course_id_set() -> frozenset[str]:
+    return frozenset(course.id for course in BUILT_IN_COURSES)

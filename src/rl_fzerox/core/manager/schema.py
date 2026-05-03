@@ -62,6 +62,12 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             message TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES runs(id)
         );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS runs_name_unique_idx
+        ON runs(name COLLATE NOCASE);
+
+        CREATE UNIQUE INDEX IF NOT EXISTS run_drafts_name_unique_idx
+        ON run_drafts(name COLLATE NOCASE);
         """
     )
     connection.execute(
@@ -78,7 +84,7 @@ def _insert_default_template(connection: sqlite3.Connection, *, created_at: str)
     config = default_managed_run_config()
     connection.execute(
         """
-        INSERT OR IGNORE INTO run_templates(
+        INSERT INTO run_templates(
             id,
             name,
             config_json,
@@ -87,6 +93,11 @@ def _insert_default_template(connection: sqlite3.Connection, *, created_at: str)
             updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            config_json = excluded.config_json,
+            config_hash = excluded.config_hash,
+            updated_at = excluded.updated_at
         """,
         (
             "all_cups_recurrent_ppo",

@@ -40,10 +40,61 @@ class StateComponentInfo(BaseModel):
     features: tuple[StateFeatureInfo, ...]
 
 
+class TrackCupInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+    order: int
+    course_ids: tuple[str, ...]
+
+
+class BuiltInCourseInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    ref: str
+    display_name: str
+    cup: str
+    cup_label: str
+    course_index: int
+    default_selected: bool = True
+
+
+class VehicleInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    display_name: str
+    character_index: int
+    machine_select_slot: int
+    menu_row: int
+    menu_column: int
+
+
+class EngineSettingPresetInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    display_name: str
+    raw_value: int
+
+
 class RunManagerConfigMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     observation_presets: tuple[ObservationPresetInfo, ...]
+    track_pool_modes: tuple[SelectOption, ...]
+    race_modes: tuple[SelectOption, ...]
+    track_sampling_modes: tuple[SelectOption, ...]
+    track_cups: tuple[TrackCupInfo, ...]
+    built_in_courses: tuple[BuiltInCourseInfo, ...]
+    vehicles: tuple[VehicleInfo, ...]
+    engine_setting_presets: tuple[EngineSettingPresetInfo, ...]
+    steering_modes: tuple[SelectOption, ...]
+    drive_modes: tuple[SelectOption, ...]
+    lean_output_modes: tuple[SelectOption, ...]
+    lean_modes: tuple[SelectOption, ...]
     stack_modes: tuple[SelectOption, ...]
     resize_filters: tuple[SelectOption, ...]
     progress_sources: tuple[SelectOption, ...]
@@ -79,8 +130,13 @@ class ConvLayerPreview(BaseModel):
     out_channels: int
     kernel_size: int
     stride: int
+    padding: int
+    input_height: int
+    input_width: int
     output_height: int
     output_width: int
+    dropped_height: int
+    dropped_width: int
     params: int
 
 
@@ -91,12 +147,23 @@ class ParameterGroupPreview(BaseModel):
     params: int
 
 
+class ActionBranchPreview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    kind: str
+    size: int
+    enabled: bool
+    mask_label: str | None = None
+
+
 class ArchitectureNodePreview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
     label: str
     detail: str
+    params: int | None = None
     tone: str = "normal"
 
 
@@ -121,6 +188,9 @@ class PolicyArchitecturePreview(BaseModel):
     fusion_input_dim: int
     extractor_output_dim: int
     policy_input_dim: int
+    action_branches: tuple[ActionBranchPreview, ...]
+    continuous_action_dims: int
+    discrete_action_logits: int
     parameter_groups: tuple[ParameterGroupPreview, ...]
     total_params: int
     architecture_lanes: tuple[ArchitectureLanePreview, ...]
