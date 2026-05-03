@@ -8,6 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from rl_fzerox.core.manager.config import ManagedRunConfig
+from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunDraft,
@@ -52,11 +53,12 @@ class ManagerStore:
         self.initialize()
         created_at = _utc_now()
         run_id = _new_run_id(name)
+        normalized_name = name.strip() or run_id
         root = (managed_runs_root or Path("local/managed_runs")).expanduser().resolve()
         run_dir = root / run_id
         run = ManagedRun(
             id=run_id,
-            name=name.strip() or run_id,
+            name=normalized_name,
             status="created",
             config=config,
             config_hash=config_hash(config),
@@ -67,47 +69,52 @@ class ManagerStore:
             created_at=created_at,
         )
 
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO runs(
-                    id,
-                    name,
-                    status,
-                    config_json,
-                    config_hash,
-                    run_dir,
-                    parent_run_id,
-                    source_run_id,
-                    source_artifact,
-                    created_at,
-                    started_at,
-                    stopped_at
+        try:
+            with self._connect() as connection:
+                _assert_name_available(connection, normalized_name)
+                connection.execute(
+                    """
+                    INSERT INTO runs(
+                        id,
+                        name,
+                        status,
+                        config_json,
+                        config_hash,
+                        run_dir,
+                        parent_run_id,
+                        source_run_id,
+                        source_artifact,
+                        created_at,
+                        started_at,
+                        stopped_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        run.id,
+                        run.name,
+                        run.status,
+                        config_json(run.config),
+                        run.config_hash,
+                        str(run.run_dir),
+                        run.parent_run_id,
+                        run.source_run_id,
+                        run.source_artifact,
+                        run.created_at,
+                        run.started_at,
+                        run.stopped_at,
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run.id,
-                    run.name,
-                    run.status,
-                    config_json(run.config),
-                    run.config_hash,
-                    str(run.run_dir),
-                    run.parent_run_id,
-                    run.source_run_id,
-                    run.source_artifact,
-                    run.created_at,
-                    run.started_at,
-                    run.stopped_at,
-                ),
-            )
-            connection.execute(
-                """
-                INSERT INTO run_events(run_id, created_at, kind, message)
-                VALUES (?, ?, ?, ?)
-                """,
-                (run.id, created_at, "created", "run created from manager config"),
-            )
+                connection.execute(
+                    """
+                    INSERT INTO run_events(run_id, created_at, kind, message)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (run.id, created_at, "created", "run created from manager config"),
+                )
+        except sqlite3.IntegrityError as error:
+            _raise_name_conflict(error, table="runs", kind="run", name=normalized_name)
+            raise
         return run
 
     def create_draft(
@@ -121,37 +128,43 @@ class ManagerStore:
         self.initialize()
         created_at = _utc_now()
         draft_id = _new_record_id(name)
+        normalized_name = name.strip() or draft_id
         draft = ManagedRunDraft(
             id=draft_id,
-            name=name.strip() or draft_id,
+            name=normalized_name,
             config=config,
             config_hash=config_hash(config),
             created_at=created_at,
             updated_at=created_at,
         )
 
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO run_drafts(
-                    id,
-                    name,
-                    config_json,
-                    config_hash,
-                    created_at,
-                    updated_at
+        try:
+            with self._connect() as connection:
+                _assert_name_available(connection, normalized_name)
+                connection.execute(
+                    """
+                    INSERT INTO run_drafts(
+                        id,
+                        name,
+                        config_json,
+                        config_hash,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        draft.id,
+                        draft.name,
+                        config_json(draft.config),
+                        draft.config_hash,
+                        draft.created_at,
+                        draft.updated_at,
+                    ),
                 )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    draft.id,
-                    draft.name,
-                    config_json(draft.config),
-                    draft.config_hash,
-                    draft.created_at,
-                    draft.updated_at,
-                ),
-            )
+        except sqlite3.IntegrityError as error:
+            _raise_name_conflict(error, table="run_drafts", kind="draft", name=normalized_name)
+            raise
         return draft
 
     def list_runs(self) -> tuple[ManagedRun, ...]:
@@ -227,32 +240,38 @@ class ManagerStore:
 
         self.initialize()
         updated_at = _utc_now()
-        with self._connect() as connection:
-            row = connection.execute(
-                """
-                UPDATE run_drafts
-                SET
-                    name = ?,
-                    config_json = ?,
-                    config_hash = ?,
-                    updated_at = ?
-                WHERE id = ?
-                RETURNING
-                    id,
-                    name,
-                    config_json,
-                    config_hash,
-                    created_at,
-                    updated_at
-                """,
-                (
-                    name.strip() or draft_id,
-                    config_json(config),
-                    config_hash(config),
-                    updated_at,
-                    draft_id,
-                ),
-            ).fetchone()
+        normalized_name = name.strip() or draft_id
+        try:
+            with self._connect() as connection:
+                _assert_name_available(connection, normalized_name, exclude_draft_id=draft_id)
+                row = connection.execute(
+                    """
+                    UPDATE run_drafts
+                    SET
+                        name = ?,
+                        config_json = ?,
+                        config_hash = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    RETURNING
+                        id,
+                        name,
+                        config_json,
+                        config_hash,
+                        created_at,
+                        updated_at
+                    """,
+                    (
+                        normalized_name,
+                        config_json(config),
+                        config_hash(config),
+                        updated_at,
+                        draft_id,
+                    ),
+                ).fetchone()
+        except sqlite3.IntegrityError as error:
+            _raise_name_conflict(error, table="run_drafts", kind="draft", name=normalized_name)
+            raise
         return None if row is None else _draft_from_row(row)
 
     def list_templates(self) -> tuple[ManagedRunTemplate, ...]:
@@ -358,6 +377,52 @@ def _new_record_id(name: str) -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     slug = _slugify(name) or "run"
     return f"{timestamp}-{slug}-{uuid4().hex[:8]}"
+
+
+def _raise_name_conflict(
+    error: sqlite3.IntegrityError,
+    *,
+    table: str,
+    kind: str,
+    name: str,
+) -> None:
+    if f"UNIQUE constraint failed: {table}.name" in str(error):
+        raise ManagerNameConflictError(kind=kind, name=name) from error
+
+
+def _assert_name_available(
+    connection: sqlite3.Connection,
+    name: str,
+    *,
+    exclude_draft_id: str | None = None,
+    exclude_run_id: str | None = None,
+) -> None:
+    row = connection.execute(
+        """
+        SELECT source FROM (
+            SELECT 'run' AS source
+            FROM runs
+            WHERE name = ? COLLATE NOCASE
+              AND (? IS NULL OR id != ?)
+            UNION ALL
+            SELECT 'draft' AS source
+            FROM run_drafts
+            WHERE name = ? COLLATE NOCASE
+              AND (? IS NULL OR id != ?)
+        )
+        LIMIT 1
+        """,
+        (
+            name,
+            exclude_run_id,
+            exclude_run_id,
+            name,
+            exclude_draft_id,
+            exclude_draft_id,
+        ),
+    ).fetchone()
+    if row is not None:
+        raise ManagerNameConflictError(kind=str(row["source"]), name=name)
 
 
 def _slugify(value: str) -> str:

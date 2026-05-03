@@ -5,7 +5,10 @@ import json
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.manager.errors import ManagerNameConflictError
 
 
 def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
@@ -16,6 +19,34 @@ def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
     assert len(templates) == 1
     assert templates[0].id == "all_cups_recurrent_ppo"
     assert templates[0].config == default_managed_run_config()
+
+
+def test_manager_store_refreshes_system_template_to_current_defaults(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "runs.db")
+    store.initialize()
+
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"]["energy_refill_progress_multiplier"] = 1.0
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            UPDATE run_templates
+            SET config_json = ?, config_hash = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "all_cups_recurrent_ppo",
+            ),
+        )
+
+    template = store.default_template()
+
+    assert template.config == default_managed_run_config()
+    assert template.config.reward.energy_refill_progress_multiplier == 3.0
 
 
 def test_manager_store_saves_draft_without_filesystem_artifacts(tmp_path: Path) -> None:
@@ -133,6 +164,97 @@ def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> N
     )
 
 
+def test_manager_store_normalizes_legacy_vehicle_fields(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["vehicle"] = {
+        "vehicle_id": "golden_fox",
+        "engine_setting_raw_value": 65,
+    }
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-vehicle",
+                "Old Vehicle",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.vehicle.selection_mode == "pool"
+    assert draft.config.vehicle.selected_vehicle_ids == ("golden_fox",)
+    assert draft.config.vehicle.engine_mode == "fixed"
+    assert draft.config.vehicle.engine_setting_raw_value == 65
+    assert draft.config.vehicle.engine_setting_min_raw_value == 65
+    assert draft.config.vehicle.engine_setting_max_raw_value == 65
+
+
+def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config.pop("action", None)
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-action",
+                "Old Action",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.action.action_repeat == 2
+    assert draft.config.action.steering_mode == "continuous"
+    assert draft.config.action.drive_mode == "on_off"
+    assert draft.config.action.force_full_throttle is False
+    assert draft.config.action.include_air_brake is True
+    assert draft.config.action.enable_air_brake is True
+    assert draft.config.action.boost_unmask_max_speed_kph is None
+    assert draft.config.action.boost_min_energy_fraction == 0.1
+    assert draft.config.action.lean_output_mode == "three_way"
+    assert draft.config.action.lean_mode == "release_cooldown"
+    assert draft.config.action.lean_unmask_min_speed_kph is None
+    assert draft.config.action.lean_initial_lockout_frames == 0
+    assert draft.config.action.include_pitch is True
+    assert draft.config.action.enable_pitch is True
+    assert draft.config.action.pitch_mode == "discrete"
+    assert draft.config.action.pitch_buckets == 5
+
+
 
 def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -157,3 +279,25 @@ def test_manager_store_visible_runs_exclude_created_records(tmp_path: Path) -> N
     )
 
     assert store.list_visible_runs() == ()
+
+
+def test_manager_store_rejects_draft_name_used_by_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    store.create_run(name="Shared Name", config=config, managed_runs_root=tmp_path / "managed_runs")
+
+    with pytest.raises(ManagerNameConflictError, match="name already exists: Shared Name"):
+        store.create_draft(name="Shared Name", config=config)
+
+
+def test_manager_store_rejects_run_name_used_by_draft(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    store.create_draft(name="Shared Name", config=config)
+
+    with pytest.raises(ManagerNameConflictError, match="name already exists: Shared Name"):
+        store.create_run(
+            name="Shared Name",
+            config=config,
+            managed_runs_root=tmp_path / "managed_runs",
+        )

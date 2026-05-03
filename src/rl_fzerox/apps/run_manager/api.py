@@ -22,6 +22,7 @@ from rl_fzerox.core.manager.architecture import (
     policy_architecture_preview,
     run_manager_config_metadata,
 )
+from rl_fzerox.core.manager.errors import ManagerNameConflictError
 
 
 class CreateDraftRequest(BaseModel):
@@ -91,7 +92,10 @@ def create_manager_api_app(store: ManagerStore) -> FastAPI:
         name = request.name.strip()
         if not name:
             raise HTTPException(status_code=400, detail="draft name is required")
-        draft = store.create_draft(name=name, config=request.config)
+        try:
+            draft = store.create_draft(name=name, config=request.config)
+        except ManagerNameConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         return {"draft": _draft_payload(draft)}
 
     @app.put("/api/drafts/{draft_id}")
@@ -102,7 +106,10 @@ def create_manager_api_app(store: ManagerStore) -> FastAPI:
         name = request.name.strip()
         if not name:
             raise HTTPException(status_code=400, detail="draft name is required")
-        draft = store.update_draft(draft_id=draft_id, name=name, config=request.config)
+        try:
+            draft = store.update_draft(draft_id=draft_id, name=name, config=request.config)
+        except ManagerNameConflictError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         if draft is None:
             raise HTTPException(status_code=404, detail="draft not found")
         return {"draft": _draft_payload(draft)}
