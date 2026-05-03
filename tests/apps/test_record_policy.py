@@ -9,14 +9,8 @@ import numpy as np
 import pytest
 
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.apps.record_policy import (
-    AttemptRunResult,
-    _attempt_seed,
-    _finished_rank,
-    _move_result_to_output,
-    _run_attempt,
-    parse_args,
-)
+from rl_fzerox.apps.recording.cli import parse_args
+from rl_fzerox.apps.recording.models import AttemptRunResult
 from rl_fzerox.apps.recording.progress import (
     format_progress_line as _format_progress_line,
 )
@@ -25,6 +19,12 @@ from rl_fzerox.apps.recording.progress import (
 )
 from rl_fzerox.apps.recording.progress import (
     format_target_rank as _format_target_rank,
+)
+from rl_fzerox.apps.recording.runner import (
+    _attempt_seed,
+    _finished_rank,
+    _move_result_to_output,
+    _run_attempt,
 )
 from rl_fzerox.apps.recording.video import (
     VideoSettings,
