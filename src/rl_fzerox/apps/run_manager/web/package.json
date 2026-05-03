@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "sync-fixtures": "PYTHON_BIN=${PYTHON:-$(if [ -x ../../../../../.venv/bin/python ]; then printf ../../../../../.venv/bin/python; else printf python; fi)}; PYTHONPATH=../../../.. \"$PYTHON_BIN\" -m rl_fzerox.core.manager.export_web_test_fixtures && biome format --write src/test/generated/manager-fixtures.json",
+    "build": "npm run sync-fixtures && tsc -b && vite build",
     "format": "biome format --write src index.html vite.config.ts package.json tsconfig.json",
     "lint": "biome lint src index.html vite.config.ts",
     "biome-check": "biome check src index.html vite.config.ts package.json tsconfig.json",
-    "check": "tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json",
-    "test": "vitest run"
+    "check": "npm run sync-fixtures && tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json",
+    "test": "npm run sync-fixtures && vitest run"
   },
   "dependencies": {
     "elkjs": "^0.11.1",

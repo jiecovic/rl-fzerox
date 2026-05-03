@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -8,6 +9,94 @@ import {
 import { FieldLabel } from "@/features/configurator/fields/label";
 
 type RangeHandle = "min" | "max";
+
+interface SliderTick {
+  label: string;
+  value: number;
+}
+
+interface RangePairFieldProps {
+  help: string;
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: { min: number; max: number }) => void;
+  resetMax?: number;
+  resetMin?: number;
+  step?: number;
+  ticks?: readonly SliderTick[];
+  valueMax: number;
+  valueMin: number;
+}
+
+export function RangePairField({
+  help,
+  label,
+  max,
+  min,
+  onChange,
+  resetMax,
+  resetMin,
+  step = 1,
+  ticks,
+  valueMax,
+  valueMin,
+}: RangePairFieldProps) {
+  const fieldResetHandler =
+    resetMin === undefined ||
+    resetMax === undefined ||
+    (Object.is(valueMin, resetMin) && Object.is(valueMax, resetMax))
+      ? undefined
+      : () => onChange({ min: resetMin, max: resetMax });
+
+  function updateMin(nextValue: number) {
+    onChange({ min: clamp(snapToStep(nextValue, min, step), min, valueMax), max: valueMax });
+  }
+
+  function updateMax(nextValue: number) {
+    onChange({ min: valueMin, max: clamp(snapToStep(nextValue, min, step), valueMin, max) });
+  }
+
+  return (
+    <div className="field-shell range-pair-field">
+      <FieldLabel help={help} label={label} onReset={fieldResetHandler} />
+      <div className="range-pair-row range-pair-row-bare">
+        <RangePairSlider
+          disabled={false}
+          label={label}
+          max={max}
+          min={min}
+          step={step}
+          ticks={ticks}
+          valueMax={valueMax}
+          valueMin={valueMin}
+          onMaxChange={updateMax}
+          onMinChange={updateMin}
+        />
+        <div className="range-pair-values">
+          <input
+            aria-label={`${label} minimum`}
+            max={valueMax}
+            min={min}
+            step={step}
+            type="number"
+            value={valueMin}
+            onChange={(event) => updateMin(Number(event.target.value))}
+          />
+          <input
+            aria-label={`${label} maximum`}
+            max={max}
+            min={valueMin}
+            step={step}
+            type="number"
+            value={valueMax}
+            onChange={(event) => updateMax(Number(event.target.value))}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function OptionalRangePairField({
   help,
@@ -120,6 +209,7 @@ function RangePairSlider({
   max,
   min,
   step,
+  ticks,
   valueMax,
   valueMin,
   onMaxChange,
@@ -130,6 +220,7 @@ function RangePairSlider({
   max: number;
   min: number;
   step: number;
+  ticks?: readonly SliderTick[];
   valueMax: number;
   valueMin: number;
   onMaxChange: (value: number) => void;
@@ -189,13 +280,18 @@ function RangePairSlider({
     setDragging(handle);
   }
 
+  const sliderTicks = ticks ?? [
+    { label: formatCompactDecimal(min), value: min },
+    { label: formatCompactDecimal(max), value: max },
+  ];
+
   return (
     <div className="range-pair-slider" ref={trackRef} onPointerDown={handleTrackPointerDown}>
       <div aria-hidden="true" className="range-pair-rail" />
       <div
         aria-hidden="true"
         className="range-pair-fill"
-        style={{ left: `${lowerPercent}%`, right: `${100 - upperPercent}%` }}
+        style={rangeFillStyle(lowerPercent, upperPercent)}
       />
       <RangeThumb
         disabled={disabled}
@@ -222,8 +318,13 @@ function RangePairSlider({
         onPointerDown={() => beginDrag("max")}
       />
       <div className="slider-ticks" aria-hidden="true">
-        <span data-label={formatCompactDecimal(min)} style={{ left: "0%" }} />
-        <span data-label={formatCompactDecimal(max)} style={{ left: "100%" }} />
+        {sliderTicks.map((tick) => (
+          <span
+            data-label={tick.label}
+            key={`${tick.value}-${tick.label}`}
+            style={rangePositionStyle(rangePercent(tick.value, min, max))}
+          />
+        ))}
       </div>
     </div>
   );
@@ -261,7 +362,7 @@ function RangeThumb({
       className={sliding ? "range-pair-thumb sliding" : "range-pair-thumb"}
       disabled={disabled}
       role="slider"
-      style={{ left: `${percent}%` }}
+      style={rangePositionStyle(percent)}
       type="button"
       onKeyDown={(event) => {
         if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
@@ -303,6 +404,17 @@ function valueFromClientX(
 
 function rangePercent(value: number, min: number, max: number) {
   return clamp(((value - min) / (max - min)) * 100, 0, 100);
+}
+
+function rangePositionStyle(percent: number): CSSProperties {
+  return { "--range-pair-ratio": `${percent / 100}` } as CSSProperties;
+}
+
+function rangeFillStyle(lowerPercent: number, upperPercent: number): CSSProperties {
+  return {
+    "--range-pair-min-ratio": `${lowerPercent / 100}`,
+    "--range-pair-max-ratio": `${upperPercent / 100}`,
+  } as CSSProperties;
 }
 
 function snapToStep(value: number, min: number, step: number) {

@@ -13,6 +13,15 @@ const observationPresetSchema = z.enum([
   "crop_76x100",
   "crop_64x64",
 ]);
+const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
+const raceModeSchema = z.enum(["time_attack", "gp_race"]);
+const trackSamplingModeSchema = z.enum(["equal", "step_balanced"]);
+const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
+const engineSettingModeSchema = z.enum(["fixed", "random_range"]);
+const actionAxisModeSchema = z.enum(["continuous", "discrete"]);
+const actionDriveModeSchema = z.enum(["pwm", "on_off"]);
+const leanOutputModeSchema = z.enum(["three_way", "independent_buttons"]);
+const leanModeSchema = z.enum(["minimum_hold", "release_cooldown", "timer_assist", "raw"]);
 const stateComponentNameSchema = z.enum([
   "vehicle_state",
   "machine_context",
@@ -40,7 +49,15 @@ const convProfileSchema = z.enum([
   "compact_deep",
   "compact_bottleneck",
   "tiny_256",
+  "custom",
 ]);
+
+const customConvLayerSchema = z.object({
+  out_channels: z.number().int().positive(),
+  kernel_size: z.number().int().positive(),
+  stride: z.number().int().positive(),
+  padding: z.number().int().nonnegative(),
+});
 
 const trainConfigSchema = z.object({
   algorithm: z.literal("maskable_hybrid_recurrent_ppo"),
@@ -60,7 +77,82 @@ const trainConfigSchema = z.object({
   normalize_advantage: z.boolean(),
   target_kl: z.number().positive().nullable(),
   stats_window_size: z.number().int().positive(),
+  checkpoint_every_rollouts: z.number().int().positive(),
+  save_latest_checkpoint: z.boolean(),
+  save_best_checkpoint: z.boolean(),
+  save_recent_checkpoints: z.boolean(),
+  recent_checkpoint_limit: z.number().int().positive().nullable(),
   course_context_dropout_prob: z.number().min(0).max(1),
+});
+
+const tracksConfigSchema = z.object({
+  pool_mode: trackPoolModeSchema,
+  race_mode: raceModeSchema,
+  sampling_mode: trackSamplingModeSchema,
+  selected_course_ids: z.array(z.string()),
+});
+
+const vehicleConfigSchema = z
+  .object({
+    selection_mode: vehicleSelectionModeSchema,
+    selected_vehicle_ids: z.array(z.string()).min(1),
+    engine_mode: engineSettingModeSchema,
+    engine_setting_raw_value: z.number().int().min(0).max(100),
+    engine_setting_min_raw_value: z.number().int().min(0).max(100),
+    engine_setting_max_raw_value: z.number().int().min(0).max(100),
+  })
+  .refine(
+    (vehicle) => vehicle.engine_setting_min_raw_value <= vehicle.engine_setting_max_raw_value,
+    {
+      message: "engine_setting_min_raw_value must be <= engine_setting_max_raw_value",
+      path: ["engine_setting_min_raw_value"],
+    },
+  );
+
+const actionConfigSchema = z
+  .object({
+    action_repeat: z.number().int().positive(),
+    steering_mode: actionAxisModeSchema,
+    steer_buckets: z.number().int().min(3),
+    drive_mode: actionDriveModeSchema,
+    force_full_throttle: z.boolean(),
+    continuous_drive_deadzone: z.number().min(0).lt(1),
+    continuous_drive_full_threshold: z.number().gt(0).max(1),
+    continuous_drive_min_thrust: z.number().min(0).max(1),
+    include_air_brake: z.boolean(),
+    enable_air_brake: z.boolean(),
+    include_boost: z.boolean(),
+    enable_boost: z.boolean(),
+    boost_unmask_max_speed_kph: z.number().nonnegative().nullable(),
+    boost_min_energy_fraction: z.number().min(0).max(1),
+    include_lean: z.boolean(),
+    enable_lean: z.boolean(),
+    lean_output_mode: leanOutputModeSchema,
+    lean_mode: leanModeSchema,
+    lean_unmask_min_speed_kph: z.number().nonnegative().nullable(),
+    lean_initial_lockout_frames: z.number().int().nonnegative(),
+    include_pitch: z.boolean(),
+    enable_pitch: z.boolean(),
+    pitch_mode: actionAxisModeSchema,
+    pitch_buckets: z.number().int().min(3),
+  })
+  .refine((action) => action.steer_buckets % 2 === 1, {
+    message: "steer_buckets must be odd",
+    path: ["steer_buckets"],
+  })
+  .refine((action) => action.pitch_buckets % 2 === 1, {
+    message: "pitch_buckets must be odd",
+    path: ["pitch_buckets"],
+  })
+  .refine((action) => action.continuous_drive_deadzone < action.continuous_drive_full_threshold, {
+    message: "continuous_drive_deadzone must be lower than continuous_drive_full_threshold",
+    path: ["continuous_drive_deadzone"],
+  });
+
+const environmentConfigSchema = z.object({
+  max_episode_steps: z.number().int().positive(),
+  progress_frontier_stall_limit_frames: z.number().int().positive().nullable(),
+  progress_frontier_epsilon: z.number().nonnegative(),
 });
 
 const stateComponentConfigSchema = z.object({
@@ -90,6 +182,7 @@ const observationConfigSchema = z.object({
 
 const policyConfigSchema = z.object({
   conv_profile: convProfileSchema,
+  custom_conv_layers: z.array(customConvLayerSchema),
   features_dim: z.union([z.literal("auto"), z.number().int().positive()]),
   state_net_arch: z.array(z.number().int().positive()),
   fusion_features_dim: z.number().int().positive(),
@@ -109,7 +202,6 @@ const rewardConfigSchema = z
   .object({
     time_penalty_per_frame: z.number(),
     reverse_time_penalty_scale: z.number().nonnegative(),
-    low_speed_time_penalty_scale: z.number().nonnegative(),
     slow_speed_time_penalty_scale: z.number().nonnegative(),
     slow_speed_time_penalty_start_kph: z.number().nonnegative(),
     slow_speed_time_penalty_power: z.number().positive(),
@@ -131,14 +223,13 @@ const rewardConfigSchema = z
     dirt_entry_penalty: z.number().max(0),
     ice_entry_penalty: z.number().max(0),
     energy_refill_collision_cooldown_frames: z.number().int().nonnegative(),
-    energy_full_refill_lap_bonus: z.number().nonnegative(),
-    energy_full_refill_min_gain_fraction: z.number().min(0).max(1),
     gas_underuse_penalty: z.number().max(0),
     gas_underuse_threshold: z.number().min(0).max(1),
     steer_oscillation_penalty: z.number().max(0),
     steer_oscillation_deadzone: z.number().nonnegative(),
     steer_oscillation_cap: z.number().positive(),
     steer_oscillation_power: z.number().positive(),
+    air_brake_request_penalty: z.number().max(0),
     manual_boost_reward: z.number().nonnegative(),
     boost_pad_reward: z.number().nonnegative(),
     boost_pad_reward_progress_window: z.number().positive(),
@@ -171,6 +262,10 @@ export const managedRunConfigSchema = z.object({
   version: z.literal(1),
   seed: z.number().int(),
   preset_name: z.string(),
+  tracks: tracksConfigSchema,
+  vehicle: vehicleConfigSchema,
+  action: actionConfigSchema,
+  environment: environmentConfigSchema,
   train: trainConfigSchema,
   observation: observationConfigSchema,
   policy: policyConfigSchema,
@@ -234,6 +329,38 @@ const observationPresetInfoSchema = z.object({
   width: z.number().int().positive(),
 });
 
+const trackCupInfoSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  order: z.number().int().nonnegative(),
+  course_ids: z.array(z.string()),
+});
+
+const builtInCourseInfoSchema = z.object({
+  id: z.string(),
+  ref: z.string(),
+  display_name: z.string(),
+  cup: z.string(),
+  cup_label: z.string(),
+  course_index: z.number().int().nonnegative(),
+  default_selected: z.boolean(),
+});
+
+const vehicleInfoSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  character_index: z.number().int().nonnegative(),
+  machine_select_slot: z.number().int().nonnegative(),
+  menu_row: z.number().int().nonnegative(),
+  menu_column: z.number().int().nonnegative(),
+});
+
+const engineSettingPresetInfoSchema = z.object({
+  id: z.string(),
+  display_name: z.string(),
+  raw_value: z.number().int().min(0).max(100),
+});
+
 const stateComponentInfoSchema = z.object({
   name: z.string(),
   low: z.number(),
@@ -249,6 +376,17 @@ const stateComponentSchema = z.object({
 
 export const configMetadataSchema = z.object({
   observation_presets: z.array(observationPresetInfoSchema),
+  track_pool_modes: z.array(selectOptionSchema),
+  race_modes: z.array(selectOptionSchema),
+  track_sampling_modes: z.array(selectOptionSchema),
+  track_cups: z.array(trackCupInfoSchema),
+  built_in_courses: z.array(builtInCourseInfoSchema),
+  vehicles: z.array(vehicleInfoSchema),
+  engine_setting_presets: z.array(engineSettingPresetInfoSchema),
+  steering_modes: z.array(selectOptionSchema),
+  drive_modes: z.array(selectOptionSchema),
+  lean_output_modes: z.array(selectOptionSchema),
+  lean_modes: z.array(selectOptionSchema),
   stack_modes: z.array(selectOptionSchema),
   resize_filters: z.array(selectOptionSchema),
   progress_sources: z.array(selectOptionSchema),
@@ -282,8 +420,13 @@ const convLayerPreviewSchema = z.object({
   out_channels: z.number().int().positive(),
   kernel_size: z.number().int().positive(),
   stride: z.number().int().positive(),
+  padding: z.number().int().nonnegative(),
+  input_height: z.number().int().positive(),
+  input_width: z.number().int().positive(),
   output_height: z.number().int().positive(),
   output_width: z.number().int().positive(),
+  dropped_height: z.number().int().nonnegative(),
+  dropped_width: z.number().int().nonnegative(),
   params: z.number().int().nonnegative(),
 });
 
@@ -292,10 +435,19 @@ const parameterGroupPreviewSchema = z.object({
   params: z.number().int().nonnegative(),
 });
 
+const actionBranchPreviewSchema = z.object({
+  name: z.string(),
+  kind: z.string(),
+  size: z.number().int().positive(),
+  enabled: z.boolean(),
+  mask_label: z.string().nullable().optional(),
+});
+
 const architectureNodePreviewSchema = z.object({
   id: z.string(),
   label: z.string(),
   detail: z.string(),
+  params: z.number().int().nonnegative().nullable().optional(),
   tone: z.string(),
 });
 
@@ -316,6 +468,9 @@ export const policyArchitecturePreviewSchema = z.object({
   fusion_input_dim: z.number().int().nonnegative(),
   extractor_output_dim: z.number().int().nonnegative(),
   policy_input_dim: z.number().int().nonnegative(),
+  action_branches: z.array(actionBranchPreviewSchema),
+  continuous_action_dims: z.number().int().nonnegative(),
+  discrete_action_logits: z.number().int().nonnegative(),
   parameter_groups: z.array(parameterGroupPreviewSchema),
   total_params: z.number().int().nonnegative(),
   architecture_lanes: z.array(architectureLanePreviewSchema),

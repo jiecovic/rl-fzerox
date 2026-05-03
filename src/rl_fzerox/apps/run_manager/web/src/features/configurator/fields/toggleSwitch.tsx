@@ -1,4 +1,4 @@
-interface StateSwitchProps {
+interface ToggleSwitchProps {
   checked: boolean;
   disabled?: boolean;
   hideLabel?: boolean;
@@ -7,20 +7,21 @@ interface StateSwitchProps {
   onChange: (checked: boolean) => void;
 }
 
-export function StateSwitch({
+export function ToggleSwitch({
   checked,
   disabled = false,
   hideLabel = false,
   label,
   tooltip,
   onChange,
-}: StateSwitchProps) {
+}: ToggleSwitchProps) {
   return (
     <label
       className={disabled ? "state-switch disabled tooltip-anchor" : "state-switch tooltip-anchor"}
       data-tooltip={tooltip}
     >
       <input
+        aria-label={label}
         checked={checked}
         disabled={disabled}
         type="checkbox"

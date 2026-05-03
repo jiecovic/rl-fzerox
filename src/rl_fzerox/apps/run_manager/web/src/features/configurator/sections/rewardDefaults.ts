@@ -5,7 +5,6 @@ type RewardPatch = Partial<RewardConfig>;
 
 export function timePressureDefaults(reward: RewardConfig): RewardPatch {
   return {
-    low_speed_time_penalty_scale: reward.low_speed_time_penalty_scale,
     reverse_time_penalty_scale: reward.reverse_time_penalty_scale,
     slow_speed_time_penalty_power: reward.slow_speed_time_penalty_power,
     slow_speed_time_penalty_scale: reward.slow_speed_time_penalty_scale,
@@ -41,7 +40,6 @@ export function trackEventDefaults(reward: RewardConfig): RewardPatch {
     dirt_entry_penalty: reward.dirt_entry_penalty,
     dirt_progress_multiplier: reward.dirt_progress_multiplier,
     energy_loss_epsilon: reward.energy_loss_epsilon,
-    energy_refill_progress_multiplier: reward.energy_refill_progress_multiplier,
     ice_entry_penalty: reward.ice_entry_penalty,
     ice_progress_multiplier: reward.ice_progress_multiplier,
     lap_completion_bonus: reward.lap_completion_bonus,
@@ -51,14 +49,14 @@ export function trackEventDefaults(reward: RewardConfig): RewardPatch {
 
 export function energyDefaults(reward: RewardConfig): RewardPatch {
   return {
-    energy_full_refill_lap_bonus: reward.energy_full_refill_lap_bonus,
-    energy_full_refill_min_gain_fraction: reward.energy_full_refill_min_gain_fraction,
     energy_refill_collision_cooldown_frames: reward.energy_refill_collision_cooldown_frames,
+    energy_refill_progress_multiplier: reward.energy_refill_progress_multiplier,
   };
 }
 
 export function actionDefaults(reward: RewardConfig): RewardPatch {
   return {
+    air_brake_request_penalty: reward.air_brake_request_penalty,
     boost_pad_reward: reward.boost_pad_reward,
     boost_pad_reward_progress_window: reward.boost_pad_reward_progress_window,
     gas_underuse_penalty: reward.gas_underuse_penalty,

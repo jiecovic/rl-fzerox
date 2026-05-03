@@ -14,7 +14,7 @@ export function DisclosureToolbar({
   onCollapseAll,
 }: DisclosureToolbarProps) {
   return (
-    <div className="reward-accordion-toolbar">
+    <div className="disclosure-toolbar">
       <button
         aria-label={expandLabel}
         className="icon-button compact-icon-button tooltip-anchor"

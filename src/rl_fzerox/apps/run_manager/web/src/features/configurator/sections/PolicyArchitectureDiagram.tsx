@@ -90,13 +90,18 @@ export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitec
 }
 
 function ArchitectureSvgNode({ node }: { node: RenderedNode }) {
+  const detailY = node.y + 45;
+  const paramY =
+    detailY +
+    node.visual.detailLines.length * diagramMetrics.node.detailLineHeight +
+    diagramMetrics.node.paramTopGap;
   return (
     <g className={node.visual.tone === "muted" ? "architecture-node muted" : "architecture-node"}>
       <rect height={node.height} rx={0} width={node.width} x={node.x} y={node.y} />
       <text className="architecture-node-title" x={node.x + 14} y={node.y + 24}>
         {node.visual.label}
       </text>
-      <text className="architecture-node-detail" x={node.x + 14} y={node.y + 45}>
+      <text className="architecture-node-detail" x={node.x + 14} y={detailY}>
         {node.visual.detailLines.map((line, lineIndex) => (
           <tspan
             dy={lineIndex === 0 ? 0 : diagramMetrics.node.detailLineHeight}
@@ -107,6 +112,11 @@ function ArchitectureSvgNode({ node }: { node: RenderedNode }) {
           </tspan>
         ))}
       </text>
+      {node.visual.paramLine ? (
+        <text className="architecture-node-param" x={node.x + 14} y={paramY}>
+          {node.visual.paramLine}
+        </text>
+      ) : null}
     </g>
   );
 }

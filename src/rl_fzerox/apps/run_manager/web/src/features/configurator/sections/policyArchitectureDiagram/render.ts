@@ -39,8 +39,10 @@ export function toRenderedGraph(
 
   return {
     edges,
+    height,
     nodes,
     viewBox: `${-margin} ${-margin} ${width + margin * 2} ${height + margin * 2}`,
+    width,
   };
 }
 
@@ -55,8 +57,10 @@ export function fallbackGraph(visuals: Map<string, NodeVisual>): RenderedGraph {
   }));
   return {
     edges: [],
+    height: maxNodeExtent(nodes, "y"),
     nodes,
     viewBox: `0 0 ${maxNodeExtent(nodes, "x")} ${maxNodeExtent(nodes, "y")}`,
+    width: maxNodeExtent(nodes, "x"),
   };
 }
 
@@ -137,11 +141,18 @@ function concatBranchPath(
     x: source.x + source.width,
     y: source.y + source.height / 2,
   };
-  const end = {
-    x: concat.x,
-    y: concat.y + concat.height / 2,
-  };
-  const mergeX = Math.max(start.x + 24, end.x - 24);
+  const end = edgeId.endsWith("-concat:image")
+    ? {
+        x: concat.x + concat.width / 2,
+        y: concat.y,
+      }
+    : {
+        x: concat.x,
+        y: concat.y + concat.height / 2,
+      };
+  const mergeX = edgeId.endsWith("-concat:image")
+    ? Math.max(start.x + 22, end.x)
+    : Math.max(start.x + 24, end.x - 24);
   return [
     `M ${round(start.x)} ${round(start.y)}`,
     `H ${round(mergeX)}`,

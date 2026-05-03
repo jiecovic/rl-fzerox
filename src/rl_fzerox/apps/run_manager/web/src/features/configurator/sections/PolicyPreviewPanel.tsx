@@ -1,7 +1,24 @@
 import { PolicyArchitectureDiagram } from "@/features/configurator/sections/PolicyArchitectureDiagram";
-import type { PolicyArchitecturePreview } from "@/shared/api/contract";
+import {
+  formatConvSpatial,
+  formatFitMode,
+  formatParamCount,
+  formatPixelDrop,
+} from "@/features/configurator/sections/policy/convPreviewFormatting";
+import { CustomConvTableRows } from "@/features/configurator/sections/policy/LayerEditors";
+import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 
-export function PolicyPreviewPanel({ preview }: { preview: PolicyArchitecturePreview | null }) {
+export function PolicyPreviewPanel({
+  convProfile,
+  customConvLayers,
+  preview,
+  setCustomConvLayers,
+}: {
+  convProfile: ManagedRunConfig["policy"]["conv_profile"];
+  customConvLayers: ManagedRunConfig["policy"]["custom_conv_layers"];
+  preview: PolicyArchitecturePreview | null;
+  setCustomConvLayers: (value: ManagedRunConfig["policy"]["custom_conv_layers"]) => void;
+}) {
   if (preview === null) {
     return <div className="preview-placeholder">Computing architecture preview...</div>;
   }
@@ -10,52 +27,69 @@ export function PolicyPreviewPanel({ preview }: { preview: PolicyArchitecturePre
     <div className="policy-preview-grid">
       <section className="architecture-flow-panel">
         <h3>Architecture</h3>
-        <PolicyArchitectureDiagram preview={preview} />
-      </section>
-
-      <section className="parameter-panel">
-        <h3>Trainable parameters</h3>
-        <strong className="parameter-total">{formatParams(preview.total_params)}</strong>
-        <div className="parameter-breakdown">
-          {preview.parameter_groups.map((group) => (
-            <div className="parameter-row" key={group.name}>
-              <span>{group.name}</span>
-              <strong>{formatParams(group.params)}</strong>
-            </div>
-          ))}
+        <div className="architecture-graph-shell">
+          <div className="architecture-total-summary-box">
+            <span className="architecture-total-label">total params</span>
+            <strong className="architecture-total-value">
+              {formatParamCount(preview.total_params)}
+            </strong>
+          </div>
+          <PolicyArchitectureDiagram preview={preview} />
         </div>
       </section>
 
-      <section className="conv-table-panel">
+      <section className="conv-table-panel" id="policy-cnn-configurator">
         <h3>CNN layers</h3>
-        <table className="derived-table">
+        <table
+          className={
+            convProfile === "custom"
+              ? "derived-table conv-derived-table conv-derived-table-custom"
+              : "derived-table conv-derived-table"
+          }
+        >
           <thead>
             <tr>
               <th>Layer</th>
               <th>Channels</th>
               <th>Kernel</th>
+              <th>Stride</th>
+              <th>Pad</th>
+              <th>Input</th>
               <th>Output</th>
+              <th>Fit</th>
+              <th>Pixel drop</th>
               <th>Params</th>
+              {convProfile === "custom" ? <th>Actions</th> : null}
             </tr>
           </thead>
           <tbody>
-            {preview.conv_layers.map((layer) => (
-              <tr key={layer.name}>
-                <th>{layer.name}</th>
-                <td>
-                  {layer.in_channels}
-                  {" → "}
-                  {layer.out_channels}
-                </td>
-                <td>
-                  {layer.kernel_size} / {layer.stride}
-                </td>
-                <td>
-                  {layer.output_height} x {layer.output_width}
-                </td>
-                <td>{formatParams(layer.params)}</td>
-              </tr>
-            ))}
+            {convProfile === "custom" ? (
+              <CustomConvTableRows
+                flattenDim={preview.flatten_dim}
+                previewLayers={preview.conv_layers}
+                value={customConvLayers}
+                onChange={setCustomConvLayers}
+              />
+            ) : (
+              preview.conv_layers.map((layer) => (
+                <tr key={layer.name}>
+                  <th>{layer.name}</th>
+                  <td>
+                    {layer.in_channels}
+                    {" → "}
+                    {layer.out_channels}
+                  </td>
+                  <td>{layer.kernel_size}</td>
+                  <td>{layer.stride}</td>
+                  <td>{layer.padding}</td>
+                  <td>{formatConvSpatial(layer, "input")}</td>
+                  <td>{formatConvSpatial(layer, "output")}</td>
+                  <td>{formatFitMode(layer)}</td>
+                  <td>{formatPixelDrop(layer)}</td>
+                  <td>{formatParamCount(layer.params)}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
@@ -75,7 +109,39 @@ export function PolicyPreviewPanel({ preview }: { preview: PolicyArchitecturePre
             value={preview.extractor_output_dim.toLocaleString()}
           />
           <ShapeMetric label="Policy input" value={preview.policy_input_dim.toLocaleString()} />
+          <ShapeMetric
+            label="Continuous action"
+            value={preview.continuous_action_dims.toLocaleString()}
+          />
+          <ShapeMetric
+            label="Discrete logits"
+            value={preview.discrete_action_logits.toLocaleString()}
+          />
         </div>
+      </section>
+
+      <section className="shape-panel">
+        <h3>Action head</h3>
+        <table className="derived-table">
+          <thead>
+            <tr>
+              <th>Branch</th>
+              <th>Kind</th>
+              <th>Size</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {preview.action_branches.map((branch) => (
+              <tr key={branch.name}>
+                <th>{branch.name}</th>
+                <td>{branch.kind}</td>
+                <td>{branch.size}</td>
+                <td>{branch.mask_label ?? (branch.enabled ? "trainable" : "masked")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   );
@@ -92,17 +158,4 @@ function ShapeMetric({ label, value }: { label: string; value: string }) {
 
 function formatPreviewText(value: string) {
   return value.replaceAll(" -> ", " → ");
-}
-
-function formatParams(value: number) {
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(2)}M`;
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}K`;
-  }
-  return value.toLocaleString();
 }

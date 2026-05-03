@@ -8,6 +8,7 @@ interface TabsProps<T extends string> {
   label: string;
   activeId: T;
   items: TabItem<T>[];
+  variant?: "workspace" | "section";
   onSelect: (id: T) => void;
   onClose?: (id: T) => void;
 }
@@ -16,14 +17,20 @@ export function Tabs<T extends string>({
   label,
   activeId,
   items,
+  variant = "workspace",
   onSelect,
   onClose,
 }: TabsProps<T>) {
   return (
-    <nav aria-label={label} className="mode-tabs">
+    <nav
+      aria-label={label}
+      className={
+        variant === "workspace" ? "tab-strip tab-strip-workspace" : "tab-strip tab-strip-section"
+      }
+    >
       {items.map((item) => (
-        <span className={item.id === activeId ? "tab-group active" : "tab-group"} key={item.id}>
-          <button className="tab" type="button" onClick={() => onSelect(item.id)}>
+        <span className={item.id === activeId ? "tab-shell active" : "tab-shell"} key={item.id}>
+          <button className="tab-item" type="button" onClick={() => onSelect(item.id)}>
             {item.label}
           </button>
           {item.closable === true && onClose !== undefined ? (

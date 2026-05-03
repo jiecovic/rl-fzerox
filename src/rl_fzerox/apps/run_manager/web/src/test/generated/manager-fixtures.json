@@ -1,0 +1,1864 @@
+{
+  "config_metadata": {
+    "action_history_controls": [
+      {
+        "label": "steer",
+        "value": "steer"
+      },
+      {
+        "label": "thrust",
+        "value": "thrust"
+      },
+      {
+        "label": "air brake",
+        "value": "air_brake"
+      },
+      {
+        "label": "boost",
+        "value": "boost"
+      },
+      {
+        "label": "lean",
+        "value": "lean"
+      },
+      {
+        "label": "pitch",
+        "value": "pitch"
+      }
+    ],
+    "activation_functions": [
+      {
+        "label": "relu",
+        "value": "relu"
+      },
+      {
+        "label": "gelu",
+        "value": "gelu"
+      },
+      {
+        "label": "tanh",
+        "value": "tanh"
+      }
+    ],
+    "built_in_courses": [
+      {
+        "course_index": 0,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Mute City",
+        "id": "mute_city",
+        "ref": "jack/mute_city"
+      },
+      {
+        "course_index": 1,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Silence",
+        "id": "silence",
+        "ref": "jack/silence"
+      },
+      {
+        "course_index": 2,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Sand Ocean",
+        "id": "sand_ocean",
+        "ref": "jack/sand_ocean"
+      },
+      {
+        "course_index": 3,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Devil's Forest",
+        "id": "devils_forest",
+        "ref": "jack/devils_forest"
+      },
+      {
+        "course_index": 4,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Big Blue",
+        "id": "big_blue",
+        "ref": "jack/big_blue"
+      },
+      {
+        "course_index": 5,
+        "cup": "jack",
+        "cup_label": "Jack Cup",
+        "default_selected": true,
+        "display_name": "Port Town",
+        "id": "port_town",
+        "ref": "jack/port_town"
+      },
+      {
+        "course_index": 6,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "Sector Alpha",
+        "id": "sector_alpha",
+        "ref": "queen/sector_alpha"
+      },
+      {
+        "course_index": 7,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "Red Canyon",
+        "id": "red_canyon",
+        "ref": "queen/red_canyon"
+      },
+      {
+        "course_index": 8,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "Devil's Forest 2",
+        "id": "devils_forest_2",
+        "ref": "queen/devils_forest_2"
+      },
+      {
+        "course_index": 9,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "Mute City 2",
+        "id": "mute_city_2",
+        "ref": "queen/mute_city_2"
+      },
+      {
+        "course_index": 10,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "Big Blue 2",
+        "id": "big_blue_2",
+        "ref": "queen/big_blue_2"
+      },
+      {
+        "course_index": 11,
+        "cup": "queen",
+        "cup_label": "Queen Cup",
+        "default_selected": true,
+        "display_name": "White Land",
+        "id": "white_land",
+        "ref": "queen/white_land"
+      },
+      {
+        "course_index": 12,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "Fire Field",
+        "id": "fire_field",
+        "ref": "king/fire_field"
+      },
+      {
+        "course_index": 13,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "Silence 2",
+        "id": "silence_2",
+        "ref": "king/silence_2"
+      },
+      {
+        "course_index": 14,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "Sector Beta",
+        "id": "sector_beta",
+        "ref": "king/sector_beta"
+      },
+      {
+        "course_index": 15,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "Red Canyon 2",
+        "id": "red_canyon_2",
+        "ref": "king/red_canyon_2"
+      },
+      {
+        "course_index": 16,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "White Land 2",
+        "id": "white_land_2",
+        "ref": "king/white_land_2"
+      },
+      {
+        "course_index": 17,
+        "cup": "king",
+        "cup_label": "King Cup",
+        "default_selected": true,
+        "display_name": "Mute City 3",
+        "id": "mute_city_3",
+        "ref": "king/mute_city_3"
+      },
+      {
+        "course_index": 18,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Rainbow Road",
+        "id": "rainbow_road",
+        "ref": "joker/rainbow_road"
+      },
+      {
+        "course_index": 19,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Devil's Forest 3",
+        "id": "devils_forest_3",
+        "ref": "joker/devils_forest_3"
+      },
+      {
+        "course_index": 20,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Space Plant",
+        "id": "space_plant",
+        "ref": "joker/space_plant"
+      },
+      {
+        "course_index": 21,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Sand Ocean 2",
+        "id": "sand_ocean_2",
+        "ref": "joker/sand_ocean_2"
+      },
+      {
+        "course_index": 22,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Port Town 2",
+        "id": "port_town_2",
+        "ref": "joker/port_town_2"
+      },
+      {
+        "course_index": 23,
+        "cup": "joker",
+        "cup_label": "Joker Cup",
+        "default_selected": true,
+        "display_name": "Big Hand",
+        "id": "big_hand",
+        "ref": "joker/big_hand"
+      }
+    ],
+    "component_modes": [
+      {
+        "label": "include",
+        "value": "include"
+      },
+      {
+        "label": "zero",
+        "value": "zero"
+      },
+      {
+        "label": "exclude",
+        "value": "exclude"
+      }
+    ],
+    "conv_profiles": [
+      {
+        "label": "auto",
+        "value": "auto"
+      },
+      {
+        "label": "nature",
+        "value": "nature"
+      },
+      {
+        "label": "nature 32 64 128",
+        "value": "nature_32_64_128"
+      },
+      {
+        "label": "nature wide",
+        "value": "nature_wide"
+      },
+      {
+        "label": "nature extra k3",
+        "value": "nature_extra_k3"
+      },
+      {
+        "label": "compact deep",
+        "value": "compact_deep"
+      },
+      {
+        "label": "compact bottleneck",
+        "value": "compact_bottleneck"
+      },
+      {
+        "label": "tiny 256",
+        "value": "tiny_256"
+      },
+      {
+        "label": "custom",
+        "value": "custom"
+      }
+    ],
+    "drive_modes": [
+      {
+        "label": "Continuous PWM",
+        "value": "pwm"
+      },
+      {
+        "label": "Discrete button",
+        "value": "on_off"
+      }
+    ],
+    "engine_setting_presets": [
+      {
+        "display_name": "Max Acceleration",
+        "id": "max_acceleration",
+        "raw_value": 0
+      },
+      {
+        "display_name": "Balanced",
+        "id": "balanced",
+        "raw_value": 50
+      },
+      {
+        "display_name": "Max Speed",
+        "id": "max_speed",
+        "raw_value": 100
+      }
+    ],
+    "lean_modes": [
+      {
+        "label": "Release cooldown",
+        "value": "release_cooldown"
+      },
+      {
+        "label": "Minimum hold",
+        "value": "minimum_hold"
+      },
+      {
+        "label": "Timer assist",
+        "value": "timer_assist"
+      },
+      {
+        "label": "Raw",
+        "value": "raw"
+      }
+    ],
+    "lean_output_modes": [
+      {
+        "label": "3-way axis",
+        "value": "three_way"
+      },
+      {
+        "label": "Independent buttons",
+        "value": "independent_buttons"
+      }
+    ],
+    "net_arch_presets": [
+      {
+        "label": "[256, 128]",
+        "value": "256,128"
+      },
+      {
+        "label": "[512, 256]",
+        "value": "512,256"
+      },
+      {
+        "label": "[256]",
+        "value": "256"
+      },
+      {
+        "label": "[128]",
+        "value": "128"
+      }
+    ],
+    "observation_presets": [
+      {
+        "height": 84,
+        "label": "84 x 116",
+        "value": "crop_84x116",
+        "width": 116
+      },
+      {
+        "height": 92,
+        "label": "92 x 124",
+        "value": "crop_92x124",
+        "width": 124
+      },
+      {
+        "height": 116,
+        "label": "116 x 164",
+        "value": "crop_116x164",
+        "width": 164
+      },
+      {
+        "height": 98,
+        "label": "98 x 130",
+        "value": "crop_98x130",
+        "width": 130
+      },
+      {
+        "height": 66,
+        "label": "66 x 82",
+        "value": "crop_66x82",
+        "width": 82
+      },
+      {
+        "height": 60,
+        "label": "60 x 76",
+        "value": "crop_60x76",
+        "width": 76
+      },
+      {
+        "height": 68,
+        "label": "68 x 68",
+        "value": "crop_68x68",
+        "width": 68
+      },
+      {
+        "height": 84,
+        "label": "84 x 84",
+        "value": "crop_84x84",
+        "width": 84
+      },
+      {
+        "height": 76,
+        "label": "76 x 100",
+        "value": "crop_76x100",
+        "width": 100
+      },
+      {
+        "height": 64,
+        "label": "64 x 64",
+        "value": "crop_64x64",
+        "width": 64
+      }
+    ],
+    "progress_sources": [
+      {
+        "label": "lap progress",
+        "value": "lap_progress"
+      },
+      {
+        "label": "segment progress",
+        "value": "segment_progress"
+      },
+      {
+        "label": "none",
+        "value": "none"
+      }
+    ],
+    "race_modes": [
+      {
+        "label": "time attack",
+        "value": "time_attack"
+      },
+      {
+        "label": "gp race",
+        "value": "gp_race"
+      }
+    ],
+    "resize_filters": [
+      {
+        "label": "nearest",
+        "value": "nearest"
+      },
+      {
+        "label": "bilinear",
+        "value": "bilinear"
+      }
+    ],
+    "stack_modes": [
+      {
+        "label": "rgb",
+        "value": "rgb"
+      },
+      {
+        "label": "gray",
+        "value": "gray"
+      },
+      {
+        "label": "luma chroma",
+        "value": "luma_chroma"
+      }
+    ],
+    "state_components": [
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 2.0,
+            "low": 0.0,
+            "name": "vehicle_state.speed_norm"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.energy_frac"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.reverse_active"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.airborne"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.boost_unlocked"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.boost_active"
+          },
+          {
+            "high": 1.0,
+            "low": -1.0,
+            "name": "vehicle_state.lateral_velocity_norm"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "vehicle_state.sliding_active"
+          }
+        ],
+        "label": "vehicle state",
+        "name": "vehicle_state"
+      },
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "machine_context.body_stat"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "machine_context.boost_stat"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "machine_context.grip_stat"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "machine_context.weight"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "machine_context.engine"
+          }
+        ],
+        "label": "machine context",
+        "name": "machine_context"
+      },
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "track_position.lap_progress"
+          },
+          {
+            "high": 1.0,
+            "low": -1.0,
+            "name": "track_position.edge_ratio"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "track_position.outside_track_bounds"
+          }
+        ],
+        "label": "track position",
+        "name": "track_position"
+      },
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "surface_state.on_refill_surface"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "surface_state.on_dirt_surface"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "surface_state.on_ice_surface"
+          }
+        ],
+        "label": "surface state",
+        "name": "surface_state"
+      },
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_00"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_01"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_02"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_03"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_04"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_05"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_06"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_07"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_08"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_09"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_10"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_11"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_12"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_13"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_14"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_15"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_16"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_17"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_18"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_19"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_20"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_21"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_22"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "course_context.course_builtin_23"
+          }
+        ],
+        "label": "course context",
+        "name": "course_context"
+      },
+      {
+        "default_mode": "include",
+        "features": [
+          {
+            "high": 1.0,
+            "low": -1.0,
+            "name": "control_history.prev_steer_1"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "control_history.prev_thrust_1"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "control_history.prev_air_brake_1"
+          },
+          {
+            "high": 1.0,
+            "low": 0.0,
+            "name": "control_history.prev_boost_1"
+          },
+          {
+            "high": 1.0,
+            "low": -1.0,
+            "name": "control_history.prev_lean_1"
+          },
+          {
+            "high": 1.0,
+            "low": -1.0,
+            "name": "control_history.prev_pitch_1"
+          }
+        ],
+        "label": "control history",
+        "name": "control_history"
+      }
+    ],
+    "steering_modes": [
+      {
+        "label": "Continuous",
+        "value": "continuous"
+      },
+      {
+        "label": "Discrete",
+        "value": "discrete"
+      }
+    ],
+    "track_cups": [
+      {
+        "course_ids": [
+          "mute_city",
+          "silence",
+          "sand_ocean",
+          "devils_forest",
+          "big_blue",
+          "port_town"
+        ],
+        "id": "jack",
+        "label": "Jack Cup",
+        "order": 0
+      },
+      {
+        "course_ids": [
+          "sector_alpha",
+          "red_canyon",
+          "devils_forest_2",
+          "mute_city_2",
+          "big_blue_2",
+          "white_land"
+        ],
+        "id": "queen",
+        "label": "Queen Cup",
+        "order": 1
+      },
+      {
+        "course_ids": [
+          "fire_field",
+          "silence_2",
+          "sector_beta",
+          "red_canyon_2",
+          "white_land_2",
+          "mute_city_3"
+        ],
+        "id": "king",
+        "label": "King Cup",
+        "order": 2
+      },
+      {
+        "course_ids": [
+          "rainbow_road",
+          "devils_forest_3",
+          "space_plant",
+          "sand_ocean_2",
+          "port_town_2",
+          "big_hand"
+        ],
+        "id": "joker",
+        "label": "Joker Cup",
+        "order": 3
+      }
+    ],
+    "track_pool_modes": [
+      {
+        "label": "Built-in cups",
+        "value": "built_in"
+      },
+      {
+        "label": "X Cup",
+        "value": "x_cup"
+      }
+    ],
+    "track_sampling_modes": [
+      {
+        "label": "step balanced",
+        "value": "step_balanced"
+      },
+      {
+        "label": "equal",
+        "value": "equal"
+      }
+    ],
+    "vehicles": [
+      {
+        "character_index": 0,
+        "display_name": "Blue Falcon",
+        "id": "blue_falcon",
+        "machine_select_slot": 0,
+        "menu_column": 0,
+        "menu_row": 0
+      },
+      {
+        "character_index": 1,
+        "display_name": "Golden Fox",
+        "id": "golden_fox",
+        "machine_select_slot": 1,
+        "menu_column": 1,
+        "menu_row": 0
+      },
+      {
+        "character_index": 2,
+        "display_name": "Wild Goose",
+        "id": "wild_goose",
+        "machine_select_slot": 2,
+        "menu_column": 2,
+        "menu_row": 0
+      },
+      {
+        "character_index": 3,
+        "display_name": "Fire Stingray",
+        "id": "fire_stingray",
+        "machine_select_slot": 3,
+        "menu_column": 3,
+        "menu_row": 0
+      },
+      {
+        "character_index": 4,
+        "display_name": "White Cat",
+        "id": "white_cat",
+        "machine_select_slot": 4,
+        "menu_column": 4,
+        "menu_row": 0
+      },
+      {
+        "character_index": 5,
+        "display_name": "Red Gazelle",
+        "id": "red_gazelle",
+        "machine_select_slot": 5,
+        "menu_column": 5,
+        "menu_row": 0
+      },
+      {
+        "character_index": 6,
+        "display_name": "Great Star",
+        "id": "great_star",
+        "machine_select_slot": 9,
+        "menu_column": 3,
+        "menu_row": 1
+      },
+      {
+        "character_index": 7,
+        "display_name": "Iron Tiger",
+        "id": "iron_tiger",
+        "machine_select_slot": 6,
+        "menu_column": 0,
+        "menu_row": 1
+      },
+      {
+        "character_index": 8,
+        "display_name": "Deep Claw",
+        "id": "deep_claw",
+        "machine_select_slot": 7,
+        "menu_column": 1,
+        "menu_row": 1
+      },
+      {
+        "character_index": 9,
+        "display_name": "Twin Noritta",
+        "id": "twin_noritta",
+        "machine_select_slot": 13,
+        "menu_column": 1,
+        "menu_row": 2
+      },
+      {
+        "character_index": 10,
+        "display_name": "Super Piranha",
+        "id": "super_piranha",
+        "machine_select_slot": 22,
+        "menu_column": 4,
+        "menu_row": 3
+      },
+      {
+        "character_index": 11,
+        "display_name": "Mighty Hurricane",
+        "id": "mighty_hurricane",
+        "machine_select_slot": 23,
+        "menu_column": 5,
+        "menu_row": 3
+      },
+      {
+        "character_index": 12,
+        "display_name": "Little Wyvern",
+        "id": "little_wyvern",
+        "machine_select_slot": 18,
+        "menu_column": 0,
+        "menu_row": 3
+      },
+      {
+        "character_index": 13,
+        "display_name": "Space Angler",
+        "id": "space_angler",
+        "machine_select_slot": 24,
+        "menu_column": 0,
+        "menu_row": 4
+      },
+      {
+        "character_index": 14,
+        "display_name": "Green Panther",
+        "id": "green_panther",
+        "machine_select_slot": 27,
+        "menu_column": 3,
+        "menu_row": 4
+      },
+      {
+        "character_index": 15,
+        "display_name": "Black Bull",
+        "id": "black_bull",
+        "machine_select_slot": 28,
+        "menu_column": 4,
+        "menu_row": 4
+      },
+      {
+        "character_index": 16,
+        "display_name": "Wild Boar",
+        "id": "wild_boar",
+        "machine_select_slot": 20,
+        "menu_column": 2,
+        "menu_row": 3
+      },
+      {
+        "character_index": 17,
+        "display_name": "Astro Robin",
+        "id": "astro_robin",
+        "machine_select_slot": 17,
+        "menu_column": 5,
+        "menu_row": 2
+      },
+      {
+        "character_index": 18,
+        "display_name": "King Meteor",
+        "id": "king_meteor",
+        "machine_select_slot": 21,
+        "menu_column": 3,
+        "menu_row": 3
+      },
+      {
+        "character_index": 19,
+        "display_name": "Queen Meteor",
+        "id": "queen_meteor",
+        "machine_select_slot": 15,
+        "menu_column": 3,
+        "menu_row": 2
+      },
+      {
+        "character_index": 20,
+        "display_name": "Wonder Wasp",
+        "id": "wonder_wasp",
+        "machine_select_slot": 14,
+        "menu_column": 2,
+        "menu_row": 2
+      },
+      {
+        "character_index": 21,
+        "display_name": "Hyper Speeder",
+        "id": "hyper_speeder",
+        "machine_select_slot": 26,
+        "menu_column": 2,
+        "menu_row": 4
+      },
+      {
+        "character_index": 22,
+        "display_name": "Death Anchor",
+        "id": "death_anchor",
+        "machine_select_slot": 19,
+        "menu_column": 1,
+        "menu_row": 3
+      },
+      {
+        "character_index": 23,
+        "display_name": "Crazy Bear",
+        "id": "crazy_bear",
+        "machine_select_slot": 8,
+        "menu_column": 2,
+        "menu_row": 1
+      },
+      {
+        "character_index": 24,
+        "display_name": "Night Thunder",
+        "id": "night_thunder",
+        "machine_select_slot": 12,
+        "menu_column": 0,
+        "menu_row": 2
+      },
+      {
+        "character_index": 25,
+        "display_name": "Big Fang",
+        "id": "big_fang",
+        "machine_select_slot": 10,
+        "menu_column": 4,
+        "menu_row": 1
+      },
+      {
+        "character_index": 26,
+        "display_name": "Mighty Typhoon",
+        "id": "mighty_typhoon",
+        "machine_select_slot": 25,
+        "menu_column": 1,
+        "menu_row": 4
+      },
+      {
+        "character_index": 27,
+        "display_name": "Mad Wolf",
+        "id": "mad_wolf",
+        "machine_select_slot": 11,
+        "menu_column": 5,
+        "menu_row": 1
+      },
+      {
+        "character_index": 28,
+        "display_name": "Sonic Phantom",
+        "id": "sonic_phantom",
+        "machine_select_slot": 29,
+        "menu_column": 5,
+        "menu_row": 4
+      },
+      {
+        "character_index": 29,
+        "display_name": "Blood Hawk",
+        "id": "blood_hawk",
+        "machine_select_slot": 16,
+        "menu_column": 4,
+        "menu_row": 2
+      }
+    ]
+  },
+  "managed_run_config": {
+    "action": {
+      "action_repeat": 2,
+      "boost_min_energy_fraction": 0.1,
+      "boost_unmask_max_speed_kph": null,
+      "continuous_drive_deadzone": 0.05,
+      "continuous_drive_full_threshold": 0.85,
+      "continuous_drive_min_thrust": 0.25,
+      "drive_mode": "on_off",
+      "enable_air_brake": true,
+      "enable_boost": true,
+      "enable_lean": true,
+      "enable_pitch": true,
+      "force_full_throttle": false,
+      "include_air_brake": true,
+      "include_boost": true,
+      "include_lean": true,
+      "include_pitch": true,
+      "lean_initial_lockout_frames": 0,
+      "lean_mode": "release_cooldown",
+      "lean_output_mode": "three_way",
+      "lean_unmask_min_speed_kph": null,
+      "pitch_buckets": 5,
+      "pitch_mode": "discrete",
+      "steer_buckets": 7,
+      "steering_mode": "continuous"
+    },
+    "environment": {
+      "max_episode_steps": 12000,
+      "progress_frontier_epsilon": 100.0,
+      "progress_frontier_stall_limit_frames": 900
+    },
+    "observation": {
+      "frame_stack": 2,
+      "minimap_layer": false,
+      "minimap_resize_filter": "nearest",
+      "preset": "crop_60x76",
+      "resize_filter": "bilinear",
+      "stack_mode": "rgb",
+      "state_components": [
+        {
+          "controls": null,
+          "encoding": null,
+          "length": null,
+          "mode": "include",
+          "name": "vehicle_state",
+          "progress_source": null
+        },
+        {
+          "controls": null,
+          "encoding": null,
+          "length": null,
+          "mode": "include",
+          "name": "machine_context",
+          "progress_source": null
+        },
+        {
+          "controls": null,
+          "encoding": null,
+          "length": null,
+          "mode": "include",
+          "name": "track_position",
+          "progress_source": "segment_progress"
+        },
+        {
+          "controls": null,
+          "encoding": null,
+          "length": null,
+          "mode": "include",
+          "name": "surface_state",
+          "progress_source": null
+        },
+        {
+          "controls": null,
+          "encoding": "one_hot_builtin",
+          "length": null,
+          "mode": "include",
+          "name": "course_context",
+          "progress_source": null
+        },
+        {
+          "controls": ["steer", "thrust", "air_brake", "boost", "lean", "pitch"],
+          "encoding": null,
+          "length": 1,
+          "mode": "include",
+          "name": "control_history",
+          "progress_source": null
+        }
+      ],
+      "state_feature_modes": [
+        {
+          "mode": "zero",
+          "name": "track_position.edge_ratio"
+        },
+        {
+          "mode": "zero",
+          "name": "track_position.outside_track_bounds"
+        }
+      ]
+    },
+    "policy": {
+      "activation": "relu",
+      "conv_profile": "nature_32_64_128",
+      "custom_conv_layers": [
+        {
+          "kernel_size": 8,
+          "out_channels": 32,
+          "padding": 0,
+          "stride": 4
+        },
+        {
+          "kernel_size": 4,
+          "out_channels": 64,
+          "padding": 0,
+          "stride": 2
+        },
+        {
+          "kernel_size": 3,
+          "out_channels": 128,
+          "padding": 0,
+          "stride": 1
+        }
+      ],
+      "features_dim": "auto",
+      "fusion_features_dim": 768,
+      "gas_on_logit": 0.5,
+      "layer_norm": true,
+      "pi_net_arch": [256, 128],
+      "recurrent_enable_critic_lstm": true,
+      "recurrent_enabled": true,
+      "recurrent_hidden_size": 256,
+      "recurrent_n_lstm_layers": 1,
+      "recurrent_shared_lstm": false,
+      "state_net_arch": [64],
+      "vf_net_arch": [256, 128]
+    },
+    "preset_name": "all-cups recurrent PPO",
+    "reward": {
+      "air_brake_request_penalty": 0.0,
+      "airborne_landing_reward": 0.0,
+      "airborne_offtrack_penalty_scale": 0.05,
+      "airborne_offtrack_recovery_descend_epsilon": 1.0,
+      "airborne_offtrack_recovery_requires_descending": true,
+      "airborne_offtrack_recovery_reward_scale": 0.05,
+      "airborne_pitch_up_penalty": -0.2,
+      "airborne_progress_bucket_distance": 100.0,
+      "boost_pad_reward": 10.0,
+      "boost_pad_reward_progress_window": 800.0,
+      "collision_recoil_penalty": -4.0,
+      "damage_taken_frame_penalty": 0.0,
+      "damage_taken_streak_cap_frames": 0,
+      "damage_taken_streak_ramp_penalty": 0.0,
+      "dirt_entry_penalty": 0.0,
+      "dirt_progress_multiplier": 1.0,
+      "energy_loss_epsilon": 0.01,
+      "energy_refill_collision_cooldown_frames": 120,
+      "energy_refill_progress_multiplier": 3.0,
+      "failure_penalty": -30.0,
+      "gas_underuse_penalty": 0.0,
+      "gas_underuse_threshold": 0.5,
+      "ice_entry_penalty": 0.0,
+      "ice_progress_multiplier": 1.0,
+      "lap_completion_bonus": 5.0,
+      "lap_position_scale": 1.0,
+      "lean_low_speed_penalty": -0.005,
+      "lean_low_speed_penalty_max_speed_kph": 750.0,
+      "lean_request_penalty": -0.003,
+      "manual_boost_reward": 0.01,
+      "outside_bounds_reentry_progress_distance_cap": 10000.0,
+      "progress_bucket_distance": 1000.0,
+      "progress_bucket_reward": 1.0,
+      "progress_reward_interval_frames": 1,
+      "reverse_time_penalty_scale": 2.0,
+      "slow_speed_time_penalty_power": 1.0,
+      "slow_speed_time_penalty_scale": 3.0,
+      "slow_speed_time_penalty_start_kph": 760.0,
+      "steer_oscillation_cap": 2.0,
+      "steer_oscillation_deadzone": 0.0,
+      "steer_oscillation_penalty": 0.0,
+      "steer_oscillation_power": 2.0,
+      "step_reward_clip_max": 100.0,
+      "step_reward_clip_min": -100.0,
+      "time_penalty_per_frame": 0.0,
+      "truncation_penalty": -30.0
+    },
+    "seed": 123,
+    "tracks": {
+      "pool_mode": "built_in",
+      "race_mode": "time_attack",
+      "sampling_mode": "step_balanced",
+      "selected_course_ids": [
+        "mute_city",
+        "silence",
+        "sand_ocean",
+        "devils_forest",
+        "big_blue",
+        "port_town",
+        "sector_alpha",
+        "red_canyon",
+        "devils_forest_2",
+        "mute_city_2",
+        "big_blue_2",
+        "white_land",
+        "fire_field",
+        "silence_2",
+        "sector_beta",
+        "red_canyon_2",
+        "white_land_2",
+        "mute_city_3",
+        "rainbow_road",
+        "devils_forest_3",
+        "space_plant",
+        "sand_ocean_2",
+        "port_town_2",
+        "big_hand"
+      ]
+    },
+    "train": {
+      "algorithm": "maskable_hybrid_recurrent_ppo",
+      "batch_size": 1024,
+      "checkpoint_every_rollouts": 5,
+      "clip_range": 0.19,
+      "clip_range_vf": null,
+      "course_context_dropout_prob": 0.0,
+      "ent_coef": 0.01,
+      "gae_lambda": 0.95,
+      "gamma": 0.995,
+      "learning_rate": 8.5e-5,
+      "max_grad_norm": 0.5,
+      "n_epochs": 3,
+      "n_steps": 2048,
+      "normalize_advantage": true,
+      "num_envs": 10,
+      "recent_checkpoint_limit": 5,
+      "save_best_checkpoint": true,
+      "save_latest_checkpoint": true,
+      "save_recent_checkpoints": false,
+      "stats_window_size": 100,
+      "target_kl": null,
+      "total_timesteps": 50000000,
+      "vf_coef": 0.5
+    },
+    "vehicle": {
+      "engine_mode": "fixed",
+      "engine_setting_max_raw_value": 50,
+      "engine_setting_min_raw_value": 50,
+      "engine_setting_raw_value": 50,
+      "selected_vehicle_ids": ["blue_falcon"],
+      "selection_mode": "pool"
+    },
+    "version": 1
+  },
+  "policy_preview": {
+    "action_branches": [
+      {
+        "enabled": true,
+        "kind": "continuous",
+        "mask_label": null,
+        "name": "steer",
+        "size": 1
+      },
+      {
+        "enabled": true,
+        "kind": "discrete",
+        "mask_label": null,
+        "name": "throttle",
+        "size": 2
+      },
+      {
+        "enabled": true,
+        "kind": "discrete",
+        "mask_label": null,
+        "name": "air_brake",
+        "size": 2
+      },
+      {
+        "enabled": true,
+        "kind": "discrete",
+        "mask_label": "\u2265 10% energy",
+        "name": "boost",
+        "size": 2
+      },
+      {
+        "enabled": true,
+        "kind": "discrete",
+        "mask_label": null,
+        "name": "lean",
+        "size": 3
+      },
+      {
+        "enabled": true,
+        "kind": "discrete",
+        "mask_label": null,
+        "name": "pitch",
+        "size": 5
+      }
+    ],
+    "architecture_lanes": [
+      {
+        "id": "image_branch",
+        "label": "Image branch",
+        "nodes": [
+          {
+            "detail": "60 x 76 x 6",
+            "id": "image",
+            "label": "Image",
+            "params": null,
+            "tone": "normal"
+          },
+          {
+            "detail": "nature_32_64_128 \u2192 3072",
+            "id": "cnn",
+            "label": "CNN",
+            "params": 119008,
+            "tone": "normal"
+          },
+          {
+            "detail": "identity 3072",
+            "id": "image_projection",
+            "label": "Image projection",
+            "params": 0,
+            "tone": "muted"
+          }
+        ]
+      },
+      {
+        "id": "state_branch",
+        "label": "State branch",
+        "nodes": [
+          {
+            "detail": "49 scalars",
+            "id": "state",
+            "label": "State vector",
+            "params": null,
+            "tone": "normal"
+          },
+          {
+            "detail": "49 \u2192 [64]",
+            "id": "state_mlp",
+            "label": "State MLP",
+            "params": 3200,
+            "tone": "normal"
+          }
+        ]
+      },
+      {
+        "id": "fusion_and_heads",
+        "label": "Fusion and heads",
+        "nodes": [
+          {
+            "detail": "3136",
+            "id": "concat",
+            "label": "Concat",
+            "params": null,
+            "tone": "normal"
+          },
+          {
+            "detail": "3136 \u2192 768",
+            "id": "fusion",
+            "label": "Fusion MLP",
+            "params": 2409216,
+            "tone": "normal"
+          },
+          {
+            "detail": "on",
+            "id": "layer_norm",
+            "label": "LayerNorm",
+            "params": 1536,
+            "tone": "normal"
+          },
+          {
+            "detail": "768 \u2192 256, 1 layer, actor + critic",
+            "id": "lstm",
+            "label": "LSTM",
+            "params": 2101248,
+            "tone": "normal"
+          },
+          {
+            "detail": "256 \u2192 [256, 128], relu",
+            "id": "policy_head",
+            "label": "Policy head",
+            "params": 98688,
+            "tone": "normal"
+          },
+          {
+            "detail": "128 \u2192 1 continuous, 14 logits (steer 1, throttle 2, air_brake 2, boost 2 \u2265 10% energy, lean 3, pitch 5)",
+            "id": "action_net",
+            "label": "Action net",
+            "params": 1935,
+            "tone": "normal"
+          },
+          {
+            "detail": "256 \u2192 [256, 128], relu",
+            "id": "value_head",
+            "label": "Value head",
+            "params": 98688,
+            "tone": "normal"
+          },
+          {
+            "detail": "128 \u2192 1 value",
+            "id": "value_net",
+            "label": "Value net",
+            "params": 129,
+            "tone": "normal"
+          }
+        ]
+      }
+    ],
+    "continuous_action_dims": 1,
+    "conv_layers": [
+      {
+        "dropped_height": 0,
+        "dropped_width": 0,
+        "in_channels": 6,
+        "input_height": 60,
+        "input_width": 76,
+        "kernel_size": 8,
+        "name": "conv1",
+        "out_channels": 32,
+        "output_height": 14,
+        "output_width": 18,
+        "padding": 0,
+        "params": 12320,
+        "stride": 4
+      },
+      {
+        "dropped_height": 0,
+        "dropped_width": 0,
+        "in_channels": 32,
+        "input_height": 14,
+        "input_width": 18,
+        "kernel_size": 4,
+        "name": "conv2",
+        "out_channels": 64,
+        "output_height": 6,
+        "output_width": 8,
+        "padding": 0,
+        "params": 32832,
+        "stride": 2
+      },
+      {
+        "dropped_height": 0,
+        "dropped_width": 0,
+        "in_channels": 64,
+        "input_height": 6,
+        "input_width": 8,
+        "kernel_size": 3,
+        "name": "conv3",
+        "out_channels": 128,
+        "output_height": 4,
+        "output_width": 6,
+        "padding": 0,
+        "params": 73856,
+        "stride": 1
+      }
+    ],
+    "discrete_action_logits": 14,
+    "extractor_output_dim": 768,
+    "flatten_dim": 3072,
+    "fusion_input_dim": 3136,
+    "image_features_dim": 3072,
+    "image_shape": {
+      "channels": 6,
+      "height": 60,
+      "width": 76
+    },
+    "parameter_groups": [
+      {
+        "name": "CNN convolutions",
+        "params": 119008
+      },
+      {
+        "name": "Image projection",
+        "params": 0
+      },
+      {
+        "name": "State MLP",
+        "params": 3200
+      },
+      {
+        "name": "Fusion",
+        "params": 2409216
+      },
+      {
+        "name": "LayerNorm",
+        "params": 1536
+      },
+      {
+        "name": "LSTM",
+        "params": 2101248
+      },
+      {
+        "name": "Policy head",
+        "params": 100623
+      },
+      {
+        "name": "Value head",
+        "params": 98817
+      }
+    ],
+    "policy_input_dim": 256,
+    "state_dim": 49,
+    "state_features": [
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.speed_norm"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.energy_frac"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.reverse_active"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.airborne"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.boost_unlocked"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.boost_active"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.lateral_velocity_norm"
+      },
+      {
+        "component": "vehicle_state",
+        "mode": "include",
+        "name": "vehicle_state.sliding_active"
+      },
+      {
+        "component": "machine_context",
+        "mode": "include",
+        "name": "machine_context.body_stat"
+      },
+      {
+        "component": "machine_context",
+        "mode": "include",
+        "name": "machine_context.boost_stat"
+      },
+      {
+        "component": "machine_context",
+        "mode": "include",
+        "name": "machine_context.grip_stat"
+      },
+      {
+        "component": "machine_context",
+        "mode": "include",
+        "name": "machine_context.weight"
+      },
+      {
+        "component": "machine_context",
+        "mode": "include",
+        "name": "machine_context.engine"
+      },
+      {
+        "component": "track_position",
+        "mode": "include",
+        "name": "track_position.lap_progress"
+      },
+      {
+        "component": "track_position",
+        "mode": "zero",
+        "name": "track_position.edge_ratio"
+      },
+      {
+        "component": "track_position",
+        "mode": "zero",
+        "name": "track_position.outside_track_bounds"
+      },
+      {
+        "component": "surface_state",
+        "mode": "include",
+        "name": "surface_state.on_refill_surface"
+      },
+      {
+        "component": "surface_state",
+        "mode": "include",
+        "name": "surface_state.on_dirt_surface"
+      },
+      {
+        "component": "surface_state",
+        "mode": "include",
+        "name": "surface_state.on_ice_surface"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_00"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_01"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_02"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_03"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_04"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_05"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_06"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_07"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_08"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_09"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_10"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_11"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_12"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_13"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_14"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_15"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_16"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_17"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_18"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_19"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_20"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_21"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_22"
+      },
+      {
+        "component": "course_context",
+        "mode": "include",
+        "name": "course_context.course_builtin_23"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_steer_1"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_thrust_1"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_air_brake_1"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_boost_1"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_lean_1"
+      },
+      {
+        "component": "control_history",
+        "mode": "include",
+        "name": "control_history.prev_pitch_1"
+      }
+    ],
+    "state_features_dim": 64,
+    "total_params": 4833648
+  }
+}

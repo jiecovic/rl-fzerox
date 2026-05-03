@@ -1,4 +1,5 @@
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk.bundled.js";
+import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 
 import { diagramMetrics } from "./constants";
@@ -124,12 +125,12 @@ function concatPorts() {
   const center = diagramMetrics.junctionSize / 2 - 1;
   return [
     concatPort("concat:image", center, 0, "NORTH"),
-    concatPort("concat:state", center, diagramMetrics.junctionSize - 2, "SOUTH"),
+    concatPort("concat:state", 0, center, "WEST"),
     concatPort("concat:out", diagramMetrics.junctionSize - 2, center, "EAST"),
   ];
 }
 
-function concatPort(id: string, x: number, y: number, side: "EAST" | "NORTH" | "SOUTH") {
+function concatPort(id: string, x: number, y: number, side: "EAST" | "NORTH" | "SOUTH" | "WEST") {
   return {
     id,
     height: 2,
@@ -144,7 +145,13 @@ function concatPort(id: string, x: number, y: number, side: "EAST" | "NORTH" | "
 
 function nodeVisual(node: ArchitectureNode): NodeVisual {
   const detailLines = detailLinesForNode(node);
-  const longestLineLength = Math.max(node.label.length, ...detailLines.map((line) => line.length));
+  const paramLine =
+    node.params === null || node.params === undefined ? undefined : formatParamLine(node.params);
+  const longestLineLength = Math.max(
+    node.label.length,
+    ...(paramLine === undefined ? [] : [paramLine.length]),
+    ...detailLines.map((line) => line.length),
+  );
   const width = clamp(
     Math.ceil(
       longestLineLength * diagramMetrics.node.characterWidth + diagramMetrics.node.paddingX,
@@ -155,7 +162,10 @@ function nodeVisual(node: ArchitectureNode): NodeVisual {
   const height = Math.max(
     diagramMetrics.node.minHeight,
     diagramMetrics.node.titleAndPaddingHeight +
-      detailLines.length * diagramMetrics.node.detailLineHeight,
+      detailLines.length * diagramMetrics.node.detailLineHeight +
+      (paramLine === undefined
+        ? 0
+        : diagramMetrics.node.paramTopGap + diagramMetrics.node.paramLineHeight),
   );
 
   return {
@@ -163,6 +173,7 @@ function nodeVisual(node: ArchitectureNode): NodeVisual {
     height,
     kind: "node",
     label: node.label,
+    paramLine,
     tone: node.tone,
     width,
   };
@@ -268,4 +279,8 @@ function lastId(ids: readonly string[]) {
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function formatParamLine(value: number) {
+  return `${formatParamCount(value)} params`;
 }

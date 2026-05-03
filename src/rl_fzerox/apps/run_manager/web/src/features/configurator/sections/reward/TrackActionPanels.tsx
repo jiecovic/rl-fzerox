@@ -50,14 +50,6 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ energy_loss_epsilon: value })}
           />
           <NumberField
-            help="Progress reward multiplier while on refill surface."
-            label="Refill progress multiplier"
-            resetValue={defaultConfig.reward.energy_refill_progress_multiplier}
-            step="0.1"
-            value={config.reward.energy_refill_progress_multiplier}
-            onChange={(value) => updateReward({ energy_refill_progress_multiplier: value })}
-          />
-          <NumberField
             help="Progress reward multiplier while on dirt."
             label="Dirt progress multiplier"
             resetValue={defaultConfig.reward.dirt_progress_multiplier}
@@ -99,28 +91,20 @@ export function TrackActionPanels({
         onReset={() => updateReward(energyDefaults(defaultConfig.reward))}
       >
         <div className="config-field-grid">
+          <NumberField
+            help="Progress reward multiplier while on refill surface."
+            label="Refill progress multiplier"
+            resetValue={defaultConfig.reward.energy_refill_progress_multiplier}
+            step="0.1"
+            value={config.reward.energy_refill_progress_multiplier}
+            onChange={(value) => updateReward({ energy_refill_progress_multiplier: value })}
+          />
           <IntegerField
             help="Frames after collision during which refill surface reward is suppressed."
             label="Refill collision cooldown"
             resetValue={defaultConfig.reward.energy_refill_collision_cooldown_frames}
             value={config.reward.energy_refill_collision_cooldown_frames}
             onChange={(value) => updateReward({ energy_refill_collision_cooldown_frames: value })}
-          />
-          <NumberField
-            help="Lap bonus for sufficiently refilling energy."
-            label="Full refill lap bonus"
-            resetValue={defaultConfig.reward.energy_full_refill_lap_bonus}
-            step="0.5"
-            value={config.reward.energy_full_refill_lap_bonus}
-            onChange={(value) => updateReward({ energy_full_refill_lap_bonus: value })}
-          />
-          <NumberField
-            help="Minimum gained fraction required for the full-refill lap bonus."
-            label="Full refill min fraction"
-            resetValue={defaultConfig.reward.energy_full_refill_min_gain_fraction}
-            step="0.05"
-            value={config.reward.energy_full_refill_min_gain_fraction}
-            onChange={(value) => updateReward({ energy_full_refill_min_gain_fraction: value })}
           />
         </div>
       </ConfigDisclosure>
@@ -163,6 +147,14 @@ export function TrackActionPanels({
             step="0.001"
             value={config.reward.gas_underuse_penalty}
             onChange={(value) => updateReward({ gas_underuse_penalty: value })}
+          />
+          <NumberField
+            help="Per-step penalty for requesting air brake."
+            label="Air brake request penalty"
+            resetValue={defaultConfig.reward.air_brake_request_penalty}
+            step="0.001"
+            value={config.reward.air_brake_request_penalty}
+            onChange={(value) => updateReward({ air_brake_request_penalty: value })}
           />
           <NumberField
             help="Gas request threshold below which underuse penalty can apply."
