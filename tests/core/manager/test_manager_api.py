@@ -258,6 +258,8 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
                         "current_weight": 1.5,
                         "completed_frames": 1200,
                         "episode_count": 3,
+                        "finished_episode_count": 2,
+                        "success_sample_count": 2,
                         "ema_episode_frames": 400.0,
                     },
                     {
@@ -268,6 +270,8 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
                         "current_weight": 0.5,
                         "completed_frames": 800,
                         "episode_count": 1,
+                        "finished_episode_count": 1,
+                        "success_sample_count": 1,
                         "ema_episode_frames": 800.0,
                     },
                 ],
@@ -286,7 +290,60 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
     assert payload["entries"][0]["label"] == "Mute City"
     assert payload["entries"][0]["current_probability"] == pytest.approx(0.75)
     assert payload["entries"][0]["completed_env_steps"] == 600
+    assert payload["entries"][0]["finished_episode_count"] == 2
+    assert payload["entries"][0]["success_sample_count"] == 2
+    assert payload["entries"][0]["success_rate"] == pytest.approx(1.0)
     assert payload["entries"][0]["step_share"] == pytest.approx(0.6)
+
+
+def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-reset-track-pool",
+        name="Resettable Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-reset-track-pool",
+    )
+    store.update_run_status(
+        run_id=run.id,
+        status="stopped",
+        started_at="2026-05-04T12:00:00+00:00",
+        stopped_at="2026-05-04T12:30:00+00:00",
+        message="stopped for reset",
+    )
+    state_path = run.run_dir / "runtime" / "track_sampling_state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text("{}", encoding="utf-8")
+
+    client = _client(tmp_path, store=store)
+    response = client.post(f"/api/runs/{run.id}/track-sampling/reset")
+
+    assert response.status_code == 200
+    assert response.json() == {"reset": True}
+    assert not state_path.exists()
+
+
+def test_manager_api_rejects_track_sampling_reset_while_running(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-active-track-pool",
+        name="Active Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-active-track-pool",
+    )
+    store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at="2026-05-04T12:00:00+00:00",
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    client = _client(tmp_path, store=store)
+    response = client.post(f"/api/runs/{run.id}/track-sampling/reset")
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "track-pool stats can only be reset while the run is stopped"
 
 
 def test_manager_api_deletes_lineage(tmp_path: Path) -> None:

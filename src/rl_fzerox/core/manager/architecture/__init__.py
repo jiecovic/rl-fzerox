@@ -1,11 +1,14 @@
-# src/rl_fzerox/core/manager/architecture.py
+# src/rl_fzerox/core/manager/architecture/__init__.py
 """Managed-run metadata and policy preview facade."""
 
-from rl_fzerox.core.manager.architecture_metadata import run_manager_config_metadata
-from rl_fzerox.core.manager.architecture_models import (
+from rl_fzerox.core.manager.architecture.metadata import run_manager_config_metadata
+from rl_fzerox.core.manager.architecture.models import (
+    ActionBranchPreview,
     ArchitectureLanePreview,
     ArchitectureNodePreview,
+    BuiltInCourseInfo,
     ConvLayerPreview,
+    EngineSettingPresetInfo,
     ObservationPresetInfo,
     ParameterGroupPreview,
     PolicyArchitecturePreview,
@@ -15,13 +18,18 @@ from rl_fzerox.core.manager.architecture_models import (
     StateComponentInfo,
     StateFeatureInfo,
     StateFeaturePreview,
+    TrackCupInfo,
+    VehicleInfo,
 )
-from rl_fzerox.core.manager.architecture_preview import policy_architecture_preview
+from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
 
 __all__ = [
+    "ActionBranchPreview",
     "ArchitectureLanePreview",
     "ArchitectureNodePreview",
+    "BuiltInCourseInfo",
     "ConvLayerPreview",
+    "EngineSettingPresetInfo",
     "ObservationPresetInfo",
     "ParameterGroupPreview",
     "PolicyArchitecturePreview",
@@ -31,6 +39,8 @@ __all__ = [
     "StateComponentInfo",
     "StateFeatureInfo",
     "StateFeaturePreview",
+    "TrackCupInfo",
+    "VehicleInfo",
     "policy_architecture_preview",
     "run_manager_config_metadata",
 ]

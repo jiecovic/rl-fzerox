@@ -576,7 +576,7 @@ class ManagedRunConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_custom_conv_geometry(self) -> ManagedRunConfig:
-        from rl_fzerox.core.manager.architecture_metadata import preset_geometry
+        from rl_fzerox.core.manager.architecture.metadata import preset_geometry
         from rl_fzerox.core.policy.extractors import (
             ensure_conv_spec_fits_geometry,
             resolve_conv_spec,

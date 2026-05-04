@@ -209,6 +209,30 @@ def create_manager_api_app(
         )
         return {"state": None if state is None else _track_sampling_state_payload(state)}
 
+    @app.post("/api/runs/{run_id}/track-sampling/reset")
+    def reset_run_track_sampling(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, bool]:
+        run = store.get_run(run_id)
+        if run is None:
+            raise HTTPException(status_code=404, detail="run not found")
+        if run.status != "stopped":
+            raise HTTPException(
+                status_code=400,
+                detail="track-pool stats can only be reset while the run is stopped",
+            )
+        state_path = (
+            run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename
+        )
+        if state_path.exists():
+            state_path.unlink()
+        store.append_run_event(
+            run_id=run.id,
+            kind="track_sampling_reset",
+            message="track-pool stats reset from manager",
+        )
+        return {"reset": True}
+
     @app.post("/api/runs", status_code=201)
     def launch_run(request: LaunchRunRequest) -> dict[str, dict[str, object]]:
         name = request.name.strip()
@@ -507,8 +531,15 @@ def _track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str,
                     0.0 if total_weight <= 0.0 else entry.current_weight / total_weight
                 ),
                 "episode_count": entry.episode_count,
+                "finished_episode_count": entry.finished_episode_count,
+                "success_sample_count": entry.success_sample_count,
                 "episode_share": (
                     0.0 if total_episodes <= 0 else entry.episode_count / total_episodes
+                ),
+                "success_rate": (
+                    None
+                    if entry.success_sample_count <= 0
+                    else entry.finished_episode_count / entry.success_sample_count
                 ),
                 "completed_frames": entry.completed_frames,
                 "completed_env_steps": (

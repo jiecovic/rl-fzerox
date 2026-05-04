@@ -49,15 +49,29 @@ class ManagerStore:
 
     def __init__(self, db_path: Path | None = None) -> None:
         self.db_path = (db_path or default_manager_db_path()).expanduser().resolve()
+        self._schema_initialized = False
 
     def initialize(self) -> None:
         """Create the manager database schema if needed."""
+
+        self._initialize_schema()
+
+    def _ensure_schema_initialized(self) -> None:
+        """Initialize schema once for hot-path store operations."""
+
+        if self._schema_initialized:
+            return
+        self._initialize_schema()
+
+    def _initialize_schema(self) -> None:
+        """Apply schema/bootstrap work to the manager database."""
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             initialize_manager_schema(connection, applied_at=_utc_now())
             _backfill_lineage_ids(connection)
             _migrate_lineage_layout(connection)
+        self._schema_initialized = True
 
     def create_run(
         self,
@@ -372,7 +386,10 @@ class ManagerStore:
                 UPDATE runs
                 SET
                     status = ?,
-                    started_at = COALESCE(?, started_at),
+                    started_at = CASE
+                        WHEN ? IS NULL THEN started_at
+                        ELSE ?
+                    END,
                     stopped_at = ?
                 WHERE id = ?
                 RETURNING
@@ -394,6 +411,7 @@ class ManagerStore:
                 (
                     status,
                     started_at,
+                    started_at,
                     stopped_at,
                     run_id,
                 ),
@@ -413,6 +431,16 @@ class ManagerStore:
             ).fetchone()
         return None if selected_row is None else _run_from_row(selected_row)
 
+    def clear_run_runtime(self, run_id: str) -> None:
+        """Remove the latest runtime snapshot for one run."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM run_runtime WHERE run_id = ?",
+                (run_id,),
+            )
+
     def upsert_run_runtime(
         self,
         *,
@@ -431,7 +459,7 @@ class ManagerStore:
     ) -> None:
         """Persist the latest runtime snapshot for one managed run."""
 
-        self.initialize()
+        self._ensure_schema_initialized()
         with self._connect() as connection:
             connection.execute(
                 """
@@ -489,7 +517,7 @@ class ManagerStore:
     ) -> None:
         """Append one manager event for a run without mutating run status."""
 
-        self.initialize()
+        self._ensure_schema_initialized()
         event_at = created_at or _utc_now()
         with self._connect() as connection:
             connection.execute(
@@ -499,6 +527,56 @@ class ManagerStore:
                 """,
                 (run_id, event_at, kind, message),
             )
+
+    def update_run_fork_source(
+        self,
+        *,
+        run_id: str,
+        source_snapshot_dir: Path,
+        source_num_timesteps: int,
+        lineage_step_offset: int | None = None,
+    ) -> ManagedRun | None:
+        """Persist one rebuilt pinned fork source for a managed run."""
+
+        self.initialize()
+        rebuilt_at = _utc_now()
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                UPDATE runs
+                SET
+                    source_snapshot_dir = ?,
+                    source_num_timesteps = ?,
+                    lineage_step_offset = COALESCE(?, lineage_step_offset)
+                WHERE id = ?
+                RETURNING id
+                """,
+                (
+                    str(source_snapshot_dir.expanduser().resolve()),
+                    source_num_timesteps,
+                    lineage_step_offset,
+                    run_id,
+                ),
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                """
+                INSERT INTO run_events(run_id, created_at, kind, message)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    run_id,
+                    rebuilt_at,
+                    "fork_source_rebuilt",
+                    "recreated pinned fork source snapshot",
+                ),
+            )
+            selected_row = connection.execute(
+                _run_select_sql(where_clause="WHERE runs.id = ?"),
+                (run_id,),
+            ).fetchone()
+        return None if selected_row is None else _run_from_row(selected_row)
 
     def request_run_command(
         self,
@@ -543,7 +621,7 @@ class ManagerStore:
     def pending_run_command(self, run_id: str) -> RunCommand | None:
         """Return the current pending command for one run, if any."""
 
-        self.initialize()
+        self._ensure_schema_initialized()
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT command FROM run_commands WHERE run_id = ?",
@@ -559,7 +637,7 @@ class ManagerStore:
     ) -> None:
         """Clear one pending runtime control command."""
 
-        self.initialize()
+        self._ensure_schema_initialized()
         with self._connect() as connection:
             if command is None:
                 connection.execute(
@@ -970,8 +1048,10 @@ class ManagerStore:
                 )
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=30.0)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA busy_timeout = 30000")
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 

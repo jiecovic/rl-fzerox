@@ -75,8 +75,10 @@ def main(argv: list[str] | None = None) -> None:
                     run_id=run.id,
                     run_paths=run_paths,
                     total_timesteps=train_config.train.total_timesteps,
+                    lineage_step_offset=run.lineage_step_offset,
                 ),
             ),
+            startup_reporter=_startup_reporter(store=store, run_id=run.id),
         )
         LOGGER.info("run_training returned normally for run_id=%s", run.id)
     except RunControlSignal as signal:
@@ -206,6 +208,20 @@ def _configure_logging() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+
+
+def _startup_reporter(*, store: ManagerStore, run_id: str):
+    def report(kind: str, message: str) -> None:
+        pending_command = store.pending_run_command(run_id)
+        if pending_command is not None:
+            raise RunControlSignal(pending_command)
+        store.append_run_event(
+            run_id=run_id,
+            kind=kind,
+            message=message,
+        )
+
+    return report
 
 
 if __name__ == "__main__":
