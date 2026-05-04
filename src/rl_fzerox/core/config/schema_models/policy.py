@@ -42,6 +42,7 @@ class ExtractorConfig(BaseModel):
     custom_conv_layers: tuple[CustomConvLayer, ...] = ()
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
+    state_net_arch: tuple[PositiveInt, ...] | None = None
     fusion_features_dim: PositiveInt | None = None
     layer_norm: bool = False
 
@@ -50,6 +51,13 @@ class ExtractorConfig(BaseModel):
         if self.conv_profile == "custom" and not self.custom_conv_layers:
             raise ValueError("policy.extractor.custom_conv_layers must not be empty")
         return self
+
+    def resolved_state_net_arch(self) -> tuple[int, ...]:
+        """Return the canonical state MLP widths for runtime/extractor code."""
+
+        if self.state_net_arch is None:
+            return (int(self.state_features_dim),)
+        return tuple(int(width) for width in self.state_net_arch)
 
 
 class PolicyRecurrentConfig(BaseModel):

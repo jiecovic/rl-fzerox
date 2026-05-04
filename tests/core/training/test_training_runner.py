@@ -27,11 +27,12 @@ from rl_fzerox.core.config.schema import (
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.training import runner
-from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
+from rl_fzerox.core.training.runs import RUN_LAYOUT, build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     atomic_save_artifact,
     load_policy_artifact_metadata,
+    policy_artifact_metadata_path,
     resolve_train_run_config,
     validate_training_baseline_state,
 )
@@ -408,8 +409,10 @@ def test_resume_curriculum_stage_index_reads_full_model_artifact_metadata(
     core_path.touch()
     rom_path.touch()
     run_dir.mkdir(parents=True)
-    (run_dir / "latest_policy.zip").write_bytes(b"policy")
-    (run_dir / "latest_policy.metadata.json").write_text(
+    latest_policy_path = run_dir / RUN_LAYOUT.policy_artifacts.latest
+    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_policy_path.write_bytes(b"policy")
+    policy_artifact_metadata_path(latest_policy_path).write_text(
         json.dumps(
             {
                 "curriculum_stage_index": 2,
@@ -471,7 +474,7 @@ def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
 
 
 def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path) -> None:
-    target_path = tmp_path / "latest_policy.zip"
+    target_path = tmp_path / RUN_LAYOUT.policy_artifacts.latest
 
     def _fake_save(path: str) -> None:
         Path(path).write_bytes(b"new-policy")
@@ -479,7 +482,7 @@ def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path
     atomic_save_artifact(_fake_save, target_path)
 
     assert target_path.read_bytes() == b"new-policy"
-    assert list(tmp_path.glob("*.tmp.zip")) == []
+    assert list(target_path.parent.glob("*.tmp.zip")) == []
 
 
 def test_train_config_rejects_plain_ppo_algorithm(

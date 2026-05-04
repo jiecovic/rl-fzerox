@@ -17,8 +17,13 @@ from rl_fzerox.core.envs.actions import (
     HybridSteerGasBoostLeanActionAdapter,
     SteerDriveActionAdapter,
     SteerGasAirBrakeBoostLeanActionAdapter,
+    build_action_adapter,
 )
-from rl_fzerox.core.envs.actions.continuous_controls import continuous_drive_gas_level
+from rl_fzerox.core.envs.actions.continuous_controls import (
+    action_drive_axis,
+    continuous_drive_gas_level,
+    requested_gas_level,
+)
 
 
 def test_steer_drive_adapter_uses_default_seven_bucket_multidiscrete_space() -> None:
@@ -37,7 +42,10 @@ def test_steer_drive_adapter_supports_custom_bucket_counts() -> None:
 
 
 def test_action_config_rejects_even_steer_bucket_counts() -> None:
-    with pytest.raises(ValueError, match="steer_buckets must be odd"):
+    with pytest.raises(
+        ValueError,
+        match="action bucket counts must be odd so one bucket maps to neutral",
+    ):
         ActionConfig(steer_buckets=6)
 
 
@@ -275,6 +283,39 @@ def test_hybrid_steer_gas_air_brake_boost_lean_adapter_masks_discrete_heads() ->
         False,
         False,
     ]
+
+
+def test_action_drive_axis_is_none_when_configured_layout_has_no_drive_axis() -> None:
+    config = ActionConfig(
+        name="configured_hybrid",
+        layout_continuous_axes=("steer", "pitch"),
+        layout_discrete_axes=("gas",),
+    )
+    adapter = config.runtime()
+    action = {
+        "continuous": np.array([0.1, 0.6], dtype=np.float32),
+        "discrete": np.array([1], dtype=np.int64),
+    }
+
+    drive_axis = action_drive_axis(
+        action,
+        build_action_adapter(config).action_space,
+        drive_axis_index=adapter.continuous_drive_axis_index(),
+    )
+
+    assert drive_axis is None
+
+
+def test_requested_gas_level_uses_discrete_accelerate_when_no_drive_axis_exists() -> None:
+    gas_level = requested_gas_level(
+        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_y=0.6),
+        drive_axis=None,
+        continuous_drive_deadzone=0.05,
+        continuous_drive_full_threshold=0.85,
+        continuous_drive_min_thrust=0.25,
+    )
+
+    assert gas_level == 1.0
 
 
 def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:

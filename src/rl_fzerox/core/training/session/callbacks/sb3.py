@@ -1,6 +1,8 @@
 # src/rl_fzerox/core/training/session/callbacks/sb3.py
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
@@ -13,7 +15,11 @@ from rl_fzerox.core.training.session.curriculum import ActionMaskCurriculumContr
 
 from .checkpoints import CheckpointPolicy, resolve_checkpoint_policy
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
-from .track_sampling import StepBalancedTrackSamplingController
+from .track_sampling import (
+    StepBalancedTrackSamplingController,
+    load_track_sampling_runtime_state,
+    save_track_sampling_runtime_state,
+)
 from .tuning import apply_stage_train_overrides, record_stage_train_overrides
 
 
@@ -24,6 +30,7 @@ def build_callbacks(
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
     initial_curriculum_stage_index: int | None = None,
+    extra_callbacks: Sequence[object] = (),
 ):
     """Construct the SB3 callback list used during training."""
 
@@ -203,14 +210,31 @@ def build_callbacks(
             super().__init__(verbose=0)
             self._controller = controller
 
+        def _on_training_start(self) -> None:
+            self.training_env.env_method(
+                "set_track_sampling_weights",
+                self._controller.current_weights(),
+            )
+            save_track_sampling_runtime_state(
+                run_paths.track_sampling_state_path,
+                self._controller.runtime_state(),
+            )
+
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
             if infos is None:
                 return True
 
-            weights = self._controller.record_episodes(episode_dicts(infos))
+            episodes = episode_dicts(infos)
+            if not episodes:
+                return True
+            weights = self._controller.record_episodes(episodes)
             if weights is not None:
                 self.training_env.env_method("set_track_sampling_weights", weights)
+            save_track_sampling_runtime_state(
+                run_paths.track_sampling_state_path,
+                self._controller.runtime_state(),
+            )
             return True
 
         def _on_rollout_end(self) -> None:
@@ -229,6 +253,7 @@ def build_callbacks(
         track_balance_controller = StepBalancedTrackSamplingController.from_configs(
             env_config=env_config,
             curriculum_config=curriculum_config,
+            restored_state=load_track_sampling_runtime_state(run_paths.track_sampling_state_path),
         )
         if track_balance_controller is not None:
             callbacks.append(StepBalancedTrackSamplingCallback(track_balance_controller))
@@ -240,4 +265,9 @@ def build_callbacks(
                 initial_stage_index=initial_curriculum_stage_index,
             )
         )
+    callbacks.extend(
+        callback
+        for callback in extra_callbacks
+        if isinstance(callback, BaseCallback)
+    )
     return CallbackList(callbacks)

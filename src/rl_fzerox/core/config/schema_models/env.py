@@ -16,6 +16,7 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.config.renderers import DEFAULT_RENDERER, RendererName
 from rl_fzerox.core.config.schema_models.actions import ActionConfig
 from rl_fzerox.core.config.schema_models.observations import ObservationConfig
 from rl_fzerox.core.config.schema_models.tracks import TrackSamplingConfig
@@ -52,6 +53,11 @@ class RewardCourseOverrideConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_progress_suspend_field(cls, data: object) -> object:
+        return _normalize_canonical_progress_suspend_field(data)
+
     time_penalty_per_frame: float | None = None
     reverse_time_penalty_scale: NonNegativeFloat | None = None
     low_speed_time_penalty_scale: NonNegativeFloat | None = None
@@ -62,7 +68,10 @@ class RewardCourseOverrideConfig(BaseModel):
     progress_bucket_reward: NonNegativeFloat | None = None
     progress_reward_interval_frames: PositiveInt | None = None
     airborne_progress_bucket_distance: PositiveFloat | None = None
+    suspend_progress_while_airborne: bool | None = None
+    suspend_progress_while_outside_track_bounds: bool | None = None
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    outside_track_frame_penalty: float | None = Field(default=None, le=0.0)
     airborne_offtrack_penalty_scale: NonNegativeFloat | None = None
     airborne_offtrack_recovery_reward_scale: NonNegativeFloat | None = None
     airborne_offtrack_recovery_requires_descending: bool | None = None
@@ -116,6 +125,11 @@ class RewardConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_progress_suspend_field(cls, data: object) -> object:
+        return _normalize_canonical_progress_suspend_field(data)
+
     name: Literal["race_v3", "reward_main"] = "race_v3"
     time_penalty_per_frame: float = -0.005
     reverse_time_penalty_scale: NonNegativeFloat = 2.0
@@ -127,7 +141,10 @@ class RewardConfig(BaseModel):
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
     airborne_progress_bucket_distance: PositiveFloat | None = None
+    suspend_progress_while_airborne: bool = False
+    suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    outside_track_frame_penalty: float = Field(default=0.0, le=0.0)
     airborne_offtrack_penalty_scale: NonNegativeFloat = 0.0
     airborne_offtrack_recovery_reward_scale: NonNegativeFloat = 0.0
     airborne_offtrack_recovery_requires_descending: bool = False
@@ -186,6 +203,21 @@ def _validate_step_reward_clip_bounds(
         raise ValueError("step_reward_clip_min must be <= step_reward_clip_max")
 
 
+def _normalize_canonical_progress_suspend_field(data: object) -> object:
+    if not isinstance(data, dict):
+        return data
+    normalized = dict(data)
+    if (
+        "suspend_progress_while_outside_track_bounds" not in normalized
+        and "suspend_progress_while_airborne" in normalized
+    ):
+        normalized["suspend_progress_while_outside_track_bounds"] = normalized[
+            "suspend_progress_while_airborne"
+        ]
+    normalized.pop("suspend_progress_while_airborne", None)
+    return normalized
+
+
 class EmulatorConfig(BaseModel):
     """Paths used to boot the libretro core, content, and optional state."""
 
@@ -195,4 +227,4 @@ class EmulatorConfig(BaseModel):
     rom_path: FilePath
     runtime_dir: Path | None = None
     baseline_state_path: Path | None = None
-    renderer: Literal["angrylion", "gliden64"] = "angrylion"
+    renderer: RendererName = DEFAULT_RENDERER

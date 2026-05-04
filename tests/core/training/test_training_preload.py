@@ -9,6 +9,7 @@ import torch as th
 from rl_fzerox.core.config.schema import (
     TrainConfig,
 )
+from rl_fzerox.core.training.runs import RUN_LAYOUT
 from rl_fzerox.core.training.session.model import (
     maybe_resume_training_model,
 )
@@ -17,7 +18,8 @@ from rl_fzerox.core.training.session.model import (
 def test_maybe_resume_training_model_loads_weights_only_artifact(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
     run_dir.mkdir(parents=True)
-    model_path = run_dir / "latest_model.zip"
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_bytes(b"checkpoint")
     train_config_path = run_dir / "train_config.yaml"
     train_config_path.write_text(
@@ -77,7 +79,8 @@ def test_maybe_resume_training_model_loads_full_model_artifact(
 ) -> None:
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
     run_dir.mkdir(parents=True)
-    model_path = run_dir / "best_model.zip"
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.best
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_bytes(b"checkpoint")
     (tmp_path / "core.so").touch()
     (tmp_path / "rom.n64").touch()
@@ -139,7 +142,8 @@ def test_full_model_resume_reapplies_current_sac_training_config(
 ) -> None:
     run_dir = tmp_path / "runs" / "hybrid_sac_0001"
     run_dir.mkdir(parents=True)
-    model_path = run_dir / "latest_model.zip"
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_bytes(b"checkpoint")
     (tmp_path / "core.so").touch()
     (tmp_path / "rom.n64").touch()
@@ -255,7 +259,8 @@ def test_maybe_resume_training_model_ignores_stale_non_train_config(
 ) -> None:
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
     run_dir.mkdir(parents=True)
-    model_path = run_dir / "latest_model.zip"
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
     model_path.write_bytes(b"checkpoint")
     (run_dir / "train_config.yaml").write_text(
         "\n".join(
@@ -311,7 +316,9 @@ def test_maybe_resume_training_model_rejects_non_string_train_keys(
 ) -> None:
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
     run_dir.mkdir(parents=True)
-    (run_dir / "latest_model.zip").write_bytes(b"checkpoint")
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    model_path.write_bytes(b"checkpoint")
     (run_dir / "train_config.yaml").write_text(
         "\n".join(
             [
@@ -351,7 +358,9 @@ def test_maybe_resume_training_model_rejects_non_string_train_keys(
 def test_maybe_resume_training_model_rejects_algorithm_mismatch(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "ppo_cnn_0042"
     run_dir.mkdir(parents=True)
-    (run_dir / "latest_model.zip").write_bytes(b"checkpoint")
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    model_path.write_bytes(b"checkpoint")
     (tmp_path / "core.so").touch()
     (tmp_path / "rom.n64").touch()
     (run_dir / "train_config.yaml").write_text(

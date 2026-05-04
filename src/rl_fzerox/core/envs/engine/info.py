@@ -75,6 +75,7 @@ def set_observation_info(
     observation_state_components: StateComponentsSettings | None,
     observation_zeroed_state_components: tuple[str, ...] = (),
     observation_zeroed_state_features: tuple[str, ...] = (),
+    observation_excluded_state_features: tuple[str, ...] = (),
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -114,6 +115,7 @@ def set_observation_info(
             )
         info["observation_zeroed_state_components"] = observation_zeroed_state_components
         info["observation_zeroed_state_features"] = observation_zeroed_state_features
+        info["observation_excluded_state_features"] = observation_excluded_state_features
         info["observation_state_shape"] = (
             state_feature_count(
                 observation_state_profile,
@@ -122,6 +124,7 @@ def set_observation_info(
                 action_history_len=action_history_len,
                 action_history_controls=action_history_controls,
                 state_components=observation_state_components,
+                excluded_state_features=observation_excluded_state_features,
             ),
         )
         info["observation_state_features"] = state_feature_names(
@@ -131,6 +134,7 @@ def set_observation_info(
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             state_components=observation_state_components,
+            excluded_state_features=observation_excluded_state_features,
         )
 
 

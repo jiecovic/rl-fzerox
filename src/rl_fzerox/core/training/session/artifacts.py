@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
@@ -39,10 +40,15 @@ def resolve_train_run_config(
     *,
     config: TrainAppConfig,
     run_paths: RunPaths,
+    startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
     """Resolve one train config snapshot with a run-local runtime root."""
 
-    return materialize_train_run_config(config, run_paths=run_paths)
+    return materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        startup_reporter=startup_reporter,
+    )
 
 
 def validate_training_baseline_state(config: TrainAppConfig) -> None:

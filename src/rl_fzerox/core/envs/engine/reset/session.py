@@ -88,11 +88,15 @@ class EngineResetCoordinator:
             selected_track = select_reset_track_by_course_id(
                 self._active_track_sampling,
                 course_id=self._locked_reset_course_id,
+                seed=seed,
             )
             if selected_track is not None:
                 return selected_track
         if self._sequential_track_sampling:
-            return self._track_selector.select_sequential(self._active_track_sampling)
+            return self._track_selector.select_sequential(
+                self._active_track_sampling,
+                seed=self._reset_seeds.track_sampling_seed(seed),
+            )
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),
@@ -115,6 +119,7 @@ class EngineResetCoordinator:
             backend=self._backend,
             config=self._config,
             sampled_track_baseline=selected_track is not None,
+            selected_track=selected_track,
         )
         if selected_track is not None:
             info.update(selected_track.info())

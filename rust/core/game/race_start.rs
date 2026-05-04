@@ -25,10 +25,20 @@ pub struct VehicleSetupInfo {
     pub racer_engine_curve: f32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RaceStartMode {
+    TimeAttack,
+    GpRace,
+}
+
+#[derive(Clone, Copy)]
+struct RaceStartMenuState {
+    selected_mode: Option<i32>,
+    current_ghost_type: Option<i32>,
+}
+
 #[derive(Clone, Copy)]
 struct RaceStartGameIds {
-    time_attack_menu_mode: i32,
-    no_ghost: i32,
     single_player: i32,
     change_init: i16,
 }
@@ -42,8 +52,6 @@ struct RaceStartBounds {
 }
 
 const GAME_IDS: RaceStartGameIds = RaceStartGameIds {
-    time_attack_menu_mode: 1,
-    no_ghost: 0,
     single_player: 1,
     change_init: 3,
 };
@@ -59,26 +67,83 @@ pub fn write_time_attack_race_setup(
     system_ram: &mut [u8],
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    validate_setup(setup)?;
-    write_menu_setup(system_ram, setup)?;
-    write_live_racer_setup(system_ram, setup)
+    write_race_setup(system_ram, RaceStartMode::TimeAttack, setup)
 }
 
 pub fn write_time_attack_machine_settings(
     system_ram: &mut [u8],
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    validate_setup(setup)?;
-    write_menu_setup(system_ram, setup)
+    write_machine_settings(system_ram, RaceStartMode::TimeAttack, setup)
 }
 
 pub fn force_time_attack_reinit(system_ram: &mut [u8]) -> Result<(), CoreError> {
-    write_i32(system_ram, GLOBALS.game_mode, GameMode::TimeAttack as i32)?;
-    write_i32(
-        system_ram,
-        GLOBALS.queued_game_mode,
-        GameMode::TimeAttack as i32,
-    )?;
+    force_race_reinit(system_ram, RaceStartMode::TimeAttack)
+}
+
+pub fn validate_time_attack_race_setup(
+    system_ram: &[u8],
+    setup: RaceStartSetup,
+) -> Result<(), CoreError> {
+    validate_race_setup(system_ram, RaceStartMode::TimeAttack, setup)
+}
+
+pub fn write_gp_race_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Result<(), CoreError> {
+    write_race_setup(system_ram, RaceStartMode::GpRace, setup)
+}
+
+pub fn write_gp_race_machine_settings(
+    system_ram: &mut [u8],
+    setup: RaceStartSetup,
+) -> Result<(), CoreError> {
+    write_machine_settings(system_ram, RaceStartMode::GpRace, setup)
+}
+
+pub fn force_gp_race_reinit(system_ram: &mut [u8]) -> Result<(), CoreError> {
+    force_race_reinit(system_ram, RaceStartMode::GpRace)
+}
+
+pub fn validate_gp_race_setup(system_ram: &[u8], setup: RaceStartSetup) -> Result<(), CoreError> {
+    validate_race_setup(system_ram, RaceStartMode::GpRace, setup)
+}
+
+pub fn vehicle_setup_info(system_ram: &[u8]) -> Result<VehicleSetupInfo, CoreError> {
+    let character_index = read_i16(system_ram, GLOBALS.player_characters)?;
+    let player_base = player_racer_base();
+    Ok(VehicleSetupInfo {
+        character_index,
+        engine_setting: read_f32(system_ram, GLOBALS.player_engine)?,
+        character_engine_setting: read_f32(
+            system_ram,
+            GLOBALS.character_last_engine + ((character_index as usize) * 4),
+        )?,
+        racer_engine_curve: read_f32(system_ram, player_base + RACER.engine_curve)?,
+    })
+}
+
+fn write_race_setup(
+    system_ram: &mut [u8],
+    mode: RaceStartMode,
+    setup: RaceStartSetup,
+) -> Result<(), CoreError> {
+    validate_setup(setup)?;
+    write_menu_setup(system_ram, mode, setup)?;
+    write_live_racer_setup(system_ram, setup)
+}
+
+fn write_machine_settings(
+    system_ram: &mut [u8],
+    mode: RaceStartMode,
+    setup: RaceStartSetup,
+) -> Result<(), CoreError> {
+    validate_setup(setup)?;
+    write_menu_setup(system_ram, mode, setup)
+}
+
+fn force_race_reinit(system_ram: &mut [u8], mode: RaceStartMode) -> Result<(), CoreError> {
+    let game_mode = mode.game_mode() as i32;
+    write_i32(system_ram, GLOBALS.game_mode, game_mode)?;
+    write_i32(system_ram, GLOBALS.queued_game_mode, game_mode)?;
     write_i16(
         system_ram,
         GLOBALS.game_mode_change_state,
@@ -86,8 +151,9 @@ pub fn force_time_attack_reinit(system_ram: &mut [u8]) -> Result<(), CoreError> 
     )
 }
 
-pub fn validate_time_attack_race_setup(
+fn validate_race_setup(
     system_ram: &[u8],
+    mode: RaceStartMode,
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
     validate_setup(setup)?;
@@ -102,18 +168,22 @@ pub fn validate_time_attack_race_setup(
         read_i32(system_ram, GLOBALS.course_index)?,
         setup.course_index,
     );
-    push_mismatch(
-        &mut mismatches,
-        "selected_mode",
-        read_i32(system_ram, GLOBALS.selected_mode)?,
-        GAME_IDS.time_attack_menu_mode,
-    );
-    push_mismatch(
-        &mut mismatches,
-        "current_ghost_type",
-        read_i32(system_ram, GLOBALS.current_ghost_type)?,
-        GAME_IDS.no_ghost,
-    );
+    if let Some(selected_mode) = mode.menu_state().selected_mode {
+        push_mismatch(
+            &mut mismatches,
+            "selected_mode",
+            read_i32(system_ram, GLOBALS.selected_mode)?,
+            selected_mode,
+        );
+    }
+    if let Some(current_ghost_type) = mode.menu_state().current_ghost_type {
+        push_mismatch(
+            &mut mismatches,
+            "current_ghost_type",
+            read_i32(system_ram, GLOBALS.current_ghost_type)?,
+            current_ghost_type,
+        );
+    }
     push_mismatch(
         &mut mismatches,
         "player_character",
@@ -155,31 +225,21 @@ pub fn validate_time_attack_race_setup(
     }
 }
 
-pub fn vehicle_setup_info(system_ram: &[u8]) -> Result<VehicleSetupInfo, CoreError> {
-    let character_index = read_i16(system_ram, GLOBALS.player_characters)?;
-    let player_base = player_racer_base();
-    Ok(VehicleSetupInfo {
-        character_index,
-        engine_setting: read_f32(system_ram, GLOBALS.player_engine)?,
-        character_engine_setting: read_f32(
-            system_ram,
-            GLOBALS.character_last_engine + ((character_index as usize) * 4),
-        )?,
-        racer_engine_curve: read_f32(system_ram, player_base + RACER.engine_curve)?,
-    })
-}
-
-fn write_menu_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Result<(), CoreError> {
+fn write_menu_setup(
+    system_ram: &mut [u8],
+    mode: RaceStartMode,
+    setup: RaceStartSetup,
+) -> Result<(), CoreError> {
     let engine_value = setup.engine_setting_raw_value as f32 / 100.0;
 
     write_i32(system_ram, GLOBALS.num_players, GAME_IDS.single_player)?;
     write_i32(system_ram, GLOBALS.total_lap_count, setup.total_lap_count)?;
-    write_i32(
-        system_ram,
-        GLOBALS.selected_mode,
-        GAME_IDS.time_attack_menu_mode,
-    )?;
-    write_i32(system_ram, GLOBALS.current_ghost_type, GAME_IDS.no_ghost)?;
+    if let Some(selected_mode) = mode.menu_state().selected_mode {
+        write_i32(system_ram, GLOBALS.selected_mode, selected_mode)?;
+    }
+    if let Some(current_ghost_type) = mode.menu_state().current_ghost_type {
+        write_i32(system_ram, GLOBALS.current_ghost_type, current_ghost_type)?;
+    }
     write_i32(system_ram, GLOBALS.course_index, setup.course_index)?;
     write_i16(system_ram, GLOBALS.player_characters, setup.character_index)?;
     write_i16(
@@ -259,6 +319,28 @@ fn player_racer_base() -> usize {
     GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size)
 }
 
+impl RaceStartMode {
+    const fn game_mode(self) -> GameMode {
+        match self {
+            Self::TimeAttack => GameMode::TimeAttack,
+            Self::GpRace => GameMode::GpRace,
+        }
+    }
+
+    const fn menu_state(self) -> RaceStartMenuState {
+        match self {
+            Self::TimeAttack => RaceStartMenuState {
+                selected_mode: Some(1),
+                current_ghost_type: Some(0),
+            },
+            Self::GpRace => RaceStartMenuState {
+                selected_mode: None,
+                current_ghost_type: None,
+            },
+        }
+    }
+}
+
 fn engine_to_curve_value(engine_value: f32) -> f32 {
     if engine_value == 0.0 {
         0.0
@@ -275,3 +357,7 @@ where
         mismatches.push(format!("{label}: expected {expected:?}, got {actual:?}"));
     }
 }
+
+#[cfg(test)]
+#[path = "tests/race_start_tests.rs"]
+mod tests;

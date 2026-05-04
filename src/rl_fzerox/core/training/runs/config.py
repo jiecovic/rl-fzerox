@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -45,6 +46,7 @@ def materialize_watch_session_config(
         baseline_state_path=baseline_source_path,
         session_name=session_name,
     )
+    shutil.rmtree(paths.session_dir, ignore_errors=True)
     ensure_watch_session_dirs(paths)
     _copy_state_file(
         source=baseline_source_path,
@@ -67,6 +69,7 @@ def materialize_train_run_config(
     *,
     run_paths: RunPaths,
     baseline_cache_root: Path | None = None,
+    startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
     """Rewrite one train config to use run-local runtime and baseline files."""
 
@@ -74,6 +77,7 @@ def materialize_train_run_config(
         config,
         run_paths=run_paths,
         cache_root=baseline_cache_root,
+        startup_reporter=startup_reporter,
     )
     return materialized_config.model_copy(
         update={
@@ -214,6 +218,7 @@ def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: P
             ),
             "train": (
                 "output_root",
+                "explicit_run_dir",
                 "continue_run_dir",
                 "resume_run_dir",
             ),

@@ -12,7 +12,8 @@ from rl_fzerox.core.config.paths import project_root_dir
 class BaselineMaterializerSettings:
     """Stable materializer settings that affect cache identity and filenames."""
 
-    schema_version: int = 8
+    schema_version: int = 10
+    boot_menu_gp_race_mode: str = "boot_menu_gp_race"
     boot_menu_time_attack_mode: str = "boot_menu_time_attack"
     cache_root: Path = field(
         default_factory=lambda: project_root_dir() / "local" / "cache" / "baseline_materializer"

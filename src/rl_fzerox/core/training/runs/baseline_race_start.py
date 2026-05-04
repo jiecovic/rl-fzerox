@@ -10,6 +10,7 @@ from fzerox_emulator import (
     Emulator,
     joypad_mask,
 )
+from fzerox_emulator.base import RaceStartMode
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +43,7 @@ class RaceStartVariant:
     """Target race-start setup materialized from an existing baseline state."""
 
     course_index: int
-    mode: str
+    mode: RaceStartMode
     character_index: int
     engine_setting_raw_value: int
     race_intro_target_timer: int | None
@@ -58,16 +59,29 @@ def materialize_race_start_state(
 ) -> None:
     """Patch race setup globals and let the game rebuild a clean race start."""
 
-    if variant.mode != "time_attack":
-        raise ValueError(
-            f"Race-start materialization currently supports time_attack only, got {variant.mode!r}"
-        )
+    _validate_mode(variant.mode)
     _validate_variant(variant)
 
     emulator.reset()
     _write_race_setup(emulator, variant)
-    _force_time_attack_reinit(emulator)
+    _force_race_reinit(emulator, variant)
     _step_until_ready(emulator, variant)
+
+
+def materialize_race_start_from_boot(
+    *,
+    emulator: Emulator,
+    variant: RaceStartVariant,
+) -> None:
+    """Navigate from a cold boot and save a clean race-start setup."""
+
+    if variant.mode == "time_attack":
+        materialize_time_attack_race_start_from_boot(emulator=emulator, variant=variant)
+        return
+    if variant.mode == "gp_race":
+        materialize_gp_race_start_from_boot(emulator=emulator, variant=variant)
+        return
+    raise ValueError(f"Unsupported race-start mode {variant.mode!r}")
 
 
 def materialize_time_attack_race_start_from_boot(
@@ -108,7 +122,46 @@ def materialize_time_attack_race_start_from_boot(
     _step_until_ready_from_boot(emulator, variant)
 
 
+def materialize_gp_race_start_from_boot(
+    *,
+    emulator: Emulator,
+    variant: RaceStartVariant,
+) -> None:
+    """Navigate from a cold boot and save a clean GP race-start setup."""
+
+    if variant.mode != "gp_race":
+        raise ValueError(
+            f"Boot-menu race-start materialization supports gp_race only, got {variant.mode!r}"
+        )
+    _validate_variant(variant)
+
+    emulator.reset()
+    _release_input(emulator)
+    emulator.step_frames(MENU_TIMING.boot_frames, capture_video=False)
+
+    _press_until_mode(emulator, target_mode="main_menu")
+    emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
+    _press_until_mode(emulator, target_mode="course_select")
+
+    _write_machine_settings(emulator, variant)
+    _press_until_mode(emulator, target_mode="machine_select")
+
+    _select_machine(emulator, variant)
+    _press_until_mode(emulator, target_mode="machine_settings")
+
+    _write_machine_settings(emulator, variant)
+    _press_until_mode(emulator, target_mode="gp_race", require_race_mode=True)
+    _step_until_ready_from_boot(emulator, variant)
+
+
+def _validate_mode(mode: str) -> None:
+    if mode in ("time_attack", "gp_race"):
+        return
+    raise ValueError(f"Unsupported race-start mode {mode!r}")
+
+
 def _validate_variant(variant: RaceStartVariant) -> None:
+    _validate_mode(variant.mode)
     if variant.course_index < 0:
         raise ValueError(f"course_index must be non-negative, got {variant.course_index}")
     if variant.character_index < 0:
@@ -130,7 +183,8 @@ def _validate_variant(variant: RaceStartVariant) -> None:
 
 
 def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
-    emulator.patch_time_attack_race_start_setup(
+    emulator.patch_race_start_setup(
+        mode=variant.mode,
         course_index=variant.course_index,
         character_index=variant.character_index,
         machine_skin_index=variant.machine_skin_index,
@@ -140,7 +194,8 @@ def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
 
 
 def _write_machine_settings(emulator: Emulator, variant: RaceStartVariant) -> None:
-    emulator.patch_time_attack_machine_settings(
+    emulator.patch_machine_settings(
+        mode=variant.mode,
         course_index=variant.course_index,
         character_index=variant.character_index,
         machine_skin_index=variant.machine_skin_index,
@@ -149,8 +204,8 @@ def _write_machine_settings(emulator: Emulator, variant: RaceStartVariant) -> No
     )
 
 
-def _force_time_attack_reinit(emulator: Emulator) -> None:
-    emulator.force_time_attack_reinit()
+def _force_race_reinit(emulator: Emulator, variant: RaceStartVariant) -> None:
+    emulator.force_race_reinit(mode=variant.mode)
 
 
 def _step_until_ready(emulator: Emulator, variant: RaceStartVariant) -> None:
@@ -169,7 +224,7 @@ def _step_until_ready(emulator: Emulator, variant: RaceStartVariant) -> None:
         )
         if not telemetry.in_race_mode:
             continue
-        if telemetry.game_mode_name != "time_attack":
+        if telemetry.game_mode_name != variant.mode:
             continue
         if int(telemetry.course_index) != variant.course_index:
             continue
@@ -204,7 +259,7 @@ def _step_until_ready_from_boot(emulator: Emulator, variant: RaceStartVariant) -
         )
         if not telemetry.in_race_mode:
             continue
-        if telemetry.game_mode_name != "time_attack":
+        if telemetry.game_mode_name != variant.mode:
             continue
         if int(telemetry.course_index) != variant.course_index:
             continue
@@ -287,7 +342,8 @@ def _release_input(emulator: Emulator) -> None:
 
 
 def _validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
-    emulator.validate_time_attack_race_start_setup(
+    emulator.validate_race_start_setup(
+        mode=variant.mode,
         course_index=variant.course_index,
         character_index=variant.character_index,
         machine_skin_index=variant.machine_skin_index,
@@ -307,9 +363,9 @@ def _validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVari
     if telemetry is None:
         mismatches.append("telemetry: unavailable")
     else:
-        if telemetry.game_mode_name != "time_attack":
+        if telemetry.game_mode_name != variant.mode:
             mismatches.append(
-                f"game_mode: expected 'time_attack', got {telemetry.game_mode_name!r}"
+                f"game_mode: expected {variant.mode!r}, got {telemetry.game_mode_name!r}"
             )
         if int(telemetry.course_index) != variant.course_index:
             mismatches.append(

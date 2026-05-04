@@ -25,6 +25,7 @@ from rl_fzerox.core.config.schema import (
     WatchXCupConfig,
 )
 from rl_fzerox.core.training.runs import (
+    RUN_LAYOUT,
     apply_train_run_to_watch_config,
     baseline_materializer,
     build_run_paths,
@@ -35,6 +36,7 @@ from rl_fzerox.core.training.runs import (
     load_train_run_config,
     materialize_train_run_config,
     materialize_watch_session_config,
+    migrate_run_artifact_layout,
     reserve_run_paths,
     resolve_latest_model_path,
     resolve_latest_policy_path,
@@ -86,7 +88,7 @@ def _patch_fake_boot_materializer(
         def close(self) -> None:
             pass
 
-    def fake_materialize_time_attack_race_start_from_boot(
+    def fake_materialize_race_start_from_boot(
         *,
         emulator: object,
         variant: RaceStartVariant,
@@ -97,8 +99,8 @@ def _patch_fake_boot_materializer(
     monkeypatch.setattr(baseline_materializer, "Emulator", FakeEmulator)
     monkeypatch.setattr(
         baseline_materializer,
-        "materialize_time_attack_race_start_from_boot",
-        fake_materialize_time_attack_race_start_from_boot,
+        "materialize_race_start_from_boot",
+        fake_materialize_race_start_from_boot,
     )
     return captured_variants
 
@@ -209,6 +211,48 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     assert (checkpoint_dirs[-1] / "model.zip").is_file()
     assert (checkpoint_dirs[-1] / "policy.zip").is_file()
     assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
+
+
+def test_migrate_run_artifact_layout_moves_root_artifacts_into_checkpoint_tree(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    run_dir.mkdir(parents=True)
+    legacy_files = {
+        "latest_model.zip": b"latest-model",
+        "best_model.zip": b"best-model",
+        "latest_policy.zip": b"latest-policy",
+        "best_policy.zip": b"best-policy",
+        "latest_policy.metadata.json": b'{"num_timesteps": 123}',
+        "best_policy.metadata.json": b'{"num_timesteps": 456}',
+    }
+    for filename, payload in legacy_files.items():
+        (run_dir / filename).write_bytes(payload)
+
+    migrate_run_artifact_layout(run_dir)
+
+    assert not (run_dir / "latest_model.zip").exists()
+    assert not (run_dir / "best_model.zip").exists()
+    assert not (run_dir / "latest_policy.zip").exists()
+    assert not (run_dir / "best_policy.zip").exists()
+    assert (run_dir / RUN_LAYOUT.model_artifacts.latest).read_bytes() == b"latest-model"
+    assert (run_dir / RUN_LAYOUT.model_artifacts.best).read_bytes() == b"best-model"
+    assert (run_dir / RUN_LAYOUT.policy_artifacts.latest).read_bytes() == b"latest-policy"
+    assert (run_dir / RUN_LAYOUT.policy_artifacts.best).read_bytes() == b"best-policy"
+    assert load_policy_artifact_metadata(run_dir / RUN_LAYOUT.policy_artifacts.latest) == (
+        PolicyArtifactMetadata(
+            curriculum_stage_index=None,
+            curriculum_stage_name=None,
+            num_timesteps=123,
+        )
+    )
+    assert load_policy_artifact_metadata(run_dir / RUN_LAYOUT.policy_artifacts.best) == (
+        PolicyArtifactMetadata(
+            curriculum_stage_index=None,
+            curriculum_stage_name=None,
+            num_timesteps=456,
+        )
+    )
 
 
 def test_save_train_run_config_persists_action_branches_without_adapter_fields(
@@ -1048,11 +1092,9 @@ def test_build_watch_session_paths_uses_run_local_watch_root(tmp_path: Path) -> 
         session_name="session-001",
     )
 
-    assert session_paths.session_dir == run_dir / "watch" / "session-001"
-    assert session_paths.runtime_dir == run_dir / "watch" / "session-001" / "runtime"
-    assert session_paths.baseline_state_path == (
-        run_dir / "watch" / "session-001" / "baseline.state"
-    )
+    assert session_paths.session_dir == run_dir / "watch"
+    assert session_paths.runtime_dir == run_dir / "watch" / "runtime"
+    assert session_paths.baseline_state_path == run_dir / "watch" / "baseline.state"
 
 
 def test_materialize_watch_session_config_isolates_runtime_and_baseline(
@@ -1083,10 +1125,10 @@ def test_materialize_watch_session_config_isolates_runtime_and_baseline(
     )
 
     assert materialized.emulator.runtime_dir == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "runtime"
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "runtime"
     )
     assert materialized.emulator.baseline_state_path == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "baseline.state"
     )
     assert materialized.emulator.baseline_state_path is not None
     assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
@@ -1118,7 +1160,7 @@ def test_materialize_watch_session_config_allocates_x_cup_baseline_path(
     )
 
     assert materialized.emulator.baseline_state_path == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "session-001" / "baseline.state"
+        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "baseline.state"
     )
     assert materialized.emulator.baseline_state_path is not None
     assert not materialized.emulator.baseline_state_path.exists()
@@ -1136,3 +1178,34 @@ def test_ensure_watch_session_dirs_creates_runtime_root(tmp_path: Path) -> None:
 
     assert paths.session_dir.is_dir()
     assert paths.runtime_dir.is_dir()
+
+
+def test_materialize_watch_session_config_resets_old_watch_workspace(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    baseline_state_path = tmp_path / "shared.state"
+    watch_root = tmp_path / "runs" / "ppo_cnn_0001" / "watch"
+    core_path.touch()
+    rom_path.touch()
+    baseline_state_path.write_bytes(b"baseline")
+    (watch_root / "old-session" / "runtime").mkdir(parents=True)
+    (watch_root / "old-session" / "artifact.txt").write_text("stale", encoding="utf-8")
+
+    watch_config = WatchAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+            runtime_dir=tmp_path / "runtime",
+            baseline_state_path=baseline_state_path,
+        ),
+        watch=WatchConfig(),
+    )
+
+    materialized = materialize_watch_session_config(
+        watch_config,
+        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
+    )
+
+    assert materialized.emulator.runtime_dir == watch_root / "runtime"
+    assert not (watch_root / "old-session").exists()

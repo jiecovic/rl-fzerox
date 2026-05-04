@@ -1,4 +1,6 @@
 # tests/core/training/test_track_sampling_balance.py
+from pathlib import Path
+
 import pytest
 
 from rl_fzerox.core.config.schema import (
@@ -9,6 +11,8 @@ from rl_fzerox.core.config.schema import (
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     StepBalancedTrackSamplingController,
+    load_track_sampling_runtime_state,
+    save_track_sampling_runtime_state,
 )
 
 
@@ -181,3 +185,48 @@ def test_step_balance_controller_aggregates_duplicate_courses() -> None:
     assert values["track_sampling/big_blue/prob"] == pytest.approx(1.0)
     assert "track_sampling/big_blue_time_attack_blue_falcon_balanced/prob" not in values
     assert "track_sampling/big_blue_gp_blue_falcon_balanced/prob" not in values
+
+
+def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"mute": 1.0, "silence": 1.0},
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=0.5,
+        max_weight_scale=5.0,
+        track_log_keys={"mute": "mute_city", "silence": "silence"},
+        track_labels={"mute": "Mute City", "silence": "Silence"},
+    )
+    controller.record_episodes(
+        (
+            {"track_id": "mute", "episode_step": 100},
+            {"track_id": "silence", "episode_step": 400},
+        )
+    )
+    state_path = tmp_path / "track_sampling_state.json"
+    save_track_sampling_runtime_state(state_path, controller.runtime_state())
+
+    restored_state = load_track_sampling_runtime_state(state_path)
+
+    assert restored_state is not None
+    restored = StepBalancedTrackSamplingController(
+        track_base_weights={"mute": 1.0, "silence": 1.0},
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=0.5,
+        max_weight_scale=5.0,
+        track_log_keys={"mute": "mute_city", "silence": "silence"},
+        track_labels={"mute": "Mute City", "silence": "Silence"},
+        restored_state=restored_state,
+    )
+
+    assert restored.current_weights() == pytest.approx(controller.current_weights())
+    restored_runtime = restored.runtime_state()
+    assert {entry.track_id: entry.completed_frames for entry in restored_runtime.entries} == {
+        "mute": 100,
+        "silence": 400,
+    }
+    assert {entry.track_id: entry.episode_count for entry in restored_runtime.entries} == {
+        "mute": 1,
+        "silence": 1,
+    }

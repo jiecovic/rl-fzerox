@@ -3,19 +3,9 @@ from collections.abc import Callable
 
 from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.domain.action_adapters import (
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
-    ACTION_ADAPTER_STEER_DRIVE,
-    ACTION_ADAPTER_STEER_DRIVE_BOOST,
-    ACTION_ADAPTER_STEER_DRIVE_BOOST_LEAN,
-    ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
+    ACTION_ADAPTERS,
     DEFAULT_ACTION_ADAPTER_NAME,
+    LEGACY_ACTION_ADAPTERS,
     ActionAdapterName,
 )
 from rl_fzerox.core.envs.actions.base import (
@@ -23,6 +13,10 @@ from rl_fzerox.core.envs.actions.base import (
     ActionValue,
     DiscreteActionDimension,
     ResettableActionAdapter,
+)
+from rl_fzerox.core.envs.actions.configured import (
+    ConfiguredDiscreteActionAdapter,
+    ConfiguredHybridActionAdapter,
 )
 from rl_fzerox.core.envs.actions.continuous.steer_drive import (
     ContinuousSteerDriveActionAdapter,
@@ -57,26 +51,28 @@ from rl_fzerox.core.envs.actions.hybrid.facade import (
 ActionAdapterFactory = Callable[[ActionRuntimeConfig], ActionAdapter]
 DEFAULT_ACTION_NAME: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
 ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE: ContinuousSteerDriveActionAdapter,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: HybridSteerDriveBoostLeanActionAdapter,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE: (
+    ACTION_ADAPTERS.configured_discrete: ConfiguredDiscreteActionAdapter,
+    ACTION_ADAPTERS.configured_hybrid: ConfiguredHybridActionAdapter,
+    LEGACY_ACTION_ADAPTERS.continuous_steer_drive: ContinuousSteerDriveActionAdapter,
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_boost_lean: HybridSteerDriveBoostLeanActionAdapter,
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_boost_lean_primitive: (
         HybridSteerDriveBoostLeanPrimitiveActionAdapter
     ),
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH: (
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_air_brake_boost_lean_pitch: (
         HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter
     ),
-    ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: HybridSteerGasBoostLeanActionAdapter,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: (
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_boost_lean: HybridSteerGasBoostLeanActionAdapter,
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_air_brake_boost_lean: (
         HybridSteerGasAirBrakeBoostLeanActionAdapter
     ),
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH: (
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_air_brake_boost_lean_pitch: (
         HybridSteerGasAirBrakeBoostLeanPitchActionAdapter
     ),
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN: HybridSteerDriveLeanActionAdapter,
-    ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_LEAN: SteerGasAirBrakeBoostLeanActionAdapter,
-    ACTION_ADAPTER_STEER_DRIVE: SteerDriveActionAdapter,
-    ACTION_ADAPTER_STEER_DRIVE_BOOST: SteerDriveBoostActionAdapter,
-    ACTION_ADAPTER_STEER_DRIVE_BOOST_LEAN: SteerDriveBoostLeanActionAdapter,
+    LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_lean: HybridSteerDriveLeanActionAdapter,
+    LEGACY_ACTION_ADAPTERS.steer_gas_air_brake_boost_lean: SteerGasAirBrakeBoostLeanActionAdapter,
+    LEGACY_ACTION_ADAPTERS.steer_drive: SteerDriveActionAdapter,
+    LEGACY_ACTION_ADAPTERS.steer_drive_boost: SteerDriveBoostActionAdapter,
+    LEGACY_ACTION_ADAPTERS.steer_drive_boost_lean: SteerDriveBoostLeanActionAdapter,
 }
 
 
@@ -105,6 +101,8 @@ __all__ = [
     "ActionValue",
     "BRAKE_MASK",
     "BOOST_MASK",
+    "ConfiguredDiscreteActionAdapter",
+    "ConfiguredHybridActionAdapter",
     "ContinuousSteerDriveActionAdapter",
     "DEFAULT_ACTION_NAME",
     "DiscreteActionDimension",

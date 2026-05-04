@@ -99,6 +99,12 @@ def draw_watch_frame(
             panel_tab_index=panel_tab_index,
             record_tab_index=record_tab_index,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
+            continuous_drive_enabled=action_config.uses_continuous_drive(),
+            force_full_throttle=bool(action_config.force_full_throttle),
+            continuous_pitch_enabled=(
+                action_config.name == "configured_hybrid"
+                and "pitch" in action_config.layout_continuous_axes
+            ),
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
             continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
             action_repeat=config.env.action_repeat,

@@ -14,7 +14,7 @@ from rl_fzerox.core.envs.rewards.progress import (
     DamagePenaltyState,
 )
 from rl_fzerox.core.envs.rewards.race_v3.bounds import (
-    airborne_descending,
+    airborne_descending_with_epsilon,
     airborne_height_above_ground,
     airborne_offtrack_excess,
     airborne_offtrack_penalty,
@@ -127,10 +127,10 @@ class RaceV3RewardTracker:
         self._progress.ensure_origin(telemetry)
         outside_track_bounds = telemetry_outside_track_bounds(telemetry)
         offtrack_excess = airborne_offtrack_excess(telemetry)
-        descending = airborne_descending(
+        descending = airborne_descending_with_epsilon(
             previous_height=self._previous_airborne_height,
             telemetry=telemetry,
-            weights=self._weights,
+            epsilon=float(self._weights.airborne_offtrack_recovery_descend_epsilon),
         )
         defer_outside_bounds_progress = (
             outside_track_bounds

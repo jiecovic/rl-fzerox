@@ -622,6 +622,46 @@ def test_state_components_can_keep_progress_while_zeroing_track_bounds_fields() 
     assert values["track_position.outside_track_bounds"] == 0.0
 
 
+def test_state_components_can_exclude_track_bounds_fields_and_shrink_shape() -> None:
+    components = (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="machine_context"),
+        ObservationStateComponentSettings(name="track_position"),
+    )
+    telemetry = make_telemetry(
+        signed_lateral_offset=150.0,
+        current_radius_left=100.0,
+        lap_distance=20_000.0,
+        course_length=80_000.0,
+    )
+
+    vector = telemetry_state_vector(
+        telemetry,
+        state_components=components,
+        excluded_state_features=frozenset(
+            {
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            }
+        ),
+    )
+    feature_names = state_feature_names(
+        "race_core",
+        state_components=components,
+        excluded_state_features=frozenset(
+            {
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            }
+        ),
+    )
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert "track_position.edge_ratio" not in values
+    assert "track_position.outside_track_bounds" not in values
+    assert values["track_position.lap_progress"] == 0.25
+
+
 def test_state_components_can_feed_segment_progress_through_progress_slot() -> None:
     components = (
         ObservationStateComponentSettings(name="vehicle_state"),

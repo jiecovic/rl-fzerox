@@ -414,8 +414,33 @@ class Emulator:
         machine_skin_index: int = 0,
         total_lap_count: int = 3,
     ) -> None: ...
+    def patch_gp_race_start_setup(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
+    def patch_gp_race_machine_settings(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
     def force_time_attack_reinit(self) -> None: ...
+    def force_gp_race_reinit(self) -> None: ...
     def validate_time_attack_race_start_setup(
+        self,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        machine_skin_index: int = 0,
+        total_lap_count: int = 3,
+    ) -> None: ...
+    def validate_gp_race_start_setup(
         self,
         course_index: int,
         character_index: int,

@@ -75,6 +75,9 @@ class FrameRenderData:
     panel_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
+    continuous_drive_enabled: bool
+    force_full_throttle: bool
+    continuous_pitch_enabled: bool
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
     action_repeat: int
@@ -203,6 +206,9 @@ def _draw_frame(
         policy_action=data.policy_action,
         action_mask_branches=data.action_mask_branches,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
+        continuous_drive_enabled=data.continuous_drive_enabled,
+        force_full_throttle=data.force_full_throttle,
+        continuous_pitch_enabled=data.continuous_pitch_enabled,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
     )

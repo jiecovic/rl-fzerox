@@ -82,6 +82,8 @@ class TrackSamplingEntryConfig(BaseModel):
     source_vehicle: str | None = None
     engine_setting: str | None = None
     engine_setting_raw_value: NonNegativeInt | None = None
+    engine_setting_min_raw_value: NonNegativeInt | None = None
+    engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
@@ -127,6 +129,8 @@ class TrackConfig(BaseModel):
     source_vehicle: str | None = None
     engine_setting: str | None = None
     engine_setting_raw_value: NonNegativeInt | None = None
+    engine_setting_min_raw_value: NonNegativeInt | None = None
+    engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None

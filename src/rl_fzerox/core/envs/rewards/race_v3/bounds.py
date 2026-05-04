@@ -1,10 +1,23 @@
 # src/rl_fzerox/core/envs/rewards/race_v3/bounds.py
 from __future__ import annotations
 
+from typing import Protocol
+
 from fzerox_emulator import FZeroXTelemetry, StepSummary
 from rl_fzerox.core.envs.rewards.race_v3.progress import FrontierReward
 from rl_fzerox.core.envs.rewards.shared_weights import SharedRewardWeights
 from rl_fzerox.core.envs.track_bounds import track_edge_state
+
+
+class AirborneOfftrackWeights(Protocol):
+    @property
+    def airborne_offtrack_penalty_scale(self) -> float: ...
+
+    @property
+    def airborne_offtrack_recovery_reward_scale(self) -> float: ...
+
+    @property
+    def airborne_offtrack_recovery_requires_descending(self) -> bool: ...
 
 
 def cap_outside_bounds_reentry_reward(
@@ -57,14 +70,26 @@ def airborne_descending(
     *,
     previous_height: float | None,
     telemetry: FZeroXTelemetry,
-    weights: SharedRewardWeights,
 ) -> bool:
-    """Return whether the player is descending enough to reward off-track recovery."""
+    """Return whether airborne height decreased at all since the prior step."""
 
     current_height = airborne_height_above_ground(telemetry)
     if previous_height is None or current_height is None:
         return False
-    epsilon = float(weights.airborne_offtrack_recovery_descend_epsilon)
+    return current_height < previous_height
+
+
+def airborne_descending_with_epsilon(
+    *,
+    previous_height: float | None,
+    telemetry: FZeroXTelemetry,
+    epsilon: float,
+) -> bool:
+    """Legacy descending gate with an explicit minimum downward delta."""
+
+    current_height = airborne_height_above_ground(telemetry)
+    if previous_height is None or current_height is None:
+        return False
     return current_height < previous_height - epsilon
 
 
@@ -72,7 +97,7 @@ def airborne_offtrack_penalty(
     summary: StepSummary,
     outside_excess: float | None,
     *,
-    weights: SharedRewardWeights,
+    weights: AirborneOfftrackWeights,
 ) -> float:
     """Penalize airborne distance beyond the lateral track edge."""
 
@@ -87,7 +112,7 @@ def airborne_offtrack_recovery_reward(
     previous_excess: float | None,
     current_excess: float | None,
     descending: bool,
-    weights: SharedRewardWeights,
+    weights: AirborneOfftrackWeights,
 ) -> float:
     """Shape airborne off-track recovery as a non-farmable potential delta."""
 

@@ -1,12 +1,16 @@
-# src/rl_fzerox/core/domain/action_adapters.py
 """String-backed action adapter names shared by config, env factories, and validation."""
 
 from __future__ import annotations
 
-from typing import Final, Literal, TypeAlias
+from dataclasses import dataclass
+from typing import Literal, TypeAlias
+
+from .action_adapters_legacy import LEGACY_ACTION_ADAPTERS
 
 ActionAdapterName: TypeAlias = Literal[
     "continuous_steer_drive",
+    "configured_discrete",
+    "configured_hybrid",
     "hybrid_steer_drive_boost_lean",
     "hybrid_steer_drive_boost_lean_primitive",
     "hybrid_steer_drive_air_brake_boost_lean_pitch",
@@ -20,56 +24,44 @@ ActionAdapterName: TypeAlias = Literal[
     "steer_drive_boost_lean",
 ]
 
-ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE: Final[ActionAdapterName] = "continuous_steer_drive"
-ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN: Final[ActionAdapterName] = (
-    "hybrid_steer_drive_boost_lean"
-)
-ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE: Final[ActionAdapterName] = (
-    "hybrid_steer_drive_boost_lean_primitive"
-)
-ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH: Final[ActionAdapterName] = (
-    "hybrid_steer_drive_air_brake_boost_lean_pitch"
-)
-ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN: Final[ActionAdapterName] = "hybrid_steer_gas_boost_lean"
-ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN: Final[ActionAdapterName] = (
-    "hybrid_steer_gas_air_brake_boost_lean"
-)
-ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH: Final[ActionAdapterName] = (
-    "hybrid_steer_gas_air_brake_boost_lean_pitch"
-)
-ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN: Final[ActionAdapterName] = "hybrid_steer_drive_lean"
-ACTION_ADAPTER_STEER_GAS_AIR_BRAKE_BOOST_LEAN: Final[ActionAdapterName] = (
-    "steer_gas_air_brake_boost_lean"
-)
-ACTION_ADAPTER_STEER_DRIVE: Final[ActionAdapterName] = "steer_drive"
-ACTION_ADAPTER_STEER_DRIVE_BOOST: Final[ActionAdapterName] = "steer_drive_boost"
-ACTION_ADAPTER_STEER_DRIVE_BOOST_LEAN: Final[ActionAdapterName] = "steer_drive_boost_lean"
 
-DEFAULT_ACTION_ADAPTER_NAME: Final[ActionAdapterName] = ACTION_ADAPTER_STEER_DRIVE_BOOST_LEAN
+@dataclass(frozen=True, slots=True)
+class ActionAdapterCatalog:
+    """Current compositional adapter names plus capability groups."""
+
+    configured_discrete: ActionAdapterName = "configured_discrete"
+    configured_hybrid: ActionAdapterName = "configured_hybrid"
+
+    @property
+    def default(self) -> ActionAdapterName:
+        return LEGACY_ACTION_ADAPTERS.default
+
+    @property
+    def sac(self) -> frozenset[ActionAdapterName]:
+        return LEGACY_ACTION_ADAPTERS.sac
+
+    @property
+    def hybrid(self) -> frozenset[ActionAdapterName]:
+        return frozenset((self.configured_hybrid, *LEGACY_ACTION_ADAPTERS.hybrid))
+
+    @property
+    def continuous_drive(self) -> frozenset[ActionAdapterName]:
+        return LEGACY_ACTION_ADAPTERS.continuous_drive
 
 
-def _adapter_set(*names: ActionAdapterName) -> frozenset[ActionAdapterName]:
-    """Build typed immutable groups while keeping YAML-facing values as strings."""
-    return frozenset(names)
+ACTION_ADAPTERS = ActionAdapterCatalog()
+DEFAULT_ACTION_ADAPTER_NAME = ACTION_ADAPTERS.default
+SAC_ACTION_ADAPTERS = ACTION_ADAPTERS.sac
+HYBRID_ACTION_ADAPTERS = ACTION_ADAPTERS.hybrid
+CONTINUOUS_DRIVE_ACTION_ADAPTERS = ACTION_ADAPTERS.continuous_drive
 
-
-SAC_ACTION_ADAPTERS: Final = _adapter_set(
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-)
-HYBRID_ACTION_ADAPTERS: Final = _adapter_set(
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH,
-)
-
-CONTINUOUS_DRIVE_ACTION_ADAPTERS: Final = _adapter_set(
-    ACTION_ADAPTER_CONTINUOUS_STEER_DRIVE,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN_PRIMITIVE,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
-)
+__all__ = [
+    "ACTION_ADAPTERS",
+    "ActionAdapterCatalog",
+    "ActionAdapterName",
+    "CONTINUOUS_DRIVE_ACTION_ADAPTERS",
+    "DEFAULT_ACTION_ADAPTER_NAME",
+    "HYBRID_ACTION_ADAPTERS",
+    "LEGACY_ACTION_ADAPTERS",
+    "SAC_ACTION_ADAPTERS",
+]

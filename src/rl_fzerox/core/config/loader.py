@@ -67,6 +67,7 @@ def load_train_app_config(
             "curriculum.stages.track_sampling.entries": ("baseline_state_path",),
             "train": (
                 "output_root",
+                "explicit_run_dir",
                 "continue_run_dir",
                 "resume_run_dir",
             ),
