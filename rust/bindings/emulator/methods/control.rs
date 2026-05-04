@@ -140,6 +140,27 @@ pub(in crate::bindings::emulator) fn patch_time_attack_machine_settings(
         .map_err(map_core_error)
 }
 
+pub(in crate::bindings::emulator) fn patch_time_attack_menu_mode(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+) -> PyResult<()> {
+    py.detach(|| emulator.host.patch_time_attack_menu_mode())
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn patch_time_attack_engine_settings(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    engine_setting_raw_value: i32,
+) -> PyResult<()> {
+    py.detach(|| {
+        emulator
+            .host
+            .patch_time_attack_engine_settings(engine_setting_raw_value)
+    })
+    .map_err(map_core_error)
+}
+
 pub(in crate::bindings::emulator) fn patch_gp_race_start_setup(
     emulator: &mut PyEmulator,
     py: Python<'_>,
@@ -178,6 +199,19 @@ pub(in crate::bindings::emulator) fn patch_gp_race_machine_settings(
     };
     py.detach(|| emulator.host.patch_gp_race_machine_settings(setup))
         .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn patch_gp_race_engine_settings(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    engine_setting_raw_value: i32,
+) -> PyResult<()> {
+    py.detach(|| {
+        emulator
+            .host
+            .patch_gp_race_engine_settings(engine_setting_raw_value)
+    })
+    .map_err(map_core_error)
 }
 
 pub(in crate::bindings::emulator) fn force_time_attack_reinit(
@@ -244,7 +278,8 @@ pub(in crate::bindings::emulator) fn vehicle_setup_info<'py>(
         .detach(|| emulator.host.vehicle_setup_info())
         .map_err(map_core_error)?;
     let dict = PyDict::new(py);
-    dict.set_item("vehicle_character_index_ram", setup.character_index)?;
+    dict.set_item("player_character_index_ram", setup.player_character_index)?;
+    dict.set_item("racer_character_index_ram", setup.racer_character_index)?;
     dict.set_item("engine_setting_ram", setup.engine_setting)?;
     dict.set_item("engine_setting_percent_ram", setup.engine_setting * 100.0)?;
     dict.set_item(

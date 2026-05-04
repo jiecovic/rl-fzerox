@@ -108,6 +108,42 @@ class CameraSyncBackend(SyntheticBackend):
         )
 
 
+class CameraSyncAfterIntroBackend(SyntheticBackend):
+    def __init__(
+        self,
+        *,
+        camera_setting_raw: int = 2,
+        race_intro_timer: int = 80,
+        camera_ready_intro_timer: int = 38,
+    ) -> None:
+        super().__init__()
+        self.camera_setting_raw = camera_setting_raw
+        self.race_intro_timer = race_intro_timer
+        self.camera_ready_intro_timer = camera_ready_intro_timer
+
+    def step_frame(self):
+        if (
+            self.last_controller_state.right_stick_x > 0.5
+            and self.race_intro_timer <= self.camera_ready_intro_timer
+        ):
+            self.camera_setting_raw = (self.camera_setting_raw + 1) % 4
+        frame = super().step_frame()
+        if self.race_intro_timer > 0:
+            self.race_intro_timer -= 1
+        return frame
+
+    def try_read_telemetry(self) -> FZeroXTelemetry | None:
+        return make_telemetry(
+            game_mode_raw=1,
+            game_mode_name="gp_race",
+            in_race_mode=True,
+            race_distance=0.0,
+            race_intro_timer=self.race_intro_timer,
+            camera_setting_raw=self.camera_setting_raw,
+            camera_setting_name=camera_setting_name(self.camera_setting_raw),
+        )
+
+
 def telemetry(
     *,
     race_distance: float,

@@ -228,6 +228,22 @@ impl Host {
         crate::core::game::race_start::write_time_attack_machine_settings(system_ram, setup)
     }
 
+    pub fn patch_time_attack_menu_mode(&mut self) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_time_attack_menu_mode(system_ram)
+    }
+
+    pub fn patch_time_attack_engine_settings(
+        &mut self,
+        engine_setting_raw_value: i32,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_time_attack_engine_settings(
+            system_ram,
+            engine_setting_raw_value,
+        )
+    }
+
     pub fn patch_gp_race_start_setup(&mut self, setup: RaceStartSetup) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice_mut()?;
         crate::core::game::race_start::write_gp_race_setup(system_ram, setup)
@@ -239,6 +255,17 @@ impl Host {
     ) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice_mut()?;
         crate::core::game::race_start::write_gp_race_machine_settings(system_ram, setup)
+    }
+
+    pub fn patch_gp_race_engine_settings(
+        &mut self,
+        engine_setting_raw_value: i32,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_gp_race_engine_settings(
+            system_ram,
+            engine_setting_raw_value,
+        )
     }
 
     pub fn force_time_attack_reinit(&mut self) -> Result<(), CoreError> {

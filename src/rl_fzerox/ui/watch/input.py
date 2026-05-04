@@ -5,12 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from fzerox_emulator import (
-    JOYPAD_SELECT,
-    JOYPAD_START,
-    ControllerState,
-    joypad_mask,
-)
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
@@ -173,9 +168,9 @@ def _poll_viewer_input(
         manual_mask |= LEAN_RIGHT_MASK
     pressed_buttons: list[int] = []
     if keys[pygame.K_RETURN]:
-        pressed_buttons.append(JOYPAD_START)
+        pressed_buttons.append(JOYPAD_BUTTONS.start)
     if keys[pygame.K_BACKSPACE]:
-        pressed_buttons.append(JOYPAD_SELECT)
+        pressed_buttons.append(JOYPAD_BUTTONS.select)
     manual_mask |= joypad_mask(*pressed_buttons)
 
     left_stick_x = 0.0

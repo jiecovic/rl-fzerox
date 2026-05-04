@@ -19,7 +19,8 @@ class FrameObservationOptionsDict(TypedDict):
     minimap_resize_filter: Literal["nearest", "bilinear"]
 
 class VehicleSetupInfoDict(TypedDict):
-    vehicle_character_index_ram: int
+    player_character_index_ram: int
+    racer_character_index_ram: int
     engine_setting_ram: float
     engine_setting_percent_ram: float
     character_engine_setting_ram: float
@@ -403,7 +404,7 @@ class Emulator:
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
     ) -> None: ...
     def patch_time_attack_machine_settings(
@@ -411,15 +412,20 @@ class Emulator:
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
+    ) -> None: ...
+    def patch_time_attack_menu_mode(self) -> None: ...
+    def patch_time_attack_engine_settings(
+        self,
+        engine_setting_raw_value: int,
     ) -> None: ...
     def patch_gp_race_start_setup(
         self,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
     ) -> None: ...
     def patch_gp_race_machine_settings(
@@ -427,8 +433,12 @@ class Emulator:
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
+    ) -> None: ...
+    def patch_gp_race_engine_settings(
+        self,
+        engine_setting_raw_value: int,
     ) -> None: ...
     def force_time_attack_reinit(self) -> None: ...
     def force_gp_race_reinit(self) -> None: ...
@@ -437,7 +447,7 @@ class Emulator:
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
     ) -> None: ...
     def validate_gp_race_start_setup(
@@ -445,7 +455,7 @@ class Emulator:
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
+        machine_skin_index: int = -1,
         total_lap_count: int = 3,
     ) -> None: ...
     def vehicle_setup_info(self) -> VehicleSetupInfoDict: ...
@@ -466,20 +476,3 @@ class CoreInfo:
 def probe_core(core_path: str) -> CoreInfo: ...
 def encode_state_flags(labels: list[str] | tuple[str, ...]) -> int: ...
 def joypad_mask(*buttons: int) -> int: ...
-
-JOYPAD_B: int
-JOYPAD_Y: int
-JOYPAD_SELECT: int
-JOYPAD_START: int
-JOYPAD_UP: int
-JOYPAD_DOWN: int
-JOYPAD_LEFT: int
-JOYPAD_RIGHT: int
-JOYPAD_A: int
-JOYPAD_X: int
-JOYPAD_L: int
-JOYPAD_R: int
-JOYPAD_L2: int
-JOYPAD_R2: int
-JOYPAD_L3: int
-JOYPAD_R3: int

@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import JOYPAD_L2, JOYPAD_R, JOYPAD_Y, ControllerState, joypad_mask
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
 from fzerox_emulator.arrays import ActionMask, DiscreteAction
 from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.envs.actions.base import (
@@ -27,9 +27,9 @@ from rl_fzerox.core.envs.actions.discrete.steer_drive import (
 # - N64 B -> boost
 # - N64 Z -> left lean / left side-input edge
 # - N64 R -> right lean / right side-input edge
-BOOST_MASK = joypad_mask(JOYPAD_Y)
-LEAN_LEFT_MASK = joypad_mask(JOYPAD_L2)
-LEAN_RIGHT_MASK = joypad_mask(JOYPAD_R)
+BOOST_MASK = joypad_mask(JOYPAD_BUTTONS.y)
+LEAN_LEFT_MASK = joypad_mask(JOYPAD_BUTTONS.l2)
+LEAN_RIGHT_MASK = joypad_mask(JOYPAD_BUTTONS.r)
 LEAN_MASKS = (
     0,
     LEAN_LEFT_MASK,

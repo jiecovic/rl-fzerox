@@ -2,7 +2,7 @@
 use super::{
     RaceStartSetup, force_gp_race_reinit, force_time_attack_reinit, validate_gp_race_setup,
     validate_time_attack_race_setup, write_gp_race_machine_settings, write_gp_race_setup,
-    write_time_attack_machine_settings, write_time_attack_race_setup,
+    write_time_attack_machine_settings, write_time_attack_menu_mode, write_time_attack_race_setup,
 };
 use crate::core::game::telemetry::layout::{GLOBALS, TELEMETRY_CONFIG};
 
@@ -63,6 +63,31 @@ fn force_reinit_sets_expected_target_game_mode() {
     assert_eq!(read_i16(&memory, GLOBALS.game_mode_change_state), 3);
 }
 
+#[test]
+fn preserve_machine_skin_leaves_existing_skin_untouched() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let mut setup = sample_setup();
+    setup.machine_skin_index = -1;
+
+    write_i16(&mut memory, GLOBALS.player_machine_skins, 111);
+    write_time_attack_machine_settings(&mut memory, setup).expect("machine settings should write");
+    assert_eq!(
+        read_i16(&memory, GLOBALS.player_machine_skins),
+        111,
+        "preserve sentinel should not overwrite the selected machine skin"
+    );
+}
+
+#[test]
+fn time_attack_menu_mode_sets_time_attack_selection_without_full_setup() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+
+    write_time_attack_menu_mode(&mut memory).expect("time attack menu mode should write");
+    assert_eq!(read_i32(&memory, GLOBALS.num_players), 1);
+    assert_eq!(read_i32(&memory, GLOBALS.selected_mode), 1);
+    assert_eq!(read_i32(&memory, GLOBALS.current_ghost_type), 0);
+}
+
 fn sample_setup() -> RaceStartSetup {
     RaceStartSetup {
         course_index: 5,
@@ -79,4 +104,8 @@ fn read_i32(memory: &[u8], offset: usize) -> i32 {
 
 fn read_i16(memory: &[u8], offset: usize) -> i16 {
     i16::from_le_bytes(memory[offset..offset + 2].try_into().expect("two bytes"))
+}
+
+fn write_i16(memory: &mut [u8], offset: usize, value: i16) {
+    memory[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
 }

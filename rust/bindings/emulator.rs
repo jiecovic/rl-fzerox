@@ -420,6 +420,19 @@ impl PyEmulator {
         )
     }
 
+    fn patch_time_attack_menu_mode(&mut self, py: Python<'_>) -> PyResult<()> {
+        methods::control::patch_time_attack_menu_mode(self, py)
+    }
+
+    #[pyo3(signature = (engine_setting_raw_value))]
+    fn patch_time_attack_engine_settings(
+        &mut self,
+        py: Python<'_>,
+        engine_setting_raw_value: i32,
+    ) -> PyResult<()> {
+        methods::control::patch_time_attack_engine_settings(self, py, engine_setting_raw_value)
+    }
+
     #[pyo3(signature = (
         course_index,
         character_index,
@@ -472,6 +485,15 @@ impl PyEmulator {
             machine_skin_index,
             total_lap_count,
         )
+    }
+
+    #[pyo3(signature = (engine_setting_raw_value))]
+    fn patch_gp_race_engine_settings(
+        &mut self,
+        py: Python<'_>,
+        engine_setting_raw_value: i32,
+    ) -> PyResult<()> {
+        methods::control::patch_gp_race_engine_settings(self, py, engine_setting_raw_value)
     }
 
     fn force_time_attack_reinit(&mut self, py: Python<'_>) -> PyResult<()> {
