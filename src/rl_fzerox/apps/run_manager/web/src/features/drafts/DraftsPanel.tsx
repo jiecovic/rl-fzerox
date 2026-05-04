@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ManagedDraft } from "@/shared/api/contract";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { formatDate } from "@/shared/ui/format";
+import { PlusIcon, TrashIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface DraftsPanelProps {
@@ -107,32 +108,5 @@ export function DraftsPanel({
         onConfirm={() => void confirmDelete()}
       />
     </>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M10 4.5v11M4.5 10h11"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M6.5 6.5v7M10 6.5v7M13.5 6.5v7M4.5 4.5h11M7.5 4.5l.8-1.5h3.4l.8 1.5M6 4.5v11h8v-11"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
   );
 }

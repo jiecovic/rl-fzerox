@@ -8,6 +8,7 @@ import {
   formatPixelDrop,
 } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
+import { AddLayerIcon, RemoveLayerIcon } from "@/shared/ui/icons";
 
 type CustomConvLayer = ManagedRunConfig["policy"]["custom_conv_layers"][number];
 
@@ -271,20 +272,4 @@ function syncLayerRowIds(rowIds: string[], length: number, label: string) {
     rowIds.push(`${label}-${crypto.randomUUID()}`);
   }
   rowIds.length = length;
-}
-
-function AddLayerIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path d="M10 4v12M4 10h12" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function RemoveLayerIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="12" viewBox="0 0 20 20" width="12">
-      <path d="M5 10h10" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
-    </svg>
-  );
 }

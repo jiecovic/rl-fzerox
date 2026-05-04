@@ -6,6 +6,7 @@ import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { formatDate, formatRelativeTime } from "@/shared/ui/format";
+import { BranchSourceIcon, ChevronIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface RunsPanelProps {
@@ -653,20 +654,6 @@ function statusLabel(run: ManagedRun) {
   return run.status;
 }
 
-function BranchSourceIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" viewBox="0 0 16 16">
-      <path
-        d="M5 3.5a1.5 1.5 0 1 1-3 0A1.5 1.5 0 0 1 5 3.5Zm0 9a1.5 1.5 0 1 1-3 0A1.5 1.5 0 0 1 5 12.5Zm0-9v2c0 1.105.895 2 2 2h2.25a1.75 1.75 0 1 1 0 1H7a3 3 0 0 1-3-3v-2"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.25"
-      />
-    </svg>
-  );
-}
-
 function deleteDisabledReason(entry: RunLineageRun, busy: boolean, isDeleting: boolean) {
   if (busy || isDeleting) {
     return "Wait for the current action to finish";
@@ -694,61 +681,4 @@ function deleteDescription(pendingDelete: PendingDelete | null) {
     return `Delete lineage "${pendingDelete.lineage.label}"? All runs, dependent fork drafts, and lineage files on disk will be removed.`;
   }
   return `Delete run "${pendingDelete.run.name}"? Its manager record and run directory will be removed from disk.`;
-}
-
-function TrashIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M6.5 6.5v7M10 6.5v7M13.5 6.5v7M4.5 4.5h11M7.5 4.5l.8-1.5h3.4l.8 1.5M6 4.5v11h8v-11"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <rect
-        height="9"
-        rx="1.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        width="9"
-        x="5.5"
-        y="5.5"
-      />
-    </svg>
-  );
-}
-
-function ResumeIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M7 5.5v9l7-4.5-7-4.5Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M7 5.5 12 10 7 14.5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.7"
-      />
-    </svg>
-  );
 }

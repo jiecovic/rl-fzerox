@@ -15,6 +15,7 @@ import {
   launchRun,
   openRunDirectory,
   renameRun,
+  resetRunTrackSamplingState,
   resumeRun,
   stopRun,
   updateDraftWithSource,
@@ -269,6 +270,10 @@ export function App() {
     await watchRun(runId, artifact);
   }
 
+  async function resetManagedRunTrackPool(runId: string) {
+    await resetRunTrackSamplingState(runId);
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -331,12 +336,14 @@ export function App() {
                     <Notice tone="error">This run is no longer available.</Notice>
                   ) : (
                     <RunWorkspace
+                      allRuns={runs}
                       metadata={metadata}
                       run={run}
                       onOpenDirectory={openManagedRunDirectory}
                       onFork={forkManagedRun}
                       onRename={renameManagedRun}
                       onResume={resumeManagedRun}
+                      onResetTrackPool={resetManagedRunTrackPool}
                       onShowCharts={showRunCharts}
                       onStop={stopManagedRun}
                       onWatch={watchManagedRun}

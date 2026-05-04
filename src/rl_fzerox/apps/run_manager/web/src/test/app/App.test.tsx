@@ -154,7 +154,12 @@ describe("App", () => {
 
     const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
     await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
-    await user.click(screen.getByRole("button", { name: "Open run ppo_test_1" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
     await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
 
     expect(launchRunMock).not.toHaveBeenCalled();
@@ -176,28 +181,43 @@ describe("App", () => {
     if (runtime === null) {
       throw new Error("run fixture must include runtime data");
     }
+    const parentRun = runFixture({
+      id: "run-parent",
+      status: "stopped",
+      started_at: "2026-05-03T17:35:24+00:00",
+      stopped_at: "2026-05-03T18:35:24+00:00",
+      runtime: {
+        ...runtime,
+        num_timesteps: 180_000,
+        updated_at: "2026-05-03T18:35:24+00:00",
+        fps: null,
+      },
+    });
+    const childRun = runFixture({
+      id: "run-001",
+      status: "stopped",
+      lineage_step_offset: 180_000,
+      parent_run_id: "run-parent",
+      started_at: "2026-05-03T18:35:24+00:00",
+      stopped_at: "2026-05-03T19:05:24+00:00",
+      config: {
+        ...managedRunConfigFixture,
+        action: {
+          ...managedRunConfigFixture.action,
+          action_repeat: 2,
+        },
+      },
+      runtime: {
+        ...runtime,
+        num_timesteps: 60_000,
+        updated_at: "2026-05-03T19:05:24+00:00",
+        fps: null,
+      },
+    });
     loadManagerDataMock.mockResolvedValueOnce({
       drafts: [],
       metadata: configMetadataFixture,
-      runs: [
-        runFixture({
-          id: "run-001",
-          status: "stopped",
-          lineage_step_offset: 180_000,
-          stopped_at: "2026-05-03T19:05:24+00:00",
-          config: {
-            ...managedRunConfigFixture,
-            action: {
-              ...managedRunConfigFixture.action,
-              action_repeat: 2,
-            },
-          },
-          runtime: {
-            ...runtime,
-            num_timesteps: 60_000,
-          },
-        }),
-      ],
+      runs: [parentRun, childRun],
       templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
     });
 
@@ -205,14 +225,122 @@ describe("App", () => {
 
     const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
     await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
-    await user.click(screen.getByRole("button", { name: "Open run ppo_test_1" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
 
-    const simMetric = (await screen.findByText("Sim game time")).closest(".run-runtime-metric");
-    expect(simMetric?.textContent).toContain("2h 13m");
-    const ratioMetric = screen.getByText("Sim / wall").closest(".run-runtime-metric");
-    expect(ratioMetric?.textContent).toContain("2.52x");
+    const wallLocalMetric = (await screen.findByText("Wall time · local")).closest(
+      ".run-runtime-metric",
+    );
+    expect(wallLocalMetric?.textContent).toMatch(/29m 59s|30m 0s/);
+    const wallTotalMetric = screen.getByText("Wall time · total").closest(".run-runtime-metric");
+    expect(wallTotalMetric?.textContent).toMatch(/1h 29m 59s|1h 30m 0s/);
+    const simLocalMetric = (await screen.findByText("Sim game time · local")).closest(
+      ".run-runtime-metric",
+    );
+    expect(simLocalMetric?.textContent).toContain("33m 20s");
+    const simTotalMetric = screen.getByText("Sim game time · total").closest(".run-runtime-metric");
+    expect(simTotalMetric?.textContent).toContain("2h 13m 20s");
+    const ratioLocalMetric = screen.getByText("Sim / wall · local").closest(".run-runtime-metric");
+    expect(ratioLocalMetric?.textContent).toContain("1.11x");
+    const ratioTotalMetric = screen.getByText("Sim / wall · total").closest(".run-runtime-metric");
+    expect(ratioTotalMetric?.textContent).toContain("1.48x");
     expect(screen.getByText(/lineage steps ·/i).textContent).toContain(
       "240,000 lineage steps · 60,000 / 50,000,000 local fork steps",
     );
+  });
+
+  it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {
+    const user = userEvent.setup();
+    const baseRuntime = runFixture().runtime;
+    if (baseRuntime === null) {
+      throw new Error("run fixture must include runtime data");
+    }
+    const staleStartedRun = runFixture({
+      id: "run-001",
+      name: "ppo_test_1 - all tracks",
+      status: "running",
+      created_at: "2026-05-04T15:35:04+00:00",
+      started_at: "2026-05-04T15:35:04+00:00",
+      lineage_step_offset: 22_079_560,
+      parent_run_id: "run-parent",
+      config: {
+        ...managedRunConfigFixture,
+        action: {
+          ...managedRunConfigFixture.action,
+          action_repeat: 2,
+        },
+      },
+      runtime: {
+        ...baseRuntime,
+        num_timesteps: 600,
+        fps: 60,
+        updated_at: "2026-05-04T17:00:10+00:00",
+      },
+    });
+    const parentRun = runFixture({
+      id: "run-parent",
+      status: "stopped",
+      runtime: null,
+      started_at: "2026-05-03T10:00:00+00:00",
+      stopped_at: "2026-05-03T11:00:00+00:00",
+    });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [parentRun, staleStartedRun],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", {
+      name: "Open run ppo_test_1 - all tracks",
+    });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+
+    const wallLocalMetric = (await screen.findByText("Wall time · local")).closest(
+      ".run-runtime-metric",
+    );
+    expect(wallLocalMetric?.textContent).toContain("10s");
+    const ratioLocalMetric = screen.getByText("Sim / wall · local").closest(".run-runtime-metric");
+    expect(ratioLocalMetric?.textContent).toContain("2.00x");
+  });
+
+  it("shows lineage step fallback for failed forks without runtime samples", async () => {
+    const user = userEvent.setup();
+    const failedForkRun = runFixture({
+      id: "20260504-153504-ed51f7e7",
+      name: "ppo_test_1 - all tracks",
+      status: "failed",
+      lineage_step_offset: 20_304_180,
+      source_num_timesteps: 20_304_180,
+      runtime: null,
+    });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [failedForkRun],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    await user.click(screen.getByRole("button", { name: "Open run ppo_test_1 - all tracks" }));
+
+    const lineageStepsMetric = await screen.findByText("Lineage steps");
+    expect(lineageStepsMetric.closest(".run-runtime-metric")?.textContent).toContain("20,304,180");
+    expect(screen.getByText("20260504-153504-ed51f7e7")).toBeInTheDocument();
   });
 });

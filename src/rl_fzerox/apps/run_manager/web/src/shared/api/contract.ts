@@ -347,7 +347,10 @@ export const trackSamplingRuntimeEntrySchema = z.object({
   current_weight: z.number().nonnegative(),
   current_probability: z.number().min(0).max(1),
   episode_count: z.number().int().nonnegative(),
+  finished_episode_count: z.number().int().nonnegative(),
+  success_sample_count: z.number().int().nonnegative(),
   episode_share: z.number().min(0).max(1),
+  success_rate: z.number().min(0).max(1).nullable(),
   completed_frames: z.number().int().nonnegative(),
   completed_env_steps: z.number().int().nonnegative(),
   step_share: z.number().min(0).max(1),
@@ -386,6 +389,10 @@ export const forkRunResponseSchema = createRunResponseSchema;
 
 export const deleteRunResponseSchema = z.object({
   deleted: z.boolean(),
+});
+
+export const resetTrackSamplingResponseSchema = z.object({
+  reset: z.boolean(),
 });
 
 export const openRunDirectoryResponseSchema = z.object({
