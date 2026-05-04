@@ -1,8 +1,8 @@
-# src/rl_fzerox/core/manager/architecture_preview.py
+# src/rl_fzerox/core/manager/architecture/preview.py
 from __future__ import annotations
 
-from rl_fzerox.core.manager.architecture_metadata import component_features, preset_geometry
-from rl_fzerox.core.manager.architecture_models import (
+from rl_fzerox.core.manager.architecture.metadata import component_features, preset_geometry
+from rl_fzerox.core.manager.architecture.models import (
     ActionBranchPreview,
     ArchitectureLanePreview,
     ArchitectureNodePreview,

@@ -1,13 +1,13 @@
-# src/rl_fzerox/core/manager/architecture_metadata.py
+# src/rl_fzerox/core/manager/architecture/metadata.py
 from __future__ import annotations
 
 from collections.abc import Iterable
 
-from rl_fzerox.core.config.vehicle_catalog import CATALOG
+from rl_fzerox.core.config.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
 from rl_fzerox.core.envs.observations.state.components import state_component_definition
 from rl_fzerox.core.envs.observations.state.types import StateFeature
-from rl_fzerox.core.manager.architecture_models import (
+from rl_fzerox.core.manager.architecture.models import (
     BuiltInCourseInfo,
     EngineSettingPresetInfo,
     ObservationPresetInfo,
@@ -161,8 +161,8 @@ def vehicle_infos() -> tuple[VehicleInfo, ...]:
             display_name=vehicle.display_name,
             character_index=vehicle.character_index,
             machine_select_slot=vehicle.machine_select_slot,
-            menu_row=vehicle.machine_select_slot // 6,
-            menu_column=vehicle.machine_select_slot % 6,
+            menu_row=vehicle_menu_row_and_column(vehicle.machine_select_slot)[0],
+            menu_column=vehicle_menu_row_and_column(vehicle.machine_select_slot)[1],
         )
         for vehicle in CATALOG.vehicles
     )

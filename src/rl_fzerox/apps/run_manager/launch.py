@@ -185,29 +185,71 @@ class ManagerRunLauncher:
         if run.status not in {"paused", "stopped", "failed"}:
             raise ValueError("only paused, stopped, or failed runs can be resumed")
 
+        self._store.clear_run_command(run.id)
+        reset_local_clock = False
         try:
             resolve_model_artifact_path(run.run_dir, artifact="latest")
-        except FileNotFoundError as error:
-            raise ValueError(
-                "no resumable checkpoint exists for this run yet; "
-                "resume cannot continue it safely"
-            ) from error
+        except FileNotFoundError:
+            if run.source_snapshot_dir is None and run.source_run_id is None:
+                raise ValueError(
+                    "no resumable checkpoint exists for this run yet; "
+                    "resume cannot continue it safely"
+                ) from None
+            run, restored = self._ensure_fork_source_snapshot(run)
+            reset_local_clock = True
+            self._spawn_worker(run_id=run.id, resume=False)
+            message = (
+                "training worker relaunched from "
+                f"{'rebuilt ' if restored else ''}pinned fork source; "
+                f"log: {_manager_worker_log_path(run.id)}"
+            )
+        else:
+            self._spawn_worker(run_id=run.id, resume=True)
+            message = (
+                "training worker resumed from latest checkpoint; "
+                f"log: {_manager_worker_log_path(run.id)}"
+            )
 
-        self._store.clear_run_command(run.id)
-        self._spawn_worker(run_id=run.id, resume=True)
+        if reset_local_clock:
+            self._store.clear_run_runtime(run.id)
         resumed = self._store.update_run_status(
             run_id=run.id,
             status="running",
-            started_at=None,
+            started_at=_utc_now() if reset_local_clock else None,
             stopped_at=None,
-            message=(
-                "training worker resumed from latest checkpoint; "
-                f"log: {_manager_worker_log_path(run.id)}"
-            ),
+            message=message,
         )
         if resumed is None:
             raise RuntimeError(f"managed run disappeared during resume: {run.id}")
         return resumed
+
+    def _ensure_fork_source_snapshot(self, run: ManagedRun) -> tuple[ManagedRun, bool]:
+        """Restore a missing pinned fork source before a warm-start relaunch."""
+
+        snapshot_dir = run.source_snapshot_dir or run_fork_source_dir(run_dir=run.run_dir)
+        if snapshot_dir.is_dir():
+            return run, False
+        if run.source_run_id is None or run.source_artifact is None:
+            raise ValueError(
+                "fork source snapshot is missing and this run cannot rebuild it safely"
+            )
+        source_run = self._store.get_run(run.source_run_id)
+        if source_run is None:
+            raise ValueError(f"source run not found for forked run: {run.source_run_id}")
+        source_num_timesteps = snapshot_fork_source(
+            source_run_dir=source_run.run_dir,
+            artifact=run.source_artifact,
+            destination_dir=snapshot_dir,
+        )
+        refreshed = self._store.update_run_fork_source(
+            run_id=run.id,
+            source_snapshot_dir=snapshot_dir,
+            source_num_timesteps=source_num_timesteps,
+            lineage_step_offset=source_run.lineage_step_offset + source_num_timesteps,
+        )
+        if refreshed is None:
+            raise RuntimeError(f"managed run disappeared while rebuilding fork source: {run.id}")
+        return refreshed, True
 
     def request_pause(self, *, run_id: str) -> ManagedRun:
         """Request a graceful pause for one running run."""

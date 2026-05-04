@@ -1,4 +1,4 @@
-# src/rl_fzerox/core/manager/architecture_models.py
+# src/rl_fzerox/core/manager/architecture/models.py
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict

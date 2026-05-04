@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import rl_fzerox.core.manager.store as store_module
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
 
 
@@ -19,6 +20,28 @@ def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
     assert len(templates) == 1
     assert templates[0].id == "all_cups_recurrent_ppo"
     assert templates[0].config == default_managed_run_config()
+
+
+def test_manager_store_initializes_schema_only_once_per_instance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    call_count = 0
+    original_initialize_schema = store_module.initialize_manager_schema
+
+    def wrapped_initialize_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
+        nonlocal call_count
+        call_count += 1
+        original_initialize_schema(connection, applied_at=applied_at)
+
+    monkeypatch.setattr(store_module, "initialize_manager_schema", wrapped_initialize_schema)
+
+    store = ManagerStore(tmp_path / "runs.db")
+
+    assert store.pending_run_command("missing-run") is None
+    assert store.pending_run_command("missing-run") is None
+
+    assert call_count == 1
 
 
 def test_manager_store_refreshes_system_template_to_current_defaults(tmp_path: Path) -> None:
