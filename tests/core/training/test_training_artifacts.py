@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -25,7 +26,6 @@ from rl_fzerox.core.config.schema import (
     WatchXCupConfig,
 )
 from rl_fzerox.core.training.runs import (
-    RUN_LAYOUT,
     apply_train_run_to_watch_config,
     baseline_materializer,
     build_run_paths,
@@ -36,7 +36,6 @@ from rl_fzerox.core.training.runs import (
     load_train_run_config,
     materialize_train_run_config,
     materialize_watch_session_config,
-    migrate_run_artifact_layout,
     reserve_run_paths,
     resolve_latest_model_path,
     resolve_latest_policy_path,
@@ -44,9 +43,11 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
-from rl_fzerox.core.training.runs.baseline_race_start import RaceStartVariant
+from rl_fzerox.core.training.runs.baseline_materializer.requests import request_from_track_entry
+from rl_fzerox.core.training.runs.race_start import RaceStartVariant
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
+    cleanup_failed_run,
     list_recent_checkpoint_dirs,
     load_policy_artifact_metadata,
     save_artifacts_atomically,
@@ -71,16 +72,39 @@ class _FakeModel:
         Path(path).write_bytes(b"model")
 
 
+@dataclass
+class _FakeMaterializerCapture:
+    variants: list[RaceStartVariant]
+    generic_modes: list[str]
+    baseline_state_paths: list[Path | None]
+
+
 def _patch_fake_boot_materializer(
     monkeypatch: MonkeyPatch,
     *,
     payload: bytes = b"generated",
-) -> list[RaceStartVariant]:
-    captured_variants: list[RaceStartVariant] = []
+) -> _FakeMaterializerCapture:
+    capture = _FakeMaterializerCapture(variants=[], generic_modes=[], baseline_state_paths=[])
 
     class FakeEmulator:
-        def __init__(self, **_: object) -> None:
+        def __init__(self, **kwargs: object) -> None:
+            raw_baseline_state_path = kwargs.get("baseline_state_path")
+            baseline_state_path = (
+                raw_baseline_state_path if isinstance(raw_baseline_state_path, Path) else None
+            )
+            capture.baseline_state_paths.append(baseline_state_path)
+
+        def reset(self) -> None:
             pass
+
+        def set_controller_state(self, _: object) -> None:
+            pass
+
+        def step_frames(self, _: int, *, capture_video: bool = False) -> None:
+            del capture_video
+
+        def try_read_telemetry(self):
+            return None
 
         def save_state(self, path: Path) -> None:
             path.write_bytes(payload)
@@ -88,21 +112,34 @@ def _patch_fake_boot_materializer(
         def close(self) -> None:
             pass
 
-    def fake_materialize_race_start_from_boot(
+    def fake_materialize_generic_mode_seed(
+        *,
+        emulator: object,
+        mode: str,
+    ) -> None:
+        del emulator
+        capture.generic_modes.append(mode)
+
+    def fake_materialize_race_start_from_menu_seed(
         *,
         emulator: object,
         variant: RaceStartVariant,
     ) -> None:
         del emulator
-        captured_variants.append(variant)
+        capture.variants.append(variant)
 
     monkeypatch.setattr(baseline_materializer, "Emulator", FakeEmulator)
     monkeypatch.setattr(
         baseline_materializer,
-        "materialize_race_start_from_boot",
-        fake_materialize_race_start_from_boot,
+        "materialize_generic_mode_seed",
+        fake_materialize_generic_mode_seed,
     )
-    return captured_variants
+    monkeypatch.setattr(
+        baseline_materializer,
+        "materialize_race_start_from_menu_seed",
+        fake_materialize_race_start_from_menu_seed,
+    )
+    return capture
 
 
 def _required_baseline_path(entry: TrackSamplingEntryConfig) -> Path:
@@ -211,48 +248,6 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     assert (checkpoint_dirs[-1] / "model.zip").is_file()
     assert (checkpoint_dirs[-1] / "policy.zip").is_file()
     assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
-
-
-def test_migrate_run_artifact_layout_moves_root_artifacts_into_checkpoint_tree(
-    tmp_path: Path,
-) -> None:
-    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
-    run_dir.mkdir(parents=True)
-    legacy_files = {
-        "latest_model.zip": b"latest-model",
-        "best_model.zip": b"best-model",
-        "latest_policy.zip": b"latest-policy",
-        "best_policy.zip": b"best-policy",
-        "latest_policy.metadata.json": b'{"num_timesteps": 123}',
-        "best_policy.metadata.json": b'{"num_timesteps": 456}',
-    }
-    for filename, payload in legacy_files.items():
-        (run_dir / filename).write_bytes(payload)
-
-    migrate_run_artifact_layout(run_dir)
-
-    assert not (run_dir / "latest_model.zip").exists()
-    assert not (run_dir / "best_model.zip").exists()
-    assert not (run_dir / "latest_policy.zip").exists()
-    assert not (run_dir / "best_policy.zip").exists()
-    assert (run_dir / RUN_LAYOUT.model_artifacts.latest).read_bytes() == b"latest-model"
-    assert (run_dir / RUN_LAYOUT.model_artifacts.best).read_bytes() == b"best-model"
-    assert (run_dir / RUN_LAYOUT.policy_artifacts.latest).read_bytes() == b"latest-policy"
-    assert (run_dir / RUN_LAYOUT.policy_artifacts.best).read_bytes() == b"best-policy"
-    assert load_policy_artifact_metadata(run_dir / RUN_LAYOUT.policy_artifacts.latest) == (
-        PolicyArtifactMetadata(
-            curriculum_stage_index=None,
-            curriculum_stage_name=None,
-            num_timesteps=123,
-        )
-    )
-    assert load_policy_artifact_metadata(run_dir / RUN_LAYOUT.policy_artifacts.best) == (
-        PolicyArtifactMetadata(
-            curriculum_stage_index=None,
-            curriculum_stage_name=None,
-            num_timesteps=456,
-        )
-    )
 
 
 def test_save_train_run_config_persists_action_branches_without_adapter_fields(
@@ -660,7 +655,7 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
     cache_root = tmp_path / "cache"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+    capture = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
@@ -711,12 +706,15 @@ def test_materialize_train_run_config_reuses_baseline_materializer_cache(
         )
     )
     assert first_metadata["cache_key"] == second_metadata["cache_key"]
-    assert first_metadata["materializer_mode"] == "boot_menu_time_attack"
-    assert len(captured_variants) == 1
-    assert len(list(cache_root.glob("*.state"))) == 1
+    assert first_metadata["materializer_mode"] == "course_vehicle_seed_time_attack"
+    assert capture.generic_modes == ["time_attack"]
+    assert capture.baseline_state_paths[0] is None
+    assert capture.baseline_state_paths[1] is not None
+    assert len(capture.variants) == 1
+    assert len(list(cache_root.rglob("*.state"))) == 2
 
 
-def test_materialize_train_run_config_reuses_existing_run_local_baseline_for_in_place_continue(
+def test_materialize_train_run_config_regenerates_stale_run_local_baseline_for_in_place_continue(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
 ) -> None:
@@ -724,7 +722,7 @@ def test_materialize_train_run_config_reuses_existing_run_local_baseline_for_in_
     rom_path = tmp_path / "fzerox.n64"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+    capture = _patch_fake_boot_materializer(monkeypatch)
 
     run_dir = tmp_path / "runs" / "ppo_cnn_0001"
     run_dir.mkdir(parents=True)
@@ -765,9 +763,18 @@ def test_materialize_train_run_config_reuses_existing_run_local_baseline_for_in_
         baseline_cache_root=tmp_path / "cache",
     )
 
-    assert materialized.emulator.baseline_state_path == baseline_path
-    assert materialized.track.baseline_state_path == baseline_path
-    assert captured_variants == []
+    assert materialized.emulator.baseline_state_path != baseline_path
+    assert materialized.track.baseline_state_path == materialized.emulator.baseline_state_path
+    assert capture.variants == [
+        RaceStartVariant(
+            course_index=0,
+            mode="time_attack",
+            character_index=0,
+            machine_select_slot=0,
+            engine_setting_raw_value=50,
+            race_intro_target_timer=None,
+        )
+    ]
 
 
 def test_materialize_train_run_config_rewrites_track_sampling_baselines(
@@ -778,7 +785,7 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
     rom_path = tmp_path / "fzerox.n64"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+    capture = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
@@ -833,7 +840,82 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
     assert second_baseline_path.read_bytes() == b"generated"
     assert first_baseline_path.with_suffix(".json").is_file()
     assert second_baseline_path.with_suffix(".json").is_file()
-    assert [variant.course_index for variant in captured_variants] == [0, 1]
+    assert capture.generic_modes == ["time_attack"]
+    assert [variant.course_index for variant in capture.variants] == [0, 1]
+
+
+def test_materialize_train_run_config_reports_track_sampling_progress(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    _patch_fake_boot_materializer(monkeypatch)
+    startup_messages: list[tuple[str, str]] = []
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_city_time_attack_blue_falcon_balanced",
+                        course_id="mute_city",
+                        course_name="Mute City",
+                        course_index=0,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting="balanced",
+                        engine_setting_raw_value=50,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence_time_attack_blue_falcon_balanced",
+                        course_id="silence",
+                        course_name="Silence",
+                        course_index=1,
+                        mode="time_attack",
+                        vehicle="blue_falcon",
+                        engine_setting="balanced",
+                        engine_setting_raw_value=50,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+        startup_reporter=lambda kind, message: startup_messages.append((kind, message)),
+    )
+
+    materialize_messages = [
+        message for kind, message in startup_messages if kind == "startup_materialize"
+    ]
+    assert (
+        "Materializing track sampling baselines for 2 entries" in materialize_messages
+    )
+    assert (
+        "Materializing track sampling baselines: 0/2 complete; next Mute City"
+        in materialize_messages
+    )
+    assert (
+        "Materializing track sampling baselines: 1/2 complete; next Silence"
+        in materialize_messages
+    )
 
 
 def test_materialize_train_run_config_generates_race_start_engine_variant(
@@ -844,7 +926,7 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
     rom_path = tmp_path / "fzerox.n64"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+    capture = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
@@ -885,14 +967,16 @@ def test_materialize_train_run_config_generates_race_start_engine_variant(
     baseline_path = _required_baseline_path(entry)
     assert baseline_path.read_bytes() == b"generated"
     metadata = json.loads(baseline_path.with_suffix(".json").read_text())
-    assert metadata["materializer_mode"] == "boot_menu_time_attack"
-    assert len(captured_variants) == 1
-    variant = captured_variants[0]
-    assert variant.course_index == 1
-    assert variant.mode == "time_attack"
-    assert variant.character_index == 0
-    assert variant.engine_setting_raw_value == 100
-    assert variant.race_intro_target_timer == 38
+    assert metadata["materializer_mode"] == "course_vehicle_seed_time_attack"
+    assert capture.generic_modes == ["time_attack"]
+    assert len(capture.variants) == 1
+    course_vehicle_variant = capture.variants[0]
+    assert course_vehicle_variant.course_index == 1
+    assert course_vehicle_variant.mode == "time_attack"
+    assert course_vehicle_variant.character_index == 0
+    assert course_vehicle_variant.engine_setting_raw_value == 50
+    assert entry.source_vehicle == "blue_falcon"
+    assert entry.source_engine_setting_raw_value == 50
 
 
 def test_materialize_train_run_config_reuses_target_variant_cache_without_source(
@@ -904,7 +988,7 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
     cache_root = tmp_path / "cache"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch, payload=b"generated-target")
+    capture = _patch_fake_boot_materializer(monkeypatch, payload=b"generated-target")
 
     def build_config() -> TrainAppConfig:
         return TrainAppConfig(
@@ -957,14 +1041,15 @@ def test_materialize_train_run_config_reuses_target_variant_cache_without_source
     second_baseline_path = _required_baseline_path(second_entry)
     assert first_baseline_path.read_bytes() == b"generated-target"
     assert second_baseline_path.read_bytes() == b"generated-target"
-    assert captured_variants == [
+    assert capture.generic_modes == ["time_attack"]
+    assert capture.variants == [
         RaceStartVariant(
             course_index=1,
             mode="time_attack",
             character_index=0,
             machine_select_slot=0,
-            engine_setting_raw_value=100,
-            race_intro_target_timer=38,
+            engine_setting_raw_value=50,
+            race_intro_target_timer=None,
         )
     ]
     assert first_baseline_path.with_suffix(".json").is_file()
@@ -979,7 +1064,7 @@ def test_materialize_train_run_config_generates_vehicle_variant(
     rom_path = tmp_path / "fzerox.n64"
     core_path.touch()
     rom_path.touch()
-    captured_variants = _patch_fake_boot_materializer(monkeypatch)
+    capture = _patch_fake_boot_materializer(monkeypatch)
 
     config = TrainAppConfig(
         seed=123,
@@ -1018,9 +1103,11 @@ def test_materialize_train_run_config_generates_vehicle_variant(
     entry = materialized.env.track_sampling.entries[0]
     assert entry.baseline_state_path is not None
     assert entry.baseline_state_path.read_bytes() == b"generated"
-    assert captured_variants[0].character_index == 4
-    assert captured_variants[0].machine_select_slot == 4
-    assert captured_variants[0].engine_setting_raw_value == 70
+    assert entry.source_vehicle == "white_cat"
+    assert entry.source_engine_setting_raw_value == 50
+    assert [variant.character_index for variant in capture.variants] == [4]
+    assert [variant.machine_select_slot for variant in capture.variants] == [4]
+    assert [variant.engine_setting_raw_value for variant in capture.variants] == [50]
 
 
 def test_materialize_train_run_config_rewrites_curriculum_track_sampling(
@@ -1209,3 +1296,28 @@ def test_materialize_watch_session_config_resets_old_watch_workspace(tmp_path: P
 
     assert materialized.emulator.runtime_dir == watch_root / "runtime"
     assert not (watch_root / "old-session").exists()
+
+
+def test_cleanup_failed_run_preserves_explicit_run_dir_when_requested(tmp_path: Path) -> None:
+    run_paths = reserve_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
+
+    cleanup_failed_run(run_paths, model=None, preserve_run_dir=True)
+
+    assert run_paths.run_dir.is_dir()
+
+
+def test_track_sampling_baseline_label_omits_engine_range_metadata() -> None:
+    entry = TrackSamplingEntryConfig(
+        id="silence_time_attack_fire_stingray_engine_range_20_80",
+        course_id="silence",
+        course_name="Silence",
+        course_index=0,
+        mode="time_attack",
+        vehicle="fire_stingray",
+        vehicle_name="Fire Stingray",
+        engine_setting="random",
+    )
+
+    request = request_from_track_entry(entry, camera_setting="close_behind")
+
+    assert request.label == "silence_time_attack_fire_stingray"

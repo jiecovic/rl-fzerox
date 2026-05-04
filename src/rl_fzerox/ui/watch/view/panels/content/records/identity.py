@@ -65,15 +65,18 @@ def watch_track_value(
 
 
 def track_best_key(info: RecordInfo) -> str | None:
+    course_id = info.get("track_course_id")
+    if isinstance(course_id, str) and course_id:
+        return course_id
+    value = info.get("track_course_index", info.get("course_index"))
+    if isinstance(value, int):
+        return f"course:{value}"
+    if isinstance(value, bool):
+        return None
     for key in ("track_id", "track_display_name"):
         value = info.get(key)
         if isinstance(value, str) and value:
             return value
-    value = info.get("track_course_index", info.get("course_index"))
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return f"course:{value}"
     return None
 
 

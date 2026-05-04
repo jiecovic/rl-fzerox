@@ -22,6 +22,7 @@ class PolicyArtifactMetadata:
     curriculum_stage_index: int | None
     curriculum_stage_name: str | None
     num_timesteps: int | None
+    lineage_num_timesteps: int | None = None
 
 
 class SaveArtifactFn(Protocol):
@@ -164,15 +165,19 @@ def load_policy_artifact_metadata(policy_path: Path) -> PolicyArtifactMetadata |
         curriculum_stage_index=_coerce_optional_int(data.get("curriculum_stage_index")),
         curriculum_stage_name=_coerce_optional_str(data.get("curriculum_stage_name")),
         num_timesteps=_coerce_optional_int(data.get("num_timesteps")),
+        lineage_num_timesteps=_coerce_optional_int(data.get("lineage_num_timesteps")),
     )
 
 
 def current_policy_artifact_metadata(
     train_env: TrainingEnvAttrReader,
     model: object,
+    *,
+    lineage_step_offset: int = 0,
 ) -> PolicyArtifactMetadata:
     """Read the currently active curriculum stage from the vector env."""
 
+    num_timesteps = _current_num_timesteps(model)
     return PolicyArtifactMetadata(
         curriculum_stage_index=_coerce_optional_int(
             _first_env_attr(train_env, "curriculum_stage_index")
@@ -180,7 +185,10 @@ def current_policy_artifact_metadata(
         curriculum_stage_name=_coerce_optional_str(
             _first_env_attr(train_env, "curriculum_stage_name")
         ),
-        num_timesteps=_current_num_timesteps(model),
+        num_timesteps=num_timesteps,
+        lineage_num_timesteps=(
+            None if num_timesteps is None else max(0, int(lineage_step_offset)) + num_timesteps
+        ),
     )
 
 
@@ -251,10 +259,17 @@ def _policy_save_fn(model: object) -> SaveArtifactFn:
     return save_fn
 
 
-def cleanup_failed_run(run_paths: RunPaths, model: object | None) -> None:
+def cleanup_failed_run(
+    run_paths: RunPaths,
+    model: object | None,
+    *,
+    preserve_run_dir: bool = False,
+) -> None:
     if not run_paths.fresh_run:
         return
     if not run_paths.run_dir.exists():
+        return
+    if preserve_run_dir:
         return
 
     num_timesteps = getattr(model, "num_timesteps", None) if model is not None else None

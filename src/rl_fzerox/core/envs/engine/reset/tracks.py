@@ -6,7 +6,7 @@ from fractions import Fraction
 from functools import reduce
 from math import gcd
 from pathlib import Path
-from random import Random, random
+from random import Random, choice, random
 
 from fzerox_emulator import EmulatorBackend
 from rl_fzerox.core.config.schema import (
@@ -103,15 +103,28 @@ class TrackResetSelector:
         self._env_index = max(0, int(env_index))
         self._fingerprint: tuple[object, ...] | None = None
         self._cycle: tuple[TrackSamplingEntryConfig, ...] = ()
+        self._sequential_course_buckets: tuple[tuple[TrackSamplingEntryConfig, ...], ...] = ()
         self._cursor = 0
 
     def select(self, config: TrackSamplingConfig, *, seed: int | None) -> SelectedTrack | None:
         if config.sampling_mode == "random":
             return select_reset_track(config, seed=seed)
-        if config.sampling_mode in ("balanced", "step_balanced"):
+        if config.sampling_mode == "balanced":
             return self._select_balanced(
                 config,
                 sampling_mode=config.sampling_mode,
+                seed=seed,
+            )
+        if config.sampling_mode == "step_balanced":
+            if not config.enabled:
+                return None
+            if not config.entries:
+                raise ValueError("track sampling is enabled but has no entries")
+            total_weight = sum(float(entry.weight) for entry in config.entries)
+            sample = (Random(seed).random() if seed is not None else random()) * total_weight
+            return _selected_track_from_entry(
+                _weighted_entry(config.entries, sample=sample),
+                sampling_mode="step_balanced",
                 seed=seed,
             )
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
@@ -129,8 +142,11 @@ class TrackResetSelector:
         if not config.entries:
             raise ValueError("track sampling is enabled but has no entries")
         self._sync_sequential_cycle(config)
-        position = self._cursor % len(self._cycle)
-        entry = self._cycle[position]
+        position = self._cursor % len(self._sequential_course_buckets)
+        entry = _pick_track_entry(
+            self._sequential_course_buckets[position],
+            seed=seed,
+        )
         self._cursor += 1
         return _selected_track_from_entry(
             entry,
@@ -170,11 +186,11 @@ class TrackResetSelector:
         self._cursor = self._env_index % len(self._cycle)
 
     def _sync_sequential_cycle(self, config: TrackSamplingConfig) -> None:
-        fingerprint = ("sequential", *_track_sampling_fingerprint(config))
+        fingerprint = ("sequential", *_sequential_track_sampling_fingerprint(config))
         if fingerprint == self._fingerprint:
             return
         self._fingerprint = fingerprint
-        self._cycle = tuple(config.entries)
+        self._sequential_course_buckets = _sequential_course_buckets(config.entries)
         self._cursor = 0
 
 
@@ -184,13 +200,17 @@ def select_reset_track_by_course_id(
     course_id: str,
     seed: int | None = None,
 ) -> SelectedTrack | None:
-    """Select the first configured reset baseline for a specific course id."""
+    """Select one configured reset baseline for a specific course id."""
 
     if not config.enabled:
         return None
-    for entry in config.entries:
-        if entry.course_id == course_id:
-            return _selected_track_from_entry(entry, sampling_mode="locked", seed=seed)
+    matching_entries = tuple(entry for entry in config.entries if entry.course_id == course_id)
+    if matching_entries:
+        return _selected_track_from_entry(
+            _pick_track_entry(matching_entries, seed=seed),
+            sampling_mode="locked",
+            seed=seed,
+        )
     return None
 
 
@@ -226,6 +246,18 @@ def _weighted_entry(
         if sample < cursor:
             return entry
     return entries[-1]
+
+
+def _pick_track_entry(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+    *,
+    seed: int | None,
+) -> TrackSamplingEntryConfig:
+    if len(entries) == 1:
+        return entries[0]
+    if seed is not None:
+        return Random(seed).choice(entries)
+    return choice(entries)
 
 
 def _selected_track_from_entry(
@@ -362,3 +394,56 @@ def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ..
             for entry in config.entries
         ),
     )
+
+
+def _sequential_track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
+    return tuple(
+        (
+            course_key,
+            tuple(
+                (
+                    entry.id,
+                    entry.baseline_state_path,
+                    entry.vehicle,
+                    entry.engine_setting,
+                    entry.engine_setting_raw_value,
+                    entry.engine_setting_min_raw_value,
+                    entry.engine_setting_max_raw_value,
+                )
+                for entry in entries
+            ),
+        )
+        for course_key, entries in _group_entries_by_course(config.entries)
+    )
+
+
+def _sequential_course_buckets(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[tuple[TrackSamplingEntryConfig, ...], ...]:
+    return tuple(entries for _, entries in _group_entries_by_course(entries))
+
+
+def _group_entries_by_course(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[tuple[str, tuple[TrackSamplingEntryConfig, ...]], ...]:
+    grouped: dict[str, list[TrackSamplingEntryConfig]] = {}
+    order: list[str] = []
+    for entry in entries:
+        course_key = _entry_course_key(entry)
+        bucket = grouped.get(course_key)
+        if bucket is None:
+            bucket = []
+            grouped[course_key] = bucket
+            order.append(course_key)
+        bucket.append(entry)
+    return tuple((course_key, tuple(grouped[course_key])) for course_key in order)
+
+
+def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
+    if entry.course_id:
+        return f"course_id:{entry.course_id}"
+    if entry.course_ref:
+        return f"course_ref:{entry.course_ref}"
+    if entry.course_index is not None:
+        return f"course_index:{int(entry.course_index)}"
+    return f"entry:{entry.id}"

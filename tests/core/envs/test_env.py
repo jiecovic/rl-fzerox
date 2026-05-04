@@ -348,6 +348,7 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
+    env.reset(seed=7)
 
     obs, _, _, _, info = env.step(
         {
@@ -589,6 +590,49 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
     assert backend.last_controller_state == air_brake_state
     assert reward == 0.0
     assert "reward_breakdown" not in info
+
+
+def test_step_control_keeps_ground_air_brake_when_configured() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=5.0, state_labels=("active",)),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active",)),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="configured_hybrid",
+                layout_continuous_axes=("steer", "pitch"),
+                layout_discrete_axes=("gas", "air_brake", "boost", "lean"),
+                mask_air_brake_on_ground=False,
+            ),
+        ),
+        reward_config=RewardConfig(
+            name="reward_main",
+            time_penalty_per_frame=0.0,
+            air_brake_request_penalty=-0.2,
+            progress_bucket_reward=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        ),
+    )
+    air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
+
+    env.reset(seed=21)
+    _, reward, _, _, info = env.step_control(air_brake_state)
+
+    assert backend.last_controller_state == air_brake_state
+    assert reward == pytest.approx(-0.2)
+    reward_breakdown = info["reward_breakdown"]
+    assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["air_brake"] == pytest.approx(-0.2)
 
 
 def test_step_suppresses_air_only_controls_until_airborne() -> None:

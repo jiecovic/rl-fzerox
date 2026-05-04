@@ -1,0 +1,269 @@
+# src/rl_fzerox/core/training/runs/baseline_materializer/materialization/course_vehicle.py
+from __future__ import annotations
+
+import json
+import os
+from collections.abc import Callable
+from pathlib import Path
+
+from fzerox_emulator.base import RaceStartMode
+from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
+from rl_fzerox.core.envs.engine.info import read_live_telemetry
+from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
+from rl_fzerox.core.training.runs.baseline_materializer.cache import (
+    atomic_write_json,
+    cache_write_lock,
+    course_vehicle_cache_payload,
+    course_vehicle_state_path,
+    generic_mode_cache_payload,
+    generic_mode_state_path,
+    sha256_bytes,
+    sha256_json,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.models import (
+    BaselineMaterializerContext,
+    GenericModeSeedMaterializer,
+    RaceStartMaterializer,
+    StateSavingEmulator,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.settings import (
+    BASELINE_MATERIALIZER_SETTINGS,
+)
+from rl_fzerox.core.training.runs.race_start import RaceStartVariant
+
+
+def ensure_course_vehicle_baseline(
+    *,
+    mode: RaceStartMode,
+    label: str,
+    course_index: int,
+    vehicle_id: str,
+    camera_setting: str | None,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+    generic_mode_seed_materializer: GenericModeSeedMaterializer,
+    menu_seed_race_start_materializer: RaceStartMaterializer,
+) -> Path:
+    payload = course_vehicle_cache_payload(
+        mode=mode,
+        course_index=course_index,
+        vehicle_id=vehicle_id,
+        camera_setting=camera_setting,
+        race_intro_target_timer=context.race_intro_target_timer,
+        context=context,
+    )
+    cache_key = sha256_json(payload)
+    cache_state_path = course_vehicle_state_path(cache_root, label=label, cache_key=cache_key)
+    cache_metadata_path = cache_state_path.with_suffix(".json")
+    if cache_entry_is_current(
+        cache_state_path=cache_state_path,
+        cache_metadata_path=cache_metadata_path,
+        expected_kind="course_vehicle_baseline",
+        expected_cache_key=cache_key,
+    ):
+        return cache_state_path
+
+    with cache_write_lock(cache_state_path):
+        if not cache_entry_is_current(
+            cache_state_path=cache_state_path,
+            cache_metadata_path=cache_metadata_path,
+            expected_kind="course_vehicle_baseline",
+            expected_cache_key=cache_key,
+        ):
+            cache_state_path.unlink(missing_ok=True)
+            cache_metadata_path.unlink(missing_ok=True)
+            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
+            materialized_sha256 = generate_course_vehicle_state(
+                mode=mode,
+                course_index=course_index,
+                vehicle_id=vehicle_id,
+                camera_setting=camera_setting,
+                cache_state_path=cache_state_path,
+                cache_root=cache_root,
+                context=context,
+                emulator_type=emulator_type,
+                generic_mode_seed_materializer=generic_mode_seed_materializer,
+                menu_seed_race_start_materializer=menu_seed_race_start_materializer,
+            )
+        else:
+            materialized_sha256 = sha256_bytes(cache_state_path.read_bytes())
+        if not cache_metadata_path.is_file():
+            atomic_write_json(
+                cache_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "cache_kind": "course_vehicle_baseline",
+                    "materialized_state_sha256": materialized_sha256,
+                },
+            )
+    return cache_state_path
+
+
+def ensure_generic_mode_baseline(
+    *,
+    mode: RaceStartMode,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+    generic_mode_seed_materializer: GenericModeSeedMaterializer,
+) -> Path:
+    payload = generic_mode_cache_payload(mode=mode, context=context)
+    cache_key = sha256_json(payload)
+    cache_state_path = generic_mode_state_path(cache_root, mode=mode, cache_key=cache_key)
+    cache_metadata_path = cache_state_path.with_suffix(".json")
+    if cache_entry_is_current(
+        cache_state_path=cache_state_path,
+        cache_metadata_path=cache_metadata_path,
+        expected_kind="generic_mode_seed",
+        expected_cache_key=cache_key,
+    ):
+        return cache_state_path
+
+    with cache_write_lock(cache_state_path):
+        if not cache_entry_is_current(
+            cache_state_path=cache_state_path,
+            cache_metadata_path=cache_metadata_path,
+            expected_kind="generic_mode_seed",
+            expected_cache_key=cache_key,
+        ):
+            cache_state_path.unlink(missing_ok=True)
+            cache_metadata_path.unlink(missing_ok=True)
+            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
+            materialized_sha256 = generate_generic_mode_state(
+                mode=mode,
+                cache_state_path=cache_state_path,
+                cache_root=cache_root,
+                context=context,
+                emulator_type=emulator_type,
+                generic_mode_seed_materializer=generic_mode_seed_materializer,
+            )
+        else:
+            materialized_sha256 = sha256_bytes(cache_state_path.read_bytes())
+        if not cache_metadata_path.is_file():
+            atomic_write_json(
+                cache_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "cache_kind": "generic_mode_seed",
+                    "materialized_state_sha256": materialized_sha256,
+                },
+            )
+    return cache_state_path
+
+
+def cache_entry_is_current(
+    *,
+    cache_state_path: Path,
+    cache_metadata_path: Path,
+    expected_kind: str,
+    expected_cache_key: str,
+) -> bool:
+    if not cache_state_path.is_file() or not cache_metadata_path.is_file():
+        return False
+    metadata = read_metadata(cache_metadata_path)
+    return bool(
+        metadata.get("cache_kind") == expected_kind
+        and metadata.get("cache_key") == expected_cache_key
+        and metadata.get("schema_version") == BASELINE_MATERIALIZER_SETTINGS.schema_version
+    )
+
+
+def read_metadata(metadata_path: Path) -> dict[str, object]:
+    raw_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if not isinstance(raw_metadata, dict):
+        raise ValueError(f"Baseline metadata must be a JSON object: {metadata_path}")
+    return raw_metadata
+
+
+def generate_generic_mode_state(
+    *,
+    mode: RaceStartMode,
+    cache_state_path: Path,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+    generic_mode_seed_materializer: GenericModeSeedMaterializer,
+) -> str:
+    runtime_dir = cache_root / "runtime" / "generic" / cache_state_path.stem
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    tmp_state_path = cache_state_path.with_name(
+        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
+    )
+    emulator = emulator_type(
+        core_path=context.core_path,
+        rom_path=context.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=None,
+        renderer=context.renderer,
+    )
+    try:
+        generic_mode_seed_materializer(emulator=emulator, mode=mode)
+        emulator.save_state(tmp_state_path)
+    finally:
+        emulator.close()
+    os.replace(tmp_state_path, cache_state_path)
+    return sha256_bytes(cache_state_path.read_bytes())
+
+
+def generate_course_vehicle_state(
+    *,
+    mode: RaceStartMode,
+    course_index: int,
+    vehicle_id: str,
+    camera_setting: str | None,
+    cache_state_path: Path,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+    generic_mode_seed_materializer: GenericModeSeedMaterializer,
+    menu_seed_race_start_materializer: RaceStartMaterializer,
+) -> str:
+    defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
+    vehicle = vehicle_by_id(vehicle_id)
+    generic_state_path = ensure_generic_mode_baseline(
+        mode=mode,
+        cache_root=cache_root,
+        context=context,
+        emulator_type=emulator_type,
+        generic_mode_seed_materializer=generic_mode_seed_materializer,
+    )
+    runtime_dir = cache_root / "runtime" / "course_vehicle" / cache_state_path.stem
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    tmp_state_path = cache_state_path.with_name(
+        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
+    )
+    emulator = emulator_type(
+        core_path=context.core_path,
+        rom_path=context.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=generic_state_path,
+        renderer=context.renderer,
+    )
+    try:
+        menu_seed_race_start_materializer(
+            emulator=emulator,
+            variant=RaceStartVariant(
+                course_index=course_index,
+                mode=mode,
+                character_index=vehicle.character_index,
+                machine_select_slot=vehicle.machine_select_slot,
+                engine_setting_raw_value=defaults.engine_setting_raw_value,
+                race_intro_target_timer=None,
+            ),
+        )
+        telemetry = read_live_telemetry(emulator)
+        sync_reset_presentation(
+            emulator,
+            camera_setting=camera_setting,
+            race_intro_target_timer=context.race_intro_target_timer,
+            telemetry=telemetry,
+            info={},
+        )
+        emulator.save_state(tmp_state_path)
+    finally:
+        emulator.close()
+    os.replace(tmp_state_path, cache_state_path)
+    return sha256_bytes(cache_state_path.read_bytes())

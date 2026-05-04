@@ -143,7 +143,11 @@ def run_training(
             save_latest_artifacts(
                 model,
                 run_paths,
-                policy_metadata=current_policy_artifact_metadata(train_env, model),
+                policy_metadata=current_policy_artifact_metadata(
+                    train_env,
+                    model,
+                    lineage_step_offset=run_config.train.tensorboard_step_offset,
+                ),
             )
         callbacks = build_callbacks(
             env_config=run_config.env,
@@ -173,23 +177,39 @@ def run_training(
                 save_latest_artifacts(
                     model,
                     run_paths,
-                    policy_metadata=current_policy_artifact_metadata(train_env, model),
+                    policy_metadata=current_policy_artifact_metadata(
+                        train_env,
+                        model,
+                        lineage_step_offset=run_config.train.tensorboard_step_offset,
+                    ),
                 )
             raise
         save_artifacts_atomically(
             model=model,
             model_path=run_paths.final_model_path,
             policy_path=run_paths.final_policy_path,
-            policy_metadata=current_policy_artifact_metadata(train_env, model),
+            policy_metadata=current_policy_artifact_metadata(
+                train_env,
+                model,
+                lineage_step_offset=run_config.train.tensorboard_step_offset,
+            ),
         )
         if run_config.train.save_latest_checkpoint:
             save_latest_artifacts(
                 model,
                 run_paths,
-                policy_metadata=current_policy_artifact_metadata(train_env, model),
+                policy_metadata=current_policy_artifact_metadata(
+                    train_env,
+                    model,
+                    lineage_step_offset=run_config.train.tensorboard_step_offset,
+                ),
             )
     except Exception:
-        cleanup_failed_run(run_paths, model)
+        cleanup_failed_run(
+            run_paths,
+            model,
+            preserve_run_dir=config.train.explicit_run_dir is not None,
+        )
         raise
     finally:
         if train_env is not None:

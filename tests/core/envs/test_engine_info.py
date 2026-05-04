@@ -14,7 +14,8 @@ class _Backend:
 
     def vehicle_setup_info(self) -> dict[str, object]:
         return {
-            "vehicle_character_index_ram": 0,
+            "player_character_index_ram": 0,
+            "racer_character_index_ram": 0,
             "engine_setting_ram": 0.5,
             "engine_setting_percent_ram": 50.0,
             "character_engine_setting_ram": 0.5,

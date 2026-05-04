@@ -16,6 +16,7 @@ class CameraSyncControls:
     """Controller inputs used to cycle the in-game camera setting."""
 
     setting_count: int = len(CAMERA_SETTINGS)
+    ready_intro_timer: int = 160
     next_camera: ControllerState = ControllerState(right_stick_x=1.0)
     idle: ControllerState = ControllerState()
 

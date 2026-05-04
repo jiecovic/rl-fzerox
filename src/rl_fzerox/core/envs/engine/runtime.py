@@ -401,6 +401,7 @@ class FZeroXEnvEngine:
         gated_control_state = apply_dynamic_control_gates(
             control_state,
             mask_controller=self._mask_controller,
+            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
             continuous_air_brake_mode=self._action_config.continuous_air_brake_mode,
             last_telemetry=self._episode.last_telemetry,
         )
