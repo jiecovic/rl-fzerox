@@ -30,7 +30,7 @@ from rl_fzerox.core.training.session.model.replay import (
     LazyImageStateReplayBuffer,
     LazyMaskableReplayBuffer,
 )
-from tests.support.fakes import SyntheticBackend
+from tests.support.fakes import SyntheticBackend, vec_env_fns
 
 
 def test_training_requires_no_action_masks_for_sac(tmp_path: Path) -> None:
@@ -248,12 +248,12 @@ def test_build_ppo_model_can_construct_maskable_ppo() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
-        ]
+        )
     )
 
     try:
@@ -274,7 +274,7 @@ def test_build_training_model_can_construct_sac() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -282,7 +282,7 @@ def test_build_training_model_can_construct_sac() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -313,7 +313,7 @@ def test_build_training_model_can_construct_hybrid_action_sac() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -321,7 +321,7 @@ def test_build_training_model_can_construct_hybrid_action_sac() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -352,7 +352,7 @@ def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -360,7 +360,7 @@ def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -394,14 +394,7 @@ def test_build_training_model_uses_lazy_replay_buffer_for_sac() -> None:
         action=ActionConfig(name="continuous_steer_drive"),
         observation=ObservationConfig(mode="image_state", stack_mode="gray"),
     )
-    env = DummyVecEnv(
-        [
-            lambda: FZeroXEnv(
-                backend=SyntheticBackend(),
-                config=env_config,
-            )
-        ]
-    )
+    env = DummyVecEnv(vec_env_fns(lambda: FZeroXEnv(backend=SyntheticBackend(), config=env_config)))
 
     try:
         model = build_training_model(
@@ -435,14 +428,7 @@ def test_build_training_model_uses_lazy_replay_buffer_for_maskable_hybrid_sac() 
         action=ActionConfig(name="hybrid_steer_drive_boost_lean"),
         observation=ObservationConfig(mode="image_state", stack_mode="gray"),
     )
-    env = DummyVecEnv(
-        [
-            lambda: FZeroXEnv(
-                backend=SyntheticBackend(),
-                config=env_config,
-            )
-        ]
-    )
+    env = DummyVecEnv(vec_env_fns(lambda: FZeroXEnv(backend=SyntheticBackend(), config=env_config)))
 
     try:
         model = build_training_model(
@@ -473,7 +459,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -481,7 +467,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -507,7 +493,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -515,7 +501,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -547,7 +533,7 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -557,7 +543,7 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:
@@ -590,12 +576,12 @@ def test_build_ppo_model_rejects_recurrent_policy_with_feedforward_algorithm() -
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
-        ]
+        )
     )
 
     try:
@@ -620,7 +606,7 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
@@ -628,7 +614,7 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )
-        ]
+        )
     )
 
     try:

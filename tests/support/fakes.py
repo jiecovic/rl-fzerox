@@ -1,10 +1,13 @@
 # tests/support/fakes.py
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
+from gymnasium import Env
 
 from fzerox_emulator import (
     BackendStepResult,
@@ -19,9 +22,12 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+from fzerox_emulator.base import RaceStartMode
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
+_ObsT = TypeVar("_ObsT")
+_ActT = TypeVar("_ActT")
 
 
 @dataclass
@@ -56,6 +62,9 @@ class SyntheticBackend:
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
         self._active_baseline_path: Path | None = None
         self._system_ram = bytearray(0x0030_0000)
+        self.last_race_start_setup: dict[str, object] | None = None
+        self.last_machine_settings: dict[str, object] | None = None
+        self.last_race_reinit_mode: RaceStartMode | None = None
 
     @property
     def name(self) -> str:
@@ -448,6 +457,105 @@ class SyntheticBackend:
         self._active_baseline_path = source_path
         self.loaded_baseline_bytes.append((source_path, len(state)))
 
+    def patch_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        self.last_race_start_setup = {
+            "mode": mode,
+            "course_index": course_index,
+            "character_index": character_index,
+            "machine_skin_index": machine_skin_index,
+            "engine_setting_raw_value": engine_setting_raw_value,
+            "total_lap_count": total_lap_count,
+        }
+
+    def patch_machine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        self.last_machine_settings = {
+            "mode": mode,
+            "course_index": course_index,
+            "character_index": character_index,
+            "machine_skin_index": machine_skin_index,
+            "engine_setting_raw_value": engine_setting_raw_value,
+            "total_lap_count": total_lap_count,
+        }
+
+    def force_race_reinit(self, *, mode: RaceStartMode) -> None:
+        self.last_race_reinit_mode = mode
+
+    def validate_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        self.patch_race_start_setup(
+            mode=mode,
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def patch_time_attack_race_start_setup(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        self.patch_race_start_setup(
+            mode="time_attack",
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def patch_time_attack_machine_settings(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        self.patch_machine_settings(
+            mode="time_attack",
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def force_time_attack_reinit(self) -> None:
+        self.force_race_reinit(mode="time_attack")
+
     def close(self) -> None:
         return None
 
@@ -518,6 +626,14 @@ def _materialize_observation_stack(
         stacked = np.concatenate([_rgb_luma_chroma(frame) for frame in frames], axis=2)
         return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
+
+
+def vec_env_fns(
+    env_fn: Callable[[], Env[_ObsT, _ActT]],
+) -> list[Callable[[], Env[_ObsT, _ActT]]]:
+    """Return one typed env-factory list for DummyVecEnv tests."""
+
+    return [env_fn]
 
 
 def _append_fake_minimap_layer(

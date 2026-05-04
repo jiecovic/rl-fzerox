@@ -46,7 +46,7 @@ from rl_fzerox.core.training.session.model import (
     build_ppo_model,
     resolve_policy_activation_fn,
 )
-from tests.support.fakes import SyntheticBackend
+from tests.support.fakes import SyntheticBackend, vec_env_fns
 
 
 class _CapturingLogger:
@@ -364,12 +364,12 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
         run_paths=run_paths,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
-        ]
+        )
     )
 
     try:
@@ -767,13 +767,13 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
         run_paths=run_paths,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
                 curriculum_config=curriculum,
             )
-        ]
+        )
     )
 
     try:
@@ -863,13 +863,13 @@ def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
         initial_curriculum_stage_index=1,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
                 curriculum_config=curriculum,
             )
-        ]
+        )
     )
 
     try:

@@ -20,7 +20,7 @@ from rl_fzerox.core.training.session.artifacts import list_recent_checkpoint_dir
 from rl_fzerox.core.training.session.callbacks import build_callbacks
 from rl_fzerox.core.training.session.callbacks.checkpoints import resolve_checkpoint_policy
 from rl_fzerox.core.training.session.model import build_ppo_model
-from tests.support.fakes import SyntheticBackend
+from tests.support.fakes import SyntheticBackend, vec_env_fns
 
 
 def test_resolve_checkpoint_policy_prefers_rollout_interval_for_ppo() -> None:
@@ -74,12 +74,12 @@ def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: 
         run_paths=run_paths,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
-        ]
+        )
     )
 
     try:
