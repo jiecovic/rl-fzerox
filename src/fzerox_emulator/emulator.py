@@ -143,7 +143,6 @@ class Emulator:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -157,7 +156,7 @@ class Emulator:
         native_patch(
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
+            machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -168,7 +167,6 @@ class Emulator:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -182,10 +180,32 @@ class Emulator:
         native_patch(
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
+            machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
+
+    def patch_engine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        engine_setting_raw_value: int,
+    ) -> None:
+        """Patch only engine-related globals for the already selected machine."""
+
+        if mode == "time_attack":
+            self._native.patch_time_attack_engine_settings(
+                engine_setting_raw_value=engine_setting_raw_value,
+            )
+            return
+        self._native.patch_gp_race_engine_settings(
+            engine_setting_raw_value=engine_setting_raw_value,
+        )
+
+    def patch_time_attack_menu_mode(self) -> None:
+        """Select the Time Attack branch in the main-menu globals."""
+
+        self._native.patch_time_attack_menu_mode()
 
     def force_race_reinit(self, *, mode: RaceStartMode) -> None:
         """Force the game to rebuild the current race from menu globals."""
@@ -201,7 +221,6 @@ class Emulator:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -215,7 +234,7 @@ class Emulator:
         native_validate(
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
+            machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -225,7 +244,6 @@ class Emulator:
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -233,7 +251,6 @@ class Emulator:
             mode="time_attack",
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -243,7 +260,6 @@ class Emulator:
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -251,7 +267,6 @@ class Emulator:
             mode="time_attack",
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -264,7 +279,6 @@ class Emulator:
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -272,7 +286,6 @@ class Emulator:
             mode="time_attack",
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )

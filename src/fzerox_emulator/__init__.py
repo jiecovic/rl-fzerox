@@ -1,16 +1,5 @@
 # src/fzerox_emulator/__init__.py
 from fzerox_emulator._native import (
-    JOYPAD_A,
-    JOYPAD_B,
-    JOYPAD_DOWN,
-    JOYPAD_L2,
-    JOYPAD_LEFT,
-    JOYPAD_R,
-    JOYPAD_RIGHT,
-    JOYPAD_SELECT,
-    JOYPAD_START,
-    JOYPAD_UP,
-    JOYPAD_Y,
     CoreInfo,
     FZeroXTelemetry,
     PlayerTelemetry,
@@ -30,6 +19,7 @@ from fzerox_emulator.base import (
     ResetState,
     stacked_observation_channels,
 )
+from fzerox_emulator.buttons import JOYPAD_BUTTONS, JoypadButtons
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.emulator import Emulator
 from fzerox_emulator.video import display_size
@@ -43,17 +33,8 @@ __all__ = [
     "encode_state_flags",
     "FZeroXTelemetry",
     "FrameStep",
-    "JOYPAD_A",
-    "JOYPAD_B",
-    "JOYPAD_DOWN",
-    "JOYPAD_L2",
-    "JOYPAD_LEFT",
-    "JOYPAD_R",
-    "JOYPAD_RIGHT",
-    "JOYPAD_SELECT",
-    "JOYPAD_START",
-    "JOYPAD_UP",
-    "JOYPAD_Y",
+    "JOYPAD_BUTTONS",
+    "JoypadButtons",
     "ObservationSpec",
     "ObservationResizeFilter",
     "ObservationStackMode",

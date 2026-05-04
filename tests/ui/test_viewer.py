@@ -3,12 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fzerox_emulator import (
-    JOYPAD_A,
-    JOYPAD_START,
-    JOYPAD_UP,
-    ControllerState,
-)
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState
 from rl_fzerox.core.config.schema import (
     PolicyConfig,
     TrainConfig,
@@ -48,7 +43,11 @@ from tests.ui.viewer_support import (
 def test_pressed_button_labels_are_human_readable() -> None:
     assert _pressed_button_labels(0) == "none"
     assert (
-        _pressed_button_labels((1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START))
+        _pressed_button_labels(
+            (1 << JOYPAD_BUTTONS.up)
+            | (1 << JOYPAD_BUTTONS.a)
+            | (1 << JOYPAD_BUTTONS.start)
+        )
         == "Up A Start"
     )
 

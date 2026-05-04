@@ -162,7 +162,6 @@ class EmulatorBackend(Protocol):
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None: ...
@@ -173,9 +172,17 @@ class EmulatorBackend(Protocol):
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+    ) -> None: ...
+
+    def patch_time_attack_menu_mode(self) -> None: ...
+
+    def patch_engine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        engine_setting_raw_value: int,
     ) -> None: ...
 
     def force_race_reinit(self, *, mode: RaceStartMode) -> None: ...
@@ -186,7 +193,6 @@ class EmulatorBackend(Protocol):
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None: ...
@@ -196,7 +202,6 @@ class EmulatorBackend(Protocol):
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None: ...
@@ -206,7 +211,6 @@ class EmulatorBackend(Protocol):
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None: ...

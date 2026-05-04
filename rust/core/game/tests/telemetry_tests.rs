@@ -21,6 +21,7 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&4_i16.to_le_bytes());
     memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
         .copy_from_slice(&0.7_f32.to_le_bytes());
+    memory[player_base + RACER.character] = 4_u8;
     let machine_base = MACHINE_TABLE.machines + (4 * MACHINE_TABLE.machine_size);
     write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.body_stat, 4);
     write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.boost_stat, 3);
@@ -165,6 +166,41 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.machine_context.grip_stat, 2);
     assert_eq!(telemetry.player.machine_context.weight, 1260);
     assert!((telemetry.player.machine_context.engine_setting - 0.7).abs() < f32::EPSILON);
+}
+
+#[test]
+fn read_snapshot_machine_context_prefers_live_racer_character() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let player_base = GLOBALS.racers;
+    memory[GLOBALS.player_characters..GLOBALS.player_characters + 2]
+        .copy_from_slice(&0_i16.to_le_bytes());
+    memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
+        .copy_from_slice(&0.51_f32.to_le_bytes());
+    memory[player_base + RACER.character] = 5_u8;
+
+    let stale_machine_base = MACHINE_TABLE.machines;
+    write_machine_u8(&mut memory, stale_machine_base + MACHINE_TABLE.body_stat, 1);
+    write_machine_u8(
+        &mut memory,
+        stale_machine_base + MACHINE_TABLE.boost_stat,
+        1,
+    );
+    write_machine_u8(&mut memory, stale_machine_base + MACHINE_TABLE.grip_stat, 1);
+    write_machine_i16(&mut memory, stale_machine_base + MACHINE_TABLE.weight, 900);
+
+    let live_machine_base = MACHINE_TABLE.machines + (5 * MACHINE_TABLE.machine_size);
+    write_machine_u8(&mut memory, live_machine_base + MACHINE_TABLE.body_stat, 4);
+    write_machine_u8(&mut memory, live_machine_base + MACHINE_TABLE.boost_stat, 3);
+    write_machine_u8(&mut memory, live_machine_base + MACHINE_TABLE.grip_stat, 2);
+    write_machine_i16(&mut memory, live_machine_base + MACHINE_TABLE.weight, 1260);
+
+    let telemetry = read_snapshot(&memory).expect("telemetry should decode");
+
+    assert_eq!(telemetry.player.machine_context.body_stat, 4);
+    assert_eq!(telemetry.player.machine_context.boost_stat, 3);
+    assert_eq!(telemetry.player.machine_context.grip_stat, 2);
+    assert_eq!(telemetry.player.machine_context.weight, 1260);
+    assert!((telemetry.player.machine_context.engine_setting - 0.51).abs() < f32::EPSILON);
 }
 
 #[test]

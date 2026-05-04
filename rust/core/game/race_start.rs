@@ -17,9 +17,12 @@ pub struct RaceStartSetup {
     pub total_lap_count: i32,
 }
 
+const PRESERVE_MACHINE_SKIN: i16 = -1;
+
 #[derive(Clone, Copy, Debug)]
 pub struct VehicleSetupInfo {
-    pub character_index: i16,
+    pub player_character_index: i16,
+    pub racer_character_index: i16,
     pub engine_setting: f32,
     pub character_engine_setting: f32,
     pub racer_engine_curve: f32,
@@ -77,6 +80,17 @@ pub fn write_time_attack_machine_settings(
     write_machine_settings(system_ram, RaceStartMode::TimeAttack, setup)
 }
 
+pub fn write_time_attack_menu_mode(system_ram: &mut [u8]) -> Result<(), CoreError> {
+    write_menu_mode_state(system_ram, RaceStartMode::TimeAttack)
+}
+
+pub fn write_time_attack_engine_settings(
+    system_ram: &mut [u8],
+    engine_setting_raw_value: i32,
+) -> Result<(), CoreError> {
+    write_engine_settings_only(system_ram, engine_setting_raw_value)
+}
+
 pub fn force_time_attack_reinit(system_ram: &mut [u8]) -> Result<(), CoreError> {
     force_race_reinit(system_ram, RaceStartMode::TimeAttack)
 }
@@ -99,6 +113,13 @@ pub fn write_gp_race_machine_settings(
     write_machine_settings(system_ram, RaceStartMode::GpRace, setup)
 }
 
+pub fn write_gp_race_engine_settings(
+    system_ram: &mut [u8],
+    engine_setting_raw_value: i32,
+) -> Result<(), CoreError> {
+    write_engine_settings_only(system_ram, engine_setting_raw_value)
+}
+
 pub fn force_gp_race_reinit(system_ram: &mut [u8]) -> Result<(), CoreError> {
     force_race_reinit(system_ram, RaceStartMode::GpRace)
 }
@@ -108,14 +129,16 @@ pub fn validate_gp_race_setup(system_ram: &[u8], setup: RaceStartSetup) -> Resul
 }
 
 pub fn vehicle_setup_info(system_ram: &[u8]) -> Result<VehicleSetupInfo, CoreError> {
-    let character_index = read_i16(system_ram, GLOBALS.player_characters)?;
+    let player_character_index = read_i16(system_ram, GLOBALS.player_characters)?;
+    let racer_character_index = read_i8(system_ram, player_racer_base() + RACER.character)? as i16;
     let player_base = player_racer_base();
     Ok(VehicleSetupInfo {
-        character_index,
+        player_character_index,
+        racer_character_index,
         engine_setting: read_f32(system_ram, GLOBALS.player_engine)?,
         character_engine_setting: read_f32(
             system_ram,
-            GLOBALS.character_last_engine + ((character_index as usize) * 4),
+            GLOBALS.character_last_engine + ((active_character_index(system_ram)? as usize) * 4),
         )?,
         racer_engine_curve: read_f32(system_ram, player_base + RACER.engine_curve)?,
     })
@@ -140,6 +163,39 @@ fn write_machine_settings(
     write_menu_setup(system_ram, mode, setup)
 }
 
+fn write_menu_mode_state(system_ram: &mut [u8], mode: RaceStartMode) -> Result<(), CoreError> {
+    write_i32(system_ram, GLOBALS.num_players, GAME_IDS.single_player)?;
+    if let Some(selected_mode) = mode.menu_state().selected_mode {
+        write_i32(system_ram, GLOBALS.selected_mode, selected_mode)?;
+    }
+    if let Some(current_ghost_type) = mode.menu_state().current_ghost_type {
+        write_i32(system_ram, GLOBALS.current_ghost_type, current_ghost_type)?;
+    }
+    Ok(())
+}
+
+fn write_engine_settings_only(
+    system_ram: &mut [u8],
+    engine_setting_raw_value: i32,
+) -> Result<(), CoreError> {
+    let character_index = active_character_index(system_ram)?;
+    validate_character_and_engine(character_index, engine_setting_raw_value)?;
+    let engine_value = engine_setting_raw_value as f32 / 100.0;
+    let player_base = player_racer_base();
+
+    write_f32(system_ram, GLOBALS.player_engine, engine_value)?;
+    write_f32(
+        system_ram,
+        GLOBALS.character_last_engine + ((character_index as usize) * 4),
+        engine_value,
+    )?;
+    write_f32(
+        system_ram,
+        player_base + RACER.engine_curve,
+        engine_to_curve_value(engine_value),
+    )
+}
+
 fn force_race_reinit(system_ram: &mut [u8], mode: RaceStartMode) -> Result<(), CoreError> {
     let game_mode = mode.game_mode() as i32;
     write_i32(system_ram, GLOBALS.game_mode, game_mode)?;
@@ -161,6 +217,8 @@ fn validate_race_setup(
     let engine_curve = engine_to_curve_value(engine_value);
     let player_base = player_racer_base();
 
+    let player_character = read_i16(system_ram, GLOBALS.player_characters)?;
+    let racer_character = read_i8(system_ram, player_base + RACER.character)? as i16;
     let mut mismatches = Vec::new();
     push_mismatch(
         &mut mismatches,
@@ -184,24 +242,20 @@ fn validate_race_setup(
             current_ghost_type,
         );
     }
-    push_mismatch(
-        &mut mismatches,
-        "player_character",
-        read_i16(system_ram, GLOBALS.player_characters)?,
-        setup.character_index,
-    );
-    push_mismatch(
-        &mut mismatches,
-        "racer_character",
-        read_i8(system_ram, player_base + RACER.character)?,
-        setup.character_index as i8,
-    );
-    push_mismatch(
-        &mut mismatches,
-        "racer_machine_skin",
-        read_i16(system_ram, player_base + RACER.machine_skin_index)?,
-        setup.machine_skin_index,
-    );
+    if player_character != setup.character_index && racer_character != setup.character_index {
+        mismatches.push(format!(
+            "character: expected {:?}, got player_character={:?}, racer_character={:?}",
+            setup.character_index, player_character, racer_character
+        ));
+    }
+    if setup.machine_skin_index != PRESERVE_MACHINE_SKIN {
+        push_mismatch(
+            &mut mismatches,
+            "racer_machine_skin",
+            read_i16(system_ram, player_base + RACER.machine_skin_index)?,
+            setup.machine_skin_index,
+        );
+    }
 
     let player_engine = read_f32(system_ram, GLOBALS.player_engine)?;
     if (player_engine - engine_value).abs() > 0.001 {
@@ -242,11 +296,13 @@ fn write_menu_setup(
     }
     write_i32(system_ram, GLOBALS.course_index, setup.course_index)?;
     write_i16(system_ram, GLOBALS.player_characters, setup.character_index)?;
-    write_i16(
-        system_ram,
-        GLOBALS.player_machine_skins,
-        setup.machine_skin_index,
-    )?;
+    if setup.machine_skin_index != PRESERVE_MACHINE_SKIN {
+        write_i16(
+            system_ram,
+            GLOBALS.player_machine_skins,
+            setup.machine_skin_index,
+        )?;
+    }
     write_f32(system_ram, GLOBALS.player_engine, engine_value)?;
     write_f32(
         system_ram,
@@ -263,11 +319,13 @@ fn write_live_racer_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Resul
         player_base + RACER.character,
         setup.character_index as i8,
     )?;
-    write_i16(
-        system_ram,
-        player_base + RACER.machine_skin_index,
-        setup.machine_skin_index,
-    )?;
+    if setup.machine_skin_index != PRESERVE_MACHINE_SKIN {
+        write_i16(
+            system_ram,
+            player_base + RACER.machine_skin_index,
+            setup.machine_skin_index,
+        )?;
+    }
     write_f32(
         system_ram,
         player_base + RACER.engine_curve,
@@ -282,24 +340,11 @@ fn validate_setup(setup: RaceStartSetup) -> Result<(), CoreError> {
             BOUNDS.course_count, setup.course_index
         )));
     }
-    if setup.character_index < 0 || setup.character_index as usize >= MACHINE_TABLE.machine_count {
+    validate_character_and_engine(setup.character_index, setup.engine_setting_raw_value)?;
+    if setup.machine_skin_index < 0 && setup.machine_skin_index != PRESERVE_MACHINE_SKIN {
         return Err(invalid_setup(format!(
-            "character_index must be in [0, {}), got {}",
-            MACHINE_TABLE.machine_count, setup.character_index
-        )));
-    }
-    if setup.machine_skin_index < 0 {
-        return Err(invalid_setup(format!(
-            "machine_skin_index must be non-negative, got {}",
-            setup.machine_skin_index
-        )));
-    }
-    if !(BOUNDS.engine_setting_min..=BOUNDS.engine_setting_max)
-        .contains(&setup.engine_setting_raw_value)
-    {
-        return Err(invalid_setup(format!(
-            "engine_setting raw value must be in [{}, {}], got {}",
-            BOUNDS.engine_setting_min, BOUNDS.engine_setting_max, setup.engine_setting_raw_value
+            "machine_skin_index must be non-negative or preserve sentinel {}, got {}",
+            PRESERVE_MACHINE_SKIN, setup.machine_skin_index
         )));
     }
     if setup.total_lap_count < BOUNDS.minimum_lap_count {
@@ -311,12 +356,41 @@ fn validate_setup(setup: RaceStartSetup) -> Result<(), CoreError> {
     Ok(())
 }
 
+fn validate_character_and_engine(
+    character_index: i16,
+    engine_setting_raw_value: i32,
+) -> Result<(), CoreError> {
+    if character_index < 0 || character_index as usize >= MACHINE_TABLE.machine_count {
+        return Err(invalid_setup(format!(
+            "character_index must be in [0, {}), got {}",
+            MACHINE_TABLE.machine_count, character_index
+        )));
+    }
+    if !(BOUNDS.engine_setting_min..=BOUNDS.engine_setting_max).contains(&engine_setting_raw_value)
+    {
+        return Err(invalid_setup(format!(
+            "engine_setting raw value must be in [{}, {}], got {}",
+            BOUNDS.engine_setting_min, BOUNDS.engine_setting_max, engine_setting_raw_value
+        )));
+    }
+    Ok(())
+}
+
 fn invalid_setup(message: String) -> CoreError {
     CoreError::InvalidRaceStartSetup { message }
 }
 
 fn player_racer_base() -> usize {
     GLOBALS.racers + (TELEMETRY_CONFIG.player_racer_index * RACER.size)
+}
+
+fn active_character_index(system_ram: &[u8]) -> Result<i16, CoreError> {
+    let racer_character_index = read_i8(system_ram, player_racer_base() + RACER.character)? as i16;
+    if racer_character_index >= 0 && (racer_character_index as usize) < MACHINE_TABLE.machine_count
+    {
+        return Ok(racer_character_index);
+    }
+    read_i16(system_ram, GLOBALS.player_characters)
 }
 
 impl RaceStartMode {

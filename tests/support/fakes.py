@@ -463,7 +463,6 @@ class SyntheticBackend:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -471,7 +470,6 @@ class SyntheticBackend:
             "mode": mode,
             "course_index": course_index,
             "character_index": character_index,
-            "machine_skin_index": machine_skin_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
         }
@@ -482,7 +480,6 @@ class SyntheticBackend:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -490,10 +487,23 @@ class SyntheticBackend:
             "mode": mode,
             "course_index": course_index,
             "character_index": character_index,
-            "machine_skin_index": machine_skin_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
         }
+
+    def patch_engine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        engine_setting_raw_value: int,
+    ) -> None:
+        self.last_engine_settings = {
+            "mode": mode,
+            "engine_setting_raw_value": engine_setting_raw_value,
+        }
+
+    def patch_time_attack_menu_mode(self) -> None:
+        self.last_time_attack_menu_mode = True
 
     def force_race_reinit(self, *, mode: RaceStartMode) -> None:
         self.last_race_reinit_mode = mode
@@ -504,7 +514,6 @@ class SyntheticBackend:
         mode: RaceStartMode,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -512,7 +521,6 @@ class SyntheticBackend:
             mode=mode,
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -522,7 +530,6 @@ class SyntheticBackend:
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -530,7 +537,6 @@ class SyntheticBackend:
             mode="time_attack",
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )
@@ -540,7 +546,6 @@ class SyntheticBackend:
         *,
         course_index: int,
         character_index: int,
-        machine_skin_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
@@ -548,7 +553,6 @@ class SyntheticBackend:
             mode="time_attack",
             course_index=course_index,
             character_index=character_index,
-            machine_skin_index=machine_skin_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
         )

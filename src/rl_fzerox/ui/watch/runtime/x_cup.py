@@ -5,16 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fzerox_emulator import (
-    JOYPAD_L2,
-    JOYPAD_R,
-    JOYPAD_RIGHT,
-    JOYPAD_START,
+    JOYPAD_BUTTONS,
     ControllerState,
     Emulator,
     FZeroXTelemetry,
     joypad_mask,
 )
-from fzerox_emulator._native import JOYPAD_L
+from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
 from rl_fzerox.core.config.schema import WatchAppConfig
 
 
@@ -67,19 +64,6 @@ X_CUP_BOOTSTRAP_TIMING = XCupBootstrapTiming()
 X_CUP_BOOTSTRAP_INFO = XCupBootstrapInfo()
 _X_CUP_MENU_INDEX = 48
 
-# The USA ROM path exposes X Cup only after the standard unlock-everything
-# code is entered on the main mode-select screen.
-_UNLOCK_EVERYTHING_SEQUENCE: tuple[ControllerState, ...] = (
-    ControllerState(joypad_mask=joypad_mask(JOYPAD_L)),
-    ControllerState(joypad_mask=joypad_mask(JOYPAD_L2)),
-    ControllerState(joypad_mask=joypad_mask(JOYPAD_R)),
-    ControllerState(right_stick_y=-1.0),
-    ControllerState(right_stick_y=1.0),
-    ControllerState(right_stick_x=-1.0),
-    ControllerState(right_stick_x=1.0),
-    ControllerState(joypad_mask=joypad_mask(JOYPAD_START)),
-)
-
 
 def materialize_x_cup_watch_baseline(config: WatchAppConfig) -> dict[str, object]:
     """Create one watch-session baseline by cold-booting into GP X Cup.
@@ -124,8 +108,8 @@ def _boot_into_x_cup_gp_race(emulator: Emulator) -> None:
     for _ in range(4):
         _tap_start(emulator)
     emulator.step_frames(X_CUP_BOOTSTRAP_TIMING.main_menu_ready_frames, capture_video=False)
-    for control_state in _UNLOCK_EVERYTHING_SEQUENCE:
-        _tap_state(emulator, control_state)
+    for unlock_input in UNLOCK_EVERYTHING_SEQUENCE:
+        _tap_state(emulator, unlock_input.control_state)
     emulator.step_frames(X_CUP_BOOTSTRAP_TIMING.post_unlock_settle_frames, capture_video=False)
 
     _press_start_until_mode(emulator, target_mode="course_select")
@@ -177,7 +161,9 @@ def _press_start_until_x_cup_race_mode(emulator: Emulator) -> None:
         if _is_x_cup_race_telemetry(telemetry):
             return
 
-        emulator.set_controller_state(ControllerState(joypad_mask=joypad_mask(JOYPAD_START)))
+        emulator.set_controller_state(
+            ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start))
+        )
         emulator.step_frames(X_CUP_BOOTSTRAP_TIMING.start_hold_frames, capture_video=False)
         emulator.set_controller_state(ControllerState())
         for _ in range(X_CUP_BOOTSTRAP_TIMING.race_mode_poll_frames):
@@ -239,7 +225,7 @@ def _is_x_cup_race_telemetry(telemetry: FZeroXTelemetry | None) -> bool:
 def _tap_start(emulator: Emulator) -> None:
     _tap_state(
         emulator,
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_START)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start)),
         hold_frames=X_CUP_BOOTSTRAP_TIMING.start_hold_frames,
         settle_frames=X_CUP_BOOTSTRAP_TIMING.start_settle_frames,
     )
@@ -248,7 +234,7 @@ def _tap_start(emulator: Emulator) -> None:
 def _tap_menu_right(emulator: Emulator) -> None:
     _tap_state(
         emulator,
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_RIGHT)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right)),
         hold_frames=X_CUP_BOOTSTRAP_TIMING.menu_hold_frames,
         settle_frames=X_CUP_BOOTSTRAP_TIMING.menu_settle_frames,
     )

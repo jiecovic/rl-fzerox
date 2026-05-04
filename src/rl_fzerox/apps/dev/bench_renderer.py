@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from fzerox_emulator import JOYPAD_A, ControllerState, Emulator, joypad_mask
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, Emulator, joypad_mask
 from fzerox_emulator.base import BackendStepResult
 
 RENDERERS: tuple[str, ...] = ("angrylion", "gliden64")
@@ -112,7 +112,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 def _benchmark_renderer(args: argparse.Namespace, renderer: str) -> RendererBenchResult:
     runtime_dir = (args.runtime_dir / renderer).expanduser().resolve()
     runtime_dir.mkdir(parents=True, exist_ok=True)
-    controller = ControllerState(joypad_mask=joypad_mask(JOYPAD_A))
+    controller = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.a))
 
     try:
         emulator = Emulator(

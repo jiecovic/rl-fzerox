@@ -6,7 +6,9 @@ use std::mem::size_of;
 use libretro_sys::MEMORY_SYSTEM_RAM;
 
 use crate::core::error::CoreError;
-use crate::core::game::memory::{read_f32, read_i16, read_i32, read_u32, read_word_swapped_u8};
+use crate::core::game::memory::{
+    read_f32, read_i8, read_i16, read_i32, read_u32, read_word_swapped_u8,
+};
 use crate::core::telemetry::layout::{
     CAMERA, COURSE_INFO, COURSE_SEGMENT, CameraRaceSetting, GLOBALS, GameMode, MACHINE_TABLE,
     RACER, RACER_SEGMENT_POSITION_INFO, RaceDifficulty, TELEMETRY_CONFIG,
@@ -118,7 +120,7 @@ fn player_camera_setting_offset() -> usize {
 }
 
 fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, CoreError> {
-    let character_index = read_i16(system_ram, GLOBALS.player_characters)?;
+    let character_index = resolve_machine_character_index(system_ram)?;
     let engine_setting = read_f32(system_ram, GLOBALS.player_engine)?;
     if character_index < 0 || character_index as usize >= MACHINE_TABLE.machine_count {
         return Ok(MachineContextTelemetry {
@@ -136,6 +138,15 @@ fn read_machine_context(system_ram: &[u8]) -> Result<MachineContextTelemetry, Co
         weight: read_machine_i16(system_ram, machine_base + MACHINE_TABLE.weight)?,
         engine_setting,
     })
+}
+
+fn resolve_machine_character_index(system_ram: &[u8]) -> Result<i16, CoreError> {
+    let racer_character_index = read_i8(system_ram, GLOBALS.racers + RACER.character)? as i16;
+    if racer_character_index >= 0 && (racer_character_index as usize) < MACHINE_TABLE.machine_count
+    {
+        return Ok(racer_character_index);
+    }
+    read_i16(system_ram, GLOBALS.player_characters)
 }
 
 fn read_racer_geometry(

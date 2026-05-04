@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import JOYPAD_A, JOYPAD_B, ControllerState, joypad_mask
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
 from fzerox_emulator.arrays import ActionMask, DiscreteAction
 from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
 from rl_fzerox.core.envs.actions.base import (
@@ -21,8 +21,8 @@ from rl_fzerox.core.envs.actions.base import (
 
 # Mupen64Plus-Next's standard RetroPad mapping exposes the in-game N64 A/C-Down
 # buttons on RetroPad B/A. F-Zero X names those controls Accelerate/Air Brake.
-ACCELERATE_MASK = joypad_mask(JOYPAD_B)
-AIR_BRAKE_MASK = joypad_mask(JOYPAD_A)
+ACCELERATE_MASK = joypad_mask(JOYPAD_BUTTONS.b)
+AIR_BRAKE_MASK = joypad_mask(JOYPAD_BUTTONS.a)
 
 # Legacy aliases kept for existing imports and older tests/config-adjacent code.
 THROTTLE_MASK = ACCELERATE_MASK
