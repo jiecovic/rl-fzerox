@@ -14,6 +14,7 @@ import {
   openRunDirectoryResponseSchema,
   type PolicyArchitecturePreview,
   policyArchitecturePreviewSchema,
+  resetTrackSamplingResponseSchema,
   runMetricsResponseSchema,
   runsResponseSchema,
   runTrackSamplingResponseSchema,
@@ -56,6 +57,13 @@ export async function fetchRunTrackSamplingState(
     await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling`),
   );
   return payload.state;
+}
+
+export async function resetRunTrackSamplingState(runId: string): Promise<void> {
+  const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/track-sampling/reset`, {
+    method: "POST",
+  });
+  resetTrackSamplingResponseSchema.parse(await parseJson(response));
 }
 
 export function getCachedRunMetrics(

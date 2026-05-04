@@ -1,3 +1,5 @@
+import { CloseIcon } from "@/shared/ui/icons";
+
 export interface TabItem<T extends string> {
   id: T;
   label: string;
@@ -62,17 +64,4 @@ function tabShellClass<T extends string>(item: TabItem<T>, active: boolean) {
     classes.push("tab-shell-run");
   }
   return classes.join(" ");
-}
-
-function CloseIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 16 16" width="14">
-      <path
-        d="M4.25 4.25 8 8m0 0 3.75 3.75M8 8l3.75-3.75M8 8l-3.75 3.75"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
 }

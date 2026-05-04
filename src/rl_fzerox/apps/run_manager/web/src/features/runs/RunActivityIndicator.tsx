@@ -17,10 +17,10 @@ export function RunActivityIndicator({ run }: { run: ManagedRun }) {
     return <span>updated {formatRelativeTime(run.runtime.updated_at)}</span>;
   }
   if (run.status === "running") {
-    return <span>starting</span>;
+    return <span>{startupActivityLabel(run) ?? "starting"}</span>;
   }
   if (run.status === "failed") {
-    return <span>no runtime sample</span>;
+    return <span>{startupActivityLabel(run) ?? "no runtime sample"}</span>;
   }
   return <span>idle</span>;
 }
@@ -34,4 +34,12 @@ export function isRunHeartbeatFresh(run: ManagedRun, now: Date = new Date()) {
     return false;
   }
   return now.getTime() - updatedAt.getTime() <= 8_000;
+}
+
+function startupActivityLabel(run: ManagedRun) {
+  const startupEvent = run.recent_events.find((event) => event.kind.startsWith("startup_"));
+  if (startupEvent === undefined) {
+    return null;
+  }
+  return startupEvent.message;
 }

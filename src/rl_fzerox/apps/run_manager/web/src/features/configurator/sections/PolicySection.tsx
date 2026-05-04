@@ -8,6 +8,7 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { CnnConfigIcon } from "@/shared/ui/icons";
 
 interface PolicySectionProps {
   config: ManagedRunConfig;
@@ -232,19 +233,5 @@ export function PolicySection({
         />
       </ConfigPanel>
     </div>
-  );
-}
-
-function CnnConfigIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <rect height="12" rx="2" stroke="currentColor" strokeWidth="1.4" width="12" x="4" y="4" />
-      <path
-        d="M8 8h4M8 12h7M12 8v4"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeWidth="1.4"
-      />
-    </svg>
   );
 }

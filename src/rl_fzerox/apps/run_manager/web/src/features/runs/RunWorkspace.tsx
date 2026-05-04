@@ -15,6 +15,7 @@ import { TracksSection } from "@/features/configurator/sections/TracksSection";
 import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
 import { VehicleSection } from "@/features/configurator/sections/VehicleSection";
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
+import { RunTrackPoolPanel } from "@/features/runs/RunTrackPoolPanel";
 import { fetchPolicyPreview, fetchRunTrackSamplingState } from "@/shared/api/client";
 import type {
   ConfigMetadata,
@@ -22,16 +23,27 @@ import type {
   PolicyArchitecturePreview,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
-import { formatDate, formatRelativeTime } from "@/shared/ui/format";
+import { formatDate } from "@/shared/ui/format";
+import {
+  ChartIcon,
+  CopyIcon,
+  FolderIcon,
+  ForkIcon,
+  ResumeIcon,
+  StopIcon,
+  WatchIcon,
+} from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
 
 interface RunWorkspaceProps {
+  allRuns: ManagedRun[];
   metadata: ConfigMetadata;
   onFork: (runId: string, artifact: "latest" | "best") => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
   onResume: (runId: string) => Promise<void>;
+  onResetTrackPool: (runId: string) => Promise<void>;
   onShowCharts: (runId: string) => void;
   onStop: (runId: string) => Promise<void>;
   onWatch: (runId: string, artifact: "latest" | "best") => Promise<void>;
@@ -39,11 +51,13 @@ interface RunWorkspaceProps {
 }
 
 export function RunWorkspace({
+  allRuns,
   metadata,
   onFork,
   onOpenDirectory,
   onRename,
   onResume,
+  onResetTrackPool,
   onShowCharts,
   onStop,
   onWatch,
@@ -62,6 +76,8 @@ export function RunWorkspace({
   const [isStopping, setIsStopping] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<"latest" | "best">("latest");
   const [watchingArtifact, setWatchingArtifact] = useState<"latest" | "best" | null>(null);
+  const [isResettingTrackPool, setIsResettingTrackPool] = useState(false);
+  const [copiedRunId, setCopiedRunId] = useState(false);
   const [trackSamplingState, setTrackSamplingState] = useState<TrackSamplingRuntimeState | null>(
     null,
   );
@@ -103,6 +119,18 @@ export function RunWorkspace({
       window.clearInterval(intervalId);
     };
   }, [run.status]);
+
+  useEffect(() => {
+    if (!copiedRunId) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setCopiedRunId(false);
+    }, 1_200);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [copiedRunId]);
 
   useEffect(() => {
     let ignore = false;
@@ -207,12 +235,35 @@ export function RunWorkspace({
     }
   }
 
+  async function resetTrackPoolState() {
+    setIsResettingTrackPool(true);
+    setControlError(null);
+    try {
+      await onResetTrackPool(run.id);
+      setTrackSamplingState(null);
+    } catch (caught) {
+      setControlError(
+        caught instanceof Error ? caught.message : "failed to reset track-pool stats",
+      );
+    } finally {
+      setIsResettingTrackPool(false);
+    }
+  }
+
+  async function copyRunId() {
+    try {
+      await navigator.clipboard.writeText(run.id);
+      setCopiedRunId(true);
+      setControlError(null);
+    } catch {
+      setControlError("failed to copy run id");
+    }
+  }
+
   const pendingCommand = run.pending_command;
   const runtime = run.runtime;
   const progressFraction = runtime?.progress_fraction ?? 0;
-  const visibleTrackSamplingState = showTrackSamplingState(trackSamplingState)
-    ? trackSamplingState
-    : null;
+  const showsLineageTotals = run.lineage_step_offset > 0 || run.parent_run_id !== null;
   const normalizedRunName = runName.trim();
   const canRename =
     normalizedRunName.length > 0 &&
@@ -243,78 +294,94 @@ export function RunWorkspace({
           <div className="run-runtime-metrics-grid">
             <div className="run-runtime-metric">
               <span className="run-runtime-metric-label">Env step / s</span>
-              <strong className="run-runtime-metric-value">{envStepRateLabel(run)}</strong>
+              <div className="run-runtime-metric-value">{envStepRateLabel(run)}</div>
             </div>
             <div className="run-runtime-metric">
               <span className="run-runtime-metric-label">Train fps</span>
-              <strong className="run-runtime-metric-value">{trainFpsLabel(run)}</strong>
+              <div className="run-runtime-metric-value">{trainFpsLabel(run)}</div>
             </div>
-            <div className="run-runtime-metric">
-              <span className="run-runtime-metric-label">Wall time</span>
-              <strong className="run-runtime-metric-value">{wallTimeLabel(run, nowMs)}</strong>
-            </div>
-            <div className="run-runtime-metric">
-              <span className="run-runtime-metric-label">Sim game time</span>
-              <strong className="run-runtime-metric-value">{simGameTimeLabel(run)}</strong>
-            </div>
-            <div className="run-runtime-metric">
-              <span className="run-runtime-metric-label">Sim / wall</span>
-              <strong className="run-runtime-metric-value">
-                {simToWallRatioLabel(run, nowMs)}
-              </strong>
-            </div>
+            {showsLineageTotals ? (
+              <>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">
+                    {run.runtime === null ? "Setup time · local" : "Wall time · local"}
+                  </span>
+                  <div className="run-runtime-metric-value">{localWallTimeLabel(run, nowMs)}</div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">
+                    {run.runtime === null ? "Setup time · total" : "Wall time · total"}
+                  </span>
+                  <div className="run-runtime-metric-value">
+                    {lineageWallTimeLabel(run, allRuns, nowMs)}
+                  </div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim game time · local</span>
+                  <div className="run-runtime-metric-value">{localSimGameTimeLabel(run)}</div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim game time · total</span>
+                  <div className="run-runtime-metric-value">
+                    {lineageSimGameTimeLabelText(run, allRuns)}
+                  </div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim / wall · local</span>
+                  <div className="run-runtime-metric-value">
+                    {localSimToWallRatioLabel(run, nowMs)}
+                  </div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim / wall · total</span>
+                  <div className="run-runtime-metric-value">
+                    {lineageSimToWallRatioLabel(run, allRuns, nowMs)}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">
+                    {run.runtime === null ? "Setup time" : "Wall time"}
+                  </span>
+                  <div className="run-runtime-metric-value">{localWallTimeLabel(run, nowMs)}</div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim game time</span>
+                  <div className="run-runtime-metric-value">{localSimGameTimeLabel(run)}</div>
+                </div>
+                <div className="run-runtime-metric">
+                  <span className="run-runtime-metric-label">Sim / wall</span>
+                  <div className="run-runtime-metric-value">
+                    {localSimToWallRatioLabel(run, nowMs)}
+                  </div>
+                </div>
+              </>
+            )}
             {run.lineage_step_offset > 0 ? (
               <div className="run-runtime-metric">
                 <span className="run-runtime-metric-label">Lineage steps</span>
-                <strong className="run-runtime-metric-value">{lineageStepsLabel(run)}</strong>
+                <div className="run-runtime-metric-value">{lineageStepsLabel(run)}</div>
               </div>
             ) : null}
-          </div>
-          {visibleTrackSamplingState !== null ? (
-            <div className="run-track-distribution-panel">
-              <div className="run-track-distribution-header">
-                <div>
-                  <strong>Track pool</strong>
-                  <div className="run-track-distribution-note">
-                    step-balanced · updated {trackSamplingUpdatedLabel(run)}
-                  </div>
-                </div>
-                <div className="run-track-distribution-meta">
-                  every {visibleTrackSamplingState.update_episodes} episodes
-                </div>
+            <div className="run-runtime-metric">
+              <span className="run-runtime-metric-label">Run id</span>
+              <div className="run-runtime-metric-value run-runtime-metric-inline">
+                <code className="run-runtime-code">{run.id}</code>
+                <button
+                  aria-label={copiedRunId ? "Run id copied" : "Copy run id"}
+                  className="icon-button compact-icon-button tooltip-anchor run-runtime-copy-button"
+                  data-tooltip={copiedRunId ? "Copied" : "Copy run id"}
+                  data-tooltip-position="top"
+                  type="button"
+                  onClick={() => void copyRunId()}
+                >
+                  <CopyIcon />
+                </button>
               </div>
-              <table className="run-track-distribution-table">
-                <thead>
-                  <tr>
-                    <th>Course</th>
-                    <th>Sample</th>
-                    <th>Episodes</th>
-                    <th>Env steps</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleTrackSamplingState.entries.map((entry) => (
-                    <tr key={entry.track_id}>
-                      <th scope="row">{entry.label}</th>
-                      <td>{formatPercent(entry.current_probability)}</td>
-                      <td>
-                        {entry.episode_count.toLocaleString()}
-                        <span className="run-track-distribution-share">
-                          {formatPercent(entry.episode_share)}
-                        </span>
-                      </td>
-                      <td>
-                        {entry.completed_env_steps.toLocaleString()}
-                        <span className="run-track-distribution-share">
-                          {formatPercent(entry.step_share)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
-          ) : null}
+          </div>
         </div>
 
         <div className="run-runtime-actions">
@@ -415,6 +482,15 @@ export function RunWorkspace({
             <ResumeIcon />
           </button>
         </div>
+
+        <RunTrackPoolPanel
+          canReset={run.status === "stopped"}
+          isResetting={isResettingTrackPool}
+          metadata={metadata}
+          onReset={() => void resetTrackPoolState()}
+          run={run}
+          state={trackSamplingState}
+        />
       </div>
 
       {controlError !== null || previewError !== null ? (
@@ -538,20 +614,6 @@ export function RunWorkspace({
   );
 }
 
-function ForkIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 20 20" width="16">
-      <path
-        d="M6 4.5a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0Zm0 11a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0Zm10-5.5a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0ZM4.5 6v3.25c0 .69.56 1.25 1.25 1.25h7.5M4.5 14v-3.25c0-.69.56-1.25 1.25-1.25h7.5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
 function progressHeadline(run: ManagedRun) {
   const runtime = run.runtime;
   if (runtime === null) {
@@ -566,10 +628,16 @@ function progressNote(run: ManagedRun) {
   const runtime = run.runtime;
   const target = run.config.train.total_timesteps.toLocaleString();
   if (runtime === null) {
+    const startupMessage = latestStartupMessage(run);
     if (run.status === "failed") {
-      return `Run failed before the first callback flush. Target was ${target} steps.`;
+      return (
+        startupMessage ?? `Run failed before the first callback flush. Target was ${target} steps.`
+      );
     }
-    return `Target ${target} steps. Runtime metrics appear after the first callback flush.`;
+    return (
+      startupMessage ??
+      `Target ${target} steps. Runtime metrics appear after the first callback flush.`
+    );
   }
   if (run.lineage_step_offset <= 0) {
     return `${runtime.num_timesteps.toLocaleString()} / ${runtime.total_timesteps.toLocaleString()} steps`;
@@ -607,47 +675,64 @@ function formatRate(value: number) {
   return value >= 100 ? `${value.toFixed(0)}` : `${value.toFixed(1)}`;
 }
 
-function formatPercent(value: number) {
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-function wallTimeLabel(run: ManagedRun, nowMs: number) {
-  const seconds = wallTimeSeconds(run, nowMs);
+function localWallTimeLabel(run: ManagedRun, nowMs: number) {
+  const seconds = localWallTimeSeconds(run, nowMs);
   return seconds === null ? "n/a" : formatDurationSeconds(seconds);
 }
 
-function simGameTimeLabel(run: ManagedRun) {
-  const value = simGameTimeSeconds(run);
-  if (value === null) {
-    return "n/a";
-  }
-  return formatDurationSeconds(value);
+function lineageWallTimeLabel(run: ManagedRun, allRuns: ManagedRun[], nowMs: number) {
+  const seconds = lineageWallTimeSeconds(run, allRuns, nowMs);
+  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
 }
 
-function simToWallRatioLabel(run: ManagedRun, nowMs: number) {
-  const wallSeconds = wallTimeSeconds(run, nowMs);
-  const simSeconds = localSimGameTimeSeconds(run);
-  if (wallSeconds === null || simSeconds === null || wallSeconds <= 0) {
-    return "n/a";
-  }
-  return `${(simSeconds / wallSeconds).toFixed(2)}x`;
+function localSimGameTimeLabel(run: ManagedRun) {
+  const seconds = localSimGameTimeSeconds(run);
+  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
 }
 
-function simGameTimeSeconds(run: ManagedRun) {
+function lineageSimGameTimeLabelText(run: ManagedRun, allRuns: ManagedRun[]) {
+  const seconds = lineageSimGameTimeSeconds(run, allRuns);
+  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+}
+
+function localSimToWallRatioLabel(run: ManagedRun, nowMs: number) {
+  const localWallSeconds = localWallTimeSeconds(run, nowMs);
   const localSimSeconds = localSimGameTimeSeconds(run);
-  if (localSimSeconds === null) {
-    return null;
+  if (localWallSeconds === null || localSimSeconds === null || localWallSeconds <= 0) {
+    return "n/a";
   }
-  const actionRepeat = Math.max(run.config.action.action_repeat, 1);
-  return (run.lineage_step_offset * actionRepeat) / 60 + localSimSeconds;
+  return `${(localSimSeconds / localWallSeconds).toFixed(2)}x`;
+}
+
+function lineageSimToWallRatioLabel(run: ManagedRun, allRuns: ManagedRun[], nowMs: number) {
+  const lineageWallSeconds = lineageWallTimeSeconds(run, allRuns, nowMs);
+  const lineageSimSeconds = lineageSimGameTimeSeconds(run, allRuns);
+  if (lineageWallSeconds === null || lineageSimSeconds === null || lineageWallSeconds <= 0) {
+    return "n/a";
+  }
+  return `${(lineageSimSeconds / lineageWallSeconds).toFixed(2)}x`;
 }
 
 function lineageStepsLabel(run: ManagedRun) {
   const runtime = run.runtime;
-  if (runtime === null) {
-    return "n/a";
+  if (runtime !== null) {
+    return (run.lineage_step_offset + runtime.num_timesteps).toLocaleString();
   }
-  return (run.lineage_step_offset + runtime.num_timesteps).toLocaleString();
+  if (run.lineage_step_offset > 0) {
+    return run.lineage_step_offset.toLocaleString();
+  }
+  if (run.source_num_timesteps !== null) {
+    return run.source_num_timesteps.toLocaleString();
+  }
+  return "n/a";
+}
+
+function latestStartupMessage(run: ManagedRun) {
+  const startupEvent = run.recent_events.find((event) => event.kind.startsWith("startup_"));
+  if (startupEvent === undefined) {
+    return null;
+  }
+  return startupEvent.message;
 }
 
 function localSimGameTimeSeconds(run: ManagedRun) {
@@ -657,6 +742,10 @@ function localSimGameTimeSeconds(run: ManagedRun) {
   }
   const actionRepeat = Math.max(run.config.action.action_repeat, 1);
   return (runtime.num_timesteps * actionRepeat) / 60;
+}
+
+function lineageSimGameTimeSeconds(run: ManagedRun, allRuns: ManagedRun[]) {
+  return lineageAggregateSeconds(run, allRuns, localSimGameTimeSeconds);
 }
 
 function envStepRateValue(run: ManagedRun) {
@@ -676,7 +765,11 @@ function envStepRateValue(run: ManagedRun) {
   return runtime.num_timesteps / ((updatedMs - startedMs) / 1000);
 }
 
-function wallTimeSeconds(run: ManagedRun, nowMs: number) {
+function localWallTimeSeconds(run: ManagedRun, nowMs: number) {
+  const activeRuntimeWallSeconds = activeRuntimeWallTimeSeconds(run);
+  if (activeRuntimeWallSeconds !== null) {
+    return activeRuntimeWallSeconds;
+  }
   const startedAt = run.started_at ?? run.created_at;
   const startedMs = Date.parse(startedAt);
   if (Number.isNaN(startedMs)) {
@@ -687,6 +780,49 @@ function wallTimeSeconds(run: ManagedRun, nowMs: number) {
     return null;
   }
   return Math.max(0, (stoppedMs - startedMs) / 1000);
+}
+
+function activeRuntimeWallTimeSeconds(run: ManagedRun) {
+  const runtime = run.runtime;
+  if (runtime === null) {
+    return null;
+  }
+  const envStepRate = envStepRateValue(run);
+  if (envStepRate === null || envStepRate <= 0) {
+    return null;
+  }
+  return runtime.num_timesteps / envStepRate;
+}
+
+function lineageWallTimeSeconds(run: ManagedRun, allRuns: ManagedRun[], nowMs: number) {
+  return lineageAggregateSeconds(run, allRuns, (currentRun) =>
+    localWallTimeSeconds(currentRun, nowMs),
+  );
+}
+
+function lineageAggregateSeconds(
+  run: ManagedRun,
+  allRuns: ManagedRun[],
+  selector: (run: ManagedRun) => number | null,
+) {
+  const runsById = new Map(allRuns.map((candidate) => [candidate.id, candidate]));
+  const visited = new Set<string>();
+  let totalSeconds = 0;
+  let hasAnyValue = false;
+  let currentRun: ManagedRun | null = run;
+
+  while (currentRun !== null && !visited.has(currentRun.id)) {
+    visited.add(currentRun.id);
+    const seconds = selector(currentRun);
+    if (seconds !== null) {
+      totalSeconds += seconds;
+      hasAnyValue = true;
+    }
+    currentRun =
+      currentRun.parent_run_id === null ? null : (runsById.get(currentRun.parent_run_id) ?? null);
+  }
+
+  return hasAnyValue ? totalSeconds : null;
 }
 
 function formatDurationSeconds(value: number) {
@@ -716,86 +852,4 @@ function formatDurationSeconds(value: number) {
     }
   }
   return parts.join(" ");
-}
-
-function showTrackSamplingState(state: TrackSamplingRuntimeState | null) {
-  return state !== null && state.entries.length > 1;
-}
-
-function trackSamplingUpdatedLabel(run: ManagedRun) {
-  const updatedAt = run.runtime?.updated_at;
-  if (updatedAt === undefined || updatedAt === null) {
-    return "recently";
-  }
-  return formatRelativeTime(updatedAt);
-}
-
-function FolderIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M2.5 5.5h4.2l1.3 1.7H17a1 1 0 0 1 1 1v6.8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6.5a1 1 0 0 1 .5-1Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M4.5 15.5V10.5M10 15.5V7.5M15.5 15.5V4.5M3.5 15.5h13"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function WatchIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M2.5 10s2.8-4.5 7.5-4.5S17.5 10 17.5 10s-2.8 4.5-7.5 4.5S2.5 10 2.5 10Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-      <circle cx="10" cy="10" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function StopIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <rect
-        height="9"
-        rx="1.25"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        width="9"
-        x="5.5"
-        y="5.5"
-      />
-    </svg>
-  );
-}
-
-function ResumeIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 20 20" width="14">
-      <path
-        d="M7 5.5v9l7-4.5-7-4.5Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
 }

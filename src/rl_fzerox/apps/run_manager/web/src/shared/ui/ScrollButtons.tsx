@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowDownIcon, ArrowUpIcon } from "@/shared/ui/icons";
 
 export function ScrollButtons() {
   const [position, setPosition] = useState(scrollPosition());
@@ -68,32 +69,4 @@ function scrollPosition() {
     atBottom: scrollTop >= maxScrollTop - 4,
     atTop: scrollTop <= 4,
   };
-}
-
-function ArrowUpIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 20 20" width="16">
-      <path
-        d="M10 16V4M5 9l5-5 5 5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
-}
-
-function ArrowDownIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 20 20" width="16">
-      <path
-        d="M10 4v12M5 11l5 5 5-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.8"
-      />
-    </svg>
-  );
 }
