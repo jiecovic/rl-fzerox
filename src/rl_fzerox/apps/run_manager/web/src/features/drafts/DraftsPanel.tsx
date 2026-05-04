@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ManagedDraft } from "@/shared/api/contract";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { formatDate } from "@/shared/ui/format";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface DraftsPanelProps {
@@ -36,7 +37,7 @@ export function DraftsPanel({
     <>
       <Panel>
         <div className="panel-header-row">
-          <PanelHeader title="Drafts" subtitle="Create a new draft or reopen one for editing." />
+          <PanelHeader title="Drafts" subtitle="Create or reopen a draft." />
           <button
             className="secondary-button button-with-icon"
             type="button"
@@ -50,6 +51,17 @@ export function DraftsPanel({
           <Notice>No drafts yet. Create one to open the configurator.</Notice>
         ) : (
           <div className="record-list">
+            <div className="record-head" role="presentation">
+              <div className="record-head-main">
+                <span>Draft</span>
+                <span>Envs</span>
+                <span>Steps</span>
+                <span>LR</span>
+                <span>Policy</span>
+                <span>Created at</span>
+              </div>
+              <span className="record-head-actions" />
+            </div>
             {drafts.map((draft) => (
               <div className="record-row" key={draft.id}>
                 <button
@@ -62,6 +74,7 @@ export function DraftsPanel({
                   <span>{draft.config.train.total_timesteps.toLocaleString()} steps</span>
                   <span>{draft.config.train.learning_rate.toExponential(2)}</span>
                   <span>{draft.config.policy.conv_profile}</span>
+                  <span className="record-created-at">{formatDate(draft.created_at)}</span>
                 </button>
                 <button
                   aria-label={`Delete draft ${draft.name}`}

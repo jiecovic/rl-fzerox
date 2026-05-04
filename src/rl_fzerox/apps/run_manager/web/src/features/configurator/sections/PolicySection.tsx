@@ -13,6 +13,7 @@ interface PolicySectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
+  checkpointLocked?: boolean;
   preview: PolicyArchitecturePreview | null;
   setConfig: (config: ManagedRunConfig) => void;
 }
@@ -21,6 +22,7 @@ export function PolicySection({
   config,
   defaultConfig,
   metadata,
+  checkpointLocked = false,
   preview,
   setConfig,
 }: PolicySectionProps) {
@@ -54,18 +56,21 @@ export function PolicySection({
       <div className="form-grid three training-panel-grid">
         <ConfigPanel
           title="CNN extractor"
-          onReset={() =>
-            updatePolicy({
-              conv_profile: defaultConfig.policy.conv_profile,
-              custom_conv_layers: defaultConfig.policy.custom_conv_layers,
-              features_dim: defaultConfig.policy.features_dim,
-              state_net_arch: defaultConfig.policy.state_net_arch,
-              fusion_features_dim: defaultConfig.policy.fusion_features_dim,
-              layer_norm: defaultConfig.policy.layer_norm,
-            })
+          onReset={
+            checkpointLocked
+              ? undefined
+              : () =>
+                  updatePolicy({
+                    conv_profile: defaultConfig.policy.conv_profile,
+                    custom_conv_layers: defaultConfig.policy.custom_conv_layers,
+                    features_dim: defaultConfig.policy.features_dim,
+                    state_net_arch: defaultConfig.policy.state_net_arch,
+                    fusion_features_dim: defaultConfig.policy.fusion_features_dim,
+                    layer_norm: defaultConfig.policy.layer_norm,
+                  })
           }
         >
-          <div className="training-field-grid">
+          <fieldset className="fork-lock-fieldset training-field-grid" disabled={checkpointLocked}>
             <SelectField
               help="Convolution stack used for the image branch. Choose custom to edit the conv layers directly."
               label="CNN profile"
@@ -111,22 +116,25 @@ export function PolicySection({
               value={config.policy.layer_norm}
               onChange={(value) => updatePolicy({ layer_norm: value })}
             />
-          </div>
+          </fieldset>
         </ConfigPanel>
 
         <ConfigPanel
           title="Recurrent core"
-          onReset={() =>
-            updatePolicy({
-              recurrent_enable_critic_lstm: defaultConfig.policy.recurrent_enable_critic_lstm,
-              recurrent_enabled: defaultConfig.policy.recurrent_enabled,
-              recurrent_hidden_size: defaultConfig.policy.recurrent_hidden_size,
-              recurrent_n_lstm_layers: defaultConfig.policy.recurrent_n_lstm_layers,
-              recurrent_shared_lstm: defaultConfig.policy.recurrent_shared_lstm,
-            })
+          onReset={
+            checkpointLocked
+              ? undefined
+              : () =>
+                  updatePolicy({
+                    recurrent_enable_critic_lstm: defaultConfig.policy.recurrent_enable_critic_lstm,
+                    recurrent_enabled: defaultConfig.policy.recurrent_enabled,
+                    recurrent_hidden_size: defaultConfig.policy.recurrent_hidden_size,
+                    recurrent_n_lstm_layers: defaultConfig.policy.recurrent_n_lstm_layers,
+                    recurrent_shared_lstm: defaultConfig.policy.recurrent_shared_lstm,
+                  })
           }
         >
-          <div className="training-field-grid">
+          <fieldset className="fork-lock-fieldset training-field-grid" disabled={checkpointLocked}>
             <BooleanField
               help="Insert LSTM actor/critic cores between extractor and heads."
               label="Use LSTM"
@@ -134,7 +142,10 @@ export function PolicySection({
               value={config.policy.recurrent_enabled}
               onChange={(value) => updatePolicy({ recurrent_enabled: value })}
             />
-            <fieldset className="dependent-fieldset" disabled={!config.policy.recurrent_enabled}>
+            <fieldset
+              className="dependent-fieldset"
+              disabled={checkpointLocked || !config.policy.recurrent_enabled}
+            >
               <IntegerField
                 help="Hidden width of the recurrent actor and critic."
                 label="LSTM hidden"
@@ -166,15 +177,20 @@ export function PolicySection({
                 onChange={(value) => updatePolicy({ recurrent_enable_critic_lstm: value })}
               />
             </fieldset>
-          </div>
+          </fieldset>
         </ConfigPanel>
 
         <ConfigPanel
           title="Heads"
           onReset={() =>
             updatePolicy({
-              pi_net_arch: defaultConfig.policy.pi_net_arch,
-              vf_net_arch: defaultConfig.policy.vf_net_arch,
+              pi_net_arch: checkpointLocked
+                ? config.policy.pi_net_arch
+                : defaultConfig.policy.pi_net_arch,
+              vf_net_arch: checkpointLocked
+                ? config.policy.vf_net_arch
+                : defaultConfig.policy.vf_net_arch,
+              activation: defaultConfig.policy.activation,
             })
           }
         >
@@ -187,20 +203,22 @@ export function PolicySection({
               value={config.policy.activation}
               onChange={(value) => updatePolicy({ activation: value })}
             />
-            <LayerListField
-              help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
-              label="Policy head"
-              resetValue={defaultConfig.policy.pi_net_arch}
-              value={config.policy.pi_net_arch}
-              onChange={(value) => updatePolicy({ pi_net_arch: value })}
-            />
-            <LayerListField
-              help="Value MLP layers after the recurrent core. Add or remove rows to change the head depth."
-              label="Value head"
-              resetValue={defaultConfig.policy.vf_net_arch}
-              value={config.policy.vf_net_arch}
-              onChange={(value) => updatePolicy({ vf_net_arch: value })}
-            />
+            <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+              <LayerListField
+                help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
+                label="Policy head"
+                resetValue={defaultConfig.policy.pi_net_arch}
+                value={config.policy.pi_net_arch}
+                onChange={(value) => updatePolicy({ pi_net_arch: value })}
+              />
+              <LayerListField
+                help="Value MLP layers after the recurrent core. Add or remove rows to change the head depth."
+                label="Value head"
+                resetValue={defaultConfig.policy.vf_net_arch}
+                value={config.policy.vf_net_arch}
+                onChange={(value) => updatePolicy({ vf_net_arch: value })}
+              />
+            </fieldset>
           </div>
         </ConfigPanel>
       </div>

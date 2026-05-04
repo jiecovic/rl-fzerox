@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { formatInteger } from "@/features/configurator/fields/format";
+import { formatEditableDecimal, formatInteger } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
 
@@ -10,7 +10,7 @@ export function NumberField({
   value,
   onChange,
   resetValue,
-  step = "1",
+  step: _step = "1",
 }: {
   help: string;
   label: string;
@@ -19,15 +19,37 @@ export function NumberField({
   resetValue?: number;
   step?: string;
 }) {
+  const [rawValue, setRawValue] = useState(formatEditableDecimal(value));
+
+  useEffect(() => {
+    setRawValue(formatEditableDecimal(value));
+  }, [value]);
+
+  function commitValue() {
+    const normalized = rawValue.trim();
+    if (normalized === "" || normalized === "-" || normalized === "." || normalized === "-.") {
+      setRawValue(formatEditableDecimal(value));
+      return;
+    }
+    const parsed = Number(normalized);
+    if (!Number.isFinite(parsed)) {
+      setRawValue(formatEditableDecimal(value));
+      return;
+    }
+    onChange(parsed);
+    setRawValue(formatEditableDecimal(parsed));
+  }
+
   return (
     <div className="field-shell compact-value-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <input
         aria-label={label}
-        type="number"
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        inputMode="decimal"
+        spellCheck={false}
+        value={rawValue}
+        onBlur={commitValue}
+        onChange={(event) => setRawValue(event.target.value)}
       />
     </div>
   );

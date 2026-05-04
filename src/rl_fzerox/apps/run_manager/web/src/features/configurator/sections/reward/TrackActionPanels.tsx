@@ -3,7 +3,6 @@ import { IntegerField, NumberField } from "@/features/configurator/fields";
 import {
   actionDefaults,
   energyDefaults,
-  leanDefaults,
   trackEventDefaults,
 } from "@/features/configurator/sections/rewardDefaults";
 
@@ -141,14 +140,6 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ boost_pad_reward_progress_window: value })}
           />
           <NumberField
-            help="Penalty when the agent underuses gas below the threshold."
-            label="Gas underuse penalty"
-            resetValue={defaultConfig.reward.gas_underuse_penalty}
-            step="0.001"
-            value={config.reward.gas_underuse_penalty}
-            onChange={(value) => updateReward({ gas_underuse_penalty: value })}
-          />
-          <NumberField
             help="Per-step penalty for requesting air brake."
             label="Air brake request penalty"
             resetValue={defaultConfig.reward.air_brake_request_penalty}
@@ -157,78 +148,12 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ air_brake_request_penalty: value })}
           />
           <NumberField
-            help="Gas request threshold below which underuse penalty can apply."
-            label="Gas underuse threshold"
-            resetValue={defaultConfig.reward.gas_underuse_threshold}
-            step="0.05"
-            value={config.reward.gas_underuse_threshold}
-            onChange={(value) => updateReward({ gas_underuse_threshold: value })}
-          />
-          <NumberField
-            help="Penalty for rapid steering oscillation."
-            label="Steer oscillation penalty"
-            resetValue={defaultConfig.reward.steer_oscillation_penalty}
-            step="0.001"
-            value={config.reward.steer_oscillation_penalty}
-            onChange={(value) => updateReward({ steer_oscillation_penalty: value })}
-          />
-          <NumberField
-            help="Steering magnitude ignored by oscillation detection."
-            label="Steer oscillation deadzone"
-            resetValue={defaultConfig.reward.steer_oscillation_deadzone}
-            step="0.01"
-            value={config.reward.steer_oscillation_deadzone}
-            onChange={(value) => updateReward({ steer_oscillation_deadzone: value })}
-          />
-          <NumberField
-            help="Maximum oscillation penalty magnitude before power shaping."
-            label="Steer oscillation cap"
-            resetValue={defaultConfig.reward.steer_oscillation_cap}
-            step="0.1"
-            value={config.reward.steer_oscillation_cap}
-            onChange={(value) => updateReward({ steer_oscillation_cap: value })}
-          />
-          <NumberField
-            help="Exponent for steering oscillation shaping."
-            label="Steer oscillation power"
-            resetValue={defaultConfig.reward.steer_oscillation_power}
-            step="0.1"
-            value={config.reward.steer_oscillation_power}
-            onChange={(value) => updateReward({ steer_oscillation_power: value })}
-          />
-        </div>
-      </ConfigDisclosure>
-
-      <ConfigDisclosure
-        open={openSections.lean}
-        title="Lean and pitch"
-        onToggle={(open) => setSectionOpen("lean", open)}
-        onReset={() => updateReward(leanDefaults(defaultConfig.reward))}
-      >
-        <div className="config-field-grid">
-          <NumberField
             help="Per-step penalty for requesting lean."
             label="Lean request penalty"
             resetValue={defaultConfig.reward.lean_request_penalty}
             step="0.001"
             value={config.reward.lean_request_penalty}
             onChange={(value) => updateReward({ lean_request_penalty: value })}
-          />
-          <NumberField
-            help="Additional lean penalty below the configured speed cutoff."
-            label="Low-speed lean penalty"
-            resetValue={defaultConfig.reward.lean_low_speed_penalty}
-            step="0.001"
-            value={config.reward.lean_low_speed_penalty}
-            onChange={(value) => updateReward({ lean_low_speed_penalty: value })}
-          />
-          <NumberField
-            help="Speed below which the low-speed lean penalty applies."
-            label="Low-speed lean cutoff"
-            resetValue={defaultConfig.reward.lean_low_speed_penalty_max_speed_kph}
-            step="10"
-            value={config.reward.lean_low_speed_penalty_max_speed_kph}
-            onChange={(value) => updateReward({ lean_low_speed_penalty_max_speed_kph: value })}
           />
           <NumberField
             help="Penalty when requesting pitch-up while airborne."

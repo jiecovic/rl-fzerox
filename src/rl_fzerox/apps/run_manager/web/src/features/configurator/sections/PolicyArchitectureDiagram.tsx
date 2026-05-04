@@ -13,7 +13,6 @@ export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitec
   useEffect(() => {
     let cancelled = false;
     const graph = buildArchitectureGraph(preview);
-    setLayout(null);
 
     layoutGraph(graph.elkGraph)
       .then((elkGraph) => {
@@ -37,55 +36,57 @@ export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitec
   }
 
   return (
-    <svg
-      aria-label="Policy architecture diagram"
-      className="architecture-graph-svg"
-      preserveAspectRatio="xMinYMid meet"
-      role="img"
-      viewBox={layout.viewBox}
-    >
-      <defs>
-        <marker
-          id="policy-architecture-arrow"
-          markerHeight="8"
-          markerWidth="8"
-          orient="auto"
-          refX="8"
-          refY="4"
-          viewBox="0 0 8 8"
-        >
-          <path className="architecture-arrow-head" d="M0 0 8 4 0 8z" />
-        </marker>
-      </defs>
+    <div className="architecture-graph-frame">
+      <svg
+        aria-label="Policy architecture diagram"
+        className="architecture-graph-svg"
+        preserveAspectRatio="xMinYMid meet"
+        role="img"
+        viewBox={layout.viewBox}
+      >
+        <defs>
+          <marker
+            id="policy-architecture-arrow"
+            markerHeight="8"
+            markerWidth="8"
+            orient="auto"
+            refX="8"
+            refY="4"
+            viewBox="0 0 8 8"
+          >
+            <path className="architecture-arrow-head" d="M0 0 8 4 0 8z" />
+          </marker>
+        </defs>
 
-      <g className="architecture-edges">
-        {layout.edges.map((edge) => (
-          <path
-            className="architecture-edge"
-            d={edge.path}
-            fill="none"
-            key={edge.id}
-            markerEnd={edge.hasArrow ? "url(#policy-architecture-arrow)" : undefined}
-          />
-        ))}
-      </g>
-
-      <g className="architecture-nodes">
-        {layout.nodes.map((node) =>
-          node.visual.kind === "junction" ? (
-            <circle
-              className="architecture-junction"
-              cx={node.x + node.width / 2}
-              cy={node.y + node.height / 2}
-              key={node.id}
-              r={node.width / 2}
+        <g className="architecture-edges">
+          {layout.edges.map((edge) => (
+            <path
+              className="architecture-edge"
+              d={edge.path}
+              fill="none"
+              key={edge.id}
+              markerEnd={edge.hasArrow ? "url(#policy-architecture-arrow)" : undefined}
             />
-          ) : (
-            <ArchitectureSvgNode key={node.id} node={node} />
-          ),
-        )}
-      </g>
-    </svg>
+          ))}
+        </g>
+
+        <g className="architecture-nodes">
+          {layout.nodes.map((node) =>
+            node.visual.kind === "junction" ? (
+              <circle
+                className="architecture-junction"
+                cx={node.x + node.width / 2}
+                cy={node.y + node.height / 2}
+                key={node.id}
+                r={node.width / 2}
+              />
+            ) : (
+              <ArchitectureSvgNode key={node.id} node={node} />
+            ),
+          )}
+        </g>
+      </svg>
+    </div>
   );
 }
 

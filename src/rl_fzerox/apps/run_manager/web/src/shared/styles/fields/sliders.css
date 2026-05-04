@@ -141,13 +141,13 @@ input[type="range"]:focus {
 
 .range-pair-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 104px;
+  grid-template-columns: 52px minmax(0, 1fr) 148px;
   gap: 12px;
   align-items: center;
 }
 
 .range-pair-row-bare {
-  grid-template-columns: minmax(0, 1fr) 104px;
+  grid-template-columns: minmax(0, 1fr) 148px;
 }
 
 .range-pair-values {

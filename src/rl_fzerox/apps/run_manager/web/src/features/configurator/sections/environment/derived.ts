@@ -22,6 +22,11 @@ export function environmentSummaryRows(config: ManagedRunConfig) {
   const stallLimit = config.environment.progress_frontier_stall_limit_frames;
   return [
     {
+      label: "Renderer",
+      detail: "Requested Mupen video backend for training and watch bootstraps.",
+      value: config.environment.renderer,
+    },
+    {
       label: "Episode frame cap",
       detail: "Counted per emulated frame, not per policy step.",
       value: formatInteger(config.environment.max_episode_steps),

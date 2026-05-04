@@ -16,6 +16,17 @@ export function formatCompactDecimal(value: number) {
   return Number.isInteger(value) ? String(value) : String(value).replace(/^0/, "");
 }
 
+export function formatEditableDecimal(value: number) {
+  const normalized = roundSignificant(value, 12);
+  if (!Number.isFinite(normalized) || Object.is(normalized, -0) || normalized === 0) {
+    return "0";
+  }
+  if (Number.isInteger(normalized)) {
+    return String(normalized);
+  }
+  return trimTrailingZeros(normalized.toFixed(12));
+}
+
 export function formatDecimalInput(value: number, step: number | string) {
   const fractionDigits = stepFractionDigits(step);
   if (fractionDigits === 0) {

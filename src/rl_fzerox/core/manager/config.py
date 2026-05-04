@@ -16,6 +16,7 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.config.renderers import DEFAULT_RENDERER, RendererName
 from rl_fzerox.core.config.vehicle_catalog import known_vehicle_ids
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
@@ -67,9 +68,22 @@ ActivationName = Literal["relu", "tanh", "gelu"]
 
 _LEGACY_REMOVED_MANAGER_REWARD_FIELDS = frozenset(
     (
+        "airborne_progress_bucket_distance",
+        "airborne_offtrack_penalty_scale",
+        "airborne_offtrack_recovery_requires_descending",
+        "airborne_offtrack_recovery_descend_epsilon",
+        "airborne_offtrack_recovery_reward_scale",
         "energy_full_refill_lap_bonus",
         "energy_full_refill_min_gain_fraction",
+        "gas_underuse_penalty",
+        "gas_underuse_threshold",
+        "lean_low_speed_penalty",
+        "lean_low_speed_penalty_max_speed_kph",
         "low_speed_time_penalty_scale",
+        "steer_oscillation_cap",
+        "steer_oscillation_deadzone",
+        "steer_oscillation_penalty",
+        "steer_oscillation_power",
     )
 )
 _LEGACY_REMOVED_MANAGER_ENVIRONMENT_FIELDS = frozenset(("terminate_on_energy_depleted",))
@@ -214,6 +228,7 @@ class ManagedActionConfig(BaseModel):
     continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
     include_air_brake: bool = True
     enable_air_brake: bool = True
+    mask_air_brake_on_ground: bool = False
     include_boost: bool = True
     enable_boost: bool = True
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
@@ -274,7 +289,7 @@ class ManagedActionConfig(BaseModel):
 
 
 class ManagedEnvironmentConfig(BaseModel):
-    """Episode-limit knobs exposed by the run manager."""
+    """Episode-limit and emulator-runtime knobs exposed by the run manager."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -286,6 +301,7 @@ class ManagedEnvironmentConfig(BaseModel):
     max_episode_steps: PositiveInt = 12_000
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
+    renderer: RendererName = DEFAULT_RENDERER
 
 
 class ManagedStateComponentConfig(BaseModel):
@@ -449,7 +465,7 @@ class ManagedPolicyConfig(BaseModel):
     recurrent_enable_critic_lstm: bool = True
     pi_net_arch: tuple[PositiveInt, ...] = (256, 128)
     vf_net_arch: tuple[PositiveInt, ...] = (256, 128)
-    gas_on_logit: float = 0.5
+    gas_on_logit: float = 0.0
 
     @model_validator(mode="after")
     def _validate_custom_conv_layers(self) -> ManagedPolicyConfig:
@@ -473,15 +489,12 @@ class ManagedRewardConfig(BaseModel):
     slow_speed_time_penalty_scale: NonNegativeFloat = 3.0
     slow_speed_time_penalty_start_kph: NonNegativeFloat = 760.0
     slow_speed_time_penalty_power: PositiveFloat = 1.0
-    progress_bucket_distance: PositiveFloat = 1_000.0
-    progress_bucket_reward: NonNegativeFloat = 1.0
+    progress_bucket_distance: PositiveFloat = 25.0
+    progress_bucket_reward: NonNegativeFloat = 0.05
     progress_reward_interval_frames: PositiveInt = 1
-    airborne_progress_bucket_distance: PositiveFloat | None = 100.0
+    suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = 10_000.0
-    airborne_offtrack_penalty_scale: NonNegativeFloat = 0.05
-    airborne_offtrack_recovery_reward_scale: NonNegativeFloat = 0.05
-    airborne_offtrack_recovery_requires_descending: bool = True
-    airborne_offtrack_recovery_descend_epsilon: NonNegativeFloat = 1.0
+    outside_track_frame_penalty: float = Field(default=0.0, le=0.0)
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -491,24 +504,16 @@ class ManagedRewardConfig(BaseModel):
     dirt_entry_penalty: float = Field(default=0.0, le=0.0)
     ice_entry_penalty: float = Field(default=0.0, le=0.0)
     energy_refill_collision_cooldown_frames: NonNegativeInt = 120
-    gas_underuse_penalty: float = Field(default=0.0, le=0.0)
-    gas_underuse_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
-    steer_oscillation_penalty: float = Field(default=0.0, le=0.0)
-    steer_oscillation_deadzone: NonNegativeFloat = 0.0
-    steer_oscillation_cap: PositiveFloat = 2.0
-    steer_oscillation_power: PositiveFloat = 2.0
     air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     manual_boost_reward: NonNegativeFloat = 0.01
     boost_pad_reward: NonNegativeFloat = 10.0
     boost_pad_reward_progress_window: PositiveFloat = 800.0
     lean_request_penalty: float = Field(default=-0.003, le=0.0)
-    lean_low_speed_penalty: float = Field(default=-0.005, le=0.0)
-    lean_low_speed_penalty_max_speed_kph: NonNegativeFloat = 750.0
     airborne_pitch_up_penalty: float = Field(default=-0.2, le=0.0)
-    damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
-    damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
-    damage_taken_streak_cap_frames: NonNegativeInt = 0
-    airborne_landing_reward: float = 0.0
+    damage_taken_frame_penalty: float = Field(default=-0.02, le=0.0)
+    damage_taken_streak_ramp_penalty: float = Field(default=-0.001, le=0.0)
+    damage_taken_streak_cap_frames: NonNegativeInt = 120
+    airborne_landing_reward: float = 1.0
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0
@@ -530,6 +535,14 @@ def _strip_legacy_manager_reward_fields(data: object) -> object:
     if not isinstance(data, Mapping):
         return data
     normalized = dict(data)
+    if (
+        "suspend_progress_while_outside_track_bounds" not in normalized
+        and "suspend_progress_while_airborne" in normalized
+    ):
+        normalized["suspend_progress_while_outside_track_bounds"] = normalized[
+            "suspend_progress_while_airborne"
+        ]
+    normalized.pop("suspend_progress_while_airborne", None)
     for field_name in _LEGACY_REMOVED_MANAGER_REWARD_FIELDS:
         normalized.pop(field_name, None)
     return normalized

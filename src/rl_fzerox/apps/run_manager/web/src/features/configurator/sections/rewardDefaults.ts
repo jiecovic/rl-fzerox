@@ -15,23 +15,19 @@ export function timePressureDefaults(reward: RewardConfig): RewardPatch {
 
 export function progressDefaults(reward: RewardConfig): RewardPatch {
   return {
-    airborne_progress_bucket_distance: reward.airborne_progress_bucket_distance,
     outside_bounds_reentry_progress_distance_cap:
       reward.outside_bounds_reentry_progress_distance_cap,
     progress_bucket_distance: reward.progress_bucket_distance,
     progress_bucket_reward: reward.progress_bucket_reward,
     progress_reward_interval_frames: reward.progress_reward_interval_frames,
+    suspend_progress_while_outside_track_bounds: reward.suspend_progress_while_outside_track_bounds,
   };
 }
 
-export function airborneDefaults(reward: RewardConfig): RewardPatch {
+export function boundsDefaults(reward: RewardConfig): RewardPatch {
   return {
     airborne_landing_reward: reward.airborne_landing_reward,
-    airborne_offtrack_penalty_scale: reward.airborne_offtrack_penalty_scale,
-    airborne_offtrack_recovery_descend_epsilon: reward.airborne_offtrack_recovery_descend_epsilon,
-    airborne_offtrack_recovery_requires_descending:
-      reward.airborne_offtrack_recovery_requires_descending,
-    airborne_offtrack_recovery_reward_scale: reward.airborne_offtrack_recovery_reward_scale,
+    outside_track_frame_penalty: reward.outside_track_frame_penalty,
   };
 }
 
@@ -57,24 +53,11 @@ export function energyDefaults(reward: RewardConfig): RewardPatch {
 export function actionDefaults(reward: RewardConfig): RewardPatch {
   return {
     air_brake_request_penalty: reward.air_brake_request_penalty,
+    airborne_pitch_up_penalty: reward.airborne_pitch_up_penalty,
     boost_pad_reward: reward.boost_pad_reward,
     boost_pad_reward_progress_window: reward.boost_pad_reward_progress_window,
-    gas_underuse_penalty: reward.gas_underuse_penalty,
-    gas_underuse_threshold: reward.gas_underuse_threshold,
-    manual_boost_reward: reward.manual_boost_reward,
-    steer_oscillation_cap: reward.steer_oscillation_cap,
-    steer_oscillation_deadzone: reward.steer_oscillation_deadzone,
-    steer_oscillation_penalty: reward.steer_oscillation_penalty,
-    steer_oscillation_power: reward.steer_oscillation_power,
-  };
-}
-
-export function leanDefaults(reward: RewardConfig): RewardPatch {
-  return {
-    airborne_pitch_up_penalty: reward.airborne_pitch_up_penalty,
-    lean_low_speed_penalty: reward.lean_low_speed_penalty,
-    lean_low_speed_penalty_max_speed_kph: reward.lean_low_speed_penalty_max_speed_kph,
     lean_request_penalty: reward.lean_request_penalty,
+    manual_boost_reward: reward.manual_boost_reward,
   };
 }
 

@@ -6,11 +6,16 @@ import {
   OptionalNumberField,
 } from "@/features/configurator/fields";
 import {
-  airborneDefaults,
+  boundsDefaults,
   progressDefaults,
   timePressureDefaults,
 } from "@/features/configurator/sections/rewardDefaults";
 
+import {
+  progressBucketRewardFromDensity,
+  progressRewardDensityPerThousand,
+  progressSummaryRows,
+} from "./progressDerived";
 import type { RewardPanelProps } from "./types";
 
 export function TimeProgressPanels({
@@ -20,6 +25,9 @@ export function TimeProgressPanels({
   setSectionOpen,
   updateReward,
 }: RewardPanelProps) {
+  const progressDensityPerThousand = progressRewardDensityPerThousand(config);
+  const progressRows = progressSummaryRows(config);
+
   return (
     <>
       <ConfigDisclosure
@@ -80,47 +88,66 @@ export function TimeProgressPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Spline distance represented by one progress reward bucket."
+            help="Spline distance represented by one progress reward bucket. Changing this keeps the current reward density per 1k spline units and derives a new per-bucket reward automatically."
             label="Bucket distance"
             resetValue={defaultConfig.reward.progress_bucket_distance}
-            step="25"
+            step="5"
             value={config.reward.progress_bucket_distance}
-            onChange={(value) => updateReward({ progress_bucket_distance: value })}
+            onChange={(value) =>
+              updateReward({
+                progress_bucket_distance: value,
+                progress_bucket_reward: progressBucketRewardFromDensity(
+                  value,
+                  progressDensityPerThousand,
+                ),
+              })
+            }
           />
           <NumberField
-            help="Reward paid per newly covered progress bucket."
-            label="Bucket reward"
-            resetValue={defaultConfig.reward.progress_bucket_reward}
+            help="Overall frontier reward density. The per-bucket reward is derived as (reward per 1k units × bucket distance / 1000), so you can change granularity without changing total lap shaping."
+            label="Reward / 1k spline units"
+            resetValue={progressRewardDensityPerThousand(defaultConfig)}
             step="0.01"
-            value={config.reward.progress_bucket_reward}
-            onChange={(value) => updateReward({ progress_bucket_reward: value })}
+            value={progressDensityPerThousand}
+            onChange={(value) =>
+              updateReward({
+                progress_bucket_reward: progressBucketRewardFromDensity(
+                  config.reward.progress_bucket_distance,
+                  value,
+                ),
+              })
+            }
           />
           <IntegerField
-            help="Minimum frame interval between progress reward payouts."
+            help="Native-frame payout cooldown for frontier buckets. Crossed buckets are accumulated and paid together once this many internal frames have elapsed, or earlier if the episode ends."
             label="Progress interval frames"
             min={1}
             resetValue={defaultConfig.reward.progress_reward_interval_frames}
             value={config.reward.progress_reward_interval_frames}
             onChange={(value) => updateReward({ progress_reward_interval_frames: value })}
           />
-          <OptionalNumberField
-            defaultValue={100}
-            help="Optional larger bucket distance used while airborne."
-            label="Airborne bucket distance"
-            max={5_000}
-            min={1}
-            resetValue={defaultConfig.reward.airborne_progress_bucket_distance}
-            step="25"
-            value={config.reward.airborne_progress_bucket_distance}
-            onChange={(value) => updateReward({ airborne_progress_bucket_distance: value })}
-          />
+          <div className="reward-wide-field">
+            <BooleanField
+              help="Pause frontier bucket progress whenever the machine is outside track bounds. Airborne movement that stays over the track still counts normally. If progress gets deferred out of bounds, payout stays paused until the machine is back inside bounds and grounded again, then resumes from the visible grounded re-entry position rather than the off-track trajectory."
+              label="Suspend progress while outside track bounds"
+              resetValue={defaultConfig.reward.suspend_progress_while_outside_track_bounds}
+              value={config.reward.suspend_progress_while_outside_track_bounds}
+              onChange={(value) =>
+                updateReward({ suspend_progress_while_outside_track_bounds: value })
+              }
+            />
+          </div>
           <OptionalNumberField
             defaultValue={10_000}
-            help="Caps deferred outside-track re-entry progress distance."
+            enabledLabel="Cap"
+            help="Caps deferred outside-track re-entry progress distance. Drag fully right for unlimited."
             label="Re-entry distance cap"
             max={50_000}
             min={0}
+            nullLabel="Unlimited"
             resetValue={defaultConfig.reward.outside_bounds_reentry_progress_distance_cap}
+            sliderNullPosition="max"
+            sliderNullTickLabel="∞"
             step="100"
             value={config.reward.outside_bounds_reentry_progress_distance_cap}
             onChange={(value) =>
@@ -128,49 +155,33 @@ export function TimeProgressPanels({
             }
           />
         </div>
+        <table className="derived-table">
+          <tbody>
+            {progressRows.map((row) => (
+              <tr key={row.label}>
+                <th>{row.label}</th>
+                <td>{row.detail}</td>
+                <td>{row.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </ConfigDisclosure>
 
       <ConfigDisclosure
         open={openSections.airborne}
-        title="Airborne off-track"
+        title="Outside bounds"
         onToggle={(open) => setSectionOpen("airborne", open)}
-        onReset={() => updateReward(airborneDefaults(defaultConfig.reward))}
+        onReset={() => updateReward(boundsDefaults(defaultConfig.reward))}
       >
         <div className="config-field-grid">
-          <BooleanField
-            help="Only pay airborne off-track recovery reward while height is descending."
-            label="Require descending"
-            resetValue={defaultConfig.reward.airborne_offtrack_recovery_requires_descending}
-            value={config.reward.airborne_offtrack_recovery_requires_descending}
-            onChange={(value) =>
-              updateReward({ airborne_offtrack_recovery_requires_descending: value })
-            }
-          />
           <NumberField
-            help="Minimum height drop required when descending-gated recovery is enabled."
-            label="Descend epsilon"
-            resetValue={defaultConfig.reward.airborne_offtrack_recovery_descend_epsilon}
-            step="0.1"
-            value={config.reward.airborne_offtrack_recovery_descend_epsilon}
-            onChange={(value) =>
-              updateReward({ airborne_offtrack_recovery_descend_epsilon: value })
-            }
-          />
-          <NumberField
-            help="Penalty multiplier while airborne and outside track bounds."
-            label="Off-track penalty multiplier"
-            resetValue={defaultConfig.reward.airborne_offtrack_penalty_scale}
+            help="Flat penalty applied every internal frame while the machine is outside track bounds, whether grounded or airborne."
+            label="Outside-track frame penalty"
+            resetValue={defaultConfig.reward.outside_track_frame_penalty}
             step="0.01"
-            value={config.reward.airborne_offtrack_penalty_scale}
-            onChange={(value) => updateReward({ airborne_offtrack_penalty_scale: value })}
-          />
-          <NumberField
-            help="Recovery reward multiplier for reducing off-track distance while airborne."
-            label="Recovery reward multiplier"
-            resetValue={defaultConfig.reward.airborne_offtrack_recovery_reward_scale}
-            step="0.01"
-            value={config.reward.airborne_offtrack_recovery_reward_scale}
-            onChange={(value) => updateReward({ airborne_offtrack_recovery_reward_scale: value })}
+            value={config.reward.outside_track_frame_penalty}
+            onChange={(value) => updateReward({ outside_track_frame_penalty: value })}
           />
           <NumberField
             help="Reward paid on landing after airborne time."

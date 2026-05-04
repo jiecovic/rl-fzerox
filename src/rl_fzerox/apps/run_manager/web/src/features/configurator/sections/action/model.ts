@@ -124,7 +124,13 @@ function actionHeadShape(action: ManagedActionConfig): {
 function auxiliaryOutputSummary(action: ManagedActionConfig): string {
   const labels: string[] = [];
   if (action.include_air_brake) {
-    labels.push(action.enable_air_brake ? "air brake" : "air brake masked");
+    if (!action.enable_air_brake) {
+      labels.push("air brake masked");
+    } else if (action.mask_air_brake_on_ground) {
+      labels.push("air brake, air-only");
+    } else {
+      labels.push("air brake");
+    }
   }
   if (action.include_boost) {
     labels.push(boostOutputSummary(action));

@@ -31,6 +31,10 @@
   position: relative;
 }
 
+.architecture-graph-frame {
+  position: relative;
+}
+
 .architecture-graph-svg {
   display: block;
   width: 100%;

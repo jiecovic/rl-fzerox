@@ -19,6 +19,7 @@ import type { ActionUpdateContext } from "@/features/configurator/sections/actio
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 export function ControlFamilyDisclosure({
+  checkpointLocked = false,
   config,
   defaultConfig,
   metadata,
@@ -44,9 +45,15 @@ export function ControlFamilyDisclosure({
           action: normalizedActionConfig({
             ...config.action,
             action_repeat: defaultConfig.action.action_repeat,
-            steer_buckets: defaultConfig.action.steer_buckets,
-            steering_mode: defaultConfig.action.steering_mode,
-            drive_mode: defaultConfig.action.drive_mode,
+            steer_buckets: checkpointLocked
+              ? config.action.steer_buckets
+              : defaultConfig.action.steer_buckets,
+            steering_mode: checkpointLocked
+              ? config.action.steering_mode
+              : defaultConfig.action.steering_mode,
+            drive_mode: checkpointLocked
+              ? config.action.drive_mode
+              : defaultConfig.action.drive_mode,
             force_full_throttle: defaultConfig.action.force_full_throttle,
             continuous_drive_deadzone: defaultConfig.action.continuous_drive_deadzone,
             continuous_drive_full_threshold: defaultConfig.action.continuous_drive_full_threshold,
@@ -65,46 +72,48 @@ export function ControlFamilyDisclosure({
             <strong>Steering</strong>
             <span>Choose between one analog lane and a discrete bucket head.</span>
           </div>
-          <div className="field-shell">
-            <FieldLabel
-              help="Choose whether steering is one analog lane or a discrete bucket head."
-              label="Steering mode"
-            />
-            <SegmentedChoiceStrip
-              ariaLabel="Steering mode"
-              options={metadata.steering_modes.map((option) => ({
-                active: action.steering_mode === option.value,
-                key: option.value,
-                label: option.label,
-                onClick: () =>
-                  updateAction({
-                    steering_mode: option.value as ManagedRunConfig["action"]["steering_mode"],
-                  }),
-              }))}
-            />
-          </div>
-          {action.steering_mode === "discrete" ? (
-            <div className="action-axis-fields">
-              <RangeIntegerField
-                help="Odd bucket counts preserve one neutral center action while adding more left and right resolution."
-                label="Steer buckets"
-                max={31}
-                min={3}
-                rangeStep={2}
-                resetValue={defaultConfig.action.steer_buckets}
-                ticks={[
-                  { value: 3, label: "3" },
-                  { value: 7, label: "7" },
-                  { value: 15, label: "15" },
-                  { value: 31, label: "31" },
-                ]}
-                value={action.steer_buckets}
-                onChange={(value) =>
-                  updateAction({ steer_buckets: normalizeOddBucketCount(value) })
-                }
+          <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+            <div className="field-shell">
+              <FieldLabel
+                help="Choose whether steering is one analog lane or a discrete bucket head."
+                label="Steering mode"
+              />
+              <SegmentedChoiceStrip
+                ariaLabel="Steering mode"
+                options={metadata.steering_modes.map((option) => ({
+                  active: action.steering_mode === option.value,
+                  key: option.value,
+                  label: option.label,
+                  onClick: () =>
+                    updateAction({
+                      steering_mode: option.value as ManagedRunConfig["action"]["steering_mode"],
+                    }),
+                }))}
               />
             </div>
-          ) : null}
+            {action.steering_mode === "discrete" ? (
+              <div className="action-axis-fields">
+                <RangeIntegerField
+                  help="Odd bucket counts preserve one neutral center action while adding more left and right resolution."
+                  label="Steer buckets"
+                  max={31}
+                  min={3}
+                  rangeStep={2}
+                  resetValue={defaultConfig.action.steer_buckets}
+                  ticks={[
+                    { value: 3, label: "3" },
+                    { value: 7, label: "7" },
+                    { value: 15, label: "15" },
+                    { value: 31, label: "31" },
+                  ]}
+                  value={action.steer_buckets}
+                  onChange={(value) =>
+                    updateAction({ steer_buckets: normalizeOddBucketCount(value) })
+                  }
+                />
+              </div>
+            ) : null}
+          </fieldset>
         </section>
 
         <section className="action-axis-card">
@@ -114,27 +123,29 @@ export function ControlFamilyDisclosure({
               Choose between a continuous PWM throttle lane and a stock-style digital button press.
             </span>
           </div>
-          <div className="field-shell">
-            <FieldLabel
-              help="Choose between a continuous PWM throttle lane and a stock-style digital gas button. PWM is a workaround that approximates fractional throttle by pulsing the real N64 button across frames."
-              label="Throttle mode"
-            />
-            <SegmentedChoiceStrip
-              ariaLabel="Throttle mode"
-              options={metadata.drive_modes.map((option) => ({
-                active: action.drive_mode === option.value,
-                key: option.value,
-                label: option.label,
-                tooltip: throttleModeDescription(
-                  option.value as ManagedRunConfig["action"]["drive_mode"],
-                ),
-                onClick: () =>
-                  updateAction({
-                    drive_mode: option.value as ManagedRunConfig["action"]["drive_mode"],
-                  }),
-              }))}
-            />
-          </div>
+          <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+            <div className="field-shell">
+              <FieldLabel
+                help="Choose between a continuous PWM throttle lane and a stock-style digital gas button. PWM is a workaround that approximates fractional throttle by pulsing the real N64 button across frames."
+                label="Throttle mode"
+              />
+              <SegmentedChoiceStrip
+                ariaLabel="Throttle mode"
+                options={metadata.drive_modes.map((option) => ({
+                  active: action.drive_mode === option.value,
+                  key: option.value,
+                  label: option.label,
+                  tooltip: throttleModeDescription(
+                    option.value as ManagedRunConfig["action"]["drive_mode"],
+                  ),
+                  onClick: () =>
+                    updateAction({
+                      drive_mode: option.value as ManagedRunConfig["action"]["drive_mode"],
+                    }),
+                }))}
+              />
+            </div>
+          </fieldset>
           <div
             className={
               action.drive_mode === "pwm"
@@ -195,14 +206,19 @@ export function ControlFamilyDisclosure({
               </>
             ) : (
               <div className="action-axis-fields">
-                <NumberField
-                  help="Initial policy logit bias toward the engaged gas button when throttle uses the discrete N64-style button branch."
-                  label="Gas-on logit"
-                  resetValue={defaultConfig.policy.gas_on_logit}
-                  step="0.1"
-                  value={config.policy.gas_on_logit}
-                  onChange={(value) => updatePolicy({ gas_on_logit: value })}
-                />
+                <div className="field-with-note">
+                  <NumberField
+                    help="Initial logit bias toward the engaged gas button when throttle uses the discrete N64-style button branch."
+                    label="Gas-on logit"
+                    resetValue={defaultConfig.policy.gas_on_logit}
+                    step="0.1"
+                    value={config.policy.gas_on_logit}
+                    onChange={(value) => updatePolicy({ gas_on_logit: value })}
+                  />
+                  <div className="field-note">
+                    {`sigmoid(${formatSignedDecimal(config.policy.gas_on_logit)}) ≈ ${formatPercent(gasOnProbability(config.policy.gas_on_logit))} initial engage probability`}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -266,4 +282,23 @@ export function ControlFamilyDisclosure({
       </div>
     </ConfigDisclosure>
   );
+}
+
+function gasOnProbability(value: number) {
+  return 1 / (1 + Math.exp(-value));
+}
+
+function formatPercent(value: number) {
+  return `${(value * 100).toLocaleString(undefined, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })}%`;
+}
+
+function formatSignedDecimal(value: number) {
+  const formatted = value.toLocaleString(undefined, {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  });
+  return value > 0 ? `+${formatted}` : formatted;
 }
