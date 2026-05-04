@@ -15,6 +15,7 @@ interface ObservationSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
+  checkpointLocked?: boolean;
   preview: PolicyArchitecturePreview | null;
   setConfig: (config: ManagedRunConfig) => void;
 }
@@ -23,6 +24,7 @@ export function ObservationSection({
   config,
   defaultConfig,
   metadata,
+  checkpointLocked = false,
   preview,
   setConfig,
 }: ObservationSectionProps) {
@@ -44,39 +46,41 @@ export function ObservationSection({
       <div className="form-grid two">
         <ConfigPanel title="Image observation">
           <div className="config-field-grid image-observation-grid">
-            <SelectField
-              help="Rendered crop preset used for the policy image input."
-              label="Input resolution"
-              options={metadata.observation_presets.map((preset) => preset.value)}
-              resetValue={defaultConfig.observation.preset}
-              value={config.observation.preset}
-              onChange={(value) => updateObservation({ preset: value })}
-            />
-            <SelectField
-              help="Image channel encoding used by the frame stack."
-              label="Color mode"
-              options={stackModeOptions}
-              resetValue={defaultConfig.observation.stack_mode}
-              value={config.observation.stack_mode}
-              onChange={(value) => updateObservation({ stack_mode: value })}
-            />
-            <DiscreteSliderNumberField
-              help="Number of recent image observations exposed to the policy."
-              label="Frame stack"
-              maxManual={8}
-              minManual={1}
-              resetValue={defaultConfig.observation.frame_stack}
-              sliderValues={[1, 2, 3, 4, 5, 6, 7, 8]}
-              value={config.observation.frame_stack}
-              onChange={(value) => updateObservation({ frame_stack: value })}
-            />
-            <BooleanField
-              help="Append a one-channel minimap image to the frame stack."
-              label="Minimap layer"
-              resetValue={defaultConfig.observation.minimap_layer}
-              value={config.observation.minimap_layer}
-              onChange={(value) => updateObservation({ minimap_layer: value })}
-            />
+            <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+              <SelectField
+                help="Rendered crop preset used for the policy image input."
+                label="Input resolution"
+                options={metadata.observation_presets.map((preset) => preset.value)}
+                resetValue={defaultConfig.observation.preset}
+                value={config.observation.preset}
+                onChange={(value) => updateObservation({ preset: value })}
+              />
+              <SelectField
+                help="Image channel encoding used by the frame stack."
+                label="Color mode"
+                options={stackModeOptions}
+                resetValue={defaultConfig.observation.stack_mode}
+                value={config.observation.stack_mode}
+                onChange={(value) => updateObservation({ stack_mode: value })}
+              />
+              <DiscreteSliderNumberField
+                help="Number of recent image observations exposed to the policy."
+                label="Frame stack"
+                maxManual={8}
+                minManual={1}
+                resetValue={defaultConfig.observation.frame_stack}
+                sliderValues={[1, 2, 3, 4, 5, 6, 7, 8]}
+                value={config.observation.frame_stack}
+                onChange={(value) => updateObservation({ frame_stack: value })}
+              />
+              <BooleanField
+                help="Append a one-channel minimap image to the frame stack."
+                label="Minimap layer"
+                resetValue={defaultConfig.observation.minimap_layer}
+                value={config.observation.minimap_layer}
+                onChange={(value) => updateObservation({ minimap_layer: value })}
+              />
+            </fieldset>
             <SelectField
               help="Resize filter used for the main image crop."
               label="Resize filter"
@@ -125,6 +129,7 @@ export function ObservationSection({
 
       <ConfigPanel title="State vector components" wide>
         <StateComponentPanels
+          checkpointLocked={checkpointLocked}
           config={config}
           metadata={metadata}
           updateObservation={updateObservation}

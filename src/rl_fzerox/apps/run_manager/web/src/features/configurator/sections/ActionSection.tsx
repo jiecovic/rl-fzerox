@@ -13,7 +13,13 @@ import type { ManagedRunConfig } from "@/shared/api/contract";
 
 type ActionDisclosureState = Record<"auxiliary" | "family", boolean>;
 
-export function ActionSection({ config, defaultConfig, metadata, setConfig }: ActionSectionProps) {
+export function ActionSection({
+  config,
+  defaultConfig,
+  checkpointLocked = false,
+  metadata,
+  setConfig,
+}: ActionSectionProps) {
   const action = config.action;
   const compatibilityNote = actionCompatibilityNote(action);
   const [openSections, setOpenSections] = usePersistentDisclosureMap<ActionDisclosureState>(
@@ -50,6 +56,7 @@ export function ActionSection({ config, defaultConfig, metadata, setConfig }: Ac
         onExpandAll={() => setOpenSections({ auxiliary: true, family: true })}
       />
       <ControlFamilyDisclosure
+        checkpointLocked={checkpointLocked}
         config={config}
         defaultConfig={defaultConfig}
         metadata={metadata}
@@ -61,6 +68,7 @@ export function ActionSection({ config, defaultConfig, metadata, setConfig }: Ac
       />
 
       <AuxiliaryBranchesDisclosure
+        checkpointLocked={checkpointLocked}
         config={config}
         defaultConfig={defaultConfig}
         metadata={metadata}

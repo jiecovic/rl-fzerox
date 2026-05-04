@@ -5,8 +5,8 @@ interface PanelProps {
 }
 
 interface PanelHeaderProps {
-  title: string;
-  subtitle: string;
+  title: ReactNode;
+  subtitle: ReactNode;
 }
 
 export function Panel({ children }: PanelProps) {

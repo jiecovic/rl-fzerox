@@ -62,7 +62,7 @@ export function checkpointSummaryRows(train: ManagedRunConfig["train"]) {
     },
     {
       label: "Latest artifact",
-      detail: "rolling latest_model.zip / latest_policy.zip",
+      detail: "rolling checkpoints/latest/{model,policy}.zip",
       value: train.save_latest_checkpoint ? "on" : "off",
     },
     {

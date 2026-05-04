@@ -1,5 +1,10 @@
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
-import { BooleanField, RangeIntegerField, RangeNumberField } from "@/features/configurator/fields";
+import {
+  BooleanField,
+  RangeIntegerField,
+  RangeNumberField,
+  SelectField,
+} from "@/features/configurator/fields";
 import {
   environmentSummaryRows,
   episodeDecisionSummary,
@@ -25,6 +30,27 @@ export function EnvironmentSection({ config, defaultConfig, setConfig }: Environ
 
   return (
     <div className="config-stack training-panel-grid">
+      <ConfigPanel
+        title="Runtime"
+        onReset={() =>
+          updateEnvironment({
+            renderer: defaultConfig.environment.renderer,
+          })
+        }
+      >
+        <div className="training-field-grid">
+          <SelectField
+            help="Video backend requested from the Mupen core. gliden64 matches the established training runs; angrylion is slower and mainly useful for stricter software-rendering comparisons."
+            label="Renderer"
+            optionLabels={{ angrylion: "angrylion", gliden64: "gliden64" }}
+            options={["gliden64", "angrylion"]}
+            resetValue={defaultConfig.environment.renderer}
+            value={config.environment.renderer}
+            onChange={(value) => updateEnvironment({ renderer: value })}
+          />
+        </div>
+      </ConfigPanel>
+
       <ConfigPanel
         title="Episode bounds"
         onReset={() =>

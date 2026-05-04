@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,9 +8,14 @@ import {
   draftFixture,
   managedRunConfigFixture,
   policyPreviewFixture,
+  runFixture,
 } from "@/test/fixtures";
 
 const fetchPolicyPreviewMock = vi.fn();
+
+function launchRunMock() {
+  return vi.fn().mockResolvedValue(runFixture({ name: "run" }));
+}
 
 vi.mock("@/shared/api/client", async () => {
   const actual = await vi.importActual<typeof import("@/shared/api/client")>("@/shared/api/client");
@@ -43,6 +48,7 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={loadedDraft}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={onSaveDraft}
         onUpdateDraft={onUpdateDraft}
       />,
@@ -74,6 +80,7 @@ describe("Configurator", () => {
         existingNames={["ppo_allcups_recurrent", "other_open_editor"]}
         loadedDraft={loadedDraft}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
@@ -86,7 +93,7 @@ describe("Configurator", () => {
     );
 
     expect(
-      screen.queryByText("This name is already used by another draft, run, or open editor."),
+      screen.queryByText("This draft name is already used by another draft or open editor."),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
   });
@@ -103,15 +110,17 @@ describe("Configurator", () => {
         initialDraftName="ppo_allcups_recurrent"
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={onSaveDraft}
         onUpdateDraft={onUpdateDraft}
       />,
     );
 
     expect(
-      screen.getByText("This name is already used by another draft, run, or open editor."),
+      screen.getByText("This draft name is already used by another draft or open editor."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Train" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Save draft" }));
     expect(onSaveDraft).not.toHaveBeenCalled();
@@ -126,6 +135,7 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
@@ -154,6 +164,7 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
@@ -185,6 +196,7 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
@@ -216,6 +228,7 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
@@ -246,28 +259,18 @@ describe("Configurator", () => {
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Action" }));
-    const steeringDiscreteButton = screen
-      .getAllByRole("button", { name: "Discrete" })
-      .find((button) => button.getAttribute("aria-pressed") === "false");
-    if (steeringDiscreteButton === undefined) {
-      throw new Error("Missing discrete steering button");
-    }
-    await user.click(steeringDiscreteButton);
-
-    expect(screen.getByRole("checkbox", { name: "Pitch in output" })).toBeChecked();
+    await user.click(screen.getByText("Auxiliary branches"));
 
     await user.click(screen.getByRole("checkbox", { name: "Boost enabled" }));
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeChecked();
-
-    await user.click(screen.getByRole("checkbox", { name: "Pitch in output" }));
-    expect(screen.getByRole("checkbox", { name: "Pitch in output" })).not.toBeChecked();
 
     await user.click(screen.getByRole("checkbox", { name: "Force full throttle" }));
     expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeChecked();
@@ -276,29 +279,110 @@ describe("Configurator", () => {
   it("lets you switch image features from auto to a custom width", async () => {
     const user = userEvent.setup();
 
-    render(
+    const { container } = render(
       <Configurator
         baseConfig={managedRunConfigFixture}
         existingNames={[]}
         loadedDraft={null}
         metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
         onSaveDraft={vi.fn()}
         onUpdateDraft={vi.fn()}
       />,
     );
 
     await user.click(screen.getByRole("button", { name: "Policy" }));
-    await user.click(screen.getByRole("button", { name: "Custom" }));
+    await user.click(
+      within(screen.getByRole("group", { name: "Image features mode" })).getByRole("button", {
+        name: "Custom",
+      }),
+    );
 
-    const imageFeatures = screen.getByRole("textbox", { name: "Image features" });
+    const imageFeatures = container.querySelector(".feature-dim-input");
+    if (!(imageFeatures instanceof HTMLInputElement)) {
+      throw new Error("Missing feature-dim input");
+    }
     expect(imageFeatures).toHaveValue("512");
 
     await user.clear(imageFeatures);
     await user.type(imageFeatures, "640");
     imageFeatures.blur();
 
-    await waitFor(() =>
-      expect(screen.getByRole("textbox", { name: "Image features" })).toHaveValue("640"),
+    await waitFor(() => expect(imageFeatures).toHaveValue("640"));
+  });
+
+  it("locks only checkpoint-incompatible fork controls", async () => {
+    const user = userEvent.setup();
+    const loadedDraft = draftFixture({
+      source_artifact: "latest",
+      source_run_id: "run-001",
+      source_num_timesteps: 123_456,
+    });
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={loadedDraft}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
     );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    expect(screen.getByRole("combobox", { name: "Input resolution" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Resize filter" })).toBeEnabled();
+
+    await user.click(screen.getByText("control history"));
+    const controlHistoryPanel = screen.getByText("control history").closest("details");
+    if (!(controlHistoryPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing control history panel");
+    }
+    expect(
+      within(controlHistoryPanel).getByRole("checkbox", { name: "category enabled" }),
+    ).toBeDisabled();
+    const gasRow = within(controlHistoryPanel).getByText("Gas at time t-1").closest("tr");
+    if (!(gasRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing gas row");
+    }
+    const gasToggle = within(gasRow).getByRole("checkbox", { name: "entry enabled" });
+    expect(gasToggle).toBeEnabled();
+    expect(gasToggle).toBeChecked();
+    await user.click(gasToggle);
+    expect(gasToggle).not.toBeChecked();
+
+    await user.click(screen.getByText("track position"));
+    const trackPositionPanel = screen.getByText("track position").closest("details");
+    if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing track position panel");
+    }
+    const lapProgressRow = within(trackPositionPanel).getByText("Progress scalar").closest("tr");
+    if (!(lapProgressRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing lap progress row");
+    }
+    const progressSourceGroup = within(lapProgressRow).getByRole("group", {
+      name: "Progress scalar source",
+    });
+    await user.click(within(progressSourceGroup).getByRole("button", { name: "Lap segment" }));
+    expect(within(progressSourceGroup).getByRole("button", { name: "Lap segment" })).toHaveClass(
+      "active",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Policy" }));
+    expect(screen.getByRole("combobox", { name: "CNN profile" })).toBeDisabled();
+    expect(screen.getByRole("combobox", { name: "Activation" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "Action" }));
+    await user.click(screen.getByText("Control family"));
+    await user.click(screen.getByText("Auxiliary branches"));
+
+    expect(
+      screen.getByRole("button", { name: configMetadataFixture.drive_modes[0].label }),
+    ).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Boost enabled" })).toBeEnabled();
   });
 });

@@ -17,12 +17,14 @@ import {
 import { ProgressSourceToggle } from "./ProgressSourceToggle";
 
 interface StateComponentPanelsProps {
+  checkpointLocked?: boolean;
   config: ManagedRunConfig;
   metadata: ConfigMetadata;
   updateObservation: (patch: Partial<ManagedRunConfig["observation"]>) => void;
 }
 
 export function StateComponentPanels({
+  checkpointLocked = false,
   config,
   metadata,
   updateObservation,
@@ -129,9 +131,16 @@ export function StateComponentPanels({
               </span>
               <ToggleSwitch
                 checked={enabled}
+                disabled={checkpointLocked}
                 hideLabel
                 label="category enabled"
-                tooltip={enabled ? "Disable category" : "Enable category"}
+                tooltip={
+                  checkpointLocked
+                    ? "Forked checkpoints keep the original state-vector shape."
+                    : enabled
+                      ? "Disable category"
+                      : "Enable category"
+                }
                 onChange={(checked) => setComponentEnabled(component.name, checked)}
               />
             </summary>
@@ -139,6 +148,7 @@ export function StateComponentPanels({
             <div className="config-disclosure-body state-component-body">
               <ComponentSettings
                 component={component}
+                checkpointLocked={checkpointLocked}
                 disabled={!enabled}
                 updateComponent={updateComponent}
               />
@@ -228,10 +238,12 @@ export function StateComponentPanels({
 
 function ComponentSettings({
   component,
+  checkpointLocked = false,
   disabled,
   updateComponent,
 }: {
   component: StateComponentConfig;
+  checkpointLocked?: boolean;
   disabled: boolean;
   updateComponent: (name: string, patch: Partial<StateComponentConfig>) => void;
 }) {
@@ -242,13 +254,15 @@ function ComponentSettings({
   return (
     <div className="state-component-settings">
       {component.name === "control_history" ? (
-        <IntegerField
-          help="Number of prior action samples exposed in the state vector."
-          label="History length"
-          min={1}
-          value={component.length ?? 1}
-          onChange={(value) => updateComponent(component.name, { length: value })}
-        />
+        <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+          <IntegerField
+            help="Number of prior action samples exposed in the state vector."
+            label="History length"
+            min={1}
+            value={component.length ?? 1}
+            onChange={(value) => updateComponent(component.name, { length: value })}
+          />
+        </fieldset>
       ) : null}
       {disabled ? <span className="state-component-disabled">category disabled</span> : null}
     </div>

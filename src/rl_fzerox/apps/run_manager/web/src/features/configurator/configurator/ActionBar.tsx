@@ -4,27 +4,33 @@ import { SaveDraftIcon, UnsavedDot } from "./icons";
 
 interface ActionBarProps {
   canSave: boolean;
+  canTrain: boolean;
   canUpdate: boolean;
   hasLoadedDraft: boolean;
   isDirty: boolean;
   isSaving: boolean;
+  isTraining: boolean;
   isUpdating: boolean;
   onResetToDefault: () => void;
   onResetToDraft: () => void;
   onSaveDraft: () => void;
+  onTrain: () => void;
   onUpdateDraft: () => void;
 }
 
 export function ActionBar({
   canSave,
+  canTrain,
   canUpdate,
   hasLoadedDraft,
   isDirty,
   isSaving,
+  isTraining,
   isUpdating,
   onResetToDefault,
   onResetToDraft,
   onSaveDraft,
+  onTrain,
   onUpdateDraft,
 }: ActionBarProps) {
   return (
@@ -58,7 +64,7 @@ export function ActionBar({
           <button
             className="secondary-button draft-action-button"
             type="button"
-            disabled={isSaving || isUpdating}
+            disabled={isSaving || isUpdating || isTraining}
             onClick={onResetToDraft}
           >
             <ResetIcon />
@@ -68,14 +74,14 @@ export function ActionBar({
         <button
           className="secondary-button draft-action-button"
           type="button"
-          disabled={isSaving || isUpdating}
+          disabled={isSaving || isUpdating || isTraining}
           onClick={onResetToDefault}
         >
           <ResetIcon />
           <span>Reset to default</span>
         </button>
-        <button className="primary-button" type="button" disabled>
-          Train
+        <button className="primary-button" type="button" disabled={!canTrain} onClick={onTrain}>
+          {isTraining ? "Launching..." : "Train"}
         </button>
       </div>
     </div>

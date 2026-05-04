@@ -137,13 +137,28 @@ export function PolicyPreviewPanel({
                 <th>{branch.name}</th>
                 <td>{branch.kind}</td>
                 <td>{branch.size}</td>
-                <td>{branch.mask_label ?? (branch.enabled ? "trainable" : "masked")}</td>
+                <td>{branchStatus(branch)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </section>
     </div>
+  );
+}
+
+function branchStatus(branch: PolicyArchitecturePreview["action_branches"][number]) {
+  if (!branch.enabled) {
+    return branch.mask_label ?? "masked";
+  }
+  if (branch.mask_label === null) {
+    return "trainable";
+  }
+  return (
+    <span className="derived-value-stack">
+      <strong>trainable</strong>
+      <span className="derived-value-note">{branch.mask_label}</span>
+    </span>
   );
 }
 

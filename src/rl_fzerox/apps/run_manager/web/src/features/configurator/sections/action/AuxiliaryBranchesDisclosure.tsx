@@ -15,6 +15,7 @@ import type { ActionUpdateContext } from "@/features/configurator/sections/actio
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 export function AuxiliaryBranchesDisclosure({
+  checkpointLocked = false,
   config,
   defaultConfig,
   metadata,
@@ -34,22 +35,35 @@ export function AuxiliaryBranchesDisclosure({
       title="Auxiliary branches"
       onReset={() =>
         updateAction({
-          include_air_brake: defaultConfig.action.include_air_brake,
+          include_air_brake: checkpointLocked
+            ? config.action.include_air_brake
+            : defaultConfig.action.include_air_brake,
           enable_air_brake: defaultConfig.action.enable_air_brake,
-          include_boost: defaultConfig.action.include_boost,
+          mask_air_brake_on_ground: defaultConfig.action.mask_air_brake_on_ground,
+          include_boost: checkpointLocked
+            ? config.action.include_boost
+            : defaultConfig.action.include_boost,
           enable_boost: defaultConfig.action.enable_boost,
           boost_unmask_max_speed_kph: defaultConfig.action.boost_unmask_max_speed_kph,
           boost_min_energy_fraction: defaultConfig.action.boost_min_energy_fraction,
-          include_lean: defaultConfig.action.include_lean,
+          include_lean: checkpointLocked
+            ? config.action.include_lean
+            : defaultConfig.action.include_lean,
           enable_lean: defaultConfig.action.enable_lean,
-          lean_output_mode: defaultConfig.action.lean_output_mode,
+          lean_output_mode: checkpointLocked
+            ? config.action.lean_output_mode
+            : defaultConfig.action.lean_output_mode,
           lean_mode: defaultConfig.action.lean_mode,
           lean_unmask_min_speed_kph: defaultConfig.action.lean_unmask_min_speed_kph,
           lean_initial_lockout_frames: defaultConfig.action.lean_initial_lockout_frames,
-          include_pitch: defaultConfig.action.include_pitch,
+          include_pitch: checkpointLocked
+            ? config.action.include_pitch
+            : defaultConfig.action.include_pitch,
           enable_pitch: defaultConfig.action.enable_pitch,
-          pitch_mode: defaultConfig.action.pitch_mode,
-          pitch_buckets: defaultConfig.action.pitch_buckets,
+          pitch_mode: checkpointLocked ? config.action.pitch_mode : defaultConfig.action.pitch_mode,
+          pitch_buckets: checkpointLocked
+            ? config.action.pitch_buckets
+            : defaultConfig.action.pitch_buckets,
         })
       }
     >
@@ -74,6 +88,9 @@ export function AuxiliaryBranchesDisclosure({
             description="Expose left / right air brake as a digital branch."
             enabled={action.enable_air_brake}
             enabledLabel="Air brake enabled"
+            outputDisabledReason={
+              checkpointLocked ? "Forked checkpoints keep the original action outputs." : undefined
+            }
             output={action.include_air_brake}
             outputLabel="Air brake in output"
             label="Air brake"
@@ -89,6 +106,9 @@ export function AuxiliaryBranchesDisclosure({
             description="Expose manual boost as a digital branch."
             enabled={action.enable_boost}
             enabledLabel="Boost enabled"
+            outputDisabledReason={
+              checkpointLocked ? "Forked checkpoints keep the original action outputs." : undefined
+            }
             output={action.include_boost}
             outputLabel="Boost in output"
             label="Boost"
@@ -108,6 +128,9 @@ export function AuxiliaryBranchesDisclosure({
             }
             enabled={action.enable_lean}
             enabledLabel="Lean enabled"
+            outputDisabledReason={
+              checkpointLocked ? "Forked checkpoints keep the original action outputs." : undefined
+            }
             output={action.include_lean}
             outputLabel="Lean in output"
             label="Lean"
@@ -132,6 +155,9 @@ export function AuxiliaryBranchesDisclosure({
                 : undefined
             }
             enabledLabel="Pitch enabled"
+            outputDisabledReason={
+              checkpointLocked ? "Forked checkpoints keep the original action outputs." : undefined
+            }
             output={action.include_pitch}
             outputLabel="Pitch in output"
             label="Pitch"
@@ -146,6 +172,48 @@ export function AuxiliaryBranchesDisclosure({
         </div>
 
         <div className="action-behavior-grid">
+          <section className="action-runtime-card">
+            <div className="action-runtime-header config-disclosure-copy">
+              <strong>Air brake guards</strong>
+              <small>
+                Choose whether grounded air brake stays available or is restricted to airborne use.
+              </small>
+            </div>
+            {action.include_air_brake ? null : (
+              <p className="action-note">
+                Air brake is not in the action output right now, so this runtime rule is inactive.
+              </p>
+            )}
+            <fieldset
+              className="dependent-fieldset action-runtime-fields"
+              disabled={!action.include_air_brake}
+            >
+              <div className="field-shell">
+                <FieldLabel
+                  help="When enabled, the air-brake branch is masked back to neutral while grounded. Turn this off to let the policy use air brake freely on ground too."
+                  label="Mask on ground"
+                />
+                <SegmentedChoiceStrip
+                  ariaLabel="Air brake grounded mask"
+                  options={[
+                    {
+                      active: !action.mask_air_brake_on_ground,
+                      key: "allow_on_ground",
+                      label: "Off",
+                      onClick: () => updateAction({ mask_air_brake_on_ground: false }),
+                    },
+                    {
+                      active: action.mask_air_brake_on_ground,
+                      key: "mask_on_ground",
+                      label: "On",
+                      onClick: () => updateAction({ mask_air_brake_on_ground: true }),
+                    },
+                  ]}
+                />
+              </div>
+            </fieldset>
+          </section>
+
           <section className="action-runtime-card">
             <div className="action-runtime-header config-disclosure-copy">
               <strong>Boost guards</strong>
@@ -207,25 +275,27 @@ export function AuxiliaryBranchesDisclosure({
               className="dependent-fieldset action-runtime-fields"
               disabled={!action.include_lean}
             >
-              <div className="field-shell">
-                <FieldLabel
-                  help="Choose whether lean is one 3-way axis or two independent left and right buttons that can be pressed together."
-                  label="Lean output"
-                />
-                <SegmentedChoiceStrip
-                  ariaLabel="Lean output"
-                  options={metadata.lean_output_modes.map((option) => ({
-                    active: action.lean_output_mode === option.value,
-                    key: option.value,
-                    label: option.label,
-                    onClick: () =>
-                      updateAction({
-                        lean_output_mode:
-                          option.value as ManagedRunConfig["action"]["lean_output_mode"],
-                      }),
-                  }))}
-                />
-              </div>
+              <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Choose whether lean is one 3-way axis or two independent left and right buttons that can be pressed together."
+                    label="Lean output"
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Lean output"
+                    options={metadata.lean_output_modes.map((option) => ({
+                      active: action.lean_output_mode === option.value,
+                      key: option.value,
+                      label: option.label,
+                      onClick: () =>
+                        updateAction({
+                          lean_output_mode:
+                            option.value as ManagedRunConfig["action"]["lean_output_mode"],
+                        }),
+                    }))}
+                  />
+                </div>
+              </fieldset>
               {action.lean_output_mode === "three_way" ? (
                 <>
                   <div className="field-shell">
@@ -292,50 +362,52 @@ export function AuxiliaryBranchesDisclosure({
               className="dependent-fieldset action-runtime-fields"
               disabled={!action.include_pitch}
             >
-              <div className="field-shell">
-                <FieldLabel
-                  help="Choose whether airborne pitch is a continuous analog lane or a discrete bucket head."
-                  label="Pitch mode"
-                />
-                <SegmentedChoiceStrip
-                  ariaLabel="Pitch mode"
-                  options={metadata.steering_modes.map((option) => ({
-                    active: action.pitch_mode === option.value,
-                    key: option.value,
-                    label: option.label,
-                    onClick: () =>
-                      updateAction({
-                        pitch_mode: option.value as ManagedRunConfig["action"]["pitch_mode"],
-                      }),
-                  }))}
-                />
-              </div>
-              {action.pitch_mode === "discrete" ? (
-                <RangeIntegerField
-                  help="Odd bucket counts preserve one neutral center action while adding more upward and downward pitch resolution."
-                  label="Pitch buckets"
-                  max={31}
-                  min={3}
-                  rangeStep={2}
-                  resetValue={defaultConfig.action.pitch_buckets}
-                  ticks={[
-                    { value: 3, label: "3" },
-                    { value: 5, label: "5" },
-                    { value: 9, label: "9" },
-                    { value: 15, label: "15" },
-                    { value: 31, label: "31" },
-                  ]}
-                  value={action.pitch_buckets}
-                  onChange={(value) =>
-                    updateAction({ pitch_buckets: normalizeOddBucketCount(value) })
-                  }
-                />
-              ) : (
-                <p className="action-note">
-                  Continuous pitch maps the airborne pitch axis directly, so runtime masking stays
-                  unavailable.
-                </p>
-              )}
+              <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Choose whether airborne pitch is a continuous analog lane or a discrete bucket head."
+                    label="Pitch mode"
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Pitch mode"
+                    options={metadata.steering_modes.map((option) => ({
+                      active: action.pitch_mode === option.value,
+                      key: option.value,
+                      label: option.label,
+                      onClick: () =>
+                        updateAction({
+                          pitch_mode: option.value as ManagedRunConfig["action"]["pitch_mode"],
+                        }),
+                    }))}
+                  />
+                </div>
+                {action.pitch_mode === "discrete" ? (
+                  <RangeIntegerField
+                    help="Odd bucket counts preserve one neutral center action while adding more upward and downward pitch resolution."
+                    label="Pitch buckets"
+                    max={31}
+                    min={3}
+                    rangeStep={2}
+                    resetValue={defaultConfig.action.pitch_buckets}
+                    ticks={[
+                      { value: 3, label: "3" },
+                      { value: 5, label: "5" },
+                      { value: 9, label: "9" },
+                      { value: 15, label: "15" },
+                      { value: 31, label: "31" },
+                    ]}
+                    value={action.pitch_buckets}
+                    onChange={(value) =>
+                      updateAction({ pitch_buckets: normalizeOddBucketCount(value) })
+                    }
+                  />
+                ) : (
+                  <p className="action-note">
+                    Continuous pitch maps the airborne pitch axis directly, so runtime masking stays
+                    unavailable.
+                  </p>
+                )}
+              </fieldset>
             </fieldset>
           </section>
         </div>

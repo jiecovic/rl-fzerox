@@ -2,6 +2,7 @@ export interface TabItem<T extends string> {
   id: T;
   label: string;
   closable?: boolean;
+  tone?: "draft" | "run";
 }
 
 interface TabsProps<T extends string> {
@@ -29,7 +30,7 @@ export function Tabs<T extends string>({
       }
     >
       {items.map((item) => (
-        <span className={item.id === activeId ? "tab-shell active" : "tab-shell"} key={item.id}>
+        <span className={tabShellClass(item, item.id === activeId)} key={item.id}>
           <button className="tab-item" type="button" onClick={() => onSelect(item.id)}>
             {item.label}
           </button>
@@ -47,6 +48,20 @@ export function Tabs<T extends string>({
       ))}
     </nav>
   );
+}
+
+function tabShellClass<T extends string>(item: TabItem<T>, active: boolean) {
+  const classes = ["tab-shell"];
+  if (active) {
+    classes.push("active");
+  }
+  if (item.tone === "draft") {
+    classes.push("tab-shell-draft");
+  }
+  if (item.tone === "run") {
+    classes.push("tab-shell-run");
+  }
+  return classes.join(" ");
 }
 
 function CloseIcon() {

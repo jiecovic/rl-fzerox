@@ -20,19 +20,29 @@ import { fetchPolicyPreview } from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
+  ManagedRun,
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { formatDate } from "@/shared/ui/format";
 import { Notice, Panel } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
 
 interface ConfiguratorProps {
   baseConfig: ManagedRunConfig;
   existingNames: string[];
+  forkSourceArtifact?: "latest" | "best" | null;
+  forkSourceRunLabel?: string | null;
   initialDraftName?: string;
+  initialConfig?: ManagedRunConfig | null;
   loadedDraft: ManagedDraft | null;
   metadata: ConfigMetadata;
   onDraftNameChange?: (name: string) => void;
+  onLaunchRun: (
+    name: string,
+    config: ManagedRunConfig,
+    draftId: string | null,
+  ) => Promise<ManagedRun>;
   onSaveDraft: (name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
   onUpdateDraft: (id: string, name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
 }
@@ -40,21 +50,26 @@ interface ConfiguratorProps {
 export function Configurator({
   baseConfig,
   existingNames,
+  forkSourceArtifact = null,
+  forkSourceRunLabel = null,
   initialDraftName,
+  initialConfig = null,
   loadedDraft,
   metadata,
   onDraftNameChange,
+  onLaunchRun,
   onSaveDraft,
   onUpdateDraft,
 }: ConfiguratorProps) {
-  const baselineConfig = loadedDraft?.config ?? baseConfig;
+  const baselineConfig = loadedDraft?.config ?? initialConfig ?? baseConfig;
   const baselineDraftName = configuratorDraftName(baseConfig, initialDraftName, loadedDraft);
   const [draftName, setDraftName] = useState(baselineDraftName);
-  const [config, setConfig] = useState(baseConfig);
+  const [config, setConfig] = useState(baselineConfig);
   const [section, setSection] = useState<ConfigSection>("tracks");
   const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTraining, setIsTraining] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resetSourceKeyRef = useRef<string | null>(null);
@@ -79,9 +94,9 @@ export function Configurator({
     normalizedDraftName.length === 0
       ? "Run name is required."
       : updateNameConflict
-        ? "This name is already used by another draft, run, or open editor."
+        ? "This draft name is already used by another draft or open editor."
         : loadedDraft === null && createNameConflict
-          ? "This name is already used by another draft, run, or open editor."
+          ? "This draft name is already used by another draft or open editor."
           : null;
   const isDirty = useMemo(() => {
     if (normalizedDraftName !== normalizedBaselineDraftName) {
@@ -92,7 +107,18 @@ export function Configurator({
   const notifyDraftNameChange = useEffectEvent((name: string) => {
     onDraftNameChange?.(name);
   });
-  const resetSourceKey = loadedDraft?.id ?? `new:${initialDraftName ?? baselineDraftName}`;
+  const resetSourceKey =
+    loadedDraft?.id ??
+    [
+      "new",
+      initialDraftName ?? baselineDraftName,
+      forkSourceRunLabel ?? "",
+      forkSourceArtifact ?? "",
+    ].join(":");
+  const checkpointLocked =
+    loadedDraft !== null &&
+    loadedDraft.source_run_id !== null &&
+    loadedDraft.source_artifact !== null;
 
   useEffect(() => {
     if (resetSourceKeyRef.current === resetSourceKey) {
@@ -165,6 +191,21 @@ export function Configurator({
     }
   }
 
+  async function launchRun() {
+    if (normalizedDraftName.length === 0) {
+      return;
+    }
+    setIsTraining(true);
+    setError(null);
+    try {
+      await onLaunchRun(normalizedDraftName, config, loadedDraft?.id ?? null);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "failed to launch training run");
+    } finally {
+      setIsTraining(false);
+    }
+  }
+
   function randomizeSeed() {
     const values = new Uint32Array(1);
     crypto.getRandomValues(values);
@@ -187,26 +228,46 @@ export function Configurator({
     setPreviewError(null);
   }
 
+  const forkedAtLabel = loadedDraft === null ? null : formatDate(loadedDraft.created_at);
+  const forkSourceStepCount = loadedDraft?.source_num_timesteps ?? null;
+
   return (
     <Panel>
       <ActionBar
-        canSave={!isSaving && !isUpdating && !createNameConflict && normalizedDraftName.length > 0}
+        canSave={
+          !isSaving &&
+          !isUpdating &&
+          !isTraining &&
+          !createNameConflict &&
+          normalizedDraftName.length > 0
+        }
+        canTrain={!isSaving && !isUpdating && !isTraining && normalizedDraftName.length > 0}
         canUpdate={
           loadedDraft !== null &&
           !isSaving &&
           !isUpdating &&
+          !isTraining &&
           !updateNameConflict &&
           normalizedDraftName.length > 0
         }
         hasLoadedDraft={loadedDraft !== null}
         isDirty={isDirty}
         isSaving={isSaving}
+        isTraining={isTraining}
         isUpdating={isUpdating}
         onResetToDefault={resetToDefault}
         onResetToDraft={resetToDraft}
         onSaveDraft={() => void saveDraft()}
+        onTrain={() => void launchRun()}
         onUpdateDraft={() => void updateDraft()}
       />
+
+      {error !== null || previewError !== null ? (
+        <div className="configurator-feedback-stack">
+          {error !== null ? <Notice tone="error">{error}</Notice> : null}
+          {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
+        </div>
+      ) : null}
 
       <div className="form-grid run-identity-grid">
         <div className="field-shell">
@@ -242,6 +303,23 @@ export function Configurator({
             <RandomizeIcon />
           </button>
         </div>
+        {forkSourceRunLabel !== null && forkSourceArtifact !== null ? (
+          <section className="fork-context-card" aria-label="Fork source context">
+            <div className="fork-context-header">
+              <span className="fork-context-kicker">Forked from</span>
+              <strong>{forkSourceRunLabel}</strong>
+              <span className="fork-context-artifact">{forkSourceArtifact} checkpoint</span>
+            </div>
+            {forkedAtLabel !== null || forkSourceStepCount !== null ? (
+              <div className="fork-context-meta">
+                {forkedAtLabel !== null ? <span>forked {forkedAtLabel}</span> : null}
+                {forkSourceStepCount !== null ? (
+                  <span>@ {forkSourceStepCount.toLocaleString()} steps</span>
+                ) : null}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
       </div>
       {nameError !== null ? <Notice tone="error">{nameError}</Notice> : null}
 
@@ -268,6 +346,7 @@ export function Configurator({
       ) : null}
       {section === "observation" ? (
         <ObservationSection
+          checkpointLocked={checkpointLocked}
           config={config}
           defaultConfig={baseConfig}
           metadata={metadata}
@@ -277,6 +356,7 @@ export function Configurator({
       ) : null}
       {section === "policy" ? (
         <PolicySection
+          checkpointLocked={checkpointLocked}
           config={config}
           defaultConfig={baseConfig}
           metadata={metadata}
@@ -297,6 +377,7 @@ export function Configurator({
       ) : null}
       {section === "action" ? (
         <ActionSection
+          checkpointLocked={checkpointLocked}
           config={config}
           defaultConfig={baseConfig}
           metadata={metadata}
@@ -309,9 +390,6 @@ export function Configurator({
       {section === "logging" ? (
         <LoggingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
       ) : null}
-
-      {error !== null ? <Notice tone="error">{error}</Notice> : null}
-      {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
     </Panel>
   );
 }

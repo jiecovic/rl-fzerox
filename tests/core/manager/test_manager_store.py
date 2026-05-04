@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
-from rl_fzerox.core.manager.errors import ManagerNameConflictError
+from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
 
 
 def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
@@ -66,6 +66,84 @@ def test_manager_store_saves_draft_without_filesystem_artifacts(tmp_path: Path) 
     assert not (tmp_path / "managed_runs").exists()
 
 
+def test_manager_store_pins_and_cleans_fork_draft_snapshot(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    source_run = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "parent-run",
+    )
+
+    def fake_snapshot_fork_source(
+        *,
+        source_run_dir: Path,
+        artifact: str,
+        destination_dir: Path,
+    ) -> int:
+        assert source_run_dir == source_run.run_dir
+        assert artifact == "latest"
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        (destination_dir / "train_config.yaml").write_text("train: {}\n", encoding="utf-8")
+        return 123_456
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.manager.store.snapshot_fork_source",
+        fake_snapshot_fork_source,
+    )
+
+    draft = store.create_draft(
+        name="Pinned Fork",
+        config=config,
+        source_run_id=source_run.id,
+        source_artifact="latest",
+    )
+
+    assert draft.source_snapshot_dir is not None
+    assert draft.source_snapshot_dir.is_dir()
+    assert draft.source_num_timesteps == 123_456
+
+    assert store.delete_draft(draft.id)
+    assert not draft.source_snapshot_dir.exists()
+
+
+def test_manager_store_persists_run_lineage_metadata(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "parent-run",
+    )
+
+    run = store.create_run(
+        run_id="child-run",
+        name="Child Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "child-run",
+        lineage_step_offset=816_040,
+        parent_run_id="parent-run",
+        source_run_id="parent-run",
+        source_artifact="best",
+        source_num_timesteps=816_040,
+    )
+
+    loaded = store.get_run(run.id)
+
+    assert loaded is not None
+    assert loaded.lineage_id == "parent-run"
+    assert loaded.lineage_step_offset == 816_040
+    assert loaded.parent_run_id == "parent-run"
+    assert loaded.source_run_id == "parent-run"
+    assert loaded.source_artifact == "best"
+    assert loaded.source_num_timesteps == 816_040
+
+
 def test_manager_store_deletes_draft(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     draft = store.create_draft(
@@ -110,8 +188,43 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     draft = store.list_drafts()[0]
 
     assert draft.config.reward.manual_boost_reward == 0.5
-    assert draft.config.reward.time_penalty_per_frame == -0.005
+    assert draft.config.reward.time_penalty_per_frame == 0.0
     assert draft.config.reward.step_reward_clip_max == 100.0
+
+
+def test_manager_store_adds_lineage_columns_to_existing_db(tmp_path: Path) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(db_path) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE runs (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                status TEXT NOT NULL,
+                config_json TEXT NOT NULL,
+                config_hash TEXT NOT NULL,
+                run_dir TEXT NOT NULL UNIQUE,
+                parent_run_id TEXT,
+                source_run_id TEXT,
+                source_artifact TEXT,
+                created_at TEXT NOT NULL,
+                started_at TEXT,
+                stopped_at TEXT
+            );
+            """
+        )
+
+    ManagerStore(db_path).initialize()
+
+    with sqlite3.connect(db_path) as connection:
+        columns = {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(runs)").fetchall()
+        }
+
+    assert "lineage_step_offset" in columns
+    assert "source_num_timesteps" in columns
 
 
 def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> None:
@@ -238,6 +351,42 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     draft = store.list_drafts()[0]
 
     assert draft.config.action.action_repeat == 2
+
+
+def test_manager_store_normalizes_legacy_progress_suspend_field(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["reward"]["suspend_progress_while_outside_track_bounds"] = False
+    stale_config["reward"].pop("suspend_progress_while_outside_track_bounds")
+    stale_config["reward"]["suspend_progress_while_airborne"] = True
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "old-progress-suspend",
+                "Old Progress Suspend",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    draft = store.list_drafts()[0]
+
+    assert draft.config.reward.suspend_progress_while_outside_track_bounds is True
     assert draft.config.action.steering_mode == "continuous"
     assert draft.config.action.drive_mode == "on_off"
     assert draft.config.action.force_full_throttle is False
@@ -270,6 +419,34 @@ def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path:
     assert not run.run_dir.exists()
 
 
+def test_manager_store_supports_explicit_run_dir_and_status_updates(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run_id = new_managed_run_id("Launch Me")
+    run_dir = tmp_path / "runs" / f"{run_id}_0001"
+    run_dir.mkdir(parents=True)
+    started_at = datetime.now(UTC).isoformat(timespec="seconds")
+
+    run = store.create_run(
+        run_id=run_id,
+        name="Launch Me",
+        config=default_managed_run_config(),
+        explicit_run_dir=run_dir,
+    )
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert launched.run_dir == run_dir.resolve()
+    assert launched.status == "running"
+    assert launched.started_at == started_at
+    assert store.get_run(run.id) == launched
+
+
 def test_manager_store_visible_runs_exclude_created_records(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.create_run(
@@ -281,23 +458,208 @@ def test_manager_store_visible_runs_exclude_created_records(tmp_path: Path) -> N
     assert store.list_visible_runs() == ()
 
 
-def test_manager_store_rejects_draft_name_used_by_run(tmp_path: Path) -> None:
+def test_manager_store_allows_draft_name_used_by_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()
     store.create_run(name="Shared Name", config=config, managed_runs_root=tmp_path / "managed_runs")
+    draft = store.create_draft(name="Shared Name", config=config)
 
-    with pytest.raises(ManagerNameConflictError, match="name already exists: Shared Name"):
-        store.create_draft(name="Shared Name", config=config)
+    assert draft.name == "Shared Name"
 
 
-def test_manager_store_rejects_run_name_used_by_draft(tmp_path: Path) -> None:
+def test_manager_store_allows_run_name_used_by_draft(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()
     store.create_draft(name="Shared Name", config=config)
+    run = store.create_run(
+        name="Shared Name",
+        config=config,
+        managed_runs_root=tmp_path / "managed_runs",
+    )
 
-    with pytest.raises(ManagerNameConflictError, match="name already exists: Shared Name"):
-        store.create_run(
-            name="Shared Name",
-            config=config,
-            managed_runs_root=tmp_path / "managed_runs",
-        )
+    assert run.name == "Shared Name"
+
+
+def test_manager_store_renames_run_without_mutating_config(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Old Name",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+
+    renamed = store.update_run_name(run_id=run.id, name="New Name")
+
+    assert renamed is not None
+    assert renamed.name == "New Name"
+    assert renamed.config == run.config
+
+
+def test_manager_store_allows_duplicate_run_names(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    first = store.create_run(name="Shared Run", config=config, managed_runs_root=tmp_path / "runs")
+    second = store.create_run(
+        name="Shared Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+    )
+
+    assert first.name == "Shared Run"
+    assert second.name == "Shared Run"
+    assert first.id != second.id
+
+
+def test_manager_store_allows_renaming_run_to_existing_run_name(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    store.create_run(name="Existing Run", config=config, managed_runs_root=tmp_path / "runs")
+    target = store.create_run(name="Target Run", config=config, managed_runs_root=tmp_path / "runs")
+
+    renamed = store.update_run_name(run_id=target.id, name="Existing Run")
+
+    assert renamed is not None
+    assert renamed.name == "Existing Run"
+
+
+def test_manager_store_persists_runtime_snapshots_and_metric_history(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Runtime Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at="2026-05-03T12:00:00+00:00",
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+
+    store.upsert_run_runtime(
+        run_id=run.id,
+        total_timesteps=50_000_000,
+        num_timesteps=125_000,
+        progress_fraction=0.0025,
+        updated_at="2026-05-03T12:05:00+00:00",
+        fps=987.0,
+        episode_reward_mean=4.2,
+        episode_length_mean=512.0,
+        approx_kl=0.014,
+    )
+    commanded = store.request_run_command(run_id=run.id, command="pause")
+
+    assert commanded is not None
+    assert commanded.pending_command == "pause"
+    assert commanded.runtime is not None
+    assert commanded.runtime.num_timesteps == 125_000
+    assert commanded.runtime.fps == 987.0
+    assert store.pending_run_command(run.id) == "pause"
+
+
+def test_manager_store_deletes_non_running_runs_with_runtime_rows(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Delete Runtime Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    stopped = store.update_run_status(
+        run_id=run.id,
+        status="stopped",
+        started_at="2026-05-03T12:00:00+00:00",
+        stopped_at="2026-05-03T12:30:00+00:00",
+        message="worker stopped",
+    )
+
+    assert stopped is not None
+
+    store.upsert_run_runtime(
+        run_id=run.id,
+        total_timesteps=1_000,
+        num_timesteps=500,
+        progress_fraction=0.5,
+        updated_at="2026-05-03T12:10:00+00:00",
+        fps=321.0,
+    )
+
+    assert store.delete_run(run.id) is True
+    assert store.get_run(run.id) is None
+
+
+def test_manager_store_rejects_deleting_non_leaf_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.create_run(
+        run_id="child-run",
+        name="Child Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+        lineage_id=parent.lineage_id,
+        parent_run_id=parent.id,
+        source_run_id=parent.id,
+        source_artifact="latest",
+        source_num_timesteps=123,
+    )
+
+    with pytest.raises(ValueError, match="only leaf runs can be deleted individually"):
+        store.delete_run(parent.id)
+
+
+def test_manager_store_deletes_full_lineage(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+    )
+    child = store.create_run(
+        run_id="child-run",
+        name="Child Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+        lineage_id=parent.lineage_id,
+        parent_run_id=parent.id,
+        source_run_id=parent.id,
+        source_artifact="latest",
+        source_num_timesteps=456,
+    )
+    parent.run_dir.mkdir(parents=True)
+    child.run_dir.mkdir(parents=True)
+
+    assert store.delete_lineage(parent.lineage_id) is True
+    assert store.get_run(parent.id) is None
+    assert store.get_run(child.id) is None
+    assert not parent.run_dir.exists()
+
+
+def test_manager_store_rejects_deleting_running_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Active Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at="2026-05-03T12:00:00+00:00",
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+
+    with pytest.raises(ValueError, match="stop or pause the run before deleting it"):
+        store.delete_run(run.id)

@@ -5,7 +5,6 @@ export type RewardDisclosureId =
   | "track"
   | "energy"
   | "actions"
-  | "lean"
   | "damage";
 
 export type RewardDisclosureState = Record<RewardDisclosureId, boolean>;
@@ -20,7 +19,6 @@ export function allRewardSectionsOpen(open: boolean): RewardDisclosureState {
     airborne: open,
     damage: open,
     energy: open,
-    lean: open,
     progress: open,
     time: open,
     track: open,

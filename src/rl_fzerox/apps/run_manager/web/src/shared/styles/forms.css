@@ -10,7 +10,57 @@
 .run-identity-grid {
   grid-template-columns: minmax(0, 1fr) 240px;
   align-items: end;
-  margin-bottom: 22px;
+  margin-bottom: 28px;
+}
+
+.fork-context-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 12px 14px;
+}
+
+.fork-context-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fork-context-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fork-context-header strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fork-context-artifact {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 8px;
+  text-transform: lowercase;
+}
+
+.fork-context-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .form-grid.three {
@@ -91,6 +141,19 @@
   border: 0;
   gap: 12px;
   padding: 0;
+}
+
+.fork-lock-fieldset {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  gap: 12px;
+  padding: 0;
+}
+
+.fork-lock-fieldset:disabled {
+  opacity: 0.52;
 }
 
 .dependent-fieldset:disabled {
@@ -251,6 +314,10 @@
 }
 
 .reward-accordion-stack .optional-number-field {
+  grid-column: span 2;
+}
+
+.reward-accordion-stack .reward-wide-field {
   grid-column: span 2;
 }
 

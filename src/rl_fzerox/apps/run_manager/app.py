@@ -31,6 +31,12 @@ class BoundApiSocket:
     socket: socket.socket
 
 
+@dataclass(frozen=True, slots=True)
+class ResolvedWebPort:
+    port: int
+    reassigned: bool
+
+
 DEFAULTS = RunManagerLauncherDefaults()
 
 
@@ -65,6 +71,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     _ensure_frontend_dependencies(DEFAULTS.web_root)
+    web_binding = _resolve_web_port(args.web_port)
     command = [
         "npm",
         "run",
@@ -73,12 +80,18 @@ def main(argv: list[str] | None = None) -> None:
         "--host",
         "0.0.0.0",
         "--port",
-        str(args.web_port),
+        str(web_binding.port),
+        "--strictPort",
     ]
     environment = os.environ.copy()
     environment["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{api_binding.port}"
 
-    print(f"Run manager UI:  http://localhost:{args.web_port}")
+    if web_binding.reassigned:
+        print(
+            f"Run manager UI port {args.web_port} is busy; using {web_binding.port} instead.",
+            file=sys.stderr,
+        )
+    print(f"Run manager UI:  http://localhost:{web_binding.port}")
     print(f"Run manager API: http://127.0.0.1:{api_binding.port}")
     process = subprocess.Popen(command, cwd=DEFAULTS.web_root, env=environment)
     try:
@@ -136,6 +149,31 @@ def _open_api_socket(port: int) -> socket.socket:
         bound_socket.close()
         raise
     return bound_socket
+
+
+def _resolve_web_port(requested_port: int) -> ResolvedWebPort:
+    if _port_is_free(requested_port):
+        return ResolvedWebPort(port=requested_port, reassigned=False)
+    for candidate_port in range(requested_port + 1, requested_port + 21):
+        if _port_is_free(candidate_port):
+            return ResolvedWebPort(port=candidate_port, reassigned=True)
+    raise SystemExit(
+        f"Run manager UI port {requested_port} is busy and no nearby free port was found."
+    )
+
+
+def _port_is_free(port: int) -> bool:
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        probe.bind(("0.0.0.0", port))
+    except OSError as exc:
+        if exc.errno == errno.EADDRINUSE:
+            return False
+        raise
+    finally:
+        probe.close()
+    return True
 
 
 def _run_api_server(api_server: uvicorn.Server, bound_socket: socket.socket) -> None:

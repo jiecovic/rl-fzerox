@@ -3,9 +3,23 @@ import { useCallback, useEffect, useState } from "react";
 import { loadManagerData } from "@/app/managerData";
 import { Configurator } from "@/features/configurator/Configurator";
 import { DraftsPanel } from "@/features/drafts/DraftsPanel";
-import { RunInspector } from "@/features/runs/RunInspector";
+import { ChartsPanel } from "@/features/runs/ChartsPanel";
 import { RunsPanel } from "@/features/runs/RunsPanel";
-import { createDraft, deleteDraft, updateDraft } from "@/shared/api/client";
+import { RunWorkspace } from "@/features/runs/RunWorkspace";
+import {
+  createDraftWithSource,
+  deleteDraft,
+  deleteLineage,
+  deleteRun,
+  fetchRuns,
+  launchRun,
+  openRunDirectory,
+  renameRun,
+  resumeRun,
+  stopRun,
+  updateDraftWithSource,
+  watchRun,
+} from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -17,13 +31,26 @@ import { ScrollButtons } from "@/shared/ui/ScrollButtons";
 import { Tabs } from "@/shared/ui/Tabs";
 import { type Theme, ThemeToggle } from "@/shared/ui/ThemeToggle";
 
-type WorkspaceTabId = "drafts" | "runs" | `editor:${string}`;
+type WorkspaceTabId = "drafts" | "runs" | "charts" | `editor:${string}` | `run:${string}`;
+
+interface ForkSource {
+  artifact: "latest" | "best";
+  runId: string;
+}
 
 interface DraftEditorSession {
   draftId: string | null;
+  forkSource: ForkSource | null;
   initialDraftName: string;
+  initialConfig: ManagedRunConfig | null;
   loadedDraft: ManagedDraft | null;
   sessionId: `editor:${string}`;
+  title: string;
+}
+
+interface RunSession {
+  runId: string;
+  sessionId: `run:${string}`;
   title: string;
 }
 
@@ -35,7 +62,8 @@ export function App() {
   const [metadata, setMetadata] = useState<ConfigMetadata | null>(null);
   const [defaultConfig, setDefaultConfig] = useState<ManagedRunConfig | null>(null);
   const [draftEditors, setDraftEditors] = useState<DraftEditorSession[]>([]);
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [runTabs, setRunTabs] = useState<RunSession[]>([]);
+  const [chartsFocusRunId, setChartsFocusRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -63,18 +91,43 @@ export function App() {
     void reloadManagerData();
   }, [reloadManagerData]);
 
-  const selectedRun = runs.find((run) => run.id === selectedRunId) ?? null;
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void fetchRuns()
+        .then((nextRuns) => setRuns([...nextRuns].sort(compareRuns)))
+        .catch(() => undefined);
+    }, 2_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   const activeDraftEditor =
-    activeTabId === "drafts" || activeTabId === "runs"
+    activeTabId === "drafts" || activeTabId === "runs" || activeTabId === "charts"
       ? null
       : (draftEditors.find((session) => session.sessionId === activeTabId) ?? null);
-  const workspaceTabs: Array<{ closable?: boolean; id: WorkspaceTabId; label: string }> = [
+  const activeRunTab =
+    activeTabId === "drafts" || activeTabId === "runs" || activeTabId === "charts"
+      ? null
+      : (runTabs.find((session) => session.sessionId === activeTabId) ?? null);
+  const workspaceTabs: Array<{
+    closable?: boolean;
+    id: WorkspaceTabId;
+    label: string;
+    tone?: "draft" | "run";
+  }> = [
     { id: "drafts", label: "Drafts" },
     { id: "runs", label: "Runs" },
+    { id: "charts", label: "Charts" },
+    ...runTabs.map((session) => ({
+      id: session.sessionId,
+      label: `Run · ${runs.find((run) => run.id === session.runId)?.name ?? session.title}`,
+      closable: true,
+      tone: "run" as const,
+    })),
     ...draftEditors.map((session) => ({
       id: session.sessionId,
-      label: session.title,
+      label: `${session.forkSource === null ? "Draft" : "Fork draft"} · ${session.title}`,
       closable: true,
+      tone: "draft" as const,
     })),
   ];
 
@@ -83,11 +136,19 @@ export function App() {
     name: string,
     config: ManagedRunConfig,
   ) {
-    const draft = await createDraft(name, config);
+    const session = draftEditors.find((current) => current.sessionId === sessionId) ?? null;
+    const draft = await createDraftWithSource(
+      name,
+      config,
+      session?.forkSource?.runId ?? null,
+      session?.forkSource?.artifact ?? null,
+    );
     setDrafts((current) => upsertDraft(current, draft));
     patchDraftEditor(sessionId, {
       draftId: draft.id,
+      forkSource: draftForkSource(draft),
       initialDraftName: draft.name,
+      initialConfig: null,
       loadedDraft: draft,
       title: draft.name,
     });
@@ -100,11 +161,20 @@ export function App() {
     name: string,
     config: ManagedRunConfig,
   ) {
-    const draft = await updateDraft(id, name, config);
+    const session = draftEditors.find((current) => current.sessionId === sessionId) ?? null;
+    const draft = await updateDraftWithSource(
+      id,
+      name,
+      config,
+      session?.forkSource?.runId ?? null,
+      session?.forkSource?.artifact ?? null,
+    );
     setDrafts((current) => upsertDraft(current, draft));
     patchDraftEditor(sessionId, {
       draftId: draft.id,
+      forkSource: draftForkSource(draft),
       initialDraftName: draft.name,
+      initialConfig: null,
       loadedDraft: draft,
       title: draft.name,
     });
@@ -115,6 +185,88 @@ export function App() {
     await deleteDraft(id);
     setDrafts((current) => current.filter((draft) => draft.id !== id));
     closeEditorsForDraft(id);
+  }
+
+  async function removeRun(run: ManagedRun) {
+    await deleteRun(run.id);
+    setRuns((current) => current.filter((candidate) => candidate.id !== run.id));
+    closeRunTabsForRun(run.id);
+    setChartsFocusRunId((current) => (current === run.id ? null : current));
+  }
+
+  async function removeLineage(lineageId: string) {
+    const lineageRunIds = runs
+      .filter((candidate) => candidate.lineage_id === lineageId)
+      .map((candidate) => candidate.id);
+    await deleteLineage(lineageId);
+    closeRunTabsForRuns(lineageRunIds);
+    closeEditorsForSourceRuns(lineageRunIds);
+    setChartsFocusRunId((current) =>
+      current !== null && lineageRunIds.includes(current) ? null : current,
+    );
+    await reloadManagerData();
+  }
+
+  async function launchTrainingRun(
+    sessionId: DraftEditorSession["sessionId"],
+    name: string,
+    config: ManagedRunConfig,
+    draftId: string | null,
+  ) {
+    const session = draftEditors.find((current) => current.sessionId === sessionId) ?? null;
+    const run = await launchRun(
+      name,
+      config,
+      draftId,
+      session?.forkSource?.runId ?? null,
+      session?.forkSource?.artifact ?? null,
+    );
+    setRuns((current) => upsertRun(current, run));
+    openRun(run);
+    return run;
+  }
+
+  async function forkManagedRun(runId: string, artifact: "latest" | "best") {
+    const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
+    const sourceConfig = sourceRun?.config ?? defaultConfig;
+    if (sourceConfig === null) {
+      throw new Error("fork source config is unavailable");
+    }
+    const baseName =
+      sourceRun === null
+        ? artifact === "best"
+          ? "fork best"
+          : "fork"
+        : artifact === "best"
+          ? `${sourceRun.name} best fork`
+          : `${sourceRun.name} fork`;
+    const initialDraftName = nextAvailableDraftName(baseName, allKnownNames());
+    const draft = await createDraftWithSource(initialDraftName, sourceConfig, runId, artifact);
+    setDrafts((current) => upsertDraft(current, draft));
+    openDraft(draft);
+  }
+
+  async function stopManagedRun(runId: string) {
+    const run = await stopRun(runId);
+    setRuns((current) => upsertRun(current, run));
+  }
+
+  async function resumeManagedRun(runId: string) {
+    const run = await resumeRun(runId);
+    setRuns((current) => upsertRun(current, run));
+  }
+
+  async function renameManagedRun(runId: string, name: string) {
+    const run = await renameRun(runId, name);
+    setRuns((current) => upsertRun(current, run));
+  }
+
+  async function openManagedRunDirectory(runId: string) {
+    await openRunDirectory(runId);
+  }
+
+  async function watchManagedRun(runId: string, artifact: "latest" | "best") {
+    await watchRun(runId, artifact);
   }
 
   return (
@@ -139,7 +291,7 @@ export function App() {
           activeId={activeTabId}
           items={workspaceTabs}
           variant="workspace"
-          onClose={(id) => closeDraftEditor(id as DraftEditorSession["sessionId"])}
+          onClose={(id) => closeWorkspaceTab(id)}
           onSelect={(id) => setActiveTabId(id)}
         />
       </div>
@@ -156,12 +308,44 @@ export function App() {
             onOpenDraft={openDraft}
           />
         ) : null}
-        {!isLoading && activeTabId === "runs" && selectedRun === null ? (
-          <RunsPanel runs={runs} onOpenRun={openRun} />
+        {!isLoading && activeTabId === "runs" ? (
+          <RunsPanel
+            drafts={drafts}
+            runs={runs}
+            onDeleteLineage={removeLineage}
+            onDeleteRun={removeRun}
+            onOpenRun={openRun}
+            onResumeRun={(run) => resumeManagedRun(run.id)}
+            onStopRun={(run) => stopManagedRun(run.id)}
+          />
         ) : null}
-        {!isLoading && activeTabId === "runs" && selectedRun !== null ? (
-          <RunInspector run={selectedRun} />
+        {!isLoading && activeTabId === "charts" ? (
+          <ChartsPanel focusedRunId={chartsFocusRunId} onOpenRun={openRun} runs={runs} />
         ) : null}
+        {!isLoading && activeRunTab !== null && metadata !== null
+          ? runTabs.map((session) => {
+              const run = runs.find((candidate) => candidate.id === session.runId) ?? null;
+              return (
+                <div hidden={activeTabId !== session.sessionId} key={session.sessionId}>
+                  {run === null ? (
+                    <Notice tone="error">This run is no longer available.</Notice>
+                  ) : (
+                    <RunWorkspace
+                      metadata={metadata}
+                      run={run}
+                      onOpenDirectory={openManagedRunDirectory}
+                      onFork={forkManagedRun}
+                      onRename={renameManagedRun}
+                      onResume={resumeManagedRun}
+                      onShowCharts={showRunCharts}
+                      onStop={stopManagedRun}
+                      onWatch={watchManagedRun}
+                    />
+                  )}
+                </div>
+              );
+            })
+          : null}
         {!isLoading && activeDraftEditor !== null ? (
           defaultConfig !== null && metadata !== null ? (
             draftEditors.map((session) => (
@@ -169,10 +353,16 @@ export function App() {
                 <Configurator
                   baseConfig={defaultConfig}
                   existingNames={reservedNamesForSession(session.sessionId)}
+                  forkSourceArtifact={session.forkSource?.artifact ?? null}
+                  forkSourceRunLabel={forkSourceRunLabel(session.forkSource)}
                   initialDraftName={session.initialDraftName}
+                  initialConfig={session.initialConfig}
                   loadedDraft={session.loadedDraft}
                   metadata={metadata}
                   onDraftNameChange={(name) => setDraftEditorTitle(session.sessionId, name)}
+                  onLaunchRun={(name, config, draftId) =>
+                    launchTrainingRun(session.sessionId, name, config, draftId)
+                  }
                   onSaveDraft={(name, config) => saveDraft(session.sessionId, name, config)}
                   onUpdateDraft={(id, name, config) =>
                     updateExistingDraft(session.sessionId, id, name, config)
@@ -198,7 +388,9 @@ export function App() {
             ...current,
             {
               draftId: draft.id,
+              forkSource: draftForkSource(draft),
               initialDraftName: draft.name,
+              initialConfig: null,
               loadedDraft: draft,
               sessionId,
               title: draft.name,
@@ -209,8 +401,18 @@ export function App() {
   }
 
   function openRun(run: ManagedRun) {
-    setSelectedRunId(run.id);
-    setActiveTabId("runs");
+    const sessionId = runSessionId(run.id);
+    setRunTabs((current) =>
+      current.some((session) => session.sessionId === sessionId)
+        ? current
+        : [...current, { runId: run.id, sessionId, title: run.name }],
+    );
+    setActiveTabId(sessionId);
+  }
+
+  function showRunCharts(runId: string) {
+    setChartsFocusRunId(runId);
+    setActiveTabId("charts");
   }
 
   function createNewDraft() {
@@ -218,7 +420,15 @@ export function App() {
     const initialDraftName = nextAvailableDraftName(defaultDraftName(), allKnownNames());
     setDraftEditors((current) => [
       ...current,
-      { draftId: null, initialDraftName, loadedDraft: null, sessionId, title: initialDraftName },
+      {
+        draftId: null,
+        forkSource: null,
+        initialDraftName,
+        initialConfig: null,
+        loadedDraft: null,
+        sessionId,
+        title: initialDraftName,
+      },
     ]);
     setActiveTabId(sessionId);
   }
@@ -234,6 +444,55 @@ export function App() {
       const fallbackSession =
         remaining[closingIndex - 1] ?? remaining[closingIndex] ?? remaining.at(-1) ?? null;
       setActiveTabId(fallbackSession?.sessionId ?? "drafts");
+    }
+  }
+
+  function closeRunTab(sessionId: RunSession["sessionId"]) {
+    const closingIndex = runTabs.findIndex((session) => session.sessionId === sessionId);
+    if (closingIndex === -1) {
+      return;
+    }
+    const remaining = runTabs.filter((session) => session.sessionId !== sessionId);
+    setRunTabs(remaining);
+    if (activeTabId === sessionId) {
+      const fallbackSession =
+        remaining[closingIndex - 1] ?? remaining[closingIndex] ?? remaining.at(-1) ?? null;
+      setActiveTabId(fallbackSession?.sessionId ?? "runs");
+    }
+  }
+
+  function closeRunTabsForRun(runId: string) {
+    closeRunTabsForRuns([runId]);
+  }
+
+  function closeRunTabsForRuns(runIds: readonly string[]) {
+    if (runIds.length === 0) {
+      return;
+    }
+    const runIdSet = new Set(runIds);
+    const removedSessions = runTabs.filter((session) => runIdSet.has(session.runId));
+    if (removedSessions.length === 0) {
+      return;
+    }
+    const removedIds = new Set(removedSessions.map((session) => session.sessionId));
+    const remaining = runTabs.filter((session) => !removedIds.has(session.sessionId));
+    setRunTabs(remaining);
+    if (removedIds.has(activeTabId as RunSession["sessionId"])) {
+      setActiveTabId("runs");
+    }
+  }
+
+  function closeWorkspaceTab(id: WorkspaceTabId) {
+    if (id === "charts") {
+      setActiveTabId("runs");
+      return;
+    }
+    if (id.startsWith("editor:")) {
+      closeDraftEditor(id as DraftEditorSession["sessionId"]);
+      return;
+    }
+    if (id.startsWith("run:")) {
+      closeRunTab(id as RunSession["sessionId"]);
     }
   }
 
@@ -255,6 +514,8 @@ export function App() {
         changed =
           updated.title !== session.title ||
           updated.initialDraftName !== session.initialDraftName ||
+          updated.initialConfig !== session.initialConfig ||
+          updated.forkSource !== session.forkSource ||
           updated.draftId !== session.draftId ||
           updated.loadedDraft !== session.loadedDraft;
         return changed ? updated : session;
@@ -276,13 +537,43 @@ export function App() {
     }
   }
 
+  function closeEditorsForSourceRuns(runIds: readonly string[]) {
+    if (runIds.length === 0) {
+      return;
+    }
+    const sourceRunIds = new Set(runIds);
+    const removedSessionIds = new Set(
+      draftEditors
+        .filter((session) => {
+          const sourceRunId =
+            session.loadedDraft?.source_run_id ?? session.forkSource?.runId ?? null;
+          return sourceRunId !== null && sourceRunIds.has(sourceRunId);
+        })
+        .map((session) => session.sessionId),
+    );
+    if (removedSessionIds.size === 0) {
+      return;
+    }
+    setDraftEditors((current) =>
+      current.filter((session) => !removedSessionIds.has(session.sessionId)),
+    );
+    if (removedSessionIds.has(activeTabId as DraftEditorSession["sessionId"])) {
+      setActiveTabId("drafts");
+    }
+  }
+
+  function forkSourceRunLabel(source: ForkSource | null) {
+    if (source === null) {
+      return null;
+    }
+    const run = runs.find((candidate) => candidate.id === source.runId) ?? null;
+    return run?.name ?? source.runId;
+  }
+
   function reservedNamesForSession(sessionId: DraftEditorSession["sessionId"]) {
     const names = new Set<string>();
     for (const draft of drafts) {
       names.add(draft.name);
-    }
-    for (const run of runs) {
-      names.add(run.name);
     }
     for (const session of draftEditors) {
       if (session.sessionId !== sessionId) {
@@ -309,6 +600,10 @@ export function App() {
 
 function editorSessionId(seed: string): `editor:${string}` {
   return `editor:${seed}`;
+}
+
+function runSessionId(seed: string): `run:${string}` {
+  return `run:${seed}`;
 }
 
 function normalizeDraftTabTitle(title: string) {
@@ -344,4 +639,26 @@ function compareDrafts(left: ManagedDraft, right: ManagedDraft) {
     return right.updated_at.localeCompare(left.updated_at);
   }
   return right.id.localeCompare(left.id);
+}
+
+function upsertRun(current: ManagedRun[], nextRun: ManagedRun) {
+  const withoutPrevious = current.filter((run) => run.id !== nextRun.id);
+  return [nextRun, ...withoutPrevious].sort(compareRuns);
+}
+
+function compareRuns(left: ManagedRun, right: ManagedRun) {
+  if (left.created_at !== right.created_at) {
+    return right.created_at.localeCompare(left.created_at);
+  }
+  return right.id.localeCompare(left.id);
+}
+
+function draftForkSource(draft: ManagedDraft): ForkSource | null {
+  if (draft.source_run_id === null || draft.source_artifact === null) {
+    return null;
+  }
+  return {
+    runId: draft.source_run_id,
+    artifact: draft.source_artifact,
+  };
 }

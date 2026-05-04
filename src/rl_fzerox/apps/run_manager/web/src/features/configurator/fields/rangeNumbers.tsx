@@ -344,6 +344,10 @@ export function OptionalNumberField({
   min = 0,
   resetValue,
   step = "0.01",
+  enabledLabel = "On",
+  nullLabel = "Off",
+  sliderNullPosition = "none",
+  sliderNullTickLabel = "∞",
 }: {
   help: string;
   label: string;
@@ -354,14 +358,40 @@ export function OptionalNumberField({
   min?: number;
   resetValue?: number | null;
   step?: string;
+  enabledLabel?: string;
+  nullLabel?: string;
+  sliderNullPosition?: "none" | "max";
+  sliderNullTickLabel?: string;
 }) {
   const enabled = value !== null;
-  const sliderValue = enabled ? value : defaultValue;
+  const sliderStep = Number(step);
+  const sliderSupportsNullAtMax =
+    sliderNullPosition === "max" && Number.isFinite(sliderStep) && sliderStep > 0;
+  const sliderMax = sliderSupportsNullAtMax ? max + sliderStep : max;
+  const sliderValue = enabled ? value : sliderMax;
+  const sliderDisabled = !enabled && !sliderSupportsNullAtMax;
+  const sliderTicks = sliderSupportsNullAtMax
+    ? [
+        { value: min, label: formatCompactDecimal(min) },
+        { value: sliderMax, label: sliderNullTickLabel },
+      ]
+    : [
+        { value: min, label: formatCompactDecimal(min) },
+        { value: max, label: formatCompactDecimal(max) },
+      ];
+
+  function updateFromSlider(nextValue: number) {
+    if (sliderSupportsNullAtMax && nextValue >= sliderMax) {
+      onChange(null);
+      return;
+    }
+    onChange(nextValue);
+  }
 
   return (
     <div className="field-shell optional-number-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <div className={enabled ? "optional-number-row" : "optional-number-row disabled"}>
+      <div className={sliderDisabled ? "optional-number-row disabled" : "optional-number-row"}>
         <button
           aria-label={`${label} enabled`}
           aria-pressed={enabled}
@@ -370,21 +400,18 @@ export function OptionalNumberField({
           onClick={() => onChange(enabled ? null : defaultValue)}
         >
           <span aria-hidden="true" />
-          <strong>{enabled ? "On" : "Off"}</strong>
+          <strong>{enabled ? enabledLabel : nullLabel}</strong>
         </button>
         <Slider
           ariaLabel={`${label} slider`}
-          disabled={!enabled}
-          max={max}
+          disabled={sliderDisabled}
+          max={sliderMax}
           min={min}
-          step={Number(step)}
-          ticks={[
-            { value: min, label: formatCompactDecimal(min) },
-            { value: max, label: formatCompactDecimal(max) },
-          ]}
-          value={clamp(sliderValue, min, max)}
-          valueLabel={String(enabled ? value : defaultValue)}
-          onChange={onChange}
+          step={sliderStep}
+          ticks={sliderTicks}
+          value={clamp(sliderValue, min, sliderMax)}
+          valueLabel={enabled ? formatDecimalInput(value, step) : nullLabel}
+          onChange={updateFromSlider}
         />
         <input
           aria-label={label}
@@ -393,7 +420,7 @@ export function OptionalNumberField({
           min={min}
           step={step}
           type="number"
-          value={enabled ? value : defaultValue}
+          value={enabled ? formatDecimalInput(value, step) : ""}
           onChange={(event) => onChange(Number(event.target.value))}
         />
       </div>
