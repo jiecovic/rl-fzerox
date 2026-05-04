@@ -404,6 +404,34 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_num_timesteps == 660_000
 
 
+def test_policy_runner_prefers_lineage_checkpoint_timesteps(tmp_path: Path) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        _FakePolicy([2, 0]),
+    )
+
+    metadata_path = policy_artifact_metadata_path(policy_path)
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "num_timesteps": 660_000,
+                "lineage_num_timesteps": 14_820_470,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runner.refresh()
+
+    assert runner.checkpoint_num_timesteps == 14_820_470
+
+
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"

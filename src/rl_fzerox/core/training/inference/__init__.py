@@ -38,6 +38,7 @@ class LoadedPolicy:
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
     num_timesteps: int | None = None
+    lineage_num_timesteps: int | None = None
 
 
 class PolicyRunner:
@@ -93,9 +94,9 @@ class PolicyRunner:
 
     @property
     def checkpoint_num_timesteps(self) -> int | None:
-        """Return the total timesteps saved with the current checkpoint, if any."""
+        """Return the lineage-aware experience saved with the current checkpoint, if any."""
 
-        return self._loaded_policy.num_timesteps
+        return self._loaded_policy.lineage_num_timesteps or self._loaded_policy.num_timesteps
 
     @property
     def supports_action_masks(self) -> bool:

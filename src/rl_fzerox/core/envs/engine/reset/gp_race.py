@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
-from rl_fzerox.core.training.runs.baseline_race_start import RACE_DEFAULTS
-
-from ..info import read_live_telemetry
-from .tracks import SelectedTrack
+from rl_fzerox.core.envs.engine.info import read_live_telemetry
+from rl_fzerox.core.envs.engine.reset.tracks import SelectedTrack
 
 
 def retarget_gp_race_baseline(
@@ -15,7 +12,7 @@ def retarget_gp_race_baseline(
     telemetry: FZeroXTelemetry | None,
     info: dict[str, object],
 ) -> FZeroXTelemetry | None:
-    """Patch one loaded GP baseline to the selected track setup."""
+    """Patch engine only on one exact GP course+vehicle baseline."""
 
     if not _needs_gp_race_retarget(selected_track):
         return telemetry
@@ -25,22 +22,15 @@ def retarget_gp_race_baseline(
         raise ValueError("gp_race retarget requires selected_track.vehicle")
     if selected_track.engine_setting_raw_value is None:
         raise ValueError("gp_race retarget requires selected_track.engine_setting_raw_value")
+    if selected_track.course_index != selected_track.source_course_index:
+        raise RuntimeError("gp baseline course mismatch; stale exact baseline")
+    if selected_track.vehicle != selected_track.source_vehicle:
+        raise RuntimeError("gp baseline vehicle mismatch; stale exact baseline")
 
-    vehicle = vehicle_by_id(selected_track.vehicle)
-    total_lap_count = (
-        int(telemetry.total_lap_count) if telemetry is not None else RACE_DEFAULTS.lap_count
+    backend.patch_engine_settings(
+        mode="gp_race",
+        engine_setting_raw_value=int(selected_track.engine_setting_raw_value),
     )
-    patch_kwargs = {
-        "mode": "gp_race",
-        "course_index": int(selected_track.course_index),
-        "character_index": int(vehicle.character_index),
-        "machine_skin_index": int(RACE_DEFAULTS.machine_skin_index),
-        "engine_setting_raw_value": int(selected_track.engine_setting_raw_value),
-        "total_lap_count": total_lap_count,
-    }
-    backend.patch_machine_settings(**patch_kwargs)
-    backend.patch_race_start_setup(**patch_kwargs)
-    backend.force_race_reinit(mode="gp_race")
     info["track_gp_race_retargeted"] = True
     info["track_source_vehicle"] = selected_track.source_vehicle
     info["track_source_engine_setting"] = selected_track.source_engine_setting
@@ -52,7 +42,5 @@ def _needs_gp_race_retarget(selected_track: SelectedTrack) -> bool:
     if selected_track.mode != "gp_race":
         return False
     return bool(
-        selected_track.course_index != selected_track.source_course_index
-        or selected_track.vehicle != selected_track.source_vehicle
-        or selected_track.engine_setting_raw_value != selected_track.source_engine_setting_raw_value
+        selected_track.engine_setting_raw_value != selected_track.source_engine_setting_raw_value
     )

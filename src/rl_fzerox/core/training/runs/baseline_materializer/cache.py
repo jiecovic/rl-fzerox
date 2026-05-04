@@ -8,13 +8,12 @@ import shutil
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import asdict
 from pathlib import Path
 
 from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.paths import RunPaths
 
-from .models import BaselineMaterializerContext, BaselineRequest
+from .models import BaselineMaterializerContext
 from .settings import BASELINE_MATERIALIZER_SETTINGS
 
 
@@ -40,85 +39,68 @@ def cache_write_lock(cache_state_path: Path) -> Iterator[None]:
         shutil.rmtree(lock_path, ignore_errors=True)
 
 
-def cache_payload(
-    request: BaselineRequest,
+def course_vehicle_cache_payload(
     *,
-    materializer_mode: str,
+    mode: str,
+    course_index: int,
+    vehicle_id: str,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+    context: BaselineMaterializerContext,
+) -> dict[str, object]:
+    defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
+    vehicle = vehicle_by_id(vehicle_id)
+    return {
+        "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
+        "materializer_mode": f"course_vehicle_seed_{mode}",
+        "mode": mode,
+        "renderer": context.renderer,
+        "course_index": course_index,
+        "vehicle": vehicle_id,
+        "vehicle_character_index": vehicle.character_index,
+        "vehicle_menu_slot": vehicle.machine_select_slot,
+        "engine_setting_raw_value": defaults.engine_setting_raw_value,
+        "camera_setting": camera_setting,
+        "race_intro_target_timer": race_intro_target_timer,
+    }
+
+
+def generic_mode_cache_payload(
+    *,
+    mode: str,
     context: BaselineMaterializerContext,
 ) -> dict[str, object]:
     return {
         "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
-        "materializer_mode": materializer_mode,
-        "target": target_variant_cache_data(request, context=context),
-    }
-
-
-def target_variant_cache_data(
-    request: BaselineRequest,
-    *,
-    context: BaselineMaterializerContext,
-) -> dict[str, object]:
-    course_index = (
-        request.source_course_index
-        if request.source_course_index is not None
-        else request.course_index
-    )
-    vehicle_id = request.source_vehicle if request.source_vehicle is not None else request.vehicle
-    engine_setting = (
-        request.source_engine_setting
-        if request.source_engine_setting is not None
-        else request.engine_setting
-    )
-    engine_setting_raw_value = (
-        request.source_engine_setting_raw_value
-        if request.source_engine_setting_raw_value is not None
-        else request.engine_setting_raw_value
-    )
-    payload = {
-        "camera_setting": request.camera_setting,
-        "course_id": request.course_id,
-        "course_index": course_index,
-        "engine_setting": engine_setting,
-        "engine_setting_raw_value": engine_setting_raw_value,
-        "mode": request.mode,
-        "race_intro_target_timer": context.race_intro_target_timer,
+        "materializer_mode": f"generic_mode_seed_{mode}",
+        "mode": mode,
         "renderer": context.renderer,
-        "vehicle": vehicle_id,
     }
-    if vehicle_id is not None:
-        vehicle = vehicle_by_id(vehicle_id)
-        payload["vehicle_character_index"] = vehicle.character_index
-        payload["vehicle_menu_slot"] = vehicle.machine_select_slot
-    return payload
-
-
-def cache_metadata(
-    request: BaselineRequest,
-    *,
-    cache_payload: dict[str, object],
-    cache_key: str,
-    materializer_mode: str,
-    materialized_state_sha256: str,
-) -> dict[str, object]:
-    return {
-        **cache_payload,
-        "cache_key": cache_key,
-        "materializer_mode": materializer_mode,
-        "materialized_state_sha256": materialized_state_sha256,
-        "request": request_metadata(request),
-    }
-
-
-def request_metadata(request: BaselineRequest) -> dict[str, object]:
-    request_data = asdict(request)
-    if request.source_state_path is not None:
-        request_data["source_state_path"] = str(request.source_state_path)
-    return request_data
 
 
 def run_state_path(run_paths: RunPaths, *, label: str, cache_key: str) -> Path:
     safe_label = safe_filename(label or "baseline")
     return run_paths.baselines_dir / f"{safe_label}__{cache_key[:12]}.state"
+
+
+def generic_mode_state_path(cache_root: Path, *, mode: str, cache_key: str) -> Path:
+    safe_mode = safe_filename(mode or "generic")
+    return cache_root / "generic" / f"{safe_mode}__{cache_key[:12]}.state"
+
+
+def course_vehicle_state_path(cache_root: Path, *, label: str, cache_key: str) -> Path:
+    safe_label = safe_filename(label or "course_vehicle")
+    return cache_root / "course_vehicle" / f"{safe_label}__{cache_key[:12]}.state"
+
+
+def link_or_copy_file(source_path: Path, destination_path: Path) -> None:
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    if destination_path.exists():
+        destination_path.unlink()
+    try:
+        os.link(source_path, destination_path)
+    except OSError:
+        shutil.copy2(source_path, destination_path)
 
 
 def safe_filename(value: str) -> str:

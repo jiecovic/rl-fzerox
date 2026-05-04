@@ -66,6 +66,7 @@ def apply_dynamic_control_gates(
     control_state: ControllerState,
     *,
     mask_controller: ActionMaskController,
+    mask_air_brake_on_ground: bool,
     continuous_air_brake_mode: ContinuousAirBrakeMode,
     last_telemetry: FZeroXTelemetry | None,
 ) -> ControllerState:
@@ -115,4 +116,6 @@ def apply_dynamic_control_gates(
 
     if last_telemetry is None or last_telemetry.player.airborne:
         return control_state
-    return with_left_stick_y(without_joypad_mask(control_state, AIR_BRAKE_MASK), 0.0)
+    if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
+        control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
+    return with_left_stick_y(control_state, 0.0)

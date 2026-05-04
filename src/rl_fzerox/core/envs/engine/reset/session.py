@@ -13,7 +13,7 @@ from ..info import (
     has_custom_baseline,
     read_live_telemetry,
 )
-from .camera import sync_camera_setting
+from .camera import CAMERA_SYNC_CONTROLS, sync_camera_setting
 from .race import load_track_baseline, reset_race_state
 from .seeding import EngineResetSeeds
 from .tracks import (
@@ -128,17 +128,13 @@ class EngineResetCoordinator:
 
         uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-        telemetry = sync_camera_setting(
+        telemetry = sync_reset_presentation(
             self._backend,
-            target_name=self._config.camera_setting,
+            camera_setting=self._config.camera_setting,
+            race_intro_target_timer=self._config.race_intro_target_timer,
             telemetry=telemetry,
             info=info,
         )
-        race_intro_info, telemetry = sync_race_intro_target(
-            self._backend,
-            target_timer=self._config.race_intro_target_timer,
-        )
-        info.update(race_intro_info)
         info.update(backend_step_info(self._backend))
         return EngineResetResult(
             selected_track=selected_track,
@@ -202,3 +198,60 @@ class EngineResetCoordinator:
         info["rng_seed"] = rng_seed
         info["rng_state"] = rng_state
         return read_live_telemetry(self._backend) or telemetry
+
+
+def sync_reset_presentation(
+    backend: EmulatorBackend,
+    *,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+    telemetry: FZeroXTelemetry | None,
+    info: dict[str, object],
+) -> FZeroXTelemetry | None:
+    camera_ready_timer = _camera_ready_intro_timer(
+        camera_setting=camera_setting,
+        race_intro_target_timer=race_intro_target_timer,
+    )
+    if camera_ready_timer is not None:
+        _, telemetry = sync_race_intro_target(
+            backend,
+            target_timer=camera_ready_timer,
+        )
+    telemetry = sync_camera_setting(
+        backend,
+        target_name=_validated_camera_setting(camera_setting),
+        telemetry=telemetry,
+        info=info,
+    )
+    race_intro_info, telemetry = sync_race_intro_target(
+        backend,
+        target_timer=race_intro_target_timer,
+    )
+    info.update(race_intro_info)
+    return telemetry
+
+
+def _camera_ready_intro_timer(
+    *,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+) -> int | None:
+    if camera_setting is None:
+        return race_intro_target_timer
+    if race_intro_target_timer is None:
+        return CAMERA_SYNC_CONTROLS.ready_intro_timer
+    return max(race_intro_target_timer, CAMERA_SYNC_CONTROLS.ready_intro_timer)
+
+
+def _validated_camera_setting(camera_setting: str | None):
+    if camera_setting is None:
+        return None
+    if camera_setting == "overhead":
+        return "overhead"
+    if camera_setting == "close_behind":
+        return "close_behind"
+    if camera_setting == "regular":
+        return "regular"
+    if camera_setting == "wide":
+        return "wide"
+    raise ValueError(f"Unsupported camera setting {camera_setting!r}")

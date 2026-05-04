@@ -8,16 +8,26 @@ from pathlib import Path
 
 from fzerox_emulator import Emulator
 from rl_fzerox.core.config.schema import TrainAppConfig
-from rl_fzerox.core.training.runs.baseline_race_start import (
-    materialize_race_start_from_boot,
+from rl_fzerox.core.training.runs.baseline_materializer.materialization import (
+    materialize_baseline_impl,
+    materialize_run_baselines_impl,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.models import (
+    BaselineArtifact,
+    BaselineMaterializerContext,
+    BaselineRequest,
+)
+from rl_fzerox.core.training.runs.baseline_materializer.settings import (
+    BASELINE_MATERIALIZER_SETTINGS,
+    BaselineMaterializerSettings,
 )
 from rl_fzerox.core.training.runs.paths import RunPaths
-
-from .materialize import materialize_baseline_impl, materialize_run_baselines_impl
-from .models import BaselineArtifact, BaselineMaterializerContext, BaselineRequest
-from .settings import BASELINE_MATERIALIZER_SETTINGS, BaselineMaterializerSettings
-
-_RaceStartMaterializer = Callable[..., None]
+from rl_fzerox.core.training.runs.race_start import (
+    materialize_generic_mode_seed,
+    materialize_race_start_from_boot,
+    materialize_race_start_from_menu_seed,
+    materialize_race_start_state,
+)
 
 
 def materialize_run_baselines(
@@ -35,7 +45,8 @@ def materialize_run_baselines(
         cache_root=cache_root,
         startup_reporter=startup_reporter,
         emulator_type=Emulator,
-        race_start_materializer=materialize_race_start_from_boot,
+        generic_mode_seed_materializer=materialize_generic_mode_seed,
+        menu_seed_race_start_materializer=materialize_race_start_from_menu_seed,
     )
 
 
@@ -46,7 +57,7 @@ def materialize_baseline(
     cache_root: Path,
     context: BaselineMaterializerContext,
 ) -> BaselineArtifact:
-    """Ensure one generated baseline exists in cache and copy it into the run."""
+    """Ensure one generated baseline exists in cache and link it into the run."""
 
     return materialize_baseline_impl(
         request,
@@ -54,7 +65,8 @@ def materialize_baseline(
         cache_root=cache_root,
         context=context,
         emulator_type=Emulator,
-        race_start_materializer=materialize_race_start_from_boot,
+        generic_mode_seed_materializer=materialize_generic_mode_seed,
+        menu_seed_race_start_materializer=materialize_race_start_from_menu_seed,
     )
 
 
@@ -66,6 +78,9 @@ __all__ = [
     "BaselineRequest",
     "Emulator",
     "materialize_baseline",
+    "materialize_generic_mode_seed",
     "materialize_run_baselines",
     "materialize_race_start_from_boot",
+    "materialize_race_start_from_menu_seed",
+    "materialize_race_start_state",
 ]

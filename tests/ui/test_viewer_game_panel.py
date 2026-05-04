@@ -612,6 +612,46 @@ def test_records_section_groups_track_pool_by_cup() -> None:
     ]
 
 
+def test_records_section_dedupes_course_variants_to_one_course_row() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0, "track_course_id": "mute_city"},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        best_finish_times={"mute_city": 88_000},
+        track_pool_records=(
+            {
+                "track_id": "mute_city_blue_falcon",
+                "track_course_id": "mute_city",
+                "track_course_name": "Mute City",
+                "track_vehicle": "blue_falcon",
+            },
+            {
+                "track_id": "mute_city_fire_stingray",
+                "track_course_id": "mute_city",
+                "track_course_name": "Mute City",
+                "track_vehicle": "fire_stingray",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    headings = [line.label for line in records_section.lines if line.heading]
+
+    assert headings == ["> Mute City"]
+
+
 def test_records_section_highlights_current_track_heading() -> None:
     columns = _build_panel_columns(
         episode=0,

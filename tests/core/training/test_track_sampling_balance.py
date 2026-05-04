@@ -102,6 +102,30 @@ def test_step_balance_controller_can_log_detailed_distribution_shares() -> None:
     assert "track_sampling/silence/ema_episode_frames" not in values
 
 
+def test_step_balance_controller_tracks_finished_episode_counts() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"mute": 1.0, "silence": 1.0},
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+    )
+
+    controller.record_episodes(
+        (
+            {"track_id": "mute", "episode_step": 100, "termination_reason": "finished"},
+            {"track_id": "silence", "episode_step": 400, "termination_reason": "stalled"},
+        )
+    )
+
+    runtime = controller.runtime_state()
+
+    assert {entry.track_id: entry.finished_episode_count for entry in runtime.entries} == {
+        "mute": 1,
+        "silence": 0,
+    }
+
+
 def test_step_balance_controller_builds_from_env_config() -> None:
     controller = StepBalancedTrackSamplingController.from_configs(
         env_config=EnvConfig(
@@ -179,12 +203,56 @@ def test_step_balance_controller_aggregates_duplicate_courses() -> None:
         curriculum_config=CurriculumConfig(),
     )
 
-    assert controller is not None
-    values = controller.log_values()
+    assert controller is None
 
-    assert values["track_sampling/big_blue/prob"] == pytest.approx(1.0)
-    assert "track_sampling/big_blue_time_attack_blue_falcon_balanced/prob" not in values
-    assert "track_sampling/big_blue_gp_blue_falcon_balanced/prob" not in values
+
+def test_step_balance_controller_aggregates_duplicate_course_entries() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={
+            "mute_blue_falcon": 1.0,
+            "mute_white_cat": 1.0,
+            "silence_blue_falcon": 1.0,
+        },
+        action_repeat=1,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        track_course_keys={
+            "mute_blue_falcon": "mute_city",
+            "mute_white_cat": "mute_city",
+            "silence_blue_falcon": "silence",
+        },
+        track_log_keys={
+            "mute_blue_falcon": "mute_city",
+            "mute_white_cat": "mute_city",
+            "silence_blue_falcon": "silence",
+        },
+        track_labels={
+            "mute_blue_falcon": "Mute City",
+            "mute_white_cat": "Mute City",
+            "silence_blue_falcon": "Silence",
+        },
+    )
+
+    weights = controller.record_episodes(
+        (
+            {"track_id": "mute_blue_falcon", "episode_step": 100},
+            {"track_id": "silence_blue_falcon", "episode_step": 400},
+        )
+    )
+
+    assert weights is not None
+    assert weights["mute_blue_falcon"] == pytest.approx(weights["mute_white_cat"])
+    assert weights["mute_blue_falcon"] + weights["mute_white_cat"] > weights["silence_blue_falcon"]
+    runtime = controller.runtime_state()
+    assert {entry.track_id: entry.completed_frames for entry in runtime.entries} == {
+        "mute_city": 100,
+        "silence": 400,
+    }
+    assert {entry.track_id: entry.episode_count for entry in runtime.entries} == {
+        "mute_city": 1,
+        "silence": 1,
+    }
 
 
 def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) -> None:
@@ -199,8 +267,8 @@ def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) ->
     )
     controller.record_episodes(
         (
-            {"track_id": "mute", "episode_step": 100},
-            {"track_id": "silence", "episode_step": 400},
+            {"track_id": "mute", "episode_step": 100, "termination_reason": "finished"},
+            {"track_id": "silence", "episode_step": 400, "termination_reason": "stalled"},
         )
     )
     state_path = tmp_path / "track_sampling_state.json"
@@ -223,10 +291,18 @@ def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) ->
     assert restored.current_weights() == pytest.approx(controller.current_weights())
     restored_runtime = restored.runtime_state()
     assert {entry.track_id: entry.completed_frames for entry in restored_runtime.entries} == {
-        "mute": 100,
+        "mute_city": 100,
         "silence": 400,
     }
     assert {entry.track_id: entry.episode_count for entry in restored_runtime.entries} == {
-        "mute": 1,
+        "mute_city": 1,
+        "silence": 1,
+    }
+    assert {entry.track_id: entry.finished_episode_count for entry in restored_runtime.entries} == {
+        "mute_city": 1,
+        "silence": 0,
+    }
+    assert {entry.track_id: entry.success_sample_count for entry in restored_runtime.entries} == {
+        "mute_city": 1,
         "silence": 1,
     }

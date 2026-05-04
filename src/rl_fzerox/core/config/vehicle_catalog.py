@@ -40,10 +40,25 @@ class VehicleInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class VehicleMenuGrid:
+    """Physical machine-select grid layout used by the stock vehicle menu."""
+
+    column_count: int = 6
+
+    def row_and_column(self, machine_select_slot: int) -> tuple[int, int]:
+        if machine_select_slot < 0:
+            raise ValueError(
+                f"machine_select_slot must be non-negative, got {machine_select_slot}"
+            )
+        return divmod(machine_select_slot, self.column_count)
+
+
+@dataclass(frozen=True, slots=True)
 class VehicleCatalog:
     """ROM/decomp-backed stable ids for stock machines and engine aliases."""
 
     generated_engine_prefix: str = "engine_"
+    menu_grid: VehicleMenuGrid = field(default_factory=VehicleMenuGrid)
     engine_presets: tuple[EngineSettingPreset, ...] = (
         EngineSettingPreset("max_acceleration", "Max Acceleration", 0),
         EngineSettingPreset("balanced", "Balanced", 50),
@@ -102,6 +117,12 @@ def known_vehicle_ids() -> tuple[str, ...]:
     """Return all stock vehicle ids accepted by config."""
 
     return tuple(vehicle.id for vehicle in CATALOG.vehicles)
+
+
+def vehicle_menu_row_and_column(machine_select_slot: int) -> tuple[int, int]:
+    """Return the row/column of one machine in the stock vehicle-select grid."""
+
+    return CATALOG.menu_grid.row_and_column(machine_select_slot)
 
 
 def resolve_engine_setting(raw_engine_setting: object, *, context: str) -> EngineSetting:

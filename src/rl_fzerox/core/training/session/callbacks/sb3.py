@@ -78,7 +78,11 @@ def build_callbacks(
                 model=self.model,
                 model_path=self._run_paths.latest_model_path,
                 policy_path=self._run_paths.latest_policy_path,
-                policy_metadata=current_policy_artifact_metadata(self.training_env, self.model),
+                policy_metadata=current_policy_artifact_metadata(
+                    self.training_env,
+                    self.model,
+                    lineage_step_offset=train_config.tensorboard_step_offset,
+                ),
             )
 
         def _save_recent(self) -> None:
@@ -89,7 +93,11 @@ def build_callbacks(
                 self.model,
                 self._run_paths,
                 num_timesteps=num_timesteps,
-                policy_metadata=current_policy_artifact_metadata(self.training_env, self.model),
+                policy_metadata=current_policy_artifact_metadata(
+                    self.training_env,
+                    self.model,
+                    lineage_step_offset=train_config.tensorboard_step_offset,
+                ),
             )
             trim_recent_checkpoint_artifacts(
                 self._run_paths,
@@ -113,7 +121,11 @@ def build_callbacks(
                 model=self.model,
                 model_path=self._run_paths.best_model_path,
                 policy_path=self._run_paths.best_policy_path,
-                policy_metadata=current_policy_artifact_metadata(self.training_env, self.model),
+                policy_metadata=current_policy_artifact_metadata(
+                    self.training_env,
+                    self.model,
+                    lineage_step_offset=train_config.tensorboard_step_offset,
+                ),
             )
 
         def _on_training_start(self) -> None:
