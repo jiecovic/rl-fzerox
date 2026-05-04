@@ -25,6 +25,20 @@ from rl_fzerox.core.training.inference.loader import (
     _load_saved_policy,
     _load_saved_policy_algorithm,
 )
+from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
+
+
+def _latest_policy_path(run_dir: Path) -> Path:
+    path = run_dir / RUN_LAYOUT.policy_artifacts.latest
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _latest_model_path(run_dir: Path) -> Path:
+    path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 class _FakePolicy:
@@ -137,7 +151,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     loaded_policy = LoadedPolicy(
@@ -168,7 +182,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
 
 
 def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     loaded_policy = LoadedPolicy(
@@ -184,7 +198,7 @@ def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> 
 
 
 def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakePolicy([2, 0])
 
@@ -204,7 +218,7 @@ def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> N
 
 
 def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -224,7 +238,7 @@ def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> Non
 
 
 def test_policy_runner_preserves_hybrid_action_dict(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -246,7 +260,7 @@ def test_policy_runner_preserves_hybrid_action_dict(tmp_path: Path) -> None:
 
 
 def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakeMaskablePolicy([2, 0])
 
@@ -271,7 +285,7 @@ def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) 
 
 
 def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakeRecurrentMaskablePolicy([2, 0])
 
@@ -313,7 +327,7 @@ def test_policy_runner_exposes_reload_error_until_success(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -356,7 +370,7 @@ def test_policy_runner_exposes_reload_error_until_success(
 
 
 def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     runner = PolicyRunner(
         LoadedPolicy(
@@ -371,7 +385,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_curriculum_stage is None
     assert runner.checkpoint_num_timesteps is None
 
-    metadata_path = tmp_path / "latest_policy.metadata.json"
+    metadata_path = policy_artifact_metadata_path(policy_path)
     metadata_path.write_text(
         json.dumps(
             {
@@ -610,9 +624,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -672,9 +686,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -738,9 +752,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_sac_runs
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -807,9 +821,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -845,7 +859,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
     }
 
 
-def test_artifact_kind_from_policy_path_uses_standard_prefixes() -> None:
-    assert _artifact_kind_from_policy_path(Path("latest_policy.zip")) == "latest"
-    assert _artifact_kind_from_policy_path(Path("best_policy.zip")) == "best"
-    assert _artifact_kind_from_policy_path(Path("final_policy.zip")) == "final"
+def test_artifact_kind_from_policy_path_uses_checkpoint_directory_names() -> None:
+    assert _artifact_kind_from_policy_path(Path("checkpoints/latest/policy.zip")) == "latest"
+    assert _artifact_kind_from_policy_path(Path("checkpoints/best/policy.zip")) == "best"
+    assert _artifact_kind_from_policy_path(Path("checkpoints/final/policy.zip")) == "final"

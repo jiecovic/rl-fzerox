@@ -33,6 +33,7 @@ class EngineObservationBuilder:
     state_components: StateComponentsSettings | None
     zeroed_state_components: tuple[str, ...]
     zeroed_state_features: tuple[str, ...]
+    excluded_state_features: tuple[str, ...]
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -57,6 +58,12 @@ class EngineObservationBuilder:
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
         )
+        excluded_state_features = _validated_excluded_state_features(
+            config=config,
+            state_components=state_components,
+            action_history_len=action_history_len,
+            action_history_controls=action_history_controls,
+        )
         space = build_observation_space(
             spec,
             frame_stack=config.observation.frame_stack,
@@ -69,6 +76,7 @@ class EngineObservationBuilder:
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             state_components=state_components,
+            excluded_state_features=excluded_state_features,
         )
         return cls(
             backend=backend,
@@ -77,6 +85,7 @@ class EngineObservationBuilder:
             state_components=state_components,
             zeroed_state_components=tuple(config.observation.zeroed_state_components),
             zeroed_state_features=zeroed_state_features,
+            excluded_state_features=excluded_state_features,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -114,6 +123,7 @@ class EngineObservationBuilder:
             state_components=self.state_components,
             zeroed_state_components=self.zeroed_state_components,
             zeroed_state_features=self.zeroed_state_features,
+            excluded_state_features=self.excluded_state_features,
             **control_state.observation_fields(),
         )
 
@@ -141,6 +151,7 @@ class EngineObservationBuilder:
             observation_state_components=self.state_components,
             observation_zeroed_state_components=self.zeroed_state_components,
             observation_zeroed_state_features=self.zeroed_state_features,
+            observation_excluded_state_features=self.excluded_state_features,
         )
 
 
@@ -175,3 +186,36 @@ def _validated_zeroed_state_features(
             f"{joined}"
         )
     return zeroed_state_features
+
+
+def _validated_excluded_state_features(
+    *,
+    config: EnvConfig,
+    state_components: StateComponentsSettings | None,
+    action_history_len: int | None,
+    action_history_controls: tuple[ActionHistoryControlName, ...],
+) -> tuple[str, ...]:
+    excluded_state_features = tuple(config.observation.excluded_state_features)
+    if not excluded_state_features:
+        return ()
+
+    active_features = set(
+        state_feature_names(
+            config.observation.state_profile,
+            course_context=config.observation.course_context,
+            ground_effect_context=config.observation.ground_effect_context,
+            action_history_len=action_history_len,
+            action_history_controls=action_history_controls,
+            state_components=state_components,
+        )
+    )
+    unknown_features = sorted(
+        feature for feature in excluded_state_features if feature not in active_features
+    )
+    if unknown_features:
+        joined = ", ".join(unknown_features)
+        raise ValueError(
+            "observation.excluded_state_features must reference active state features: "
+            f"{joined}"
+        )
+    return excluded_state_features

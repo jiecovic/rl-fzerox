@@ -58,19 +58,35 @@ def target_variant_cache_data(
     *,
     context: BaselineMaterializerContext,
 ) -> dict[str, object]:
+    course_index = (
+        request.source_course_index
+        if request.source_course_index is not None
+        else request.course_index
+    )
+    vehicle_id = request.source_vehicle if request.source_vehicle is not None else request.vehicle
+    engine_setting = (
+        request.source_engine_setting
+        if request.source_engine_setting is not None
+        else request.engine_setting
+    )
+    engine_setting_raw_value = (
+        request.source_engine_setting_raw_value
+        if request.source_engine_setting_raw_value is not None
+        else request.engine_setting_raw_value
+    )
     payload = {
         "camera_setting": request.camera_setting,
         "course_id": request.course_id,
-        "course_index": request.course_index,
-        "engine_setting": request.engine_setting,
-        "engine_setting_raw_value": request.engine_setting_raw_value,
+        "course_index": course_index,
+        "engine_setting": engine_setting,
+        "engine_setting_raw_value": engine_setting_raw_value,
         "mode": request.mode,
         "race_intro_target_timer": context.race_intro_target_timer,
         "renderer": context.renderer,
-        "vehicle": request.vehicle,
+        "vehicle": vehicle_id,
     }
-    if request.vehicle is not None:
-        vehicle = vehicle_by_id(request.vehicle)
+    if vehicle_id is not None:
+        vehicle = vehicle_by_id(vehicle_id)
         payload["vehicle_character_index"] = vehicle.character_index
         payload["vehicle_menu_slot"] = vehicle.machine_select_slot
     return payload

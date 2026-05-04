@@ -6,7 +6,7 @@ seed: 123
 
 emulator:
   baseline_state_path: null
-  renderer: angrylion
+  renderer: gliden64
 
 env:
   reset_to_race: true

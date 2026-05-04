@@ -36,6 +36,7 @@ def build_policy_kwargs(
             ),
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
+            "state_net_arch": policy_config.extractor.resolved_state_net_arch(),
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
             "layer_norm": policy_config.extractor.layer_norm,
         }

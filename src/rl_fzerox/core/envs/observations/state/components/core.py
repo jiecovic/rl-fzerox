@@ -40,10 +40,16 @@ class StateComponentDefinition:
 
 def state_vector_spec_from_components(
     state_components: StateComponentsSettings,
+    *,
+    excluded_state_features: Collection[str] = (),
 ) -> StateVectorSpec:
     features: list[StateFeature] = []
     for component in state_components:
-        features.extend(state_component_definition(component).features(component))
+        features.extend(
+            feature
+            for feature in state_component_definition(component).features(component)
+            if feature.name not in excluded_state_features
+        )
 
     return StateVectorSpec(
         features=tuple(features),
@@ -60,6 +66,7 @@ def component_state_values(
     state_components: StateComponentsSettings,
     zeroed_state_components: Collection[str] = (),
     zeroed_state_features: Collection[str] = (),
+    excluded_state_features: Collection[str] = (),
     action_history: Mapping[str, float],
     profile_fields: Mapping[str, float],
 ) -> list[float]:
@@ -80,6 +87,7 @@ def component_state_values(
         values.extend(
             0.0 if feature.name in zeroed_state_features else value
             for feature, value in zip(component_features, component_values, strict=True)
+            if feature.name not in excluded_state_features
         )
 
     return values

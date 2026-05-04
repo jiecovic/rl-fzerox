@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from stable_baselines3.common.vec_env import VecEnv
 
 
-def build_tensorboard_logger(run_paths: RunPaths):
+def build_tensorboard_logger(run_paths: RunPaths, *, step_offset: int = 0):
     """Create the SB3 TensorBoard logger for one training run."""
 
     try:
@@ -28,7 +28,21 @@ def build_tensorboard_logger(run_paths: RunPaths):
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    return sb3_logger.configure(str(run_paths.tensorboard_dir), ["tensorboard"])
+    logger = sb3_logger.configure(str(run_paths.tensorboard_dir), ["tensorboard"])
+    if step_offset <= 0:
+        return logger
+
+    class TensorboardStepOffsetLogger(sb3_logger.Logger):
+        """Apply one fixed global-step offset before SB3 writes TensorBoard events."""
+
+        def __init__(self, *, step_offset: int) -> None:
+            super().__init__(folder=logger.dir, output_formats=logger.output_formats)
+            self._step_offset = step_offset
+
+        def dump(self, step: int = 0) -> None:
+            super().dump(step + self._step_offset)
+
+    return TensorboardStepOffsetLogger(step_offset=step_offset)
 
 
 def print_training_startup(

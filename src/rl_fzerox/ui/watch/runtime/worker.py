@@ -116,6 +116,8 @@ def _run_simulation_loop(
         deterministic_policy = bool(config.watch.deterministic_policy)
         manual_control_enabled = policy_runner is None
         manual_control_state = ControllerState()
+        committed_policy_action: ActionValue | None = None
+        committed_action_mask_branches = env.action_mask_branches()
         cnn_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
@@ -130,8 +132,9 @@ def _run_simulation_loop(
             reset_info = dict(info)
             current_control_state = env.last_requested_control_state
             current_gas_level = env.last_gas_level
+            committed_action_mask_branches = env.action_mask_branches()
             boost_lamp_level = 0.0
-            current_policy_action: ActionValue | None = None
+            current_policy_action: ActionValue | None = committed_policy_action
             terminated = False
             truncated = False
             episode_reward = 0.0
@@ -238,6 +241,10 @@ def _run_simulation_loop(
                 previous_info = dict(info)
                 previous_episode_reward = episode_reward
                 previous_telemetry = _read_live_telemetry(emulator)
+                previous_control_state = current_control_state
+                previous_gas_level = current_gas_level
+                previous_policy_action = committed_policy_action
+                previous_action_mask_branches = committed_action_mask_branches
                 decision_action_mask = env.action_mask_snapshot()
                 if manual_control_enabled:
                     if single_frame_manual:
@@ -252,6 +259,7 @@ def _run_simulation_loop(
                     current_policy_action = None
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
+                    committed_policy_action = None
                     cnn_activations = None
                 else:
                     assert policy_runner is not None
@@ -285,6 +293,7 @@ def _run_simulation_loop(
                     display_frames = watch_step.display_frames
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
+                final_action_mask_branches = env.action_mask_branches()
                 if x_cup_info is not None:
                     info.update(x_cup_info)
                 live_telemetry = _read_live_telemetry(emulator)
@@ -336,16 +345,20 @@ def _run_simulation_loop(
                     final_info=info,
                     final_episode_reward=episode_reward,
                     final_telemetry=live_telemetry,
+                    previous_control_state=previous_control_state,
+                    previous_gas_level=previous_gas_level,
+                    previous_action_mask_branches=previous_action_mask_branches,
+                    previous_policy_action=previous_policy_action,
+                    final_control_state=current_control_state,
+                    final_gas_level=current_gas_level,
+                    final_action_mask_branches=final_action_mask_branches,
+                    final_policy_action=current_policy_action,
                     reset_info=reset_info,
                     episode=episode,
                     control_fps=control_rate.rate_hz(),
                     target_control_fps=target_control_fps,
                     target_control_seconds=target_control_seconds,
-                    control_state=current_control_state,
-                    gas_level=current_gas_level,
                     boost_lamp_level=boost_lamp_level,
-                    action_mask_branches=decision_action_mask.branches,
-                    policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
@@ -357,6 +370,8 @@ def _run_simulation_loop(
                     failed_track_attempts=failed_track_attempts,
                     manual_control_enabled=manual_control_enabled,
                 )
+                committed_policy_action = current_policy_action
+                committed_action_mask_branches = final_action_mask_branches
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)

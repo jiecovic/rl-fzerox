@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.runtime.cnn import CnnActivationLayer, CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PygameModule, PygameSurface, ViewerFonts
@@ -54,32 +54,94 @@ def _draw_cnn_tab(
             text="No F-Zero X CNN image extractor found for this policy.",
         )
 
+    layer_layout = _plan_layer_layout(
+        pygame=pygame,
+        fonts=fonts,
+        width=width,
+        available_height=max(1, screen.get_height() - y - LAYOUT.panel_padding),
+        layers=activations.layers,
+    )
     current_y = y
-    for layer in activations.layers:
-        label = (
-            f"{layer.name}  "
-            f"{layer.channel_count} x {layer.spatial_shape[0]} x {layer.spatial_shape[1]}"
-        )
-        label_surface = fonts.small.render(label, True, PALETTE.text_muted)
-        screen.blit(label_surface, (x, current_y))
-        current_y += label_surface.get_height() + LAYOUT.section_title_gap
+    for planned in layer_layout:
+        screen.blit(planned.label_surface, (x, current_y))
+        current_y += planned.label_surface.get_height() + LAYOUT.section_title_gap
 
-        surface = _rgb_surface(pygame, layer.image)
-        target_size = _scaled_size(surface.get_size(), max_width=width)
-        if target_size != surface.get_size():
-            surface = pygame.transform.scale(surface, target_size)
+        surface = planned.surface
+        if planned.target_size != surface.get_size():
+            surface = pygame.transform.scale(surface, planned.target_size)
         screen.blit(surface, (x, current_y))
         _draw_grid_overlay(
             pygame=pygame,
             screen=screen,
             x=x,
             y=current_y,
-            size=target_size,
-            grid_shape=layer.grid_shape,
-            used_tiles=layer.rendered_channel_count,
+            size=planned.target_size,
+            grid_shape=planned.layer.grid_shape,
+            used_tiles=planned.layer.rendered_channel_count,
         )
-        current_y += target_size[1] + LAYOUT.section_gap
+        current_y += planned.target_size[1] + LAYOUT.section_gap
     return current_y
+
+
+class _PlannedLayerDraw:
+    def __init__(
+        self,
+        *,
+        layer: CnnActivationLayer,
+        label_surface: PygameSurface,
+        surface: PygameSurface,
+        target_size: tuple[int, int],
+    ) -> None:
+        self.layer = layer
+        self.label_surface = label_surface
+        self.surface = surface
+        self.target_size = target_size
+
+
+def _plan_layer_layout(
+    *,
+    pygame: PygameModule,
+    fonts: ViewerFonts,
+    width: int,
+    available_height: int,
+    layers: tuple[CnnActivationLayer, ...],
+) -> tuple[_PlannedLayerDraw, ...]:
+    planned: list[_PlannedLayerDraw] = []
+    fixed_height = 0
+    image_height = 0
+    for layer in layers:
+        label = (
+            f"{layer.name}  "
+            f"{layer.channel_count} x {layer.spatial_shape[0]} x {layer.spatial_shape[1]}"
+        )
+        label_surface = fonts.small.render(label, True, PALETTE.text_muted)
+        surface = _rgb_surface(pygame, layer.image)
+        target_size = _scaled_size(surface.get_size(), max_width=width)
+        planned.append(
+            _PlannedLayerDraw(
+                layer=layer,
+                label_surface=label_surface,
+                surface=surface,
+                target_size=target_size,
+            )
+        )
+        fixed_height += label_surface.get_height() + LAYOUT.section_title_gap + LAYOUT.section_gap
+        image_height += target_size[1]
+
+    if not planned or image_height <= 0:
+        return tuple(planned)
+
+    remaining_image_height = max(1, available_height - fixed_height)
+    if image_height <= remaining_image_height:
+        return tuple(planned)
+
+    scale = remaining_image_height / float(image_height)
+    for item in planned:
+        item.target_size = (
+            max(1, round(item.target_size[0] * scale)),
+            max(1, round(item.target_size[1] * scale)),
+        )
+    return tuple(planned)
 
 
 def _draw_heading(

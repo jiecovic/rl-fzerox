@@ -136,6 +136,7 @@ class ObservationConfig(BaseModel):
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
     zeroed_state_components: tuple[ObservationStateComponentName, ...] = ()
     zeroed_state_features: tuple[str, ...] = ()
+    excluded_state_features: tuple[str, ...] = ()
 
     @field_validator("action_history_controls")
     @classmethod
@@ -180,6 +181,16 @@ class ObservationConfig(BaseModel):
             raise ValueError("observation.zeroed_state_features must not contain duplicates")
         return value
 
+    @field_validator("excluded_state_features")
+    @classmethod
+    def _validate_unique_excluded_state_features(
+        cls,
+        value: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("observation.excluded_state_features must not contain duplicates")
+        return value
+
     @model_validator(mode="after")
     def _validate_zeroed_state_components_are_active(self) -> ObservationConfig:
         if not self.zeroed_state_components:
@@ -198,6 +209,51 @@ class ObservationConfig(BaseModel):
             joined = ", ".join(unknown_names)
             raise ValueError(
                 "observation.zeroed_state_components must reference active state components: "
+                f"{joined}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_feature_overrides_are_active(self) -> ObservationConfig:
+        if self.state_components is None:
+            return self
+
+        from rl_fzerox.core.envs.observations.state.components import state_component_definition
+
+        active_names = {
+            feature.name
+            for component in self.state_components_data() or ()
+            for feature in state_component_definition(component).features(component)
+        }
+        unknown_zeroed = sorted(
+            feature_name
+            for feature_name in self.zeroed_state_features
+            if feature_name not in active_names
+        )
+        if unknown_zeroed:
+            joined = ", ".join(unknown_zeroed)
+            raise ValueError(
+                "observation.zeroed_state_features must reference active state features: "
+                f"{joined}"
+            )
+
+        unknown_excluded = sorted(
+            feature_name
+            for feature_name in self.excluded_state_features
+            if feature_name not in active_names
+        )
+        if unknown_excluded:
+            joined = ", ".join(unknown_excluded)
+            raise ValueError(
+                "observation.excluded_state_features must reference active state features: "
+                f"{joined}"
+            )
+
+        overlap = sorted(set(self.zeroed_state_features) & set(self.excluded_state_features))
+        if overlap:
+            joined = ", ".join(overlap)
+            raise ValueError(
+                "observation feature overrides cannot both zero and exclude the same feature: "
                 f"{joined}"
             )
         return self

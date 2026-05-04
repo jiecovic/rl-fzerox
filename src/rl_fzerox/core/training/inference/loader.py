@@ -189,11 +189,11 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:
-    filename = policy_path.name
-    if filename.startswith("latest_"):
-        return "latest"
-    if filename.startswith("best_"):
-        return "best"
-    if filename.startswith("final_"):
-        return "final"
-    raise ValueError(f"Unsupported policy artifact filename: {filename}")
+    if policy_path.name != "policy.zip":
+        raise ValueError(f"Unsupported policy artifact filename: {policy_path.name}")
+    if policy_path.parent.parent.name != RUN_LAYOUT.checkpoints_dirname:
+        raise ValueError(f"Unsupported policy artifact path: {policy_path}")
+    artifact_kind = policy_path.parent.name
+    if artifact_kind in {"latest", "best", "final"}:
+        return artifact_kind
+    raise ValueError(f"Unsupported policy artifact path: {policy_path}")

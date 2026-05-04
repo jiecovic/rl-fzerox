@@ -70,6 +70,7 @@ def build_observation(
     state_components: StateComponentsSettings | None = None,
     zeroed_state_components: Collection[str] = (),
     zeroed_state_features: Collection[str] = (),
+    excluded_state_features: Collection[str] = (),
 ) -> ObservationValue:
     if mode == "image":
         return image
@@ -95,6 +96,7 @@ def build_observation(
                 state_components=state_components,
                 zeroed_state_components=zeroed_state_components,
                 zeroed_state_features=zeroed_state_features,
+                excluded_state_features=excluded_state_features,
             ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")
@@ -117,6 +119,7 @@ def build_observation_space(
         ActionHistoryControl, ...
     ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
+    excluded_state_features: Collection[str] = (),
 ) -> spaces.Box | spaces.Dict:
     image_space = build_image_observation_space(
         observation_spec,
@@ -134,6 +137,7 @@ def build_observation_space(
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             state_components=state_components,
+            excluded_state_features=excluded_state_features,
         )
         return spaces.Dict(
             {

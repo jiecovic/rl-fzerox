@@ -64,6 +64,7 @@ def telemetry_state_vector(
     state_components: StateComponentsSettings | None = None,
     zeroed_state_components: Collection[str] = (),
     zeroed_state_features: Collection[str] = (),
+    excluded_state_features: Collection[str] = (),
 ) -> StateVector:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
@@ -73,6 +74,7 @@ def telemetry_state_vector(
             state_components=state_components,
             zeroed_state_components=zeroed_state_components,
             zeroed_state_features=zeroed_state_features,
+            excluded_state_features=excluded_state_features,
             action_history=action_history or {},
             profile_fields={
                 "left_lean_held": left_lean_held,
@@ -85,7 +87,10 @@ def telemetry_state_vector(
                 "recent_steer_pressure": recent_steer_pressure,
             },
         )
-        expected_count = state_vector_spec_from_components(state_components).count
+        expected_count = state_vector_spec_from_components(
+            state_components,
+            excluded_state_features=excluded_state_features,
+        ).count
         if len(values) != expected_count:
             raise ValueError(
                 "Observation state component value count does not match feature spec: "
@@ -137,11 +142,15 @@ def state_vector_spec(
         ActionHistoryControl, ...
     ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
+    excluded_state_features: Collection[str] = (),
 ) -> StateVectorSpec:
     """Return the scalar-state schema selected by config."""
 
     if state_components is not None:
-        return state_vector_spec_from_components(state_components)
+        return state_vector_spec_from_components(
+            state_components,
+            excluded_state_features=excluded_state_features,
+        )
 
     try:
         base_spec = STATE_VECTOR_SPECS[state_profile]
@@ -173,6 +182,7 @@ def state_feature_names(
         ActionHistoryControl, ...
     ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
+    excluded_state_features: Collection[str] = (),
 ) -> tuple[str, ...]:
     """Return ordered scalar-state feature names for one profile."""
 
@@ -183,6 +193,7 @@ def state_feature_names(
         action_history_len=action_history_len,
         action_history_controls=action_history_controls,
         state_components=state_components,
+        excluded_state_features=excluded_state_features,
     ).names
 
 
@@ -198,6 +209,7 @@ def state_feature_count(
         ActionHistoryControl, ...
     ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
+    excluded_state_features: Collection[str] = (),
 ) -> int:
     """Return scalar-state width for one profile."""
 
@@ -208,6 +220,7 @@ def state_feature_count(
         action_history_len=action_history_len,
         action_history_controls=action_history_controls,
         state_components=state_components,
+        excluded_state_features=excluded_state_features,
     ).count
 
 

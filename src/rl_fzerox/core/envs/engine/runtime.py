@@ -82,6 +82,7 @@ class FZeroXEnvEngine:
             curriculum_config=curriculum_config,
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
+            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
         )
         self._reset_coordinator = EngineResetCoordinator(
             backend=backend,
@@ -251,7 +252,11 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._step_control_state(
             self._action_adapter.decode(action),
-            action_drive_axis=action_drive_axis(action, self._action_space),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._action_space,
+                drive_axis_index=self._action_config.continuous_drive_axis_index(),
+            ),
         )
 
     def step_watch(self, action: ActionValue) -> WatchEnvStep:
@@ -259,7 +264,11 @@ class FZeroXEnvEngine:
 
         return self._step_control_state_watch(
             self._action_adapter.decode(action),
-            action_drive_axis=action_drive_axis(action, self._action_space),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._action_space,
+                drive_axis_index=self._action_config.continuous_drive_axis_index(),
+            ),
         )
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:

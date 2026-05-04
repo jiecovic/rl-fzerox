@@ -16,6 +16,7 @@ from rl_fzerox.core.training.runs.config import (
     materialize_watch_session_config,
     save_train_run_config,
 )
+from rl_fzerox.core.training.runs.migration import migrate_run_artifact_layout
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -25,6 +26,7 @@ from rl_fzerox.core.training.runs.paths import (
     continue_run_paths,
     ensure_run_dirs,
     ensure_watch_session_dirs,
+    explicit_run_paths,
     reserve_run_paths,
     resolve_train_run_config_path,
 )
@@ -39,11 +41,13 @@ __all__ = [
     "continue_run_paths",
     "ensure_run_dirs",
     "ensure_watch_session_dirs",
+    "explicit_run_paths",
     "load_train_run_config",
     "load_train_run_config_for_watch",
     "load_train_run_train_config",
     "materialize_train_run_config",
     "materialize_watch_session_config",
+    "migrate_run_artifact_layout",
     "resolve_latest_model_path",
     "resolve_latest_policy_path",
     "resolve_model_artifact_path",

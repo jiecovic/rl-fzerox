@@ -1,10 +1,38 @@
 # src/rl_fzerox/core/training/session/callbacks/track_sampling.py
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+import os
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingRuntimeEntry:
+    track_id: str
+    course_key: str
+    label: str
+    base_weight: float
+    current_weight: float
+    completed_frames: int
+    episode_count: int
+    ema_episode_frames: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class TrackSamplingRuntimeState:
+    sampling_mode: str
+    action_repeat: int
+    update_episodes: int
+    ema_alpha: float
+    max_weight_scale: float
+    update_count: int
+    episodes_since_update: int
+    entries: tuple[TrackSamplingRuntimeEntry, ...]
 
 
 @dataclass(slots=True)
@@ -39,6 +67,8 @@ class StepBalancedTrackSamplingController:
         max_weight_scale: float,
         log_details: bool = False,
         track_log_keys: dict[str, str] | None = None,
+        track_labels: dict[str, str] | None = None,
+        restored_state: TrackSamplingRuntimeState | None = None,
     ) -> None:
         self._stats = {
             track_id: _TrackStepStats(base_weight=weight, current_weight=weight)
@@ -53,8 +83,13 @@ class StepBalancedTrackSamplingController:
             track_id: _sanitize_log_key((track_log_keys or {}).get(track_id, track_id))
             for track_id in self._stats
         }
+        self._track_labels = {
+            track_id: (track_labels or {}).get(track_id, track_id)
+            for track_id in self._stats
+        }
         self._episodes_since_update = 0
         self.update_count = 0
+        self._restore_state(restored_state)
 
     @classmethod
     def from_configs(
@@ -62,6 +97,7 @@ class StepBalancedTrackSamplingController:
         *,
         env_config: EnvConfig,
         curriculum_config: CurriculumConfig,
+        restored_state: TrackSamplingRuntimeState | None = None,
     ) -> StepBalancedTrackSamplingController | None:
         configs = _step_balanced_sampling_configs(env_config, curriculum_config)
         if not configs:
@@ -69,10 +105,15 @@ class StepBalancedTrackSamplingController:
 
         base_weights: dict[str, float] = {}
         requested_log_keys: dict[str, str] = {}
+        requested_labels: dict[str, str] = {}
         for config in configs:
             for entry in config.entries:
                 base_weights.setdefault(entry.id, float(entry.weight))
                 requested_log_keys.setdefault(entry.id, entry.course_id or entry.id)
+                requested_labels.setdefault(
+                    entry.id,
+                    entry.course_name or entry.display_name or entry.course_id or entry.id,
+                )
         if len(base_weights) <= 1:
             return None
 
@@ -85,6 +126,8 @@ class StepBalancedTrackSamplingController:
             max_weight_scale=settings.step_balance_max_weight_scale,
             log_details=settings.step_balance_log_details,
             track_log_keys=requested_log_keys,
+            track_labels=requested_labels,
+            restored_state=restored_state,
         )
 
     def record_episodes(self, episodes: Sequence[dict[str, object]]) -> dict[str, float] | None:
@@ -127,6 +170,36 @@ class StepBalancedTrackSamplingController:
             )
         return values
 
+    def current_weights(self) -> dict[str, float]:
+        return {
+            track_id: stats.current_weight
+            for track_id, stats in self._stats.items()
+        }
+
+    def runtime_state(self) -> TrackSamplingRuntimeState:
+        return TrackSamplingRuntimeState(
+            sampling_mode="step_balanced",
+            action_repeat=self._action_repeat,
+            update_episodes=self._update_episodes,
+            ema_alpha=self._ema_alpha,
+            max_weight_scale=self._max_weight_scale,
+            update_count=self.update_count,
+            episodes_since_update=self._episodes_since_update,
+            entries=tuple(
+                TrackSamplingRuntimeEntry(
+                    track_id=track_id,
+                    course_key=self._track_log_keys[track_id],
+                    label=self._track_labels[track_id],
+                    base_weight=stats.base_weight,
+                    current_weight=stats.current_weight,
+                    completed_frames=stats.completed_frames,
+                    episode_count=stats.episode_count,
+                    ema_episode_frames=stats.ema_episode_frames,
+                )
+                for track_id, stats in sorted(self._stats.items())
+            ),
+        )
+
     def _compute_weights(self) -> dict[str, float]:
         reference_length = self._reference_episode_length()
         raw_weights: dict[str, float] = {}
@@ -166,6 +239,25 @@ class StepBalancedTrackSamplingController:
             1.0,
             sum(weight * length for weight, length in weighted_lengths) / total_weight,
         )
+
+    def _restore_state(self, restored_state: TrackSamplingRuntimeState | None) -> None:
+        if restored_state is None or restored_state.sampling_mode != "step_balanced":
+            return
+        state_by_track_id = {entry.track_id: entry for entry in restored_state.entries}
+        for track_id, stats in self._stats.items():
+            entry = state_by_track_id.get(track_id)
+            if entry is None:
+                continue
+            stats.completed_frames = max(0, int(entry.completed_frames))
+            stats.episode_count = max(0, int(entry.episode_count))
+            stats.ema_episode_frames = (
+                None
+                if entry.ema_episode_frames is None
+                else max(0.0, float(entry.ema_episode_frames))
+            )
+            stats.current_weight = max(0.0, float(entry.current_weight))
+        self._episodes_since_update = max(0, int(restored_state.episodes_since_update))
+        self.update_count = max(0, int(restored_state.update_count))
 
 
 def _step_balanced_sampling_configs(
@@ -213,3 +305,146 @@ def _episode_frame_count(
 def _sanitize_log_key(value: str) -> str:
     sanitized = "".join(char if char.isalnum() else "_" for char in value.strip().lower())
     return sanitized.strip("_") or "unknown"
+
+
+def save_track_sampling_runtime_state(
+    path: Path,
+    state: TrackSamplingRuntimeState,
+) -> None:
+    """Persist one step-balanced sampler snapshot atomically."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(f".{path.stem}.{os.getpid()}.tmp{path.suffix}")
+    data = {
+        "version": 1,
+        "sampling_mode": state.sampling_mode,
+        "action_repeat": state.action_repeat,
+        "update_episodes": state.update_episodes,
+        "ema_alpha": state.ema_alpha,
+        "max_weight_scale": state.max_weight_scale,
+        "update_count": state.update_count,
+        "episodes_since_update": state.episodes_since_update,
+        "entries": [
+            {
+                "track_id": entry.track_id,
+                "course_key": entry.course_key,
+                "label": entry.label,
+                "base_weight": entry.base_weight,
+                "current_weight": entry.current_weight,
+                "completed_frames": entry.completed_frames,
+                "episode_count": entry.episode_count,
+                "ema_episode_frames": entry.ema_episode_frames,
+            }
+            for entry in state.entries
+        ],
+    }
+    try:
+        tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState | None:
+    """Load one persisted step-balanced sampler snapshot, if present."""
+
+    if not path.is_file():
+        return None
+    loaded = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, Mapping):
+        return None
+    if loaded.get("sampling_mode") != "step_balanced":
+        return None
+    raw_entries = loaded.get("entries")
+    if not isinstance(raw_entries, list):
+        return None
+    entries: list[TrackSamplingRuntimeEntry] = []
+    for raw_entry in raw_entries:
+        if not isinstance(raw_entry, Mapping):
+            continue
+        track_id = _mapping_str(raw_entry, "track_id")
+        course_key = _mapping_str(raw_entry, "course_key")
+        label = _mapping_str(raw_entry, "label")
+        base_weight = _mapping_float(raw_entry, "base_weight")
+        current_weight = _mapping_float(raw_entry, "current_weight")
+        completed_frames = _mapping_int(raw_entry, "completed_frames")
+        episode_count = _mapping_int(raw_entry, "episode_count")
+        ema_episode_frames = _mapping_optional_float(raw_entry, "ema_episode_frames")
+        if (
+            track_id is None
+            or course_key is None
+            or label is None
+            or base_weight is None
+            or current_weight is None
+            or completed_frames is None
+            or episode_count is None
+        ):
+            continue
+        entries.append(
+            TrackSamplingRuntimeEntry(
+                track_id=track_id,
+                course_key=course_key,
+                label=label,
+                base_weight=base_weight,
+                current_weight=current_weight,
+                completed_frames=completed_frames,
+                episode_count=episode_count,
+                ema_episode_frames=ema_episode_frames,
+            )
+        )
+    if not entries:
+        return None
+    action_repeat = _mapping_int(loaded, "action_repeat")
+    update_episodes = _mapping_int(loaded, "update_episodes")
+    ema_alpha = _mapping_float(loaded, "ema_alpha")
+    max_weight_scale = _mapping_float(loaded, "max_weight_scale")
+    update_count = _mapping_int(loaded, "update_count")
+    episodes_since_update = _mapping_int(loaded, "episodes_since_update")
+    if (
+        action_repeat is None
+        or update_episodes is None
+        or ema_alpha is None
+        or max_weight_scale is None
+        or update_count is None
+        or episodes_since_update is None
+    ):
+        return None
+    return TrackSamplingRuntimeState(
+        sampling_mode="step_balanced",
+        action_repeat=action_repeat,
+        update_episodes=update_episodes,
+        ema_alpha=ema_alpha,
+        max_weight_scale=max_weight_scale,
+        update_count=update_count,
+        episodes_since_update=episodes_since_update,
+        entries=tuple(entries),
+    )
+
+
+def _mapping_str(mapping: Mapping[str, Any], key: str) -> str | None:
+    value = mapping.get(key)
+    return value if isinstance(value, str) and value else None
+
+
+def _mapping_int(mapping: Mapping[str, Any], key: str) -> int | None:
+    value = mapping.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)
+
+
+def _mapping_float(mapping: Mapping[str, Any], key: str) -> float | None:
+    value = mapping.get(key)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)
+
+
+def _mapping_optional_float(mapping: Mapping[str, Any], key: str) -> float | None:
+    value = mapping.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return float(value)

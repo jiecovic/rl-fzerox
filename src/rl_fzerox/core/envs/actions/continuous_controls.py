@@ -181,8 +181,16 @@ def requested_gas_level(
     return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
 
 
-def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float | None:
+def action_drive_axis(
+    action: ActionValue,
+    action_space: spaces.Space,
+    *,
+    drive_axis_index: int | None = None,
+) -> float | None:
     """Extract the raw continuous drive axis when the action space exposes one."""
+
+    if drive_axis_index is None:
+        return None
 
     source: object
     if isinstance(action_space, spaces.Dict):
@@ -199,9 +207,10 @@ def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float 
         values = np.asarray(source, dtype=np.float32).reshape(-1)
     except (TypeError, ValueError):
         return None
-    if values.size < 2 or not np.isfinite(values[1]):
+    axis_index = int(drive_axis_index)
+    if axis_index < 0 or values.size <= axis_index or not np.isfinite(values[axis_index]):
         return None
-    return float(np.clip(values[1], -1.0, 1.0))
+    return float(np.clip(values[axis_index], -1.0, 1.0))
 
 
 def _continuous_drive_thrust_curve(

@@ -319,6 +319,53 @@ def test_step_updates_race_core_with_action_history() -> None:
     assert values["prev_steer_3"] == 0.0
 
 
+def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_application() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=5.0),
+                summary=_step_summary(max_race_distance=5.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            ),
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=ActionConfig(
+                name="configured_hybrid",
+                layout_continuous_axes=("steer", "pitch"),
+                layout_discrete_axes=("gas",),
+            ),
+            observation=ObservationConfig(
+                mode="image_state",
+                state_profile="race_core",
+                action_history_len=1,
+                action_history_controls=("pitch",),
+            ),
+        ),
+        reward_config=RewardConfig(time_penalty_per_frame=0.0),
+    )
+
+    obs, _, _, _, info = env.step(
+        {
+            "continuous": np.array([0.0, 0.5], dtype=np.float32),
+            "discrete": np.array([1], dtype=np.int64),
+        }
+    )
+
+    assert backend.last_controller_state.left_stick_y == 0.0
+    assert isinstance(obs, dict)
+    raw_feature_names = info["observation_state_features"]
+    assert isinstance(raw_feature_names, tuple)
+    values = {
+        name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
+    }
+    assert values["prev_pitch_1"] == pytest.approx(0.5)
+
+
 def test_step_updates_right_lean_hold_and_press_age_in_image_state_observation() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(

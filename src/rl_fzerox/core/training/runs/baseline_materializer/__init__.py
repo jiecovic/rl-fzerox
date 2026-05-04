@@ -9,7 +9,7 @@ from pathlib import Path
 from fzerox_emulator import Emulator
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.training.runs.baseline_race_start import (
-    materialize_time_attack_race_start_from_boot,
+    materialize_race_start_from_boot,
 )
 from rl_fzerox.core.training.runs.paths import RunPaths
 
@@ -25,6 +25,7 @@ def materialize_run_baselines(
     *,
     run_paths: RunPaths,
     cache_root: Path | None = None,
+    startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
     """Generate run-local baseline state artifacts for the current run."""
 
@@ -32,8 +33,9 @@ def materialize_run_baselines(
         config,
         run_paths=run_paths,
         cache_root=cache_root,
+        startup_reporter=startup_reporter,
         emulator_type=Emulator,
-        race_start_materializer=materialize_time_attack_race_start_from_boot,
+        race_start_materializer=materialize_race_start_from_boot,
     )
 
 
@@ -52,7 +54,7 @@ def materialize_baseline(
         cache_root=cache_root,
         context=context,
         emulator_type=Emulator,
-        race_start_materializer=materialize_time_attack_race_start_from_boot,
+        race_start_materializer=materialize_race_start_from_boot,
     )
 
 
@@ -65,5 +67,5 @@ __all__ = [
     "Emulator",
     "materialize_baseline",
     "materialize_run_baselines",
-    "materialize_time_attack_race_start_from_boot",
+    "materialize_race_start_from_boot",
 ]

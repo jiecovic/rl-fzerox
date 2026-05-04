@@ -96,6 +96,32 @@ def test_observation_can_zero_track_position_fields_individually() -> None:
     )
 
 
+def test_observation_can_exclude_track_position_fields_individually() -> None:
+    config = ObservationConfig.model_validate(
+        {
+            "mode": "image_state",
+            "state_components": ["vehicle_state", "track_position"],
+            "excluded_state_features": [
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+            ],
+        }
+    )
+
+    assert config.excluded_state_features == (
+        "track_position.edge_ratio",
+        "track_position.outside_track_bounds",
+    )
+
+
+def test_policy_config_reads_state_net_arch() -> None:
+    config = PolicyConfig.model_validate(
+        {"extractor": {"state_net_arch": [], "fusion_features_dim": 256}}
+    )
+
+    assert config.extractor.resolved_state_net_arch() == ()
+
+
 def test_policy_config_reads_action_bias() -> None:
     config = PolicyConfig.model_validate({"action_bias": {"gas_on_logit": 0.5}})
 

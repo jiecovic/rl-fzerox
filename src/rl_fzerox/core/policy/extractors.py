@@ -229,6 +229,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         observation_space: spaces.Dict,
         features_dim: int | Literal["auto"] = 512,
         state_features_dim: int = 64,
+        state_net_arch: tuple[int, ...] | None = None,
         fusion_features_dim: int | None = None,
         conv_profile: ConvProfile = "auto",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
@@ -247,6 +248,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         if not isinstance(state_space, spaces.Box) or len(state_space.shape) != 1:
             raise ValueError(f"{type(self).__name__} requires 1D Box key 'state'")
 
+        state_dim = int(state_space.shape[0])
         image_features_dim = (
             _image_flatten_dim(
                 image_space,
@@ -256,8 +258,15 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             if features_dim == "auto"
             else int(features_dim)
         )
-        resolved_state_features_dim = int(state_features_dim)
-        combined_features_dim = image_features_dim + resolved_state_features_dim
+        resolved_state_net_arch = (
+            (int(state_features_dim),)
+            if state_net_arch is None
+            else tuple(int(width) for width in state_net_arch)
+        )
+        state_branch_output_dim = (
+            state_dim if not resolved_state_net_arch else resolved_state_net_arch[-1]
+        )
+        combined_features_dim = image_features_dim + state_branch_output_dim
         resolved_fusion_features_dim = (
             None if fusion_features_dim is None else int(fusion_features_dim)
         )
@@ -268,7 +277,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         )
         super().__init__(observation_space, output_features_dim)
 
-        self._state_dim = int(state_space.shape[0])
+        self._state_dim = state_dim
         self._image_extractor = FZeroXObservationCnnExtractor(
             image_space,
             features_dim=features_dim,
@@ -276,9 +285,9 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             custom_conv_layers=custom_conv_layers,
             layer_norm=False,
         )
-        self._state_mlp = nn.Sequential(
-            nn.Linear(self._state_dim, resolved_state_features_dim),
-            nn.ReLU(),
+        self._state_mlp = _state_branch_mlp(
+            input_dim=self._state_dim,
+            widths=resolved_state_net_arch,
         )
         if resolved_fusion_features_dim is None:
             self._fusion_mlp: nn.Module = nn.Identity()
@@ -311,6 +320,19 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             dim=1,
         )
         return self._layer_norm(self._fusion_mlp(combined_features))
+
+
+def _state_branch_mlp(*, input_dim: int, widths: tuple[int, ...]) -> nn.Module:
+    if not widths:
+        return nn.Identity()
+
+    layers: list[nn.Module] = []
+    previous_dim = input_dim
+    for width in widths:
+        layers.append(nn.Linear(previous_dim, int(width)))
+        layers.append(nn.ReLU())
+        previous_dim = int(width)
+    return nn.Sequential(*layers)
 
 
 @dataclass(frozen=True, slots=True)

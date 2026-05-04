@@ -9,6 +9,7 @@ from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
+    ACCELERATE_MASK,
     AIR_BRAKE_MASK,
     BOOST_MASK,
     LEAN_LEFT_MASK,
@@ -49,6 +50,9 @@ def _control_viz(
     policy_action: ActionValue | None = None,
     action_mask_branches: ActionMaskBranches | None = None,
     continuous_drive_deadzone: float = 0.2,
+    continuous_drive_enabled: bool = False,
+    force_full_throttle: bool = False,
+    continuous_pitch_enabled: bool = False,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
@@ -88,10 +92,16 @@ def _control_viz(
             ),
         ),
     )
+    displayed_gas_level = _displayed_gas_level(
+        joypad_mask=joypad_mask,
+        gas_level=gas_level,
+        continuous_drive_enabled=continuous_drive_enabled,
+        force_full_throttle=force_full_throttle,
+    )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         pitch_y=max(-1.0, min(1.0, control_state.left_stick_y)),
-        gas_level=max(0.0, min(1.0, gas_level)),
+        gas_level=displayed_gas_level,
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         thrust_deadzone_threshold=_normalize_optional_level(thrust_deadzone_threshold),
         thrust_full_threshold=_normalize_optional_level(thrust_full_threshold),
@@ -105,11 +115,15 @@ def _control_viz(
         boost_lamp_level=normalized_boost_lamp_level,
         lean_direction=lean_direction,
         deterministic_policy=policy_deterministic,
-        thrust_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "gas",
-            1,
-            missing_allowed=True,
+        thrust_masked=(
+            False
+            if force_full_throttle or continuous_drive_enabled
+            else not action_branch_value_allowed(
+                action_mask_branches,
+                "gas",
+                1,
+                missing_allowed=False,
+            )
         ),
         air_brake_masked=not action_branch_value_allowed(
             action_mask_branches,
@@ -135,13 +149,31 @@ def _control_viz(
             2,
             missing_allowed=False,
         ),
-        pitch_masked=not action_branch_non_neutral_allowed(
-            action_mask_branches,
-            "pitch",
-            neutral_index=2,
-            missing_allowed=False,
+        pitch_masked=(
+            False
+            if continuous_pitch_enabled
+            else not action_branch_non_neutral_allowed(
+                action_mask_branches,
+                "pitch",
+                neutral_index=2,
+                missing_allowed=False,
+            )
         ),
     )
+
+
+def _displayed_gas_level(
+    *,
+    joypad_mask: int,
+    gas_level: float,
+    continuous_drive_enabled: bool,
+    force_full_throttle: bool,
+) -> float:
+    if force_full_throttle:
+        return 1.0
+    if continuous_drive_enabled:
+        return max(0.0, min(1.0, gas_level))
+    return 1.0 if joypad_mask & ACCELERATE_MASK else 0.0
 
 
 def _selected_policy_branches(

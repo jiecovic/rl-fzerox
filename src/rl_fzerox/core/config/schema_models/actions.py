@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal, TypeAlias
 
 from pydantic import (
     BaseModel,
@@ -24,12 +25,32 @@ from rl_fzerox.core.config.schema_models.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,
 )
-from rl_fzerox.core.domain.action_adapters import DEFAULT_ACTION_ADAPTER_NAME, ActionAdapterName
+from rl_fzerox.core.domain.action_adapters import (
+    ACTION_ADAPTERS,
+    DEFAULT_ACTION_ADAPTER_NAME,
+    LEGACY_ACTION_ADAPTERS,
+    ActionAdapterName,
+)
 from rl_fzerox.core.domain.action_values import (
     ActionMaskSpec,
     compile_action_mask_values,
 )
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
+
+ConfiguredContinuousAxis: TypeAlias = Literal["steer", "drive", "pitch"]
+ConfiguredDiscreteAxis: TypeAlias = Literal[
+    "steer",
+    "drive",
+    "gas",
+    "air_brake",
+    "boost",
+    "lean",
+    "pitch",
+]
+_CONFIGURED_CONTINUOUS_AXES = frozenset(("steer", "drive", "pitch"))
+_CONFIGURED_DISCRETE_AXES = frozenset(
+    ("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch")
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,6 +111,8 @@ class ActionRuntimeConfig:
     continuous_drive_deadzone: float
     continuous_drive_full_threshold: float
     continuous_drive_min_thrust: float
+    force_full_throttle: bool
+    mask_air_brake_on_ground: bool
     continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
@@ -98,7 +121,30 @@ class ActionRuntimeConfig:
     boost_request_lockout_frames: int
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
+    pitch_buckets: int
+    independent_lean_buttons: bool
+    layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...]
+    layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...]
     mask_overrides: ActionMaskOverrides | None
+
+    def continuous_drive_axis_index(self) -> int | None:
+        """Return the continuous drive-axis index when this layout exposes one."""
+
+        if self.name == ACTION_ADAPTERS.configured_hybrid:
+            try:
+                return self.layout_continuous_axes.index("drive")
+            except ValueError:
+                return None
+        if self.name == LEGACY_ACTION_ADAPTERS.continuous_steer_drive:
+            return 1
+        if self.name in LEGACY_ACTION_ADAPTERS.continuous_drive:
+            return 1
+        return None
+
+    def uses_continuous_drive(self) -> bool:
+        """Return whether the action layout carries a live continuous throttle axis."""
+
+        return self.continuous_drive_axis_index() is not None
 
     @classmethod
     def from_config(cls, config: ActionConfig) -> ActionRuntimeConfig:
@@ -109,6 +155,8 @@ class ActionRuntimeConfig:
             continuous_drive_deadzone=float(config.continuous_drive_deadzone),
             continuous_drive_full_threshold=float(config.continuous_drive_full_threshold),
             continuous_drive_min_thrust=float(config.continuous_drive_min_thrust),
+            force_full_throttle=bool(config.force_full_throttle),
+            mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
             continuous_air_brake_mode=config.continuous_air_brake_mode,
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
@@ -125,7 +173,15 @@ class ActionRuntimeConfig:
                 else float(config.lean_unmask_min_speed_kph)
             ),
             lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
-            mask_overrides=config.mask.branch_overrides() if config.mask is not None else None,
+            pitch_buckets=int(config.pitch_buckets),
+            independent_lean_buttons=bool(config.independent_lean_buttons),
+            layout_continuous_axes=tuple(config.layout_continuous_axes),
+            layout_discrete_axes=tuple(config.layout_discrete_axes),
+            mask_overrides=(
+                config.configured_mask_overrides
+                if config.configured_mask_overrides is not None
+                else (config.mask.branch_overrides() if config.mask is not None else None)
+            ),
         )
 
     @classmethod
@@ -157,6 +213,8 @@ class ActionRuntimeConfig:
                 if compilation.continuous_drive_min_thrust is None
                 else compilation.continuous_drive_min_thrust
             ),
+            force_full_throttle=bool(config.force_full_throttle),
+            mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
             continuous_air_brake_mode=(
                 config.continuous_air_brake_mode
                 if compilation.continuous_air_brake_mode is None
@@ -173,7 +231,15 @@ class ActionRuntimeConfig:
                 if compilation.lean_initial_lockout_frames is None
                 else int(compilation.lean_initial_lockout_frames)
             ),
-            mask_overrides=compilation.mask_overrides,
+            pitch_buckets=int(config.pitch_buckets),
+            independent_lean_buttons=bool(config.independent_lean_buttons),
+            layout_continuous_axes=tuple(config.layout_continuous_axes),
+            layout_discrete_axes=tuple(config.layout_discrete_axes),
+            mask_overrides=(
+                config.configured_mask_overrides
+                if config.configured_mask_overrides is not None
+                else compilation.mask_overrides
+            ),
         )
 
 
@@ -188,12 +254,19 @@ class ActionConfig(BaseModel):
     continuous_drive_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
     continuous_drive_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
     continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
+    force_full_throttle: bool = False
+    mask_air_brake_on_ground: bool = True
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    pitch_buckets: int = Field(default=5, ge=3)
+    independent_lean_buttons: bool = False
+    layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()
+    layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = ()
+    configured_mask_overrides: ActionMaskOverrides | None = None
     mask: ActionMaskConfig | None = None
     branches: ActionBranchesConfig | None = None
 
@@ -205,11 +278,21 @@ class ActionConfig(BaseModel):
         compiled = compile_action_branches(self.branches)
         return ActionRuntimeConfig.from_branch_config(self, compiled)
 
-    @field_validator("steer_buckets")
+    @field_validator("steer_buckets", "pitch_buckets")
     @classmethod
-    def _validate_odd_steer_buckets(cls, value: int) -> int:
+    def _validate_odd_bucket_count(cls, value: int) -> int:
         if value % 2 == 0:
-            raise ValueError("steer_buckets must be odd so one bucket maps to straight")
+            raise ValueError("action bucket counts must be odd so one bucket maps to neutral")
+        return value
+
+    @field_validator("layout_continuous_axes", "layout_discrete_axes")
+    @classmethod
+    def _validate_unique_layout_axes(
+        cls,
+        value: tuple[object, ...],
+    ) -> tuple[object, ...]:
+        if len(set(value)) != len(value):
+            raise ValueError("configured action layout axes must not contain duplicates")
         return value
 
     @model_validator(mode="after")
@@ -218,6 +301,27 @@ class ActionConfig(BaseModel):
             raise ValueError(
                 "continuous_drive_deadzone must be lower than continuous_drive_full_threshold"
             )
+        invalid_continuous_axes = set(self.layout_continuous_axes) - _CONFIGURED_CONTINUOUS_AXES
+        if invalid_continuous_axes:
+            joined = ", ".join(sorted(invalid_continuous_axes))
+            raise ValueError(f"Unknown continuous action layout axis: {joined}")
+        invalid_discrete_axes = set(self.layout_discrete_axes) - _CONFIGURED_DISCRETE_AXES
+        if invalid_discrete_axes:
+            joined = ", ".join(sorted(invalid_discrete_axes))
+            raise ValueError(f"Unknown discrete action layout axis: {joined}")
+        if set(self.layout_continuous_axes) & set(self.layout_discrete_axes):
+            raise ValueError("configured action axes cannot be both continuous and discrete")
+        if self.name == ACTION_ADAPTERS.configured_hybrid and not self.layout_continuous_axes:
+            raise ValueError("configured_hybrid requires at least one continuous axis")
+        if self.name == ACTION_ADAPTERS.configured_discrete:
+            if self.layout_continuous_axes:
+                raise ValueError("configured_discrete cannot define continuous axes")
+            if not self.layout_discrete_axes:
+                raise ValueError("configured_discrete requires at least one discrete axis")
+        if self.independent_lean_buttons and "lean" not in self.layout_discrete_axes:
+            raise ValueError("independent_lean_buttons requires a discrete lean axis")
+        if self.configured_mask_overrides is not None and self.mask is not None:
+            raise ValueError("configured_mask_overrides cannot be combined with env.action.mask")
         if self.branches is not None:
             compile_action_branches(self.branches)
         return self

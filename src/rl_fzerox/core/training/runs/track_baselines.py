@@ -39,6 +39,8 @@ def track_config_from_sampling_entry(
             "source_vehicle": entry.source_vehicle,
             "engine_setting": entry.engine_setting,
             "engine_setting_raw_value": entry.engine_setting_raw_value,
+            "engine_setting_min_raw_value": entry.engine_setting_min_raw_value,
+            "engine_setting_max_raw_value": entry.engine_setting_max_raw_value,
             "source_course_index": entry.source_course_index,
             "source_engine_setting": entry.source_engine_setting,
             "source_engine_setting_raw_value": entry.source_engine_setting_raw_value,

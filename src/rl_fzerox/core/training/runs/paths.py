@@ -3,15 +3,13 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
 class ArtifactFilenames:
-    """The latest/best/final filenames for one artifact family."""
+    """The latest/best/final relative paths for one artifact family."""
 
     latest: str
     best: str
@@ -29,6 +27,7 @@ class RunLayout:
     runtime_dirname: str
     tensorboard_dirname: str
     checkpoints_dirname: str
+    track_sampling_state_filename: str
     model_artifacts: ArtifactFilenames
     policy_artifacts: ArtifactFilenames
 
@@ -41,15 +40,16 @@ RUN_LAYOUT = RunLayout(
     runtime_dirname="runtime",
     tensorboard_dirname="tensorboard",
     checkpoints_dirname="checkpoints",
+    track_sampling_state_filename="track_sampling_state.json",
     model_artifacts=ArtifactFilenames(
-        latest="latest_model.zip",
-        best="best_model.zip",
-        final="final_model.zip",
+        latest="checkpoints/latest/model.zip",
+        best="checkpoints/best/model.zip",
+        final="checkpoints/final/model.zip",
     ),
     policy_artifacts=ArtifactFilenames(
-        latest="latest_policy.zip",
-        best="best_policy.zip",
-        final="final_policy.zip",
+        latest="checkpoints/latest/policy.zip",
+        best="checkpoints/best/policy.zip",
+        final="checkpoints/final/policy.zip",
     ),
 )
 
@@ -63,6 +63,7 @@ class RunPaths:
     runtime_root: Path
     tensorboard_dir: Path
     checkpoints_dir: Path
+    track_sampling_state_path: Path
     latest_model_path: Path
     latest_policy_path: Path
     best_model_path: Path
@@ -118,6 +119,13 @@ def reserve_run_paths(*, output_root: Path, run_name: str) -> RunPaths:
         return _run_paths(run_dir, fresh_run=True)
 
 
+def explicit_run_paths(run_dir: Path) -> RunPaths:
+    """Use one exact run directory instead of reserving a suffixed sibling."""
+
+    resolved_run_dir = run_dir.expanduser().resolve()
+    return _run_paths(resolved_run_dir, fresh_run=True)
+
+
 def continue_run_paths(run_dir: Path) -> RunPaths:
     """Reuse one existing training run directory for in-place continuation."""
 
@@ -134,6 +142,9 @@ def _run_paths(run_dir: Path, *, fresh_run: bool) -> RunPaths:
         runtime_root=run_dir / RUN_LAYOUT.runtime_dirname,
         tensorboard_dir=run_dir / RUN_LAYOUT.tensorboard_dirname,
         checkpoints_dir=run_dir / RUN_LAYOUT.checkpoints_dirname,
+        track_sampling_state_path=run_dir
+        / RUN_LAYOUT.runtime_dirname
+        / RUN_LAYOUT.track_sampling_state_filename,
         latest_model_path=run_dir / RUN_LAYOUT.model_artifacts.latest,
         latest_policy_path=run_dir / RUN_LAYOUT.policy_artifacts.latest,
         best_model_path=run_dir / RUN_LAYOUT.model_artifacts.best,
@@ -152,6 +163,12 @@ def ensure_run_dirs(paths: RunPaths) -> None:
     paths.runtime_root.mkdir(parents=True, exist_ok=True)
     paths.tensorboard_dir.mkdir(parents=True, exist_ok=True)
     paths.checkpoints_dir.mkdir(parents=True, exist_ok=True)
+    paths.latest_model_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.best_model_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.best_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.final_model_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.final_policy_path.parent.mkdir(parents=True, exist_ok=True)
     paths.baselines_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -162,15 +179,15 @@ def build_watch_session_paths(
     baseline_state_path: Path | None,
     session_name: str | None = None,
 ) -> WatchSessionPaths:
-    """Build one isolated runtime/baseline layout for a watch session."""
+    """Build one reusable runtime/baseline workspace for watch."""
 
+    del session_name
     session_root = _watch_session_root(run_dir=run_dir, runtime_dir=runtime_dir)
-    session_dir = session_root / (session_name or _watch_session_name())
     return WatchSessionPaths(
-        session_dir=session_dir,
-        runtime_dir=session_dir / RUN_LAYOUT.runtime_dirname,
+        session_dir=session_root,
+        runtime_dir=session_root / RUN_LAYOUT.runtime_dirname,
         baseline_state_path=(
-            None if baseline_state_path is None else session_dir / RUN_LAYOUT.baseline_filename
+            None if baseline_state_path is None else session_root / RUN_LAYOUT.baseline_filename
         ),
     )
 
@@ -200,11 +217,6 @@ def _watch_session_root(*, run_dir: Path | None, runtime_dir: Path | None) -> Pa
     if runtime_dir is not None:
         return runtime_dir.expanduser().resolve().parent / RUN_LAYOUT.watch_rootname
     return Path("local/watch").expanduser().resolve()
-
-
-def _watch_session_name() -> str:
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"{timestamp}-{os.getpid()}"
 
 
 def _next_run_dir(output_root: Path, run_name: str) -> Path:

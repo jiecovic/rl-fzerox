@@ -15,11 +15,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.action_adapters import (
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH,
-    ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH,
-    ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN,
+    LEGACY_ACTION_ADAPTERS,
     ActionAdapterName,
 )
 from rl_fzerox.core.domain.action_values import (
@@ -127,17 +123,17 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         gas_branch = _required_branch(branches, "gas")
         if gas_branch.type == "continuous":
             _validate_continuous_branch("gas", gas_branch)
-            adapter_name = ACTION_ADAPTER_HYBRID_STEER_DRIVE_BOOST_LEAN
+            adapter_name = LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_boost_lean
             continuous_gas = True
             continuous_gas_branch = gas_branch
         else:
             _validate_discrete_branch("gas", gas_branch)
-            adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_BOOST_LEAN
+            adapter_name = LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_boost_lean
             continuous_gas = False
     elif branch_names == _SUPPORTED_BRANCH_SHAPES.steer_gas_air_brake_boost_lean:
         _validate_discrete_branch("gas", _required_branch(branches, "gas"))
         _validate_discrete_branch("air_brake", _required_branch(branches, "air_brake"))
-        adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN
+        adapter_name = LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_air_brake_boost_lean
         continuous_gas = False
     elif branch_names == _SUPPORTED_BRANCH_SHAPES.steer_gas_air_brake_boost_lean_pitch:
         gas_branch = _required_branch(branches, "gas")
@@ -145,12 +141,12 @@ def compile_action_branches(raw_branches: object) -> ActionBranchCompilation:
         _validate_discrete_branch("pitch", _required_branch(branches, "pitch"))
         if gas_branch.type == "continuous":
             _validate_continuous_branch("gas", gas_branch)
-            adapter_name = ACTION_ADAPTER_HYBRID_STEER_DRIVE_AIR_BRAKE_BOOST_LEAN_PITCH
+            adapter_name = LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_air_brake_boost_lean_pitch
             continuous_gas = True
             continuous_gas_branch = gas_branch
         else:
             _validate_discrete_branch("gas", gas_branch)
-            adapter_name = ACTION_ADAPTER_HYBRID_STEER_GAS_AIR_BRAKE_BOOST_LEAN_PITCH
+            adapter_name = LEGACY_ACTION_ADAPTERS.hybrid_steer_gas_air_brake_boost_lean_pitch
             continuous_gas = False
     else:
         names = ", ".join(branch_names) or "none"

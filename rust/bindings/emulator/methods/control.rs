@@ -140,11 +140,59 @@ pub(in crate::bindings::emulator) fn patch_time_attack_machine_settings(
         .map_err(map_core_error)
 }
 
+pub(in crate::bindings::emulator) fn patch_gp_race_start_setup(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.patch_gp_race_start_setup(setup))
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn patch_gp_race_machine_settings(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.patch_gp_race_machine_settings(setup))
+        .map_err(map_core_error)
+}
+
 pub(in crate::bindings::emulator) fn force_time_attack_reinit(
     emulator: &mut PyEmulator,
     py: Python<'_>,
 ) -> PyResult<()> {
     py.detach(|| emulator.host.force_time_attack_reinit())
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn force_gp_race_reinit(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+) -> PyResult<()> {
+    py.detach(|| emulator.host.force_gp_race_reinit())
         .map_err(map_core_error)
 }
 
@@ -165,6 +213,26 @@ pub(in crate::bindings::emulator) fn validate_time_attack_race_start_setup(
         total_lap_count,
     };
     py.detach(|| emulator.host.validate_time_attack_race_start_setup(setup))
+        .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn validate_gp_race_start_setup(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    course_index: i32,
+    character_index: i16,
+    engine_setting_raw_value: i32,
+    machine_skin_index: i16,
+    total_lap_count: i32,
+) -> PyResult<()> {
+    let setup = RaceStartSetup {
+        course_index,
+        character_index,
+        machine_skin_index,
+        engine_setting_raw_value,
+        total_lap_count,
+    };
+    py.detach(|| emulator.host.validate_gp_race_start_setup(setup))
         .map_err(map_core_error)
 }
 

@@ -12,6 +12,7 @@ from fzerox_emulator.base import (
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
+    RaceStartMode,
     ResetState,
 )
 from fzerox_emulator.control import ControllerState
@@ -23,6 +24,7 @@ from fzerox_emulator.frames import (
 )
 from fzerox_emulator.repeat import RepeatStepConfig, run_repeat_step, run_repeat_watch_step
 from fzerox_emulator.video import display_size
+from rl_fzerox.core.config.renderers import DEFAULT_RENDERER, RendererName
 
 
 class Emulator:
@@ -35,7 +37,7 @@ class Emulator:
         rom_path: Path,
         runtime_dir: Path | None = None,
         baseline_state_path: Path | None = None,
-        renderer: str = "angrylion",
+        renderer: RendererName = DEFAULT_RENDERER,
     ) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
@@ -135,6 +137,89 @@ class Emulator:
 
         self._native.write_system_ram(offset, data)
 
+    def patch_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Patch one live race start using native-owned RAM layout rules."""
+
+        native_patch = (
+            self._native.patch_time_attack_race_start_setup
+            if mode == "time_attack"
+            else self._native.patch_gp_race_start_setup
+        )
+        native_patch(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def patch_machine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Patch menu-level machine settings before race initialization."""
+
+        native_patch = (
+            self._native.patch_time_attack_machine_settings
+            if mode == "time_attack"
+            else self._native.patch_gp_race_machine_settings
+        )
+        native_patch(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
+    def force_race_reinit(self, *, mode: RaceStartMode) -> None:
+        """Force the game to rebuild the current race from menu globals."""
+
+        if mode == "time_attack":
+            self._native.force_time_attack_reinit()
+            return
+        self._native.force_gp_race_reinit()
+
+    def validate_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None:
+        """Validate that the native race-start RAM view matches the requested setup."""
+
+        native_validate = (
+            self._native.validate_time_attack_race_start_setup
+            if mode == "time_attack"
+            else self._native.validate_gp_race_start_setup
+        )
+        native_validate(
+            course_index=course_index,
+            character_index=character_index,
+            machine_skin_index=machine_skin_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+        )
+
     def patch_time_attack_race_start_setup(
         self,
         *,
@@ -144,9 +229,8 @@ class Emulator:
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
-        """Patch a live Time Attack race start using native-owned RAM layout rules."""
-
-        self._native.patch_time_attack_race_start_setup(
+        self.patch_race_start_setup(
+            mode="time_attack",
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=machine_skin_index,
@@ -163,9 +247,8 @@ class Emulator:
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
-        """Patch menu-level Time Attack machine settings before race initialization."""
-
-        self._native.patch_time_attack_machine_settings(
+        self.patch_machine_settings(
+            mode="time_attack",
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=machine_skin_index,
@@ -174,9 +257,7 @@ class Emulator:
         )
 
     def force_time_attack_reinit(self) -> None:
-        """Force the game to rebuild the current Time Attack race from menu globals."""
-
-        self._native.force_time_attack_reinit()
+        self.force_race_reinit(mode="time_attack")
 
     def validate_time_attack_race_start_setup(
         self,
@@ -187,9 +268,8 @@ class Emulator:
         engine_setting_raw_value: int,
         total_lap_count: int,
     ) -> None:
-        """Validate that the native race-start RAM view matches the requested setup."""
-
-        self._native.validate_time_attack_race_start_setup(
+        self.validate_race_start_setup(
+            mode="time_attack",
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=machine_skin_index,

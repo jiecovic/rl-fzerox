@@ -7,7 +7,7 @@ seed: 123
 emulator:
   core_path: local/libretro/mupen64plus_next_libretro.so
   rom_path: local/roms/F-Zero X (USA).n64
-  renderer: angrylion
+  renderer: gliden64
 
 env:
   action_repeat: 2

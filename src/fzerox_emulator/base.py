@@ -43,6 +43,7 @@ class ObservationSpec:
 
 ObservationStackMode: TypeAlias = Literal["rgb", "gray", "luma_chroma"]
 ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
+RaceStartMode: TypeAlias = Literal["time_attack", "gp_race"]
 
 
 def stacked_observation_channels(
@@ -154,6 +155,63 @@ class EmulatorBackend(Protocol):
     def load_baseline(self, path: Path) -> None: ...
 
     def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None: ...
+
+    def patch_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None: ...
+
+    def patch_machine_settings(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None: ...
+
+    def force_race_reinit(self, *, mode: RaceStartMode) -> None: ...
+
+    def validate_race_start_setup(
+        self,
+        *,
+        mode: RaceStartMode,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None: ...
+
+    def patch_time_attack_race_start_setup(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None: ...
+
+    def patch_time_attack_machine_settings(
+        self,
+        *,
+        course_index: int,
+        character_index: int,
+        machine_skin_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+    ) -> None: ...
+
+    def force_time_attack_reinit(self) -> None: ...
 
     def render(self) -> RgbFrame: ...
 

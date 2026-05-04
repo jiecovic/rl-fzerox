@@ -164,6 +164,7 @@ class EngineStepAssembler:
 
         self.control_state.record_step(
             control_state=applied_control_state,
+            requested_control_state=requested_control_state,
             frames_run=step_result.summary.frames_run,
             gas_level=gas_level,
         )

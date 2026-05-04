@@ -14,6 +14,7 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
+from rl_fzerox.core.config.vehicle_catalog import EngineSetting, resolve_engine_setting
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,13 @@ class SelectedTrack:
     vehicle: str | None
     vehicle_name: str | None
     engine_setting: str | None
+    engine_setting_raw_value: int | None
+    engine_setting_min_raw_value: int | None
+    engine_setting_max_raw_value: int | None
+    source_vehicle: str | None
+    source_course_index: int | None
+    source_engine_setting: str | None
+    source_engine_setting_raw_value: int | None
     records: TrackRecordsConfig | None
     sampling_mode: str
     cycle_position: int | None = None
@@ -62,6 +70,7 @@ class SelectedTrack:
             "track_vehicle": self.vehicle,
             "track_vehicle_name": self.vehicle_name,
             "track_engine_setting": self.engine_setting,
+            "track_engine_setting_raw_value": self.engine_setting_raw_value,
             "track_sampling_cycle_position": self.cycle_position,
         }
         if self.records is not None:
@@ -100,10 +109,19 @@ class TrackResetSelector:
         if config.sampling_mode == "random":
             return select_reset_track(config, seed=seed)
         if config.sampling_mode in ("balanced", "step_balanced"):
-            return self._select_balanced(config, sampling_mode=config.sampling_mode)
+            return self._select_balanced(
+                config,
+                sampling_mode=config.sampling_mode,
+                seed=seed,
+            )
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
-    def select_sequential(self, config: TrackSamplingConfig) -> SelectedTrack | None:
+    def select_sequential(
+        self,
+        config: TrackSamplingConfig,
+        *,
+        seed: int | None,
+    ) -> SelectedTrack | None:
         """Select configured tracks in list order, ignoring training weights."""
 
         if not config.enabled:
@@ -118,6 +136,7 @@ class TrackResetSelector:
             entry,
             sampling_mode="sequential",
             cycle_position=position,
+            seed=seed,
         )
 
     def _select_balanced(
@@ -125,6 +144,7 @@ class TrackResetSelector:
         config: TrackSamplingConfig,
         *,
         sampling_mode: str,
+        seed: int | None,
     ) -> SelectedTrack | None:
         if not config.enabled:
             return None
@@ -138,6 +158,7 @@ class TrackResetSelector:
             entry,
             sampling_mode=sampling_mode,
             cycle_position=position,
+            seed=seed,
         )
 
     def _sync_balanced_cycle(self, config: TrackSamplingConfig) -> None:
@@ -161,6 +182,7 @@ def select_reset_track_by_course_id(
     config: TrackSamplingConfig,
     *,
     course_id: str,
+    seed: int | None = None,
 ) -> SelectedTrack | None:
     """Select the first configured reset baseline for a specific course id."""
 
@@ -168,7 +190,7 @@ def select_reset_track_by_course_id(
         return None
     for entry in config.entries:
         if entry.course_id == course_id:
-            return _selected_track_from_entry(entry, sampling_mode="locked")
+            return _selected_track_from_entry(entry, sampling_mode="locked", seed=seed)
     return None
 
 
@@ -189,6 +211,7 @@ def select_reset_track(
     return _selected_track_from_entry(
         _weighted_entry(config.entries, sample=sample),
         sampling_mode="random",
+        seed=seed,
     )
 
 
@@ -210,11 +233,13 @@ def _selected_track_from_entry(
     *,
     sampling_mode: str,
     cycle_position: int | None = None,
+    seed: int | None,
 ) -> SelectedTrack:
     if entry.baseline_state_path is None:
         raise ValueError(
             f"track sampling entry {entry.id!r} has no materialized baseline_state_path"
         )
+    resolved_engine = _resolved_engine_setting(entry, seed=seed)
     return SelectedTrack(
         id=entry.id,
         display_name=entry.display_name,
@@ -227,10 +252,61 @@ def _selected_track_from_entry(
         mode=entry.mode,
         vehicle=entry.vehicle,
         vehicle_name=entry.vehicle_name,
-        engine_setting=entry.engine_setting,
+        engine_setting=resolved_engine.id if resolved_engine is not None else entry.engine_setting,
+        engine_setting_raw_value=(
+            None if resolved_engine is None else int(resolved_engine.raw_value)
+        ),
+        engine_setting_min_raw_value=entry.engine_setting_min_raw_value,
+        engine_setting_max_raw_value=entry.engine_setting_max_raw_value,
+        source_vehicle=entry.source_vehicle,
+        source_course_index=entry.source_course_index,
+        source_engine_setting=entry.source_engine_setting,
+        source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
         records=entry.records,
         sampling_mode=sampling_mode,
         cycle_position=cycle_position,
+    )
+
+
+def _resolved_engine_setting(
+    entry: TrackSamplingEntryConfig,
+    *,
+    seed: int | None,
+) -> EngineSetting | None:
+    raw_value = _target_engine_setting_raw_value(entry, seed=seed)
+    if raw_value is None:
+        return None
+    return resolve_engine_setting(
+        raw_value,
+        context=f"track sampling entry {entry.id!r}",
+    )
+
+
+def _target_engine_setting_raw_value(
+    entry: TrackSamplingEntryConfig,
+    *,
+    seed: int | None,
+) -> int | None:
+    minimum = entry.engine_setting_min_raw_value
+    maximum = entry.engine_setting_max_raw_value
+    if minimum is None and maximum is None:
+        return entry.engine_setting_raw_value
+    if minimum is None or maximum is None:
+        raise ValueError(
+            f"track sampling entry {entry.id!r} must define both engine range bounds"
+        )
+    if minimum > maximum:
+        raise ValueError(
+            f"track sampling entry {entry.id!r} has engine range min > max: "
+            f"{minimum} > {maximum}"
+        )
+    if minimum == maximum:
+        return int(minimum)
+    rng = Random(seed) if seed is not None else None
+    return (
+        rng.randint(int(minimum), int(maximum))
+        if rng is not None
+        else Random().randint(int(minimum), int(maximum))
     )
 
 

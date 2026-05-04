@@ -69,6 +69,7 @@ class ControlStateTracker:
         self,
         *,
         control_state: ControllerState,
+        requested_control_state: ControllerState | None = None,
         frames_run: int,
         gas_level: float | None = None,
     ) -> None:
@@ -84,7 +85,10 @@ class ControlStateTracker:
         self._lean.record(joypad_mask=control_state.joypad_mask, frames_elapsed=frames_elapsed)
         self._left_steer_held = steer_axis < -1.0e-6
         self._right_steer_held = steer_axis > 1.0e-6
-        self._action_history.record(control_state, gas_level=gas_level)
+        self._action_history.record(
+            control_state if requested_control_state is None else requested_control_state,
+            gas_level=gas_level,
+        )
 
     def observation_fields(self) -> dict[str, float]:
         """Return control-history features passed into observation building."""
