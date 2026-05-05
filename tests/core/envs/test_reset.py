@@ -281,6 +281,44 @@ def test_track_baseline_cache_reads_each_state_once(tmp_path: Path) -> None:
     ]
 
 
+def test_track_baseline_cache_evicts_oldest_states_when_byte_limit_is_hit(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "first.state"
+    second_path = tmp_path / "second.state"
+    first_path.write_bytes(b"aaa")
+    second_path.write_bytes(b"bbbb")
+    backend = SyntheticBackend()
+    cache = TrackBaselineCache(max_cached_state_bytes=6)
+
+    cache.load_into_backend(backend, first_path)
+    cache.load_into_backend(backend, second_path)
+    first_path.write_bytes(b"ccccc")
+    cache.load_into_backend(backend, first_path)
+
+    assert backend.loaded_baseline_bytes == [
+        (first_path, len(b"aaa")),
+        (second_path, len(b"bbbb")),
+        (first_path, len(b"ccccc")),
+    ]
+
+
+def test_track_baseline_cache_skips_caching_oversized_states(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "oversized.state"
+    baseline_path.write_bytes(b"12345")
+    backend = SyntheticBackend()
+    cache = TrackBaselineCache(max_cached_state_bytes=4)
+
+    cache.load_into_backend(backend, baseline_path)
+    baseline_path.write_bytes(b"12")
+    cache.load_into_backend(backend, baseline_path)
+
+    assert backend.loaded_baseline_bytes == [
+        (baseline_path, len(b"12345")),
+        (baseline_path, len(b"12")),
+    ]
+
+
 def test_balanced_track_sampling_cycles_with_env_index_offset(tmp_path: Path) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand", "forest"))
     config = EnvConfig(
