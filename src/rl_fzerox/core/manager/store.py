@@ -1,10 +1,11 @@
 # src/rl_fzerox/core/manager/store.py
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sqlite3
-import subprocess
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -29,6 +30,8 @@ from rl_fzerox.core.manager.models import (
 from rl_fzerox.core.manager.paths import manager_runs_root, predicted_managed_run_dir
 from rl_fzerox.core.manager.schema import initialize_manager_schema
 from rl_fzerox.core.manager.serialization import config_hash, config_json, load_config_json
+
+RUN_WORKER_HEARTBEAT_TIMEOUT = timedelta(seconds=90)
 
 
 def default_manager_db_path() -> Path:
@@ -418,6 +421,8 @@ class ManagerStore:
             ).fetchone()
             if row is None:
                 return None
+            if status != "running":
+                connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
             connection.execute(
                 """
                 INSERT INTO run_events(run_id, created_at, kind, message)
@@ -440,6 +445,87 @@ class ManagerStore:
                 "DELETE FROM run_runtime WHERE run_id = ?",
                 (run_id,),
             )
+
+    def register_run_worker(
+        self,
+        *,
+        run_id: str,
+        launch_token: str,
+        pid: int,
+        launched_at: str,
+    ) -> bool:
+        """Persist the currently owned manager worker lease for one run."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM runs WHERE id = ?",
+                (run_id,),
+            ).fetchone()
+            if row is None:
+                return False
+            connection.execute(
+                """
+                INSERT INTO run_workers(
+                    run_id,
+                    launch_token,
+                    pid,
+                    launched_at,
+                    heartbeat_at
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    launch_token = excluded.launch_token,
+                    pid = excluded.pid,
+                    launched_at = excluded.launched_at,
+                    heartbeat_at = excluded.heartbeat_at
+                """,
+                (
+                    run_id,
+                    launch_token,
+                    pid,
+                    launched_at,
+                    launched_at,
+                ),
+            )
+        return True
+
+    def heartbeat_run_worker(
+        self,
+        *,
+        run_id: str,
+        launch_token: str,
+        heartbeat_at: str,
+    ) -> bool:
+        """Refresh one owned manager worker lease heartbeat."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE run_workers
+                SET heartbeat_at = ?
+                WHERE run_id = ? AND launch_token = ?
+                """,
+                (heartbeat_at, run_id, launch_token),
+            )
+        return cursor.rowcount > 0
+
+    def clear_run_worker(self, run_id: str, *, launch_token: str | None = None) -> None:
+        """Delete the current manager worker lease for one run."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            if launch_token is None:
+                connection.execute(
+                    "DELETE FROM run_workers WHERE run_id = ?",
+                    (run_id,),
+                )
+            else:
+                connection.execute(
+                    "DELETE FROM run_workers WHERE run_id = ? AND launch_token = ?",
+                    (run_id, launch_token),
+                )
 
     def upsert_run_runtime(
         self,
@@ -744,6 +830,7 @@ class ManagerStore:
 
             connection.execute("DELETE FROM run_runtime WHERE run_id = ?", (run_id,))
             connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
+            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
             connection.execute("DELETE FROM run_events WHERE run_id = ?", (run_id,))
             cursor = connection.execute("DELETE FROM runs WHERE id = ?", (run_id,))
         return cursor.rowcount > 0
@@ -808,6 +895,7 @@ class ManagerStore:
             for run_id in run_delete_order:
                 connection.execute("DELETE FROM run_runtime WHERE run_id = ?", (run_id,))
                 connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
+                connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
                 connection.execute("DELETE FROM run_events WHERE run_id = ?", (run_id,))
                 connection.execute("DELETE FROM runs WHERE id = ?", (run_id,))
 
@@ -1004,28 +1092,36 @@ class ManagerStore:
         return templates[0]
 
     def reconcile_orphaned_runs(self) -> None:
-        """Mark dead manager-owned worker runs as failed so they can be recovered."""
+        """Mark stale owned worker leases as failed when the worker has disappeared."""
 
         self.initialize()
-        active_run_ids = _manager_worker_run_ids()
         now = datetime.now(UTC)
         with self._connect() as connection:
             rows = connection.execute(
                 _run_select_sql(where_clause="WHERE runs.status = 'running'")
             ).fetchall()
+            worker_rows = connection.execute(
+                """
+                SELECT run_id, launch_token, pid, launched_at, heartbeat_at
+                FROM run_workers
+                """
+            ).fetchall()
+            worker_by_run_id = {
+                str(row["run_id"]): _run_worker_lease_from_row(row)
+                for row in worker_rows
+            }
             for row in rows:
                 run = _run_from_row(row)
-                if run.id in active_run_ids:
+                worker = worker_by_run_id.get(run.id)
+                if worker is None:
                     continue
-                last_heartbeat = (
-                    run.runtime.updated_at if run.runtime is not None else run.started_at
-                )
-                if last_heartbeat is None:
-                    last_heartbeat = run.created_at
-                heartbeat_at = datetime.fromisoformat(last_heartbeat)
-                if now - heartbeat_at <= timedelta(seconds=15):
+                heartbeat_at = datetime.fromisoformat(worker.heartbeat_at)
+                if now - heartbeat_at <= RUN_WORKER_HEARTBEAT_TIMEOUT:
+                    continue
+                if _pid_exists(worker.pid):
                     continue
                 connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run.id,))
+                connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run.id,))
                 connection.execute(
                     """
                     UPDATE runs
@@ -1094,6 +1190,25 @@ def _runtime_from_row(row: sqlite3.Row) -> ManagedRunRuntime | None:
         entropy_loss=_optional_float(row["runtime_entropy_loss"]),
         value_loss=_optional_float(row["runtime_value_loss"]),
         policy_gradient_loss=_optional_float(row["runtime_policy_gradient_loss"]),
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _RunWorkerLease:
+    run_id: str
+    launch_token: str
+    pid: int
+    launched_at: str
+    heartbeat_at: str
+
+
+def _run_worker_lease_from_row(row: sqlite3.Row) -> _RunWorkerLease:
+    return _RunWorkerLease(
+        run_id=str(row["run_id"]),
+        launch_token=str(row["launch_token"]),
+        pid=int(row["pid"]),
+        launched_at=str(row["launched_at"]),
+        heartbeat_at=str(row["heartbeat_at"]),
     )
 
 
@@ -1451,21 +1566,13 @@ def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
-def _manager_worker_run_ids() -> set[str]:
+def _pid_exists(pid: int) -> bool:
+    if pid <= 0:
+        return False
     try:
-        result = subprocess.run(
-            ["ps", "-eo", "args="],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return set()
-    active: set[str] = set()
-    for line in result.stdout.splitlines():
-        if "rl_fzerox.apps.run_manager.worker" not in line:
-            continue
-        match = re.search(r"--run-id\s+(\S+)", line)
-        if match is not None:
-            active.add(match.group(1))
-    return active
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True

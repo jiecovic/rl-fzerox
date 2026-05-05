@@ -6,7 +6,7 @@ import sqlite3
 from rl_fzerox.core.manager.config import default_managed_run_config
 from rl_fzerox.core.manager.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -92,6 +92,15 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             run_id TEXT PRIMARY KEY,
             command TEXT NOT NULL,
             requested_at TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS run_workers (
+            run_id TEXT PRIMARY KEY,
+            launch_token TEXT NOT NULL,
+            pid INTEGER NOT NULL,
+            launched_at TEXT NOT NULL,
+            heartbeat_at TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES runs(id)
         );
 
