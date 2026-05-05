@@ -364,6 +364,7 @@ export function OptionalNumberField({
   sliderNullTickLabel?: string;
 }) {
   const enabled = value !== null;
+  const [rawValue, setRawValue] = useState(value === null ? "" : formatDecimalInput(value, step));
   const sliderStep = Number(step);
   const sliderSupportsNullAtMax =
     sliderNullPosition === "max" && Number.isFinite(sliderStep) && sliderStep > 0;
@@ -380,12 +381,44 @@ export function OptionalNumberField({
         { value: max, label: formatCompactDecimal(max) },
       ];
 
+  useEffect(() => {
+    setRawValue(value === null ? "" : formatDecimalInput(value, step));
+  }, [step, value]);
+
   function updateFromSlider(nextValue: number) {
     if (sliderSupportsNullAtMax && nextValue >= sliderMax) {
       onChange(null);
       return;
     }
-    onChange(nextValue);
+    const normalized = roundToStepPrecision(nextValue, step);
+    onChange(normalized);
+    setRawValue(formatDecimalInput(normalized, step));
+  }
+
+  function commitValue() {
+    if (!enabled) {
+      return;
+    }
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      setRawValue(formatDecimalInput(value, step));
+      return;
+    }
+    const normalized = roundToStepPrecision(parsed, step);
+    onChange(normalized);
+    setRawValue(formatDecimalInput(normalized, step));
+  }
+
+  function changeValue(nextRawValue: string) {
+    setRawValue(nextRawValue);
+    if (nextRawValue.trim().length === 0) {
+      return;
+    }
+    const parsed = Number(nextRawValue);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      return;
+    }
+    onChange(roundToStepPrecision(parsed, step));
   }
 
   return (
@@ -397,7 +430,15 @@ export function OptionalNumberField({
           aria-pressed={enabled}
           className={enabled ? "switch-button active" : "switch-button"}
           type="button"
-          onClick={() => onChange(enabled ? null : defaultValue)}
+          onClick={() => {
+            if (enabled) {
+              onChange(null);
+              return;
+            }
+            const normalized = roundToStepPrecision(defaultValue, step);
+            onChange(normalized);
+            setRawValue(formatDecimalInput(normalized, step));
+          }}
         >
           <span aria-hidden="true" />
           <strong>{enabled ? enabledLabel : nullLabel}</strong>
@@ -420,8 +461,14 @@ export function OptionalNumberField({
           min={min}
           step={step}
           type="number"
-          value={enabled ? formatDecimalInput(value, step) : ""}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={rawValue}
+          onBlur={commitValue}
+          onChange={(event) => changeValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+          }}
         />
       </div>
     </div>

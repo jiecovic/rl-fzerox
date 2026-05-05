@@ -7,13 +7,9 @@ import {
   formatCompactNumber,
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
+import type { SliderTick } from "@/features/configurator/fields/types";
 
 type RangeHandle = "min" | "max";
-
-interface SliderTick {
-  label: string;
-  value: number;
-}
 
 interface RangePairFieldProps {
   help: string;
@@ -42,6 +38,8 @@ export function RangePairField({
   valueMax,
   valueMin,
 }: RangePairFieldProps) {
+  const [rawMin, setRawMin] = useState(String(valueMin));
+  const [rawMax, setRawMax] = useState(String(valueMax));
   const fieldResetHandler =
     resetMin === undefined ||
     resetMax === undefined ||
@@ -49,12 +47,62 @@ export function RangePairField({
       ? undefined
       : () => onChange({ min: resetMin, max: resetMax });
 
-  function updateMin(nextValue: number) {
-    onChange({ min: clamp(snapToStep(nextValue, min, step), min, valueMax), max: valueMax });
+  useEffect(() => {
+    setRawMin(String(valueMin));
+  }, [valueMin]);
+
+  useEffect(() => {
+    setRawMax(String(valueMax));
+  }, [valueMax]);
+
+  function updateMin(nextValue: number, syncInput = true) {
+    const normalized = normalizeRangeValue(nextValue, min, valueMax, step);
+    onChange({ min: normalized, max: valueMax });
+    if (syncInput) {
+      setRawMin(String(normalized));
+    }
   }
 
-  function updateMax(nextValue: number) {
-    onChange({ min: valueMin, max: clamp(snapToStep(nextValue, min, step), valueMin, max) });
+  function updateMax(nextValue: number, syncInput = true) {
+    const normalized = normalizeRangeValue(nextValue, valueMin, max, step);
+    onChange({ min: valueMin, max: normalized });
+    if (syncInput) {
+      setRawMax(String(normalized));
+    }
+  }
+
+  function changeMin(nextRawValue: string) {
+    setRawMin(nextRawValue);
+    const parsed = parseEditableNumberInput(nextRawValue);
+    if (parsed !== null) {
+      updateMin(parsed, false);
+    }
+  }
+
+  function changeMax(nextRawValue: string) {
+    setRawMax(nextRawValue);
+    const parsed = parseEditableNumberInput(nextRawValue);
+    if (parsed !== null) {
+      updateMax(parsed, false);
+    }
+  }
+
+  function commitMin() {
+    const parsed = parseEditableNumberInput(rawMin);
+    if (parsed === null) {
+      setRawMin(String(valueMin));
+      return;
+    }
+    updateMin(parsed);
+  }
+
+  function commitMax() {
+    const parsed = parseEditableNumberInput(rawMax);
+    if (parsed === null) {
+      setRawMax(String(valueMax));
+      return;
+    }
+    updateMax(parsed);
   }
 
   return (
@@ -80,8 +128,14 @@ export function RangePairField({
             min={min}
             step={step}
             type="number"
-            value={valueMin}
-            onChange={(event) => updateMin(Number(event.target.value))}
+            value={rawMin}
+            onBlur={commitMin}
+            onChange={(event) => changeMin(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
           />
           <input
             aria-label={`${label} maximum`}
@@ -89,8 +143,14 @@ export function RangePairField({
             min={valueMin}
             step={step}
             type="number"
-            value={valueMax}
-            onChange={(event) => updateMax(Number(event.target.value))}
+            value={rawMax}
+            onBlur={commitMax}
+            onChange={(event) => changeMax(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
           />
         </div>
       </div>
@@ -128,6 +188,8 @@ export function OptionalRangePairField({
   const enabled = valueMin !== null && valueMax !== null;
   const activeMin = enabled ? valueMin : defaultMin;
   const activeMax = enabled ? valueMax : defaultMax;
+  const [rawMin, setRawMin] = useState(String(activeMin));
+  const [rawMax, setRawMax] = useState(String(activeMax));
   const fieldResetHandler =
     resetMin === undefined ||
     resetMax === undefined ||
@@ -135,20 +197,78 @@ export function OptionalRangePairField({
       ? undefined
       : () => onChange({ min: resetMin, max: resetMax });
 
+  useEffect(() => {
+    setRawMin(String(activeMin));
+  }, [activeMin]);
+
+  useEffect(() => {
+    setRawMax(String(activeMax));
+  }, [activeMax]);
+
   function updateEnabled() {
-    onChange(enabled ? { min: null, max: null } : { min: defaultMin, max: defaultMax });
+    if (enabled) {
+      onChange({ min: null, max: null });
+      return;
+    }
+    const normalizedMin = normalizeRangeValue(defaultMin, min, defaultMax, step);
+    const normalizedMax = normalizeRangeValue(defaultMax, normalizedMin, max, step);
+    onChange({ min: normalizedMin, max: normalizedMax });
+    setRawMin(String(normalizedMin));
+    setRawMax(String(normalizedMax));
   }
 
-  function updateMin(nextValue: number) {
+  function updateMin(nextValue: number, syncInput = true) {
     if (enabled) {
-      onChange({ min: clamp(snapToStep(nextValue, min, step), min, activeMax), max: activeMax });
+      const normalized = normalizeRangeValue(nextValue, min, activeMax, step);
+      onChange({ min: normalized, max: activeMax });
+      if (syncInput) {
+        setRawMin(String(normalized));
+      }
     }
   }
 
-  function updateMax(nextValue: number) {
+  function updateMax(nextValue: number, syncInput = true) {
     if (enabled) {
-      onChange({ min: activeMin, max: clamp(snapToStep(nextValue, min, step), activeMin, max) });
+      const normalized = normalizeRangeValue(nextValue, activeMin, max, step);
+      onChange({ min: activeMin, max: normalized });
+      if (syncInput) {
+        setRawMax(String(normalized));
+      }
     }
+  }
+
+  function changeMin(nextRawValue: string) {
+    setRawMin(nextRawValue);
+    const parsed = parseEditableNumberInput(nextRawValue);
+    if (parsed !== null) {
+      updateMin(parsed, false);
+    }
+  }
+
+  function changeMax(nextRawValue: string) {
+    setRawMax(nextRawValue);
+    const parsed = parseEditableNumberInput(nextRawValue);
+    if (parsed !== null) {
+      updateMax(parsed, false);
+    }
+  }
+
+  function commitMin() {
+    const parsed = parseEditableNumberInput(rawMin);
+    if (parsed === null) {
+      setRawMin(String(activeMin));
+      return;
+    }
+    updateMin(parsed);
+  }
+
+  function commitMax() {
+    const parsed = parseEditableNumberInput(rawMax);
+    if (parsed === null) {
+      setRawMax(String(activeMax));
+      return;
+    }
+    updateMax(parsed);
   }
 
   return (
@@ -184,8 +304,14 @@ export function OptionalRangePairField({
             min={min}
             step={step}
             type="number"
-            value={activeMin}
-            onChange={(event) => updateMin(Number(event.target.value))}
+            value={rawMin}
+            onBlur={commitMin}
+            onChange={(event) => changeMin(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
           />
           <input
             aria-label={`${label} maximum`}
@@ -194,8 +320,14 @@ export function OptionalRangePairField({
             min={activeMin}
             step={step}
             type="number"
-            value={activeMax}
-            onChange={(event) => updateMax(Number(event.target.value))}
+            value={rawMax}
+            onBlur={commitMax}
+            onChange={(event) => changeMax(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+            }}
           />
         </div>
       </div>
@@ -421,4 +553,16 @@ function snapToStep(value: number, min: number, step: number) {
   const snapped = min + Math.round((value - min) / step) * step;
   const decimals = step.toString().split(".")[1]?.length ?? 0;
   return Number(snapped.toFixed(decimals));
+}
+
+function parseEditableNumberInput(rawValue: string) {
+  if (rawValue.trim().length === 0) {
+    return null;
+  }
+  const parsed = Number(rawValue);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeRangeValue(value: number, min: number, max: number, step: number) {
+  return clamp(snapToStep(value, min, step), min, max);
 }
