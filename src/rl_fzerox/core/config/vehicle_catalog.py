@@ -47,9 +47,7 @@ class VehicleMenuGrid:
 
     def row_and_column(self, machine_select_slot: int) -> tuple[int, int]:
         if machine_select_slot < 0:
-            raise ValueError(
-                f"machine_select_slot must be non-negative, got {machine_select_slot}"
-            )
+            raise ValueError(f"machine_select_slot must be non-negative, got {machine_select_slot}")
         return divmod(machine_select_slot, self.column_count)
 
 

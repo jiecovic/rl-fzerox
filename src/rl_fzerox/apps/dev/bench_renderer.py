@@ -12,8 +12,9 @@ from pathlib import Path
 
 from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, Emulator, joypad_mask
 from fzerox_emulator.base import BackendStepResult
+from rl_fzerox.core.config.renderers import KNOWN_RENDERERS, RendererName
 
-RENDERERS: tuple[str, ...] = ("angrylion", "gliden64")
+RENDERERS: tuple[RendererName, ...] = KNOWN_RENDERERS
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,7 +110,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         _print_table(results)
 
 
-def _benchmark_renderer(args: argparse.Namespace, renderer: str) -> RendererBenchResult:
+def _benchmark_renderer(
+    args: argparse.Namespace,
+    renderer: RendererName,
+) -> RendererBenchResult:
     runtime_dir = (args.runtime_dir / renderer).expanduser().resolve()
     runtime_dir.mkdir(parents=True, exist_ok=True)
     controller = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.a))
@@ -150,7 +154,10 @@ def _benchmark_renderer(args: argparse.Namespace, renderer: str) -> RendererBenc
         emulator.close()
 
 
-def _benchmark_renderer_isolated(args: argparse.Namespace, renderer: str) -> RendererBenchResult:
+def _benchmark_renderer_isolated(
+    args: argparse.Namespace,
+    renderer: RendererName,
+) -> RendererBenchResult:
     command = [
         sys.executable,
         "-m",

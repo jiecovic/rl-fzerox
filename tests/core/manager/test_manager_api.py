@@ -1,12 +1,13 @@
 # tests/core/manager/test_manager_api.py
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Literal
 
+import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api as manager_api
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
@@ -45,6 +46,44 @@ class _LauncherStub:
     def watch_artifact(self, *, run_id: str, artifact: str) -> None:
         del run_id, artifact
         raise AssertionError("watch should not be called")
+
+
+class _ApiClient:
+    def __init__(self, app: object) -> None:
+        self._app = app
+
+    async def _request_async(
+        self,
+        method: str,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        transport = httpx.ASGITransport(app=self._app)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            return await client.request(method, url, **kwargs)
+
+    def request(
+        self,
+        method: str,
+        url: str,
+        **kwargs: object,
+    ) -> httpx.Response:
+        return asyncio.run(self._request_async(method, url, **kwargs))
+
+    def get(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request("GET", url, **kwargs)
+
+    def post(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request("POST", url, **kwargs)
+
+    def put(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request("PUT", url, **kwargs)
+
+    def delete(self, url: str, **kwargs: object) -> httpx.Response:
+        return self.request("DELETE", url, **kwargs)
 
 
 def test_manager_api_lists_default_template(tmp_path: Path) -> None:
@@ -98,7 +137,7 @@ def test_manager_api_launches_run(tmp_path: Path) -> None:
                 raise RuntimeError("launch status update failed")
             return launched
 
-    client = TestClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
     config = default_managed_run_config().model_dump(mode="json")
 
     response = client.post("/api/runs", json={"name": "Launch Me", "config": config})
@@ -140,7 +179,7 @@ def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> 
                 raise RuntimeError("launch status update failed")
             return launched
 
-    client = TestClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
     config = default_managed_run_config().model_dump(mode="json")
     draft_response = client.post("/api/drafts", json={"name": "Shared", "config": config})
     draft_id = draft_response.json()["draft"]["id"]
@@ -209,7 +248,7 @@ def test_manager_api_forks_run(tmp_path: Path) -> None:
                 raise RuntimeError("fork status update failed")
             return launched
 
-    client = TestClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
 
     response = client.post(f"/api/runs/{parent.id}/fork", json={"artifact": "best"})
 
@@ -240,16 +279,16 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(
         json.dumps(
-                {
-                    "version": 1,
-                    "sampling_mode": "step_balanced",
-                    "action_repeat": 2,
-                    "update_episodes": 4,
-                    "ema_alpha": 0.5,
-                    "max_weight_scale": 5.0,
-                    "update_count": 3,
-                    "episodes_since_update": 1,
-                    "entries": [
+            {
+                "version": 1,
+                "sampling_mode": "step_balanced",
+                "action_repeat": 2,
+                "update_episodes": 4,
+                "ema_alpha": 0.5,
+                "max_weight_scale": 5.0,
+                "update_count": 3,
+                "episodes_since_update": 1,
+                "entries": [
                     {
                         "track_id": "mute",
                         "course_key": "mute_city",
@@ -410,7 +449,7 @@ def test_manager_api_metrics_full_mode_disables_recent_limit(
             del name, config, draft_id, source_run_id, source_artifact
             raise AssertionError("launch should not be called")
 
-    client = TestClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
 
     recent_response = client.get(f"/api/runs/{run.id}/metrics")
     full_response = client.get(f"/api/runs/{run.id}/metrics?mode=full")
@@ -477,7 +516,7 @@ def test_manager_api_allows_draft_name_matching_existing_run(tmp_path: Path) -> 
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    client = TestClient(create_manager_api_app(store))
+    client = _ApiClient(create_manager_api_app(store))
     config = default_managed_run_config().model_dump(mode="json")
 
     response = client.post("/api/drafts", json={"name": "Shared Name", "config": config})
@@ -506,7 +545,7 @@ def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    client = TestClient(create_manager_api_app(store))
+    client = _ApiClient(create_manager_api_app(store))
 
     response = client.get("/api/runs")
 
@@ -521,39 +560,25 @@ def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert "crop_60x76" in {
-        preset["value"] for preset in payload["observation_presets"]
-    }
-    assert "nature_32_64_128" in {
-        profile["value"] for profile in payload["conv_profiles"]
-    }
+    assert "crop_60x76" in {preset["value"] for preset in payload["observation_presets"]}
+    assert "nature_32_64_128" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "x_cup" in {mode["value"] for mode in payload["track_pool_modes"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
-    assert "step_balanced" in {
-        mode["value"] for mode in payload["track_sampling_modes"]
-    }
+    assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "jack" in {cup["id"] for cup in payload["track_cups"]}
     assert "mute_city" in {course["id"] for course in payload["built_in_courses"]}
     assert "blue_falcon" in {vehicle["id"] for vehicle in payload["vehicles"]}
-    blue_falcon = next(
-        vehicle for vehicle in payload["vehicles"] if vehicle["id"] == "blue_falcon"
-    )
+    blue_falcon = next(vehicle for vehicle in payload["vehicles"] if vehicle["id"] == "blue_falcon")
     assert blue_falcon["menu_row"] == 0
     assert blue_falcon["menu_column"] == 0
-    red_gazelle = next(
-        vehicle for vehicle in payload["vehicles"] if vehicle["id"] == "red_gazelle"
-    )
+    red_gazelle = next(vehicle for vehicle in payload["vehicles"] if vehicle["id"] == "red_gazelle")
     assert red_gazelle["menu_row"] == 0
     assert red_gazelle["menu_column"] == 5
-    assert "balanced" in {
-        preset["id"] for preset in payload["engine_setting_presets"]
-    }
+    assert "balanced" in {preset["id"] for preset in payload["engine_setting_presets"]}
     assert "continuous" in {mode["value"] for mode in payload["steering_modes"]}
     assert "on_off" in {mode["value"] for mode in payload["drive_modes"]}
-    assert "independent_buttons" in {
-        mode["value"] for mode in payload["lean_output_modes"]
-    }
+    assert "independent_buttons" in {mode["value"] for mode in payload["lean_output_modes"]}
     lean_modes = {mode["value"] for mode in payload["lean_modes"]}
     assert "release_cooldown" in lean_modes
     assert "raw" in lean_modes
@@ -693,6 +718,6 @@ def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path: Path)
     assert "boost" not in branch_names
 
 
-def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> TestClient:
+def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> _ApiClient:
     resolved_store = store or ManagerStore(tmp_path / "manager" / "runs.db")
-    return TestClient(create_manager_api_app(resolved_store))
+    return _ApiClient(create_manager_api_app(resolved_store))

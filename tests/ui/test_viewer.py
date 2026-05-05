@@ -44,9 +44,7 @@ def test_pressed_button_labels_are_human_readable() -> None:
     assert _pressed_button_labels(0) == "none"
     assert (
         _pressed_button_labels(
-            (1 << JOYPAD_BUTTONS.up)
-            | (1 << JOYPAD_BUTTONS.a)
-            | (1 << JOYPAD_BUTTONS.start)
+            (1 << JOYPAD_BUTTONS.up) | (1 << JOYPAD_BUTTONS.a) | (1 << JOYPAD_BUTTONS.start)
         )
         == "Up A Start"
     )
@@ -237,6 +235,7 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
     labels = {line.label for line in session_section.lines}
     assert "Reverse frames" not in labels
     assert "Stuck frames" not in labels
+
 
 def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(None) == "manual"
@@ -605,6 +604,7 @@ def test_side_panel_marks_zeroed_state_components() -> None:
         "// edge_ratio",
     ]
 
+
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -831,6 +831,7 @@ def test_session_section_shows_na_before_successful_finish() -> None:
     )
 
     assert best_position_line.value == "n/a"
+
 
 def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(None) == "manual"

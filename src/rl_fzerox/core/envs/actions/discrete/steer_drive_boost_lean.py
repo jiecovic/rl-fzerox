@@ -28,8 +28,8 @@ from rl_fzerox.core.envs.actions.discrete.steer_drive import (
 # - N64 Z -> left lean / left side-input edge
 # - N64 R -> right lean / right side-input edge
 BOOST_MASK = joypad_mask(JOYPAD_BUTTONS.y)
-LEAN_LEFT_MASK = joypad_mask(JOYPAD_BUTTONS.l2)
-LEAN_RIGHT_MASK = joypad_mask(JOYPAD_BUTTONS.r)
+LEAN_LEFT_MASK = joypad_mask(JOYPAD_BUTTONS.left_trigger)
+LEAN_RIGHT_MASK = joypad_mask(JOYPAD_BUTTONS.right_shoulder)
 LEAN_MASKS = (
     0,
     LEAN_LEFT_MASK,

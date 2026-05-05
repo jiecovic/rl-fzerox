@@ -82,4 +82,5 @@ class TrainingAlgorithmRegistry:
             )
         )
 
+
 TRAINING_ALGORITHMS = TrainingAlgorithmRegistry()

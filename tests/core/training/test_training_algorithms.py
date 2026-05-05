@@ -537,9 +537,7 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(
-                    action=ActionConfig(
-                        name="hybrid_steer_gas_air_brake_boost_lean_pitch"
-                    ),
+                    action=ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch"),
                     observation=ObservationConfig(mode="image_state"),
                 ),
             )

@@ -230,9 +230,10 @@ def test_observation_extractor_custom_profile_supports_padding() -> None:
 
     assert extractor._flatten_dim == 6_840
     assert tuple(features.shape) == (2, 6_840)
-    assert [
-        module.padding for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)
-    ] == [(1, 1), (1, 1)]
+    assert [module.padding for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)] == [
+        (1, 1),
+        (1, 1),
+    ]
 
 
 def test_observation_extractor_rejects_custom_profile_that_collapses_geometry() -> None:
@@ -241,9 +242,7 @@ def test_observation_extractor_rejects_custom_profile_that_collapses_geometry() 
             spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
             features_dim="auto",
             conv_profile="custom",
-            custom_conv_layers=(
-                {"out_channels": 32, "kernel_size": 64, "stride": 1},
-            ),
+            custom_conv_layers=({"out_channels": 32, "kernel_size": 64, "stride": 1},),
         )
 
 

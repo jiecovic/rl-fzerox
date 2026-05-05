@@ -250,6 +250,7 @@ def test_full_model_resume_reapplies_current_sac_training_config(
     assert loaded_model.log_ent_coef is None
     assert loaded_model.ent_coef_optimizer is None
     assert isinstance(loaded_model.ent_coef_tensor, th.Tensor)
+    assert loaded_model.ent_coef_tensor is not None
     assert loaded_model.ent_coef_tensor.item() == pytest.approx(0.01)
     assert loaded_model.target_entropy == pytest.approx(-3.5)
 

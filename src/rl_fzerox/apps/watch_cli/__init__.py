@@ -3,4 +3,3 @@ from rl_fzerox.apps.watch_cli.args import parse_args
 from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 
 __all__ = ["parse_args", "resolve_watch_app_config"]
-

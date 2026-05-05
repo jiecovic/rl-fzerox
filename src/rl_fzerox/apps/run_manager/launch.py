@@ -338,8 +338,7 @@ class ManagerRunLauncher:
                 )
                 if not registered:
                     raise RuntimeError(
-                        "managed run disappeared before worker registration: "
-                        f"{run_id}"
+                        f"managed run disappeared before worker registration: {run_id}"
                     )
             except Exception:
                 self._store.clear_run_worker(run_id)
@@ -358,11 +357,7 @@ def _manager_worker_log_path(run_id: str) -> Path:
 
 def _manager_watch_log_path(run_id: str, *, artifact: str) -> Path:
     return (
-        project_root_dir()
-        / "local"
-        / "manager"
-        / "logs"
-        / f"{run_id}.watch-{artifact}.log"
+        project_root_dir() / "local" / "manager" / "logs" / f"{run_id}.watch-{artifact}.log"
     ).resolve()
 
 
@@ -374,6 +369,7 @@ def _persist_launch_manifest(*, run_dir: Path, train_config: TrainAppConfig) -> 
 def _default_fork_name(source_name: str, artifact: Literal["latest", "best"]) -> str:
     suffix = "best fork" if artifact == "best" else "fork"
     return f"{source_name} {suffix}"
+
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")

@@ -8,11 +8,11 @@ default:
 # Build and install the native extension in release mode using the active
 # Python interpreter, or an explicit `PYTHON=/path/to/python` override.
 native:
-    "{{python_bin}}" -m maturin develop -r -q
+    "{{python_bin}}" -m maturin develop -r -q --skip-install
 
 # Build and install the native extension with the Rust dev profile.
 native-dev:
-    "{{python_bin}}" -m maturin develop -q
+    "{{python_bin}}" -m maturin develop -q --skip-install
 
 # Apply Rust formatters only.
 rust-fmt:

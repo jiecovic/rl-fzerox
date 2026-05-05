@@ -311,20 +311,24 @@ def _model_parameter_summary(model: object) -> _ModelParameterSummary:
 
 def _iter_model_parameters(model: object) -> tuple[th.nn.Parameter, ...]:
     policy = _model_policy(model)
-    if isinstance(policy, th.nn.Module):
-        return tuple(policy.parameters())
-    if isinstance(model, th.nn.Module):
-        return tuple(model.parameters())
-    parameters = getattr(model, "parameters", None)
+    policy_parameters = _parameter_iterable(policy)
+    if policy_parameters is not None:
+        return policy_parameters
+    model_parameters = _parameter_iterable(model)
+    if model_parameters is not None:
+        return model_parameters
+    return ()
+
+
+def _parameter_iterable(candidate: object) -> tuple[th.nn.Parameter, ...] | None:
+    parameters = getattr(candidate, "parameters", None)
     if not callable(parameters):
-        return ()
+        return None
     raw_parameters = parameters()
     if not isinstance(raw_parameters, Iterable):
-        return ()
+        return None
     return tuple(
-        parameter
-        for parameter in raw_parameters
-        if isinstance(parameter, th.nn.Parameter)
+        parameter for parameter in raw_parameters if isinstance(parameter, th.nn.Parameter)
     )
 
 

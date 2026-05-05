@@ -328,8 +328,7 @@ def _component_feature_names(component: ManagedStateComponentConfig) -> tuple[st
 
     settings = component.data()
     return tuple(
-        feature.name
-        for feature in state_component_definition(settings).features(settings)
+        feature.name for feature in state_component_definition(settings).features(settings)
     )
 
 

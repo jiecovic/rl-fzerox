@@ -63,8 +63,8 @@ class _TrackStepStats:
             self.ema_episode_frames = float(frame_count)
             return
         self.ema_episode_frames = (
-            (1.0 - ema_alpha) * self.ema_episode_frames + ema_alpha * frame_count
-        )
+            1.0 - ema_alpha
+        ) * self.ema_episode_frames + ema_alpha * frame_count
 
 
 class StepBalancedTrackSamplingController:
@@ -85,8 +85,7 @@ class StepBalancedTrackSamplingController:
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> None:
         self._entry_base_weights = {
-            track_id: float(weight)
-            for track_id, weight in track_base_weights.items()
+            track_id: float(weight) for track_id, weight in track_base_weights.items()
         }
         course_keys = {
             track_id: (
@@ -117,13 +116,10 @@ class StepBalancedTrackSamplingController:
             course_base_weight_sums[course_key] = (
                 course_base_weight_sums.get(course_key, 0.0) + base_weight
             )
-            course_base_weight_counts[course_key] = (
-                course_base_weight_counts.get(course_key, 0) + 1
-            )
+            course_base_weight_counts[course_key] = course_base_weight_counts.get(course_key, 0) + 1
 
         self._course_entry_ids = {
-            course_key: tuple(entry_ids)
-            for course_key, entry_ids in course_entry_ids.items()
+            course_key: tuple(entry_ids) for course_key, entry_ids in course_entry_ids.items()
         }
         self._course_entry_base_totals = {
             course_key: sum(self._entry_base_weights[entry_id] for entry_id in entry_ids)
@@ -316,8 +312,7 @@ class StepBalancedTrackSamplingController:
         if restored_state is None or restored_state.sampling_mode != "step_balanced":
             return
         state_by_course_key = {
-            entry.course_key: entry
-            for entry in _aggregate_runtime_entries(restored_state.entries)
+            entry.course_key: entry for entry in _aggregate_runtime_entries(restored_state.entries)
         }
         for course_key, stats in self._stats.items():
             entry = state_by_course_key.get(course_key)
@@ -384,9 +379,7 @@ def _aggregate_runtime_entries(
             current_weight=existing.current_weight + entry.current_weight,
             completed_frames=existing.completed_frames + entry.completed_frames,
             episode_count=existing.episode_count + entry.episode_count,
-            finished_episode_count=(
-                existing.finished_episode_count + entry.finished_episode_count
-            ),
+            finished_episode_count=(existing.finished_episode_count + entry.finished_episode_count),
             success_sample_count=existing.success_sample_count + entry.success_sample_count,
             ema_episode_frames=_merged_ema_episode_frames(existing, entry),
         )

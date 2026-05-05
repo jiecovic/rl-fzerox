@@ -74,9 +74,7 @@ def _run_simulation_loop(
     snapshot_queue: ProcessQueue,
 ) -> None:
     seed_process(config.seed)
-    x_cup_info = (
-        materialize_x_cup_watch_baseline(config) if config.watch.x_cup.enabled else None
-    )
+    x_cup_info = materialize_x_cup_watch_baseline(config) if config.watch.x_cup.enabled else None
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,

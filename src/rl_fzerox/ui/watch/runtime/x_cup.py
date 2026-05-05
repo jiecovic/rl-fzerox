@@ -174,10 +174,7 @@ def _press_start_until_x_cup_race_mode(emulator: Emulator) -> None:
 
     telemetry = emulator.try_read_telemetry()
     current_mode = None if telemetry is None else telemetry.game_mode_name
-    raise RuntimeError(
-        "X Cup bootstrap did not enter 'gp_race'; "
-        f"last mode was {current_mode!r}"
-    )
+    raise RuntimeError(f"X Cup bootstrap did not enter 'gp_race'; last mode was {current_mode!r}")
 
 
 def _wait_for_x_cup_race_intro_window(emulator: Emulator) -> None:

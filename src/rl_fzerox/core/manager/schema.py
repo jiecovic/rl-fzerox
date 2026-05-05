@@ -135,8 +135,7 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
 
 def _ensure_runs_columns(connection: sqlite3.Connection) -> None:
     existing_columns = {
-        str(row["name"])
-        for row in connection.execute("PRAGMA table_info(runs)").fetchall()
+        str(row["name"]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()
     }
     if "lineage_step_offset" not in existing_columns:
         connection.execute(
@@ -170,8 +169,7 @@ def _ensure_runs_columns(connection: sqlite3.Connection) -> None:
 
 def _ensure_run_draft_columns(connection: sqlite3.Connection) -> None:
     existing_columns = {
-        str(row["name"])
-        for row in connection.execute("PRAGMA table_info(run_drafts)").fetchall()
+        str(row["name"]) for row in connection.execute("PRAGMA table_info(run_drafts)").fetchall()
     }
     if "source_run_id" not in existing_columns:
         connection.execute(

@@ -40,9 +40,7 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
         "lean",
         "pitch",
     )
-    assert len(train_config.env.track_sampling.entries) == len(
-        config.tracks.selected_course_ids
-    )
+    assert len(train_config.env.track_sampling.entries) == len(config.tracks.selected_course_ids)
 
 
 def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
@@ -131,9 +129,7 @@ def test_manager_training_bridge_supports_feature_exclusion_and_state_passthroug
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.observation.state_feature_modes = (
-        config.observation.state_feature_modes[0].model_copy(
-            update={"mode": "exclude"}
-        ),
+        config.observation.state_feature_modes[0].model_copy(update={"mode": "exclude"}),
     )
     config.policy.state_net_arch = ()
 
@@ -143,9 +139,7 @@ def test_manager_training_bridge_supports_feature_exclusion_and_state_passthroug
         run_dir=tmp_path / "runs" / "bridge-exclude-passthrough_0001",
     )
 
-    assert train_config.env.observation.excluded_state_features == (
-        "track_position.edge_ratio",
-    )
+    assert train_config.env.observation.excluded_state_features == ("track_position.edge_ratio",)
     assert train_config.policy.extractor.resolved_state_net_arch() == ()
 
 

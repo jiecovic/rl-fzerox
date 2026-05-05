@@ -1,3 +1,4 @@
+# src/fzerox_emulator/buttons.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,12 +18,12 @@ class JoypadButtons:
     right: int
     a: int
     x: int
-    l: int
-    r: int
-    l2: int
-    r2: int
-    l3: int
-    r3: int
+    left_shoulder: int
+    right_shoulder: int
+    left_trigger: int
+    right_trigger: int
+    left_stick: int
+    right_stick: int
 
 
 def _button(name: str) -> int:
@@ -43,10 +44,10 @@ JOYPAD_BUTTONS = JoypadButtons(
     right=_button("JOYPAD_RIGHT"),
     a=_button("JOYPAD_A"),
     x=_button("JOYPAD_X"),
-    l=_button("JOYPAD_L"),
-    r=_button("JOYPAD_R"),
-    l2=_button("JOYPAD_L2"),
-    r2=_button("JOYPAD_R2"),
-    l3=_button("JOYPAD_L3"),
-    r3=_button("JOYPAD_R3"),
+    left_shoulder=_button("JOYPAD_L"),
+    right_shoulder=_button("JOYPAD_R"),
+    left_trigger=_button("JOYPAD_L2"),
+    right_trigger=_button("JOYPAD_R2"),
+    left_stick=_button("JOYPAD_L3"),
+    right_stick=_button("JOYPAD_R3"),
 )

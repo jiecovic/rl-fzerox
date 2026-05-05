@@ -140,19 +140,19 @@ def create_manager_api_app(
         return JSONResponse(status_code=400, content={"error": jsonable_encoder(exc.errors())})
 
     @app.get("/api/health")
-    def health() -> dict[str, bool]:
+    async def health() -> dict[str, bool]:
         return {"ok": True}
 
     @app.get("/api/templates")
-    def templates() -> dict[str, list[dict[str, object]]]:
+    async def templates() -> dict[str, list[dict[str, object]]]:
         return {"templates": [_template_payload(item) for item in store.list_templates()]}
 
     @app.get("/api/drafts")
-    def drafts() -> dict[str, list[dict[str, object]]]:
+    async def drafts() -> dict[str, list[dict[str, object]]]:
         return {"drafts": [_draft_payload(item) for item in store.list_drafts()]}
 
     @app.get("/api/runs")
-    def runs() -> dict[str, list[dict[str, object]]]:
+    async def runs() -> dict[str, list[dict[str, object]]]:
         visible_runs = store.list_visible_runs()
         recent_events = store.list_recent_run_events(
             tuple(run.id for run in visible_runs),
@@ -166,7 +166,7 @@ def create_manager_api_app(
         }
 
     @app.put("/api/runs/{run_id}")
-    def update_run(
+    async def update_run(
         run_id: Annotated[str, Path(min_length=1)],
         request: UpdateRunRequest,
     ) -> dict[str, dict[str, object]]:
@@ -183,7 +183,7 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.get("/api/runs/{run_id}/metrics")
-    def run_metrics(
+    async def run_metrics(
         run_id: Annotated[str, Path(min_length=1)],
         mode: Literal["recent", "full"] = Query(default="recent"),
         limit: int = Query(default=240, ge=1, le=2_000),
@@ -198,7 +198,7 @@ def create_manager_api_app(
         return {"samples": [_run_metric_payload(item) for item in samples]}
 
     @app.get("/api/runs/{run_id}/track-sampling")
-    def run_track_sampling(
+    async def run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, object]:
         run = store.get_run(run_id)
@@ -210,7 +210,7 @@ def create_manager_api_app(
         return {"state": None if state is None else _track_sampling_state_payload(state)}
 
     @app.post("/api/runs/{run_id}/track-sampling/reset")
-    def reset_run_track_sampling(
+    async def reset_run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, bool]:
         run = store.get_run(run_id)
@@ -234,7 +234,7 @@ def create_manager_api_app(
         return {"reset": True}
 
     @app.post("/api/runs", status_code=201)
-    def launch_run(request: LaunchRunRequest) -> dict[str, dict[str, object]]:
+    async def launch_run(request: LaunchRunRequest) -> dict[str, dict[str, object]]:
         name = request.name.strip()
         if not name:
             raise HTTPException(status_code=400, detail="run name is required")
@@ -263,7 +263,7 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.post("/api/runs/{run_id}/fork", status_code=201)
-    def fork_run(
+    async def fork_run(
         run_id: Annotated[str, Path(min_length=1)],
         request: ForkRunRequest,
     ) -> dict[str, dict[str, object]]:
@@ -282,7 +282,9 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.post("/api/runs/{run_id}/pause")
-    def pause_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, dict[str, object]]:
+    async def pause_run(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
         try:
             run = launcher.request_pause(run_id=run_id)
         except ValueError as error:
@@ -291,7 +293,9 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.post("/api/runs/{run_id}/stop")
-    def stop_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, dict[str, object]]:
+    async def stop_run(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
         try:
             run = launcher.request_stop(run_id=run_id)
         except ValueError as error:
@@ -300,7 +304,9 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.post("/api/runs/{run_id}/resume")
-    def resume_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, dict[str, object]]:
+    async def resume_run(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
         try:
             run = launcher.resume(run_id=run_id)
         except FileNotFoundError as error:
@@ -311,7 +317,7 @@ def create_manager_api_app(
         return {"run": _run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
     @app.delete("/api/runs/{run_id}")
-    def delete_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
+    async def delete_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
         try:
             deleted = store.delete_run(run_id)
         except ValueError as error:
@@ -321,7 +327,7 @@ def create_manager_api_app(
         return {"deleted": True}
 
     @app.delete("/api/lineages/{lineage_id}")
-    def delete_lineage(lineage_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
+    async def delete_lineage(lineage_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
         try:
             deleted = store.delete_lineage(lineage_id)
         except ValueError as error:
@@ -331,7 +337,7 @@ def create_manager_api_app(
         return {"deleted": True}
 
     @app.post("/api/runs/{run_id}/open-dir")
-    def open_run_dir(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
+    async def open_run_dir(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
         run = store.get_run(run_id)
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
@@ -342,7 +348,7 @@ def create_manager_api_app(
         return {"opened": True}
 
     @app.post("/api/runs/{run_id}/watch")
-    def watch_run(
+    async def watch_run(
         run_id: Annotated[str, Path(min_length=1)],
         artifact: str = Query(default="latest"),
     ) -> dict[str, bool]:
@@ -355,19 +361,19 @@ def create_manager_api_app(
         return {"started": True}
 
     @app.get("/api/schema")
-    def schema() -> dict[str, Mapping[str, object]]:
+    async def schema() -> dict[str, Mapping[str, object]]:
         return {"config": ManagedRunConfig.model_json_schema()}
 
     @app.get("/api/config-metadata")
-    def config_metadata() -> dict[str, object]:
+    async def config_metadata() -> dict[str, object]:
         return run_manager_config_metadata().model_dump(mode="json")
 
     @app.post("/api/policy-preview")
-    def policy_preview(config: ManagedRunConfig) -> dict[str, object]:
+    async def policy_preview(config: ManagedRunConfig) -> dict[str, object]:
         return policy_architecture_preview(config).model_dump(mode="json")
 
     @app.post("/api/drafts", status_code=201)
-    def create_draft(request: CreateDraftRequest) -> dict[str, dict[str, object]]:
+    async def create_draft(request: CreateDraftRequest) -> dict[str, dict[str, object]]:
         name = request.name.strip()
         if not name:
             raise HTTPException(status_code=400, detail="draft name is required")
@@ -389,7 +395,7 @@ def create_manager_api_app(
         return {"draft": _draft_payload(draft)}
 
     @app.put("/api/drafts/{draft_id}")
-    def update_draft(
+    async def update_draft(
         draft_id: Annotated[str, Path(min_length=1)],
         request: UpdateDraftRequest,
     ) -> dict[str, dict[str, object]]:
@@ -417,7 +423,7 @@ def create_manager_api_app(
         return {"draft": _draft_payload(draft)}
 
     @app.delete("/api/drafts/{draft_id}")
-    def delete_draft(
+    async def delete_draft(
         draft_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, bool]:
         return {"deleted": store.delete_draft(draft_id)}
@@ -467,7 +473,9 @@ def _run_payload(
         "source_artifact": run.source_artifact,
         "source_num_timesteps": run.source_num_timesteps,
         "pending_command": run.pending_command,
-        "runtime": None if run.runtime is None else {
+        "runtime": None
+        if run.runtime is None
+        else {
             "total_timesteps": run.runtime.total_timesteps,
             "num_timesteps": run.runtime.num_timesteps,
             "progress_fraction": run.runtime.progress_fraction,
@@ -543,13 +551,9 @@ def _track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str,
                 ),
                 "completed_frames": entry.completed_frames,
                 "completed_env_steps": (
-                    0
-                    if state.action_repeat <= 0
-                    else entry.completed_frames // state.action_repeat
+                    0 if state.action_repeat <= 0 else entry.completed_frames // state.action_repeat
                 ),
-                "step_share": (
-                    0.0 if total_frames <= 0 else entry.completed_frames / total_frames
-                ),
+                "step_share": (0.0 if total_frames <= 0 else entry.completed_frames / total_frames),
             }
             for entry in state.entries
         ],

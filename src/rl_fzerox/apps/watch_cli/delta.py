@@ -183,4 +183,3 @@ def string_key_mapping(value: object) -> dict[str, object] | None:
             return None
         mapping[key] = item
     return mapping
-

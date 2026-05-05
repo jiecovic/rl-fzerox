@@ -779,9 +779,12 @@ def test_race_v3_defers_airborne_reentry_progress_until_grounded() -> None:
     assert inside_airborne_info["progress_reward_deferred_outside_track_bounds"] is True
     assert inside_grounded.reward == 13.0
     assert inside_grounded.breakdown == {"frontier_progress": 13.0}
-    assert tracker.info(_telemetry(race_distance=1_300.0))[
-        "progress_reward_deferred_outside_track_bounds"
-    ] is False
+    assert (
+        tracker.info(_telemetry(race_distance=1_300.0))[
+            "progress_reward_deferred_outside_track_bounds"
+        ]
+        is False
+    )
 
 
 def test_race_v3_multiplies_frontier_progress_when_energy_refills() -> None:

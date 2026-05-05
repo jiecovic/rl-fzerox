@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol, TypeAlias, runtime_checkable
+from typing import Protocol, TypeAlias, TypeGuard, runtime_checkable
 
 import numpy as np
 from gymnasium import spaces
@@ -73,12 +73,16 @@ def coerce_action_values(action: ActionValue) -> list[int]:
     if isinstance(action, Mapping):
         raise ValueError("Discrete actions must be a numeric scalar or sequence")
     if isinstance(action, np.ndarray):
-        return action.astype(np.int64, copy=False).reshape(-1).tolist()
-    if isinstance(action, np.integer):
+        return np.asarray(action, dtype=np.int64).reshape(-1).tolist()
+    if _is_action_scalar(action):
         return [int(action)]
     if isinstance(action, Sequence) and not isinstance(action, str | bytes):
         return [int(value) for value in action]
-    return [int(action)]
+    raise ValueError("Discrete actions must be a numeric scalar or sequence")
+
+
+def _is_action_scalar(value: object) -> TypeGuard[ActionScalar]:
+    return isinstance(value, int | float | np.integer | np.floating)
 
 
 def shape_steer_value(steer: float, *, response_power: float) -> float:

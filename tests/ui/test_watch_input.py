@@ -232,9 +232,7 @@ def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
         _FakePygame((), mouse_click=(75, 72)),
         panel_tab_rects=((0, 0, 40, 20),),
         record_tab_rects=((0, 30, 40, 20),),
-        record_course_hitboxes=(
-            RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),
-        ),
+        record_course_hitboxes=(RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),),
     )
 
     assert viewer_input.toggle_record_course_lock_id == "mute_city"
