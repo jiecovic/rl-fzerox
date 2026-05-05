@@ -19,6 +19,7 @@ from rl_fzerox.core.envs.actions.base import (
     steer_values,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import (
+    ContinuousButtonPwmDecoder,
     ContinuousDriveDecoder,
     continuous_action_array,
     discrete_action_array,
@@ -204,6 +205,11 @@ class ConfiguredHybridActionAdapter:
             full_threshold=float(runtime.continuous_drive_full_threshold),
             min_thrust=float(runtime.continuous_drive_min_thrust),
         )
+        self._air_brake_decoder = ContinuousButtonPwmDecoder(
+            deadzone=float(runtime.continuous_air_brake_deadzone),
+            full_threshold=float(runtime.continuous_air_brake_full_threshold),
+            min_duty=float(runtime.continuous_air_brake_min_duty),
+        )
 
     @property
     def action_space(self) -> spaces.Dict:
@@ -237,6 +243,7 @@ class ConfiguredHybridActionAdapter:
 
         steer = 0.0
         drive: float | None = None
+        air_brake: float | None = None
         pitch = 0.0
         for axis, value in zip(self._config.layout_continuous_axes, continuous_values, strict=True):
             clipped = float(np.clip(value, -1.0, 1.0))
@@ -244,6 +251,8 @@ class ConfiguredHybridActionAdapter:
                 steer = clipped
             elif axis == "drive":
                 drive = clipped
+            elif axis == "air_brake":
+                air_brake = clipped
             elif axis == "pitch":
                 pitch = clipped
 
@@ -252,6 +261,8 @@ class ConfiguredHybridActionAdapter:
             joypad_mask |= self._drive_decoder.decode(
                 1.0 if self._config.force_full_throttle else drive
             )
+        if air_brake is not None and self._config.continuous_air_brake_mode != "off":
+            joypad_mask |= self._air_brake_decoder.decode(air_brake, button_mask=AIR_BRAKE_MASK)
 
         for dimension, raw_value in zip(self._dimensions, discrete_values, strict=True):
             value = int(raw_value)
@@ -284,6 +295,7 @@ class ConfiguredHybridActionAdapter:
 
     def reset(self) -> None:
         self._drive_decoder.reset()
+        self._air_brake_decoder.reset()
 
     def action_mask(
         self,

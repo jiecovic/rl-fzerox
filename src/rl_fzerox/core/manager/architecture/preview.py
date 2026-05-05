@@ -463,15 +463,31 @@ def action_branch_previews(config: ManagedRunConfig) -> tuple[ActionBranchPrevie
             )
         )
     if config.action.include_air_brake:
-        branches.append(
-            ActionBranchPreview(
-                name="air_brake",
-                kind="discrete",
-                size=2,
-                enabled=config.action.enable_air_brake,
-                mask_label=None if config.action.enable_air_brake else "masked idle",
+        air_brake_mask_label = None
+        if not config.action.enable_air_brake:
+            air_brake_mask_label = "masked idle"
+        elif config.action.mask_air_brake_on_ground:
+            air_brake_mask_label = "air-only"
+        if config.action.air_brake_mode == "pwm":
+            branches.append(
+                ActionBranchPreview(
+                    name="air_brake",
+                    kind="continuous",
+                    size=1,
+                    enabled=config.action.enable_air_brake,
+                    mask_label=air_brake_mask_label,
+                )
             )
-        )
+        else:
+            branches.append(
+                ActionBranchPreview(
+                    name="air_brake",
+                    kind="discrete",
+                    size=2,
+                    enabled=config.action.enable_air_brake,
+                    mask_label=air_brake_mask_label,
+                )
+            )
     if config.action.include_boost:
         boost_mask_label = None
         if not config.action.enable_boost:

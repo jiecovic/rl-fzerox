@@ -129,6 +129,7 @@ def test_control_viz_visualizes_canonical_gas_level() -> None:
         gas_level=0.5,
         policy_action=np.array([0.25, -0.5], dtype=np.float32),
         continuous_drive_deadzone=0.0,
+        continuous_drive_enabled=True,
     )
 
     assert control_viz.gas_level == pytest.approx(0.5)
@@ -153,6 +154,7 @@ def test_control_viz_visualizes_thrust_warning_threshold() -> None:
         thrust_deadzone_threshold=0.05,
         thrust_full_threshold=0.85,
         policy_action=None,
+        continuous_drive_enabled=True,
     )
 
     assert control_viz.gas_level == pytest.approx(0.25)
@@ -181,6 +183,8 @@ def test_control_viz_visualizes_forced_full_accelerate_drive_mode() -> None:
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
     )
 
     assert control_viz.gas_level == pytest.approx(1.0)
@@ -237,6 +241,7 @@ def test_control_viz_treats_missing_optional_branches_as_unwired() -> None:
         gas_level=1.0,
         policy_action=None,
         action_mask_branches={},
+        continuous_drive_enabled=True,
     )
 
     assert not control_viz.thrust_masked
@@ -275,10 +280,30 @@ def test_control_viz_visualizes_hybrid_policy_air_brake_axis() -> None:
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
     )
 
     assert control_viz.gas_level == pytest.approx(1.0)
     assert control_viz.air_brake_axis == pytest.approx(0.5)
+
+
+def test_control_viz_visualizes_configured_air_brake_pwm_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=AIR_BRAKE_MASK),
+        gas_level=0.0,
+        policy_action={
+            "continuous": np.array([0.25, 0.6], dtype=np.float32),
+            "discrete": np.array([0], dtype=np.int64),
+        },
+        continuous_air_brake_axis_index=1,
+        continuous_air_brake_deadzone=0.1,
+        continuous_air_brake_full_threshold=0.85,
+        continuous_air_brake_min_duty=0.2,
+    )
+
+    assert control_viz.air_brake_axis == pytest.approx(0.733333, abs=1e-6)
+    assert not control_viz.air_brake_masked
 
 
 def test_control_viz_hides_disabled_hybrid_policy_air_brake_axis() -> None:
@@ -306,6 +331,8 @@ def test_control_viz_grays_disabled_ground_air_brake_axis() -> None:
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
         continuous_air_brake_mode="disable_on_ground",
         continuous_air_brake_disabled=True,
     )

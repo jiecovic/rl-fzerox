@@ -37,7 +37,7 @@ from rl_fzerox.core.domain.action_values import (
 )
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 
-ConfiguredContinuousAxis: TypeAlias = Literal["steer", "drive", "pitch"]
+ConfiguredContinuousAxis: TypeAlias = Literal["steer", "drive", "air_brake", "pitch"]
 ConfiguredDiscreteAxis: TypeAlias = Literal[
     "steer",
     "drive",
@@ -47,7 +47,7 @@ ConfiguredDiscreteAxis: TypeAlias = Literal[
     "lean",
     "pitch",
 ]
-_CONFIGURED_CONTINUOUS_AXES = frozenset(("steer", "drive", "pitch"))
+_CONFIGURED_CONTINUOUS_AXES = frozenset(("steer", "drive", "air_brake", "pitch"))
 _CONFIGURED_DISCRETE_AXES = frozenset(
     ("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch")
 )
@@ -111,6 +111,9 @@ class ActionRuntimeConfig:
     continuous_drive_deadzone: float
     continuous_drive_full_threshold: float
     continuous_drive_min_thrust: float
+    continuous_air_brake_deadzone: float
+    continuous_air_brake_full_threshold: float
+    continuous_air_brake_min_duty: float
     force_full_throttle: bool
     mask_air_brake_on_ground: bool
     continuous_air_brake_mode: ContinuousAirBrakeMode
@@ -141,10 +144,27 @@ class ActionRuntimeConfig:
             return 1
         return None
 
+    def continuous_air_brake_axis_index(self) -> int | None:
+        """Return the continuous air-brake axis index when this layout exposes one."""
+
+        if self.name == ACTION_ADAPTERS.configured_hybrid:
+            try:
+                return self.layout_continuous_axes.index("air_brake")
+            except ValueError:
+                return None
+        if self.name == LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_boost_lean_primitive:
+            return 2
+        return None
+
     def uses_continuous_drive(self) -> bool:
         """Return whether the action layout carries a live continuous throttle axis."""
 
         return self.continuous_drive_axis_index() is not None
+
+    def uses_continuous_air_brake(self) -> bool:
+        """Return whether the action layout carries a live continuous air-brake axis."""
+
+        return self.continuous_air_brake_axis_index() is not None
 
     @classmethod
     def from_config(cls, config: ActionConfig) -> ActionRuntimeConfig:
@@ -155,6 +175,9 @@ class ActionRuntimeConfig:
             continuous_drive_deadzone=float(config.continuous_drive_deadzone),
             continuous_drive_full_threshold=float(config.continuous_drive_full_threshold),
             continuous_drive_min_thrust=float(config.continuous_drive_min_thrust),
+            continuous_air_brake_deadzone=float(config.continuous_air_brake_deadzone),
+            continuous_air_brake_full_threshold=float(config.continuous_air_brake_full_threshold),
+            continuous_air_brake_min_duty=float(config.continuous_air_brake_min_duty),
             force_full_throttle=bool(config.force_full_throttle),
             mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
             continuous_air_brake_mode=config.continuous_air_brake_mode,
@@ -213,6 +236,9 @@ class ActionRuntimeConfig:
                 if compilation.continuous_drive_min_thrust is None
                 else compilation.continuous_drive_min_thrust
             ),
+            continuous_air_brake_deadzone=float(config.continuous_air_brake_deadzone),
+            continuous_air_brake_full_threshold=float(config.continuous_air_brake_full_threshold),
+            continuous_air_brake_min_duty=float(config.continuous_air_brake_min_duty),
             force_full_throttle=bool(config.force_full_throttle),
             mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
             continuous_air_brake_mode=(
@@ -254,6 +280,9 @@ class ActionConfig(BaseModel):
     continuous_drive_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
     continuous_drive_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
     continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
+    continuous_air_brake_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
+    continuous_air_brake_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
+    continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)
     force_full_throttle: bool = False
     mask_air_brake_on_ground: bool = True
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
@@ -300,6 +329,11 @@ class ActionConfig(BaseModel):
         if self.continuous_drive_deadzone >= self.continuous_drive_full_threshold:
             raise ValueError(
                 "continuous_drive_deadzone must be lower than continuous_drive_full_threshold"
+            )
+        if self.continuous_air_brake_deadzone >= self.continuous_air_brake_full_threshold:
+            raise ValueError(
+                "continuous_air_brake_deadzone must be lower than "
+                "continuous_air_brake_full_threshold"
             )
         invalid_continuous_axes = set(self.layout_continuous_axes) - _CONFIGURED_CONTINUOUS_AXES
         if invalid_continuous_axes:

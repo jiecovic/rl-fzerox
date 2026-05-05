@@ -103,7 +103,11 @@ function actionHeadShape(action: ManagedActionConfig): {
     discreteLogits += 2;
   }
   if (action.include_air_brake) {
-    discreteLogits += 2;
+    if (action.air_brake_mode === "pwm") {
+      continuousDims += 1;
+    } else {
+      discreteLogits += 2;
+    }
   }
   if (action.include_boost) {
     discreteLogits += 2;
@@ -125,7 +129,9 @@ function auxiliaryOutputSummary(action: ManagedActionConfig): string {
   const labels: string[] = [];
   if (action.include_air_brake) {
     if (!action.enable_air_brake) {
-      labels.push("air brake masked");
+      labels.push(action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked");
+    } else if (action.air_brake_mode === "pwm") {
+      labels.push(action.mask_air_brake_on_ground ? "air brake pwm, air-only" : "air brake pwm");
     } else if (action.mask_air_brake_on_ground) {
       labels.push("air brake, air-only");
     } else {
