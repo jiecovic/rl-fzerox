@@ -12,10 +12,10 @@ import {
   airBrakeModeDescription,
   leanModeDescription,
 } from "@/features/configurator/sections/action/descriptions";
-import { HelpHint } from "@/features/configurator/sections/action/HelpHint";
 import { normalizeOddBucketCount } from "@/features/configurator/sections/action/model";
 import type { ActionUpdateContext } from "@/features/configurator/sections/action/types";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 
 export function AuxiliaryBranchesDisclosure({
   checkpointLocked = false,
@@ -82,14 +82,17 @@ export function AuxiliaryBranchesDisclosure({
           <span>Branch</span>
           <span className="action-toggle-heading">
             <span>Output</span>
-            <HelpHint label="Output" tooltip="Keep this branch in the final action output shape." />
+            <HelpTooltipButton
+              label="Output"
+              text="Keep this branch in the final action output shape."
+            />
           </span>
           <span className="action-toggle-heading">
             <span>Enabled</span>
-            <HelpHint
+            <HelpTooltipButton
               label="Enabled"
               position="left"
-              tooltip="Mask or unmask this branch at runtime without changing the output shape."
+              text="Mask or unmask this branch at runtime without changing the output shape."
             />
           </span>
         </div>

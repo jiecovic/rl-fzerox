@@ -1,4 +1,4 @@
-import { CollapseAllIcon, ExpandAllIcon } from "@/shared/ui/DisclosureIcons";
+import { CollapseAllIcon, ExpandAllIcon } from "@/shared/ui/icons";
 
 interface DisclosureToolbarProps {
   expandLabel: string;

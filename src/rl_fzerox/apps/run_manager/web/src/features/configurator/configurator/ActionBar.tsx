@@ -1,6 +1,4 @@
-import { ResetIcon } from "@/features/configurator/fields";
-
-import { SaveDraftIcon, UnsavedDot } from "./icons";
+import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 interface ActionBarProps {
   canSave: boolean;
@@ -98,4 +96,10 @@ function updateButtonClass(isDirty: boolean) {
   return isDirty
     ? "secondary-button draft-action-button draft-commit-button draft-update-button dirty-action-button"
     : "secondary-button draft-action-button draft-commit-button draft-update-button";
+}
+
+function UnsavedDot({ active }: { active: boolean }) {
+  return (
+    <span aria-hidden="true" className={active ? "dirty-action-dot active" : "dirty-action-dot"} />
+  );
 }

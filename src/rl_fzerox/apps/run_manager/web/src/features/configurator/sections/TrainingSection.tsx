@@ -8,6 +8,7 @@ import {
   RangeNumberField,
 } from "@/features/configurator/fields";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 
 interface ConfigSectionProps {
   config: ManagedRunConfig;
@@ -389,14 +390,5 @@ function DerivedRow({
 }
 
 function InfoIcon({ label, text }: { label: string; text: string }) {
-  return (
-    <button
-      aria-label={`${label}: ${text}`}
-      className="field-help"
-      data-tooltip={text}
-      type="button"
-    >
-      ?
-    </button>
-  );
+  return <HelpTooltipButton label={label} text={text} />;
 }

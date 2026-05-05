@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type UPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 
-import { ResetIcon } from "@/features/configurator/fields/reset";
+import { ResetIcon } from "@/shared/ui/icons";
 
 export type RunPlotPoint = { step: number; value: number };
 
