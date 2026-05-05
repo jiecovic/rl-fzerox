@@ -1,2 +1,6 @@
 @import "./records.css";
-@import "./workspace.css";
+@import "./list.css";
+@import "./runtime.css";
+@import "./trackPool.css";
+@import "./charts.css";
+@import "./responsive.css";
