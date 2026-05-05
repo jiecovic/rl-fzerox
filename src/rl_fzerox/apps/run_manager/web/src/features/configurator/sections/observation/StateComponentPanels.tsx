@@ -7,6 +7,7 @@ import type {
   StateComponentConfig,
   StateFeatureConfig,
 } from "@/shared/api/contract";
+import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 
 import {
   allStateComponentsOpen,
@@ -190,14 +191,7 @@ export function StateComponentPanels({
                         <td>
                           <div className="state-feature-name">
                             <span>{row.label}</span>
-                            <button
-                              aria-label={`${row.label}: ${row.help}`}
-                              className="field-help"
-                              data-tooltip={row.help}
-                              type="button"
-                            >
-                              ?
-                            </button>
+                            <HelpTooltipButton label={row.label} text={row.help} />
                             {row.id === "track_position.lap_progress" ? (
                               <ProgressSourceToggle
                                 disabled={!enabled}

@@ -20,5 +20,4 @@ export {
   OptionalRangePairField,
   RangePairField,
 } from "@/features/configurator/fields/rangePair";
-export { ResetIcon } from "@/features/configurator/fields/reset";
 export { ToggleSwitch } from "@/features/configurator/fields/toggleSwitch";

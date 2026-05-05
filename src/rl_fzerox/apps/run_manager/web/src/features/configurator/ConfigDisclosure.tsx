@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { ResetIcon } from "@/features/configurator/fields";
+import { ResetIcon } from "@/shared/ui/icons";
 
 export function ConfigDisclosure({
   children,

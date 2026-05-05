@@ -1,7 +1,6 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { ActionBar } from "@/features/configurator/configurator/ActionBar";
 import { configuratorDraftName } from "@/features/configurator/configurator/draftName";
-import { RandomizeIcon } from "@/features/configurator/configurator/icons";
 import {
   CONFIG_SECTION_TABS,
   type ConfigSection,
@@ -25,6 +24,7 @@ import type {
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
 import { formatDate } from "@/shared/ui/format";
+import { RandomizeIcon } from "@/shared/ui/icons";
 import { Notice, Panel } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
 
