@@ -15,7 +15,6 @@ from rl_fzerox.core.config.schema import (
     WatchAppConfig,
 )
 from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
-from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -72,6 +71,8 @@ def materialize_train_run_config(
     startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
     """Rewrite one train config to use run-local runtime and baseline files."""
+
+    from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
 
     materialized_config = materialize_run_baselines(
         config,
