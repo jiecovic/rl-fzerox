@@ -12,6 +12,7 @@ from pydantic import (
     NonNegativeInt,
     PositiveFloat,
     PositiveInt,
+    field_validator,
     model_validator,
 )
 
@@ -22,6 +23,26 @@ from rl_fzerox.core.domain.training_algorithms import (
 
 ResumeArtifact = Literal["latest", "best", "final"]
 ResumeMode = Literal["weights_only", "full_model"]
+
+
+class StateFeatureDropoutGroupConfig(BaseModel):
+    """Episode-scoped state-feature dropout for one feature or grouped bundle."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    feature_names: tuple[str, ...]
+    dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+
+    @field_validator("feature_names")
+    @classmethod
+    def _validate_feature_names(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        if not value:
+            raise ValueError("train.state_feature_dropout_groups[].feature_names must not be empty")
+        if len(set(value)) != len(value):
+            raise ValueError(
+                "train.state_feature_dropout_groups[].feature_names must not contain duplicates"
+            )
+        return value
 
 
 class TrainConfig(BaseModel):
@@ -60,7 +81,7 @@ class TrainConfig(BaseModel):
     target_update_interval: PositiveInt = 1
     target_entropy: float | Literal["auto"] = "auto"
     optimize_memory_usage: bool = False
-    course_context_dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
+    state_feature_dropout_groups: tuple[StateFeatureDropoutGroupConfig, ...] = ()
     verbose: int = Field(default=0, ge=0, le=2)
     device: str = "auto"
     save_freq: PositiveInt = 1_000
@@ -97,4 +118,9 @@ class TrainConfig(BaseModel):
                 )
             if self.resume_mode != "full_model":
                 raise ValueError("train.continue_run_dir requires train.resume_mode=full_model")
+        group_keys = [group.feature_names for group in self.state_feature_dropout_groups]
+        if len(set(group_keys)) != len(group_keys):
+            raise ValueError(
+                "train.state_feature_dropout_groups must not contain duplicate feature groups"
+            )
         return self

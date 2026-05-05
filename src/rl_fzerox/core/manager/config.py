@@ -51,7 +51,6 @@ ObservationPreset = Literal[
     "crop_64x64",
 ]
 ObservationResizeFilter = Literal["nearest", "bilinear"]
-StateComponentMode = Literal["include", "zero", "exclude"]
 ConvProfile = Literal[
     "auto",
     "nature",
@@ -116,7 +115,6 @@ class ManagedTrainConfig(BaseModel):
     save_best_checkpoint: bool = True
     save_recent_checkpoints: bool = False
     recent_checkpoint_limit: PositiveInt | None = 5
-    course_context_dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class ManagedTracksConfig(BaseModel):
@@ -317,7 +315,6 @@ class ManagedStateComponentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: ObservationStateComponentName
-    mode: StateComponentMode = "include"
     encoding: ObservationCourseContextName | None = None
     progress_source: TrackPositionProgressSourceName | None = None
     length: PositiveInt | None = Field(default=None, le=16)
@@ -360,19 +357,18 @@ class ManagedStateComponentConfig(BaseModel):
             name=self.name,
             encoding=self.encoding,
             progress_source=self.progress_source,
-            state_profile=None,
             length=None if self.length is None else int(self.length),
             controls=self.controls,
         )
 
 
-class ManagedStateFeatureConfig(BaseModel):
-    """Mode override for one concrete scalar state feature."""
+class ManagedStateFeatureDropoutConfig(BaseModel):
+    """Episode-scoped dropout override for one concrete scalar state feature."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    mode: StateComponentMode = "include"
+    dropout_prob: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class ManagedObservationConfig(BaseModel):
@@ -389,56 +385,18 @@ class ManagedObservationConfig(BaseModel):
     state_components: tuple[ManagedStateComponentConfig, ...] = Field(
         default_factory=lambda: default_state_components()
     )
-    state_feature_modes: tuple[ManagedStateFeatureConfig, ...] = Field(
-        default_factory=lambda: default_state_feature_modes()
+    state_feature_dropouts: tuple[ManagedStateFeatureDropoutConfig, ...] = Field(
+        default_factory=lambda: default_state_feature_dropouts()
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def _migrate_legacy_observation_fields(cls, data: object) -> object:
-        if not isinstance(data, Mapping):
-            return data
-
-        migrated = dict(data)
-        progress_source = migrated.pop("progress_source", "segment_progress")
-        zero_edge_ratio = migrated.pop("zero_edge_ratio", True)
-        zero_outside_track_bounds = migrated.pop("zero_outside_track_bounds", True)
-        legacy_zeroed_features = tuple(migrated.pop("zeroed_state_features", ()))
-        if "state_components" not in migrated:
-            migrated["state_components"] = _default_state_components_json(
-                progress_source=str(progress_source)
-            )
-        if "state_feature_modes" not in migrated:
-            zeroed_features: list[str] = []
-            zeroed_features.extend(str(feature) for feature in legacy_zeroed_features)
-            if zero_edge_ratio:
-                zeroed_features.append("track_position.edge_ratio")
-            if zero_outside_track_bounds:
-                zeroed_features.append("track_position.outside_track_bounds")
-            migrated["state_feature_modes"] = [
-                {"name": feature, "mode": "zero"} for feature in sorted(set(zeroed_features))
-            ]
-        return migrated
 
     @model_validator(mode="after")
     def _validate_observation_components(self) -> ManagedObservationConfig:
         names = [component.name for component in self.state_components]
         if len(set(names)) != len(names):
             raise ValueError("observation.state_components must not contain duplicates")
-        feature_names = [feature.name for feature in self.state_feature_modes]
+        feature_names = [feature.name for feature in self.state_feature_dropouts]
         if len(set(feature_names)) != len(feature_names):
-            raise ValueError("observation.state_feature_modes must not contain duplicates")
-        active_features = _state_component_feature_names(self.state_components)
-        unknown_features = [
-            feature.name
-            for feature in self.state_feature_modes
-            if feature.name not in active_features
-        ]
-        if unknown_features:
-            joined = ", ".join(sorted(unknown_features))
-            raise ValueError(
-                f"observation.state_feature_modes must reference active state features: {joined}"
-            )
+            raise ValueError("observation.state_feature_dropouts must not contain duplicates")
         return self
 
 
@@ -602,6 +560,21 @@ class ManagedRunConfig(BaseModel):
             conv_spec=conv_spec,
             profile_name=self.policy.conv_profile,
         )
+        active_features = _state_component_feature_names(
+            self.observation.state_components,
+            independent_lean_buttons=self.action.lean_output_mode == "independent_buttons",
+        )
+        unknown_features = [
+            feature.name
+            for feature in self.observation.state_feature_dropouts
+            if feature.name not in active_features
+        ]
+        if unknown_features:
+            joined = ", ".join(sorted(unknown_features))
+            raise ValueError(
+                "observation.state_feature_dropouts must reference active state features: "
+                f"{joined}"
+            )
         return self
 
 
@@ -633,10 +606,10 @@ def default_state_components() -> tuple[ManagedStateComponentConfig, ...]:
     return tuple(component.model_copy(deep=True) for component in DEFAULT_STATE_COMPONENTS)
 
 
-def default_state_feature_modes() -> tuple[ManagedStateFeatureConfig, ...]:
-    """Return feature-level state defaults that preserve the current run shape."""
+def default_state_feature_dropouts() -> tuple[ManagedStateFeatureDropoutConfig, ...]:
+    """Return feature-level state dropouts that preserve the current run shape."""
 
-    return tuple(feature.model_copy(deep=True) for feature in DEFAULT_STATE_FEATURE_MODES)
+    return tuple(feature.model_copy(deep=True) for feature in DEFAULT_STATE_FEATURE_DROPOUTS)
 
 
 DEFAULT_STATE_COMPONENTS: tuple[ManagedStateComponentConfig, ...] = (
@@ -651,29 +624,29 @@ DEFAULT_STATE_COMPONENTS: tuple[ManagedStateComponentConfig, ...] = (
         controls=("steer", "thrust", "air_brake", "boost", "lean", "pitch"),
     ),
 )
-DEFAULT_STATE_FEATURE_MODES: tuple[ManagedStateFeatureConfig, ...] = (
-    ManagedStateFeatureConfig(name="track_position.edge_ratio", mode="zero"),
-    ManagedStateFeatureConfig(name="track_position.outside_track_bounds", mode="zero"),
+DEFAULT_STATE_FEATURE_DROPOUTS: tuple[ManagedStateFeatureDropoutConfig, ...] = (
+    ManagedStateFeatureDropoutConfig(name="track_position.edge_ratio", dropout_prob=1.0),
+    ManagedStateFeatureDropoutConfig(
+        name="track_position.outside_track_bounds",
+        dropout_prob=1.0,
+    ),
 )
-
-
-def _default_state_components_json(*, progress_source: str) -> list[dict[str, object]]:
-    return [
-        component.model_dump(mode="json")
-        | ({"progress_source": progress_source} if component.name == "track_position" else {})
-        for component in DEFAULT_STATE_COMPONENTS
-    ]
 
 
 def _state_component_feature_names(
     components: tuple[ManagedStateComponentConfig, ...],
+    *,
+    independent_lean_buttons: bool = False,
 ) -> frozenset[str]:
-    from rl_fzerox.core.envs.observations.state.components import state_component_definition
+    from rl_fzerox.core.envs.observations.state.components import state_component_features
 
     names: set[str] = set()
     for component in components:
         settings = component.data()
-        for feature in state_component_definition(settings).features(settings):
+        for feature in state_component_features(
+            settings,
+            independent_lean_buttons=independent_lean_buttons,
+        ):
             names.add(feature.name)
     return frozenset(names)
 

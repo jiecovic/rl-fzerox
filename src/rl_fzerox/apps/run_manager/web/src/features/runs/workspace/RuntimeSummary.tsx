@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/RuntimeSummary.tsx
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
 import { RunTrackPoolPanel } from "@/features/runs/RunTrackPoolPanel";
 import type { RunWorkspaceActionState } from "@/features/runs/workspace/actions";
@@ -167,6 +168,11 @@ export function RunRuntimeSummary({
           <FolderIcon />
         </button>
         <div className="run-watch-control">
+          {actions.controlNotice !== null ? (
+            <div aria-live="polite" className="run-watch-toast" role="status">
+              {actions.controlNotice}
+            </div>
+          ) : null}
           <label className="run-watch-select-shell">
             <span className="run-watch-select-label">Checkpoint artifact</span>
             <select

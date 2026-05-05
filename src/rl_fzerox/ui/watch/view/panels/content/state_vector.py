@@ -17,7 +17,6 @@ def policy_state_sections(
     *,
     observation_state: StateVector | None,
     feature_names: tuple[str, ...],
-    zeroed_components: frozenset[str] = frozenset(),
     zeroed_features: frozenset[str] = frozenset(),
     watch_zeroed_features: frozenset[str] = frozenset(),
 ) -> list[PanelSection]:
@@ -32,9 +31,7 @@ def policy_state_sections(
     )
     section_lines: list[PanelLine] = []
     for group_title, group_prefix, component_name in _state_vector_groups(names):
-        group_zeroed = component_name in zeroed_components or (
-            component_name is not None and component_name in zeroed_features
-        )
+        group_zeroed = component_name is not None and component_name in zeroed_features
         group_lines = _state_vector_group_lines(
             names=names,
             values=values,

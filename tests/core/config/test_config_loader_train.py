@@ -50,68 +50,35 @@ def test_observation_state_components_parse_ordered_lego_list() -> None:
             controls=("steer", "thrust"),
         ),
     )
-    assert config.zeroed_state_components == ()
 
 
-def test_observation_zeroed_state_components_must_be_active() -> None:
-    config = ObservationConfig.model_validate(
-        {
-            "mode": "image_state",
-            "state_components": ["vehicle_state", "track_position"],
-            "zeroed_state_components": ["track_position"],
-        }
-    )
-
-    assert config.zeroed_state_components == ("track_position",)
-
-    with pytest.raises(ValidationError, match="must reference active state components"):
+def test_observation_rejects_removed_zero_exclude_fields() -> None:
+    with pytest.raises(ValidationError):
         ObservationConfig.model_validate(
             {
                 "mode": "image_state",
-                "state_components": ["vehicle_state"],
+                "state_components": ["vehicle_state", "track_position"],
                 "zeroed_state_components": ["track_position"],
             }
         )
 
+    with pytest.raises(ValidationError):
+        ObservationConfig.model_validate(
+            {
+                "mode": "image_state",
+                "state_components": ["vehicle_state", "track_position"],
+                "zeroed_state_features": ["track_position.edge_ratio"],
+            }
+        )
 
-def test_observation_can_zero_track_position_fields_individually() -> None:
-    config = ObservationConfig.model_validate(
-        {
-            "mode": "image_state",
-            "state_components": ["vehicle_state", "track_position"],
-            "zeroed_state_features": [
-                "track_position.edge_ratio",
-                "track_position.outside_track_bounds",
-            ],
-        }
-    )
-
-    assert config.state_components_data() == (
-        ObservationStateComponentSettings(name="vehicle_state"),
-        ObservationStateComponentSettings(name="track_position"),
-    )
-    assert config.zeroed_state_features == (
-        "track_position.edge_ratio",
-        "track_position.outside_track_bounds",
-    )
-
-
-def test_observation_can_exclude_track_position_fields_individually() -> None:
-    config = ObservationConfig.model_validate(
-        {
-            "mode": "image_state",
-            "state_components": ["vehicle_state", "track_position"],
-            "excluded_state_features": [
-                "track_position.edge_ratio",
-                "track_position.outside_track_bounds",
-            ],
-        }
-    )
-
-    assert config.excluded_state_features == (
-        "track_position.edge_ratio",
-        "track_position.outside_track_bounds",
-    )
+    with pytest.raises(ValidationError):
+        ObservationConfig.model_validate(
+            {
+                "mode": "image_state",
+                "state_components": ["vehicle_state", "track_position"],
+                "excluded_state_features": ["track_position.edge_ratio"],
+            }
+        )
 
 
 def test_policy_config_reads_state_net_arch() -> None:

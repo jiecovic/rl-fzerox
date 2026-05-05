@@ -12,7 +12,6 @@ ACTION_HISTORY_FEATURE_BOUNDS: dict[ActionHistoryControl, StateFeature] = {
     "thrust": StateFeature("thrust", 1.0),
     "air_brake": StateFeature("air_brake", 1.0),
     "boost": StateFeature("boost", 1.0),
-    "lean": StateFeature("lean", 1.0, low=-1.0),
     "pitch": StateFeature("pitch", 1.0, low=-1.0),
 }
 
@@ -21,6 +20,7 @@ def action_history_feature_names(
     action_history_len: int | None,
     *,
     action_history_controls: tuple[ActionHistoryControl, ...],
+    independent_lean_buttons: bool = False,
 ) -> tuple[str, ...]:
     """Return ordered feature names for the configured previous-action buffer."""
 
@@ -31,6 +31,7 @@ def action_history_feature_names(
         for feature in action_history_features(
             action_history_len,
             action_history_controls=action_history_controls,
+            independent_lean_buttons=independent_lean_buttons,
         )
     )
 
@@ -39,12 +40,16 @@ def action_history_features(
     action_history_len: int,
     *,
     action_history_controls: tuple[ActionHistoryControl, ...],
+    independent_lean_buttons: bool = False,
 ) -> tuple[StateFeature, ...]:
     length = validate_action_history_len(action_history_len)
     controls = validate_action_history_controls(action_history_controls)
     return tuple(
         StateFeature(f"prev_{base_feature.name}_{age}", base_feature.high, low=base_feature.low)
-        for base_feature in (ACTION_HISTORY_FEATURE_BOUNDS[control] for control in controls)
+        for base_feature in _history_feature_bounds_for_controls(
+            controls,
+            independent_lean_buttons=independent_lean_buttons,
+        )
         for age in range(1, length + 1)
     )
 
@@ -54,19 +59,15 @@ def action_history_values(
     *,
     action_history_len: int,
     action_history_controls: tuple[ActionHistoryControl, ...],
+    independent_lean_buttons: bool = False,
 ) -> list[float]:
     values: list[float] = []
     for feature in action_history_features(
         action_history_len,
         action_history_controls=action_history_controls,
+        independent_lean_buttons=independent_lean_buttons,
     ):
-        values.append(
-            clamp(
-                float(action_history.get(feature.name, 0.0)),
-                feature.low,
-                feature.high,
-            )
-        )
+        values.append(clamp(float(action_history.get(feature.name, 0.0)), feature.low, feature.high))
     return values
 
 
@@ -74,15 +75,20 @@ def component_action_history_features(
     action_history_len: int,
     *,
     controls: tuple[ActionHistoryControl, ...],
+    independent_lean_buttons: bool = False,
 ) -> tuple[StateFeature, ...]:
     length = validate_action_history_len(action_history_len)
     return tuple(
         StateFeature(
-            f"control_history.prev_{control_history_feature_name(control)}_{age}",
-            control_history_feature_bound(control).high,
-            low=control_history_feature_bound(control).low,
+            f"{feature_name}_{age}",
+            bounds.high,
+            low=bounds.low,
         )
         for control in controls
+        for feature_name, bounds in _component_history_feature_specs(
+            control,
+            independent_lean_buttons=independent_lean_buttons,
+        )
         for age in range(1, length + 1)
     )
 
@@ -92,20 +98,23 @@ def component_action_history_values(
     *,
     action_history_len: int,
     controls: tuple[ActionHistoryControl, ...],
+    independent_lean_buttons: bool = False,
 ) -> list[float]:
     values: list[float] = []
     for control in controls:
-        bounds = control_history_feature_bound(control)
-        source_control = control_history_source_control(control)
-        source_name = ACTION_HISTORY_FEATURE_BOUNDS[source_control].name
-        for age in range(1, validate_action_history_len(action_history_len) + 1):
-            values.append(
-                clamp(
-                    float(action_history.get(f"prev_{source_name}_{age}", 0.0)),
-                    bounds.low,
-                    bounds.high,
+        feature_specs = _component_history_feature_specs(
+            control,
+            independent_lean_buttons=independent_lean_buttons,
+        )
+        for source_name, bounds in feature_specs:
+            for age in range(1, validate_action_history_len(action_history_len) + 1):
+                values.append(
+                    clamp(
+                        float(action_history.get(f"prev_{source_name}_{age}", 0.0)),
+                        bounds.low,
+                        bounds.high,
+                    )
                 )
-            )
     return values
 
 
@@ -120,6 +129,46 @@ def control_history_source_control(control: ActionHistoryControl) -> ActionHisto
 def control_history_feature_bound(control: ActionHistoryControl) -> StateFeature:
     source_control = control_history_source_control(control)
     return ACTION_HISTORY_FEATURE_BOUNDS[source_control]
+
+
+def _history_feature_bounds_for_controls(
+    controls: tuple[ActionHistoryControl, ...],
+    *,
+    independent_lean_buttons: bool,
+) -> tuple[StateFeature, ...]:
+    features: list[StateFeature] = []
+    for control in controls:
+        if control == "lean":
+            features.extend(_lean_history_feature_bounds(independent_lean_buttons=independent_lean_buttons))
+            continue
+        features.append(ACTION_HISTORY_FEATURE_BOUNDS[control])
+    return tuple(features)
+
+
+def _component_history_feature_specs(
+    control: ActionHistoryControl,
+    *,
+    independent_lean_buttons: bool,
+) -> tuple[tuple[str, StateFeature], ...]:
+    if control == "lean":
+        if independent_lean_buttons:
+            return (
+                ("lean_left", StateFeature("control_history.prev_lean_left", 1.0)),
+                ("lean_right", StateFeature("control_history.prev_lean_right", 1.0)),
+            )
+        bounds = StateFeature("lean", 1.0, low=-1.0)
+        return (("lean", StateFeature("control_history.prev_lean", bounds.high, low=bounds.low)),)
+    bounds = control_history_feature_bound(control)
+    return ((ACTION_HISTORY_FEATURE_BOUNDS[control_history_source_control(control)].name, bounds),)
+
+
+def _lean_history_feature_bounds(*, independent_lean_buttons: bool) -> tuple[StateFeature, ...]:
+    if independent_lean_buttons:
+        return (
+            StateFeature("lean_left", 1.0),
+            StateFeature("lean_right", 1.0),
+        )
+    return (StateFeature("lean", 1.0, low=-1.0),)
 
 
 def action_history_control_name(value: object) -> ActionHistoryControl:

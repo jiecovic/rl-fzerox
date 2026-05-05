@@ -1,9 +1,0 @@
-# Shared repo-local runtime convention for starter train presets.
-
-emulator:
-  core_path: local/libretro/mupen64plus_next_libretro.so
-  rom_path: local/roms/F-Zero X (USA).n64
-  baseline_state_path: null
-
-train:
-  output_root: local/runs

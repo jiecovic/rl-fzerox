@@ -61,7 +61,10 @@ export interface WorkspaceActions {
     name: string,
     config: ManagedRunConfig,
   ) => Promise<ManagedDraft>;
-  watchManagedRun: (runId: string, artifact: "latest" | "best") => Promise<void>;
+  watchManagedRun: (
+    runId: string,
+    artifact: "latest" | "best",
+  ) => Promise<"started" | "already_running">;
 }
 
 export function useWorkspaceActions({
@@ -221,8 +224,11 @@ export function useWorkspaceActions({
     await openRunDirectory(runId);
   }
 
-  async function watchManagedRun(runId: string, artifact: "latest" | "best") {
-    await watchRun(runId, artifact);
+  async function watchManagedRun(
+    runId: string,
+    artifact: "latest" | "best",
+  ): Promise<"started" | "already_running"> {
+    return await watchRun(runId, artifact);
   }
 
   async function resetManagedRunTrackPool(runId: string) {

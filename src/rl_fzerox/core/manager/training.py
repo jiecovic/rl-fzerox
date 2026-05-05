@@ -1,11 +1,11 @@
 # src/rl_fzerox/core/manager/training.py
+"""Project manager-owned run configs into concrete training configs."""
+
 from __future__ import annotations
 
-from functools import lru_cache
 from pathlib import Path
 
-from rl_fzerox.core.config import load_train_app_config
-from rl_fzerox.core.config.paths import config_root_dir
+from rl_fzerox.core.config.paths import project_root_dir
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
 from rl_fzerox.core.config.vehicle_catalog import (
@@ -16,6 +16,7 @@ from rl_fzerox.core.domain.action_adapters import ACTION_ADAPTERS
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.manager.config import ManagedRunConfig, ManagedStateComponentConfig
+from rl_fzerox.core.manager.paths import manager_runs_root
 
 
 def build_managed_train_app_config(
@@ -27,16 +28,20 @@ def build_managed_train_app_config(
     """Project one manager-owned config into the current training schema."""
 
     _validate_launch_support(config)
-    base_data = _base_train_config().model_dump(mode="python")
-    base_data["seed"] = config.seed
-    base_data["emulator"]["renderer"] = config.environment.renderer
-    base_data["track"] = {}
-    base_data["env"] = _env_data(config)
-    base_data["reward"] = _reward_data(config)
-    base_data["policy"] = _policy_data(config)
-    base_data["train"] = _train_data(config, run_id=run_id, run_dir=run_dir)
-    expand_track_registry_metadata(base_data, config_root=config_root_dir().resolve())
-    return TrainAppConfig.model_validate(base_data)
+    train_data = {
+        "seed": config.seed,
+        "emulator": _emulator_data(config),
+        "track": {},
+        "env": _env_data(config),
+        "reward": _reward_data(config),
+        "policy": _policy_data(config),
+        "train": _train_data(config, run_id=run_id, run_dir=run_dir),
+    }
+    expand_track_registry_metadata(
+        train_data,
+        config_root=project_root_dir().resolve(),
+    )
+    return TrainAppConfig.model_validate(train_data)
 
 
 def build_managed_resume_train_app_config(
@@ -167,7 +172,6 @@ def _fork_observation_signature(train_config: TrainAppConfig) -> dict[str, objec
         "state_components": tuple(
             component.model_dump(mode="python") for component in observation.state_components or ()
         ),
-        "excluded_state_features": tuple(observation.excluded_state_features),
     }
 
 
@@ -200,11 +204,6 @@ def _fork_policy_signature(train_config: TrainAppConfig) -> dict[str, object]:
     }
 
 
-@lru_cache(maxsize=1)
-def _base_train_config() -> TrainAppConfig:
-    return load_train_app_config(config_root_dir() / "train_base.yaml")
-
-
 def _validate_launch_support(config: ManagedRunConfig) -> None:
     unsupported: list[str] = []
     if config.tracks.pool_mode != "built_in":
@@ -215,22 +214,33 @@ def _validate_launch_support(config: ManagedRunConfig) -> None:
 
 
 def _env_data(config: ManagedRunConfig) -> dict[str, object]:
-    env_data = _base_train_config().env.model_dump(mode="python")
-    env_data.update(
-        {
-            "action_repeat": config.action.action_repeat,
-            "max_episode_steps": config.environment.max_episode_steps,
-            "progress_frontier_stall_limit_frames": (
-                config.environment.progress_frontier_stall_limit_frames
-            ),
-            "progress_frontier_epsilon": config.environment.progress_frontier_epsilon,
-            "boost_min_energy_fraction": config.action.boost_min_energy_fraction,
-            "track_sampling": _track_sampling_data(config),
-            "action": _action_data(config),
-            "observation": _observation_data(config),
-        }
-    )
-    return env_data
+    return {
+        "action_repeat": config.action.action_repeat,
+        "max_episode_steps": config.environment.max_episode_steps,
+        "stuck_min_speed_kph": 60.0,
+        "progress_frontier_stall_limit_frames": (
+            config.environment.progress_frontier_stall_limit_frames
+        ),
+        "progress_frontier_epsilon": config.environment.progress_frontier_epsilon,
+        "boost_min_energy_fraction": config.action.boost_min_energy_fraction,
+        "randomize_game_rng_on_reset": True,
+        "randomize_game_rng_requires_race_mode": True,
+        "camera_setting": "close_behind",
+        "reset_to_race": True,
+        "race_intro_target_timer": 39,
+        "cache_track_baselines": True,
+        "track_sampling": _track_sampling_data(config),
+        "action": _action_data(config),
+        "observation": _observation_data(config),
+    }
+
+
+def _emulator_data(config: ManagedRunConfig) -> dict[str, object]:
+    return {
+        "core_path": _default_core_path(),
+        "rom_path": _default_rom_path(),
+        "renderer": config.environment.renderer,
+    }
 
 
 def _track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
@@ -274,27 +284,6 @@ def _action_data(config: ManagedRunConfig) -> dict[str, object]:
 
 
 def _observation_data(config: ManagedRunConfig) -> dict[str, object]:
-    state_components: list[dict[str, object]] = []
-    zeroed_components: list[str] = []
-    active_feature_names: set[str] = set()
-    for component in config.observation.state_components:
-        if component.mode == "exclude":
-            continue
-        state_components.append(_state_component_data(component))
-        active_feature_names.update(_component_feature_names(component))
-        if component.mode == "zero":
-            zeroed_components.append(component.name)
-
-    zeroed_features = [
-        feature.name
-        for feature in config.observation.state_feature_modes
-        if feature.mode == "zero" and feature.name in active_feature_names
-    ]
-    excluded_features = [
-        feature.name
-        for feature in config.observation.state_feature_modes
-        if feature.mode == "exclude" and feature.name in active_feature_names
-    ]
     return {
         "mode": "image_state",
         "preset": config.observation.preset,
@@ -303,10 +292,9 @@ def _observation_data(config: ManagedRunConfig) -> dict[str, object]:
         "minimap_layer": config.observation.minimap_layer,
         "resize_filter": config.observation.resize_filter,
         "minimap_resize_filter": config.observation.minimap_resize_filter,
-        "state_components": state_components,
-        "zeroed_state_components": zeroed_components,
-        "zeroed_state_features": zeroed_features,
-        "excluded_state_features": excluded_features,
+        "state_components": [
+            _state_component_data(component) for component in config.observation.state_components
+        ],
     }
 
 
@@ -323,12 +311,20 @@ def _state_component_data(component: ManagedStateComponentConfig) -> dict[str, o
     return data
 
 
-def _component_feature_names(component: ManagedStateComponentConfig) -> tuple[str, ...]:
-    from rl_fzerox.core.envs.observations.state.components import state_component_definition
+def _component_feature_names(
+    component: ManagedStateComponentConfig,
+    *,
+    independent_lean_buttons: bool,
+) -> tuple[str, ...]:
+    from rl_fzerox.core.envs.observations.state.components import state_component_features
 
     settings = component.data()
     return tuple(
-        feature.name for feature in state_component_definition(settings).features(settings)
+        feature.name
+        for feature in state_component_features(
+            settings,
+            independent_lean_buttons=independent_lean_buttons,
+        )
     )
 
 
@@ -436,11 +432,54 @@ def _train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict
         "save_best_checkpoint": train.save_best_checkpoint,
         "save_recent_checkpoints": train.save_recent_checkpoints,
         "recent_checkpoint_limit": train.recent_checkpoint_limit,
-        "course_context_dropout_prob": train.course_context_dropout_prob,
-        "output_root": run_dir.parent,
+        "state_feature_dropout_groups": _state_feature_dropout_groups(config),
+        "verbose": 0,
+        "device": "cuda",
+        "save_freq": 10_000,
+        "output_root": manager_runs_root(output_root=run_dir.parent),
         "run_name": run_id,
         "explicit_run_dir": run_dir,
     }
+
+
+def _state_feature_dropout_groups(config: ManagedRunConfig) -> list[dict[str, object]]:
+    feature_overrides = {
+        feature.name: feature for feature in config.observation.state_feature_dropouts
+    }
+    groups: list[dict[str, object]] = []
+    independent_lean_buttons = config.action.lean_output_mode == "independent_buttons"
+    for component in config.observation.state_components:
+        feature_names = _component_feature_names(
+            component,
+            independent_lean_buttons=independent_lean_buttons,
+        )
+        if component.name == "course_context":
+            feature_probs = [
+                float(feature_override.dropout_prob)
+                for feature_name in feature_names
+                if (feature_override := feature_overrides.get(feature_name)) is not None
+            ]
+            dropout_prob = max(feature_probs, default=0.0)
+            if dropout_prob > 0.0:
+                groups.append(
+                    {
+                        "feature_names": feature_names,
+                        "dropout_prob": dropout_prob,
+                    }
+                )
+            continue
+        for feature_name in feature_names:
+            override = feature_overrides.get(feature_name)
+            dropout_prob = 0.0 if override is None else float(override.dropout_prob)
+            if dropout_prob <= 0.0:
+                continue
+            groups.append(
+                {
+                    "feature_names": (feature_name,),
+                    "dropout_prob": dropout_prob,
+                }
+            )
+    return groups
 
 
 def _effective_train_algorithm(config: ManagedRunConfig) -> str:
@@ -508,6 +547,14 @@ def _configured_mask_overrides(config: ManagedRunConfig) -> dict[str, tuple[int,
     ):
         overrides["pitch"] = (config.action.pitch_buckets // 2,)
     return overrides or None
+
+
+def _default_core_path() -> Path:
+    return (project_root_dir() / "local" / "libretro" / "mupen64plus_next_libretro.so").resolve()
+
+
+def _default_rom_path() -> Path:
+    return (project_root_dir() / "local" / "roms" / "F-Zero X (USA).n64").resolve()
 
 
 def _continuous_air_brake_mode(config: ManagedRunConfig) -> str:

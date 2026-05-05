@@ -124,23 +124,50 @@ def test_manager_training_bridge_can_override_renderer(tmp_path: Path) -> None:
     assert train_config.emulator.renderer == "angrylion"
 
 
-def test_manager_training_bridge_supports_feature_exclusion_and_state_passthrough(
+def test_manager_training_bridge_uses_explicit_state_component_membership(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
-    config.observation.state_feature_modes = (
-        config.observation.state_feature_modes[0].model_copy(update={"mode": "exclude"}),
+    config.observation.state_components = tuple(
+        component
+        for component in config.observation.state_components
+        if component.name != "machine_context"
     )
     config.policy.state_net_arch = ()
 
     train_config = build_managed_train_app_config(
         config,
-        run_id="bridge-exclude-passthrough",
-        run_dir=tmp_path / "runs" / "bridge-exclude-passthrough_0001",
+        run_id="bridge-component-membership",
+        run_dir=tmp_path / "runs" / "bridge-component-membership_0001",
     )
 
-    assert train_config.env.observation.excluded_state_features == ("track_position.edge_ratio",)
+    assert "machine_context" not in {
+        component.name for component in train_config.env.observation.state_components or ()
+    }
     assert train_config.policy.extractor.resolved_state_net_arch() == ()
+
+
+def test_manager_training_bridge_supports_episode_state_feature_dropout(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.observation.state_feature_dropouts = (
+        config.observation.state_feature_dropouts[0].model_copy(
+            update={"dropout_prob": 0.25}
+        ),
+    )
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-state-feature-dropout",
+        run_dir=tmp_path / "runs" / "bridge-state-feature-dropout_0001",
+    )
+
+    assert tuple(
+        group.model_dump(mode="python") for group in train_config.train.state_feature_dropout_groups
+    ) == (
+        {"dropout_prob": 0.25, "feature_names": ("track_position.edge_ratio",)},
+    )
 
 
 def test_manager_training_bridge_supports_multilayer_state_mlp(

@@ -258,20 +258,6 @@
         "ref": "joker/big_hand"
       }
     ],
-    "component_modes": [
-      {
-        "label": "include",
-        "value": "include"
-      },
-      {
-        "label": "zero",
-        "value": "zero"
-      },
-      {
-        "label": "exclude",
-        "value": "exclude"
-      }
-    ],
     "conv_profiles": [
       {
         "label": "auto",
@@ -495,7 +481,6 @@
     ],
     "state_components": [
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 2.0,
@@ -542,7 +527,6 @@
         "name": "vehicle_state"
       },
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 1.0,
@@ -574,7 +558,6 @@
         "name": "machine_context"
       },
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 1.0,
@@ -596,7 +579,6 @@
         "name": "track_position"
       },
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 1.0,
@@ -618,7 +600,6 @@
         "name": "surface_state"
       },
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 1.0,
@@ -745,37 +726,36 @@
         "name": "course_context"
       },
       {
-        "default_mode": "include",
         "features": [
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "control_history.prev_steer_1"
+            "name": "steer_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "control_history.prev_thrust_1"
+            "name": "gas_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "control_history.prev_air_brake_1"
+            "name": "air_brake_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "control_history.prev_boost_1"
+            "name": "boost_1"
           },
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "control_history.prev_lean_1"
+            "name": "lean_1"
           },
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "control_history.prev_pitch_1"
+            "name": "pitch_1"
           }
         ],
         "label": "control history",
@@ -1159,7 +1139,6 @@
           "controls": null,
           "encoding": null,
           "length": null,
-          "mode": "include",
           "name": "vehicle_state",
           "progress_source": null
         },
@@ -1167,7 +1146,6 @@
           "controls": null,
           "encoding": null,
           "length": null,
-          "mode": "include",
           "name": "machine_context",
           "progress_source": null
         },
@@ -1175,7 +1153,6 @@
           "controls": null,
           "encoding": null,
           "length": null,
-          "mode": "include",
           "name": "track_position",
           "progress_source": "segment_progress"
         },
@@ -1183,7 +1160,6 @@
           "controls": null,
           "encoding": null,
           "length": null,
-          "mode": "include",
           "name": "surface_state",
           "progress_source": null
         },
@@ -1191,7 +1167,6 @@
           "controls": null,
           "encoding": "one_hot_builtin",
           "length": null,
-          "mode": "include",
           "name": "course_context",
           "progress_source": null
         },
@@ -1199,18 +1174,17 @@
           "controls": ["steer", "thrust", "air_brake", "boost", "lean", "pitch"],
           "encoding": null,
           "length": 1,
-          "mode": "include",
           "name": "control_history",
           "progress_source": null
         }
       ],
-      "state_feature_modes": [
+      "state_feature_dropouts": [
         {
-          "mode": "zero",
+          "dropout_prob": 1.0,
           "name": "track_position.edge_ratio"
         },
         {
-          "mode": "zero",
+          "dropout_prob": 1.0,
           "name": "track_position.outside_track_bounds"
         }
       ]
@@ -1327,7 +1301,6 @@
       "checkpoint_every_rollouts": 5,
       "clip_range": 0.19,
       "clip_range_vf": null,
-      "course_context_dropout_prob": 0.0,
       "ent_coef": 0.01,
       "gae_lambda": 0.95,
       "gamma": 0.995,
@@ -1609,248 +1582,248 @@
     "state_features": [
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.speed_norm"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.energy_frac"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.reverse_active"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.airborne"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.boost_unlocked"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.boost_active"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.lateral_velocity_norm"
       },
       {
         "component": "vehicle_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "vehicle_state.sliding_active"
       },
       {
         "component": "machine_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "machine_context.body_stat"
       },
       {
         "component": "machine_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "machine_context.boost_stat"
       },
       {
         "component": "machine_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "machine_context.grip_stat"
       },
       {
         "component": "machine_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "machine_context.weight"
       },
       {
         "component": "machine_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "machine_context.engine"
       },
       {
         "component": "track_position",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "track_position.lap_progress"
       },
       {
         "component": "track_position",
-        "mode": "zero",
+        "dropout_prob": 1.0,
         "name": "track_position.edge_ratio"
       },
       {
         "component": "track_position",
-        "mode": "zero",
+        "dropout_prob": 1.0,
         "name": "track_position.outside_track_bounds"
       },
       {
         "component": "surface_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "surface_state.on_refill_surface"
       },
       {
         "component": "surface_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "surface_state.on_dirt_surface"
       },
       {
         "component": "surface_state",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "surface_state.on_ice_surface"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_00"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_01"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_02"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_03"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_04"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_05"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_06"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_07"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_08"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_09"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_10"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_11"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_12"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_13"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_14"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_15"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_16"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_17"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_18"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_19"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_20"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_21"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_22"
       },
       {
         "component": "course_context",
-        "mode": "include",
+        "dropout_prob": 0.0,
         "name": "course_context.course_builtin_23"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_steer_1"
+        "dropout_prob": 0.0,
+        "name": "steer_1"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_thrust_1"
+        "dropout_prob": 0.0,
+        "name": "gas_1"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_air_brake_1"
+        "dropout_prob": 0.0,
+        "name": "air_brake_1"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_boost_1"
+        "dropout_prob": 0.0,
+        "name": "boost_1"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_lean_1"
+        "dropout_prob": 0.0,
+        "name": "lean_1"
       },
       {
         "component": "control_history",
-        "mode": "include",
-        "name": "control_history.prev_pitch_1"
+        "dropout_prob": 0.0,
+        "name": "pitch_1"
       }
     ],
     "state_features_dim": 64,

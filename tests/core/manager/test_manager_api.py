@@ -23,6 +23,18 @@ from rl_fzerox.core.manager import (
 
 
 class _LauncherStub:
+    def launch(
+        self,
+        *,
+        name: str,
+        config: ManagedRunConfig,
+        draft_id: str | None,
+        source_run_id: str | None,
+        source_artifact: Literal["latest", "best"] | None,
+    ) -> ManagedRun:
+        del name, config, draft_id, source_run_id, source_artifact
+        raise AssertionError("launch should not be called")
+
     def fork(
         self,
         *,
@@ -46,7 +58,12 @@ class _LauncherStub:
         del run_id
         raise AssertionError("resume should not be called")
 
-    def watch_artifact(self, *, run_id: str, artifact: str) -> None:
+    def watch_artifact(
+        self,
+        *,
+        run_id: str,
+        artifact: str,
+    ) -> Literal["started", "already_running"]:
         del run_id, artifact
         raise AssertionError("watch should not be called")
 
@@ -582,7 +599,6 @@ def test_manager_api_rejects_missing_draft_delete(tmp_path: Path) -> None:
 
     assert response.status_code == 404
     assert response.json()["error"] == "draft not found"
-
 
 def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")

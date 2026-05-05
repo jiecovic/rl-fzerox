@@ -22,7 +22,7 @@ interface RunWorkspaceProps {
   onResetTrackPool: (runId: string) => Promise<void>;
   onShowCharts: (runId: string) => void;
   onStop: (runId: string) => Promise<void>;
-  onWatch: (runId: string, artifact: "latest" | "best") => Promise<void>;
+  onWatch: (runId: string, artifact: "latest" | "best") => Promise<"started" | "already_running">;
   run: ManagedRun;
 }
 

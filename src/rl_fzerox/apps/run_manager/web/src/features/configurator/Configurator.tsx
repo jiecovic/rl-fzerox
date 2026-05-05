@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { ActionBar } from "@/features/configurator/configurator/ActionBar";
 import { configuratorDraftName } from "@/features/configurator/configurator/draftName";
 import {
@@ -72,7 +73,9 @@ export function Configurator({
   const [isTraining, setIsTraining] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const configRef = useRef(config);
   const resetSourceKeyRef = useRef<string | null>(null);
+  configRef.current = config;
   const normalizedDraftName = draftName.trim();
   const normalizedBaselineDraftName = baselineDraftName.trim();
   const normalizedLoadedDraftName = loadedDraft?.name.trim().toLowerCase() ?? null;
@@ -158,14 +161,31 @@ export function Configurator({
     notifyDraftNameChange(draftName);
   }, [draftName]);
 
+  function committedConfigSnapshot() {
+    const activeElement = document.activeElement;
+    if (
+      activeElement instanceof HTMLInputElement ||
+      activeElement instanceof HTMLTextAreaElement ||
+      activeElement instanceof HTMLSelectElement
+    ) {
+      flushSync(() => {
+        activeElement.blur();
+      });
+    } else {
+      flushSync(() => undefined);
+    }
+    return configRef.current;
+  }
+
   async function saveDraft() {
     if (createNameConflict || normalizedDraftName.length === 0) {
       return;
     }
+    const committedConfig = committedConfigSnapshot();
     setIsSaving(true);
     setError(null);
     try {
-      await onSaveDraft(normalizedDraftName, config);
+      await onSaveDraft(normalizedDraftName, committedConfig);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to save draft");
     } finally {
@@ -180,10 +200,11 @@ export function Configurator({
     if (updateNameConflict || normalizedDraftName.length === 0) {
       return;
     }
+    const committedConfig = committedConfigSnapshot();
     setIsUpdating(true);
     setError(null);
     try {
-      await onUpdateDraft(loadedDraft.id, normalizedDraftName, config);
+      await onUpdateDraft(loadedDraft.id, normalizedDraftName, committedConfig);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to update draft");
     } finally {
@@ -195,10 +216,11 @@ export function Configurator({
     if (normalizedDraftName.length === 0) {
       return;
     }
+    const committedConfig = committedConfigSnapshot();
     setIsTraining(true);
     setError(null);
     try {
-      await onLaunchRun(normalizedDraftName, config, loadedDraft?.id ?? null);
+      await onLaunchRun(normalizedDraftName, committedConfig, loadedDraft?.id ?? null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to launch training run");
     } finally {

@@ -24,8 +24,7 @@ def course_context_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del action_history, profile_fields
+    del action_history
     encoding = component_str(component, "encoding", default="one_hot_builtin")
     return course_component_values(telemetry, encoding=encoding)

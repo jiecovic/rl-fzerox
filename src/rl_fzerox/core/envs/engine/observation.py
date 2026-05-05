@@ -19,7 +19,6 @@ from rl_fzerox.core.envs.observations import (
     action_history_settings_for_observation,
     build_observation,
     build_observation_space,
-    state_feature_names,
 )
 
 
@@ -31,9 +30,7 @@ class EngineObservationBuilder:
     config: EnvConfig
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
-    zeroed_state_components: tuple[str, ...]
-    zeroed_state_features: tuple[str, ...]
-    excluded_state_features: tuple[str, ...]
+    independent_lean_buttons: bool
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -47,22 +44,9 @@ class EngineObservationBuilder:
     ) -> EngineObservationBuilder:
         spec = backend.observation_spec(config.observation.preset)
         state_components = config.observation.state_components_data()
+        independent_lean_buttons = config.action.independent_lean_buttons
         action_history_len, action_history_controls = action_history_settings_for_observation(
             state_components=state_components,
-            fallback_len=config.observation.action_history_len,
-            fallback_controls=config.observation.action_history_controls,
-        )
-        zeroed_state_features = _validated_zeroed_state_features(
-            config=config,
-            state_components=state_components,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
-        )
-        excluded_state_features = _validated_excluded_state_features(
-            config=config,
-            state_components=state_components,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
         )
         space = build_observation_space(
             spec,
@@ -70,22 +54,15 @@ class EngineObservationBuilder:
             stack_mode=config.observation.stack_mode,
             minimap_layer=config.observation.minimap_layer,
             mode=config.observation.mode,
-            state_profile=config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
             state_components=state_components,
-            excluded_state_features=excluded_state_features,
+            independent_lean_buttons=independent_lean_buttons,
         )
         return cls(
             backend=backend,
             config=config,
             spec=spec,
             state_components=state_components,
-            zeroed_state_components=tuple(config.observation.zeroed_state_components),
-            zeroed_state_features=zeroed_state_features,
-            excluded_state_features=excluded_state_features,
+            independent_lean_buttons=independent_lean_buttons,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -114,17 +91,9 @@ class EngineObservationBuilder:
             image=image,
             telemetry=telemetry,
             mode=self.config.observation.mode,
-            state_profile=self.config.observation.state_profile,
-            course_context=self.config.observation.course_context,
-            ground_effect_context=self.config.observation.ground_effect_context,
-            action_history_len=self.action_history_len,
-            action_history_controls=self.action_history_controls,
             action_history=control_state.action_history_fields(),
             state_components=self.state_components,
-            zeroed_state_components=self.zeroed_state_components,
-            zeroed_state_features=self.zeroed_state_features,
-            excluded_state_features=self.excluded_state_features,
-            **control_state.observation_fields(),
+            independent_lean_buttons=self.independent_lean_buttons,
         )
 
     def set_info(
@@ -143,77 +112,8 @@ class EngineObservationBuilder:
             observation_resize_filter=self.config.observation.resize_filter,
             observation_minimap_resize_filter=self.config.observation.minimap_resize_filter,
             observation_mode=self.config.observation.mode,
-            observation_state_profile=self.config.observation.state_profile,
-            observation_course_context=self.config.observation.course_context,
-            observation_ground_effect_context=self.config.observation.ground_effect_context,
             action_history_len=self.action_history_len,
             action_history_controls=self.action_history_controls,
             observation_state_components=self.state_components,
-            observation_zeroed_state_components=self.zeroed_state_components,
-            observation_zeroed_state_features=self.zeroed_state_features,
-            observation_excluded_state_features=self.excluded_state_features,
+            independent_lean_buttons=self.independent_lean_buttons,
         )
-
-
-def _validated_zeroed_state_features(
-    *,
-    config: EnvConfig,
-    state_components: StateComponentsSettings | None,
-    action_history_len: int | None,
-    action_history_controls: tuple[ActionHistoryControlName, ...],
-) -> tuple[str, ...]:
-    zeroed_state_features = tuple(config.observation.zeroed_state_features)
-    if not zeroed_state_features:
-        return ()
-
-    active_features = set(
-        state_feature_names(
-            config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
-            state_components=state_components,
-        )
-    )
-    unknown_features = sorted(
-        feature for feature in zeroed_state_features if feature not in active_features
-    )
-    if unknown_features:
-        joined = ", ".join(unknown_features)
-        raise ValueError(
-            f"observation.zeroed_state_features must reference active state features: {joined}"
-        )
-    return zeroed_state_features
-
-
-def _validated_excluded_state_features(
-    *,
-    config: EnvConfig,
-    state_components: StateComponentsSettings | None,
-    action_history_len: int | None,
-    action_history_controls: tuple[ActionHistoryControlName, ...],
-) -> tuple[str, ...]:
-    excluded_state_features = tuple(config.observation.excluded_state_features)
-    if not excluded_state_features:
-        return ()
-
-    active_features = set(
-        state_feature_names(
-            config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
-            state_components=state_components,
-        )
-    )
-    unknown_features = sorted(
-        feature for feature in excluded_state_features if feature not in active_features
-    )
-    if unknown_features:
-        joined = ", ".join(unknown_features)
-        raise ValueError(
-            f"observation.excluded_state_features must reference active state features: {joined}"
-        )
-    return excluded_state_features
