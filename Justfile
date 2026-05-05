@@ -1,16 +1,18 @@
 set shell := ["bash", "-cu"]
 
+python_bin := `if [ -n "${PYTHON:-}" ]; then printf '%s' "${PYTHON}"; elif [ -x .venv/bin/python ]; then printf '%s' .venv/bin/python; else printf '%s' python; fi`
+
 default:
     @just --list
 
 # Build and install the native extension in release mode using the active
 # Python interpreter, or an explicit `PYTHON=/path/to/python` override.
 native:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m maturin develop -r -q
+    "{{python_bin}}" -m maturin develop -r -q
 
 # Build and install the native extension with the Rust dev profile.
 native-dev:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m maturin develop -q
+    "{{python_bin}}" -m maturin develop -q
 
 # Apply Rust formatters only.
 rust-fmt:
@@ -28,18 +30,19 @@ rust-test:
 
 # Apply Python formatters only.
 py-fmt:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" -m ruff format src tests scripts/check_numpy_typing.py
 
 py-fmt-check:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff format --check src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" -m ruff format --check src tests scripts/check_numpy_typing.py
 
 py-lint:
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" scripts/check_numpy_typing.py src tests scripts
-    PYTHON_BIN=${PYTHON:-python}; "$PYTHON_BIN" -m ruff check src tests scripts/check_numpy_typing.py
-    PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pyright src tests scripts/check_numpy_typing.py
+    "{{python_bin}}" scripts/check_numpy_typing.py src tests scripts
+    "{{python_bin}}" -m ruff check src tests scripts/check_numpy_typing.py
+    PYTHONPATH=src "{{python_bin}}" -m pyright src tests scripts/check_numpy_typing.py
 
 py-test: native
-    PYTHON_BIN=${PYTHON:-python}; PYTHONPATH=src "$PYTHON_BIN" -m pytest
+    @PYTHONPATH=src "{{python_bin}}" -c 'import sys; print(f"pytest interpreter: {sys.executable}"); import fzerox_emulator._native as native; print(f"native module: {native.__file__}")'
+    PYTHONPATH=src "{{python_bin}}" -m pytest
 
 # Install the local React run-manager frontend dependencies.
 run-manager-install:
@@ -55,7 +58,7 @@ run-manager-build:
 
 # Launch the local React run manager with the Python SQLite API.
 run-manager:
-    @PYTHONPATH=src .venv/bin/python -m rl_fzerox.apps.run_manager
+    @PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
 
 # Aggregate repo-wide quality tasks.
 fmt: rust-fmt py-fmt
