@@ -95,25 +95,16 @@ export async function fetchConfigMetadata(): Promise<ConfigMetadata> {
 export async function fetchPolicyPreview(
   config: ManagedRunConfig,
 ): Promise<PolicyArchitecturePreview> {
-  let response = await postPolicyPreview(config);
-  if (!response.ok) {
-    response = await postPolicyPreview(legacyPreviewConfig(config));
-  }
+  const response = await postPolicyPreview(config);
   return policyArchitecturePreviewSchema.parse(await parseJson(response));
 }
 
-async function postPolicyPreview(config: unknown): Promise<Response> {
+async function postPolicyPreview(config: ManagedRunConfig): Promise<Response> {
   return fetch("/api/policy-preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
-}
-
-function legacyPreviewConfig(config: ManagedRunConfig): unknown {
-  const policy = { ...config.policy };
-  delete (policy as Partial<typeof policy>).activation;
-  return { ...config, policy };
 }
 
 export async function createDraft(name: string, config: ManagedRunConfig): Promise<ManagedDraft> {
@@ -208,10 +199,6 @@ export async function forkRun(
   });
   const payload = forkRunResponseSchema.parse(await parseJson(response));
   return payload.run;
-}
-
-export async function pauseRun(runId: string): Promise<ManagedRun> {
-  return postRunAction(`/api/runs/${encodeURIComponent(runId)}/pause`);
 }
 
 export async function stopRun(runId: string): Promise<ManagedRun> {
