@@ -59,8 +59,16 @@ class ContinuousDriveDecoder:
 class ContinuousButtonPwmDecoder:
     """Decode positive continuous intent into a binary button with deterministic PWM."""
 
-    def __init__(self, *, deadzone: float) -> None:
+    def __init__(
+        self,
+        *,
+        deadzone: float,
+        full_threshold: float = 1.0,
+        min_duty: float = 0.0,
+    ) -> None:
         self._deadzone = deadzone
+        self._full_threshold = full_threshold
+        self._min_duty = min_duty
         self._pwm_phase = 0.0
 
     def reset(self) -> None:
@@ -69,7 +77,12 @@ class ContinuousButtonPwmDecoder:
         self._pwm_phase = 0.0
 
     def decode(self, value: float, *, button_mask: int) -> int:
-        duty = _positive_button_pwm_duty_cycle(value, deadzone=self._deadzone)
+        duty = _positive_button_pwm_duty_cycle(
+            value,
+            deadzone=self._deadzone,
+            full_threshold=self._full_threshold,
+            min_duty=self._min_duty,
+        )
         if duty <= 0.0:
             self._pwm_phase = 0.0
             return 0
@@ -235,8 +248,18 @@ def _clamp_unit(value: float) -> float:
     return min(max(float(value), 0.0), 1.0)
 
 
-def _positive_button_pwm_duty_cycle(value: float, *, deadzone: float) -> float:
+def _positive_button_pwm_duty_cycle(
+    value: float,
+    *,
+    deadzone: float,
+    full_threshold: float,
+    min_duty: float,
+) -> float:
     # One-sided buttons should be neutral at 0; positive values express duty.
     if value <= deadzone:
         return 0.0
-    return (value - deadzone) / (1.0 - deadzone)
+    minimum = _clamp_unit(min_duty)
+    if value >= full_threshold or bool(np.isclose(value, full_threshold)):
+        return 1.0
+    scaled = (value - deadzone) / (full_threshold - deadzone)
+    return minimum + ((1.0 - minimum) * scaled)

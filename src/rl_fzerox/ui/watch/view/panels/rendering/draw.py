@@ -65,6 +65,10 @@ class SidePanelData:
     panel_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
+    continuous_air_brake_axis_index: int | None
+    continuous_air_brake_deadzone: float
+    continuous_air_brake_full_threshold: float
+    continuous_air_brake_min_duty: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
     action_repeat: int
@@ -127,6 +131,10 @@ def _draw_side_panel(
         failed_track_attempts=data.failed_track_attempts,
         track_pool_records=data.track_pool_records,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
+        continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
         action_repeat=data.action_repeat,

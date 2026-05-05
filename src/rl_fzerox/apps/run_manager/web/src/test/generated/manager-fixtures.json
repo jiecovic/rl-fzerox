@@ -1112,8 +1112,12 @@
   "managed_run_config": {
     "action": {
       "action_repeat": 2,
+      "air_brake_mode": "on_off",
       "boost_min_energy_fraction": 0.1,
       "boost_unmask_max_speed_kph": null,
+      "continuous_air_brake_deadzone": 0.05,
+      "continuous_air_brake_full_threshold": 0.85,
+      "continuous_air_brake_min_duty": 0.0,
       "continuous_drive_deadzone": 0.05,
       "continuous_drive_full_threshold": 0.85,
       "continuous_drive_min_thrust": 0.25,

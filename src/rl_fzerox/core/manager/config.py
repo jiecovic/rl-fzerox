@@ -227,8 +227,12 @@ class ManagedActionConfig(BaseModel):
     continuous_drive_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
     continuous_drive_min_thrust: float = Field(default=0.25, ge=0.0, le=1.0)
     include_air_brake: bool = True
+    air_brake_mode: ActionDriveMode = "on_off"
     enable_air_brake: bool = True
     mask_air_brake_on_ground: bool = False
+    continuous_air_brake_deadzone: float = Field(default=0.05, ge=0.0, lt=1.0)
+    continuous_air_brake_full_threshold: float = Field(default=0.85, gt=0.0, le=1.0)
+    continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)
     include_boost: bool = True
     enable_boost: bool = True
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
@@ -272,6 +276,11 @@ class ManagedActionConfig(BaseModel):
         if self.continuous_drive_deadzone >= self.continuous_drive_full_threshold:
             raise ValueError(
                 "continuous_drive_deadzone must be lower than continuous_drive_full_threshold"
+            )
+        if self.continuous_air_brake_deadzone >= self.continuous_air_brake_full_threshold:
+            raise ValueError(
+                "continuous_air_brake_deadzone must be lower than "
+                "continuous_air_brake_full_threshold"
             )
         if not self.include_air_brake:
             self.enable_air_brake = False

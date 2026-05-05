@@ -78,6 +78,10 @@ class FrameRenderData:
     continuous_drive_enabled: bool
     force_full_throttle: bool
     continuous_pitch_enabled: bool
+    continuous_air_brake_axis_index: int | None
+    continuous_air_brake_deadzone: float
+    continuous_air_brake_full_threshold: float
+    continuous_air_brake_min_duty: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
     action_repeat: int
@@ -209,6 +213,10 @@ def _draw_frame(
         continuous_drive_enabled=data.continuous_drive_enabled,
         force_full_throttle=data.force_full_throttle,
         continuous_pitch_enabled=data.continuous_pitch_enabled,
+        continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
     )
@@ -276,6 +284,10 @@ def _draw_frame(
             panel_tab_index=data.panel_tab_index,
             record_tab_index=data.record_tab_index,
             continuous_drive_deadzone=data.continuous_drive_deadzone,
+            continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+            continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+            continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+            continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
             continuous_air_brake_mode=data.continuous_air_brake_mode,
             continuous_air_brake_disabled=data.continuous_air_brake_disabled,
             action_repeat=data.action_repeat,

@@ -378,8 +378,11 @@ describe("Configurator", () => {
     await user.click(screen.getByText("Control family"));
     await user.click(screen.getByText("Auxiliary branches"));
 
+    const throttleModeGroup = screen.getByRole("group", { name: "Throttle mode" });
     expect(
-      screen.getByRole("button", { name: configMetadataFixture.drive_modes[0].label }),
+      within(throttleModeGroup).getByRole("button", {
+        name: configMetadataFixture.drive_modes[0].label,
+      }),
     ).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeDisabled();

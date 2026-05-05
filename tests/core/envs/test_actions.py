@@ -318,6 +318,31 @@ def test_requested_gas_level_uses_discrete_accelerate_when_no_drive_axis_exists(
     assert gas_level == 1.0
 
 
+def test_configured_hybrid_adapter_decodes_continuous_air_brake_lane() -> None:
+    adapter = build_action_adapter(
+        ActionConfig(
+            name="configured_hybrid",
+            layout_continuous_axes=("steer", "air_brake"),
+            layout_discrete_axes=("gas", "boost"),
+            continuous_air_brake_deadzone=0.0,
+            continuous_air_brake_full_threshold=1.0,
+            continuous_air_brake_min_duty=0.0,
+        )
+    )
+
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([0.25, 1.0], dtype=np.float32),
+            "discrete": np.array([0, 1], dtype=np.int64),
+        }
+    )
+
+    assert control_state == ControllerState(
+        joypad_mask=AIR_BRAKE_MASK | BOOST_MASK,
+        left_stick_x=0.25,
+    )
+
+
 def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:
     adapter = HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter(
         ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")

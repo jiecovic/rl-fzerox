@@ -19,3 +19,10 @@ export function throttleModeDescription(mode: ManagedRunConfig["action"]["drive_
   }
   return "Discrete button throttle matches the stock N64 control surface: one digital gas button with idle or engaged states.";
 }
+
+export function airBrakeModeDescription(mode: ManagedRunConfig["action"]["air_brake_mode"]) {
+  if (mode === "pwm") {
+    return "Continuous PWM air brake is a workaround. The policy emits one continuous brake value, and runtime approximates it by pulsing the real N64 air-brake button across frames.";
+  }
+  return "Discrete button air brake matches the stock N64 control surface: one digital air-brake button with idle or engaged states.";
+}

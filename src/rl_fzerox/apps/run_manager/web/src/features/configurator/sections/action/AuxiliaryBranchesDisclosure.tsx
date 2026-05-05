@@ -8,7 +8,10 @@ import {
   SegmentedChoiceStrip,
 } from "@/features/configurator/fields";
 import { ActionToggleRow } from "@/features/configurator/sections/action/ActionToggleRow";
-import { leanModeDescription } from "@/features/configurator/sections/action/descriptions";
+import {
+  airBrakeModeDescription,
+  leanModeDescription,
+} from "@/features/configurator/sections/action/descriptions";
 import { HelpHint } from "@/features/configurator/sections/action/HelpHint";
 import { normalizeOddBucketCount } from "@/features/configurator/sections/action/model";
 import type { ActionUpdateContext } from "@/features/configurator/sections/action/types";
@@ -38,8 +41,15 @@ export function AuxiliaryBranchesDisclosure({
           include_air_brake: checkpointLocked
             ? config.action.include_air_brake
             : defaultConfig.action.include_air_brake,
+          air_brake_mode: checkpointLocked
+            ? config.action.air_brake_mode
+            : defaultConfig.action.air_brake_mode,
           enable_air_brake: defaultConfig.action.enable_air_brake,
           mask_air_brake_on_ground: defaultConfig.action.mask_air_brake_on_ground,
+          continuous_air_brake_deadzone: defaultConfig.action.continuous_air_brake_deadzone,
+          continuous_air_brake_full_threshold:
+            defaultConfig.action.continuous_air_brake_full_threshold,
+          continuous_air_brake_min_duty: defaultConfig.action.continuous_air_brake_min_duty,
           include_boost: checkpointLocked
             ? config.action.include_boost
             : defaultConfig.action.include_boost,
@@ -85,7 +95,11 @@ export function AuxiliaryBranchesDisclosure({
         </div>
         <div className="action-toggle-grid">
           <ActionToggleRow
-            description="Expose left / right air brake as a digital branch."
+            description={
+              action.air_brake_mode === "pwm"
+                ? "Expose one continuous air-brake lane that runtime maps back onto the N64 button with accumulator PWM."
+                : "Expose left / right air brake as a digital branch."
+            }
             enabled={action.enable_air_brake}
             enabledLabel="Air brake enabled"
             outputDisabledReason={
@@ -174,20 +188,97 @@ export function AuxiliaryBranchesDisclosure({
         <div className="action-behavior-grid">
           <section className="action-runtime-card">
             <div className="action-runtime-header config-disclosure-copy">
-              <strong>Air brake guards</strong>
-              <small>
-                Choose whether grounded air brake stays available or is restricted to airborne use.
-              </small>
+              <strong>Air brake</strong>
+              <small>Choose the output family, optional PWM shaping, and grounded-use guard.</small>
             </div>
             {action.include_air_brake ? null : (
               <p className="action-note">
-                Air brake is not in the action output right now, so this runtime rule is inactive.
+                Air brake is not in the action output right now, so these runtime rules are
+                inactive.
               </p>
             )}
             <fieldset
               className="dependent-fieldset action-runtime-fields"
               disabled={!action.include_air_brake}
             >
+              <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Choose between a continuous PWM air-brake lane and a stock-style digital air-brake button."
+                    label="Air brake mode"
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Air brake mode"
+                    options={metadata.drive_modes.map((option) => ({
+                      active: action.air_brake_mode === option.value,
+                      key: option.value,
+                      label: option.label,
+                      tooltip: airBrakeModeDescription(
+                        option.value as ManagedRunConfig["action"]["air_brake_mode"],
+                      ),
+                      onClick: () =>
+                        updateAction({
+                          air_brake_mode:
+                            option.value as ManagedRunConfig["action"]["air_brake_mode"],
+                        }),
+                    }))}
+                  />
+                </div>
+                {action.air_brake_mode === "pwm" ? (
+                  <div className="action-axis-fields action-axis-fields-triple">
+                    <RangeNumberField
+                      help="Ignore small positive air-brake values below this threshold."
+                      label="Deadzone"
+                      max={0.5}
+                      min={0}
+                      rangeStep={0.01}
+                      resetValue={defaultConfig.action.continuous_air_brake_deadzone}
+                      ticks={[
+                        { value: 0, label: "0" },
+                        { value: 0.1, label: "0.1" },
+                        { value: 0.25, label: "0.25" },
+                        { value: 0.5, label: "0.5" },
+                      ]}
+                      value={action.continuous_air_brake_deadzone}
+                      onChange={(value) => updateAction({ continuous_air_brake_deadzone: value })}
+                    />
+                    <RangeNumberField
+                      help="Clamp air-brake duty to full once the continuous brake lane reaches this value."
+                      label="Full threshold"
+                      max={1}
+                      min={0.1}
+                      rangeStep={0.01}
+                      resetValue={defaultConfig.action.continuous_air_brake_full_threshold}
+                      ticks={[
+                        { value: 0.1, label: "0.1" },
+                        { value: 0.5, label: "0.5" },
+                        { value: 0.85, label: "0.85" },
+                        { value: 1, label: "1" },
+                      ]}
+                      value={action.continuous_air_brake_full_threshold}
+                      onChange={(value) =>
+                        updateAction({ continuous_air_brake_full_threshold: value })
+                      }
+                    />
+                    <RangeNumberField
+                      help="Minimum air-brake duty once the lane is above the deadzone. Zero keeps the first engaged pulses sparse; higher values make early braking more assertive."
+                      label="Minimum duty"
+                      max={1}
+                      min={0}
+                      rangeStep={0.01}
+                      resetValue={defaultConfig.action.continuous_air_brake_min_duty}
+                      ticks={[
+                        { value: 0, label: "0" },
+                        { value: 0.25, label: "0.25" },
+                        { value: 0.5, label: "0.5" },
+                        { value: 1, label: "1" },
+                      ]}
+                      value={action.continuous_air_brake_min_duty}
+                      onChange={(value) => updateAction({ continuous_air_brake_min_duty: value })}
+                    />
+                  </div>
+                ) : null}
+              </fieldset>
               <div className="field-shell">
                 <FieldLabel
                   help="When enabled, the air-brake branch is masked back to neutral while grounded. Turn this off to let the policy use air brake freely on ground too."

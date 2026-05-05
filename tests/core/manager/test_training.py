@@ -88,6 +88,31 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
     assert train_config.env.action.mask_air_brake_on_ground is True
 
 
+def test_manager_training_bridge_supports_continuous_air_brake_lane(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.air_brake_mode = "pwm"
+    config.action.enable_air_brake = False
+    config.action.continuous_air_brake_deadzone = 0.2
+    config.action.continuous_air_brake_full_threshold = 0.9
+    config.action.continuous_air_brake_min_duty = 0.35
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-air-brake-pwm",
+        run_dir=tmp_path / "runs" / "bridge-air-brake-pwm_0001",
+    )
+
+    assert train_config.env.action.name == "configured_hybrid"
+    assert train_config.env.action.layout_continuous_axes == ("steer", "air_brake")
+    assert train_config.env.action.layout_discrete_axes == ("gas", "boost", "lean", "pitch")
+    assert train_config.env.action.continuous_air_brake_deadzone == pytest.approx(0.2)
+    assert train_config.env.action.continuous_air_brake_full_threshold == pytest.approx(0.9)
+    assert train_config.env.action.continuous_air_brake_min_duty == pytest.approx(0.35)
+    assert train_config.env.action.continuous_air_brake_mode == "off"
+
+
 def test_manager_training_bridge_can_override_renderer(tmp_path: Path) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.environment.renderer = "angrylion"

@@ -122,8 +122,12 @@ const actionConfigSchema = z
     continuous_drive_full_threshold: z.number().gt(0).max(1),
     continuous_drive_min_thrust: z.number().min(0).max(1),
     include_air_brake: z.boolean(),
+    air_brake_mode: actionDriveModeSchema,
     enable_air_brake: z.boolean(),
     mask_air_brake_on_ground: z.boolean(),
+    continuous_air_brake_deadzone: z.number().min(0).lt(1),
+    continuous_air_brake_full_threshold: z.number().gt(0).max(1),
+    continuous_air_brake_min_duty: z.number().min(0).max(1),
     include_boost: z.boolean(),
     enable_boost: z.boolean(),
     boost_unmask_max_speed_kph: z.number().nonnegative().nullable(),
@@ -150,7 +154,15 @@ const actionConfigSchema = z
   .refine((action) => action.continuous_drive_deadzone < action.continuous_drive_full_threshold, {
     message: "continuous_drive_deadzone must be lower than continuous_drive_full_threshold",
     path: ["continuous_drive_deadzone"],
-  });
+  })
+  .refine(
+    (action) => action.continuous_air_brake_deadzone < action.continuous_air_brake_full_threshold,
+    {
+      message:
+        "continuous_air_brake_deadzone must be lower than continuous_air_brake_full_threshold",
+      path: ["continuous_air_brake_deadzone"],
+    },
+  );
 
 const environmentConfigSchema = z.object({
   max_episode_steps: z.number().int().positive(),

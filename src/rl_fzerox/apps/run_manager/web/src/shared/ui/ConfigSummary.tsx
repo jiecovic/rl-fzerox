@@ -83,7 +83,17 @@ function displayEnvironmentSummary(config: ManagedRunConfig) {
 function displayAuxiliarySummary(config: ManagedRunConfig) {
   const labels: string[] = [];
   if (config.action.include_air_brake) {
-    labels.push(config.action.enable_air_brake ? "air brake" : "air brake masked");
+    if (!config.action.enable_air_brake) {
+      labels.push(
+        config.action.air_brake_mode === "pwm" ? "air brake pwm masked" : "air brake masked",
+      );
+    } else if (config.action.air_brake_mode === "pwm") {
+      labels.push(
+        config.action.mask_air_brake_on_ground ? "air brake pwm, air-only" : "air brake pwm",
+      );
+    } else {
+      labels.push(config.action.mask_air_brake_on_ground ? "air brake, air-only" : "air brake");
+    }
   }
   if (config.action.include_boost) {
     if (!config.action.enable_boost) {

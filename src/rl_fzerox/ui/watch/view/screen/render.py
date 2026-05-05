@@ -105,6 +105,10 @@ def draw_watch_frame(
                 action_config.name == "configured_hybrid"
                 and "pitch" in action_config.layout_continuous_axes
             ),
+            continuous_air_brake_axis_index=action_config.continuous_air_brake_axis_index(),
+            continuous_air_brake_deadzone=action_config.continuous_air_brake_deadzone,
+            continuous_air_brake_full_threshold=action_config.continuous_air_brake_full_threshold,
+            continuous_air_brake_min_duty=action_config.continuous_air_brake_min_duty,
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
             continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
             action_repeat=config.env.action_repeat,

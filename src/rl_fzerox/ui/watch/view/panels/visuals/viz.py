@@ -6,7 +6,6 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator import ControllerState
-from fzerox_emulator.arrays import ContinuousAction
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
@@ -53,14 +52,27 @@ def _control_viz(
     continuous_drive_enabled: bool = False,
     force_full_throttle: bool = False,
     continuous_pitch_enabled: bool = False,
+    continuous_air_brake_axis_index: int | None = 2,
+    continuous_air_brake_deadzone: float = 0.05,
+    continuous_air_brake_full_threshold: float = 0.85,
+    continuous_air_brake_min_duty: float = 0.0,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
+    continuous_air_brake_enabled = continuous_air_brake_mode != "off"
+    continuous_air_brake_exposed = _continuous_air_brake_axis_available_from_action(
+        policy_action,
+        axis_index=continuous_air_brake_axis_index,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
+    )
     air_brake_axis = _continuous_air_brake_axis_from_action(
         policy_action,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-        continuous_air_brake_enabled=continuous_air_brake_mode != "off",
+        axis_index=continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=continuous_air_brake_min_duty,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
     )
     if (
         air_brake_axis is None
@@ -125,11 +137,15 @@ def _control_viz(
                 missing_allowed=False,
             )
         ),
-        air_brake_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "air_brake",
-            1,
-            missing_allowed=False,
+        air_brake_masked=(
+            False
+            if continuous_air_brake_exposed
+            else not action_branch_value_allowed(
+                action_mask_branches,
+                "air_brake",
+                1,
+                missing_allowed=False,
+            )
         ),
         boost_masked=not action_branch_value_allowed(
             action_mask_branches,
@@ -211,12 +227,52 @@ def _lean_direction(selected_branches: dict[str, int], *, fallback: int) -> int:
 def _continuous_air_brake_axis_from_action(
     policy_action: ActionValue | None,
     *,
-    continuous_drive_deadzone: float,
+    axis_index: int | None,
+    continuous_air_brake_deadzone: float,
+    continuous_air_brake_full_threshold: float,
+    continuous_air_brake_min_duty: float,
     continuous_air_brake_enabled: bool,
 ) -> float | None:
     """Return HUD air-brake value when the policy action exposes that axis."""
 
-    if policy_action is None:
+    values = _continuous_action_values(
+        policy_action,
+        axis_index=axis_index,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
+    )
+    if values is None or axis_index is None:
+        return None
+    return _continuous_air_brake_axis(
+        float(values[axis_index]),
+        continuous_air_brake_deadzone=continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=continuous_air_brake_min_duty,
+    )
+
+
+def _continuous_air_brake_axis_available_from_action(
+    policy_action: ActionValue | None,
+    *,
+    axis_index: int | None,
+    continuous_air_brake_enabled: bool,
+) -> bool:
+    return (
+        _continuous_action_values(
+            policy_action,
+            axis_index=axis_index,
+            continuous_air_brake_enabled=continuous_air_brake_enabled,
+        )
+        is not None
+    )
+
+
+def _continuous_action_values(
+    policy_action: ActionValue | None,
+    *,
+    axis_index: int | None,
+    continuous_air_brake_enabled: bool,
+) -> np.ndarray | None:
+    if policy_action is None or axis_index is None or not continuous_air_brake_enabled:
         return None
     source = (
         policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
@@ -227,35 +283,40 @@ def _continuous_air_brake_axis_from_action(
     if not np.issubdtype(action.dtype, np.floating):
         return None
     values = action.reshape(-1)
-    if values.size < 3 or not continuous_air_brake_enabled:
-        return None
-    return _continuous_air_brake_axis(
-        values,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-    )
+    return values if values.size > axis_index else None
 
 
 def _continuous_air_brake_axis(
-    values: ContinuousAction,
+    air_brake: float,
     *,
-    continuous_drive_deadzone: float,
+    continuous_air_brake_deadzone: float,
+    continuous_air_brake_full_threshold: float,
+    continuous_air_brake_min_duty: float,
 ) -> float | None:
-    if values.size < 3:
-        return None
-    air_brake = float(values[2])
     if not np.isfinite(air_brake):
         return None
     air_brake = max(-1.0, min(1.0, air_brake))
     return _continuous_positive_button_level(
         air_brake,
-        deadzone=continuous_drive_deadzone,
+        deadzone=continuous_air_brake_deadzone,
+        full_threshold=continuous_air_brake_full_threshold,
+        min_duty=continuous_air_brake_min_duty,
     )
 
 
-def _continuous_positive_button_level(value: float, *, deadzone: float) -> float:
+def _continuous_positive_button_level(
+    value: float,
+    *,
+    deadzone: float,
+    full_threshold: float,
+    min_duty: float,
+) -> float:
     if value <= deadzone:
         return 0.0
-    return (value - deadzone) / (1.0 - deadzone)
+    if value >= full_threshold:
+        return 1.0
+    scaled = (value - deadzone) / (full_threshold - deadzone)
+    return min(max(min_duty + ((1.0 - min_duty) * scaled), 0.0), 1.0)
 
 
 def _normalize_optional_level(value: float | None) -> float | None:
