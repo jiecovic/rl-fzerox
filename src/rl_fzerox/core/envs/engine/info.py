@@ -9,10 +9,7 @@ from fzerox_emulator import FZeroXTelemetry, ObservationSpec
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.observations import (
     ActionHistoryControl,
-    ObservationCourseContext,
-    ObservationGroundEffectContext,
     ObservationStackMode,
-    ObservationStateProfile,
     StateComponentsSettings,
     image_observation_shape,
     state_feature_count,
@@ -67,15 +64,10 @@ def set_observation_info(
     observation_resize_filter: str,
     observation_minimap_resize_filter: str,
     observation_mode: str,
-    observation_state_profile: ObservationStateProfile,
-    observation_course_context: ObservationCourseContext,
-    observation_ground_effect_context: ObservationGroundEffectContext,
     action_history_len: int | None,
     action_history_controls: tuple[ActionHistoryControl, ...],
     observation_state_components: StateComponentsSettings | None,
-    observation_zeroed_state_components: tuple[str, ...] = (),
-    observation_zeroed_state_features: tuple[str, ...] = (),
-    observation_excluded_state_features: tuple[str, ...] = (),
+    independent_lean_buttons: bool,
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -104,37 +96,22 @@ def set_observation_info(
     info["observation_resize_filter"] = observation_resize_filter
     info["observation_minimap_resize_filter"] = observation_minimap_resize_filter
     if observation_mode == "image_state":
-        info["observation_state_profile"] = observation_state_profile
-        info["observation_course_context"] = observation_course_context
-        info["observation_ground_effect_context"] = observation_ground_effect_context
+        if observation_state_components is None:
+            raise ValueError("image_state observations require state components in debug info")
         info["observation_action_history_len"] = action_history_len
         info["observation_action_history_controls"] = action_history_controls
-        if observation_state_components is not None:
-            info["observation_state_components"] = tuple(
-                asdict(component) for component in observation_state_components
-            )
-        info["observation_zeroed_state_components"] = observation_zeroed_state_components
-        info["observation_zeroed_state_features"] = observation_zeroed_state_features
-        info["observation_excluded_state_features"] = observation_excluded_state_features
+        info["observation_state_components"] = tuple(
+            asdict(component) for component in observation_state_components
+        )
         info["observation_state_shape"] = (
             state_feature_count(
-                observation_state_profile,
-                course_context=observation_course_context,
-                ground_effect_context=observation_ground_effect_context,
-                action_history_len=action_history_len,
-                action_history_controls=action_history_controls,
                 state_components=observation_state_components,
-                excluded_state_features=observation_excluded_state_features,
+                independent_lean_buttons=independent_lean_buttons,
             ),
         )
         info["observation_state_features"] = state_feature_names(
-            observation_state_profile,
-            course_context=observation_course_context,
-            ground_effect_context=observation_ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
             state_components=observation_state_components,
-            excluded_state_features=observation_excluded_state_features,
+            independent_lean_buttons=independent_lean_buttons,
         )
 
 

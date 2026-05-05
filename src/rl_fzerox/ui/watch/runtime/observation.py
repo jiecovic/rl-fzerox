@@ -4,10 +4,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-import numpy as np
-
-from rl_fzerox.core.envs import observations as observation_access
-from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.observations import (
+    ObservationValue,
+    mask_observation_state,
+    observation_state,
+    state_feature_indices,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,29 +42,22 @@ def apply_watch_state_feature_zeroing(
         return observation, next_info
 
     names = _observation_state_feature_names(info)
-    state = observation_access.observation_state(observation)
-    if state is None or len(names) != int(np.asarray(state).size):
+    state = observation_state(observation)
+    if state is None or len(names) != int(state.size):
         next_info["watch_zeroed_state_features"] = tuple(sorted(watch_zeroed_features))
         return observation, _with_union_zeroed_features(
             next_info,
             watch_zeroed_features=watch_zeroed_features,
         )
 
-    masked_state = np.array(state, copy=True)
-    masked_values = masked_state.reshape(-1)
     zero_targets = _resolved_zero_targets(names, watch_zeroed_features=watch_zeroed_features)
-    for index, name in enumerate(names):
-        if name in zero_targets:
-            masked_values[index] = 0.0
-
-    masked_observation: ObservationValue
-    if isinstance(observation, dict):
-        masked_observation = {
-            "image": observation["image"],
-            "state": masked_state,
-        }
-    else:
-        masked_observation = observation
+    masked_observation = mask_observation_state(
+        observation,
+        feature_indices=state_feature_indices(
+            names,
+            selected_feature_names=zero_targets,
+        ),
+    )
     return masked_observation, _with_union_zeroed_features(
         next_info,
         watch_zeroed_features=watch_zeroed_features,

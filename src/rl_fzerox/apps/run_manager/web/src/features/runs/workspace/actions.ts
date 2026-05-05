@@ -12,13 +12,14 @@ export interface RunWorkspaceActionsProps {
   onResume: (runId: string) => Promise<void>;
   onResetTrackPool: (runId: string) => Promise<void>;
   onStop: (runId: string) => Promise<void>;
-  onWatch: (runId: string, artifact: CheckpointArtifact) => Promise<void>;
+  onWatch: (runId: string, artifact: CheckpointArtifact) => Promise<"started" | "already_running">;
   run: ManagedRun;
   runName: string;
 }
 
 export interface RunWorkspaceActionState {
   canRename: boolean;
+  controlNotice: string | null;
   canResume: boolean;
   canStop: boolean;
   controlError: string | null;
@@ -58,6 +59,7 @@ export function useRunWorkspaceActions({
   runName,
 }: RunWorkspaceActionsProps): RunWorkspaceActionState {
   const [controlError, setControlError] = useState<string | null>(null);
+  const [controlNotice, setControlNotice] = useState<string | null>(null);
   const [copiedRunId, setCopiedRunId] = useState(false);
   const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
   const [isCreatingDraftFromRun, setIsCreatingDraftFromRun] = useState(false);
@@ -81,9 +83,22 @@ export function useRunWorkspaceActions({
     };
   }, [copiedRunId]);
 
+  useEffect(() => {
+    if (controlNotice === null) {
+      return undefined;
+    }
+    const timeoutId = window.setTimeout(() => {
+      setControlNotice(null);
+    }, 1_800);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [controlNotice]);
+
   async function resumeRun() {
     setIsResuming(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onResume(run.id);
     } catch (caught) {
@@ -96,6 +111,7 @@ export function useRunWorkspaceActions({
   async function stopRun() {
     setIsStopping(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onStop(run.id);
     } catch (caught) {
@@ -108,6 +124,7 @@ export function useRunWorkspaceActions({
   async function renameRunLabel() {
     setIsRenaming(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onRename(run.id, runName.trim());
     } catch (caught) {
@@ -120,6 +137,7 @@ export function useRunWorkspaceActions({
   async function openRunDirectoryInBrowser() {
     setIsOpeningDirectory(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onOpenDirectory(run.id);
     } catch (caught) {
@@ -132,6 +150,7 @@ export function useRunWorkspaceActions({
   async function forkRunArtifact(artifact: CheckpointArtifact) {
     setIsForking(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onFork(run.id, artifact);
     } catch (caught) {
@@ -144,6 +163,7 @@ export function useRunWorkspaceActions({
   async function createDraftFromRun() {
     setIsCreatingDraftFromRun(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onCreateDraftFromRun(run.id);
     } catch (caught) {
@@ -156,8 +176,12 @@ export function useRunWorkspaceActions({
   async function watchRunArtifact(artifact: CheckpointArtifact) {
     setWatchingArtifact(artifact);
     setControlError(null);
+    setControlNotice(null);
     try {
-      await onWatch(run.id, artifact);
+      const status = await onWatch(run.id, artifact);
+      if (status === "already_running") {
+        setControlNotice(`${artifact} watch is already running`);
+      }
     } catch (caught) {
       setControlError(caught instanceof Error ? caught.message : `failed to watch ${artifact}`);
     } finally {
@@ -168,6 +192,7 @@ export function useRunWorkspaceActions({
   async function resetTrackPoolState() {
     setIsResettingTrackPool(true);
     setControlError(null);
+    setControlNotice(null);
     try {
       await onResetTrackPool(run.id);
       clearTrackSamplingState(null);
@@ -185,6 +210,7 @@ export function useRunWorkspaceActions({
       await navigator.clipboard.writeText(run.id);
       setCopiedRunId(true);
       setControlError(null);
+      setControlNotice(null);
     } catch {
       setControlError("failed to copy run id");
     }
@@ -206,6 +232,7 @@ export function useRunWorkspaceActions({
     canResume,
     canStop,
     controlError,
+    controlNotice,
     copiedRunId,
     copyRunId,
     createDraftFromRun,

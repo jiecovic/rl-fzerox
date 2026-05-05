@@ -590,47 +590,6 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         "// outside_track_bounds",
     ]
 
-
-def test_side_panel_marks_zeroed_state_components() -> None:
-    feature_names = (
-        "vehicle_state.speed_norm",
-        "track_position.lap_progress",
-        "track_position.edge_ratio",
-    )
-    columns = _build_panel_columns(
-        episode=0,
-        info={
-            "frame_index": 0,
-            "native_fps": 60.0,
-            "observation_zeroed_state_components": ("track_position",),
-        },
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_curriculum_stage=None,
-        policy_action=None,
-        policy_reload_age_seconds=0.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(98, 130, 9),
-        observation_state=np.array([0.5, 0.0, 0.0], dtype=np.float32),
-        observation_state_feature_names=feature_names,
-        telemetry=_sample_telemetry(),
-    )
-
-    state_vector_section = next(
-        section for section in columns.stats if section.title == "State Vector"
-    )
-
-    assert _panel_group_labels(state_vector_section, "// Track Position") == [
-        "// lap_progress",
-        "// edge_ratio",
-    ]
-
-
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
         episode=0,

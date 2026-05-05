@@ -11,7 +11,7 @@ from rl_fzerox.core.domain.lean import (
     LeanMode,
 )
 from rl_fzerox.core.envs.actions import LEAN_LEFT_MASK, LEAN_RIGHT_MASK
-from rl_fzerox.core.envs.observations import DEFAULT_STATE_VECTOR_SPEC
+from rl_fzerox.core.envs.observations import OBSERVATION_STATE_DEFAULTS
 
 
 @dataclass(slots=True)
@@ -22,8 +22,8 @@ class LeanControlState:
     initial_lockout_frames: int = 0
     left_held: bool = False
     right_held: bool = False
-    left_press_age_frames: int = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
-    right_press_age_frames: int = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+    left_press_age_frames: int = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
+    right_press_age_frames: int = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
     _lock_index: int = 0
     _lock_remaining_frames: int = 0
     _cooldown_remaining_frames: int = 0
@@ -33,8 +33,8 @@ class LeanControlState:
 
         self.left_held = False
         self.right_held = False
-        self.left_press_age_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
-        self.right_press_age_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+        self.left_press_age_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
+        self.right_press_age_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
         self._lock_index = 0
         self._lock_remaining_frames = 0
         self._cooldown_remaining_frames = 0
@@ -169,7 +169,7 @@ class LeanControlState:
         if current_lean_index != 0 and current_lean_index != previous_lean_index:
             self._lock_index = current_lean_index
             self._lock_remaining_frames = max(
-                DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames - frames_elapsed,
+                OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames - frames_elapsed,
                 0,
             )
             return
@@ -187,7 +187,7 @@ class LeanControlState:
     ) -> None:
         if previous_lean_index != 0 and current_lean_index != previous_lean_index:
             self._cooldown_remaining_frames = max(
-                DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames - frames_elapsed,
+                OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames - frames_elapsed,
                 0,
             )
             return
@@ -246,13 +246,13 @@ def advance_press_age(
     is_held: bool,
     frames_elapsed: int,
 ) -> int:
-    guard_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+    guard_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
     if is_held and not was_held:
         return min(frames_elapsed, guard_frames)
     return min(previous_age_frames + frames_elapsed, guard_frames)
 
 
 def lean_press_age_norm(frames: int) -> float:
-    guard_frames = DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames
+    guard_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
     clamped_frames = min(max(int(frames), 0), guard_frames)
     return clamped_frames / guard_frames

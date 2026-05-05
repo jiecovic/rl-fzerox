@@ -189,3 +189,41 @@ def test_resume_uses_latest_checkpoint_when_present(tmp_path: Path) -> None:
     assert launcher.spawn_calls == [(run.id, True)]
     assert resumed.status == "running"
     assert "latest checkpoint" in events[run.id][0].message
+
+
+def test_watch_artifact_skips_duplicate_window(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    run = store.create_run(
+        run_id="watch-run",
+        name="Watch Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "watch-run",
+    )
+    launcher = ManagerRunLauncher(store)
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.resolve_model_artifact_path",
+        lambda *_args, **_kwargs: run.run_dir / RUN_LAYOUT.model_artifacts.latest,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch._active_watch_pid",
+        lambda **_kwargs: 4321,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.resolve_watch_app_config",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("duplicate watch should not resolve config")
+        ),
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.subprocess.Popen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("duplicate watch should not spawn a process")
+        ),
+    )
+
+    launcher.watch_artifact(run_id=run.id, artifact="latest")

@@ -1,9 +1,4 @@
-import type {
-  ConfigMetadata,
-  ManagedRunConfig,
-  StateComponentConfig,
-  StateFeatureConfig,
-} from "@/shared/api/contract";
+import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
 
 import { stateFeatureInfo } from "../stateFeatureInfo";
 
@@ -70,24 +65,23 @@ export function allStateComponentsOpen(metadata: ConfigMetadata, open: boolean) 
   return Object.fromEntries(metadata.state_components.map((component) => [component.name, open]));
 }
 
-export function effectiveFeatureMode(
-  config: ManagedRunConfig,
-  component: StateComponentConfig,
-  featureName: string,
-): StateFeatureConfig["mode"] {
+export function effectiveFeatureDropoutProb(config: ManagedRunConfig, featureName: string): number {
   return (
-    config.observation.state_feature_modes.find((feature) => feature.name === featureName)?.mode ??
-    component.mode
+    config.observation.state_feature_dropouts.find((feature) => feature.name === featureName)
+      ?.dropout_prob ?? 0
   );
 }
 
-export function isRowZeroed(
-  config: ManagedRunConfig,
-  component: StateComponentConfig,
-  row: StateFeatureRow,
-) {
+export function isRowZeroed(config: ManagedRunConfig, row: StateFeatureRow) {
   return row.featureNames.every(
-    (featureName) => effectiveFeatureMode(config, component, featureName) === "zero",
+    (featureName) => effectiveFeatureDropoutProb(config, featureName) >= 1.0,
+  );
+}
+
+export function rowDropoutProb(config: ManagedRunConfig, row: StateFeatureRow) {
+  return Math.max(
+    0,
+    ...row.featureNames.map((featureName) => effectiveFeatureDropoutProb(config, featureName)),
   );
 }
 

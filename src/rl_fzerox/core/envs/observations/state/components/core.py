@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/observations/state/components/core.py
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry
@@ -14,8 +14,8 @@ from rl_fzerox.core.envs.observations.state.history import (
     control_history_source_control,
     validate_action_history_controls,
 )
-from rl_fzerox.core.envs.observations.state.profiles import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.core.envs.observations.state.types import (
+    OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     StateFeature,
     StateVectorSpec,
@@ -26,37 +26,30 @@ from rl_fzerox.core.envs.observations.state.types import (
 class StateComponentDefinition:
     """One scalar-state component with schema and value builders kept together."""
 
-    features: Callable[[ObservationStateComponentSettings], tuple[StateFeature, ...]]
-    values: Callable[
-        [
-            FZeroXTelemetry | None,
-            ObservationStateComponentSettings,
-            Mapping[str, float],
-            Mapping[str, float],
-        ],
-        list[float],
-    ]
+    features: Callable[..., tuple[StateFeature, ...]]
+    values: Callable[..., list[float]]
 
 
 def state_vector_spec_from_components(
     state_components: StateComponentsSettings,
     *,
-    excluded_state_features: Collection[str] = (),
+    independent_lean_buttons: bool = False,
 ) -> StateVectorSpec:
     features: list[StateFeature] = []
     for component in state_components:
         features.extend(
-            feature
-            for feature in state_component_definition(component).features(component)
-            if feature.name not in excluded_state_features
+            state_component_features(
+                component,
+                independent_lean_buttons=independent_lean_buttons,
+            )
         )
 
     return StateVectorSpec(
         features=tuple(features),
-        speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
-        lean_tap_guard_frames=DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
-        recent_boost_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames,
-        recent_steer_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames,
+        speed_normalizer_kph=OBSERVATION_STATE_DEFAULTS.speed_normalizer_kph,
+        lean_tap_guard_frames=OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames,
+        recent_boost_window_frames=OBSERVATION_STATE_DEFAULTS.recent_boost_window_frames,
+        recent_steer_window_frames=OBSERVATION_STATE_DEFAULTS.recent_steer_window_frames,
     )
 
 
@@ -64,31 +57,26 @@ def component_state_values(
     telemetry: FZeroXTelemetry | None,
     *,
     state_components: StateComponentsSettings,
-    zeroed_state_components: Collection[str] = (),
-    zeroed_state_features: Collection[str] = (),
-    excluded_state_features: Collection[str] = (),
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
+    independent_lean_buttons: bool = False,
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
         definition = state_component_definition(component)
-        component_features = definition.features(component)
-        if component.name in zeroed_state_components:
-            values.extend([0.0] * len(component_features))
-            continue
-
-        component_values = definition.values(
-            telemetry,
-            component,
-            action_history,
-            profile_fields,
-        )
-        values.extend(
-            0.0 if feature.name in zeroed_state_features else value
-            for feature, value in zip(component_features, component_values, strict=True)
-            if feature.name not in excluded_state_features
-        )
+        if component.name == "control_history":
+            component_values = definition.values(
+                telemetry,
+                component,
+                action_history,
+                independent_lean_buttons=independent_lean_buttons,
+            )
+        else:
+            component_values = definition.values(
+                telemetry,
+                component,
+                action_history,
+            )
+        values.extend(component_values)
 
     return values
 
@@ -96,19 +84,31 @@ def component_state_values(
 def action_history_settings_for_observation(
     *,
     state_components: StateComponentsSettings | None,
-    fallback_len: int | None,
-    fallback_controls: tuple[ActionHistoryControl, ...],
 ) -> tuple[int | None, tuple[ActionHistoryControl, ...]]:
     """Return the control-history buffer shape needed by the selected observation."""
 
     if state_components is None:
-        return fallback_len, fallback_controls
+        return None, ()
     control_config = component_by_name(state_components, "control_history")
     if control_config is None:
         return None, ()
     length = component_int(control_config, "length", default=2)
     controls = component_controls(control_config, default=("steer", "thrust", "boost", "lean"))
     return length, tuple(control_history_source_control(control) for control in controls)
+
+
+def state_component_features(
+    component: ObservationStateComponentSettings,
+    *,
+    independent_lean_buttons: bool = False,
+) -> tuple[StateFeature, ...]:
+    definition = state_component_definition(component)
+    if component.name != "control_history":
+        return definition.features(component)
+    return definition.features(
+        component,
+        independent_lean_buttons=independent_lean_buttons,
+    )
 
 
 def state_component_definition(

@@ -50,7 +50,10 @@ from rl_fzerox.core.config.schema_models.tracks import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
-from rl_fzerox.core.config.schema_models.training import TrainConfig
+from rl_fzerox.core.config.schema_models.training import (
+    StateFeatureDropoutGroupConfig,
+    TrainConfig,
+)
 
 __all__ = [
     "ActionConfig",
@@ -81,6 +84,7 @@ __all__ = [
     "TrackSamplingConfig",
     "TrackSamplingEntryConfig",
     "TrackSamplingMode",
+    "StateFeatureDropoutGroupConfig",
     "TrainAppConfig",
     "TrainConfig",
     "WatchAppConfig",

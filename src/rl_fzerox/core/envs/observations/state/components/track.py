@@ -24,9 +24,8 @@ def track_position_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del action_history, profile_fields
+    del action_history
     return track_position_values(
         telemetry,
         progress_source=component.progress_source or "lap_progress",

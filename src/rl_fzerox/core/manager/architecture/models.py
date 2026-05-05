@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentName
-from rl_fzerox.core.manager.config import ObservationPreset, StateComponentMode
+from rl_fzerox.core.manager.config import ObservationPreset
 
 
 class SelectOption(BaseModel):
@@ -36,7 +36,6 @@ class StateComponentInfo(BaseModel):
 
     name: ObservationStateComponentName
     label: str
-    default_mode: StateComponentMode
     features: tuple[StateFeatureInfo, ...]
 
 
@@ -98,7 +97,6 @@ class RunManagerConfigMetadata(BaseModel):
     stack_modes: tuple[SelectOption, ...]
     resize_filters: tuple[SelectOption, ...]
     progress_sources: tuple[SelectOption, ...]
-    component_modes: tuple[SelectOption, ...]
     action_history_controls: tuple[SelectOption, ...]
     state_components: tuple[StateComponentInfo, ...]
     conv_profiles: tuple[SelectOption, ...]
@@ -119,7 +117,7 @@ class StateFeaturePreview(BaseModel):
 
     component: ObservationStateComponentName
     name: str
-    mode: StateComponentMode
+    dropout_prob: float
 
 
 class ConvLayerPreview(BaseModel):

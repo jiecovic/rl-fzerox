@@ -4,14 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Literal
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    PositiveInt,
-    field_validator,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
 from rl_fzerox.core.config.schema_models.common import (
     ObservationPresetName,
@@ -20,10 +13,8 @@ from rl_fzerox.core.config.schema_models.common import (
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
     ObservationCourseContextName,
-    ObservationGroundEffectContextName,
     ObservationStateComponentName,
     ObservationStateComponentSettings,
-    ObservationStateProfileName,
     TrackPositionProgressSourceName,
 )
 
@@ -36,7 +27,6 @@ class ObservationStateComponentConfig(BaseModel):
     name: ObservationStateComponentName
     encoding: ObservationCourseContextName | None = None
     progress_source: TrackPositionProgressSourceName | None = None
-    state_profile: ObservationStateProfileName | None = None
     length: PositiveInt | None = Field(default=None, le=16)
     controls: tuple[ActionHistoryControlName, ...] | None = None
 
@@ -62,7 +52,6 @@ class ObservationStateComponentConfig(BaseModel):
             for name in (
                 "encoding",
                 "progress_source",
-                "state_profile",
                 "length",
                 "controls",
             )
@@ -101,7 +90,6 @@ class ObservationStateComponentConfig(BaseModel):
             name=self.name,
             encoding=self.encoding,
             progress_source=self.progress_source,
-            state_profile=self.state_profile,
             length=None if self.length is None else int(self.length),
             controls=self.controls,
         )
@@ -113,43 +101,13 @@ class ObservationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["image", "image_state"] = "image"
-    state_profile: Literal[
-        "default",
-        "steer_history",
-        "race_core",
-    ] = "default"
     preset: ObservationPresetName = "crop_116x164"
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb"
     minimap_layer: bool = False
     resize_filter: ObservationResizeFilter = "nearest"
     minimap_resize_filter: ObservationResizeFilter = "nearest"
-    course_context: ObservationCourseContextName = "none"
-    ground_effect_context: ObservationGroundEffectContextName = "none"
-    action_history_len: PositiveInt | None = Field(default=None, le=16)
-    action_history_controls: tuple[ActionHistoryControlName, ...] = (
-        "steer",
-        "gas",
-        "boost",
-        "lean",
-    )
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
-    zeroed_state_components: tuple[ObservationStateComponentName, ...] = ()
-    zeroed_state_features: tuple[str, ...] = ()
-    excluded_state_features: tuple[str, ...] = ()
-
-    @field_validator("action_history_controls")
-    @classmethod
-    def _validate_unique_action_history_controls(
-        cls,
-        value: tuple[ActionHistoryControlName, ...],
-    ) -> tuple[ActionHistoryControlName, ...]:
-        if len(set(value)) != len(value):
-            raise ValueError("action_history_controls must not contain duplicates")
-        normalized = {"gas" if control == "thrust" else control for control in value}
-        if len(normalized) != len(value):
-            raise ValueError("action_history_controls cannot contain both gas and thrust")
-        return value
 
     @field_validator("state_components")
     @classmethod
@@ -164,97 +122,10 @@ class ObservationConfig(BaseModel):
             raise ValueError("observation.state_components must not contain duplicates")
         return value
 
-    @field_validator("zeroed_state_components")
-    @classmethod
-    def _validate_unique_zeroed_state_components(
-        cls,
-        value: tuple[ObservationStateComponentName, ...],
-    ) -> tuple[ObservationStateComponentName, ...]:
-        if len(set(value)) != len(value):
-            raise ValueError("observation.zeroed_state_components must not contain duplicates")
-        return value
-
-    @field_validator("zeroed_state_features")
-    @classmethod
-    def _validate_unique_zeroed_state_features(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        if len(set(value)) != len(value):
-            raise ValueError("observation.zeroed_state_features must not contain duplicates")
-        return value
-
-    @field_validator("excluded_state_features")
-    @classmethod
-    def _validate_unique_excluded_state_features(
-        cls,
-        value: tuple[str, ...],
-    ) -> tuple[str, ...]:
-        if len(set(value)) != len(value):
-            raise ValueError("observation.excluded_state_features must not contain duplicates")
-        return value
-
     @model_validator(mode="after")
-    def _validate_zeroed_state_components_are_active(self) -> ObservationConfig:
-        if not self.zeroed_state_components:
-            return self
-        if self.state_components is None:
-            raise ValueError(
-                "observation.zeroed_state_components requires observation.state_components"
-            )
-        active_names = {str(component.name) for component in self.state_components}
-        unknown_names = sorted(
-            str(component_name)
-            for component_name in self.zeroed_state_components
-            if str(component_name) not in active_names
-        )
-        if unknown_names:
-            joined = ", ".join(unknown_names)
-            raise ValueError(
-                "observation.zeroed_state_components must reference active state components: "
-                f"{joined}"
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _validate_feature_overrides_are_active(self) -> ObservationConfig:
-        if self.state_components is None:
-            return self
-
-        from rl_fzerox.core.envs.observations.state.components import state_component_definition
-
-        active_names = {
-            feature.name
-            for component in self.state_components_data() or ()
-            for feature in state_component_definition(component).features(component)
-        }
-        unknown_zeroed = sorted(
-            feature_name
-            for feature_name in self.zeroed_state_features
-            if feature_name not in active_names
-        )
-        if unknown_zeroed:
-            joined = ", ".join(unknown_zeroed)
-            raise ValueError(
-                f"observation.zeroed_state_features must reference active state features: {joined}"
-            )
-
-        unknown_excluded = sorted(
-            feature_name
-            for feature_name in self.excluded_state_features
-            if feature_name not in active_names
-        )
-        if unknown_excluded:
-            joined = ", ".join(unknown_excluded)
-            raise ValueError(
-                "observation.excluded_state_features must reference active state features: "
-                f"{joined}"
-            )
-
-        overlap = sorted(set(self.zeroed_state_features) & set(self.excluded_state_features))
-        if overlap:
-            joined = ", ".join(overlap)
-            raise ValueError(
-                "observation feature overrides cannot both zero and exclude the same feature: "
-                f"{joined}"
-            )
+    def _validate_state_components_for_mode(self) -> ObservationConfig:
+        if self.mode == "image_state" and not self.state_components:
+            raise ValueError("observation.state_components must not be empty for mode=image_state")
         return self
 
     def state_components_data(self) -> tuple[ObservationStateComponentSettings, ...] | None:

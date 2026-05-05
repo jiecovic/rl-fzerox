@@ -2,19 +2,21 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 
 import gymnasium as gym
 import numpy as np
 
-from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.config.schema import EnvConfig, TrainConfig
-from rl_fzerox.core.envs.observations import (
-    action_history_settings_for_observation,
-    state_feature_names,
-)
+from rl_fzerox.core.envs.observations import mask_observation_state, state_feature_names
 
-_COURSE_CONTEXT_PREFIX = "course_context."
-_COURSE_CONTEXT_DROPOUT_SEED_DOMAIN = 0x34C2_2E5B_7B67_021D
+_STATE_FEATURE_DROPOUT_SEED_DOMAIN = 0x34C2_2E5B_7B67_021D
+
+
+@dataclass(frozen=True, slots=True)
+class _StateFeatureDropoutGroup:
+    feature_indices: tuple[int, ...]
+    dropout_prob: float
 
 
 def maybe_wrap_training_observation_augmentation(
@@ -25,36 +27,29 @@ def maybe_wrap_training_observation_augmentation(
 ) -> gym.Env:
     """Apply train-only observation augmentations without changing env spaces."""
 
-    dropout_prob = float(train_config.course_context_dropout_prob)
-    if dropout_prob <= 0.0:
+    dropout_groups = _state_feature_dropout_groups(env_config=env_config, train_config=train_config)
+    if not dropout_groups:
         return env
 
-    feature_indices = _course_context_feature_indices(env_config)
-    if not feature_indices:
-        return env
-
-    return CourseContextDropoutWrapper(
+    return EpisodeStateFeatureDropoutWrapper(
         env,
-        dropout_prob=dropout_prob,
-        feature_indices=feature_indices,
+        dropout_groups=dropout_groups,
     )
 
 
-class CourseContextDropoutWrapper(gym.ObservationWrapper):
-    """Randomly zero course-context state features for whole training episodes."""
+class EpisodeStateFeatureDropoutWrapper(gym.ObservationWrapper):
+    """Randomly zero configured state-feature groups for whole training episodes."""
 
     def __init__(
         self,
         env: gym.Env,
         *,
-        dropout_prob: float,
-        feature_indices: Sequence[int],
+        dropout_groups: Sequence[_StateFeatureDropoutGroup],
     ) -> None:
         super().__init__(env)
-        self._dropout_prob = dropout_prob
-        self._feature_indices = tuple(feature_indices)
+        self._dropout_groups = tuple(dropout_groups)
         self._rng = np.random.default_rng()
-        self._drop_current_episode = False
+        self._dropped_feature_indices: tuple[int, ...] = ()
 
     def reset(
         self,
@@ -64,43 +59,66 @@ class CourseContextDropoutWrapper(gym.ObservationWrapper):
     ):
         observation, info = self.env.reset(seed=seed, options=options)
         if seed is not None:
-            self._rng = np.random.default_rng(seed ^ _COURSE_CONTEXT_DROPOUT_SEED_DOMAIN)
-        self._drop_current_episode = bool(self._rng.random() < self._dropout_prob)
+            self._rng = np.random.default_rng(seed ^ _STATE_FEATURE_DROPOUT_SEED_DOMAIN)
+        dropped_indices: set[int] = set()
+        for group in self._dropout_groups:
+            if group.dropout_prob >= 1.0:
+                dropped_indices.update(group.feature_indices)
+                continue
+            if self._rng.random() < group.dropout_prob:
+                dropped_indices.update(group.feature_indices)
+        self._dropped_feature_indices = tuple(sorted(dropped_indices))
         return self.observation(observation), info
 
     def observation(self, observation: object) -> object:
-        if not self._drop_current_episode:
+        if not self._dropped_feature_indices:
             return observation
         if not isinstance(observation, dict):
             return observation
-
-        state = observation.get("state")
-        if not isinstance(state, np.ndarray):
-            return observation
-
-        augmented_observation = dict(observation)
-        augmented_state: StateVector = np.array(state, copy=True)
-        augmented_state[list(self._feature_indices)] = 0.0
-        augmented_observation["state"] = augmented_state
-        return augmented_observation
+        return mask_observation_state(
+            observation,
+            feature_indices=self._dropped_feature_indices,
+        )
 
 
-def _course_context_feature_indices(config: EnvConfig) -> tuple[int, ...]:
+def _state_feature_dropout_groups(
+    *,
+    env_config: EnvConfig,
+    train_config: TrainConfig,
+) -> tuple[_StateFeatureDropoutGroup, ...]:
+    index_by_feature = {
+        feature_name: index
+        for index, feature_name in enumerate(_observation_state_feature_names(env_config))
+    }
+    merged_groups: dict[tuple[str, ...], float] = {}
+    ordered_feature_names = tuple(index_by_feature)
+    for group in train_config.state_feature_dropout_groups:
+        active_names = tuple(
+            feature_name
+            for feature_name in ordered_feature_names
+            if feature_name in group.feature_names
+        )
+        if not active_names or group.dropout_prob <= 0.0:
+            continue
+        merged_groups[active_names] = max(
+            merged_groups.get(active_names, 0.0),
+            float(group.dropout_prob),
+        )
+    return tuple(
+        _StateFeatureDropoutGroup(
+            feature_indices=tuple(index_by_feature[feature_name] for feature_name in feature_names),
+            dropout_prob=dropout_prob,
+        )
+        for feature_names, dropout_prob in merged_groups.items()
+    )
+
+
+def _observation_state_feature_names(config: EnvConfig) -> tuple[str, ...]:
     observation_config = config.observation
     state_components = observation_config.state_components_data()
-    action_history_len, action_history_controls = action_history_settings_for_observation(
+    if state_components is None:
+        return ()
+    return state_feature_names(
         state_components=state_components,
-        fallback_len=observation_config.action_history_len,
-        fallback_controls=observation_config.action_history_controls,
-    )
-    names = state_feature_names(
-        observation_config.state_profile,
-        course_context=observation_config.course_context,
-        ground_effect_context=observation_config.ground_effect_context,
-        action_history_len=action_history_len,
-        action_history_controls=action_history_controls,
-        state_components=state_components,
-    )
-    return tuple(
-        index for index, name in enumerate(names) if name.startswith(_COURSE_CONTEXT_PREFIX)
+        independent_lean_buttons=config.action.independent_lean_buttons,
     )

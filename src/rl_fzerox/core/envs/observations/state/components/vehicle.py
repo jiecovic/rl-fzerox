@@ -5,7 +5,6 @@ from collections.abc import Mapping
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
-from rl_fzerox.core.envs.observations.state.profiles import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.core.envs.observations.state.types import OBSERVATION_STATE_DEFAULTS, StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
@@ -22,9 +21,8 @@ def vehicle_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del component, action_history, profile_fields
+    del component, action_history
     return vehicle_state_values(telemetry)
 
 
@@ -48,7 +46,7 @@ def vehicle_state_values(telemetry: FZeroXTelemetry | None) -> list[float]:
     energy_frac = 0.0 if player.max_energy <= 0.0 else player.energy / player.max_energy
     lateral_velocity = float(player.local_lateral_velocity)
     return [
-        clamp(float(player.speed_kph) / DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph, 0.0, 2.0),
+        clamp(float(player.speed_kph) / OBSERVATION_STATE_DEFAULTS.speed_normalizer_kph, 0.0, 2.0),
         clamp(float(energy_frac), 0.0, 1.0),
         1.0 if player.reverse_timer > 0 else 0.0,
         1.0 if player.airborne else 0.0,

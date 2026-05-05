@@ -86,4 +86,9 @@ class RunLauncher(Protocol):
 
     def resume(self, *, run_id: str) -> ManagedRun: ...
 
-    def watch_artifact(self, *, run_id: str, artifact: str) -> None: ...
+    def watch_artifact(
+        self,
+        *,
+        run_id: str,
+        artifact: str,
+    ) -> Literal["started", "already_running"]: ...

@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/observations/value.py
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from typing import TypeAlias, TypedDict
 
 import numpy as np
@@ -9,19 +9,10 @@ from gymnasium import spaces
 
 from fzerox_emulator import FZeroXTelemetry, ObservationSpec, ObservationStackMode
 from fzerox_emulator.arrays import ObservationFrame, StateVector
+from rl_fzerox.core.domain.observation_components import StateComponentsSettings
 
 from .image import build_image_observation_space
-from .state import (
-    OBSERVATION_STATE_DEFAULTS,
-    ActionHistoryControl,
-    ObservationCourseContext,
-    ObservationGroundEffectContext,
-    ObservationMode,
-    ObservationStateProfile,
-    StateComponentsSettings,
-    state_vector_spec,
-    telemetry_state_vector,
-)
+from .state import ObservationMode, state_vector_spec, telemetry_state_vector
 
 ImageObservation: TypeAlias = ObservationFrame
 
@@ -49,54 +40,22 @@ def build_observation(
     image: ObservationFrame,
     telemetry: FZeroXTelemetry | None,
     mode: ObservationMode,
-    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    left_lean_held: float = 0.0,
-    right_lean_held: float = 0.0,
-    left_press_age_norm: float = 1.0,
-    right_press_age_norm: float = 1.0,
-    recent_boost_pressure: float = 0.0,
-    steer_left_held: float = 0.0,
-    steer_right_held: float = 0.0,
-    recent_steer_pressure: float = 0.0,
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
-    zeroed_state_components: Collection[str] = (),
-    zeroed_state_features: Collection[str] = (),
-    excluded_state_features: Collection[str] = (),
+    independent_lean_buttons: bool = False,
 ) -> ObservationValue:
     if mode == "image":
         return image
     if mode == "image_state":
+        if state_components is None:
+            raise ValueError("image_state observations require state_components")
         return {
             "image": image,
             "state": telemetry_state_vector(
                 telemetry,
-                state_profile=state_profile,
-                course_context=course_context,
-                ground_effect_context=ground_effect_context,
-                left_lean_held=left_lean_held,
-                right_lean_held=right_lean_held,
-                left_press_age_norm=left_press_age_norm,
-                right_press_age_norm=right_press_age_norm,
-                recent_boost_pressure=recent_boost_pressure,
-                steer_left_held=steer_left_held,
-                steer_right_held=steer_right_held,
-                recent_steer_pressure=recent_steer_pressure,
-                action_history_len=action_history_len,
-                action_history_controls=action_history_controls,
-                action_history=action_history,
                 state_components=state_components,
-                zeroed_state_components=zeroed_state_components,
-                zeroed_state_features=zeroed_state_features,
-                excluded_state_features=excluded_state_features,
+                action_history=action_history,
+                independent_lean_buttons=independent_lean_buttons,
             ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")
@@ -109,17 +68,8 @@ def build_observation_space(
     stack_mode: ObservationStackMode = "rgb",
     minimap_layer: bool = False,
     mode: ObservationMode,
-    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
     state_components: StateComponentsSettings | None = None,
-    excluded_state_features: Collection[str] = (),
+    independent_lean_buttons: bool = False,
 ) -> spaces.Box | spaces.Dict:
     image_space = build_image_observation_space(
         observation_spec,
@@ -130,14 +80,11 @@ def build_observation_space(
     if mode == "image":
         return image_space
     if mode == "image_state":
+        if state_components is None:
+            raise ValueError("image_state observations require state_components")
         spec = state_vector_spec(
-            state_profile,
-            course_context=course_context,
-            ground_effect_context=ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
             state_components=state_components,
-            excluded_state_features=excluded_state_features,
+            independent_lean_buttons=independent_lean_buttons,
         )
         return spaces.Dict(
             {

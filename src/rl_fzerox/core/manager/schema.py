@@ -118,8 +118,6 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
         ON run_drafts(name COLLATE NOCASE);
         """
     )
-    _ensure_runs_columns(connection)
-    _ensure_run_draft_columns(connection)
     connection.execute("DROP INDEX IF EXISTS run_metric_samples_run_id_created_at_idx")
     connection.execute("DROP TABLE IF EXISTS run_metric_samples")
     connection.execute("DELETE FROM schema_version")
@@ -131,74 +129,6 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
         (SCHEMA_VERSION, applied_at),
     )
     _insert_default_template(connection, created_at=applied_at)
-
-
-def _ensure_runs_columns(connection: sqlite3.Connection) -> None:
-    existing_columns = {
-        str(row["name"]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()
-    }
-    if "lineage_step_offset" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE runs
-            ADD COLUMN lineage_step_offset INTEGER NOT NULL DEFAULT 0
-            """
-        )
-    if "lineage_id" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE runs
-            ADD COLUMN lineage_id TEXT
-            """
-        )
-    if "source_num_timesteps" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE runs
-            ADD COLUMN source_num_timesteps INTEGER
-            """
-        )
-    if "source_snapshot_dir" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE runs
-            ADD COLUMN source_snapshot_dir TEXT
-            """
-        )
-
-
-def _ensure_run_draft_columns(connection: sqlite3.Connection) -> None:
-    existing_columns = {
-        str(row["name"]) for row in connection.execute("PRAGMA table_info(run_drafts)").fetchall()
-    }
-    if "source_run_id" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE run_drafts
-            ADD COLUMN source_run_id TEXT
-            """
-        )
-    if "source_artifact" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE run_drafts
-            ADD COLUMN source_artifact TEXT
-            """
-        )
-    if "source_snapshot_dir" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE run_drafts
-            ADD COLUMN source_snapshot_dir TEXT
-            """
-        )
-    if "source_num_timesteps" not in existing_columns:
-        connection.execute(
-            """
-            ALTER TABLE run_drafts
-            ADD COLUMN source_num_timesteps INTEGER
-            """
-        )
 
 
 def _insert_default_template(connection: sqlite3.Connection, *, created_at: str) -> None:

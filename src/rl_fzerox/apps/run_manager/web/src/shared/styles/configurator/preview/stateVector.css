@@ -57,6 +57,11 @@
   text-align: right;
 }
 
+.state-feature-table th:nth-child(4),
+.state-feature-table td:nth-child(4) {
+  width: 124px;
+}
+
 .state-feature-table th:nth-child(2),
 .state-feature-table td:nth-child(2) {
   width: 116px;
@@ -79,6 +84,12 @@
   gap: 8px;
 }
 
+.state-feature-column-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .state-feature-name {
   display: inline-flex;
   align-items: center;
@@ -98,6 +109,25 @@
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+.state-feature-dropout-cell {
+  background: var(--surface);
+}
+
+.state-feature-dropout-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+}
+
+.state-feature-dropout-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .state-progress-toggle {

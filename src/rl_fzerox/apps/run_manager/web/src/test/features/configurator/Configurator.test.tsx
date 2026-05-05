@@ -250,6 +250,189 @@ describe("Configurator", () => {
     expect(stallToggle).toHaveAttribute("aria-pressed", "false");
   });
 
+  it("lets you configure episode-scoped state-feature dropout from the observation tab", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.click(screen.getByText("track position"));
+
+    const trackPositionPanel = screen.getByText("track position").closest("details");
+    if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing track position panel");
+    }
+    const edgeRatioInput = within(trackPositionPanel).getByRole("spinbutton", {
+      name: "Edge ratio episode dropout",
+    });
+    expect(edgeRatioInput).toBeDisabled();
+    expect(edgeRatioInput).toHaveValue(1);
+
+    const edgeRatioRow = within(trackPositionPanel).getByText("Edge ratio").closest("tr");
+    if (!(edgeRatioRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing edge ratio row");
+    }
+    const edgeRatioToggle = within(edgeRatioRow).getByRole("checkbox", { name: "entry enabled" });
+
+    await user.click(edgeRatioToggle);
+
+    await waitFor(() => {
+      expect(edgeRatioInput).toBeEnabled();
+      expect(edgeRatioInput).toHaveValue(0);
+    });
+
+    await user.clear(edgeRatioInput);
+    await user.type(edgeRatioInput, "0.25");
+    edgeRatioInput.blur();
+
+    await waitFor(() => expect(edgeRatioInput).toHaveValue(0.25));
+
+    await user.click(edgeRatioToggle);
+
+    await waitFor(() => {
+      expect(edgeRatioInput).toBeDisabled();
+      expect(edgeRatioInput).toHaveValue(1);
+    });
+
+    await user.click(edgeRatioToggle);
+
+    await waitFor(() => {
+      expect(edgeRatioInput).toBeEnabled();
+      expect(edgeRatioInput).toHaveValue(0);
+    });
+  });
+
+  it("persists progress-scalar dropout without requiring a blur before saving", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="progress dropout draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.click(screen.getByText("track position"));
+
+    const trackPositionPanel = screen.getByText("track position").closest("details");
+    if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing track position panel");
+    }
+    const lapProgressInput = within(trackPositionPanel).getByRole("spinbutton", {
+      name: "Progress scalar episode dropout",
+    });
+
+    await user.clear(lapProgressInput);
+    await user.type(lapProgressInput, "0.1");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "progress dropout draft",
+        expect.objectContaining({
+          observation: expect.objectContaining({
+            state_feature_dropouts: expect.arrayContaining([
+              { dropout_prob: 0.1, name: "track_position.lap_progress" },
+            ]),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("persists image features without requiring a blur before saving", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="feature dim draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Policy" }));
+    await user.click(screen.getByRole("button", { name: "Custom" }));
+
+    const imageFeaturesInput = screen.getByRole("textbox", { name: "Image features" });
+    await user.clear(imageFeaturesInput);
+    await user.type(imageFeaturesInput, "1024");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "feature dim draft",
+        expect.objectContaining({
+          policy: expect.objectContaining({
+            features_dim: 1024,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("persists recent retention without requiring a blur before saving", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="recent retention draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Logging" }));
+    await user.click(screen.getByRole("button", { name: "Keep recent" }));
+
+    const retentionInput = screen.getByRole("textbox", { name: "Recent retention" });
+    await user.clear(retentionInput);
+    await user.type(retentionInput, "12");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "recent retention draft",
+        expect.objectContaining({
+          train: expect.objectContaining({
+            recent_checkpoint_limit: 12,
+            save_recent_checkpoints: true,
+          }),
+        }),
+      ),
+    );
+  });
+
   it("separates head presence from runtime masking in the action tab", async () => {
     const user = userEvent.setup();
 

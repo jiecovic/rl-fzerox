@@ -263,14 +263,16 @@ def create_manager_api_app(
     async def watch_run(
         run_id: Annotated[str, Path(min_length=1)],
         artifact: str = Query(default="latest"),
-    ) -> dict[str, bool]:
+    ) -> dict[str, str]:
         try:
-            await _run_sync(launcher.watch_artifact, run_id=run_id, artifact=artifact)
+            status = await _run_sync(launcher.watch_artifact, run_id=run_id, artifact=artifact)
         except FileNotFoundError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except RuntimeError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return {"started": True}
+        return {"status": status}
 
     @app.get("/api/config-metadata")
     async def config_metadata() -> dict[str, object]:

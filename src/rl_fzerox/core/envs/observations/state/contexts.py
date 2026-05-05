@@ -2,36 +2,8 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.envs.course_effects import GROUND_EFFECT_FEATURES, ground_effect_flags
 
-from .types import (
-    OBSERVATION_STATE_DEFAULTS,
-    ObservationCourseContext,
-    ObservationGroundEffectContext,
-    StateFeature,
-)
-
-
-def course_context_features(
-    course_context: ObservationCourseContext,
-) -> tuple[StateFeature, ...]:
-    if course_context == "none":
-        return ()
-    if course_context == "one_hot_builtin":
-        return _course_one_hot_features(prefix="course_builtin_")
-    raise ValueError(f"Unsupported observation course context: {course_context!r}")
-
-
-def course_context_values(
-    telemetry: FZeroXTelemetry | None,
-    *,
-    course_context: ObservationCourseContext,
-) -> list[float]:
-    if course_context == "none":
-        return []
-    if course_context != "one_hot_builtin":
-        raise ValueError(f"Unsupported observation course context: {course_context!r}")
-    return course_one_hot_values(telemetry)
+from .types import OBSERVATION_STATE_DEFAULTS, StateFeature
 
 
 def course_component_features(encoding: str) -> tuple[StateFeature, ...]:
@@ -69,27 +41,3 @@ def _course_one_hot_features(*, prefix: str) -> tuple[StateFeature, ...]:
         StateFeature(f"{prefix}{index:02d}", 1.0)
         for index in range(OBSERVATION_STATE_DEFAULTS.builtin_course_count)
     )
-
-
-def ground_effect_context_features(
-    ground_effect_context: ObservationGroundEffectContext,
-) -> tuple[StateFeature, ...]:
-    if ground_effect_context == "none":
-        return ()
-    if ground_effect_context == "effect_flags":
-        return tuple(StateFeature(name, 1.0) for name in GROUND_EFFECT_FEATURES)
-    raise ValueError(f"Unsupported observation ground-effect context: {ground_effect_context!r}")
-
-
-def ground_effect_context_values(
-    telemetry: FZeroXTelemetry | None,
-    *,
-    ground_effect_context: ObservationGroundEffectContext,
-) -> list[float]:
-    if ground_effect_context == "none":
-        return []
-    if ground_effect_context != "effect_flags":
-        raise ValueError(
-            f"Unsupported observation ground-effect context: {ground_effect_context!r}"
-        )
-    return list(ground_effect_flags(telemetry))

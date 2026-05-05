@@ -69,7 +69,6 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         stack_modes=_options(("rgb", "gray", "luma_chroma")),
         resize_filters=_options(("nearest", "bilinear")),
         progress_sources=_options(("lap_progress", "segment_progress", "none")),
-        component_modes=_options(("include", "zero", "exclude")),
         action_history_controls=_options(
             ("steer", "thrust", "air_brake", "boost", "lean", "pitch")
         ),
@@ -77,7 +76,6 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             StateComponentInfo(
                 name=component.name,
                 label=component.name.replace("_", " "),
-                default_mode=component.mode,
                 features=tuple(
                     StateFeatureInfo(name=feature.name, low=feature.low, high=feature.high)
                     for feature in component_features(component)
@@ -108,9 +106,18 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
     )
 
 
-def component_features(component: ManagedStateComponentConfig) -> tuple[StateFeature, ...]:
+def component_features(
+    component: ManagedStateComponentConfig,
+    *,
+    independent_lean_buttons: bool = False,
+) -> tuple[StateFeature, ...]:
     settings = component.data()
-    return state_component_definition(settings).features(settings)
+    if component.name != "control_history":
+        return state_component_definition(settings).features(settings)
+    return state_component_definition(settings).features(
+        settings,
+        independent_lean_buttons=independent_lean_buttons,
+    )
 
 
 def preset_geometry(preset: ObservationPreset) -> tuple[int, int]:

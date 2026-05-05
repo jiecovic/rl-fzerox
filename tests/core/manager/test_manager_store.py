@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 import rl_fzerox.core.manager.filesystem_ops as filesystem_ops_module
 import rl_fzerox.core.manager.registry.drafts as drafts_registry
@@ -221,39 +222,34 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     assert draft.config.reward.step_reward_clip_max == 100.0
 
 
-def test_manager_store_adds_lineage_columns_to_existing_db(tmp_path: Path) -> None:
-    db_path = tmp_path / "manager" / "runs.db"
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(db_path) as connection:
-        connection.executescript(
-            """
-            CREATE TABLE runs (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                status TEXT NOT NULL,
-                config_json TEXT NOT NULL,
-                config_hash TEXT NOT NULL,
-                run_dir TEXT NOT NULL UNIQUE,
-                parent_run_id TEXT,
-                source_run_id TEXT,
-                source_artifact TEXT,
-                created_at TEXT NOT NULL,
-                started_at TEXT,
-                stopped_at TEXT
-            );
-            """
-        )
+def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
 
-    ManagerStore(db_path).initialize()
-
-    with sqlite3.connect(db_path) as connection:
+    with sqlite3.connect(store.db_path) as connection:
         columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()}
 
-    assert "lineage_step_offset" in columns
-    assert "source_num_timesteps" in columns
+    assert columns == {
+        "id",
+        "name",
+        "status",
+        "config_json",
+        "config_hash",
+        "run_dir",
+        "lineage_id",
+        "lineage_step_offset",
+        "parent_run_id",
+        "source_run_id",
+        "source_artifact",
+        "source_snapshot_dir",
+        "source_num_timesteps",
+        "created_at",
+        "started_at",
+        "stopped_at",
+    }
 
 
-def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> None:
+def test_manager_store_rejects_legacy_observation_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -290,16 +286,51 @@ def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> N
             ),
         )
 
-    draft = store.list_drafts()[0]
+    with pytest.raises(ValidationError):
+        store.list_drafts()
 
-    assert draft.config.observation.state_components[2].name == "track_position"
-    assert draft.config.observation.state_components[2].progress_source == "segment_progress"
-    assert tuple(
-        feature.model_dump(mode="json") for feature in draft.config.observation.state_feature_modes
-    ) == (
-        {"name": "track_position.edge_ratio", "mode": "zero"},
-        {"name": "track_position.outside_track_bounds", "mode": "zero"},
-    )
+
+def test_manager_store_rejects_legacy_state_modes(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    store.initialize()
+    stale_config = default_managed_run_config().model_dump(mode="json")
+    stale_config["observation"]["state_components"] = [
+        {"name": "vehicle_state", "mode": "include"},
+        {"name": "track_position", "mode": "zero", "progress_source": "segment_progress"},
+        {"name": "course_context", "mode": "exclude", "encoding": "one_hot_builtin"},
+    ]
+    stale_config["observation"]["state_feature_modes"] = [
+        {"name": "track_position.segment_progress", "mode": "include", "dropout_prob": 0.25},
+        {"name": "track_position.edge_ratio", "mode": "exclude", "dropout_prob": 0.0},
+    ]
+
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            """
+            INSERT INTO run_drafts(
+                id,
+                name,
+                config_json,
+                config_hash,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy-state-modes",
+                "Legacy State Modes",
+                json.dumps(stale_config),
+                "stale",
+                "2026-05-01T00:00:00+00:00",
+                "2026-05-01T00:00:00+00:00",
+            ),
+        )
+
+    with pytest.raises(ValidationError):
+        store.list_drafts()
 
 
 def test_manager_store_normalizes_legacy_vehicle_fields(tmp_path: Path) -> None:

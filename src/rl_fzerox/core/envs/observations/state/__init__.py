@@ -11,34 +11,18 @@ from .api import (
     state_vector_spec,
     telemetry_state_vector,
 )
-from .profiles import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    RACE_CORE_STATE_VECTOR_SPEC,
-    STATE_VECTOR_SPECS,
-    STEER_HISTORY_STATE_VECTOR_SPEC,
-)
 from .types import (
     OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
-    ObservationCourseContext,
-    ObservationGroundEffectContext,
     ObservationMode,
-    ObservationStateProfile,
     StateFeature,
     StateVectorSpec,
 )
 
 __all__ = [
     "ActionHistoryControl",
-    "DEFAULT_STATE_VECTOR_SPEC",
     "OBSERVATION_STATE_DEFAULTS",
-    "ObservationCourseContext",
-    "ObservationGroundEffectContext",
     "ObservationMode",
-    "ObservationStateProfile",
-    "RACE_CORE_STATE_VECTOR_SPEC",
-    "STATE_VECTOR_SPECS",
-    "STEER_HISTORY_STATE_VECTOR_SPEC",
     "StateComponentsSettings",
     "StateFeature",
     "StateVectorSpec",

@@ -321,12 +321,8 @@ def _observation_state_feature_names(
     if config.env.observation.mode != "image_state":
         return ()
     return observation_access.state_feature_names(
-        config.env.observation.state_profile,
-        course_context=config.env.observation.course_context,
-        ground_effect_context=config.env.observation.ground_effect_context,
-        action_history_len=config.env.observation.action_history_len,
-        action_history_controls=config.env.observation.action_history_controls,
         state_components=config.env.observation.state_components_data(),
+        independent_lean_buttons=config.env.action.independent_lean_buttons,
     )
 
 

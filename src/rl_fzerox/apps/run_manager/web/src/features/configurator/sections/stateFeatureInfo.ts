@@ -106,6 +106,9 @@ export function stateFeatureInfo(componentName: string, featureName: string): Fe
   if (featureName.startsWith("control_history.prev_")) {
     return controlHistoryInfo(featureName);
   }
+  if (componentName === "control_history") {
+    return controlHistoryInfo(`control_history.prev_${featureName}`);
+  }
   return {
     label: fallbackLabel(componentName, featureName),
     help: "State-vector entry exposed to the policy.",

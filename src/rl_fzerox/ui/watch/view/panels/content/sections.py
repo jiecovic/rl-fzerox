@@ -250,7 +250,6 @@ def _build_panel_columns(
             *policy_state_sections(
                 observation_state=observation_state,
                 feature_names=observation_state_feature_names,
-                zeroed_components=_zeroed_state_components(info),
                 zeroed_features=_zeroed_state_features(info),
                 watch_zeroed_features=_watch_zeroed_state_features(info),
             ),
@@ -270,17 +269,6 @@ def _build_panel_columns(
             policy_config=policy_config,
         ),
     )
-
-
-def _zeroed_state_components(info: dict[str, object]) -> frozenset[str]:
-    raw_components = info.get("observation_zeroed_state_components")
-    if not isinstance(raw_components, tuple | list):
-        return frozenset()
-    return frozenset(
-        component for component in raw_components if isinstance(component, str) and component
-    )
-
-
 def _zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     raw_features = info.get("observation_zeroed_state_features")
     if isinstance(raw_features, tuple | list):

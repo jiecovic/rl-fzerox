@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/launch.py
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
+from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.config.paths import project_root_dir
 from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, new_managed_run_id
@@ -262,7 +264,7 @@ class ManagerRunLauncher:
 
         return self._request_command(run_id=run_id, command="stop")
 
-    def watch_artifact(self, *, run_id: str, artifact: str) -> None:
+    def watch_artifact(self, *, run_id: str, artifact: str) -> WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
         run = self._store.get_run(run_id)
@@ -271,6 +273,19 @@ class ManagerRunLauncher:
         if artifact not in {"latest", "best"}:
             raise ValueError(f"unsupported watch artifact: {artifact}")
         resolve_model_artifact_path(run.run_dir, artifact=artifact)
+        pid_path = _manager_watch_pid_path(run.id, artifact=artifact)
+        if _active_watch_pid(
+            pid_path=pid_path,
+            run_dir=run.run_dir,
+            artifact=artifact,
+        ) is not None:
+            return "already_running"
+        resolve_watch_app_config(
+            config_path=None,
+            policy_run_dir=run.run_dir,
+            policy_artifact="best" if artifact == "best" else "latest",
+            overrides=(),
+        )
         log_path = _manager_watch_log_path(run.id, artifact=artifact)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         command = [
@@ -283,7 +298,7 @@ class ManagerRunLauncher:
             artifact,
         ]
         with log_path.open("ab") as log_handle:
-            subprocess.Popen(
+            process = subprocess.Popen(
                 command,
                 cwd=project_root_dir(),
                 stdin=subprocess.DEVNULL,
@@ -291,6 +306,14 @@ class ManagerRunLauncher:
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
+        _write_watch_pid_file(
+            pid_path=pid_path,
+            pid=process.pid,
+            run_dir=run.run_dir,
+            artifact=artifact,
+        )
+        _raise_if_watch_exited_early(process=process, log_path=log_path, pid_path=pid_path)
+        return "started"
 
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:
         run = self._store.get_run(run_id)
@@ -355,9 +378,18 @@ def _manager_worker_log_path(run_id: str) -> Path:
     return (project_root_dir() / "local" / "manager" / "logs" / f"{run_id}.log").resolve()
 
 
+WatchLaunchStatus = Literal["started", "already_running"]
+
+
 def _manager_watch_log_path(run_id: str, *, artifact: str) -> Path:
     return (
         project_root_dir() / "local" / "manager" / "logs" / f"{run_id}.watch-{artifact}.log"
+    ).resolve()
+
+
+def _manager_watch_pid_path(run_id: str, *, artifact: str) -> Path:
+    return (
+        project_root_dir() / "local" / "manager" / "watch" / f"{run_id}.watch-{artifact}.json"
     ).resolve()
 
 
@@ -373,3 +405,90 @@ def _default_fork_name(source_name: str, artifact: Literal["latest", "best"]) ->
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _raise_if_watch_exited_early(
+    *,
+    process: subprocess.Popen[bytes],
+    log_path: Path,
+    pid_path: Path,
+) -> None:
+    try:
+        return_code = process.wait(timeout=0.35)
+    except subprocess.TimeoutExpired:
+        return
+
+    pid_path.unlink(missing_ok=True)
+    detail = _watch_failure_detail(log_path)
+    if detail is None:
+        raise RuntimeError(f"watch exited immediately with code {return_code}; see {log_path}")
+    raise RuntimeError(f"watch exited immediately with code {return_code}: {detail}")
+
+
+def _watch_failure_detail(log_path: Path) -> str | None:
+    try:
+        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    for line in reversed(lines):
+        detail = line.strip()
+        if detail:
+            return detail
+    return None
+
+
+def _active_watch_pid(*, pid_path: Path, run_dir: Path, artifact: str) -> int | None:
+    payload = _read_watch_pid_file(pid_path)
+    if payload is None:
+        return None
+    pid = payload.get("pid")
+    if not isinstance(pid, int):
+        pid_path.unlink(missing_ok=True)
+        return None
+    if _watch_process_matches(pid=pid, run_dir=run_dir, artifact=artifact):
+        return pid
+    pid_path.unlink(missing_ok=True)
+    return None
+
+
+def _write_watch_pid_file(*, pid_path: Path, pid: int, run_dir: Path, artifact: str) -> None:
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.write_text(
+        json.dumps(
+            {
+                "pid": pid,
+                "run_dir": str(run_dir),
+                "artifact": artifact,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
+def _read_watch_pid_file(pid_path: Path) -> dict[str, object] | None:
+    try:
+        return json.loads(pid_path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError):
+        pid_path.unlink(missing_ok=True)
+        return None
+
+
+def _watch_process_matches(*, pid: int, run_dir: Path, artifact: str) -> bool:
+    proc_dir = Path("/proc") / str(pid)
+    if not proc_dir.is_dir():
+        return False
+    try:
+        cmdline = (proc_dir / "cmdline").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    normalized = cmdline.replace("\x00", " ")
+    return (
+        "rl_fzerox.apps.watch" in normalized
+        and str(run_dir) in normalized
+        and f"--artifact {artifact}" in normalized
+    )

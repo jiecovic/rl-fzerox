@@ -32,7 +32,6 @@ const stateComponentNameSchema = z.enum([
   "course_context",
   "control_history",
 ]);
-const stateComponentModeSchema = z.enum(["include", "zero", "exclude"]);
 const actionHistoryControlSchema = z.enum([
   "steer",
   "gas",
@@ -84,7 +83,6 @@ const trainConfigSchema = z.object({
   save_best_checkpoint: z.boolean(),
   save_recent_checkpoints: z.boolean(),
   recent_checkpoint_limit: z.number().int().positive().nullable(),
-  course_context_dropout_prob: z.number().min(0).max(1),
 });
 
 const tracksConfigSchema = z.object({
@@ -173,16 +171,15 @@ const environmentConfigSchema = z.object({
 
 const stateComponentConfigSchema = z.object({
   name: stateComponentNameSchema,
-  mode: stateComponentModeSchema,
   encoding: z.enum(["none", "one_hot_builtin"]).nullable(),
   progress_source: z.enum(["lap_progress", "segment_progress", "none"]).nullable(),
   length: z.number().int().positive().max(16).nullable(),
   controls: z.array(actionHistoryControlSchema).nullable(),
 });
 
-const stateFeatureConfigSchema = z.object({
+const stateFeatureDropoutConfigSchema = z.object({
   name: z.string(),
-  mode: stateComponentModeSchema,
+  dropout_prob: z.number().min(0).max(1),
 });
 
 const observationConfigSchema = z.object({
@@ -193,7 +190,7 @@ const observationConfigSchema = z.object({
   resize_filter: z.enum(["nearest", "bilinear"]),
   minimap_resize_filter: z.enum(["nearest", "bilinear"]),
   state_components: z.array(stateComponentConfigSchema),
-  state_feature_modes: z.array(stateFeatureConfigSchema),
+  state_feature_dropouts: z.array(stateFeatureDropoutConfigSchema),
 });
 
 const policyConfigSchema = z.object({
@@ -411,6 +408,10 @@ export const openRunDirectoryResponseSchema = z.object({
   opened: z.boolean(),
 });
 
+export const watchRunResponseSchema = z.object({
+  status: z.enum(["started", "already_running"]),
+});
+
 export const runMetricsResponseSchema = z.object({
   samples: z.array(managedRunMetricSampleSchema),
 });
@@ -472,7 +473,6 @@ const stateComponentInfoSchema = z.object({
 const stateComponentSchema = z.object({
   name: stateComponentNameSchema,
   label: z.string(),
-  default_mode: stateComponentModeSchema,
   features: z.array(stateComponentInfoSchema),
 });
 
@@ -492,7 +492,6 @@ export const configMetadataSchema = z.object({
   stack_modes: z.array(selectOptionSchema),
   resize_filters: z.array(selectOptionSchema),
   progress_sources: z.array(selectOptionSchema),
-  component_modes: z.array(selectOptionSchema),
   action_history_controls: z.array(selectOptionSchema),
   state_components: z.array(stateComponentSchema),
   conv_profiles: z.array(selectOptionSchema),
@@ -513,7 +512,7 @@ const shapePreviewSchema = z.object({
 const stateFeaturePreviewSchema = z.object({
   component: stateComponentNameSchema,
   name: z.string(),
-  mode: stateComponentModeSchema,
+  dropout_prob: z.number().min(0).max(1),
 });
 
 const convLayerPreviewSchema = z.object({
@@ -588,4 +587,4 @@ export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeState
 export type ConfigMetadata = z.infer<typeof configMetadataSchema>;
 export type PolicyArchitecturePreview = z.infer<typeof policyArchitecturePreviewSchema>;
 export type StateComponentConfig = z.infer<typeof stateComponentConfigSchema>;
-export type StateFeatureConfig = z.infer<typeof stateFeatureConfigSchema>;
+export type StateFeatureDropoutConfig = z.infer<typeof stateFeatureDropoutConfigSchema>;

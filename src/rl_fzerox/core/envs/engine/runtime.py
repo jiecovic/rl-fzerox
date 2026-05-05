@@ -98,6 +98,7 @@ class FZeroXEnvEngine:
             boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
             action_history_len=self._observation_builder.action_history_len,
             action_history_controls=self._observation_builder.action_history_controls,
+            independent_lean_buttons=self._action_config.independent_lean_buttons,
         )
         self._step_assembler = EngineStepAssembler(
             backend=self.backend,

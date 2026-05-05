@@ -12,7 +12,7 @@ from rl_fzerox.core.manager.architecture.models import (
     ShapePreview,
     StateFeaturePreview,
 )
-from rl_fzerox.core.manager.config import ConvProfile, ManagedRunConfig, StateComponentMode
+from rl_fzerox.core.manager.config import ConvProfile, ManagedRunConfig
 from rl_fzerox.core.policy.extractors import conv_output_size, resolve_conv_spec
 
 
@@ -138,21 +138,22 @@ def image_shape_preview(config: ManagedRunConfig) -> ShapePreview:
 
 
 def state_feature_previews(config: ManagedRunConfig) -> tuple[StateFeaturePreview, ...]:
-    feature_modes: dict[str, StateComponentMode] = {
-        feature.name: feature.mode for feature in config.observation.state_feature_modes
+    feature_dropouts = {
+        feature.name: float(feature.dropout_prob)
+        for feature in config.observation.state_feature_dropouts
     }
+    independent_lean_buttons = config.action.lean_output_mode == "independent_buttons"
     features: list[StateFeaturePreview] = []
     for component in config.observation.state_components:
-        baseline_mode = component.mode
-        for feature in component_features(component):
-            feature_mode = feature_modes.get(feature.name, baseline_mode)
-            if feature_mode == "exclude":
-                continue
+        for feature in component_features(
+            component,
+            independent_lean_buttons=independent_lean_buttons,
+        ):
             features.append(
                 StateFeaturePreview(
                     component=component.name,
                     name=feature.name,
-                    mode=feature_mode,
+                    dropout_prob=feature_dropouts.get(feature.name, 0.0),
                 )
             )
     return tuple(features)

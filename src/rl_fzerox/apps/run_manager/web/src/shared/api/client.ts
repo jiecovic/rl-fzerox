@@ -20,6 +20,7 @@ import {
   runTrackSamplingResponseSchema,
   type TrackSamplingRuntimeState,
   templatesResponseSchema,
+  watchRunResponseSchema,
 } from "@/shared/api/contract";
 
 export type RunMetricRangeMode = "recent" | "full";
@@ -227,7 +228,10 @@ export async function openRunDirectory(runId: string): Promise<void> {
   openRunDirectoryResponseSchema.parse(await parseJson(response));
 }
 
-export async function watchRun(runId: string, artifact: "latest" | "best"): Promise<void> {
+export async function watchRun(
+  runId: string,
+  artifact: "latest" | "best",
+): Promise<"started" | "already_running"> {
   const response = await fetch(
     `/api/runs/${encodeURIComponent(runId)}/watch?artifact=${encodeURIComponent(artifact)}`,
     {
@@ -235,7 +239,8 @@ export async function watchRun(runId: string, artifact: "latest" | "best"): Prom
       headers: { "Content-Type": "application/json" },
     },
   );
-  await parseJson(response);
+  const payload = watchRunResponseSchema.parse(await parseJson(response));
+  return payload.status;
 }
 
 export async function deleteDraft(id: string): Promise<void> {

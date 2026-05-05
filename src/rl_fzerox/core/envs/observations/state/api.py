@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/envs/observations/state/api.py
 from __future__ import annotations
 
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 
 import numpy as np
 
@@ -14,273 +14,77 @@ from .components import (
     component_state_values,
     state_vector_spec_from_components,
 )
-from .contexts import (
-    course_context_features,
-    course_context_values,
-    ground_effect_context_features,
-    ground_effect_context_values,
-)
-from .history import (
-    action_history_feature_names,
-    action_history_features,
-    action_history_values,
-)
-from .profiles import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    STATE_VECTOR_SPECS,
-    state_profile_values,
-)
-from .types import (
-    OBSERVATION_STATE_DEFAULTS,
-    ActionHistoryControl,
-    ObservationCourseContext,
-    ObservationGroundEffectContext,
-    ObservationStateProfile,
-    StateVectorSpec,
-)
+from .history import action_history_feature_names
+from .types import StateVectorSpec
 
 
 def telemetry_state_vector(
     telemetry: FZeroXTelemetry | None,
     *,
-    state_profile: ObservationStateProfile = OBSERVATION_STATE_DEFAULTS.state_profile,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    left_lean_held: float = 0.0,
-    right_lean_held: float = 0.0,
-    left_press_age_norm: float = 1.0,
-    right_press_age_norm: float = 1.0,
-    recent_boost_pressure: float = 0.0,
-    steer_left_held: float = 0.0,
-    steer_right_held: float = 0.0,
-    recent_steer_pressure: float = 0.0,
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
+    state_components: StateComponentsSettings,
     action_history: Mapping[str, float] | None = None,
-    state_components: StateComponentsSettings | None = None,
-    zeroed_state_components: Collection[str] = (),
-    zeroed_state_features: Collection[str] = (),
-    excluded_state_features: Collection[str] = (),
+    independent_lean_buttons: bool = False,
 ) -> StateVector:
     """Build the normalized scalar policy-state vector from live game telemetry."""
 
-    if state_components is not None:
-        values = component_state_values(
-            telemetry,
-            state_components=state_components,
-            zeroed_state_components=zeroed_state_components,
-            zeroed_state_features=zeroed_state_features,
-            excluded_state_features=excluded_state_features,
-            action_history=action_history or {},
-            profile_fields={
-                "left_lean_held": left_lean_held,
-                "right_lean_held": right_lean_held,
-                "left_press_age_norm": left_press_age_norm,
-                "right_press_age_norm": right_press_age_norm,
-                "recent_boost_pressure": recent_boost_pressure,
-                "steer_left_held": steer_left_held,
-                "steer_right_held": steer_right_held,
-                "recent_steer_pressure": recent_steer_pressure,
-            },
-        )
-        expected_count = state_vector_spec_from_components(
-            state_components,
-            excluded_state_features=excluded_state_features,
-        ).count
-        if len(values) != expected_count:
-            raise ValueError(
-                "Observation state component value count does not match feature spec: "
-                f"{len(values)} != {expected_count}"
-            )
-        return np.array(values, dtype=np.float32)
-
-    values = state_profile_values(
+    values = component_state_values(
         telemetry,
-        profile=state_profile,
-        profile_fields={
-            "left_lean_held": left_lean_held,
-            "right_lean_held": right_lean_held,
-            "left_press_age_norm": left_press_age_norm,
-            "right_press_age_norm": right_press_age_norm,
-            "recent_boost_pressure": recent_boost_pressure,
-            "steer_left_held": steer_left_held,
-            "steer_right_held": steer_right_held,
-            "recent_steer_pressure": recent_steer_pressure,
-        },
+        state_components=state_components,
+        action_history=action_history or {},
+        independent_lean_buttons=independent_lean_buttons,
     )
-    values.extend(course_context_values(telemetry, course_context=course_context))
-    values.extend(
-        ground_effect_context_values(
-            telemetry,
-            ground_effect_context=ground_effect_context,
-        )
-    )
-    if action_history_len is not None:
-        values.extend(
-            action_history_values(
-                action_history or {},
-                action_history_len=action_history_len,
-                action_history_controls=action_history_controls,
-            )
+    expected_count = state_vector_spec(
+        state_components=state_components,
+        independent_lean_buttons=independent_lean_buttons,
+    ).count
+    if len(values) != expected_count:
+        raise ValueError(
+            "Observation state component value count does not match feature spec: "
+            f"{len(values)} != {expected_count}"
         )
     return np.array(values, dtype=np.float32)
 
 
 def state_vector_spec(
-    state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
-    state_components: StateComponentsSettings | None = None,
-    excluded_state_features: Collection[str] = (),
+    state_components: StateComponentsSettings,
+    independent_lean_buttons: bool = False,
 ) -> StateVectorSpec:
     """Return the scalar-state schema selected by config."""
 
-    if state_components is not None:
-        return state_vector_spec_from_components(
-            state_components,
-            excluded_state_features=excluded_state_features,
-        )
-
-    try:
-        base_spec = STATE_VECTOR_SPECS[state_profile]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported observation state profile: {state_profile!r}") from exc
-    base_spec = _state_vector_spec_with_course_context(base_spec, course_context=course_context)
-    base_spec = _state_vector_spec_with_ground_effect_context(
-        base_spec,
-        ground_effect_context=ground_effect_context,
-    )
-    if action_history_len is None:
-        return base_spec
-    return _state_vector_spec_with_action_history(
-        base_spec,
-        action_history_len,
-        action_history_controls=action_history_controls,
+    return state_vector_spec_from_components(
+        state_components,
+        independent_lean_buttons=independent_lean_buttons,
     )
 
 
 def state_feature_names(
-    state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
-    state_components: StateComponentsSettings | None = None,
-    excluded_state_features: Collection[str] = (),
+    state_components: StateComponentsSettings,
+    independent_lean_buttons: bool = False,
 ) -> tuple[str, ...]:
-    """Return ordered scalar-state feature names for one profile."""
+    """Return ordered scalar-state feature names for the selected components."""
 
     return state_vector_spec(
-        state_profile,
-        course_context=course_context,
-        ground_effect_context=ground_effect_context,
-        action_history_len=action_history_len,
-        action_history_controls=action_history_controls,
         state_components=state_components,
-        excluded_state_features=excluded_state_features,
+        independent_lean_buttons=independent_lean_buttons,
     ).names
 
 
 def state_feature_count(
-    state_profile: ObservationStateProfile,
     *,
-    course_context: ObservationCourseContext = OBSERVATION_STATE_DEFAULTS.course_context,
-    ground_effect_context: ObservationGroundEffectContext = (
-        OBSERVATION_STATE_DEFAULTS.ground_effect_context
-    ),
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len,
-    action_history_controls: tuple[
-        ActionHistoryControl, ...
-    ] = OBSERVATION_STATE_DEFAULTS.action_history_controls,
-    state_components: StateComponentsSettings | None = None,
-    excluded_state_features: Collection[str] = (),
+    state_components: StateComponentsSettings,
+    independent_lean_buttons: bool = False,
 ) -> int:
-    """Return scalar-state width for one profile."""
+    """Return scalar-state width for the selected components."""
 
     return state_vector_spec(
-        state_profile,
-        course_context=course_context,
-        ground_effect_context=ground_effect_context,
-        action_history_len=action_history_len,
-        action_history_controls=action_history_controls,
         state_components=state_components,
-        excluded_state_features=excluded_state_features,
+        independent_lean_buttons=independent_lean_buttons,
     ).count
 
 
-def _state_vector_spec_with_action_history(
-    base_spec: StateVectorSpec,
-    action_history_len: int,
-    *,
-    action_history_controls: tuple[ActionHistoryControl, ...],
-) -> StateVectorSpec:
-    return StateVectorSpec(
-        features=(
-            *base_spec.features,
-            *action_history_features(
-                action_history_len,
-                action_history_controls=action_history_controls,
-            ),
-        ),
-        speed_normalizer_kph=base_spec.speed_normalizer_kph,
-        lean_tap_guard_frames=base_spec.lean_tap_guard_frames,
-        recent_boost_window_frames=base_spec.recent_boost_window_frames,
-        recent_steer_window_frames=base_spec.recent_steer_window_frames,
-    )
-
-
-def _state_vector_spec_with_course_context(
-    base_spec: StateVectorSpec,
-    *,
-    course_context: ObservationCourseContext,
-) -> StateVectorSpec:
-    return StateVectorSpec(
-        features=(
-            *base_spec.features,
-            *course_context_features(course_context),
-        ),
-        speed_normalizer_kph=base_spec.speed_normalizer_kph,
-        lean_tap_guard_frames=base_spec.lean_tap_guard_frames,
-        recent_boost_window_frames=base_spec.recent_boost_window_frames,
-        recent_steer_window_frames=base_spec.recent_steer_window_frames,
-    )
-
-
-def _state_vector_spec_with_ground_effect_context(
-    base_spec: StateVectorSpec,
-    *,
-    ground_effect_context: ObservationGroundEffectContext,
-) -> StateVectorSpec:
-    return StateVectorSpec(
-        features=(
-            *base_spec.features,
-            *ground_effect_context_features(ground_effect_context),
-        ),
-        speed_normalizer_kph=base_spec.speed_normalizer_kph,
-        lean_tap_guard_frames=base_spec.lean_tap_guard_frames,
-        recent_boost_window_frames=base_spec.recent_boost_window_frames,
-        recent_steer_window_frames=base_spec.recent_steer_window_frames,
-    )
-
-
 __all__ = [
-    "DEFAULT_STATE_VECTOR_SPEC",
     "action_history_feature_names",
     "action_history_settings_for_observation",
     "state_feature_count",

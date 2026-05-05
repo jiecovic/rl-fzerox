@@ -120,7 +120,7 @@ export function ObservationSection({
             <ShapeMetric
               label="Zeroed entries"
               value={String(
-                preview?.state_features.filter((feature) => feature.mode === "zero").length ?? 0,
+                preview?.state_features.filter((feature) => feature.dropout_prob >= 1).length ?? 0,
               )}
             />
           </div>
@@ -131,6 +131,7 @@ export function ObservationSection({
         <StateComponentPanels
           checkpointLocked={checkpointLocked}
           config={config}
+          defaultConfig={defaultConfig}
           metadata={metadata}
           updateObservation={updateObservation}
         />
