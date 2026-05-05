@@ -18,8 +18,7 @@ def has_failed_attempt(
     record: RecordInfo,
     failed_track_attempts: frozenset[str],
 ) -> bool:
-    track_key = track_best_key(record)
-    return track_key is not None and track_key in failed_track_attempts
+    return any(track_key in failed_track_attempts for track_key in _record_lookup_keys(record))
 
 
 def record_course_id(record: RecordInfo) -> str | None:
@@ -58,10 +57,11 @@ def watch_track_value(
     info: RecordInfo,
     values: dict[str, int],
 ) -> int | None:
-    track_key = track_best_key(info)
-    if track_key is None:
-        return None
-    return values.get(track_key)
+    for track_key in _record_lookup_keys(info):
+        value = values.get(track_key)
+        if value is not None:
+            return value
+    return None
 
 
 def track_best_key(info: RecordInfo) -> str | None:
@@ -87,3 +87,22 @@ def optional_int_info(info: RecordInfo, key: str) -> int | None:
     if isinstance(value, int):
         return value
     return None
+
+
+def _record_lookup_keys(info: RecordInfo) -> tuple[str, ...]:
+    keys: list[str] = []
+
+    course_id = info.get("track_course_id")
+    if isinstance(course_id, str) and course_id:
+        keys.append(course_id)
+
+    course_index = info.get("track_course_index", info.get("course_index"))
+    if isinstance(course_index, int):
+        keys.append(f"course:{course_index}")
+
+    for field_name in ("track_id", "track_display_name"):
+        value = info.get(field_name)
+        if isinstance(value, str) and value:
+            keys.append(value)
+
+    return tuple(dict.fromkeys(keys))

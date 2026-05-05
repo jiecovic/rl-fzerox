@@ -71,18 +71,10 @@ def _publish_step_snapshots(
     previous_info: dict[str, object],
     previous_episode_reward: float,
     previous_telemetry: FZeroXTelemetry | None,
-    previous_control_state: ControllerState,
-    previous_gas_level: float,
-    previous_action_mask_branches: ActionMaskBranches,
-    previous_policy_action: ActionValue | None,
     final_observation: ObservationValue,
     final_info: dict[str, object],
     final_episode_reward: float,
     final_telemetry: FZeroXTelemetry | None,
-    final_control_state: ControllerState,
-    final_gas_level: float,
-    final_action_mask_branches: ActionMaskBranches,
-    final_policy_action: ActionValue | None,
     reset_info: dict[str, object],
     episode: int,
     control_fps: float,
@@ -99,7 +91,54 @@ def _publish_step_snapshots(
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
+    previous_control_state: ControllerState | None = None,
+    previous_gas_level: float | None = None,
+    previous_action_mask_branches: ActionMaskBranches | None = None,
+    previous_policy_action: ActionValue | None = None,
+    final_control_state: ControllerState | None = None,
+    final_gas_level: float | None = None,
+    final_action_mask_branches: ActionMaskBranches | None = None,
+    final_policy_action: ActionValue | None = None,
+    control_state: ControllerState | None = None,
+    gas_level: float | None = None,
+    action_mask_branches: ActionMaskBranches | None = None,
+    policy_action: ActionValue | None = None,
 ) -> None:
+    resolved_control_state = control_state
+    if previous_control_state is None:
+        previous_control_state = resolved_control_state
+    if final_control_state is None:
+        final_control_state = (
+            resolved_control_state if resolved_control_state is not None else previous_control_state
+        )
+    if previous_control_state is None or final_control_state is None:
+        raise TypeError(
+            "Step snapshot publishing requires control state for hold and final frames."
+        )
+
+    resolved_gas_level = gas_level
+    if previous_gas_level is None:
+        previous_gas_level = resolved_gas_level
+    if final_gas_level is None:
+        final_gas_level = (
+            resolved_gas_level if resolved_gas_level is not None else previous_gas_level
+        )
+    if previous_gas_level is None or final_gas_level is None:
+        raise TypeError("Step snapshot publishing requires gas level for hold and final frames.")
+
+    default_action_mask_branches = (
+        env.action_mask_branches() if action_mask_branches is None else action_mask_branches
+    )
+    if previous_action_mask_branches is None:
+        previous_action_mask_branches = default_action_mask_branches
+    if final_action_mask_branches is None:
+        final_action_mask_branches = default_action_mask_branches
+
+    if previous_policy_action is None:
+        previous_policy_action = policy_action
+    if final_policy_action is None:
+        final_policy_action = policy_action
+
     frames = display_frames or (env.render(),)
     frame_interval_seconds = (
         None if target_control_seconds is None else target_control_seconds / len(frames)

@@ -178,6 +178,9 @@ def current_policy_artifact_metadata(
     """Read the currently active curriculum stage from the vector env."""
 
     num_timesteps = _current_num_timesteps(model)
+    lineage_num_timesteps = None
+    if num_timesteps is not None and lineage_step_offset > 0:
+        lineage_num_timesteps = int(lineage_step_offset) + num_timesteps
     return PolicyArtifactMetadata(
         curriculum_stage_index=_coerce_optional_int(
             _first_env_attr(train_env, "curriculum_stage_index")
@@ -186,9 +189,7 @@ def current_policy_artifact_metadata(
             _first_env_attr(train_env, "curriculum_stage_name")
         ),
         num_timesteps=num_timesteps,
-        lineage_num_timesteps=(
-            None if num_timesteps is None else max(0, int(lineage_step_offset)) + num_timesteps
-        ),
+        lineage_num_timesteps=lineage_num_timesteps,
     )
 
 
