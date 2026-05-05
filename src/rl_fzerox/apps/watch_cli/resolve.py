@@ -125,4 +125,3 @@ def apply_x_cup_watch_overrides(config: WatchAppConfig) -> WatchAppConfig:
             )
         }
     )
-

@@ -165,9 +165,7 @@ def _publish_step_snapshots(
                 gas_level=final_gas_level if is_final_frame else previous_gas_level,
                 boost_lamp_level=boost_lamp_level,
                 action_mask_branches=(
-                    final_action_mask_branches
-                    if is_final_frame
-                    else previous_action_mask_branches
+                    final_action_mask_branches if is_final_frame else previous_action_mask_branches
                 ),
                 telemetry=final_telemetry if is_final_frame else previous_telemetry,
                 policy_action=final_policy_action if is_final_frame else previous_policy_action,

@@ -39,12 +39,8 @@ _EXPORT_MODULES = {
         "rl_fzerox.core.training.runs.baseline_materializer.settings"
     ),
     "BaselineArtifact": "rl_fzerox.core.training.runs.baseline_materializer.models",
-    "BaselineMaterializerContext": (
-        "rl_fzerox.core.training.runs.baseline_materializer.models"
-    ),
-    "BaselineMaterializerSettings": (
-        "rl_fzerox.core.training.runs.baseline_materializer.settings"
-    ),
+    "BaselineMaterializerContext": ("rl_fzerox.core.training.runs.baseline_materializer.models"),
+    "BaselineMaterializerSettings": ("rl_fzerox.core.training.runs.baseline_materializer.settings"),
     "BaselineRequest": "rl_fzerox.core.training.runs.baseline_materializer.models",
     "Emulator": "fzerox_emulator",
     "materialize_generic_mode_seed": "rl_fzerox.core.training.runs.race_start",

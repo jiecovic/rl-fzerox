@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 import numpy as np
 
-from fzerox_emulator.arrays import Float32Array, RgbFrame
+from fzerox_emulator.arrays import Float32Array, RgbFrame, UInt8Array
 
 if TYPE_CHECKING:
     from rl_fzerox.core.envs.observations import ObservationValue
@@ -190,7 +190,7 @@ def _normalized_channel(
     channel: Float32Array,
     *,
     scale: tuple[float, float] | None,
-) -> np.ndarray:
+) -> UInt8Array:
     finite = np.nan_to_num(channel.astype(np.float32), copy=False)
     if scale is None:
         min_value = float(finite.min(initial=0.0))

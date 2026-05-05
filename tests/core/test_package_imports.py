@@ -45,9 +45,7 @@ def test_importing_training_runs_package_does_not_load_config_or_native() -> Non
     )
 
     assert result["after_import"]["rl_fzerox.core.training.runs.config"] is False
-    assert (
-        result["after_import"]["rl_fzerox.core.training.runs.baseline_materializer"] is False
-    )
+    assert result["after_import"]["rl_fzerox.core.training.runs.baseline_materializer"] is False
     assert result["after_import"]["fzerox_emulator._native"] is False
 
 
@@ -111,9 +109,7 @@ print(json.dumps({"after_import": after_import, "after_access": after_access}))
     src_path = str(REPO_ROOT / "src")
     existing_pythonpath = env.get("PYTHONPATH")
     env["PYTHONPATH"] = (
-        src_path
-        if not existing_pythonpath
-        else os.pathsep.join((src_path, existing_pythonpath))
+        src_path if not existing_pythonpath else os.pathsep.join((src_path, existing_pythonpath))
     )
     completed = subprocess.run(
         [

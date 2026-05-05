@@ -233,8 +233,7 @@ class ObservationConfig(BaseModel):
         if unknown_zeroed:
             joined = ", ".join(unknown_zeroed)
             raise ValueError(
-                "observation.zeroed_state_features must reference active state features: "
-                f"{joined}"
+                f"observation.zeroed_state_features must reference active state features: {joined}"
             )
 
         unknown_excluded = sorted(

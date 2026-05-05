@@ -120,10 +120,6 @@ def airborne_offtrack_recovery_reward(
     if scale <= 0.0 or current_excess is None:
         return 0.0
     reward = scale * ((previous_excess or 0.0) - current_excess)
-    if (
-        reward > 0.0
-        and weights.airborne_offtrack_recovery_requires_descending
-        and not descending
-    ):
+    if reward > 0.0 and weights.airborne_offtrack_recovery_requires_descending and not descending:
         return 0.0
     return reward

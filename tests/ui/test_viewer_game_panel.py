@@ -607,9 +607,7 @@ def test_records_section_groups_track_pool_by_cup() -> None:
         "Silence",
     ]
     assert [line.label for line in columns.records[1].lines if line.heading] == ["Port Town II"]
-    assert [section.title for section in _record_tab_sections(columns.records, 1)] == [
-        "Queen Cup"
-    ]
+    assert [section.title for section in _record_tab_sections(columns.records, 1)] == ["Queen Cup"]
 
 
 def test_records_section_dedupes_course_variants_to_one_course_row() -> None:

@@ -147,9 +147,7 @@ def _add_config_track_info(
     track_pool_records: tuple[dict[str, object], ...] | None = None,
 ) -> None:
     records = (
-        _track_pool_records(config, info)
-        if track_pool_records is None
-        else track_pool_records
+        _track_pool_records(config, info) if track_pool_records is None else track_pool_records
     )
     registry_match = _track_record_matching_info(info, records)
     if registry_match:

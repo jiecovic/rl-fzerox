@@ -338,8 +338,7 @@ def _wait_until_mode(
     telemetry = emulator.try_read_telemetry()
     mode = None if telemetry is None else telemetry.game_mode_name
     raise RuntimeError(
-        f"Boot-menu materialization did not passively reach {target_mode!r}; "
-        f"last mode was {mode!r}"
+        f"Boot-menu materialization did not passively reach {target_mode!r}; last mode was {mode!r}"
     )
 
 

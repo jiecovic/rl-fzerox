@@ -85,8 +85,7 @@ class TrainConfig(BaseModel):
             and self.explicit_run_dir != self.continue_run_dir
         ):
             raise ValueError(
-                "train.explicit_run_dir must match train.continue_run_dir "
-                "when both are set"
+                "train.explicit_run_dir must match train.continue_run_dir when both are set"
             )
         if self.continue_run_dir is not None:
             if self.resume_run_dir is None:
@@ -97,7 +96,5 @@ class TrainConfig(BaseModel):
                     "for in-place continuation"
                 )
             if self.resume_mode != "full_model":
-                raise ValueError(
-                    "train.continue_run_dir requires train.resume_mode=full_model"
-                )
+                raise ValueError("train.continue_run_dir requires train.resume_mode=full_model")
         return self

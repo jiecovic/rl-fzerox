@@ -44,4 +44,3 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Which saved policy artifact to load from the run directory.",
     )
     return parser.parse_args(argv)
-

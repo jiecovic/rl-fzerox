@@ -93,9 +93,7 @@ class FrontierProgressRewardTracker:
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
             )
-        crossed_bucket_count = int(
-            (relative_progress - self._frontier_distance) // bucket_distance
-        )
+        crossed_bucket_count = int((relative_progress - self._frontier_distance) // bucket_distance)
         if crossed_bucket_count <= 0:
             return FrontierReward(
                 progress=0.0,

@@ -965,9 +965,7 @@ def test_load_train_app_config_reads_custom_cnn_profile(tmp_path: Path) -> None:
     config = load_train_app_config(config_path)
 
     assert config.policy.extractor.conv_profile == "custom"
-    assert [
-        layer.out_channels for layer in config.policy.extractor.custom_conv_layers
-    ] == [16, 32]
+    assert [layer.out_channels for layer in config.policy.extractor.custom_conv_layers] == [16, 32]
     assert [layer.padding for layer in config.policy.extractor.custom_conv_layers] == [1, 0]
 
 

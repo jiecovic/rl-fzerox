@@ -109,9 +109,8 @@ class RewardMainTracker:
 
         self._progress.ensure_origin(telemetry)
         outside_track_bounds = telemetry_outside_track_bounds(telemetry)
-        defer_outside_bounds_progress = (
-            outside_track_bounds
-            or (self._deferred_outside_bounds_progress and telemetry.player.airborne)
+        defer_outside_bounds_progress = outside_track_bounds or (
+            self._deferred_outside_bounds_progress and telemetry.player.airborne
         )
         returning_grounded_inside_track_bounds = (
             self._deferred_outside_bounds_progress

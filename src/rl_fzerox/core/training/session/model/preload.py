@@ -223,12 +223,24 @@ def _require_progress_schedule(model: object) -> _ProgressSchedule:
 
 def _effective_ent_coef_tensor(model: object) -> th.Tensor | None:
     log_ent_coef = getattr(model, "log_ent_coef", None)
-    if isinstance(log_ent_coef, th.Tensor):
-        return th.exp(log_ent_coef.detach())
+    detached_log_ent_coef = _detached_tensor(log_ent_coef)
+    if detached_log_ent_coef is not None:
+        return th.exp(detached_log_ent_coef)
     ent_coef_tensor = getattr(model, "ent_coef_tensor", None)
-    if isinstance(ent_coef_tensor, th.Tensor):
-        return ent_coef_tensor.detach()
+    detached_ent_coef = _detached_tensor(ent_coef_tensor)
+    if detached_ent_coef is not None:
+        return detached_ent_coef
     return None
+
+
+def _detached_tensor(value: object) -> th.Tensor | None:
+    if not isinstance(value, th.Tensor):
+        return None
+    detach = getattr(value, "detach", None)
+    if not callable(detach):
+        return None
+    detached = detach()
+    return detached if isinstance(detached, th.Tensor) else None
 
 
 def _resolved_sac_target_entropy(

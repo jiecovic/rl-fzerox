@@ -92,8 +92,8 @@ def _baseline_request_label(
     vehicle_name: str | None,
     fallback_label: str,
 ) -> str:
-    course_part = course_id or course_name or (
-        None if course_index is None else f"course_{course_index:02d}"
+    course_part = (
+        course_id or course_name or (None if course_index is None else f"course_{course_index:02d}")
     )
     vehicle_part = vehicle_id or vehicle_name
     if course_part is None or vehicle_part is None or mode is None:

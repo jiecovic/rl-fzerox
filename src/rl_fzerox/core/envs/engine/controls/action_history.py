@@ -73,9 +73,7 @@ class ActionHistoryBuffer:
             fields[f"prev_boost_{suffix}"] = sample.boost
             fields[f"prev_lean_{suffix}"] = sample.lean
             fields[f"prev_pitch_{suffix}"] = sample.pitch
-        return {
-            key: value for key, value in fields.items() if _field_control(key) in self.controls
-        }
+        return {key: value for key, value in fields.items() if _field_control(key) in self.controls}
 
 
 def clamp(value: float, lower: float, upper: float) -> float:

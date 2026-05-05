@@ -104,13 +104,7 @@ def _draw_observation_preview_in_rect(
     legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
     max_preview_width = width - (2 * glass_padding)
     max_preview_height = (
-        bottom
-        - y
-        - (2 * glass_padding)
-        - label_gap
-        - label_row_height
-        - legend_gap
-        - legend_height
+        bottom - y - (2 * glass_padding) - label_gap - label_row_height - legend_gap - legend_height
     )
     if max_preview_width <= 0 or max_preview_height <= 0:
         return

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator import ControllerState
+from fzerox_emulator.arrays import Float32Array
 from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
@@ -271,7 +272,7 @@ def _continuous_action_values(
     *,
     axis_index: int | None,
     continuous_air_brake_enabled: bool,
-) -> np.ndarray | None:
+) -> Float32Array | None:
     if policy_action is None or axis_index is None or not continuous_air_brake_enabled:
         return None
     source = (

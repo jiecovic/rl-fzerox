@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import TypeGuard
 
 import numpy as np
 from gymnasium import spaces
@@ -104,14 +105,7 @@ def continuous_action_array(
 ) -> ContinuousAction:
     if isinstance(action, Mapping):
         raise ValueError("Continuous steer-drive action must be a numeric sequence")
-    if isinstance(action, np.ndarray):
-        values = action.astype(np.float32, copy=False).reshape(-1)
-    elif isinstance(action, int | float | np.integer | np.floating):
-        values = np.array([float(action)], dtype=np.float32)
-    elif isinstance(action, str | bytes):
-        raise ValueError("Continuous steer-drive action must be numeric")
-    else:
-        values = np.array([float(value) for value in action], dtype=np.float32)
+    values = _coerce_continuous_action_values(action)
 
     if values.size != expected_size:
         labels = ", ".join(field_labels)
@@ -130,14 +124,7 @@ def discrete_action_array(
     action_label: str,
     field_labels: tuple[str, ...],
 ) -> DiscreteAction:
-    if isinstance(action, np.ndarray):
-        values = action.astype(np.int64, copy=False).reshape(-1)
-    elif isinstance(action, int | float | np.integer | np.floating):
-        values = np.array([int(action)], dtype=np.int64)
-    elif isinstance(action, str | bytes):
-        raise ValueError(f"{action_label} action must be numeric")
-    else:
-        values = np.array([int(value) for value in action], dtype=np.int64)
+    values = _coerce_discrete_action_values(action, action_label=action_label)
 
     if values.size != expected_size:
         labels = ", ".join(field_labels)
@@ -155,6 +142,38 @@ def hybrid_branch(
         return action[branch_name]
     except KeyError as exc:
         raise ValueError(f"Hybrid action is missing {branch_name!r} branch") from exc
+
+
+def _coerce_continuous_action_values(action: ActionValue) -> ContinuousAction:
+    if isinstance(action, np.ndarray):
+        return np.asarray(action, dtype=np.float32).reshape(-1)
+    if _is_action_scalar(action):
+        return np.array([float(action)], dtype=np.float32)
+    if isinstance(action, str | bytes):
+        raise ValueError("Continuous steer-drive action must be numeric")
+    if not isinstance(action, tuple | list):
+        raise ValueError("Continuous steer-drive action must be numeric")
+    return np.array([float(value) for value in action], dtype=np.float32)
+
+
+def _coerce_discrete_action_values(
+    action: ActionBranchValue,
+    *,
+    action_label: str,
+) -> DiscreteAction:
+    if isinstance(action, np.ndarray):
+        return np.asarray(action, dtype=np.int64).reshape(-1)
+    if _is_action_scalar(action):
+        return np.array([int(action)], dtype=np.int64)
+    if isinstance(action, str | bytes):
+        raise ValueError(f"{action_label} action must be numeric")
+    if not isinstance(action, tuple | list):
+        raise ValueError(f"{action_label} action must be numeric")
+    return np.array([int(value) for value in action], dtype=np.int64)
+
+
+def _is_action_scalar(value: object) -> TypeGuard[int | float | np.integer | np.floating]:
+    return isinstance(value, int | float | np.integer | np.floating)
 
 
 def continuous_drive_gas_level(

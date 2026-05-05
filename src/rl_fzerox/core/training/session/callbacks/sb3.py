@@ -277,9 +277,5 @@ def build_callbacks(
                 initial_stage_index=initial_curriculum_stage_index,
             )
         )
-    callbacks.extend(
-        callback
-        for callback in extra_callbacks
-        if isinstance(callback, BaseCallback)
-    )
+    callbacks.extend(callback for callback in extra_callbacks if isinstance(callback, BaseCallback))
     return CallbackList(callbacks)

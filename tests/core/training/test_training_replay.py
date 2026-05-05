@@ -192,6 +192,7 @@ def test_lazy_maskable_hybrid_action_dict_replay_buffer_returns_masks() -> None:
         np.array([[0, 1, 0, 1, 0]], dtype=np.float32),
     )
 
+
 def _observation_space(*, image_channels: int) -> spaces.Dict:
     return spaces.Dict(
         {

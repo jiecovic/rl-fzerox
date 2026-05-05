@@ -162,9 +162,7 @@ class ManagedVehicleConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     selection_mode: VehicleSelectionMode = "pool"
-    selected_vehicle_ids: tuple[str, ...] = Field(
-        default_factory=lambda: ("blue_falcon",)
-    )
+    selected_vehicle_ids: tuple[str, ...] = Field(default_factory=lambda: ("blue_falcon",))
     engine_mode: EngineSettingMode = "fixed"
     engine_setting_raw_value: NonNegativeInt = Field(default=50, le=100)
     engine_setting_min_raw_value: NonNegativeInt = Field(default=20, le=100)
@@ -439,8 +437,7 @@ class ManagedObservationConfig(BaseModel):
         if unknown_features:
             joined = ", ".join(sorted(unknown_features))
             raise ValueError(
-                "observation.state_feature_modes must reference active state features: "
-                f"{joined}"
+                f"observation.state_feature_modes must reference active state features: {joined}"
             )
         return self
 
@@ -618,15 +615,9 @@ def default_custom_conv_layers() -> tuple[ManagedPolicyConfig.CustomConvLayer, .
     """Return a sensible custom-CNN starting point for the manager."""
 
     return (
-        ManagedPolicyConfig.CustomConvLayer(
-            out_channels=32, kernel_size=8, stride=4, padding=0
-        ),
-        ManagedPolicyConfig.CustomConvLayer(
-            out_channels=64, kernel_size=4, stride=2, padding=0
-        ),
-        ManagedPolicyConfig.CustomConvLayer(
-            out_channels=128, kernel_size=3, stride=1, padding=0
-        ),
+        ManagedPolicyConfig.CustomConvLayer(out_channels=32, kernel_size=8, stride=4, padding=0),
+        ManagedPolicyConfig.CustomConvLayer(out_channels=64, kernel_size=4, stride=2, padding=0),
+        ManagedPolicyConfig.CustomConvLayer(out_channels=128, kernel_size=3, stride=1, padding=0),
     )
 
 
@@ -669,11 +660,7 @@ DEFAULT_STATE_FEATURE_MODES: tuple[ManagedStateFeatureConfig, ...] = (
 def _default_state_components_json(*, progress_source: str) -> list[dict[str, object]]:
     return [
         component.model_dump(mode="json")
-        | (
-            {"progress_source": progress_source}
-            if component.name == "track_position"
-            else {}
-        )
+        | ({"progress_source": progress_source} if component.name == "track_position" else {})
         for component in DEFAULT_STATE_COMPONENTS
     ]
 

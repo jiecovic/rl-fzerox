@@ -34,9 +34,7 @@ class BootConfig:
 
     title_mode_name: str = "title"
     race_mode_name: str = "gp_race"
-    start_control: ControllerState = ControllerState(
-        joypad_mask=joypad_mask(JOYPAD_BUTTONS.start)
-    )
+    start_control: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start))
     neutral_control: ControllerState = ControllerState()
     title_wait_frames: int = 240
     start_hold_frames: int = 2
@@ -60,15 +58,15 @@ class UnlockEverythingInput:
 UNLOCK_EVERYTHING_SEQUENCE: tuple[UnlockEverythingInput, ...] = (
     UnlockEverythingInput(
         "left_shoulder",
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.l)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left_shoulder)),
     ),
     UnlockEverythingInput(
         "left_trigger",
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.l2)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left_trigger)),
     ),
     UnlockEverythingInput(
         "right_shoulder",
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.r)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right_shoulder)),
     ),
     UnlockEverythingInput("right_stick_up", ControllerState(right_stick_y=-1.0)),
     UnlockEverythingInput("right_stick_down", ControllerState(right_stick_y=1.0)),

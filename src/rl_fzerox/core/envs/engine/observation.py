@@ -182,8 +182,7 @@ def _validated_zeroed_state_features(
     if unknown_features:
         joined = ", ".join(unknown_features)
         raise ValueError(
-            "observation.zeroed_state_features must reference active state features: "
-            f"{joined}"
+            f"observation.zeroed_state_features must reference active state features: {joined}"
         )
     return zeroed_state_features
 
@@ -215,7 +214,6 @@ def _validated_excluded_state_features(
     if unknown_features:
         joined = ", ".join(unknown_features)
         raise ValueError(
-            "observation.excluded_state_features must reference active state features: "
-            f"{joined}"
+            f"observation.excluded_state_features must reference active state features: {joined}"
         )
     return excluded_state_features

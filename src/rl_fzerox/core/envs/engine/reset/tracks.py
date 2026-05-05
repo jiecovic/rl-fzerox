@@ -358,13 +358,10 @@ def _target_engine_setting_raw_value(
     if minimum is None and maximum is None:
         return entry.engine_setting_raw_value
     if minimum is None or maximum is None:
-        raise ValueError(
-            f"track sampling entry {entry.id!r} must define both engine range bounds"
-        )
+        raise ValueError(f"track sampling entry {entry.id!r} must define both engine range bounds")
     if minimum > maximum:
         raise ValueError(
-            f"track sampling entry {entry.id!r} has engine range min > max: "
-            f"{minimum} > {maximum}"
+            f"track sampling entry {entry.id!r} has engine range min > max: {minimum} > {maximum}"
         )
     if minimum == maximum:
         return int(minimum)
