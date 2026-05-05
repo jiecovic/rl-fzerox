@@ -1,0 +1,236 @@
+.run-track-distribution-panel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.run-track-distribution-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.run-track-distribution-note,
+.run-track-distribution-meta,
+.run-track-distribution-share {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-track-distribution-reset {
+  justify-self: end;
+}
+
+.run-track-distribution-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.run-track-distribution-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-track-distribution-tab:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.run-track-distribution-tab.active {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-strong));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--text);
+}
+
+.run-track-distribution-tab-count {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.run-track-distribution-body,
+.run-track-distribution-empty {
+  padding: 12px 14px 14px;
+}
+
+.run-track-distribution-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.run-track-distribution-summary-title {
+  display: grid;
+  gap: 2px;
+}
+
+.run-track-distribution-summary-title span,
+.run-track-distribution-summary-metrics {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-track-distribution-summary-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.run-track-distribution-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.run-track-distribution-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-track-distribution-legend-swatch {
+  width: 10px;
+  height: 10px;
+}
+
+.run-track-distribution-legend-swatch-sample {
+  background: color-mix(in srgb, var(--accent) 78%, white);
+}
+
+.run-track-distribution-legend-swatch-episodes {
+  background: color-mix(in srgb, var(--run-accent) 76%, white);
+}
+
+.run-track-distribution-legend-swatch-success {
+  background: color-mix(in srgb, #2cbe7f 76%, white);
+}
+
+.run-track-distribution-legend-swatch-steps {
+  background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
+}
+
+.run-track-distribution-chart {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.run-track-distribution-axis {
+  display: grid;
+  align-items: stretch;
+  height: 176px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-track-distribution-axis span {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.run-track-distribution-axis span:first-child {
+  align-items: flex-start;
+}
+
+.run-track-distribution-axis span:last-child {
+  align-items: flex-end;
+}
+
+.run-track-distribution-columns {
+  display: grid;
+  grid-template-columns: repeat(var(--track-column-count), minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-track-distribution-column {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.run-track-distribution-column-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  height: 176px;
+  align-items: center;
+}
+
+.run-track-distribution-bar-cell {
+  display: grid;
+  align-items: end;
+  height: 100%;
+}
+
+.run-track-distribution-bar {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.run-track-distribution-bar-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+}
+
+.run-track-distribution-bar-fill-sample {
+  background: color-mix(in srgb, var(--accent) 78%, white);
+}
+
+.run-track-distribution-bar-fill-episodes {
+  background: color-mix(in srgb, var(--run-accent) 76%, white);
+}
+
+.run-track-distribution-bar-fill-success {
+  background: color-mix(in srgb, #2cbe7f 76%, white);
+}
+
+.run-track-distribution-bar-fill-steps {
+  background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
+}
+
+.run-track-distribution-column-label {
+  display: grid;
+  gap: 2px;
+}
+
+.run-track-distribution-column-label strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.run-track-distribution-column-label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-track-distribution-column-label :is(strong, span) {
+  overflow-wrap: anywhere;
+}
