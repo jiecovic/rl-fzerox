@@ -6,7 +6,7 @@ import sqlite3
 from rl_fzerox.core.manager.config import default_managed_run_config
 from rl_fzerox.core.manager.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -102,6 +102,14 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             launched_at TEXT NOT NULL,
             heartbeat_at TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS filesystem_operations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            target_path TEXT,
+            created_at TEXT NOT NULL
         );
 
         DROP INDEX IF EXISTS runs_name_unique_idx;
