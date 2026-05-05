@@ -8,6 +8,10 @@ from pathlib import Path
 
 import pytest
 
+import rl_fzerox.core.manager.filesystem_ops as filesystem_ops_module
+import rl_fzerox.core.manager.registry.drafts as drafts_registry
+import rl_fzerox.core.manager.registry.paths as registry_paths
+import rl_fzerox.core.manager.registry.runs as runs_registry
 import rl_fzerox.core.manager.store as store_module
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
 from rl_fzerox.core.manager.filesystem_ops import FilesystemOperation
@@ -116,7 +120,8 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
         return 123_456
 
     monkeypatch.setattr(
-        "rl_fzerox.core.manager.store.snapshot_fork_source",
+        drafts_registry,
+        "snapshot_fork_source",
         fake_snapshot_fork_source,
     )
 
@@ -242,10 +247,7 @@ def test_manager_store_adds_lineage_columns_to_existing_db(tmp_path: Path) -> No
     ManagerStore(db_path).initialize()
 
     with sqlite3.connect(db_path) as connection:
-        columns = {
-            str(row[1])
-            for row in connection.execute("PRAGMA table_info(runs)").fetchall()
-        }
+        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()}
 
     assert "lineage_step_offset" in columns
     assert "source_num_timesteps" in columns
@@ -293,8 +295,7 @@ def test_manager_store_normalizes_legacy_observation_fields(tmp_path: Path) -> N
     assert draft.config.observation.state_components[2].name == "track_position"
     assert draft.config.observation.state_components[2].progress_source == "segment_progress"
     assert tuple(
-        feature.model_dump(mode="json")
-        for feature in draft.config.observation.state_feature_modes
+        feature.model_dump(mode="json") for feature in draft.config.observation.state_feature_modes
     ) == (
         {"name": "track_position.edge_ratio", "mode": "zero"},
         {"name": "track_position.outside_track_bounds", "mode": "zero"},
@@ -426,7 +427,6 @@ def test_manager_store_normalizes_legacy_progress_suspend_field(tmp_path: Path) 
     assert draft.config.action.enable_pitch is True
     assert draft.config.action.pitch_mode == "discrete"
     assert draft.config.action.pitch_buckets == 5
-
 
 
 def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path: Path) -> None:
@@ -625,12 +625,12 @@ def test_manager_store_delete_run_defers_failed_filesystem_cleanup(
         managed_runs_root=tmp_path / "runs",
     )
     run.run_dir.mkdir(parents=True)
-    original_apply = store_module.apply_filesystem_operation
+    original_apply = filesystem_ops_module.apply_filesystem_operation
 
     def fail_delete(operation: FilesystemOperation) -> bool:
         raise OSError("filesystem busy")
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_delete)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", fail_delete)
 
     assert store.delete_run(run.id) is True
     assert store.get_run(run.id) is None
@@ -642,7 +642,7 @@ def test_manager_store_delete_run_defers_failed_filesystem_cleanup(
     assert pending is not None
     assert pending[0] == 1
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)
     recovered.initialize()
 
@@ -687,7 +687,7 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
             "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
             (stale_heartbeat, run.id),
         )
-    monkeypatch.setattr(store_module, "_pid_exists", lambda pid: False)
+    monkeypatch.setattr(runs_registry, "pid_exists", lambda pid: False)
 
     store.reconcile_orphaned_runs()
     failed = store.get_run(run.id)
@@ -734,7 +734,7 @@ def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
             "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
             (stale_heartbeat, run.id),
         )
-    monkeypatch.setattr(store_module, "_pid_exists", lambda pid: True)
+    monkeypatch.setattr(runs_registry, "pid_exists", lambda pid: True)
 
     store.reconcile_orphaned_runs()
     refreshed = store.get_run(run.id)
@@ -846,12 +846,12 @@ def test_manager_store_delete_lineage_defers_failed_filesystem_cleanup(
     )
     parent.run_dir.mkdir(parents=True)
     child.run_dir.mkdir(parents=True)
-    original_apply = store_module.apply_filesystem_operation
+    original_apply = filesystem_ops_module.apply_filesystem_operation
 
     def fail_delete(operation: FilesystemOperation) -> bool:
         raise OSError("filesystem busy")
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_delete)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", fail_delete)
 
     assert store.delete_lineage(parent.lineage_id) is True
     assert store.get_run(parent.id) is None
@@ -864,7 +864,7 @@ def test_manager_store_delete_lineage_defers_failed_filesystem_cleanup(
     assert pending is not None
     assert pending[0] >= 2
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)
     recovered.initialize()
 
@@ -883,11 +883,11 @@ def test_manager_store_migration_replays_pending_directory_move(
 ) -> None:
     managed_runs_root = tmp_path / "local" / "runs"
     legacy_lineages_root = tmp_path / "local" / "lineages"
-    monkeypatch.setattr(store_module, "manager_runs_root", lambda: managed_runs_root)
+    monkeypatch.setattr(registry_paths, "manager_root", lambda output_root=None: managed_runs_root)
     monkeypatch.setattr(
-        store_module,
-        "predicted_managed_run_dir",
-        lambda run_id, *, lineage_id: managed_runs_root / lineage_id / run_id,
+        registry_paths,
+        "manager_run_dir",
+        lambda *, run_id, lineage_id, output_root=None: managed_runs_root / lineage_id / run_id,
     )
 
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -901,7 +901,7 @@ def test_manager_store_migration_replays_pending_directory_move(
     run.run_dir.mkdir(parents=True)
     (run.run_dir / "artifact.bin").write_text("payload", encoding="utf-8")
     target_run_dir = managed_runs_root / "legacy-run" / "legacy-run"
-    original_apply = store_module.apply_filesystem_operation
+    original_apply = filesystem_ops_module.apply_filesystem_operation
     seen_move = False
 
     def fail_first_move(operation: FilesystemOperation) -> bool:
@@ -911,7 +911,7 @@ def test_manager_store_migration_replays_pending_directory_move(
             raise OSError("filesystem busy")
         return original_apply(operation)
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_first_move)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", fail_first_move)
 
     with pytest.raises(OSError, match="filesystem busy"):
         store.migrate_lineage_layout()
@@ -930,7 +930,7 @@ def test_manager_store_migration_replays_pending_directory_move(
     assert pending is not None
     assert pending[0] == 1
 
-    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)
     recovered.initialize()
     refreshed = recovered.get_run(run.id)
