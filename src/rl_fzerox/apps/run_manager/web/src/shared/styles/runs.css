@@ -959,8 +959,102 @@
 
 .run-chart-selection-list {
   display: grid;
+  gap: 10px;
+}
+
+.run-chart-lineage-group {
+  display: grid;
+  gap: 8px;
+}
+
+.run-chart-selection-lineage-group {
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.run-chart-selection-lineage-group[data-selection-state="partial"] {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
+}
+
+.run-chart-selection-lineage-group[data-selection-state="all"] {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--surface) 86%, var(--accent) 14%);
+}
+
+.run-chart-legend-lineage-group {
+  padding: 4px 0;
+}
+
+.run-chart-lineage-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+}
+
+.run-chart-lineage-disclosure {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  text-align: left;
+}
+
+.run-chart-lineage-heading {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.run-chart-lineage-heading strong {
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-chart-lineage-meta,
+.run-chart-lineage-header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-chart-lineage-header-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.run-chart-lineage-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.run-chart-lineage-toggle input {
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+}
+
+.run-chart-lineage-run-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  padding-top: 2px;
 }
 
 .run-chart-selection-row {
@@ -1009,11 +1103,9 @@
   position: sticky;
   top: 10px;
   z-index: 3;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: grid;
   gap: 8px;
-  width: fit-content;
+  width: min(100%, 820px);
   max-width: 100%;
   margin: 0 0 0 auto;
   padding: 8px;
@@ -1021,6 +1113,13 @@
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+.run-chart-lineage-legend-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .run-chart-global-legend-row {
@@ -1204,7 +1303,7 @@
     justify-content: flex-start;
   }
 
-  .run-chart-selection-list,
+  .run-chart-lineage-run-grid,
   .run-chart-grid {
     grid-template-columns: 1fr;
   }
@@ -1215,9 +1314,12 @@
 
   .run-chart-global-legend {
     position: static;
-    justify-content: flex-start;
     width: 100%;
     margin: 0 0 12px;
+  }
+
+  .run-chart-lineage-legend-list {
+    justify-content: flex-start;
   }
 }
 

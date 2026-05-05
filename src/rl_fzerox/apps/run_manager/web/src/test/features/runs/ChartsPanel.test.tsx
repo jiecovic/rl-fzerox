@@ -1,6 +1,6 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChartsPanel } from "@/features/runs/ChartsPanel";
 import { runFixture } from "@/test/fixtures";
@@ -20,6 +20,10 @@ vi.mock("@/shared/api/client", async () => {
 });
 
 describe("ChartsPanel", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("does not re-inject an old focused run when run polling refreshes", async () => {
     window.localStorage.clear();
     const user = userEvent.setup();
@@ -97,6 +101,131 @@ describe("ChartsPanel", () => {
       expect(selectedLegendNames()).toEqual([forkRun.name]);
     });
   });
+
+  it("groups selected runs by lineage in the selection panel and legend", async () => {
+    window.localStorage.clear();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+    const secondRootRun = runFixture({
+      id: "run-other-root",
+      name: "ppo_masked_lidar",
+      lineage_id: "lineage-b",
+      created_at: "2026-05-04T09:30:00+00:00",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+
+    expect(screen.getByLabelText("ppo_test_1 lineage runs")).toBeInTheDocument();
+    expect(screen.getByLabelText("ppo_masked_lidar lineage runs")).toBeInTheDocument();
+    expect(screen.getByText("2 runs")).toBeInTheDocument();
+    expect(screen.getByText("1 runs")).toBeInTheDocument();
+  });
+
+  it("selects and clears a whole lineage from its header checkbox", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+    const secondRootRun = runFixture({
+      id: "run-other-root",
+      name: "ppo_masked_lidar",
+      lineage_id: "lineage-b",
+      created_at: "2026-05-04T09:30:00+00:00",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+
+    const lineageSection = screen.getByLabelText("ppo_test_1 lineage runs");
+    if (!(lineageSection instanceof HTMLElement)) {
+      throw new Error("lineage section not found");
+    }
+    const lineageToggle = lineageSection.querySelector(
+      'input[aria-label="Select lineage ppo_test_1"]',
+    );
+    if (!(lineageToggle instanceof HTMLInputElement)) {
+      throw new Error("lineage toggle not found");
+    }
+
+    await user.click(screen.getByRole("button", { name: "Clear" }));
+    await user.click(lineageToggle);
+    expect(selectedLegendNames()).toEqual(["ppo_test_1 fork", "ppo_test_1"]);
+
+    await user.click(lineageToggle);
+    expect(
+      screen.getByText("Select at least one run to render comparison plots."),
+    ).toBeInTheDocument();
+  });
+
+  it("collapses and expands a lineage group in the selection panel", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[forkRun, rootRun]} />);
+
+    const lineageSection = screen.getByLabelText("ppo_test_1 lineage runs");
+    expect(within(lineageSection).getByText("ppo_test_1 fork")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Collapse lineage ppo_test_1" }));
+    expect(within(lineageSection).queryByText("ppo_test_1 fork")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Expand lineage ppo_test_1" }));
+    expect(within(lineageSection).getByText("ppo_test_1 fork")).toBeInTheDocument();
+  });
 });
 
 function rowForRun(runName: string) {
@@ -107,9 +236,11 @@ function rowForRun(runName: string) {
   if (!(panel instanceof HTMLElement)) {
     throw new Error("selection panel not found");
   }
-  const label = within(panel).getByText(runName);
-  const row = label.closest("label");
-  if (row === null) {
+  const row = [...panel.querySelectorAll(".run-chart-selection-row")].find((element) => {
+    const label = element.querySelector(".run-chart-selection-copy strong");
+    return label?.textContent?.trim() === runName;
+  });
+  if (!(row instanceof HTMLElement)) {
     throw new Error(`selection row not found for ${runName}`);
   }
   return row;
@@ -117,8 +248,8 @@ function rowForRun(runName: string) {
 
 function selectedLegendNames() {
   return within(latestLegend())
-    .getAllByRole("listitem")
-    .map((item) => item.textContent?.trim() ?? "");
+    .getAllByRole("button")
+    .map((button) => button.textContent?.trim() ?? "");
 }
 
 function selectionSwatchColor(runName: string) {
@@ -132,13 +263,13 @@ function selectionSwatchColor(runName: string) {
 
 function legendSwatchColor(runName: string) {
   const legend = latestLegend();
-  const row = within(legend)
-    .getAllByRole("listitem")
+  const button = within(legend)
+    .getAllByRole("button")
     .find((item) => item.textContent?.trim() === runName);
-  if (!(row instanceof HTMLElement)) {
-    throw new Error(`legend row not found for ${runName}`);
+  if (!(button instanceof HTMLElement)) {
+    throw new Error(`legend button not found for ${runName}`);
   }
-  const swatch = row.querySelector(".run-chart-legend-swatch");
+  const swatch = button.querySelector(".run-chart-legend-swatch");
   if (!(swatch instanceof HTMLElement)) {
     throw new Error(`legend swatch not found for ${runName}`);
   }
@@ -146,7 +277,7 @@ function legendSwatchColor(runName: string) {
 }
 
 function latestLegend() {
-  const legend = screen.getAllByRole("list", { name: "Selected run colors" }).at(-1);
+  const legend = screen.getAllByLabelText("Selected run colors").at(-1);
   if (!(legend instanceof HTMLElement)) {
     throw new Error("selected run legend not found");
   }
