@@ -175,6 +175,42 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /^ppo_test_1 fork/i })).toBeInTheDocument();
   });
 
+  it("creates a normal editable draft from a run without fork lineage", async () => {
+    const user = userEvent.setup();
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+    await user.click(screen.getByRole("button", { name: "Create editable draft from run" }));
+
+    expect(launchRunMock).not.toHaveBeenCalled();
+    expect(createDraftWithSourceMock).toHaveBeenCalledWith(
+      "ppo_test_1 draft",
+      managedRunConfigFixture,
+      null,
+      null,
+    );
+    expect(screen.queryByText(/Forked from/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("textbox", { name: "Run name" })).toHaveValue(
+      "ppo_test_1 draft",
+    );
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
+    expect(screen.getByRole("button", { name: /^ppo_test_1 draft/i })).toBeInTheDocument();
+  });
+
   it("shows forked sim game time with lineage step offset included", async () => {
     const user = userEvent.setup();
     const runtime = runFixture().runtime;

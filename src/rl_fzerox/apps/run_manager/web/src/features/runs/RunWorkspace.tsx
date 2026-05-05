@@ -30,6 +30,7 @@ import {
   FolderIcon,
   ForkIcon,
   ResumeIcon,
+  SaveDraftIcon,
   StopIcon,
   WatchIcon,
 } from "@/shared/ui/icons";
@@ -39,6 +40,7 @@ import { Tabs } from "@/shared/ui/Tabs";
 interface RunWorkspaceProps {
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
+  onCreateDraftFromRun: (runId: string) => Promise<void>;
   onFork: (runId: string, artifact: "latest" | "best") => Promise<void>;
   onOpenDirectory: (runId: string) => Promise<void>;
   onRename: (runId: string, name: string) => Promise<void>;
@@ -53,6 +55,7 @@ interface RunWorkspaceProps {
 export function RunWorkspace({
   allRuns,
   metadata,
+  onCreateDraftFromRun,
   onFork,
   onOpenDirectory,
   onRename,
@@ -70,6 +73,7 @@ export function RunWorkspace({
   const [controlError, setControlError] = useState<string | null>(null);
   const [runName, setRunName] = useState(run.name);
   const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
+  const [isCreatingDraftFromRun, setIsCreatingDraftFromRun] = useState(false);
   const [isForking, setIsForking] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
@@ -220,6 +224,18 @@ export function RunWorkspace({
       setControlError(caught instanceof Error ? caught.message : `failed to fork ${artifact}`);
     } finally {
       setIsForking(false);
+    }
+  }
+
+  async function createDraftFromRun() {
+    setIsCreatingDraftFromRun(true);
+    setControlError(null);
+    try {
+      await onCreateDraftFromRun(run.id);
+    } catch (caught) {
+      setControlError(caught instanceof Error ? caught.message : "failed to create draft from run");
+    } finally {
+      setIsCreatingDraftFromRun(false);
     }
   }
 
@@ -444,6 +460,18 @@ export function RunWorkspace({
               <ForkIcon />
             </button>
           </div>
+          <button
+            aria-label={
+              isCreatingDraftFromRun ? "Creating draft from run" : "Create editable draft from run"
+            }
+            className="icon-button"
+            title={isCreatingDraftFromRun ? "Creating draft..." : "Create editable draft"}
+            type="button"
+            disabled={isCreatingDraftFromRun}
+            onClick={() => void createDraftFromRun()}
+          >
+            <SaveDraftIcon />
+          </button>
           <button
             aria-label="Show run charts"
             className="icon-button"
