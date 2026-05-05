@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import os
 import re
-import shutil
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -13,6 +12,12 @@ from uuid import uuid4
 
 from rl_fzerox.core.manager.config import ManagedRunConfig
 from rl_fzerox.core.manager.errors import ManagerNameConflictError
+from rl_fzerox.core.manager.filesystem_ops import (
+    apply_filesystem_operation,
+    filesystem_operation_from_row,
+    queue_delete_tree,
+    queue_move_tree,
+)
 from rl_fzerox.core.manager.fork_source import (
     draft_fork_source_dir,
     reset_fork_source_dir,
@@ -58,6 +63,7 @@ class ManagerStore:
         """Create the manager database schema if needed."""
 
         self._initialize_schema()
+        self._drain_pending_filesystem_operations()
 
     def _ensure_schema_initialized(self) -> None:
         """Initialize schema once for hot-path store operations."""
@@ -73,7 +79,7 @@ class ManagerStore:
         with self._connect() as connection:
             initialize_manager_schema(connection, applied_at=_utc_now())
             _backfill_lineage_ids(connection)
-            _migrate_lineage_layout(connection)
+            _migrate_lineage_layout(connection, migrated_at=_utc_now())
         self._schema_initialized = True
 
     def create_run(
@@ -785,6 +791,8 @@ class ManagerStore:
         """Delete one managed leaf run, its runtime rows, and its run directory."""
 
         self.initialize()
+        deleted = False
+        deleted_at = _utc_now()
         with self._connect() as connection:
             row = connection.execute(
                 """
@@ -826,19 +834,23 @@ class ManagerStore:
 
             run_dir = Path(str(row["run_dir"])).expanduser().resolve()
             if run_dir.exists():
-                shutil.rmtree(run_dir)
+                queue_delete_tree(connection, path=run_dir, created_at=deleted_at)
 
             connection.execute("DELETE FROM run_runtime WHERE run_id = ?", (run_id,))
             connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
             connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
             connection.execute("DELETE FROM run_events WHERE run_id = ?", (run_id,))
             cursor = connection.execute("DELETE FROM runs WHERE id = ?", (run_id,))
-        return cursor.rowcount > 0
+            deleted = cursor.rowcount > 0
+        self._drain_pending_filesystem_operations()
+        return deleted
 
     def delete_lineage(self, lineage_id: str) -> bool:
         """Delete one full lineage, including its runs and dependent fork drafts."""
 
         self.initialize()
+        deleted = False
+        deleted_at = _utc_now()
         with self._connect() as connection:
             rows = connection.execute(
                 """
@@ -877,14 +889,21 @@ class ManagerStore:
             ).fetchall()
             run_delete_order = _delete_order_for_lineage(rows)
 
+            lineage_dir = Path(str(rows[0]["run_dir"])).expanduser().resolve().parent
             for row in rows:
                 run_dir = Path(str(row["run_dir"])).expanduser().resolve()
                 if run_dir.exists():
-                    shutil.rmtree(run_dir)
+                    queue_delete_tree(connection, path=run_dir, created_at=deleted_at)
             for row in draft_rows:
                 snapshot_dir = row["source_snapshot_dir"]
                 if isinstance(snapshot_dir, str):
-                    reset_fork_source_dir(Path(snapshot_dir))
+                    queue_delete_tree(
+                        connection,
+                        path=Path(snapshot_dir),
+                        created_at=deleted_at,
+                    )
+            if lineage_dir.exists():
+                queue_delete_tree(connection, path=lineage_dir, created_at=deleted_at)
 
             if draft_rows:
                 draft_ids = tuple(str(row["id"]) for row in draft_rows)
@@ -898,11 +917,9 @@ class ManagerStore:
                 connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
                 connection.execute("DELETE FROM run_events WHERE run_id = ?", (run_id,))
                 connection.execute("DELETE FROM runs WHERE id = ?", (run_id,))
-
-        lineage_dir = predicted_managed_run_dir(run_ids[0], lineage_id=lineage_id).parent
-        if lineage_dir.exists():
-            shutil.rmtree(lineage_dir, ignore_errors=True)
-        return True
+            deleted = True
+        self._drain_pending_filesystem_operations()
+        return deleted
 
     def migrate_lineage_layout(self) -> int:
         """Move manager-owned run directories into the lineage layout."""
@@ -910,7 +927,9 @@ class ManagerStore:
         self.initialize()
         with self._connect() as connection:
             _backfill_lineage_ids(connection)
-            return _migrate_lineage_layout(connection)
+            moved = _migrate_lineage_layout(connection, migrated_at=_utc_now())
+        self._drain_pending_filesystem_operations()
+        return moved
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
         """Rename one managed run without mutating its frozen config."""
@@ -1143,6 +1162,34 @@ class ManagerStore:
                     ),
                 )
 
+    def _drain_pending_filesystem_operations(self) -> None:
+        """Replay persisted filesystem operations after DB commits or manager restarts."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, kind, source_path, target_path, created_at
+                FROM filesystem_operations
+                ORDER BY id ASC
+                """
+            ).fetchall()
+        for row in rows:
+            operation = filesystem_operation_from_row(row)
+            try:
+                complete = apply_filesystem_operation(operation)
+            except Exception:
+                if operation.kind == "move_tree":
+                    raise
+                continue
+            if not complete:
+                continue
+            with self._connect() as connection:
+                connection.execute(
+                    "DELETE FROM filesystem_operations WHERE id = ?",
+                    (operation.id,),
+                )
+
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path, timeout=30.0)
         connection.row_factory = sqlite3.Row
@@ -1363,7 +1410,11 @@ def _backfill_lineage_ids(connection: sqlite3.Connection) -> None:
         )
 
 
-def _migrate_lineage_layout(connection: sqlite3.Connection) -> int:
+def _migrate_lineage_layout(
+    connection: sqlite3.Connection,
+    *,
+    migrated_at: str,
+) -> int:
     moved = 0
     managed_runs_root = manager_runs_root()
     legacy_lineages_root = managed_runs_root.parent / "lineages"
@@ -1407,8 +1458,12 @@ def _migrate_lineage_layout(connection: sqlite3.Connection) -> int:
             continue
         if not current_run_dir.exists():
             continue
-        target_run_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(current_run_dir), str(target_run_dir))
+        queue_move_tree(
+            connection,
+            source_path=current_run_dir,
+            target_path=target_run_dir,
+            created_at=migrated_at,
+        )
         connection.execute(
             """
             UPDATE runs

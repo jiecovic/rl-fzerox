@@ -10,6 +10,7 @@ import pytest
 
 import rl_fzerox.core.manager.store as store_module
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
+from rl_fzerox.core.manager.filesystem_ops import FilesystemOperation
 
 
 def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
@@ -613,6 +614,47 @@ def test_manager_store_deletes_non_running_runs_with_runtime_rows(tmp_path: Path
     assert store.get_run(run.id) is None
 
 
+def test_manager_store_delete_run_defers_failed_filesystem_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Delete Later",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    run.run_dir.mkdir(parents=True)
+    original_apply = store_module.apply_filesystem_operation
+
+    def fail_delete(operation: FilesystemOperation) -> bool:
+        raise OSError("filesystem busy")
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_delete)
+
+    assert store.delete_run(run.id) is True
+    assert store.get_run(run.id) is None
+    assert run.run_dir.exists()
+    with sqlite3.connect(store.db_path) as connection:
+        pending = connection.execute(
+            "SELECT COUNT(*) FROM filesystem_operations",
+        ).fetchone()
+    assert pending is not None
+    assert pending[0] == 1
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    recovered = ManagerStore(store.db_path)
+    recovered.initialize()
+
+    assert not run.run_dir.exists()
+    with sqlite3.connect(store.db_path) as connection:
+        pending = connection.execute(
+            "SELECT COUNT(*) FROM filesystem_operations",
+        ).fetchone()
+    assert pending is not None
+    assert pending[0] == 0
+
+
 def test_manager_store_reconciles_stale_dead_worker_lease(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -777,6 +819,126 @@ def test_manager_store_deletes_full_lineage(tmp_path: Path) -> None:
     assert store.get_run(parent.id) is None
     assert store.get_run(child.id) is None
     assert not parent.run_dir.exists()
+
+
+def test_manager_store_delete_lineage_defers_failed_filesystem_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+    )
+    child = store.create_run(
+        run_id="child-run",
+        name="Child Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+        lineage_id=parent.lineage_id,
+        parent_run_id=parent.id,
+        source_run_id=parent.id,
+        source_artifact="latest",
+        source_num_timesteps=456,
+    )
+    parent.run_dir.mkdir(parents=True)
+    child.run_dir.mkdir(parents=True)
+    original_apply = store_module.apply_filesystem_operation
+
+    def fail_delete(operation: FilesystemOperation) -> bool:
+        raise OSError("filesystem busy")
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_delete)
+
+    assert store.delete_lineage(parent.lineage_id) is True
+    assert store.get_run(parent.id) is None
+    assert store.get_run(child.id) is None
+    assert parent.run_dir.exists()
+    with sqlite3.connect(store.db_path) as connection:
+        pending = connection.execute(
+            "SELECT COUNT(*) FROM filesystem_operations",
+        ).fetchone()
+    assert pending is not None
+    assert pending[0] >= 2
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    recovered = ManagerStore(store.db_path)
+    recovered.initialize()
+
+    assert not parent.run_dir.exists()
+    with sqlite3.connect(store.db_path) as connection:
+        pending = connection.execute(
+            "SELECT COUNT(*) FROM filesystem_operations",
+        ).fetchone()
+    assert pending is not None
+    assert pending[0] == 0
+
+
+def test_manager_store_migration_replays_pending_directory_move(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    managed_runs_root = tmp_path / "local" / "runs"
+    legacy_lineages_root = tmp_path / "local" / "lineages"
+    monkeypatch.setattr(store_module, "manager_runs_root", lambda: managed_runs_root)
+    monkeypatch.setattr(
+        store_module,
+        "predicted_managed_run_dir",
+        lambda run_id, *, lineage_id: managed_runs_root / lineage_id / run_id,
+    )
+
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="legacy-run",
+        name="Legacy Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=legacy_lineages_root / "legacy-run" / "legacy-run",
+        lineage_id="legacy-run",
+    )
+    run.run_dir.mkdir(parents=True)
+    (run.run_dir / "artifact.bin").write_text("payload", encoding="utf-8")
+    target_run_dir = managed_runs_root / "legacy-run" / "legacy-run"
+    original_apply = store_module.apply_filesystem_operation
+    seen_move = False
+
+    def fail_first_move(operation: FilesystemOperation) -> bool:
+        nonlocal seen_move
+        if operation.kind == "move_tree" and not seen_move:
+            seen_move = True
+            raise OSError("filesystem busy")
+        return original_apply(operation)
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", fail_first_move)
+
+    with pytest.raises(OSError, match="filesystem busy"):
+        store.migrate_lineage_layout()
+
+    assert run.run_dir.exists()
+    with sqlite3.connect(store.db_path) as connection:
+        row = connection.execute(
+            "SELECT run_dir FROM runs WHERE id = ?",
+            (run.id,),
+        ).fetchone()
+        pending = connection.execute(
+            "SELECT COUNT(*) FROM filesystem_operations WHERE kind = 'move_tree'",
+        ).fetchone()
+    assert row is not None
+    assert Path(str(row[0])).resolve() == target_run_dir.resolve()
+    assert pending is not None
+    assert pending[0] == 1
+
+    monkeypatch.setattr(store_module, "apply_filesystem_operation", original_apply)
+    recovered = ManagerStore(store.db_path)
+    recovered.initialize()
+    refreshed = recovered.get_run(run.id)
+
+    assert refreshed is not None
+    assert refreshed.run_dir == target_run_dir.resolve()
+    assert target_run_dir.exists()
+    assert not run.run_dir.exists()
 
 
 def test_manager_store_rejects_deleting_running_run(tmp_path: Path) -> None:
