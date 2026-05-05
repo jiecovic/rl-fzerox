@@ -247,6 +247,17 @@ export function App() {
     openDraft(draft);
   }
 
+  async function createDraftFromManagedRun(runId: string) {
+    const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
+    if (sourceRun === null) {
+      throw new Error("run config is unavailable");
+    }
+    const initialDraftName = nextAvailableDraftName(`${sourceRun.name} draft`, allKnownNames());
+    const draft = await createDraftWithSource(initialDraftName, sourceRun.config, null, null);
+    setDrafts((current) => upsertDraft(current, draft));
+    openDraft(draft);
+  }
+
   async function stopManagedRun(runId: string) {
     const run = await stopRun(runId);
     setRuns((current) => upsertRun(current, run));
@@ -337,6 +348,7 @@ export function App() {
                   ) : (
                     <RunWorkspace
                       allRuns={runs}
+                      onCreateDraftFromRun={createDraftFromManagedRun}
                       metadata={metadata}
                       run={run}
                       onOpenDirectory={openManagedRunDirectory}
