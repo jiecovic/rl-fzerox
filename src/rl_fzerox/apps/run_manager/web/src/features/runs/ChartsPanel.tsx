@@ -11,6 +11,7 @@ import {
   type RunMetricRangeMode,
 } from "@/shared/api/client";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
+import { ChevronIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 const RUN_CHART_STYLE = {
@@ -144,6 +145,18 @@ type RunChartGroup = {
   charts: RunChartDescriptor[];
 };
 
+type LineageInfo = {
+  label: string;
+  lineageId: string;
+  totalRunCount: number;
+};
+
+type LineageRunGroup = LineageInfo & {
+  runs: ManagedRun[];
+};
+
+type LineageSelectionState = "none" | "partial" | "all";
+
 const INITIAL_GROUP_OPEN: Record<RunChartGroupId, boolean> = {
   action: true,
   curriculum: false,
@@ -271,12 +284,30 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     () => new Map(runs.map((run, index) => [run.id, chartSeriesColor(index)] as const)),
     [runs],
   );
+  const lineageInfoById = useMemo(() => buildLineageInfoById(runs), [runs]);
+  const selectionLineageGroups = useMemo(
+    () => buildLineageRunGroups(runs, lineageInfoById),
+    [lineageInfoById, runs],
+  );
+  const selectionLineageDisclosureDefaults = useMemo(
+    (): Record<string, boolean> =>
+      Object.fromEntries(selectionLineageGroups.map((group) => [group.lineageId, true] as const)),
+    [selectionLineageGroups],
+  );
+  const [openLineageById, setOpenLineageById] = usePersistentDisclosureMap(
+    "run-chart-selection-open-lineages",
+    selectionLineageDisclosureDefaults,
+  );
   const selectedRuns = useMemo(
     () =>
       selectedRunIds
         .map((runId) => runsById.get(runId))
         .filter((run): run is ManagedRun => run !== undefined),
     [runsById, selectedRunIds],
+  );
+  const selectedLineageGroups = useMemo(
+    () => buildLineageRunGroups(selectedRuns, lineageInfoById),
+    [lineageInfoById, selectedRuns],
   );
   const chartGroups = useMemo(
     () => buildChartGroups(selectedRuns, metricsByRun),
@@ -332,31 +363,82 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
           <Notice>No launched runs yet.</Notice>
         ) : (
           <div className="run-chart-selection-list">
-            {runs.map((run, index) => {
-              const checked = selectedRunIds.includes(run.id);
-              const stroke = colorByRunId.get(run.id) ?? chartSeriesColor(index);
+            {selectionLineageGroups.map((group) => {
+              const selectionState = lineageSelectionState(group.runs, selectedRunIds);
               return (
-                <label className="run-chart-selection-row" key={run.id}>
-                  <input
-                    checked={checked}
-                    type="checkbox"
-                    onChange={() => toggleSelectedRun(run.id)}
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="run-chart-selection-swatch"
-                    style={{ background: stroke }}
-                  />
-                  <span className="run-chart-selection-copy">
-                    <strong>{run.name}</strong>
-                    <span>
-                      {run.status}
-                      {run.runtime === null
-                        ? ""
-                        : ` · ${(run.runtime.progress_fraction * 100).toFixed(1)}% · ${run.runtime.num_timesteps.toLocaleString()} steps`}
-                    </span>
-                  </span>
-                </label>
+                <section
+                  aria-label={`${group.label} lineage runs`}
+                  className="run-chart-lineage-group run-chart-selection-lineage-group"
+                  data-selection-state={selectionState}
+                  key={group.lineageId}
+                >
+                  <div className="run-chart-lineage-header">
+                    <button
+                      aria-expanded={openLineageById[group.lineageId] ?? true}
+                      aria-label={`${(openLineageById[group.lineageId] ?? true) ? "Collapse" : "Expand"} lineage ${group.label}`}
+                      className="run-chart-lineage-disclosure"
+                      type="button"
+                      onClick={() => toggleCollapsedLineage(group.lineageId)}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={
+                          (openLineageById[group.lineageId] ?? true)
+                            ? "run-lineage-chevron is-open"
+                            : "run-lineage-chevron"
+                        }
+                      >
+                        <ChevronIcon />
+                      </span>
+                      <span className="run-chart-lineage-heading">
+                        <strong>{group.label}</strong>
+                        <span className="run-chart-lineage-meta">
+                          {group.runs.length === group.totalRunCount
+                            ? `${group.totalRunCount} runs`
+                            : `${group.runs.length}/${group.totalRunCount} runs`}
+                        </span>
+                      </span>
+                    </button>
+                    <div className="run-chart-lineage-header-actions">
+                      <LineageSelectionCheckbox
+                        label={group.label}
+                        state={selectionState}
+                        onChange={() => toggleSelectedLineage(group.runs)}
+                      />
+                    </div>
+                  </div>
+                  {(openLineageById[group.lineageId] ?? true) ? (
+                    <div className="run-chart-lineage-run-grid">
+                      {group.runs.map((run, index) => {
+                        const checked = selectedRunIds.includes(run.id);
+                        const stroke = colorByRunId.get(run.id) ?? chartSeriesColor(index);
+                        return (
+                          <label className="run-chart-selection-row" key={run.id}>
+                            <input
+                              checked={checked}
+                              type="checkbox"
+                              onChange={() => toggleSelectedRun(run.id)}
+                            />
+                            <span
+                              aria-hidden="true"
+                              className="run-chart-selection-swatch"
+                              style={{ background: stroke }}
+                            />
+                            <span className="run-chart-selection-copy">
+                              <strong>{run.name}</strong>
+                              <span>
+                                {run.status}
+                                {run.runtime === null
+                                  ? ""
+                                  : ` · ${(run.runtime.progress_fraction * 100).toFixed(1)}% · ${run.runtime.num_timesteps.toLocaleString()} steps`}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
               );
             })}
           </div>
@@ -369,26 +451,39 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         <Notice>Select at least one run to render comparison plots.</Notice>
       ) : (
         <div className="run-chart-content">
-          <ul className="run-chart-global-legend" aria-label="Selected run colors">
-            {selectedRuns.map((run, index) => (
-              <li className="run-chart-global-legend-row" key={run.id}>
-                <button
-                  className="run-chart-global-legend-button"
-                  type="button"
-                  onClick={() => onOpenRun?.(run)}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="run-chart-legend-swatch"
-                    style={{
-                      background: colorByRunId.get(run.id) ?? chartSeriesColor(index),
-                    }}
-                  />
-                  <span className="run-chart-global-legend-name">{run.name}</span>
-                </button>
-              </li>
+          <section className="run-chart-global-legend" aria-label="Selected run colors">
+            {selectedLineageGroups.map((group) => (
+              <div
+                className="run-chart-lineage-group run-chart-legend-lineage-group"
+                key={group.lineageId}
+              >
+                <div className="run-chart-lineage-header">
+                  <strong>{group.label}</strong>
+                  <span>{group.runs.length} selected</span>
+                </div>
+                <ul className="run-chart-lineage-legend-list">
+                  {group.runs.map((run, index) => (
+                    <li className="run-chart-global-legend-row" key={run.id}>
+                      <button
+                        className="run-chart-global-legend-button"
+                        type="button"
+                        onClick={() => onOpenRun?.(run)}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="run-chart-legend-swatch"
+                          style={{
+                            background: colorByRunId.get(run.id) ?? chartSeriesColor(index),
+                          }}
+                        />
+                        <span className="run-chart-global-legend-name">{run.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </section>
           <div className="run-chart-group-stack">
             {chartGroups.map((group) => (
               <ConfigDisclosure
@@ -424,6 +519,24 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     );
   }
 
+  function toggleSelectedLineage(lineageRuns: readonly ManagedRun[]) {
+    const lineageRunIds = lineageRuns.map((run) => run.id);
+    setSelectedRuns((current) => {
+      const currentSet = new Set(current);
+      const allSelected = lineageRunIds.every((runId) => currentSet.has(runId));
+      if (allSelected) {
+        return current.filter((runId) => !lineageRunIds.includes(runId));
+      }
+      const next = [...current];
+      for (const runId of lineageRunIds) {
+        if (!currentSet.has(runId)) {
+          next.push(runId);
+        }
+      }
+      return next;
+    });
+  }
+
   function setAllGroupsOpen(open: boolean) {
     const nextState = RUN_CHART_GROUPS.reduce<Record<RunChartGroupId, boolean>>(
       (state, group) => {
@@ -434,6 +547,13 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     );
     setGroupOpen(nextState);
   }
+
+  function toggleCollapsedLineage(lineageId: string) {
+    setOpenLineageById((current) => ({
+      ...current,
+      [lineageId]: !(current[lineageId] ?? true),
+    }));
+  }
 }
 
 function cachedMetricsByRun(runIds: readonly string[], rangeMode: RunMetricRangeMode) {
@@ -441,6 +561,38 @@ function cachedMetricsByRun(runIds: readonly string[], rangeMode: RunMetricRange
     runIds
       .map((runId) => [runId, getCachedRunMetrics(runId, rangeMode)] as const)
       .filter((entry): entry is readonly [string, ManagedRunMetricSample[]] => entry[1] !== null),
+  );
+}
+
+function LineageSelectionCheckbox({
+  label,
+  onChange,
+  state,
+}: {
+  label: string;
+  onChange: () => void;
+  state: LineageSelectionState;
+}) {
+  const checked = state === "all";
+  const inputRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      if (element !== null) {
+        element.indeterminate = state === "partial";
+      }
+    },
+    [state],
+  );
+
+  return (
+    <label className="run-chart-lineage-toggle" title={label}>
+      <input
+        aria-label={`Select lineage ${label}`}
+        checked={checked}
+        ref={inputRef}
+        type="checkbox"
+        onChange={onChange}
+      />
+    </label>
   );
 }
 
@@ -579,6 +731,77 @@ function buildEnvStepRatePoints(run: ManagedRun, samples: ManagedRunMetricSample
 
 function chartSeriesColor(index: number) {
   return RUN_CHART_STYLE.seriesPalette[index % RUN_CHART_STYLE.seriesPalette.length];
+}
+
+function buildLineageInfoById(runs: readonly ManagedRun[]) {
+  const runsByLineageId = new Map<string, ManagedRun[]>();
+  for (const run of runs) {
+    const lineageRuns = runsByLineageId.get(run.lineage_id);
+    if (lineageRuns === undefined) {
+      runsByLineageId.set(run.lineage_id, [run]);
+    } else {
+      lineageRuns.push(run);
+    }
+  }
+  return new Map(
+    [...runsByLineageId.entries()].map(([lineageId, lineageRuns]) => [
+      lineageId,
+      {
+        label: lineageLabel(lineageRuns),
+        lineageId,
+        totalRunCount: lineageRuns.length,
+      } satisfies LineageInfo,
+    ]),
+  );
+}
+
+function buildLineageRunGroups(
+  orderedRuns: readonly ManagedRun[],
+  lineageInfoById: ReadonlyMap<string, LineageInfo>,
+) {
+  const groupsByLineageId = new Map<string, LineageRunGroup>();
+  for (const run of orderedRuns) {
+    const lineageInfo = lineageInfoById.get(run.lineage_id) ?? {
+      label: run.name,
+      lineageId: run.lineage_id,
+      totalRunCount: 1,
+    };
+    const existing = groupsByLineageId.get(run.lineage_id);
+    if (existing === undefined) {
+      groupsByLineageId.set(run.lineage_id, { ...lineageInfo, runs: [run] });
+      continue;
+    }
+    existing.runs.push(run);
+  }
+  return [...groupsByLineageId.values()];
+}
+
+function lineageLabel(runs: readonly ManagedRun[]) {
+  const rootCandidates = runs.filter(
+    (run) => run.parent_run_id === null && run.source_run_id === null,
+  );
+  const rootRun =
+    [...(rootCandidates.length > 0 ? rootCandidates : runs)].sort(compareRunsAscending).at(0) ??
+    null;
+  return rootRun?.name ?? "Lineage";
+}
+
+function compareRunsAscending(left: ManagedRun, right: ManagedRun) {
+  if (left.created_at !== right.created_at) {
+    return left.created_at.localeCompare(right.created_at);
+  }
+  return left.id.localeCompare(right.id);
+}
+
+function lineageSelectionState(runs: readonly ManagedRun[], selectedRunIds: readonly string[]) {
+  const selected = runs.filter((run) => selectedRunIds.includes(run.id)).length;
+  if (selected === 0) {
+    return "none";
+  }
+  if (selected === runs.length) {
+    return "all";
+  }
+  return "partial";
 }
 
 function readStoredSelectedRunIds(runs: ManagedRun[], focusedRunId: string | null) {
