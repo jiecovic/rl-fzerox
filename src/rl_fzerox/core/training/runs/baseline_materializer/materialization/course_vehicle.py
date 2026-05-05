@@ -17,7 +17,7 @@ from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     course_vehicle_state_path,
     generic_mode_cache_payload,
     generic_mode_state_path,
-    sha256_bytes,
+    sha256_file,
     sha256_json,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.models import (
@@ -87,7 +87,7 @@ def ensure_course_vehicle_baseline(
                 menu_seed_race_start_materializer=menu_seed_race_start_materializer,
             )
         else:
-            materialized_sha256 = sha256_bytes(cache_state_path.read_bytes())
+            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
         if not cache_metadata_path.is_file():
             atomic_write_json(
                 cache_metadata_path,
@@ -140,7 +140,7 @@ def ensure_generic_mode_baseline(
                 generic_mode_seed_materializer=generic_mode_seed_materializer,
             )
         else:
-            materialized_sha256 = sha256_bytes(cache_state_path.read_bytes())
+            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
         if not cache_metadata_path.is_file():
             atomic_write_json(
                 cache_metadata_path,
@@ -205,7 +205,7 @@ def generate_generic_mode_state(
     finally:
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
-    return sha256_bytes(cache_state_path.read_bytes())
+    return sha256_file(cache_state_path)
 
 
 def generate_course_vehicle_state(
@@ -266,4 +266,12 @@ def generate_course_vehicle_state(
     finally:
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
-    return sha256_bytes(cache_state_path.read_bytes())
+    return sha256_file(cache_state_path)
+
+
+def _required_materialized_state_sha256(metadata_path: Path) -> str:
+    metadata = read_metadata(metadata_path)
+    value = metadata.get("materialized_state_sha256")
+    if isinstance(value, str) and value:
+        return value
+    raise ValueError(f"Baseline metadata is missing materialized_state_sha256: {metadata_path}")
