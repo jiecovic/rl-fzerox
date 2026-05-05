@@ -1,6 +1,8 @@
 # src/rl_fzerox/ui/watch/view/panels/rendering/section_renderer.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from rl_fzerox.ui.watch.view.components.cockpit import _draw_control_viz
 from rl_fzerox.ui.watch.view.components.tokens import _draw_flag_viz
 from rl_fzerox.ui.watch.view.panels.rendering.text import (
@@ -17,8 +19,15 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
     PygameSurface,
     RecordCourseHitbox,
+    StateFeatureHitbox,
     ViewerFonts,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _ColumnHitboxes:
+    record_courses: tuple[RecordCourseHitbox, ...] = ()
+    state_features: tuple[StateFeatureHitbox, ...] = ()
 
 
 def _draw_column(
@@ -30,9 +39,10 @@ def _draw_column(
     y: int,
     width: int,
     sections: list[PanelSection],
-) -> tuple[int, tuple[RecordCourseHitbox, ...]]:
+) -> tuple[int, _ColumnHitboxes]:
     current_y = y
     record_course_hitboxes: list[RecordCourseHitbox] = []
+    state_feature_hitboxes: list[StateFeatureHitbox] = []
     for section_index, section in enumerate(sections):
         current_y, section_hitboxes = _draw_section(
             pygame=pygame,
@@ -43,10 +53,14 @@ def _draw_column(
             width=width,
             section=section,
         )
-        record_course_hitboxes.extend(section_hitboxes)
+        record_course_hitboxes.extend(section_hitboxes.record_courses)
+        state_feature_hitboxes.extend(section_hitboxes.state_features)
         if section_index < len(sections) - 1:
             current_y += LAYOUT.section_gap
-    return current_y, tuple(record_course_hitboxes)
+    return current_y, _ColumnHitboxes(
+        record_courses=tuple(record_course_hitboxes),
+        state_features=tuple(state_feature_hitboxes),
+    )
 
 
 def _draw_section(
@@ -58,8 +72,9 @@ def _draw_section(
     y: int,
     width: int,
     section: PanelSection,
-) -> tuple[int, tuple[RecordCourseHitbox, ...]]:
+) -> tuple[int, _ColumnHitboxes]:
     record_course_hitboxes: list[RecordCourseHitbox] = []
+    state_feature_hitboxes: list[StateFeatureHitbox] = []
     section_title = fonts.section.render(section.title, True, PALETTE.text_primary)
     screen.blit(section_title, (x, y))
     y += section_title.get_height() + LAYOUT.section_title_gap
@@ -84,7 +99,7 @@ def _draw_section(
             )
             continue
         if line.label:
-            y, hitbox = _draw_labeled_value_line(
+            y, record_hitbox, state_feature_hitbox = _draw_labeled_value_line(
                 pygame=pygame,
                 screen=screen,
                 fonts=fonts,
@@ -93,8 +108,10 @@ def _draw_section(
                 width=width,
                 line=line,
             )
-            if hitbox is not None:
-                record_course_hitboxes.append(hitbox)
+            if record_hitbox is not None:
+                record_course_hitboxes.append(record_hitbox)
+            if state_feature_hitbox is not None:
+                state_feature_hitboxes.append(state_feature_hitbox)
             continue
 
         value_surface = fonts.small.render(line.value, True, line.color)
@@ -124,7 +141,10 @@ def _draw_section(
             flag_viz=section.flag_viz,
         )
 
-    return y, tuple(record_course_hitboxes)
+    return y, _ColumnHitboxes(
+        record_courses=tuple(record_course_hitboxes),
+        state_features=tuple(state_feature_hitboxes),
+    )
 
 
 def _draw_panel_divider(
@@ -187,7 +207,7 @@ def _draw_labeled_value_line(
     y: int,
     width: int,
     line: PanelLine,
-) -> tuple[int, RecordCourseHitbox | None]:
+) -> tuple[int, RecordCourseHitbox | None, StateFeatureHitbox | None]:
     label_font = fonts.record_header if line.heading else fonts.small
     label_color = line.label_color or (PALETTE.text_primary if line.heading else PALETTE.text_muted)
     label_surface = label_font.render(line.label, True, label_color)
@@ -205,6 +225,13 @@ def _draw_labeled_value_line(
         width=width,
         row_height=row_height,
     )
+    state_feature_hitbox = _state_feature_hitbox(
+        line=line,
+        x=x,
+        y=y,
+        width=width,
+        row_height=row_height,
+    )
 
     screen.blit(label_surface, (x, _centered_text_y(y, row_height, label_surface)))
 
@@ -215,23 +242,26 @@ def _draw_labeled_value_line(
 
     if line.status_icon is not None:
         icon_slot_width = row_height
-        center = (
-            x + width - (icon_slot_width // 2),
-            y + (row_height // 2),
-        )
+        status_gap = max(1, LAYOUT.inline_value_gap // 2)
+        fitted_status_text = ""
+        accessory_width = icon_slot_width
         if line.status_text:
-            status_gap = max(1, LAYOUT.inline_value_gap // 2)
             status_text_space = max(0, inline_value_space - icon_slot_width - status_gap)
             fitted_status_text = _fit_text(fonts.small, line.status_text, status_text_space)
             status_text_surface = fonts.small.render(fitted_status_text, True, line.color)
-            text_x = center[0] - (icon_slot_width // 2) - status_gap
-            screen.blit(
-                status_text_surface,
-                (
-                    text_x - status_text_surface.get_width(),
-                    _centered_text_y(y, row_height, status_text_surface),
-                ),
-            )
+            if fitted_status_text:
+                accessory_width += status_gap + status_text_surface.get_width()
+
+        value_gap = LAYOUT.inline_value_gap if line.value and accessory_width > 0 else 0
+        value_space = max(0, inline_value_space - accessory_width - value_gap)
+        fitted_value = _fit_text(value_font, line.value, value_space)
+        value_surface = value_font.render(fitted_value, True, line.color)
+
+        cursor_right = x + width
+        center = (
+            cursor_right - (icon_slot_width // 2),
+            y + (row_height // 2),
+        )
         _draw_status_icon(
             pygame,
             screen,
@@ -239,13 +269,35 @@ def _draw_labeled_value_line(
             color=line.color,
             center=center,
         )
-        return y + row_height + LAYOUT.line_gap, hitbox
+        cursor_right -= icon_slot_width
+
+        if fitted_status_text:
+            cursor_right -= status_gap
+            screen.blit(
+                status_text_surface,
+                (
+                    cursor_right - status_text_surface.get_width(),
+                    _centered_text_y(y, row_height, status_text_surface),
+                ),
+            )
+            cursor_right -= status_text_surface.get_width()
+
+        if fitted_value:
+            cursor_right -= value_gap
+            screen.blit(
+                value_surface,
+                (
+                    cursor_right - value_surface.get_width(),
+                    _centered_text_y(y, row_height, value_surface),
+                ),
+            )
+        return y + row_height + LAYOUT.line_gap, hitbox, state_feature_hitbox
 
     fitted_value = _fit_text(value_font, line.value, inline_value_space)
     value_surface = value_font.render(fitted_value, True, line.color)
     value_x = x + width - value_surface.get_width()
     screen.blit(value_surface, (value_x, _centered_text_y(y, row_height, value_surface)))
-    return y + row_height + LAYOUT.line_gap, hitbox
+    return y + row_height + LAYOUT.line_gap, hitbox, state_feature_hitbox
 
 
 def _record_course_hitbox(
@@ -261,6 +313,22 @@ def _record_course_hitbox(
     return RecordCourseHitbox(
         rect=(x, y, width, row_height + LAYOUT.line_gap),
         course_id=line.click_course_id,
+    )
+
+
+def _state_feature_hitbox(
+    *,
+    line: PanelLine,
+    x: int,
+    y: int,
+    width: int,
+    row_height: int,
+) -> StateFeatureHitbox | None:
+    if line.click_state_feature_name is None:
+        return None
+    return StateFeatureHitbox(
+        rect=(x, y, width, row_height + LAYOUT.line_gap),
+        feature_name=line.click_state_feature_name,
     )
 
 
@@ -285,3 +353,13 @@ def _draw_status_icon(
         pygame.draw.polygon(screen, color, triangle, width=1)
         pygame.draw.line(screen, color, (x, y - 2), (x, y + 1), width=1)
         pygame.draw.circle(screen, color, (x, y + 3), 1)
+        return
+    if icon == "toggle_on":
+        square = pygame.Rect(x - 5, y - 5, 10, 10)
+        pygame.draw.rect(screen, color, square, border_radius=2)
+        pygame.draw.line(screen, PALETTE.panel_background, (x - 2, y), (x, y + 2), width=2)
+        pygame.draw.line(screen, PALETTE.panel_background, (x, y + 2), (x + 3, y - 2), width=2)
+        return
+    if icon == "toggle_off":
+        square = pygame.Rect(x - 5, y - 5, 10, 10)
+        pygame.draw.rect(screen, color, square, width=1, border_radius=2)

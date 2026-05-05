@@ -178,6 +178,7 @@ def _draw_side_panel(
 
     record_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = ()
+    state_feature_hitboxes = ()
     if selected_tab_index == PANEL_TABS.cnn_index:
         _draw_cnn_tab(
             pygame=pygame,
@@ -203,7 +204,7 @@ def _draw_side_panel(
             )
             y += LAYOUT.title_section_gap
             record_sections = _record_tab_sections(record_sections, data.record_tab_index)
-        _, record_course_hitboxes = _draw_column(
+        _, record_hitboxes = _draw_column(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -212,8 +213,9 @@ def _draw_side_panel(
             width=panel_width,
             sections=record_sections,
         )
+        record_course_hitboxes = record_hitboxes.record_courses
     else:
-        _draw_column(
+        _, panel_hitboxes = _draw_column(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -222,10 +224,12 @@ def _draw_side_panel(
             width=panel_width,
             sections=_panel_tab_sections(columns, selected_tab_index),
         )
+        state_feature_hitboxes = panel_hitboxes.state_features
     return ViewerHitboxes(
         panel_tabs=tab_rects,
         record_tabs=record_tab_rects,
         record_courses=record_course_hitboxes,
+        state_features=state_feature_hitboxes,
     )
 
 

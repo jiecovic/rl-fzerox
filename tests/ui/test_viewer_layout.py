@@ -28,6 +28,29 @@ from tests.ui.viewer_support import FakeScreen, fake_viewer_fonts
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
 
 
+class _FakePygame:
+    @staticmethod
+    def Rect(x: int, y: int, width: int, height: int) -> tuple[int, int, int, int]:
+        return (x, y, width, height)
+
+    class draw:
+        @staticmethod
+        def circle(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def line(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def polygon(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def rect(*args: object, **kwargs: object) -> None:
+            return None
+
+
 def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None:
     fonts = fake_viewer_fonts()
     screen = FakeScreen()
@@ -50,6 +73,30 @@ def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None
     )
 
     assert no_y == yes_y
+
+
+def test_panel_value_rows_with_status_icons_still_draw_values() -> None:
+    fonts = fake_viewer_fonts()
+    screen = FakeScreen()
+
+    _draw_labeled_value_line(
+        pygame=_FakePygame,
+        screen=screen,
+        fonts=fonts,
+        x=0,
+        y=10,
+        width=220,
+        line=PanelLine(
+            "speed_kph_norm",
+            "0.500",
+            PALETTE.text_primary,
+            status_icon="toggle_on",
+            click_state_feature_name="speed_kph_norm",
+        ),
+    )
+
+    assert "speed_kph_norm" in [text for text, _ in screen.blits]
+    assert "0.500" in [text for text, _ in screen.blits]
 
 
 def test_point_in_rect_matches_clickable_region_bounds() -> None:

@@ -170,6 +170,23 @@ def test_drain_worker_commands_coalesces_course_lock_toggle() -> None:
     assert commands.toggle_track_course_lock_id == "silence"
 
 
+def test_drain_worker_commands_coalesces_state_feature_toggle() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(toggle_zeroed_state_feature_name="vehicle_state.speed"),
+            ViewerCommand(toggle_zeroed_state_feature_name="course_context"),
+        ]
+    )
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+    )
+
+    assert commands.toggle_zeroed_state_feature_name == "course_context"
+
+
 def test_drain_worker_commands_coalesces_control_fps_reset() -> None:
     command_queue = _CommandQueue(
         [

@@ -11,7 +11,7 @@ from rl_fzerox.core.envs.actions import (
     LEAN_RIGHT_MASK,
 )
 from rl_fzerox.ui.watch.input import SpeedKeyRepeat, _poll_viewer_input, mouse_over_clickable
-from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox
+from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox, StateFeatureHitbox
 
 
 class _PressedKeys:
@@ -238,8 +238,26 @@ def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
     assert viewer_input.toggle_record_course_lock_id == "mute_city"
 
 
+def test_poll_viewer_input_selects_state_feature_toggle_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 102)),
+        state_feature_hitboxes=(
+            StateFeatureHitbox(
+                rect=(50, 90, 120, 20),
+                feature_name="vehicle_state.speed_kph_norm",
+            ),
+        ),
+    )
+
+    assert viewer_input.toggle_zeroed_state_feature_name == "vehicle_state.speed_kph_norm"
+
+
 def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
     record_hitbox = RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city")
+    state_feature_hitbox = StateFeatureHitbox(
+        rect=(50, 90, 120, 20),
+        feature_name="vehicle_state.speed_kph_norm",
+    )
 
     assert mouse_over_clickable(
         (25, 12),
@@ -250,12 +268,14 @@ def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
         record_tab_rects=((50, 30, 40, 20),),
     )
     assert mouse_over_clickable((75, 72), record_course_hitboxes=(record_hitbox,))
+    assert mouse_over_clickable((75, 102), state_feature_hitboxes=(state_feature_hitbox,))
     assert not mouse_over_clickable(
         (500, 500),
         deterministic_toggle_rect=(0, 0, 40, 20),
         panel_tab_rects=((0, 30, 40, 20),),
         record_tab_rects=((50, 30, 40, 20),),
         record_course_hitboxes=(record_hitbox,),
+        state_feature_hitboxes=(state_feature_hitbox,),
     )
 
 

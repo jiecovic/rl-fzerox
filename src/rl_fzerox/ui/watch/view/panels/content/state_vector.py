@@ -10,7 +10,7 @@ from rl_fzerox.ui.watch.view.panels.core.lines import (
     panel_line,
 )
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
-from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection
+from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection, StatusIcon
 
 
 def policy_state_sections(
@@ -19,6 +19,7 @@ def policy_state_sections(
     feature_names: tuple[str, ...],
     zeroed_components: frozenset[str] = frozenset(),
     zeroed_features: frozenset[str] = frozenset(),
+    watch_zeroed_features: frozenset[str] = frozenset(),
 ) -> list[PanelSection]:
     if observation_state is None:
         return []
@@ -31,13 +32,16 @@ def policy_state_sections(
     )
     section_lines: list[PanelLine] = []
     for group_title, group_prefix, component_name in _state_vector_groups(names):
-        group_zeroed = component_name in zeroed_components
+        group_zeroed = component_name in zeroed_components or (
+            component_name is not None and component_name in zeroed_features
+        )
         group_lines = _state_vector_group_lines(
             names=names,
             values=values,
             group_prefix=group_prefix,
             zeroed=group_zeroed,
             zeroed_features=zeroed_features,
+            watch_zeroed_features=watch_zeroed_features,
         )
         if group_lines:
             if section_lines:
@@ -91,6 +95,7 @@ def _state_vector_group_lines(
     group_prefix: str | None,
     zeroed: bool,
     zeroed_features: frozenset[str],
+    watch_zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     if group_prefix == "course_context.":
         return _course_context_state_lines(
@@ -98,6 +103,7 @@ def _state_vector_group_lines(
             values=values,
             zeroed=zeroed,
             zeroed_features=zeroed_features,
+            watch_zeroed_features=watch_zeroed_features,
         )
     if group_prefix == "control_history.":
         return _control_history_state_lines(
@@ -105,6 +111,7 @@ def _state_vector_group_lines(
             values=values,
             zeroed=zeroed,
             zeroed_features=zeroed_features,
+            watch_zeroed_features=watch_zeroed_features,
         )
     return [
         panel_line(
@@ -125,6 +132,11 @@ def _state_vector_group_lines(
                     zeroed_features=zeroed_features,
                 )
             ),
+            status_icon=_state_vector_toggle_icon(
+                name,
+                watch_zeroed_features=watch_zeroed_features,
+            ),
+            click_state_feature_name=name,
         )
         for name, value in zip(names, values, strict=True)
         if _state_vector_name_matches_group(name, group_prefix)
@@ -137,6 +149,7 @@ def _control_history_state_lines(
     values: StateVector,
     zeroed: bool,
     zeroed_features: frozenset[str],
+    watch_zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     return [
         panel_line(
@@ -157,6 +170,11 @@ def _control_history_state_lines(
                     zeroed_features=zeroed_features,
                 )
             ),
+            status_icon=_state_vector_toggle_icon(
+                name,
+                watch_zeroed_features=watch_zeroed_features,
+            ),
+            click_state_feature_name=name,
         )
         for name, value in zip(names, values, strict=True)
         if name.startswith("control_history.") or name.startswith("prev_")
@@ -169,6 +187,7 @@ def _course_context_state_lines(
     values: StateVector,
     zeroed: bool,
     zeroed_features: frozenset[str],
+    watch_zeroed_features: frozenset[str],
 ) -> list[PanelLine]:
     course_bits = [
         float(value)
@@ -191,6 +210,11 @@ def _course_context_state_lines(
             _zeroed_label("course", zeroed=feature_zeroed),
             value,
             _state_vector_line_color(feature_zeroed),
+            status_icon=_state_vector_toggle_icon(
+                "course_context",
+                watch_zeroed_features=watch_zeroed_features,
+            ),
+            click_state_feature_name="course_context",
         ),
     ]
 
@@ -244,3 +268,11 @@ def _zeroed_label(label: str, *, zeroed: bool) -> str:
 
 def _state_vector_line_color(zeroed: bool):
     return PALETTE.text_muted if zeroed else PALETTE.text_primary
+
+
+def _state_vector_toggle_icon(
+    name: str,
+    *,
+    watch_zeroed_features: frozenset[str],
+) -> StatusIcon:
+    return "toggle_off" if name in watch_zeroed_features else "toggle_on"

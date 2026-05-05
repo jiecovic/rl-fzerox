@@ -65,12 +65,10 @@ def _inline_or_stacked_line_height(fonts: ViewerFonts, line: PanelLine, *, width
     value_font = fonts.small if line.heading else fonts.body
     label_surface = label_font.render(line.label, True, PALETTE.text_muted)
     value_surface = value_font.render(line.value, True, line.color)
-    status_text_surface = fonts.small.render(line.status_text, True, line.color)
-    value_width = (
-        value_surface.get_width()
-        if line.status_icon is None
-        else value_surface.get_height() + status_text_surface.get_width()
-    )
+    if line.status_icon is not None:
+        return max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap
+
+    value_width = value_surface.get_width()
     inline_value_space = width - label_surface.get_width() - LAYOUT.inline_value_gap
     if value_width <= inline_value_space:
         return max(label_surface.get_height(), value_surface.get_height()) + LAYOUT.line_gap

@@ -309,6 +309,7 @@ def _draw_frame(
         panel_tabs=side_panel_hitboxes.panel_tabs,
         record_tabs=side_panel_hitboxes.record_tabs,
         record_courses=side_panel_hitboxes.record_courses,
+        state_features=side_panel_hitboxes.state_features,
     )
 
 

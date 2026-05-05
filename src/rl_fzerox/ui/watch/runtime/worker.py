@@ -29,6 +29,10 @@ from rl_fzerox.ui.watch.runtime.ipc import (
     drain_worker_commands,
     publish_worker_message,
 )
+from rl_fzerox.ui.watch.runtime.observation import (
+    apply_watch_state_feature_zeroing,
+    toggle_watch_state_feature,
+)
 from rl_fzerox.ui.watch.runtime.policy import (
     _load_policy_runner,
     _persist_reload_error,
@@ -120,12 +124,18 @@ def _run_simulation_loop(
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         locked_reset_course_id: str | None = None
+        watch_zeroed_state_features: frozenset[str] = frozenset()
 
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None
-            observation, info = env.reset(seed=reset_seed)
+            raw_observation, raw_info = env.reset(seed=reset_seed)
             if x_cup_info is not None:
-                info.update(x_cup_info)
+                raw_info.update(x_cup_info)
+            observation, info = apply_watch_state_feature_zeroing(
+                raw_observation,
+                raw_info,
+                watch_zeroed_features=watch_zeroed_state_features,
+            )
             _reset_policy_runner(policy_runner)
             reset_info = dict(info)
             current_control_state = env.last_requested_control_state
@@ -133,6 +143,7 @@ def _run_simulation_loop(
             committed_action_mask_branches = env.action_mask_branches()
             boost_lamp_level = 0.0
             current_policy_action: ActionValue | None = committed_policy_action
+            cnn_activations = None
             terminated = False
             truncated = False
             episode_reward = 0.0
@@ -185,6 +196,46 @@ def _run_simulation_loop(
                 cnn_normalization = commands.cnn_normalization
                 if commands.quit_requested:
                     return
+                if commands.toggle_zeroed_state_feature_name is not None:
+                    watch_zeroed_state_features = toggle_watch_state_feature(
+                        watch_zeroed_state_features,
+                        commands.toggle_zeroed_state_feature_name,
+                    )
+                    observation, info = apply_watch_state_feature_zeroing(
+                        raw_observation,
+                        raw_info,
+                        watch_zeroed_features=watch_zeroed_state_features,
+                    )
+                    publish_worker_message(
+                        snapshot_queue,
+                        _build_snapshot(
+                            config=config,
+                            env=env,
+                            emulator=emulator,
+                            observation=observation,
+                            info=info,
+                            reset_info=reset_info,
+                            episode=episode,
+                            episode_reward=episode_reward,
+                            control_fps=control_rate.rate_hz(),
+                            target_control_fps=target_control_fps,
+                            control_state=current_control_state,
+                            gas_level=current_gas_level,
+                            boost_lamp_level=boost_lamp_level,
+                            action_mask_branches=committed_action_mask_branches,
+                            policy_action=current_policy_action,
+                            policy_runner=policy_runner,
+                            deterministic_policy=deterministic_policy,
+                            manual_control_enabled=manual_control_enabled,
+                            policy_reload_error=policy_reload_error,
+                            cnn_activations=cnn_activations,
+                            best_finish_position=best_finish_position,
+                            best_finish_times=best_finish_times,
+                            latest_finish_times=latest_finish_times,
+                            latest_finish_deltas_ms=latest_finish_deltas_ms,
+                            failed_track_attempts=failed_track_attempts,
+                        ),
+                    )
                 if commands.toggle_track_course_lock_id is not None:
                     locked_reset_course_id = _toggle_locked_reset_course(
                         env,
@@ -287,13 +338,23 @@ def _run_simulation_loop(
                         normalization=commands.cnn_normalization,
                     )
                     watch_step = env.step_watch(action)
-                    observation, reward, terminated, truncated, info = watch_step.gym_result()
+                    raw_observation, reward, terminated, truncated, raw_info = (
+                        watch_step.gym_result()
+                    )
                     display_frames = watch_step.display_frames
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
-                final_action_mask_branches = env.action_mask_branches()
+                if manual_control_enabled:
+                    raw_observation = observation
+                    raw_info = info
                 if x_cup_info is not None:
-                    info.update(x_cup_info)
+                    raw_info.update(x_cup_info)
+                observation, info = apply_watch_state_feature_zeroing(
+                    raw_observation,
+                    raw_info,
+                    watch_zeroed_features=watch_zeroed_state_features,
+                )
+                final_action_mask_branches = env.action_mask_branches()
                 live_telemetry = _read_live_telemetry(emulator)
                 boost_lamp_level = _next_boost_lamp_level(
                     previous=boost_lamp_level,
