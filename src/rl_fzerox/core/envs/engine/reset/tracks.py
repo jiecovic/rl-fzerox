@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/envs/engine/reset/tracks.py
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import reduce
@@ -25,6 +26,16 @@ class TrackSamplingLimits:
 
 
 TRACK_SAMPLING_LIMITS = TrackSamplingLimits()
+
+
+@dataclass(frozen=True, slots=True)
+class TrackBaselineCacheLimits:
+    """Per-worker limits for cached savestate bytes."""
+
+    max_cached_state_bytes: int = 256 * 1024 * 1024
+
+
+TRACK_BASELINE_CACHE_LIMITS = TrackBaselineCacheLimits()
 
 
 @dataclass(frozen=True)
@@ -82,18 +93,41 @@ class TrackBaselineCache:
     """Per-env cache of sampled track savestates.
 
     Subprocess workers keep their own cache, which avoids rereading the same
-    multi-megabyte `.state` files on every episode reset.
+    multi-megabyte `.state` files on every episode reset. The cache is bounded
+    by total bytes so large multi-track pools cannot grow worker memory
+    without limit over long training runs.
     """
 
-    def __init__(self) -> None:
-        self._states_by_path: dict[Path, bytes] = {}
+    def __init__(
+        self,
+        *,
+        max_cached_state_bytes: int = TRACK_BASELINE_CACHE_LIMITS.max_cached_state_bytes,
+    ) -> None:
+        self._max_cached_state_bytes = max(0, int(max_cached_state_bytes))
+        self._cached_state_bytes = 0
+        self._states_by_path: OrderedDict[Path, bytes] = OrderedDict()
 
     def load_into_backend(self, backend: EmulatorBackend, path: Path) -> None:
         state = self._states_by_path.get(path)
         if state is None:
             state = path.read_bytes()
-            self._states_by_path[path] = state
+            self._remember_state(path, state)
+        else:
+            self._states_by_path.move_to_end(path)
         backend.load_baseline_bytes(state, source_path=path)
+
+    def _remember_state(self, path: Path, state: bytes) -> None:
+        state_size = len(state)
+        if self._max_cached_state_bytes <= 0 or state_size > self._max_cached_state_bytes:
+            return
+        while (
+            self._states_by_path
+            and self._cached_state_bytes + state_size > self._max_cached_state_bytes
+        ):
+            _, evicted_state = self._states_by_path.popitem(last=False)
+            self._cached_state_bytes -= len(evicted_state)
+        self._states_by_path[path] = state
+        self._cached_state_bytes += state_size
 
 
 class TrackResetSelector:

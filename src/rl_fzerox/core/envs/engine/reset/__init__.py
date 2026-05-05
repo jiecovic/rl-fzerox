@@ -15,6 +15,7 @@ from rl_fzerox.core.envs.engine.reset.session import (
 from rl_fzerox.core.envs.engine.reset.tracks import (
     SelectedTrack,
     TrackBaselineCache,
+    TrackBaselineCacheLimits,
     TrackResetSelector,
     TrackSamplingLimits,
     select_reset_track,
@@ -29,6 +30,7 @@ __all__ = [
     "EngineResetCoordinator",
     "EngineResetResult",
     "TrackBaselineCache",
+    "TrackBaselineCacheLimits",
     "TrackResetSelector",
     "TrackSamplingLimits",
     "load_track_baseline",
