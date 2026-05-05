@@ -6,6 +6,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
 from rl_fzerox.core.config.paths import project_root_dir
 from rl_fzerox.core.config.schema import TrainAppConfig
@@ -305,6 +306,7 @@ class ManagerRunLauncher:
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:
         log_path = _manager_worker_log_path(run_id)
         log_path.parent.mkdir(parents=True, exist_ok=True)
+        launch_token = uuid4().hex
         command = [
             sys.executable,
             "-m",
@@ -313,12 +315,14 @@ class ManagerRunLauncher:
             str(self._store.db_path),
             "--run-id",
             run_id,
+            "--launch-token",
+            launch_token,
         ]
         if resume:
             command.append("--resume")
         with log_path.open("ab") as log_handle:
             try:
-                subprocess.Popen(
+                process = subprocess.Popen(
                     command,
                     cwd=project_root_dir(),
                     stdin=subprocess.DEVNULL,
@@ -326,7 +330,19 @@ class ManagerRunLauncher:
                     stderr=subprocess.STDOUT,
                     start_new_session=True,
                 )
+                registered = self._store.register_run_worker(
+                    run_id=run_id,
+                    launch_token=launch_token,
+                    pid=process.pid,
+                    launched_at=_utc_now(),
+                )
+                if not registered:
+                    raise RuntimeError(
+                        "managed run disappeared before worker registration: "
+                        f"{run_id}"
+                    )
             except Exception:
+                self._store.clear_run_worker(run_id)
                 self._store.update_run_status(
                     run_id=run_id,
                     status="failed",

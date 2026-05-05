@@ -42,6 +42,7 @@ def build_manager_training_callback(
     *,
     store: ManagerStore,
     run_id: str,
+    launch_token: str,
     run_paths: RunPaths,
     total_timesteps: int,
     lineage_step_offset: int = 0,
@@ -70,20 +71,22 @@ def build_manager_training_callback(
             self._training_started_num_timesteps = (
                 initial_num_timesteps if isinstance(initial_num_timesteps, int) else 0
             )
+            _heartbeat_or_raise(store=store, run_id=run_id, launch_token=launch_token)
             self._flush_runtime()
 
         def _on_step(self) -> bool:
             now = monotonic()
-            if now - self._last_runtime_flush >= 2.0:
-                self._flush_runtime()
-                self._last_runtime_flush = now
             if now - self._last_command_poll >= 1.0:
                 self._last_command_poll = now
+                _heartbeat_or_raise(store=store, run_id=run_id, launch_token=launch_token)
                 pending_command = store.pending_run_command(run_id)
                 if pending_command is not None:
                     self._write_resume_checkpoint()
                     self._flush_runtime()
                     raise RunControlSignal(pending_command)
+            if now - self._last_runtime_flush >= 2.0:
+                self._flush_runtime()
+                self._last_runtime_flush = now
             return True
 
         def _on_rollout_end(self) -> None:
@@ -93,6 +96,12 @@ def build_manager_training_callback(
         def _flush_runtime(self) -> None:
             snapshot = self._snapshot()
             updated_at = _utc_now()
+            _heartbeat_or_raise(
+                store=store,
+                run_id=run_id,
+                launch_token=launch_token,
+                heartbeat_at=updated_at,
+            )
             store.upsert_run_runtime(
                 run_id=run_id,
                 total_timesteps=snapshot.total_timesteps,
@@ -174,3 +183,19 @@ def _estimated_env_step_rate(
 
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _heartbeat_or_raise(
+    *,
+    store: ManagerStore,
+    run_id: str,
+    launch_token: str,
+    heartbeat_at: str | None = None,
+) -> None:
+    lease_ok = store.heartbeat_run_worker(
+        run_id=run_id,
+        launch_token=launch_token,
+        heartbeat_at=heartbeat_at or _utc_now(),
+    )
+    if not lease_ok:
+        raise RuntimeError("manager worker lease lost")

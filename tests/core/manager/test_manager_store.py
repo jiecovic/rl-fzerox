@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -611,6 +611,118 @@ def test_manager_store_deletes_non_running_runs_with_runtime_rows(tmp_path: Path
 
     assert store.delete_run(run.id) is True
     assert store.get_run(run.id) is None
+
+
+def test_manager_store_reconciles_stale_dead_worker_lease(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Lease Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    started_at = "2026-05-03T12:00:00+00:00"
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=started_at,
+    )
+    stale_heartbeat = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
+            (stale_heartbeat, run.id),
+        )
+    monkeypatch.setattr(store_module, "_pid_exists", lambda pid: False)
+
+    store.reconcile_orphaned_runs()
+    failed = store.get_run(run.id)
+
+    assert failed is not None
+    assert failed.status == "failed"
+    with sqlite3.connect(store.db_path) as connection:
+        worker_row = connection.execute(
+            "SELECT 1 FROM run_workers WHERE run_id = ?",
+            (run.id,),
+        ).fetchone()
+    assert worker_row is None
+
+
+def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Live Lease Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    started_at = "2026-05-03T12:00:00+00:00"
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=started_at,
+    )
+    stale_heartbeat = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
+            (stale_heartbeat, run.id),
+        )
+    monkeypatch.setattr(store_module, "_pid_exists", lambda pid: True)
+
+    store.reconcile_orphaned_runs()
+    refreshed = store.get_run(run.id)
+
+    assert refreshed is not None
+    assert refreshed.status == "running"
+
+
+def test_manager_store_skips_running_runs_without_worker_lease(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Legacy Running Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=(datetime.now(UTC) - timedelta(hours=1)).isoformat(timespec="seconds"),
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+
+    store.reconcile_orphaned_runs()
+    refreshed = store.get_run(run.id)
+
+    assert refreshed is not None
+    assert refreshed.status == "running"
 
 
 def test_manager_store_rejects_deleting_non_leaf_run(tmp_path: Path) -> None:

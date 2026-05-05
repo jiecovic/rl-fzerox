@@ -42,18 +42,21 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(f"managed run not found: {args.run_id}")
 
     try:
+        _heartbeat_or_die(store=store, run_id=run.id, launch_token=args.launch_token)
         LOGGER.info(
             "loaded run status=%s run_dir=%s pending_command=%s",
             run.status,
             run.run_dir,
             run.pending_command,
         )
+        _heartbeat_or_die(store=store, run_id=run.id, launch_token=args.launch_token)
         train_config = _resolved_train_config(
             store=store,
             run=run,
             resume=args.resume,
         )
         run_paths = _run_paths(run, resume=args.resume)
+        _heartbeat_or_die(store=store, run_id=run.id, launch_token=args.launch_token)
         LOGGER.info(
             "built train config total_timesteps=%s explicit_run_dir=%s continue_run_dir=%s",
             train_config.train.total_timesteps,
@@ -73,12 +76,17 @@ def main(argv: list[str] | None = None) -> None:
                 build_manager_training_callback(
                     store=store,
                     run_id=run.id,
+                    launch_token=args.launch_token,
                     run_paths=run_paths,
                     total_timesteps=train_config.train.total_timesteps,
                     lineage_step_offset=run.lineage_step_offset,
                 ),
             ),
-            startup_reporter=_startup_reporter(store=store, run_id=run.id),
+            startup_reporter=_startup_reporter(
+                store=store,
+                run_id=run.id,
+                launch_token=args.launch_token,
+            ),
         )
         LOGGER.info("run_training returned normally for run_id=%s", run.id)
     except RunControlSignal as signal:
@@ -102,20 +110,23 @@ def main(argv: list[str] | None = None) -> None:
             message=f"training failed: {type(exc).__name__}: {exc}",
         )
         raise
-
-    _write_manager_snapshot(run)
-    LOGGER.info("marking run finished run_id=%s", run.id)
-    store.update_run_status(
-        run_id=run.id,
-        status="finished",
-        stopped_at=_now(),
-        message="training finished",
-    )
+    else:
+        _write_manager_snapshot(run)
+        LOGGER.info("marking run finished run_id=%s", run.id)
+        store.update_run_status(
+            run_id=run.id,
+            status="finished",
+            stopped_at=_now(),
+            message="training finished",
+        )
+    finally:
+        store.clear_run_worker(run.id, launch_token=args.launch_token)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run one manager-launched training job")
     parser.add_argument("--run-id", required=True)
+    parser.add_argument("--launch-token", required=True)
     parser.add_argument(
         "--db-path",
         type=Path,
@@ -210,8 +221,9 @@ def _configure_logging() -> None:
     )
 
 
-def _startup_reporter(*, store: ManagerStore, run_id: str):
+def _startup_reporter(*, store: ManagerStore, run_id: str, launch_token: str):
     def report(kind: str, message: str) -> None:
+        _heartbeat_or_die(store=store, run_id=run_id, launch_token=launch_token)
         pending_command = store.pending_run_command(run_id)
         if pending_command is not None:
             raise RunControlSignal(pending_command)
@@ -222,6 +234,16 @@ def _startup_reporter(*, store: ManagerStore, run_id: str):
         )
 
     return report
+
+
+def _heartbeat_or_die(*, store: ManagerStore, run_id: str, launch_token: str) -> None:
+    heartbeat_ok = store.heartbeat_run_worker(
+        run_id=run_id,
+        launch_token=launch_token,
+        heartbeat_at=_now(),
+    )
+    if not heartbeat_ok:
+        raise RuntimeError("manager worker lease is missing or stale")
 
 
 if __name__ == "__main__":
