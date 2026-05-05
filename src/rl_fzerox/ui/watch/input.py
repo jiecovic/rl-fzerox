@@ -13,7 +13,12 @@ from rl_fzerox.core.envs.actions import (
     LEAN_LEFT_MASK,
     LEAN_RIGHT_MASK,
 )
-from rl_fzerox.ui.watch.view.screen.types import MouseRect, PygameModule, RecordCourseHitbox
+from rl_fzerox.ui.watch.view.screen.types import (
+    MouseRect,
+    PygameModule,
+    RecordCourseHitbox,
+    StateFeatureHitbox,
+)
 
 
 class _PressedKeyState(Protocol):
@@ -38,6 +43,7 @@ class ViewerInput:
     panel_tab_index: int | None = None
     record_tab_index: int | None = None
     toggle_record_course_lock_id: str | None = None
+    toggle_zeroed_state_feature_name: str | None = None
     control_state: ControllerState = ControllerState()
 
 
@@ -78,6 +84,7 @@ def _poll_viewer_input(
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
     record_tab_rects: tuple[MouseRect | None, ...] = (),
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
+    state_feature_hitboxes: tuple[StateFeatureHitbox, ...] = (),
     speed_repeat: SpeedKeyRepeat | None = None,
     now_seconds: float | None = None,
 ) -> ViewerInput:
@@ -95,6 +102,7 @@ def _poll_viewer_input(
     panel_tab_index = None
     record_tab_index = None
     toggle_record_course_lock_id = None
+    toggle_zeroed_state_feature_name = None
 
     mouse_button_down = getattr(pygame, "MOUSEBUTTONDOWN", None)
     for event in pygame.event.get():
@@ -116,6 +124,11 @@ def _poll_viewer_input(
                             event.pos,
                             record_course_hitboxes,
                         )
+                        if toggle_record_course_lock_id is None:
+                            toggle_zeroed_state_feature_name = _clicked_state_feature_name(
+                                event.pos,
+                                state_feature_hitboxes,
+                            )
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 quit_requested = True
@@ -206,6 +219,7 @@ def _poll_viewer_input(
         panel_tab_index=panel_tab_index,
         record_tab_index=record_tab_index,
         toggle_record_course_lock_id=toggle_record_course_lock_id,
+        toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
         control_state=ControllerState(
             joypad_mask=manual_mask,
             left_stick_x=left_stick_x,
@@ -264,6 +278,16 @@ def _clicked_record_course_id(
     return None
 
 
+def _clicked_state_feature_name(
+    position: object,
+    hitboxes: tuple[StateFeatureHitbox, ...],
+) -> str | None:
+    for hitbox in hitboxes:
+        if _point_in_rect(position, hitbox.rect):
+            return hitbox.feature_name
+    return None
+
+
 def mouse_over_clickable(
     position: object,
     *,
@@ -271,6 +295,7 @@ def mouse_over_clickable(
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
     record_tab_rects: tuple[MouseRect | None, ...] = (),
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
+    state_feature_hitboxes: tuple[StateFeatureHitbox, ...] = (),
 ) -> bool:
     """Return whether the mouse position is over a clickable watch UI target."""
 
@@ -279,4 +304,5 @@ def mouse_over_clickable(
         or _clicked_panel_tab_index(position, panel_tab_rects) is not None
         or _clicked_panel_tab_index(position, record_tab_rects) is not None
         or _clicked_record_course_id(position, record_course_hitboxes) is not None
+        or _clicked_state_feature_name(position, state_feature_hitboxes) is not None
     )

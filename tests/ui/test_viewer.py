@@ -16,6 +16,7 @@ from rl_fzerox.ui.watch.view.components.macro_legend import (
     MACRO_LEGEND_HINTS,
     _macro_legend_rows,
 )
+from rl_fzerox.ui.watch.view.panels.content.state_vector import policy_state_sections
 from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_policy_action,
     _format_reload_age,
@@ -91,6 +92,31 @@ def test_game_speed_overlay_label_formats_actual_speedup() -> None:
         )
         == "12.0x"
     )
+
+
+def test_policy_state_sections_expose_watch_ablation_toggles() -> None:
+    sections = policy_state_sections(
+        observation_state=np.asarray([0.5, 1.0, 0.0], dtype=np.float32),
+        feature_names=(
+            "vehicle_state.speed_kph_norm",
+            "machine_context.energy_norm",
+            "course_context.course_builtin_0",
+        ),
+        zeroed_features=frozenset({"machine_context.energy_norm", "course_context"}),
+        watch_zeroed_features=frozenset({"vehicle_state.speed_kph_norm", "course_context"}),
+    )
+
+    lines = sections[0].lines
+    speed_line = next(line for line in lines if line.label == "speed_kph_norm")
+    energy_line = next(line for line in lines if line.label == "// energy_norm")
+    course_line = next(line for line in lines if line.label == "// course")
+
+    assert speed_line.status_icon == "toggle_off"
+    assert speed_line.click_state_feature_name == "vehicle_state.speed_kph_norm"
+    assert energy_line.status_icon == "toggle_on"
+    assert energy_line.click_state_feature_name == "machine_context.energy_norm"
+    assert course_line.status_icon == "toggle_off"
+    assert course_line.click_state_feature_name == "course_context"
 
 
 def test_side_panel_drops_cockpit_control_section() -> None:

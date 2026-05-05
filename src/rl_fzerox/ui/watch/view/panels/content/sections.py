@@ -252,6 +252,7 @@ def _build_panel_columns(
                 feature_names=observation_state_feature_names,
                 zeroed_components=_zeroed_state_components(info),
                 zeroed_features=_zeroed_state_features(info),
+                watch_zeroed_features=_watch_zeroed_state_features(info),
             ),
         ],
         records=[
@@ -282,6 +283,13 @@ def _zeroed_state_components(info: dict[str, object]) -> frozenset[str]:
 
 def _zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     raw_features = info.get("observation_zeroed_state_features")
+    if isinstance(raw_features, tuple | list):
+        return frozenset(str(feature) for feature in raw_features)
+    return frozenset()
+
+
+def _watch_zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
+    raw_features = info.get("watch_zeroed_state_features")
     if isinstance(raw_features, tuple | list):
         return frozenset(str(feature) for feature in raw_features)
     return frozenset()

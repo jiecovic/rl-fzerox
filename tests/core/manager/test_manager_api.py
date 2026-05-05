@@ -1,15 +1,18 @@
 # tests/core/manager/test_manager_api.py
 from __future__ import annotations
 
-import asyncio
 import json
+from collections.abc import Mapping
+from functools import partial
 from pathlib import Path
 from typing import Literal
 
 import httpx
 import pytest
+from anyio.from_thread import start_blocking_portal
+from fastapi import FastAPI
 
-import rl_fzerox.apps.run_manager.api as manager_api
+import rl_fzerox.apps.run_manager.api.routes as manager_api_routes
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.core.manager import (
     ManagedRun,
@@ -49,41 +52,71 @@ class _LauncherStub:
 
 
 class _ApiClient:
-    def __init__(self, app: object) -> None:
+    def __init__(self, app: FastAPI) -> None:
         self._app = app
 
     async def _request_async(
         self,
         method: str,
         url: str,
-        **kwargs: object,
+        *,
+        content: str | bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        json: object | None = None,
     ) -> httpx.Response:
         transport = httpx.ASGITransport(app=self._app)
         async with httpx.AsyncClient(
             transport=transport,
             base_url="http://testserver",
         ) as client:
-            return await client.request(method, url, **kwargs)
+            return await client.request(
+                method,
+                url,
+                content=content,
+                headers=headers,
+                json=json,
+            )
 
     def request(
         self,
         method: str,
         url: str,
-        **kwargs: object,
+        *,
+        content: str | bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        json: object | None = None,
     ) -> httpx.Response:
-        return asyncio.run(self._request_async(method, url, **kwargs))
+        with start_blocking_portal() as portal:
+            return portal.call(
+                partial(
+                    self._request_async,
+                    method,
+                    url,
+                    content=content,
+                    headers=headers,
+                    json=json,
+                ),
+            )
 
-    def get(self, url: str, **kwargs: object) -> httpx.Response:
-        return self.request("GET", url, **kwargs)
+    def get(self, url: str) -> httpx.Response:
+        return self.request("GET", url)
 
-    def post(self, url: str, **kwargs: object) -> httpx.Response:
-        return self.request("POST", url, **kwargs)
+    def post(
+        self,
+        url: str,
+        *,
+        content: str | bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        json: object | None = None,
+    ) -> httpx.Response:
+        return self.request("POST", url, content=content, headers=headers, json=json)
 
-    def put(self, url: str, **kwargs: object) -> httpx.Response:
-        return self.request("PUT", url, **kwargs)
+    def put(self, url: str, *, json: object | None = None) -> httpx.Response:
+        return self.request("PUT", url, json=json)
 
     def delete(self, url: str, **kwargs: object) -> httpx.Response:
-        return self.request("DELETE", url, **kwargs)
+        del kwargs
+        return self.request("DELETE", url)
 
 
 def test_manager_api_lists_default_template(tmp_path: Path) -> None:
@@ -434,7 +467,11 @@ def test_manager_api_metrics_full_mode_disables_recent_limit(
         seen_limits.append(limit)
         return ()
 
-    monkeypatch.setattr(manager_api, "load_run_metric_samples_from_tensorboard", fake_loader)
+    monkeypatch.setattr(
+        manager_api_routes,
+        "load_run_metric_samples_from_tensorboard",
+        fake_loader,
+    )
 
     class FakeLauncher(_LauncherStub):
         def launch(
@@ -536,6 +573,15 @@ def test_manager_api_rejects_invalid_json(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert "error" in response.json()
+
+
+def test_manager_api_rejects_missing_draft_delete(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = client.delete("/api/drafts/missing-draft")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "draft not found"
 
 
 def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:

@@ -18,6 +18,7 @@ def panel_line(
     status_text: str = "",
     label_color: Color | None = None,
     click_course_id: str | None = None,
+    click_state_feature_name: str | None = None,
 ) -> PanelLine:
     return PanelLine(
         label=label,
@@ -31,6 +32,7 @@ def panel_line(
         status_text=status_text,
         label_color=label_color,
         click_course_id=click_course_id,
+        click_state_feature_name=click_state_feature_name,
     )
 
 

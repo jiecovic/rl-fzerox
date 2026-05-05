@@ -1,6 +1,8 @@
 # tests/ui/test_viewer_runtime.py
 from pathlib import Path
 
+import numpy as np
+
 from rl_fzerox.core.config.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
@@ -12,6 +14,7 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
+from rl_fzerox.core.envs.observations import ImageStateObservation, observation_state
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
@@ -19,6 +22,7 @@ from rl_fzerox.ui.watch.runtime.episode import (
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
+from rl_fzerox.ui.watch.runtime.observation import apply_watch_state_feature_zeroing
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
 from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
@@ -28,6 +32,64 @@ from rl_fzerox.ui.watch.runtime.timing import (
 from rl_fzerox.ui.watch.view.panels.content.records import track_record_sections
 from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info, _track_pool_records
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+def test_watch_state_feature_zeroing_masks_selected_features_without_mutating_source() -> None:
+    observation: ImageStateObservation = {
+        "image": _sample_image(),
+        "state": _sample_state([0.0, 2.0, 3.0]),
+    }
+    info = {
+        "observation_state_features": (
+            "vehicle_state.speed_kph_norm",
+            "machine_context.energy_norm",
+            "course_context.course_builtin_0",
+        ),
+        "observation_zeroed_state_features": ("vehicle_state.speed_kph_norm",),
+    }
+
+    masked_observation, masked_info = apply_watch_state_feature_zeroing(
+        observation,
+        info,
+        watch_zeroed_features=frozenset({"machine_context.energy_norm"}),
+    )
+
+    assert observation["state"][1] == 2.0
+    masked_state = observation_state(masked_observation)
+    assert masked_state is not None
+    assert masked_state[1] == 0.0
+    assert masked_state[2] == 3.0
+    assert masked_info["watch_zeroed_state_features"] == ("machine_context.energy_norm",)
+    assert masked_info["observation_zeroed_state_features"] == (
+        "machine_context.energy_norm",
+        "vehicle_state.speed_kph_norm",
+    )
+
+
+def test_watch_state_feature_zeroing_supports_component_level_course_toggle() -> None:
+    observation: ImageStateObservation = {
+        "image": _sample_image(),
+        "state": _sample_state([1.0, 0.0, 2.0]),
+    }
+    info = {
+        "observation_state_features": (
+            "course_context.course_builtin_0",
+            "course_context.course_builtin_1",
+            "vehicle_state.speed_kph_norm",
+        ),
+        "observation_zeroed_state_features": (),
+    }
+
+    masked_observation, masked_info = apply_watch_state_feature_zeroing(
+        observation,
+        info,
+        watch_zeroed_features=frozenset({"course_context"}),
+    )
+
+    masked_state = observation_state(masked_observation)
+    assert masked_state is not None
+    assert list(masked_state) == [0.0, 0.0, 2.0]
+    assert masked_info["watch_zeroed_state_features"] == ("course_context",)
 
 
 def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
@@ -330,3 +392,11 @@ def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:
     assert (tmp_path / "watch" / "reload_error.log").read_text(encoding="utf-8") == (
         "PyTorchStreamReader failed reading file data/0\n"
     )
+
+
+def _sample_image() -> np.ndarray:
+    return np.zeros((2, 2, 3), dtype=np.uint8)
+
+
+def _sample_state(values: list[float]) -> np.ndarray:
+    return np.asarray(values, dtype=np.float32)

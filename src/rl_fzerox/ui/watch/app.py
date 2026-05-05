@@ -75,6 +75,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 panel_tab_rects=hitboxes.panel_tabs,
                 record_tab_rects=hitboxes.record_tabs,
                 record_course_hitboxes=hitboxes.record_courses,
+                state_feature_hitboxes=hitboxes.state_features,
                 speed_repeat=speed_repeat,
             )
             panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
@@ -150,6 +151,7 @@ def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
         panel_tab_rects=hitboxes.panel_tabs,
         record_tab_rects=hitboxes.record_tabs,
         record_course_hitboxes=hitboxes.record_courses,
+        state_feature_hitboxes=hitboxes.state_features,
     )
     cursor = _system_cursor(
         pygame,

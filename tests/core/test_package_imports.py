@@ -84,6 +84,48 @@ def test_loading_training_run_paths_helper_stays_materializer_free() -> None:
     assert result["after_access"]["fzerox_emulator._native"] is False
 
 
+def test_importing_run_manager_package_does_not_load_app_or_uvicorn() -> None:
+    result = _probe_import(
+        module_name="rl_fzerox.apps.run_manager",
+        watched_modules=(
+            "rl_fzerox.apps.run_manager.app",
+            "uvicorn",
+        ),
+    )
+
+    assert result["after_import"]["rl_fzerox.apps.run_manager.app"] is False
+    assert result["after_import"]["uvicorn"] is False
+
+
+def test_loading_run_manager_main_is_what_triggers_app_and_uvicorn() -> None:
+    result = _probe_import(
+        module_name="rl_fzerox.apps.run_manager",
+        attribute_name="main",
+        watched_modules=(
+            "rl_fzerox.apps.run_manager.app",
+            "uvicorn",
+        ),
+    )
+
+    assert result["after_import"]["rl_fzerox.apps.run_manager.app"] is False
+    assert result["after_import"]["uvicorn"] is False
+    assert result["after_access"]["rl_fzerox.apps.run_manager.app"] is True
+    assert result["after_access"]["uvicorn"] is True
+
+
+def test_importing_run_manager_api_stays_uvicorn_free() -> None:
+    result = _probe_import(
+        module_name="rl_fzerox.apps.run_manager.api",
+        watched_modules=(
+            "rl_fzerox.apps.run_manager.app",
+            "uvicorn",
+        ),
+    )
+
+    assert result["after_import"]["rl_fzerox.apps.run_manager.app"] is False
+    assert result["after_import"]["uvicorn"] is False
+
+
 def _probe_import(
     *,
     module_name: str,
