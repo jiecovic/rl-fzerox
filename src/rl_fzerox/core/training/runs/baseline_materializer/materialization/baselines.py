@@ -11,7 +11,6 @@ from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     course_vehicle_cache_payload,
     link_or_copy_file,
     run_state_path,
-    sha256_bytes,
     sha256_json,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.materialization.course_vehicle import (
@@ -74,13 +73,16 @@ def materialize_baseline_impl(
     if not target_state_path.is_file():
         link_or_copy_file(cache_state_path, target_state_path)
     if not target_metadata_path.is_file():
+        cache_metadata_path = cache_state_path.with_suffix(".json")
         atomic_write_json(
             target_metadata_path,
             {
                 **payload,
                 "cache_key": cache_key,
                 "cache_kind": "exact_run_baseline",
-                "materialized_state_sha256": sha256_bytes(cache_state_path.read_bytes()),
+                "materialized_state_sha256": _required_materialized_state_sha256(
+                    cache_metadata_path
+                ),
                 "source_course_index": source_course_index,
                 "source_vehicle": source_vehicle_id,
                 "source_engine_setting": source_engine.id,
@@ -118,8 +120,7 @@ def _reuse_existing_run_baseline(
     metadata_path = source_state_path.with_suffix(".json")
     if not metadata_path.is_file():
         raise FileNotFoundError(
-            "In-place continuation baseline metadata not found: "
-            f"{metadata_path}"
+            f"In-place continuation baseline metadata not found: {metadata_path}"
         )
 
     metadata = read_metadata(metadata_path)
@@ -164,9 +165,7 @@ def _required_request_mode(request: BaselineRequest) -> str:
 
 def _required_request_course_index(request: BaselineRequest) -> int:
     course_index = (
-        request.course_index
-        if request.course_index is not None
-        else request.source_course_index
+        request.course_index if request.course_index is not None else request.source_course_index
     )
     if course_index is None:
         raise ValueError("course_index is required for race-start generation")
@@ -198,3 +197,11 @@ def _optional_metadata_str(metadata: dict[str, object], key: str) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
+
+
+def _required_materialized_state_sha256(metadata_path: Path) -> str:
+    metadata = read_metadata(metadata_path)
+    value = metadata.get("materialized_state_sha256")
+    if isinstance(value, str) and value:
+        return value
+    raise ValueError(f"Baseline metadata is missing materialized_state_sha256: {metadata_path}")
