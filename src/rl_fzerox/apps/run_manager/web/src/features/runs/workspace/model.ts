@@ -14,10 +14,13 @@ export function progressNote(run: ManagedRun): string {
   const runtime = run.runtime;
   const target = run.config.train.total_timesteps.toLocaleString();
   if (runtime === null) {
+    const failureMessage = latestFailureMessage(run);
     const startupMessage = latestStartupMessage(run);
     if (run.status === "failed") {
       return (
-        startupMessage ?? `Run failed before the first callback flush. Target was ${target} steps.`
+        failureMessage ??
+        startupMessage ??
+        `Run failed before the first callback flush. Target was ${target} steps.`
       );
     }
     return (
@@ -115,6 +118,14 @@ export function latestStartupMessage(run: ManagedRun): string | null {
     return null;
   }
   return startupEvent.message;
+}
+
+export function latestFailureMessage(run: ManagedRun): string | null {
+  const failedEvent = run.recent_events.find((event) => event.kind === "failed");
+  if (failedEvent === undefined) {
+    return null;
+  }
+  return failedEvent.message;
 }
 
 export function formatDurationSeconds(value: number): string {

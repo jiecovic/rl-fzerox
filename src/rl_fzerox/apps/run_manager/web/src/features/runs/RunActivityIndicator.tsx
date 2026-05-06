@@ -1,3 +1,4 @@
+import { latestFailureMessage } from "@/features/runs/workspace/model";
 import type { ManagedRun } from "@/shared/api/contract";
 import { formatRelativeTime } from "@/shared/ui/format";
 
@@ -20,7 +21,7 @@ export function RunActivityIndicator({ run }: { run: ManagedRun }) {
     return <span>{startupActivityLabel(run) ?? "starting"}</span>;
   }
   if (run.status === "failed") {
-    return <span>{startupActivityLabel(run) ?? "no runtime sample"}</span>;
+    return <span>{latestFailureMessage(run) ?? startupActivityLabel(run) ?? "failed"}</span>;
   }
   return <span>idle</span>;
 }

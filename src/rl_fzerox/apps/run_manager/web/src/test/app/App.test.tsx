@@ -416,4 +416,43 @@ describe("App", () => {
     expect(lineageStepsMetric.closest(".run-runtime-metric")?.textContent).toContain("20,304,180");
     expect(screen.getByText("20260504-153504-ed51f7e7")).toBeInTheDocument();
   });
+
+  it("shows the latest failed event detail instead of the last startup step", async () => {
+    const user = userEvent.setup();
+    const failedRun = runFixture({
+      id: "run-failed",
+      name: "ppo_test_failed",
+      status: "failed",
+      runtime: null,
+      recent_events: [
+        {
+          created_at: "2026-05-06T12:48:30+00:00",
+          kind: "failed",
+          message: "training failed: FileNotFoundError: missing fork source config",
+        },
+        {
+          created_at: "2026-05-06T12:48:29+00:00",
+          kind: "startup_resume",
+          message: "Loading latest checkpoint",
+        },
+      ],
+    });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [failedRun],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    await user.click(screen.getByRole("button", { name: "Open run ppo_test_failed" }));
+
+    expect(
+      await screen.findByText("training failed: FileNotFoundError: missing fork source config"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Loading latest checkpoint")).not.toBeInTheDocument();
+  });
 });
