@@ -237,19 +237,21 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
                 title={group.title}
                 onToggle={(open) => setGroupOpen((current) => ({ ...current, [group.id]: open }))}
               >
-                <div className="run-chart-grid">
-                  {group.charts.map((chart) => (
-                    <RunComparisonChart
-                      key={chart.id}
-                      buildPoints={chart.buildPoints}
-                      colorByRunId={colorByRunId}
-                      emptyText={chart.emptyText}
-                      metricsByRun={metricsByRun}
-                      runs={selectedRuns}
-                      title={chart.title}
-                    />
-                  ))}
-                </div>
+                {groupOpen[group.id] ? (
+                  <div className="run-chart-grid">
+                    {group.charts.map((chart) => (
+                      <RunComparisonChart
+                        key={chart.id}
+                        buildPoints={chart.buildPoints}
+                        colorByRunId={colorByRunId}
+                        emptyText={chart.emptyText}
+                        metricsByRun={metricsByRun}
+                        runs={selectedRuns}
+                        title={chart.title}
+                      />
+                    ))}
+                  </div>
+                ) : null}
               </ConfigDisclosure>
             ))}
           </div>

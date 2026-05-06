@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ChartsPanel } from "@/features/runs/ChartsPanel";
-import { runFixture } from "@/test/fixtures";
+import { runFixture, runMetricSampleFixture } from "@/test/fixtures";
 
 const fetchFreshRunMetricsMock = vi.fn();
 const getCachedRunMetricsMock = vi.fn();
@@ -225,6 +225,38 @@ describe("ChartsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Expand lineage ppo_test_1" }));
     expect(within(lineageSection).getByText("ppo_test_1 fork")).toBeInTheDocument();
+  });
+
+  it("unmounts chart cards for collapsed groups", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([
+      runMetricSampleFixture(),
+      runMetricSampleFixture({
+        created_at: "2026-05-03T18:56:00+00:00",
+        lineage_num_timesteps: 1_300_000,
+        num_timesteps: 1_300_000,
+        metrics: {
+          ...runMetricSampleFixture().metrics,
+          "rollout/ep_rew_mean": 4.8,
+        },
+      }),
+    ]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    render(<ChartsPanel focusedRunId={null} runs={[runFixture({ status: "stopped" })]} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Episode reward")).toBeInTheDocument();
+    });
+
+    const rolloutSummary = screen.getByText("Rollout").closest("summary");
+    if (!(rolloutSummary instanceof HTMLElement)) {
+      throw new Error("rollout disclosure summary not found");
+    }
+    await user.click(rolloutSummary);
+
+    expect(screen.queryByText("Episode reward")).not.toBeInTheDocument();
   });
 });
 

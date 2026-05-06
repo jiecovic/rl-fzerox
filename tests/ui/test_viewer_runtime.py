@@ -3,18 +3,28 @@ from pathlib import Path
 
 import numpy as np
 
+from fzerox_emulator.arrays import Float32Array, UInt8Array
 from rl_fzerox.core.config.schema import (
+    ActionConfig,
     CurriculumConfig,
     CurriculumStageConfig,
     EmulatorConfig,
     EnvConfig,
+    ObservationConfig,
+    ObservationStateComponentConfig,
+    StateFeatureDropoutGroupConfig,
     TrackRecordEntryConfig,
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    TrainConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.envs.observations import ImageStateObservation, observation_state
+from rl_fzerox.core.envs.observations import (
+    ImageStateObservation,
+    observation_state,
+    state_feature_names,
+)
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
     _update_best_finish_times,
@@ -22,7 +32,10 @@ from rl_fzerox.ui.watch.runtime.episode import (
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
 )
-from rl_fzerox.ui.watch.runtime.observation import apply_watch_state_feature_zeroing
+from rl_fzerox.ui.watch.runtime.observation import (
+    apply_watch_state_feature_zeroing,
+    configured_watch_zeroed_features,
+)
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
 from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
@@ -90,6 +103,56 @@ def test_watch_state_feature_zeroing_supports_component_level_course_toggle() ->
     assert masked_state is not None
     assert list(masked_state) == [0.0, 0.0, 2.0]
     assert masked_info["watch_zeroed_state_features"] == ("course_context",)
+
+
+def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    state_components = (
+        ObservationStateComponentConfig(name="track_position", progress_source="segment_progress"),
+        ObservationStateComponentConfig(name="course_context", encoding="one_hot_builtin"),
+    )
+    feature_names = state_feature_names(
+        state_components=tuple(component.data() for component in state_components),
+    )
+    course_feature_names = tuple(
+        feature_name
+        for feature_name in feature_names
+        if feature_name.startswith("course_context.")
+    )
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            action=ActionConfig(
+                name="configured_hybrid",
+                layout_continuous_axes=("steer",),
+                layout_discrete_axes=("gas", "boost", "lean"),
+            ),
+            observation=ObservationConfig(mode="image_state", state_components=state_components),
+        ),
+        train=TrainConfig(
+            state_feature_dropout_groups=(
+                StateFeatureDropoutGroupConfig(
+                    feature_names=("track_position.edge_ratio",),
+                    dropout_prob=1.0,
+                ),
+                StateFeatureDropoutGroupConfig(
+                    feature_names=course_feature_names,
+                    dropout_prob=1.0,
+                ),
+                StateFeatureDropoutGroupConfig(
+                    feature_names=("track_position.lap_progress",),
+                    dropout_prob=0.6,
+                ),
+            )
+        ),
+    )
+
+    assert configured_watch_zeroed_features(config) == frozenset(
+        {"track_position.edge_ratio", "course_context"}
+    )
 
 
 def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
@@ -394,9 +457,9 @@ def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:
     )
 
 
-def _sample_image() -> np.ndarray:
+def _sample_image() -> UInt8Array:
     return np.zeros((2, 2, 3), dtype=np.uint8)
 
 
-def _sample_state(values: list[float]) -> np.ndarray:
+def _sample_state(values: list[float]) -> Float32Array:
     return np.asarray(values, dtype=np.float32)

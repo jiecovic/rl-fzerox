@@ -26,6 +26,7 @@ const openRunDirectoryMock = vi.fn();
 const renameRunMock = vi.fn();
 const resumeRunMock = vi.fn();
 const stopRunMock = vi.fn();
+const watchRunMock = vi.fn();
 
 vi.mock("@/app/managerData", () => ({
   loadManagerData: () => loadManagerDataMock(),
@@ -52,6 +53,7 @@ vi.mock("@/shared/api/client", async () => {
     renameRun: (runId: string, name: string) => renameRunMock(runId, name),
     resumeRun: (runId: string) => resumeRunMock(runId),
     stopRun: (runId: string) => stopRunMock(runId),
+    watchRun: (runId: string, artifact: "latest" | "best") => watchRunMock(runId, artifact),
     updateDraftWithSource: (
       id: string,
       name: string,
@@ -99,6 +101,7 @@ describe("App", () => {
     renameRunMock.mockResolvedValue(runFixture({ name: "renamed run" }));
     resumeRunMock.mockResolvedValue(runFixture({ status: "running", pending_command: null }));
     stopRunMock.mockResolvedValue(runFixture({ pending_command: "stop" }));
+    watchRunMock.mockResolvedValue("started");
   });
 
   afterEach(() => {
@@ -287,6 +290,40 @@ describe("App", () => {
     expect(screen.getByText(/lineage steps ·/i).textContent).toContain(
       "240,000 lineage steps · 60,000 / 50,000,000 local fork steps",
     );
+  });
+
+  it("anchors watch launch failures to the watch control", async () => {
+    const user = userEvent.setup();
+    const run = runFixture({ id: "run-001", name: "ppo_test_1" });
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [run],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+    watchRunMock.mockRejectedValueOnce(
+      new Error(
+        "Saved train config is not compatible with the current schema: /tmp/run. Restart the run with the current config schema.",
+      ),
+    );
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+
+    const watchButton = await screen.findByRole("button", { name: "Watch latest checkpoint" });
+    await user.click(watchButton);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Saved train config is not compatible with the current schema");
+    expect(watchButton.closest(".run-watch-control")).toContainElement(alert);
   });
 
   it("derives local wall time from active runtime instead of stale initial launch timestamps", async () => {

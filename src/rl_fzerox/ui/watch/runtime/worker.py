@@ -31,6 +31,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
+    configured_watch_zeroed_features,
     toggle_watch_state_feature,
 )
 from rl_fzerox.ui.watch.runtime.policy import (
@@ -98,6 +99,7 @@ def _run_simulation_loop(
             config.watch.policy_run_dir,
             artifact=config.watch.policy_artifact,
             device=config.watch.device,
+            algorithm=config.watch.policy_algorithm,
         )
         _sync_policy_curriculum_stage(policy_runner, env)
         native_control_fps = env.backend.native_fps / config.env.action_repeat
@@ -124,7 +126,7 @@ def _run_simulation_loop(
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         locked_reset_course_id: str | None = None
-        watch_zeroed_state_features: frozenset[str] = frozenset()
+        watch_zeroed_state_features = configured_watch_zeroed_features(config)
 
         while config.watch.episodes is None or episode < config.watch.episodes:
             reset_seed = config.seed if episode == 0 else None

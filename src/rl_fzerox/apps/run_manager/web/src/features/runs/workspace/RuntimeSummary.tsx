@@ -168,9 +168,13 @@ export function RunRuntimeSummary({
           <FolderIcon />
         </button>
         <div className="run-watch-control">
-          {actions.controlNotice !== null ? (
-            <div aria-live="polite" className="run-watch-toast" role="status">
-              {actions.controlNotice}
+          {actions.watchToast !== null ? (
+            <div
+              aria-live="polite"
+              className={`run-watch-toast run-watch-toast-${actions.watchToast.tone}`}
+              role={actions.watchToast.tone === "error" ? "alert" : "status"}
+            >
+              {actions.watchToast.message}
             </div>
           ) : null}
           <label className="run-watch-select-shell">

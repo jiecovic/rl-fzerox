@@ -276,14 +276,17 @@ class ManagerRunLauncher:
         pid_path = _manager_watch_pid_path(run.id, artifact=artifact)
         if _active_watch_pid(
             pid_path=pid_path,
+            run_id=run.id,
             run_dir=run.run_dir,
             artifact=artifact,
         ) is not None:
             return "already_running"
         resolve_watch_app_config(
             config_path=None,
-            policy_run_dir=run.run_dir,
+            policy_run_dir=None,
             policy_artifact="best" if artifact == "best" else "latest",
+            manager_db_path=self._store.db_path,
+            managed_run_id=run.id,
             overrides=(),
         )
         log_path = _manager_watch_log_path(run.id, artifact=artifact)
@@ -292,8 +295,10 @@ class ManagerRunLauncher:
             sys.executable,
             "-m",
             "rl_fzerox.apps.watch",
-            "--run-dir",
-            str(run.run_dir),
+            "--manager-db-path",
+            str(self._store.db_path),
+            "--managed-run-id",
+            run.id,
             "--artifact",
             artifact,
         ]
@@ -309,6 +314,7 @@ class ManagerRunLauncher:
         _write_watch_pid_file(
             pid_path=pid_path,
             pid=process.pid,
+            run_id=run.id,
             run_dir=run.run_dir,
             artifact=artifact,
         )
@@ -437,7 +443,7 @@ def _watch_failure_detail(log_path: Path) -> str | None:
     return None
 
 
-def _active_watch_pid(*, pid_path: Path, run_dir: Path, artifact: str) -> int | None:
+def _active_watch_pid(*, pid_path: Path, run_id: str, run_dir: Path, artifact: str) -> int | None:
     payload = _read_watch_pid_file(pid_path)
     if payload is None:
         return None
@@ -445,18 +451,26 @@ def _active_watch_pid(*, pid_path: Path, run_dir: Path, artifact: str) -> int | 
     if not isinstance(pid, int):
         pid_path.unlink(missing_ok=True)
         return None
-    if _watch_process_matches(pid=pid, run_dir=run_dir, artifact=artifact):
+    if _watch_process_matches(pid=pid, run_id=run_id, run_dir=run_dir, artifact=artifact):
         return pid
     pid_path.unlink(missing_ok=True)
     return None
 
 
-def _write_watch_pid_file(*, pid_path: Path, pid: int, run_dir: Path, artifact: str) -> None:
+def _write_watch_pid_file(
+    *,
+    pid_path: Path,
+    pid: int,
+    run_id: str,
+    run_dir: Path,
+    artifact: str,
+) -> None:
     pid_path.parent.mkdir(parents=True, exist_ok=True)
     pid_path.write_text(
         json.dumps(
             {
                 "pid": pid,
+                "run_id": run_id,
                 "run_dir": str(run_dir),
                 "artifact": artifact,
             },
@@ -478,7 +492,7 @@ def _read_watch_pid_file(pid_path: Path) -> dict[str, object] | None:
         return None
 
 
-def _watch_process_matches(*, pid: int, run_dir: Path, artifact: str) -> bool:
+def _watch_process_matches(*, pid: int, run_id: str, run_dir: Path, artifact: str) -> bool:
     proc_dir = Path("/proc") / str(pid)
     if not proc_dir.is_dir():
         return False
@@ -489,6 +503,9 @@ def _watch_process_matches(*, pid: int, run_dir: Path, artifact: str) -> bool:
     normalized = cmdline.replace("\x00", " ")
     return (
         "rl_fzerox.apps.watch" in normalized
-        and str(run_dir) in normalized
         and f"--artifact {artifact}" in normalized
+        and (
+            f"--managed-run-id {run_id}" in normalized
+            or f"--run-dir {run_dir}" in normalized
+        )
     )

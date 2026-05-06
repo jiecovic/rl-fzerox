@@ -28,12 +28,18 @@ def _load_policy_runner(
     *,
     artifact: str,
     device: str,
+    algorithm: str | None = None,
 ) -> PolicyRunner | None:
     if policy_run_dir is None:
         return None
     from rl_fzerox.core.training.inference import load_policy_runner
 
-    return load_policy_runner(policy_run_dir, artifact=artifact, device=device)
+    return load_policy_runner(
+        policy_run_dir,
+        artifact=artifact,
+        device=device,
+        algorithm=algorithm,
+    )
 
 
 def _policy_label(policy_runner: PolicyRunner | None) -> str | None:

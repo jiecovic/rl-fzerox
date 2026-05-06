@@ -4,12 +4,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
     mask_observation_state,
     observation_state,
     state_feature_indices,
 )
+from rl_fzerox.core.envs.observations.state.components import state_component_features
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +28,50 @@ STATE_COMPONENT_TARGETS = (
     _StateComponentTarget("course_context", ("course_context.",)),
     _StateComponentTarget("control_history", ("control_history.", "prev_")),
 )
+
+
+def configured_watch_zeroed_features(config: WatchAppConfig) -> frozenset[str]:
+    """Return watch-default zeroed entries implied by deterministic train dropout."""
+
+    train_config = config.train
+    state_components = config.env.observation.state_components_data()
+    if train_config is None or state_components is None:
+        return frozenset()
+
+    independent_lean_buttons = config.env.action.independent_lean_buttons
+    component_feature_names = {
+        component.name: frozenset(
+            feature.name
+            for feature in state_component_features(
+                component,
+                independent_lean_buttons=independent_lean_buttons,
+            )
+        )
+        for component in state_components
+    }
+    active_feature_names = frozenset().union(*component_feature_names.values())
+    zeroed_features: set[str] = set()
+    for group in train_config.state_feature_dropout_groups:
+        if group.dropout_prob < 1.0:
+            continue
+        group_feature_names = frozenset(
+            feature_name for feature_name in group.feature_names if feature_name in active_feature_names
+        )
+        if not group_feature_names:
+            continue
+        matching_component_name = next(
+            (
+                component_name
+                for component_name, feature_names in component_feature_names.items()
+                if feature_names == group_feature_names
+            ),
+            None,
+        )
+        if matching_component_name is not None:
+            zeroed_features.add(matching_component_name)
+            continue
+        zeroed_features.update(group_feature_names)
+    return frozenset(zeroed_features)
 
 
 def apply_watch_state_feature_zeroing(
