@@ -57,13 +57,17 @@ class ManagedRunConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_custom_conv_geometry(self) -> ManagedRunConfig:
-        from rl_fzerox.core.manager.architecture.metadata import preset_geometry
         from rl_fzerox.core.policy.extractors import (
             ensure_conv_spec_fits_geometry,
             resolve_conv_spec,
         )
 
-        height, width = preset_geometry(self.observation.preset)
+        height, width = self.observation.image_geometry()
+        if self.observation.resolution_mode == "custom" and self.policy.conv_profile == "auto":
+            raise ValueError(
+                "policy.conv_profile='auto' only supports named observation presets; "
+                "choose an explicit conv_profile for custom image resolutions"
+            )
         conv_spec = resolve_conv_spec(
             (height, width),
             conv_profile=self.policy.conv_profile,

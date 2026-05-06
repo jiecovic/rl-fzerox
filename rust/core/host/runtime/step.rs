@@ -8,7 +8,7 @@
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{
     input::ControllerState,
-    observation::{ObservationPreset, ObservationStackMode},
+    observation::{ObservationLayout, ObservationStackMode},
     video::VideoResizeFilter,
 };
 
@@ -260,8 +260,8 @@ pub struct RepeatedStepConfig {
     pub controller_state: ControllerState,
     /// Number of internal emulator frames to execute.
     pub action_repeat: usize,
-    /// Observation preset used for the final stacked observation.
-    pub preset: ObservationPreset,
+    /// Observation image layout used for the final stacked observation.
+    pub layout: ObservationLayout,
     /// Number of observation frames stacked in the returned tensor.
     pub frame_stack: usize,
     /// Channel encoding used for stacked observation frames.

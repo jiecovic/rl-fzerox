@@ -396,6 +396,49 @@ describe("Configurator", () => {
     );
   });
 
+  it("persists custom observation resolution through the observation tab", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="custom resolution draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.selectOptions(screen.getByLabelText("Resolution source"), "custom");
+
+    const heightInput = screen.getByRole("textbox", { name: "Custom height" });
+    const widthInput = screen.getByRole("textbox", { name: "Custom width" });
+    await user.clear(heightInput);
+    await user.type(heightInput, "72");
+    await user.clear(widthInput);
+    await user.type(widthInput, "96");
+
+    expect(screen.getByText("208 x 296")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "custom resolution draft",
+        expect.objectContaining({
+          observation: expect.objectContaining({
+            resolution_mode: "custom",
+            custom_resolution: { height: 72, width: 96 },
+          }),
+        }),
+      ),
+    );
+  });
+
   it("persists recent retention without requiring a blur before saving", async () => {
     const user = userEvent.setup();
     const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());

@@ -7,11 +7,11 @@ use pyo3::types::PyTuple;
 use crate::bindings::emulator::frame::{frame_to_pyarray, frames_to_pylist};
 use crate::bindings::emulator::step::{step_status_to_py, step_summary_to_py};
 use crate::bindings::emulator::telemetry::telemetry_to_py;
-use crate::bindings::emulator::{PyEmulator, parse_resize_filter};
+use crate::bindings::emulator::{PyEmulator, parse_observation_layout, parse_resize_filter};
 use crate::bindings::error::map_core_error;
 use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationStackMode};
+use crate::core::observation::ObservationStackMode;
 
 pub(in crate::bindings::emulator) struct RepeatStepArgs<'a> {
     pub action_repeat: usize,
@@ -28,6 +28,8 @@ pub(in crate::bindings::emulator) struct RepeatStepArgs<'a> {
     pub minimap_layer: bool,
     pub resize_filter: &'a str,
     pub minimap_resize_filter: &'a str,
+    pub height: Option<usize>,
+    pub width: Option<usize>,
     pub joypad_mask: u16,
     pub left_stick_x: f32,
     pub left_stick_y: f32,
@@ -116,13 +118,13 @@ fn prepare_repeated_step(
     emulator: &mut PyEmulator,
     args: &RepeatStepArgs<'_>,
 ) -> PyResult<PreparedRepeatStep> {
-    let preset = ObservationPreset::parse(args.preset).map_err(map_core_error)?;
+    let layout = parse_observation_layout(args.preset, args.height, args.width)?;
     let stack_mode = ObservationStackMode::parse(args.stack_mode).map_err(map_core_error)?;
     let resize_filter = parse_resize_filter(args.resize_filter)?;
     let minimap_resize_filter = parse_resize_filter(args.minimap_resize_filter)?;
     let spec = emulator
         .host
-        .observation_spec(preset)
+        .observation_spec(layout)
         .map_err(map_core_error)?;
     let controller_state = ControllerState::from_normalized(
         args.joypad_mask,
@@ -135,7 +137,7 @@ fn prepare_repeated_step(
         config: RepeatedStepConfig {
             controller_state,
             action_repeat: args.action_repeat,
-            preset,
+            layout,
             frame_stack: args.frame_stack,
             stack_mode,
             minimap_layer: args.minimap_layer,

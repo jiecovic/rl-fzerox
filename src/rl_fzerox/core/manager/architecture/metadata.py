@@ -4,12 +4,21 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
+from rl_fzerox.core.domain.observation_image import (
+    MAX_CUSTOM_OBSERVATION_HEIGHT,
+    MAX_CUSTOM_OBSERVATION_WIDTH,
+    MIN_CUSTOM_OBSERVATION_DIMENSION,
+    OBSERVATION_PRESET_GEOMETRIES,
+    OBSERVATION_SOURCE_GEOMETRIES,
+)
 from rl_fzerox.core.envs.observations.state.components import state_component_definition
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.manager.architecture.models import (
     BuiltInCourseInfo,
     EngineSettingPresetInfo,
     ObservationPresetInfo,
+    ObservationResolutionBounds,
+    ObservationSourceGeometryInfo,
     RunManagerConfigMetadata,
     SelectOption,
     StateComponentInfo,
@@ -19,7 +28,6 @@ from rl_fzerox.core.manager.architecture.models import (
 )
 from rl_fzerox.core.manager.run_spec import (
     ManagedStateComponentConfig,
-    ObservationPreset,
     default_state_components,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
@@ -31,12 +39,25 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
     return RunManagerConfigMetadata(
         observation_presets=tuple(
             ObservationPresetInfo(
-                value=value,
-                label=value.replace("crop_", "").replace("x", " x "),
-                height=height,
-                width=width,
+                value=geometry.name,
+                label=geometry.name.replace("crop_", "").replace("x", " x "),
+                height=geometry.height,
+                width=geometry.width,
             )
-            for value, height, width in OBSERVATION_PRESET_GEOMETRIES
+            for geometry in OBSERVATION_PRESET_GEOMETRIES
+        ),
+        observation_resolution_bounds=ObservationResolutionBounds(
+            min_dimension=MIN_CUSTOM_OBSERVATION_DIMENSION,
+            max_height=MAX_CUSTOM_OBSERVATION_HEIGHT,
+            max_width=MAX_CUSTOM_OBSERVATION_WIDTH,
+        ),
+        observation_source_geometries=tuple(
+            ObservationSourceGeometryInfo(
+                renderer=geometry.renderer,
+                height=geometry.height,
+                width=geometry.width,
+            )
+            for geometry in OBSERVATION_SOURCE_GEOMETRIES
         ),
         track_pool_modes=(
             SelectOption(value="built_in", label="Built-in cups"),
@@ -120,13 +141,6 @@ def component_features(
     )
 
 
-def preset_geometry(preset: ObservationPreset) -> tuple[int, int]:
-    for value, height, width in OBSERVATION_PRESET_GEOMETRIES:
-        if value == preset:
-            return height, width
-    raise ValueError(f"Unsupported observation preset: {preset!r}")
-
-
 def _options(values: Iterable[str]) -> tuple[SelectOption, ...]:
     return tuple(SelectOption(value=value, label=value.replace("_", " ")) for value in values)
 
@@ -184,17 +198,3 @@ def engine_setting_preset_infos() -> tuple[EngineSettingPresetInfo, ...]:
         )
         for preset in CATALOG.engine_presets
     )
-
-
-OBSERVATION_PRESET_GEOMETRIES: tuple[tuple[ObservationPreset, int, int], ...] = (
-    ("crop_84x116", 84, 116),
-    ("crop_92x124", 92, 124),
-    ("crop_116x164", 116, 164),
-    ("crop_98x130", 98, 130),
-    ("crop_66x82", 66, 82),
-    ("crop_60x76", 60, 76),
-    ("crop_68x68", 68, 68),
-    ("crop_84x84", 84, 84),
-    ("crop_76x100", 76, 100),
-    ("crop_64x64", 64, 64),
-)

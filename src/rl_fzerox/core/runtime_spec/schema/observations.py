@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Literal
+from typing import Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
@@ -12,6 +12,11 @@ from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentName,
     ObservationStateComponentSettings,
     TrackPositionProgressSourceName,
+)
+from rl_fzerox.core.domain.observation_image import (
+    ObservationCustomResolution,
+    ObservationResolutionMode,
+    resolve_observation_geometry,
 )
 from rl_fzerox.core.runtime_spec.schema.common import (
     ObservationPresetName,
@@ -95,13 +100,23 @@ class ObservationStateComponentConfig(BaseModel):
         )
 
 
+class NativeObservationResolutionKwargs(TypedDict, total=False):
+    """Typed backend kwargs for preset-based or custom observation layouts."""
+
+    preset: str
+    height: int
+    width: int
+
+
 class ObservationConfig(BaseModel):
     """Observation adapter settings for the current env."""
 
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["image", "image_state"] = "image"
-    preset: ObservationPresetName = "crop_116x164"
+    resolution_mode: ObservationResolutionMode = "preset"
+    preset: ObservationPresetName = "crop_60x76"
+    custom_resolution: ObservationCustomResolution | None = None
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb"
     minimap_layer: bool = False
@@ -124,6 +139,14 @@ class ObservationConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_state_components_for_mode(self) -> ObservationConfig:
+        if self.resolution_mode == "preset" and self.custom_resolution is not None:
+            raise ValueError(
+                "observation.custom_resolution must be null for resolution_mode='preset'"
+            )
+        if self.resolution_mode == "custom" and self.custom_resolution is None:
+            raise ValueError(
+                "observation.custom_resolution must be set for resolution_mode='custom'"
+            )
         if self.mode == "image_state" and not self.state_components:
             raise ValueError("observation.state_components must not be empty for mode=image_state")
         return self
@@ -134,3 +157,20 @@ class ObservationConfig(BaseModel):
         if self.state_components is None:
             return None
         return tuple(component.data() for component in self.state_components)
+
+    def image_geometry(self) -> tuple[int, int]:
+        """Return the active `(height, width)` for one resolved runtime config."""
+
+        return resolve_observation_geometry(
+            resolution_mode=self.resolution_mode,
+            preset=self.preset,
+            custom_resolution=self.custom_resolution,
+        )
+
+    def native_resolution_kwargs(self) -> NativeObservationResolutionKwargs:
+        """Return the backend kwargs for the active preset-or-custom resolution."""
+
+        if self.resolution_mode == "preset":
+            return {"preset": self.preset}
+        height, width = self.image_geometry()
+        return {"height": height, "width": width}

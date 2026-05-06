@@ -15,6 +15,12 @@ from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.runtime_spec.track_registry import expand_track_registry_metadata
 
 
+def _validated_run_spec(config: ManagedRunConfig) -> ManagedRunConfig:
+    """Re-run root validation after any in-memory manager config mutations."""
+
+    return ManagedRunConfig.model_validate(config.model_dump(mode="python"))
+
+
 def build_managed_train_app_config(
     config: ManagedRunConfig,
     *,
@@ -23,6 +29,7 @@ def build_managed_train_app_config(
 ) -> TrainAppConfig:
     """Project one manager-owned run spec into the current training schema."""
 
+    config = _validated_run_spec(config)
     validate_launch_support(config)
     train_data = train_config_payload(
         config,

@@ -8,12 +8,14 @@ from fzerox_emulator._native import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import (
     BackendStepResult,
+    FrameObservationOptions,
     FrameStep,
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
     RaceStartMode,
     ResetState,
+    normalize_observation_resolution,
 )
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.frames import (
@@ -57,7 +59,10 @@ class Emulator:
             (None if self._baseline_state_path is None else str(self._baseline_state_path)),
             self._renderer,
         )
-        self._observation_specs: dict[str, ObservationSpec] = {}
+        self._observation_specs: dict[
+            tuple[str | None, int | None, int | None],
+            ObservationSpec,
+        ] = {}
 
     @property
     def name(self) -> str:
@@ -300,7 +305,9 @@ class Emulator:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -319,6 +326,8 @@ class Emulator:
         config = RepeatStepConfig(
             action_repeat=action_repeat,
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -336,7 +345,7 @@ class Emulator:
             self._native,
             controller_state,
             config=config,
-            spec=self.observation_spec(preset),
+            spec=self.observation_spec(preset, height=height, width=width),
         )
 
     def step_repeat_watch_raw(
@@ -344,7 +353,9 @@ class Emulator:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -363,6 +374,8 @@ class Emulator:
         config = RepeatStepConfig(
             action_repeat=action_repeat,
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -380,7 +393,7 @@ class Emulator:
             self._native,
             controller_state,
             config=config,
-            spec=self.observation_spec(preset),
+            spec=self.observation_spec(preset, height=height, width=width),
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
@@ -430,24 +443,51 @@ class Emulator:
     def render_display(
         self,
         *,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
     ) -> RgbFrame:
-        """Return one native display frame for the requested observation preset."""
+        """Return one native display frame for the requested image layout."""
 
-        spec = self.observation_spec(preset)
+        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
+            preset=preset,
+            height=height,
+            width=width,
+        )
+        spec = self.observation_spec(resolved_preset, height=resolved_height, width=resolved_width)
         expected_shape = (spec.display_height, spec.display_width, 3)
         return validated_display_frame(
-            self._native.frame_display(preset),
+            self._native.frame_display(
+                "" if resolved_preset is None else resolved_preset,
+                height=resolved_height,
+                width=resolved_width,
+            ),
             expected_shape=expected_shape,
         )
 
-    def observation_spec(self, preset: str) -> ObservationSpec:
-        """Return the resolved native observation spec for one preset."""
+    def observation_spec(
+        self,
+        preset: str | None = None,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpec:
+        """Return the resolved native observation spec for one image layout."""
 
-        cached = self._observation_specs.get(preset)
+        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
+            preset=preset,
+            height=height,
+            width=width,
+        )
+        cache_key = (resolved_preset, resolved_height, resolved_width)
+        cached = self._observation_specs.get(cache_key)
         if cached is not None:
             return cached
-        spec_data = self._native.observation_spec(preset)
+        spec_data = self._native.observation_spec(
+            "" if resolved_preset is None else resolved_preset,
+            height=resolved_height,
+            width=resolved_width,
+        )
         spec = ObservationSpec(
             preset=str(spec_data["preset"]),
             width=int(spec_data["width"]),
@@ -456,31 +496,47 @@ class Emulator:
             display_width=int(spec_data["display_width"]),
             display_height=int(spec_data["display_height"]),
         )
-        self._observation_specs[preset] = spec
+        self._observation_specs[cache_key] = spec
         return spec
 
     def render_observation(
         self,
         *,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
         resize_filter: ObservationResizeFilter = "nearest",
         minimap_resize_filter: ObservationResizeFilter = "nearest",
     ) -> ObservationFrame:
-        """Return one native stacked observation tensor for the requested preset."""
+        """Return one native stacked observation tensor for the requested image layout."""
 
-        spec = self.observation_spec(preset)
+        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
+            preset=preset,
+            height=height,
+            width=width,
+        )
+        spec = self.observation_spec(
+            resolved_preset,
+            height=resolved_height,
+            width=resolved_width,
+        )
+        options: FrameObservationOptions = {
+            "stack_mode": stack_mode,
+            "minimap_layer": minimap_layer,
+            "resize_filter": resize_filter,
+            "minimap_resize_filter": minimap_resize_filter,
+        }
+        if resolved_height is not None:
+            options["height"] = resolved_height
+        if resolved_width is not None:
+            options["width"] = resolved_width
         frame = self._native.frame_observation(
-            preset,
+            "" if resolved_preset is None else resolved_preset,
             frame_stack,
-            {
-                "stack_mode": stack_mode,
-                "minimap_layer": minimap_layer,
-                "resize_filter": resize_filter,
-                "minimap_resize_filter": minimap_resize_filter,
-            },
+            options,
         )
         expected_shape = expected_observation_shape(
             spec,

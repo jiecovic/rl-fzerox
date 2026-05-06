@@ -7,6 +7,13 @@ from typing import Literal, TypeAlias
 
 from pydantic import PositiveInt
 
+from rl_fzerox.core.domain.observation_image import (
+    ObservationPresetName,
+)
+from rl_fzerox.core.domain.observation_image import (
+    ObservationResizeFilter as DomainObservationResizeFilter,
+)
+
 ConfigVersion = Literal[1]
 StackMode = Literal["rgb", "gray", "luma_chroma"]
 RaceMode = Literal["time_attack", "gp_race"]
@@ -17,19 +24,8 @@ EngineSettingMode = Literal["fixed", "random_range"]
 ActionAxisMode = Literal["continuous", "discrete"]
 ActionDriveMode = Literal["pwm", "on_off"]
 LeanOutputMode = Literal["three_way", "independent_buttons"]
-ObservationPreset = Literal[
-    "crop_84x116",
-    "crop_92x124",
-    "crop_116x164",
-    "crop_98x130",
-    "crop_66x82",
-    "crop_60x76",
-    "crop_68x68",
-    "crop_84x84",
-    "crop_76x100",
-    "crop_64x64",
-]
-ObservationResizeFilter = Literal["nearest", "bilinear"]
+ObservationPreset = ObservationPresetName
+ObservationResizeFilter = DomainObservationResizeFilter
 ConvProfile = Literal[
     "auto",
     "nature",

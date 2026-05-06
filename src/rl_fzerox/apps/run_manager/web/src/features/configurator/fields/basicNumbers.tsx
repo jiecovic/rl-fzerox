@@ -60,6 +60,7 @@ export function IntegerField({
   help,
   label,
   min = 0,
+  max,
   value,
   onChange,
   resetValue,
@@ -67,6 +68,7 @@ export function IntegerField({
   help: string;
   label: string;
   min?: number;
+  max?: number;
   value: number;
   onChange: (value: number) => void;
   resetValue?: number;
@@ -79,7 +81,7 @@ export function IntegerField({
 
   function commitValue() {
     const parsed = Number(rawValue.replace(/[,_\s]/g, ""));
-    if (!Number.isSafeInteger(parsed) || parsed < min) {
+    if (!Number.isSafeInteger(parsed) || parsed < min || (max !== undefined && parsed > max)) {
       setRawValue(formatInteger(value));
       return;
     }

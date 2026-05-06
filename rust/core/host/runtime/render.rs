@@ -4,7 +4,7 @@
 use crate::core::callbacks::StackedObservationRequest;
 use crate::core::error::CoreError;
 use crate::core::minimap::MinimapLayerRequest;
-use crate::core::observation::{ObservationPreset, ObservationSpec};
+use crate::core::observation::{ObservationLayout, ObservationSpec};
 use crate::core::video::VideoResizeFilter;
 
 use super::host::Host;
@@ -19,10 +19,10 @@ impl Host {
 
     pub fn observation_spec(
         &self,
-        preset: ObservationPreset,
+        layout: ObservationLayout,
     ) -> Result<ObservationSpec, CoreError> {
         let (frame_height, frame_width, _) = self.frame_shape;
-        preset.resolve(
+        layout.resolve(
             frame_width,
             frame_height,
             self.display_aspect_ratio,
@@ -32,16 +32,16 @@ impl Host {
 
     pub fn observation_frame(
         &mut self,
-        preset: ObservationPreset,
+        layout: ObservationLayout,
         frame_stack: usize,
         stack_mode: crate::core::observation::ObservationStackMode,
         minimap_layer: bool,
         resize_filter: VideoResizeFilter,
         minimap_resize_filter: VideoResizeFilter,
     ) -> Result<&[u8], CoreError> {
-        let spec = self.observation_spec(preset)?;
-        let aspect_ratio = preset.observation_aspect_ratio(self.display_aspect_ratio);
-        let crop = preset.crop(self.observation_crop_profile);
+        let spec = self.observation_spec(layout)?;
+        let aspect_ratio = layout.observation_aspect_ratio(self.display_aspect_ratio);
+        let crop = layout.crop(self.observation_crop_profile);
         let minimap_layer_request =
             self.minimap_layer_request(minimap_layer, &spec, minimap_resize_filter);
         self.callbacks
@@ -58,14 +58,14 @@ impl Host {
             })
     }
 
-    pub fn display_frame(&mut self, preset: ObservationPreset) -> Result<&[u8], CoreError> {
-        let spec = self.observation_spec(preset)?;
+    pub fn display_frame(&mut self, layout: ObservationLayout) -> Result<&[u8], CoreError> {
+        let spec = self.observation_spec(layout)?;
         self.callbacks.observation_frame(
             self.display_aspect_ratio,
             spec.display_width,
             spec.display_height,
             true,
-            preset.crop(self.observation_crop_profile),
+            layout.crop(self.observation_crop_profile),
             VideoResizeFilter::Nearest,
         )
     }

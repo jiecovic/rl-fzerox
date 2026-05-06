@@ -12,6 +12,11 @@ from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentSettings,
     TrackPositionProgressSourceName,
 )
+from rl_fzerox.core.domain.observation_image import (
+    ObservationCustomResolution,
+    ObservationResolutionMode,
+    resolve_observation_geometry,
+)
 from rl_fzerox.core.manager.run_spec.common import (
     ObservationPreset,
     ObservationResizeFilter,
@@ -86,7 +91,9 @@ class ManagedObservationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    resolution_mode: ObservationResolutionMode = "preset"
     preset: ObservationPreset = "crop_60x76"
+    custom_resolution: ObservationCustomResolution | None = None
     frame_stack: PositiveInt = Field(default=2, le=8)
     stack_mode: StackMode = "rgb"
     minimap_layer: bool = False
@@ -101,6 +108,14 @@ class ManagedObservationConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_observation_components(self) -> ManagedObservationConfig:
+        if self.resolution_mode == "preset" and self.custom_resolution is not None:
+            raise ValueError(
+                "observation.custom_resolution must be null for resolution_mode='preset'"
+            )
+        if self.resolution_mode == "custom" and self.custom_resolution is None:
+            raise ValueError(
+                "observation.custom_resolution must be set for resolution_mode='custom'"
+            )
         names = [component.name for component in self.state_components]
         if len(set(names)) != len(names):
             raise ValueError("observation.state_components must not contain duplicates")
@@ -108,6 +123,15 @@ class ManagedObservationConfig(BaseModel):
         if len(set(feature_names)) != len(feature_names):
             raise ValueError("observation.state_feature_dropouts must not contain duplicates")
         return self
+
+    def image_geometry(self) -> tuple[int, int]:
+        """Return the active `(height, width)` for preview and projection code."""
+
+        return resolve_observation_geometry(
+            resolution_mode=self.resolution_mode,
+            preset=self.preset,
+            custom_resolution=self.custom_resolution,
+        )
 
 
 DEFAULT_STATE_COMPONENTS: tuple[ManagedStateComponentConfig, ...] = (
