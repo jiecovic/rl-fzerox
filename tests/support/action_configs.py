@@ -1,7 +1,7 @@
 # tests/support/action_configs.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import ActionConfig
+from rl_fzerox.core.runtime_spec.schema import ActionConfig
 
 
 def configured_discrete_action(
@@ -9,7 +9,6 @@ def configured_discrete_action(
     **overrides: object,
 ) -> ActionConfig:
     return ActionConfig(
-        name="configured_discrete",
         layout_discrete_axes=layout_discrete_axes,
         **overrides,
     )
@@ -22,7 +21,6 @@ def configured_hybrid_action(
     **overrides: object,
 ) -> ActionConfig:
     return ActionConfig(
-        name="configured_hybrid",
         layout_continuous_axes=continuous_axes,
         layout_discrete_axes=discrete_axes,
         **overrides,

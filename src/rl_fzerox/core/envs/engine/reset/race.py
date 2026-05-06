@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.config.schema import EnvConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 
 from ..info import has_custom_baseline, read_live_telemetry
 from .gp_race import retarget_gp_race_baseline

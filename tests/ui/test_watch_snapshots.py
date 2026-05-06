@@ -7,7 +7,7 @@ import numpy as np
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.config.schema import EmulatorConfig, WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.snapshots import _publish_step_snapshots
 

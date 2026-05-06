@@ -2,14 +2,13 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from rl_fzerox.apps.watch import main, resolve_watch_app_config
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     CurriculumConfig,
     CurriculumStageConfig,
@@ -54,41 +53,13 @@ class _FakeWatchEnv:
         self.stage_indices.append(stage_index)
 
 
-def test_watch_rejects_artifact_without_run_dir(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-
-    config = WatchAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        watch=WatchConfig(),
-    )
-
-    monkeypatch.setattr(
-        "rl_fzerox.apps.watch_cli.resolve.load_watch_app_config",
-        lambda *args, **kwargs: config,
-    )
-
-    with pytest.raises(
-        SystemExit,
-        match="--artifact requires --run-dir, --managed-run-id, or watch.policy_run_dir",
-    ):
-        main(["--config", str(tmp_path / "watch.yaml"), "--artifact", "best"])
+def test_watch_rejects_artifact_without_run_dir() -> None:
+    with pytest.raises(SystemExit, match="--artifact requires --run-dir or --managed-run-id"):
+        main(["--artifact", "best"])
 
 
-def test_watch_rejects_missing_config_without_run_dir() -> None:
-    with pytest.raises(
-        SystemExit,
-        match="--config is required unless --run-dir or --managed-run-id is provided",
-    ):
+def test_watch_rejects_missing_run_locator() -> None:
+    with pytest.raises(SystemExit, match="--run-dir or --managed-run-id is required"):
         main([])
 
 
@@ -177,7 +148,6 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     )
 
     config = resolve_watch_app_config(
-        config_path=None,
         policy_run_dir=run_dir,
         policy_artifact="best",
         manager_db_path=None,
@@ -236,7 +206,6 @@ def test_resolve_watch_app_config_disables_track_sampling_for_x_cup_watch(
     )
 
     config = resolve_watch_app_config(
-        config_path=None,
         policy_run_dir=run_dir,
         policy_artifact="latest",
         manager_db_path=None,
@@ -328,26 +297,6 @@ def test_watch_cli_overrides_apply_after_run_manifest(
     rom_path.touch()
     run_dir.mkdir(parents=True)
 
-    watch_config = WatchAppConfig(
-        seed=999,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-        ),
-        env=EnvConfig(action_repeat=1, camera_setting="close_behind"),
-        watch=WatchConfig(control_fps=30.0, render_fps=30.0),
-    )
-    overridden_watch_config = watch_config.model_copy(
-        update={
-            "env": watch_config.env.model_copy(update={"camera_setting": "close_behind"}),
-            "watch": watch_config.watch.model_copy(
-                update={
-                    "control_fps": 15.0,
-                    "render_fps": 15.0,
-                }
-            ),
-        }
-    )
     train_config = TrainAppConfig(
         seed=7,
         emulator=EmulatorConfig(
@@ -359,19 +308,7 @@ def test_watch_cli_overrides_apply_after_run_manifest(
         train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
     )
 
-    def _load_watch_config(
-        _config_path: Path,
-        *,
-        overrides: Sequence[str] | None = None,
-    ) -> WatchAppConfig:
-        return overridden_watch_config if overrides else watch_config
-
     captured: dict[str, WatchAppConfig] = {}
-
-    monkeypatch.setattr(
-        "rl_fzerox.apps.watch_cli.resolve.load_watch_app_config",
-        _load_watch_config,
-    )
     monkeypatch.setattr(
         "rl_fzerox.apps.watch_cli.resolve.load_train_run_config_for_watch",
         lambda *_args, **_kwargs: train_config,
@@ -387,8 +324,6 @@ def test_watch_cli_overrides_apply_after_run_manifest(
 
     main(
         [
-            "--config",
-            str(tmp_path / "watch.yaml"),
             "--run-dir",
             str(run_dir),
             "--",

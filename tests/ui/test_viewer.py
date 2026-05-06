@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 from fzerox_emulator import JOYPAD_BUTTONS, ControllerState
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     PolicyConfig,
     TrainConfig,
 )

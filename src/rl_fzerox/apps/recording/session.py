@@ -4,8 +4,8 @@ from __future__ import annotations
 from fzerox_emulator import Emulator
 from rl_fzerox.apps.recording.models import RecordingSession
 from rl_fzerox.apps.recording.video import resolve_video_fps
-from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.inference import load_policy_runner
 

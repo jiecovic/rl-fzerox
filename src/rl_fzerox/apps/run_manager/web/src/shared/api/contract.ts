@@ -61,7 +61,6 @@ const customConvLayerSchema = z.object({
 });
 
 const trainConfigSchema = z.object({
-  algorithm: z.literal("maskable_hybrid_recurrent_ppo"),
   num_envs: z.number().int().positive(),
   total_timesteps: z.number().int().positive(),
   n_steps: z.number().int().positive(),

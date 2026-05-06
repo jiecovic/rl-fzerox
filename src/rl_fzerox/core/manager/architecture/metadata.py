@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from rl_fzerox.core.config.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
 from rl_fzerox.core.envs.observations.state.components import state_component_definition
 from rl_fzerox.core.envs.observations.state.types import StateFeature
@@ -18,11 +17,12 @@ from rl_fzerox.core.manager.architecture.models import (
     TrackCupInfo,
     VehicleInfo,
 )
-from rl_fzerox.core.manager.config import (
+from rl_fzerox.core.manager.run_spec import (
     ManagedStateComponentConfig,
     ObservationPreset,
     default_state_components,
 )
+from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 
 
 def run_manager_config_metadata() -> RunManagerConfigMetadata:

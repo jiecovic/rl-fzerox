@@ -4,12 +4,8 @@ import pytest
 from gymnasium.spaces import Box, Dict, MultiDiscrete
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.config.schema import ActionConfig
 from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_RIGHT_MASK,
+    RACE_CONTROL_MASKS,
     ConfiguredDiscreteActionAdapter,
     ConfiguredHybridActionAdapter,
     ResettableActionAdapter,
@@ -20,6 +16,7 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
     continuous_drive_gas_level,
     requested_gas_level,
 )
+from rl_fzerox.core.runtime_spec.schema import ActionConfig
 from tests.support.action_configs import (
     configured_discrete_action,
     configured_hybrid_action,
@@ -75,11 +72,11 @@ def test_configured_discrete_gas_air_brake_layout_decodes_buttons() -> None:
     air_brake_state = adapter.decode(np.array([3, 0, 1], dtype=np.int64))
 
     assert accelerate_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate,
         left_stick_x=0.0,
     )
     assert air_brake_state == ControllerState(
-        joypad_mask=AIR_BRAKE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.air_brake,
         left_stick_x=0.0,
     )
 
@@ -109,7 +106,10 @@ def test_configured_discrete_full_button_layout_decodes_parallel_buttons() -> No
     control_state = adapter.decode(np.array([0, 1, 1, 1, 2], dtype=np.int64))
 
     assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate
+        | RACE_CONTROL_MASKS.air_brake
+        | RACE_CONTROL_MASKS.boost
+        | RACE_CONTROL_MASKS.lean_right,
         left_stick_x=-1.0,
     )
 
@@ -182,7 +182,9 @@ def test_configured_hybrid_steer_gas_boost_lean_decodes_discrete_buttons() -> No
     )
 
     assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate
+        | RACE_CONTROL_MASKS.boost
+        | RACE_CONTROL_MASKS.lean_right,
         left_stick_x=-0.75,
     )
 
@@ -239,7 +241,7 @@ def test_action_drive_axis_is_none_when_layout_has_no_drive_axis() -> None:
 
 def test_requested_gas_level_uses_discrete_accelerate_when_no_drive_axis_exists() -> None:
     gas_level = requested_gas_level(
-        control_state=ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_y=0.6),
+        control_state=ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate, left_stick_y=0.6),
         drive_axis=None,
         continuous_drive_deadzone=0.05,
         continuous_drive_full_threshold=0.85,
@@ -268,7 +270,7 @@ def test_configured_hybrid_decodes_continuous_air_brake_lane() -> None:
     )
 
     assert control_state == ControllerState(
-        joypad_mask=AIR_BRAKE_MASK | BOOST_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.air_brake | RACE_CONTROL_MASKS.boost,
         left_stick_x=0.25,
     )
 
@@ -310,7 +312,7 @@ def test_configured_hybrid_steer_drive_decodes_accelerate_and_coast() -> None:
     )
 
     assert accelerate_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate,
         left_stick_x=0.5,
     )
     assert coast_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
@@ -365,9 +367,13 @@ def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
     ]
 
     assert coast_mask == 0
-    assert partial_masks == [0, 0, 0, ACCELERATE_MASK]
-    assert mid_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
-    assert full_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
+    assert partial_masks == [0, 0, 0, RACE_CONTROL_MASKS.accelerate]
+    assert mid_masks == [0, RACE_CONTROL_MASKS.accelerate, 0, RACE_CONTROL_MASKS.accelerate]
+    assert full_masks == [
+        RACE_CONTROL_MASKS.accelerate,
+        RACE_CONTROL_MASKS.accelerate,
+        RACE_CONTROL_MASKS.accelerate,
+    ]
 
 
 def test_continuous_drive_curve_supports_deadzone_and_full_zone() -> None:
@@ -435,6 +441,6 @@ def test_configured_hybrid_can_force_full_thrust() -> None:
     )
 
     assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate,
         left_stick_x=-0.5,
     )

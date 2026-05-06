@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/app.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import (
     SpeedKeyRepeat,
     ViewerInput,

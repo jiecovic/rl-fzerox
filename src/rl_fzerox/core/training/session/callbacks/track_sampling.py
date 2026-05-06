@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
 
 
 @dataclass(frozen=True, slots=True)

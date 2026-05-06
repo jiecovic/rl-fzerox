@@ -20,7 +20,7 @@ from rl_fzerox.core.manager.registry.common import (
     run_command,
     run_status,
 )
-from rl_fzerox.core.manager.serialization import load_config_json
+from rl_fzerox.core.manager.storage.serialization import load_config_json
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/track_baselines.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     TrackConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,

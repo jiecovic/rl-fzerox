@@ -24,7 +24,7 @@ from fzerox_emulator.frames import (
 )
 from fzerox_emulator.repeat import RepeatStepConfig, run_repeat_step, run_repeat_watch_step
 from fzerox_emulator.video import display_size
-from rl_fzerox.core.config.renderers import DEFAULT_RENDERER, RendererName
+from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
 
 class Emulator:

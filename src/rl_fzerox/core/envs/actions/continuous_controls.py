@@ -9,9 +9,8 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
-from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
-from rl_fzerox.core.envs.actions.buttons import ACCELERATE_MASK
+from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 
 
 class ContinuousDriveDecoder:
@@ -54,7 +53,7 @@ class ContinuousDriveDecoder:
             return 0
 
         self._pwm_phase -= 1.0
-        return ACCELERATE_MASK
+        return RACE_CONTROL_MASKS.accelerate
 
 
 class ContinuousButtonPwmDecoder:
@@ -210,7 +209,7 @@ def requested_gas_level(
             full_threshold=continuous_drive_full_threshold,
             min_thrust=continuous_drive_min_thrust,
         )
-    return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
+    return 1.0 if control_state.joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
 
 
 def action_drive_axis(
@@ -228,7 +227,7 @@ def action_drive_axis(
     if isinstance(action_space, spaces.Dict):
         if not isinstance(action, Mapping):
             return None
-        source = action.get(HYBRID_CONTINUOUS_ACTION_KEY)
+        source = action.get("continuous")
     elif isinstance(action_space, spaces.Box):
         source = action
     else:

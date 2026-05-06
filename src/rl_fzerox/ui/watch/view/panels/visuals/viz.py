@@ -7,15 +7,7 @@ import numpy as np
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import Float32Array
-from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-    ActionValue,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import (
     ActionMaskBranches,
     action_branch_non_neutral_allowed,
@@ -78,7 +70,7 @@ def _control_viz(
     if (
         air_brake_axis is None
         and continuous_air_brake_mode != "off"
-        and joypad_mask & AIR_BRAKE_MASK
+        and joypad_mask & RACE_CONTROL_MASKS.air_brake
     ):
         air_brake_axis = 1.0
     selected_branches = _selected_policy_branches(
@@ -88,11 +80,15 @@ def _control_viz(
     boost_pressed = _branch_pressed(
         selected_branches,
         "boost",
-        fallback=bool(joypad_mask & BOOST_MASK),
+        fallback=bool(joypad_mask & RACE_CONTROL_MASKS.boost),
     )
     lean_direction = _lean_direction(
         selected_branches,
-        fallback=-1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0,
+        fallback=-1
+        if joypad_mask & RACE_CONTROL_MASKS.lean_left
+        else 1
+        if joypad_mask & RACE_CONTROL_MASKS.lean_right
+        else 0,
     )
     normalized_boost_lamp_level = max(
         0.0,
@@ -190,7 +186,7 @@ def _displayed_gas_level(
         return 1.0
     if continuous_drive_enabled:
         return max(0.0, min(1.0, gas_level))
-    return 1.0 if joypad_mask & ACCELERATE_MASK else 0.0
+    return 1.0 if joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
 
 
 def _selected_policy_branches(
@@ -276,9 +272,7 @@ def _continuous_action_values(
     if policy_action is None or axis_index is None or not continuous_air_brake_enabled:
         return None
     source = (
-        policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
-        if isinstance(policy_action, Mapping)
-        else policy_action
+        policy_action.get("continuous") if isinstance(policy_action, Mapping) else policy_action
     )
     action = np.asarray(source)
     if not np.issubdtype(action.dtype, np.floating):

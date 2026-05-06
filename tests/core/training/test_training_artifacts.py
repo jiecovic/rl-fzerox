@@ -8,7 +8,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pytest import MonkeyPatch, raises
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CurriculumConfig,
     CurriculumStageConfig,
@@ -267,10 +267,9 @@ def test_save_train_run_config_persists_configured_action_layout_without_runtime
         env=EnvConfig(
             action=ActionConfig.model_validate(
                 {
-                    "name": "configured_hybrid",
                     "layout_continuous_axes": ["steer"],
                     "layout_discrete_axes": ["gas", "boost", "lean"],
-                    "configured_mask_overrides": {
+                    "mask": {
                         "gas": [0, 1],
                         "boost": [0],
                         "lean": [0, 1, 2],
@@ -296,9 +295,15 @@ def test_save_train_run_config_persists_configured_action_layout_without_runtime
     assert isinstance(env_data, dict)
     action_data = env_data["action"]
     assert isinstance(action_data, dict)
-    assert action_data["name"] == "configured_hybrid"
+    assert "name" not in action_data
     assert action_data["layout_continuous_axes"] == ["steer"]
     assert action_data["layout_discrete_axes"] == ["gas", "boost", "lean"]
+    assert action_data["mask"] == {
+        "gas": [0, 1],
+        "boost": [0],
+        "lean": [0, 1, 2],
+    }
+    assert "configured_mask_overrides" not in action_data
     assert "boost_decision_interval_frames" not in action_data
     assert "boost_request_lockout_frames" not in action_data
 

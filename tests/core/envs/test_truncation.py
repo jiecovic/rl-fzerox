@@ -4,8 +4,8 @@ import pytest
 
 from fzerox_emulator import ResetState
 from fzerox_emulator.arrays import Int64Array
-from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )

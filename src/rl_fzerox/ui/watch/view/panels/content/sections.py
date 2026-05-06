@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.view.panels.content.game import (
     game_detail_section,
     game_overview_section,

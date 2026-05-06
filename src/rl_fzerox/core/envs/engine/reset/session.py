@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import sync_race_intro_target
-from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
 
 from ..info import (
     backend_step_info,

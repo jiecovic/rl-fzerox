@@ -5,16 +5,14 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.apps._cli import normalize_hydra_overrides
+from rl_fzerox.apps._cli import normalize_cli_overrides
 from rl_fzerox.apps.watch_cli.delta import (
     apply_watch_config_delta,
-    watch_config_delta,
     watch_config_delta_from_dotlist,
 )
-from rl_fzerox.core.config import load_watch_app_config
-from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.manager import ManagerStore, default_manager_db_path
 from rl_fzerox.core.manager.training import build_managed_train_app_config
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
     continue_run_paths,
@@ -26,18 +24,15 @@ from rl_fzerox.core.training.runs import (
 
 def resolve_watch_app_config(
     *,
-    config_path: Path | None,
     policy_run_dir: Path | None,
     policy_artifact: Literal["latest", "best", "final"] | None,
     manager_db_path: Path | None,
     managed_run_id: str | None,
     overrides: Sequence[str],
 ) -> WatchAppConfig:
-    """Resolve watch config with the same precedence used by the watch CLI."""
+    """Resolve watch config from the canonical managed or saved-run surfaces."""
 
-    normalized_overrides = normalize_hydra_overrides(overrides)
-    if config_path is not None and managed_run_id is not None:
-        raise ValueError("--config cannot be combined with --managed-run-id")
+    normalized_overrides = normalize_cli_overrides(overrides)
     if policy_run_dir is not None and managed_run_id is not None:
         raise ValueError("--run-dir cannot be combined with --managed-run-id")
     cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
@@ -48,47 +43,30 @@ def resolve_watch_app_config(
     )
     cli_override_delta: dict[str, object] = {}
     train_config: TrainAppConfig | None = None
-    if config_path is None:
-        if cli_run_dir is None and managed_run_id is None:
-            raise ValueError(
-                "--config is required unless --run-dir or --managed-run-id is provided"
-            )
-        if normalized_overrides:
-            cli_override_delta = watch_config_delta_from_dotlist(normalized_overrides)
-        if managed_run_id is not None:
-            cli_run_dir, train_config = _managed_watch_train_config(
-                db_path=resolved_manager_db_path,
-                run_id=managed_run_id,
-            )
-        elif cli_run_dir is not None:
-            train_config = load_train_run_config_for_watch(cli_run_dir)
-        else:
-            raise ValueError("watch config resolution requires a run directory")
-        config = default_watch_config_from_train_run(
-            train_config,
-            run_dir=cli_run_dir,
-            artifact=policy_artifact or "latest",
+    if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
+        raise ValueError("--artifact requires --run-dir or --managed-run-id")
+    if cli_run_dir is None and managed_run_id is None:
+        raise ValueError("--run-dir or --managed-run-id is required")
+    if normalized_overrides:
+        cli_override_delta = watch_config_delta_from_dotlist(normalized_overrides)
+    if managed_run_id is not None:
+        cli_run_dir, train_config = _managed_watch_train_config(
+            db_path=resolved_manager_db_path,
+            run_id=managed_run_id,
         )
+    elif cli_run_dir is not None:
+        train_config = load_train_run_config_for_watch(cli_run_dir)
     else:
-        config = load_watch_app_config(config_path)
-        if normalized_overrides:
-            overridden_config = load_watch_app_config(
-                config_path,
-                overrides=normalized_overrides,
-            )
-            cli_override_delta = watch_config_delta(
-                config,
-                overridden_config,
-                normalized_overrides,
-            )
+        raise ValueError("watch config resolution requires a run directory")
+    config = default_watch_config_from_train_run(
+        train_config,
+        run_dir=cli_run_dir,
+        artifact=policy_artifact or "latest",
+    )
 
     resolved_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
-    if cli_run_dir is None and cli_override_delta:
-        resolved_run_dir = apply_watch_config_delta(config, cli_override_delta).watch.policy_run_dir
     if policy_artifact is not None and resolved_run_dir is None:
-        raise ValueError(
-            "--artifact requires --run-dir, --managed-run-id, or watch.policy_run_dir in the config"
-        )
+        raise ValueError("--artifact requires --run-dir or --managed-run-id")
     if resolved_run_dir is not None:
         resolved_train_config = train_config or load_train_run_config_for_watch(resolved_run_dir)
         config = apply_train_run_to_watch_config(
@@ -139,6 +117,8 @@ def default_watch_config_from_train_run(
 
 
 def _managed_watch_train_config(*, db_path: Path, run_id: str) -> tuple[Path, TrainAppConfig]:
+    """Resolve one manager-owned run into a materialized runtime training config."""
+
     store = ManagerStore(db_path)
     run = store.get_run(run_id)
     if run is None:

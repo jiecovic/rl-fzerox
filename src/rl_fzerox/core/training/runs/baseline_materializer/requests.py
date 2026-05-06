@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/requests.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import TrackConfig, TrackSamplingEntryConfig
+from rl_fzerox.core.runtime_spec.schema import TrackConfig, TrackSamplingEntryConfig
 
 from .models import BaselineRequest
 

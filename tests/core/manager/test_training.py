@@ -30,7 +30,7 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
     assert train_config.reward.suspend_progress_while_outside_track_bounds is True
     assert train_config.train.explicit_run_dir == tmp_path / "runs" / "bridge-default_0001"
     assert train_config.emulator.renderer == "gliden64"
-    assert train_config.env.action.name == "configured_hybrid"
+    assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.mask_air_brake_on_ground is False
     assert train_config.env.action.layout_continuous_axes == ("steer",)
     assert train_config.env.action.layout_discrete_axes == (
@@ -64,7 +64,7 @@ def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     )
 
     assert train_config.train.algorithm == "maskable_hybrid_recurrent_ppo"
-    assert train_config.env.action.name == "configured_hybrid"
+    assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.force_full_throttle is True
     assert train_config.env.action.layout_continuous_axes == ("drive", "pitch")
     assert train_config.env.action.layout_discrete_axes == ("steer", "lean")
@@ -102,7 +102,7 @@ def test_manager_training_bridge_supports_continuous_air_brake_lane(
         run_dir=tmp_path / "runs" / "bridge-air-brake-pwm_0001",
     )
 
-    assert train_config.env.action.name == "configured_hybrid"
+    assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.layout_continuous_axes == ("steer", "air_brake")
     assert train_config.env.action.layout_discrete_axes == ("gas", "boost", "lean", "pitch")
     assert train_config.env.action.continuous_air_brake_deadzone == pytest.approx(0.2)
@@ -200,7 +200,7 @@ def test_manager_training_bridge_switches_to_discrete_ppo_when_no_continuous_axe
     )
 
     assert train_config.train.algorithm == "maskable_ppo"
-    assert train_config.env.action.name == "configured_discrete"
+    assert train_config.env.action.runtime().name == "configured_discrete"
     assert train_config.env.action.layout_continuous_axes == ()
     assert train_config.env.action.layout_discrete_axes == (
         "steer",
@@ -278,7 +278,7 @@ def test_manager_training_bridge_supports_weight_fork_from_parent_run(
     assert train_config.train.explicit_run_dir == run_dir
     assert train_config.train.continue_run_dir is None
     assert train_config.train.resume_run_dir == source_run_dir
-    assert train_config.train.resume_source_algorithm == train_config.train.algorithm
+    assert train_config.train.resume_source_algorithm is None
     assert train_config.train.resume_artifact == "best"
     assert train_config.train.resume_mode == "weights_only"
     assert train_config.train.tensorboard_step_offset == 816_040
@@ -300,7 +300,7 @@ def test_manager_training_bridge_preserves_tensorboard_offset_for_full_resume(
     assert train_config.train.explicit_run_dir == run_dir
     assert train_config.train.continue_run_dir == run_dir
     assert train_config.train.resume_run_dir == run_dir
-    assert train_config.train.resume_source_algorithm == train_config.train.algorithm
+    assert train_config.train.resume_source_algorithm is None
     assert train_config.train.resume_mode == "full_model"
     assert train_config.train.tensorboard_step_offset == 816_040
 

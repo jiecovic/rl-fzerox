@@ -4,7 +4,12 @@ from pathlib import Path
 import numpy as np
 
 from fzerox_emulator.arrays import Float32Array, UInt8Array
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs.observations import (
+    ImageStateObservation,
+    observation_state,
+    state_feature_names,
+)
+from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CurriculumConfig,
     CurriculumStageConfig,
@@ -19,11 +24,6 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     TrainConfig,
     WatchAppConfig,
-)
-from rl_fzerox.core.envs.observations import (
-    ImageStateObservation,
-    observation_state,
-    state_feature_names,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,

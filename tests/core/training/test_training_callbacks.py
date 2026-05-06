@@ -6,7 +6,8 @@ from pathlib import Path
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
     CurriculumConfig,
@@ -14,7 +15,6 @@ from rl_fzerox.core.config.schema import (
     PolicyConfig,
     TrainConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import list_recent_checkpoint_dirs
 from rl_fzerox.core.training.session.callbacks import build_callbacks
@@ -39,22 +39,6 @@ def test_resolve_checkpoint_policy_prefers_rollout_interval_for_ppo() -> None:
     assert policy.step_interval is None
     assert policy.save_recent is True
     assert policy.recent_limit == 3
-
-
-def test_resolve_checkpoint_policy_falls_back_to_step_interval_for_sac() -> None:
-    policy = resolve_checkpoint_policy(
-        TrainConfig(
-            algorithm="hybrid_action_sac",
-            checkpoint_every_rollouts=4,
-            num_envs=10,
-            save_freq=1_000,
-        )
-    )
-
-    assert policy.rollout_interval is None
-    assert policy.step_interval == 100
-
-
 def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)

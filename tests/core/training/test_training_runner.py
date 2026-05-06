@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
+from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
     CurriculumConfig,
@@ -24,8 +26,6 @@ from rl_fzerox.core.config.schema import (
     TrainAppConfig,
     TrainConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.training import runner
 from rl_fzerox.core.training.runs import RUN_LAYOUT, build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (

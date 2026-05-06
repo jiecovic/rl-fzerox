@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
     TrackSamplingConfig,

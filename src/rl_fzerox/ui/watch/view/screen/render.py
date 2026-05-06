@@ -1,7 +1,9 @@
 # src/rl_fzerox/ui/watch/view/screen/render.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import observations as observation_access
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.runtime_spec.schema import (
     ActionRuntimeConfig,
     CurriculumStageConfig,
     TrackConfig,
@@ -9,8 +11,6 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.envs import observations as observation_access
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
@@ -319,8 +319,11 @@ def _observation_state_feature_names(
         return tuple(names)
     if config.env.observation.mode != "image_state":
         return ()
+    state_components = config.env.observation.state_components_data()
+    if state_components is None:
+        return ()
     return observation_access.state_feature_names(
-        state_components=config.env.observation.state_components_data(),
+        state_components=state_components,
         independent_lean_buttons=config.env.action.independent_lean_buttons,
     )
 

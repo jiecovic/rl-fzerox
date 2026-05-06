@@ -1296,7 +1296,6 @@
       ]
     },
     "train": {
-      "algorithm": "maskable_hybrid_recurrent_ppo",
       "batch_size": 1024,
       "checkpoint_every_rollouts": 5,
       "clip_range": 0.19,

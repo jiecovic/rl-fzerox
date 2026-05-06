@@ -1,6 +1,6 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.envs.actions import ACCELERATE_MASK
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.rendering.draw import _record_tab_sections
 from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
@@ -894,7 +894,7 @@ def test_signed_boost_timer_lights_generic_boost_pill() -> None:
 
 def test_control_viz_snaps_discrete_gas_to_button_state() -> None:
     viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate),
         gas_level=0.37,
         continuous_drive_enabled=False,
         force_full_throttle=False,

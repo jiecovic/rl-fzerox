@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rl_fzerox.core.config.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 
 @dataclass(frozen=True, slots=True)

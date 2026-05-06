@@ -2,7 +2,6 @@
 from dataclasses import fields
 from typing import Any, TypeVar
 
-from rl_fzerox.core.config.schema import RewardConfig
 from rl_fzerox.core.envs.rewards.common import (
     RewardActionContext,
     RewardStep,
@@ -11,6 +10,7 @@ from rl_fzerox.core.envs.rewards.common import (
 )
 from rl_fzerox.core.envs.rewards.race_v3 import RaceV3RewardTracker, RaceV3RewardWeights
 from rl_fzerox.core.envs.rewards.reward_main import RewardMainTracker, RewardMainWeights
+from rl_fzerox.core.runtime_spec.schema import RewardConfig
 
 DEFAULT_REWARD_NAME = "race_v3"
 CANONICAL_REWARD_NAME = "reward_main"

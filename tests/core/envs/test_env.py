@@ -9,17 +9,14 @@ from fzerox_emulator import (
     ControllerState,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.core.envs.observations import ObservationStackMode
+from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     ObservationConfig,
     RewardConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-)
-from rl_fzerox.core.envs.observations import ObservationStackMode
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -65,7 +62,7 @@ def test_step_advances_backend_by_action_repeat():
     assert backend.capture_video_flags == [False, False, True]
     assert info["repeat_index"] == 2
     assert backend.last_controller_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.accelerate,
         left_stick_x=0.0,
     )
 
@@ -175,7 +172,7 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
             "discrete": np.array([], dtype=np.int64),
         }
     )
-    assert backend.last_controller_state.joypad_mask == ACCELERATE_MASK
+    assert backend.last_controller_state.joypad_mask == RACE_CONTROL_MASKS.accelerate
 
     env.reset(seed=8)
     env.step(
@@ -628,7 +625,7 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
-    air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
+    air_brake_state = ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake)
 
     env.reset(seed=21)
     assert (
@@ -681,7 +678,7 @@ def test_step_control_keeps_ground_air_brake_when_configured() -> None:
             damage_taken_streak_ramp_penalty=0.0,
         ),
     )
-    air_brake_state = ControllerState(joypad_mask=AIR_BRAKE_MASK)
+    air_brake_state = ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake)
 
     env.reset(seed=21)
     _, reward, _, _, info = env.step_control(air_brake_state)
@@ -739,7 +736,7 @@ def test_step_suppresses_air_only_controls_until_airborne() -> None:
     env.step(airborne_action)
 
     assert backend.last_controller_state == ControllerState(
-        joypad_mask=AIR_BRAKE_MASK,
+        joypad_mask=RACE_CONTROL_MASKS.air_brake,
         left_stick_y=1.0,
     )
 
@@ -777,7 +774,7 @@ def test_step_forces_accelerate_when_min_thrust_is_full() -> None:
         }
     )
 
-    assert backend.last_controller_state.joypad_mask & ACCELERATE_MASK
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.accelerate
     assert reward == 0.0
     assert "reward_breakdown" not in info
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 from fzerox_emulator import Emulator
 from rl_fzerox.core.boot import boot_into_first_race
-from rl_fzerox.core.config.renderers import DEFAULT_RENDERER, KNOWN_RENDERERS
+from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, KNOWN_RENDERERS
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:

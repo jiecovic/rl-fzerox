@@ -6,26 +6,26 @@ from collections.abc import Sequence
 from pathlib import Path
 
 
+def require_policy_run_locator(*, policy_run_dir: Path | None, managed_run_id: str | None) -> None:
+    """Reject ambiguous or missing policy sources before runtime config resolution."""
+
+    if policy_run_dir is not None and managed_run_id is not None:
+        raise SystemExit("--run-dir cannot be combined with --managed-run-id")
+    if policy_run_dir is None and managed_run_id is None:
+        raise SystemExit("--run-dir or --managed-run-id is required")
+
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI arguments for the watch app."""
 
     parser = argparse.ArgumentParser(
-        description="Watch the F-Zero X environment from a Hydra-composed YAML config.",
+        description="Watch the F-Zero X environment from a managed run or run directory.",
         allow_abbrev=False,
-    )
-    parser.add_argument(
-        "-c",
-        "--config",
-        "--config-file",
-        dest="config_path",
-        type=Path,
-        default=None,
-        help="Path to a watch config YAML file.",
     )
     parser.add_argument(
         "overrides",
         nargs=argparse.REMAINDER,
-        help="Hydra overrides. Use `-- key=value` to separate them from CLI flags.",
+        help="Watch overrides. Use `-- key=value` to separate them from CLI flags.",
     )
     parser.add_argument(
         "--run-dir",
@@ -56,4 +56,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional run-manager run id to resolve watch config from SQLite.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if (
+        args.policy_artifact is not None
+        and args.policy_run_dir is None
+        and args.managed_run_id is None
+    ):
+        raise SystemExit("--artifact requires --run-dir or --managed-run-id")
+    require_policy_run_locator(
+        policy_run_dir=args.policy_run_dir,
+        managed_run_id=args.managed_run_id,
+    )
+    return args

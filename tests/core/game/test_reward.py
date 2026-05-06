@@ -6,7 +6,6 @@ from dataclasses import fields
 import pytest
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
-from rl_fzerox.core.config.schema import RewardConfig, RewardCourseOverrideConfig
 from rl_fzerox.core.envs.rewards import (
     CANONICAL_REWARD_NAME,
     DEFAULT_REWARD_NAME,
@@ -17,6 +16,7 @@ from rl_fzerox.core.envs.rewards import (
     build_reward_tracker,
     reward_tracker_names,
 )
+from rl_fzerox.core.runtime_spec.schema import RewardConfig, RewardCourseOverrideConfig
 from tests.support.native_objects import encode_state_flags, make_step_summary, make_telemetry
 
 _COURSE_EFFECT_PIT = 1

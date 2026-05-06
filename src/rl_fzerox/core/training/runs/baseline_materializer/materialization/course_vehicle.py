@@ -7,9 +7,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fzerox_emulator.base import RaceStartMode
-from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.envs.engine.info import read_live_telemetry
 from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
     cache_write_lock,

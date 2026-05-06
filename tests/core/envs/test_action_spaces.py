@@ -1,12 +1,12 @@
 # tests/core/envs/test_action_spaces.py
 from gymnasium.spaces import Box, Dict, MultiDiscrete
 
-from rl_fzerox.core.config.schema import ActionMaskConfig, EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.engine.controls import (
     action_branch_non_neutral_allowed,
     action_branch_value_allowed,
 )
+from rl_fzerox.core.runtime_spec.schema import ActionMaskConfig, EnvConfig
 from tests.support.action_configs import (
     configured_discrete_action,
     configured_hybrid_action,

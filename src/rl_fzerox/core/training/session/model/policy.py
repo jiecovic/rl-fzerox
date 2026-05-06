@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.config.schema import PolicyConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig
 
 
 def resolve_policy_name(*, train_env: VecEnv, recurrent_enabled: bool) -> str:

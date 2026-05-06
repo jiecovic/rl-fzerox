@@ -1,0 +1,24 @@
+# src/rl_fzerox/core/runtime_spec/schema/common.py
+from __future__ import annotations
+
+from typing import Literal, TypeAlias
+
+from pydantic import PositiveFloat
+
+WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
+TrackSamplingMode: TypeAlias = Literal["random", "balanced", "step_balanced"]
+ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
+ObservationPresetName: TypeAlias = Literal[
+    "crop_84x116",
+    "crop_92x124",
+    "crop_116x164",
+    "crop_98x130",
+    "crop_66x82",
+    "crop_60x76",
+    "crop_68x68",
+    "crop_84x84",
+    "crop_76x100",
+    "crop_64x64",
+]
+ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
+ContinuousAirBrakeMode: TypeAlias = Literal["always", "disable_on_ground", "off"]
