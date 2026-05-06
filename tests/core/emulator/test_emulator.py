@@ -83,11 +83,19 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     emulator._observation_specs = {}
 
     class NativeStub:
-        def observation_spec(self, preset: str) -> dict[str, object]:
-            assert preset == "crop_84x116"
+        def observation_spec(
+            self,
+            preset: str,
+            *,
+            height: int | None = None,
+            width: int | None = None,
+        ) -> dict[str, object]:
+            assert preset == "crop_84x84"
+            assert height is None
+            assert width is None
             return {
                 "preset": preset,
-                "width": 116,
+                "width": 84,
                 "height": 84,
                 "channels": 3,
                 "display_width": 592,
@@ -97,7 +105,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         def step_repeat_raw(self, **kwargs: object):
             assert kwargs["action_repeat"] == 2
             assert kwargs["lean_timer_assist"] is False
-            observation = np.zeros((84, 116, 6), dtype=np.uint8)
+            observation = np.zeros((84, 84, 6), dtype=np.uint8)
             summary = make_step_summary(
                 frames_run=2,
                 max_race_distance=42.0,
@@ -122,7 +130,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     result = emulator.step_repeat_raw(
         controller_state=ControllerState(),
         action_repeat=2,
-        preset="crop_84x116",
+        preset="crop_84x84",
         frame_stack=2,
         stuck_min_speed_kph=50.0,
         energy_loss_epsilon=0.1,
@@ -132,7 +140,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
         terminate_on_energy_depleted=True,
     )
 
-    assert result.observation.shape == (84, 116, 6)
+    assert result.observation.shape == (84, 84, 6)
     assert result.summary.frames_run == 2
     assert result.summary.max_race_distance == 42.0
     assert result.summary.reverse_active_frames == 1
@@ -153,11 +161,19 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     emulator._observation_specs = {}
 
     class NativeStub:
-        def observation_spec(self, preset: str) -> dict[str, object]:
-            assert preset == "crop_84x116"
+        def observation_spec(
+            self,
+            preset: str,
+            *,
+            height: int | None = None,
+            width: int | None = None,
+        ) -> dict[str, object]:
+            assert preset == "crop_84x84"
+            assert height is None
+            assert width is None
             return {
                 "preset": preset,
-                "width": 116,
+                "width": 84,
                 "height": 84,
                 "channels": 3,
                 "display_width": 592,
@@ -166,7 +182,7 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
 
         def step_repeat_watch_raw(self, **kwargs: object):
             assert kwargs["action_repeat"] == 2
-            observation = np.zeros((84, 116, 6), dtype=np.uint8)
+            observation = np.zeros((84, 84, 6), dtype=np.uint8)
             display_frames = [
                 np.full((444, 592, 3), 1, dtype=np.uint8),
                 np.full((444, 592, 3), 2, dtype=np.uint8),
@@ -181,7 +197,7 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     result = emulator.step_repeat_watch_raw(
         controller_state=ControllerState(),
         action_repeat=2,
-        preset="crop_84x116",
+        preset="crop_84x84",
         frame_stack=2,
         stuck_min_speed_kph=50.0,
         energy_loss_epsilon=0.1,
@@ -191,7 +207,51 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
         terminate_on_energy_depleted=True,
     )
 
-    assert result.observation.shape == (84, 116, 6)
+    assert result.observation.shape == (84, 84, 6)
     assert len(result.display_frames) == 2
     assert result.display_frames[0].shape == (444, 592, 3)
     assert result.display_frames[1][0, 0, 0] == 2
+
+
+def test_render_observation_supports_custom_resolution() -> None:
+    emulator = object.__new__(Emulator)
+    emulator._observation_specs = {}
+
+    class NativeStub:
+        def observation_spec(
+            self,
+            preset: str,
+            *,
+            height: int | None = None,
+            width: int | None = None,
+        ) -> dict[str, object]:
+            assert preset == ""
+            assert height == 72
+            assert width == 96
+            return {
+                "preset": "custom_72x96",
+                "width": 96,
+                "height": 72,
+                "channels": 3,
+                "display_width": 592,
+                "display_height": 444,
+            }
+
+        def frame_observation(
+            self,
+            preset: str,
+            frame_stack: int,
+            options: dict[str, object] | None = None,
+        ) -> np.ndarray:
+            assert preset == ""
+            assert frame_stack == 2
+            assert options is not None
+            assert options["height"] == 72
+            assert options["width"] == 96
+            return np.zeros((72, 96, 6), dtype=np.uint8)
+
+    emulator.__dict__["_native"] = NativeStub()
+
+    frame = emulator.render_observation(height=72, width=96, frame_stack=2)
+
+    assert frame.shape == (72, 96, 6)

@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentName
-from rl_fzerox.core.manager.run_spec import ObservationPreset
+from rl_fzerox.core.domain.observation_image import ObservationPresetName
 
 
 class SelectOption(BaseModel):
@@ -17,8 +17,24 @@ class SelectOption(BaseModel):
 class ObservationPresetInfo(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    value: ObservationPreset
+    value: ObservationPresetName
     label: str
+    height: int
+    width: int
+
+
+class ObservationResolutionBounds(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    min_dimension: int
+    max_height: int
+    max_width: int
+
+
+class ObservationSourceGeometryInfo(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    renderer: str
     height: int
     width: int
 
@@ -83,6 +99,8 @@ class RunManagerConfigMetadata(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     observation_presets: tuple[ObservationPresetInfo, ...]
+    observation_resolution_bounds: ObservationResolutionBounds
+    observation_source_geometries: tuple[ObservationSourceGeometryInfo, ...]
     track_pool_modes: tuple[SelectOption, ...]
     race_modes: tuple[SelectOption, ...]
     track_sampling_modes: tuple[SelectOption, ...]

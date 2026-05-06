@@ -216,7 +216,6 @@ class EngineStepAssembler:
             return self.backend.step_repeat_watch_raw(
                 control_state,
                 action_repeat=request.action_repeat,
-                preset=self.config.observation.preset,
                 frame_stack=self.config.observation.frame_stack,
                 stack_mode=self.config.observation.stack_mode,
                 minimap_layer=self.config.observation.minimap_layer,
@@ -231,11 +230,11 @@ class EngineStepAssembler:
                 progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
                 terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
                 lean_timer_assist=lean_timer_assist,
+                **self.config.observation.native_resolution_kwargs(),
             )
         return self.backend.step_repeat_raw(
             control_state,
             action_repeat=request.action_repeat,
-            preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
@@ -248,6 +247,7 @@ class EngineStepAssembler:
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
+            **self.config.observation.native_resolution_kwargs(),
         )
 
 

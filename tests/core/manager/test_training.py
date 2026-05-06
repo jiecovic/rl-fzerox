@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from rl_fzerox.core.domain.observation_image import ObservationCustomResolution
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
@@ -168,6 +169,42 @@ def test_manager_training_bridge_supports_episode_state_feature_dropout(
     ) == (
         {"dropout_prob": 0.25, "feature_names": ("track_position.edge_ratio",)},
     )
+
+
+def test_manager_training_bridge_projects_custom_observation_resolution(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.observation.resolution_mode = "custom"
+    config.observation.custom_resolution = ObservationCustomResolution(height=72, width=96)
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-custom-resolution",
+        run_dir=tmp_path / "runs" / "bridge-custom-resolution_0001",
+    )
+
+    assert train_config.env.observation.resolution_mode == "custom"
+    assert train_config.env.observation.custom_resolution is not None
+    assert train_config.env.observation.custom_resolution.height == 72
+    assert train_config.env.observation.custom_resolution.width == 96
+
+
+def test_manager_training_bridge_rejects_auto_conv_profile_for_custom_resolution() -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.observation.resolution_mode = "custom"
+    config.observation.custom_resolution = ObservationCustomResolution(height=72, width=96)
+    config.policy.conv_profile = "auto"
+
+    with pytest.raises(
+        ValueError,
+        match="policy\\.conv_profile='auto' only supports named observation presets",
+    ):
+        build_managed_train_app_config(
+            config,
+            run_id="bridge-custom-resolution-auto-conv",
+            run_dir=Path("unused"),
+        )
 
 
 def test_manager_training_bridge_supports_multilayer_state_mlp(

@@ -42,7 +42,7 @@ class EngineObservationBuilder:
         backend: EmulatorBackend,
         config: EnvConfig,
     ) -> EngineObservationBuilder:
-        spec = backend.observation_spec(config.observation.preset)
+        spec = backend.observation_spec(**config.observation.native_resolution_kwargs())
         state_components = config.observation.state_components_data()
         independent_lean_buttons = config.action.independent_lean_buttons
         action_history_len, action_history_controls = action_history_settings_for_observation(
@@ -70,12 +70,12 @@ class EngineObservationBuilder:
 
     def render_image(self) -> ObservationFrame:
         return self.backend.render_observation(
-            preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
             resize_filter=self.config.observation.resize_filter,
             minimap_resize_filter=self.config.observation.minimap_resize_filter,
+            **self.config.observation.native_resolution_kwargs(),
         )
 
     def build_observation(

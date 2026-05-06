@@ -13,6 +13,7 @@ from fzerox_emulator import (
     stacked_observation_channels,
 )
 from fzerox_emulator.arrays import ObservationFrame
+from rl_fzerox.core.domain.observation_image import preset_geometry
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
 )
@@ -37,7 +38,9 @@ class ScriptedStepBackend(SyntheticBackend):
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -61,6 +64,8 @@ class ScriptedStepBackend(SyntheticBackend):
             lean_timer_assist,
             resize_filter,
             minimap_resize_filter,
+            height,
+            width,
         )
         self.set_controller_state(controller_state)
         self.last_lean_timer_assist = lean_timer_assist
@@ -79,7 +84,7 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         if result.observation.shape[2] != expected_channels:
             raise AssertionError("Scripted observation stack does not match frame_stack")
-        if preset != "crop_116x164":
+        if preset != "crop_60x76":
             raise AssertionError(f"Unexpected preset {preset!r}")
         return result
 
@@ -222,7 +227,8 @@ def backend_step_result(
     status: StepStatus | None = None,
 ) -> BackendStepResult:
     value = np.uint8(summary.final_frame_index % 255)
-    observation = np.full((116, 164, 12), value, dtype=np.uint8)
+    height, width = preset_geometry("crop_60x76")
+    observation = np.full((height, width, 12), value, dtype=np.uint8)
     return BackendStepResult(
         observation=observation,
         summary=summary,

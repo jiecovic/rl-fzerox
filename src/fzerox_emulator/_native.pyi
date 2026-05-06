@@ -12,11 +12,13 @@ class ObservationSpecDict(TypedDict):
     display_width: int
     display_height: int
 
-class FrameObservationOptionsDict(TypedDict):
+class FrameObservationOptionsDict(TypedDict, total=False):
     stack_mode: Literal["rgb", "gray", "luma_chroma"]
     minimap_layer: bool
     resize_filter: Literal["nearest", "bilinear"]
     minimap_resize_filter: Literal["nearest", "bilinear"]
+    height: int
+    width: int
 
 class VehicleSetupInfoDict(TypedDict):
     player_character_index_ram: int
@@ -348,6 +350,8 @@ class Emulator:
         left_stick_y: float = 0.0,
         right_stick_x: float = 0.0,
         right_stick_y: float = 0.0,
+        height: int | None = None,
+        width: int | None = None,
     ) -> tuple[npt.NDArray[np.uint8], StepSummary, StepStatus, FZeroXTelemetry]: ...
     def step_repeat_watch_raw(
         self,
@@ -370,6 +374,8 @@ class Emulator:
         left_stick_y: float = 0.0,
         right_stick_x: float = 0.0,
         right_stick_y: float = 0.0,
+        height: int | None = None,
+        width: int | None = None,
     ) -> tuple[
         npt.NDArray[np.uint8],
         list[npt.NDArray[np.uint8]],
@@ -390,14 +396,26 @@ class Emulator:
     def load_baseline_bytes(self, state: bytes) -> None: ...
     def capture_current_as_baseline(self, path: str | None = None) -> None: ...
     def frame_rgb(self) -> bytes: ...
-    def observation_spec(self, preset: str) -> ObservationSpecDict: ...
+    def observation_spec(
+        self,
+        preset: str,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpecDict: ...
     def frame_observation(
         self,
         preset: str,
         frame_stack: int,
         options: FrameObservationOptionsDict | None = None,
     ) -> npt.NDArray[np.uint8]: ...
-    def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
+    def frame_display(
+        self,
+        preset: str,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...
     def patch_time_attack_race_start_setup(
         self,

@@ -221,6 +221,23 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.image-observation-fieldset {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.image-observation-fieldset > .range-field {
+  grid-column: 1 / -1;
+}
+
+.custom-resolution-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .image-observation-grid > .range-field,
 .image-observation-grid > .boolean-field {
   grid-column: 1 / -1;

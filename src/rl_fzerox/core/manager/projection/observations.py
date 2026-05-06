@@ -11,7 +11,13 @@ from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 def build_observation_data(config: ManagedRunConfig) -> dict[str, object]:
     return {
         "mode": "image_state",
+        "resolution_mode": config.observation.resolution_mode,
         "preset": config.observation.preset,
+        "custom_resolution": (
+            None
+            if config.observation.custom_resolution is None
+            else config.observation.custom_resolution.model_dump(mode="python")
+        ),
         "frame_stack": config.observation.frame_stack,
         "stack_mode": config.observation.stack_mode,
         "minimap_layer": config.observation.minimap_layer,
@@ -84,7 +90,13 @@ def fork_observation_signature(train_config: TrainAppConfig) -> dict[str, object
     observation = train_config.env.observation
     return {
         "mode": observation.mode,
+        "resolution_mode": observation.resolution_mode,
         "preset": observation.preset,
+        "custom_resolution": (
+            None
+            if observation.custom_resolution is None
+            else observation.custom_resolution.model_dump(mode="python")
+        ),
         "frame_stack": observation.frame_stack,
         "stack_mode": observation.stack_mode,
         "minimap_layer": observation.minimap_layer,

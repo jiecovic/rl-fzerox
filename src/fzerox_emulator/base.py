@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal, Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias, TypedDict
 
 from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
@@ -31,7 +31,7 @@ class FrameStep:
 
 @dataclass(frozen=True)
 class ObservationSpec:
-    """Resolved native observation geometry for one preset."""
+    """Resolved native observation geometry for one image layout."""
 
     preset: str
     width: int
@@ -44,6 +44,34 @@ class ObservationSpec:
 ObservationStackMode: TypeAlias = Literal["rgb", "gray", "luma_chroma"]
 ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 RaceStartMode: TypeAlias = Literal["time_attack", "gp_race"]
+
+
+class FrameObservationOptions(TypedDict, total=False):
+    """Typed Python-side options passed into the native observation renderer."""
+
+    stack_mode: ObservationStackMode
+    minimap_layer: bool
+    resize_filter: ObservationResizeFilter
+    minimap_resize_filter: ObservationResizeFilter
+    height: int
+    width: int
+
+
+def normalize_observation_resolution(
+    *,
+    preset: str | None = None,
+    height: int | None = None,
+    width: int | None = None,
+) -> tuple[str | None, int | None, int | None]:
+    """Return one validated preset-or-custom resolution triple."""
+
+    if preset is not None:
+        if height is not None or width is not None:
+            raise ValueError("preset cannot be combined with custom observation height/width")
+        return preset, None, None
+    if height is None or width is None:
+        raise ValueError("custom observation height and width must both be set")
+    return None, int(height), int(width)
 
 
 def stacked_observation_channels(
@@ -115,7 +143,9 @@ class EmulatorBackend(Protocol):
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -135,7 +165,9 @@ class EmulatorBackend(Protocol):
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -219,14 +251,28 @@ class EmulatorBackend(Protocol):
 
     def render(self) -> RgbFrame: ...
 
-    def observation_spec(self, preset: str) -> ObservationSpec: ...
+    def observation_spec(
+        self,
+        preset: str | None = None,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpec: ...
 
-    def render_display(self, *, preset: str) -> RgbFrame: ...
+    def render_display(
+        self,
+        *,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> RgbFrame: ...
 
     def render_observation(
         self,
         *,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,

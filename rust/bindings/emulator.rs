@@ -3,12 +3,14 @@
 
 use std::path::Path;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 
 use crate::bindings::error::map_core_error;
 use crate::core::error::CoreError;
 use crate::core::host::Host;
+use crate::core::observation::{ObservationLayout, ObservationPreset};
 use crate::core::video::VideoResizeFilter;
 
 mod frame;
@@ -27,6 +29,8 @@ struct FrameObservationOptions {
     minimap_layer: bool,
     resize_filter: String,
     minimap_resize_filter: String,
+    height: Option<usize>,
+    width: Option<usize>,
 }
 
 impl Default for FrameObservationOptions {
@@ -36,6 +40,8 @@ impl Default for FrameObservationOptions {
             minimap_layer: false,
             resize_filter: "nearest".to_owned(),
             minimap_resize_filter: "nearest".to_owned(),
+            height: None,
+            width: None,
         }
     }
 }
@@ -59,8 +65,38 @@ impl FrameObservationOptions {
         if let Some(value) = options.get_item("minimap_resize_filter")? {
             parsed.minimap_resize_filter = value.extract()?;
         }
+        if let Some(value) = options.get_item("height")? {
+            parsed.height = Some(value.extract()?);
+        }
+        if let Some(value) = options.get_item("width")? {
+            parsed.width = Some(value.extract()?);
+        }
         Ok(parsed)
     }
+}
+
+fn parse_observation_layout(
+    preset: &str,
+    height: Option<usize>,
+    width: Option<usize>,
+) -> PyResult<ObservationLayout> {
+    if preset.is_empty() {
+        let resolved_height = height.ok_or_else(|| {
+            PyValueError::new_err("custom observation height must be set when preset is empty")
+        })?;
+        let resolved_width = width.ok_or_else(|| {
+            PyValueError::new_err("custom observation width must be set when preset is empty")
+        })?;
+        return Ok(ObservationLayout::custom(resolved_height, resolved_width));
+    }
+    if height.is_some() || width.is_some() {
+        return Err(PyValueError::new_err(
+            "custom observation height/width cannot be combined with a preset name",
+        ));
+    }
+    ObservationPreset::parse(preset)
+        .map(ObservationLayout::Preset)
+        .map_err(map_core_error)
 }
 
 /// Python-facing wrapper around one native `Host` instance.
@@ -160,6 +196,8 @@ impl PyEmulator {
         left_stick_y=0.0,
         right_stick_x=0.0,
         right_stick_y=0.0,
+        height=None,
+        width=None,
     ))]
     #[expect(
         clippy::too_many_arguments,
@@ -187,6 +225,8 @@ impl PyEmulator {
         left_stick_y: f32,
         right_stick_x: f32,
         right_stick_y: f32,
+        height: Option<usize>,
+        width: Option<usize>,
     ) -> PyResult<Bound<'py, PyTuple>> {
         methods::repeat::step_repeat_raw(
             self,
@@ -206,6 +246,8 @@ impl PyEmulator {
                 minimap_layer,
                 resize_filter,
                 minimap_resize_filter,
+                height,
+                width,
                 joypad_mask,
                 left_stick_x,
                 left_stick_y,
@@ -235,6 +277,8 @@ impl PyEmulator {
         left_stick_y=0.0,
         right_stick_x=0.0,
         right_stick_y=0.0,
+        height=None,
+        width=None,
     ))]
     #[expect(
         clippy::too_many_arguments,
@@ -262,6 +306,8 @@ impl PyEmulator {
         left_stick_y: f32,
         right_stick_x: f32,
         right_stick_y: f32,
+        height: Option<usize>,
+        width: Option<usize>,
     ) -> PyResult<Bound<'py, PyTuple>> {
         methods::repeat::step_repeat_watch_raw(
             self,
@@ -281,6 +327,8 @@ impl PyEmulator {
                 minimap_layer,
                 resize_filter,
                 minimap_resize_filter,
+                height,
+                width,
                 joypad_mask,
                 left_stick_x,
                 left_stick_y,
@@ -338,12 +386,15 @@ impl PyEmulator {
         methods::frame::frame_rgb(self, py)
     }
 
+    #[pyo3(signature = (preset, *, height=None, width=None))]
     fn observation_spec<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
+        height: Option<usize>,
+        width: Option<usize>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        methods::frame::observation_spec(self, py, preset)
+        methods::frame::observation_spec(self, py, preset, height, width)
     }
 
     #[pyo3(signature = (preset, frame_stack, options=None))]
@@ -357,9 +408,15 @@ impl PyEmulator {
         methods::frame::frame_observation(self, py, preset, frame_stack, options)
     }
 
-    #[pyo3(signature = (preset))]
-    fn frame_display<'py>(&mut self, py: Python<'py>, preset: &str) -> PyResult<Bound<'py, PyAny>> {
-        methods::frame::frame_display(self, py, preset)
+    #[pyo3(signature = (preset, *, height=None, width=None))]
+    fn frame_display<'py>(
+        &mut self,
+        py: Python<'py>,
+        preset: &str,
+        height: Option<usize>,
+        width: Option<usize>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        methods::frame::frame_display(self, py, preset, height, width)
     }
 
     fn telemetry(&mut self, py: Python<'_>) -> PyResult<Py<PyTelemetry>> {

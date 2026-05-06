@@ -27,7 +27,7 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
       />
       <SummaryItem
         label="Observation"
-        value={`${config.observation.preset} · ${config.observation.stack_mode} x${config.observation.frame_stack}${config.observation.minimap_layer ? " · minimap" : ""}`}
+        value={`${displayObservationResolution(config)} · ${config.observation.stack_mode} x${config.observation.frame_stack}${config.observation.minimap_layer ? " · minimap" : ""}`}
       />
       <SummaryItem
         label="Policy"
@@ -79,6 +79,16 @@ function displayEnvironmentSummary(config: ManagedRunConfig) {
       ? "stall off"
       : `stall ${stallLimit.toLocaleString()}f @ ε${config.environment.progress_frontier_epsilon.toLocaleString()}`;
   return `${config.environment.max_episode_steps.toLocaleString()} frames · ${stallSummary}`;
+}
+
+function displayObservationResolution(config: ManagedRunConfig) {
+  if (
+    config.observation.resolution_mode === "custom" &&
+    config.observation.custom_resolution !== null
+  ) {
+    return `${config.observation.custom_resolution.height} x ${config.observation.custom_resolution.width}`;
+  }
+  return config.observation.preset;
 }
 
 function displayAuxiliarySummary(config: ManagedRunConfig) {

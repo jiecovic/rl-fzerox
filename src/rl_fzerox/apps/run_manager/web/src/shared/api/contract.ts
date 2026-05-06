@@ -3,18 +3,8 @@ import { z } from "zod";
 
 const runStatusSchema = z.enum(["created", "running", "paused", "stopped", "finished", "failed"]);
 const runCommandSchema = z.enum(["pause", "stop"]);
-const observationPresetSchema = z.enum([
-  "crop_84x116",
-  "crop_92x124",
-  "crop_116x164",
-  "crop_98x130",
-  "crop_66x82",
-  "crop_60x76",
-  "crop_68x68",
-  "crop_84x84",
-  "crop_76x100",
-  "crop_64x64",
-]);
+const observationPresetSchema = z.enum(["crop_60x76", "crop_84x84"]);
+const observationResolutionModeSchema = z.enum(["preset", "custom"]);
 const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
 const trackSamplingModeSchema = z.enum(["equal", "step_balanced"]);
@@ -182,16 +172,40 @@ const stateFeatureDropoutConfigSchema = z.object({
   dropout_prob: z.number().min(0).max(1),
 });
 
-const observationConfigSchema = z.object({
-  preset: observationPresetSchema,
-  frame_stack: z.number().int().positive().max(8),
-  stack_mode: z.enum(["rgb", "gray", "luma_chroma"]),
-  minimap_layer: z.boolean(),
-  resize_filter: z.enum(["nearest", "bilinear"]),
-  minimap_resize_filter: z.enum(["nearest", "bilinear"]),
-  state_components: z.array(stateComponentConfigSchema),
-  state_feature_dropouts: z.array(stateFeatureDropoutConfigSchema),
+const observationCustomResolutionSchema = z.object({
+  height: z.number().int().min(32).max(208),
+  width: z.number().int().min(32).max(592),
 });
+
+const observationConfigSchema = z
+  .object({
+    resolution_mode: observationResolutionModeSchema,
+    preset: observationPresetSchema,
+    custom_resolution: observationCustomResolutionSchema.nullable(),
+    frame_stack: z.number().int().positive().max(8),
+    stack_mode: z.enum(["rgb", "gray", "luma_chroma"]),
+    minimap_layer: z.boolean(),
+    resize_filter: z.enum(["nearest", "bilinear"]),
+    minimap_resize_filter: z.enum(["nearest", "bilinear"]),
+    state_components: z.array(stateComponentConfigSchema),
+    state_feature_dropouts: z.array(stateFeatureDropoutConfigSchema),
+  })
+  .superRefine((observation, context) => {
+    if (observation.resolution_mode === "preset" && observation.custom_resolution !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "custom_resolution must be null when resolution_mode is preset",
+        path: ["custom_resolution"],
+      });
+    }
+    if (observation.resolution_mode === "custom" && observation.custom_resolution === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "custom_resolution is required when resolution_mode is custom",
+        path: ["custom_resolution"],
+      });
+    }
+  });
 
 const policyConfigSchema = z.object({
   conv_profile: convProfileSchema,
@@ -432,6 +446,18 @@ const observationPresetInfoSchema = z.object({
   width: z.number().int().positive(),
 });
 
+const observationResolutionBoundsSchema = z.object({
+  min_dimension: z.number().int().positive(),
+  max_height: z.number().int().positive(),
+  max_width: z.number().int().positive(),
+});
+
+const observationSourceGeometryInfoSchema = z.object({
+  renderer: rendererSchema,
+  height: z.number().int().positive(),
+  width: z.number().int().positive(),
+});
+
 const trackCupInfoSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -478,6 +504,8 @@ const stateComponentSchema = z.object({
 
 export const configMetadataSchema = z.object({
   observation_presets: z.array(observationPresetInfoSchema),
+  observation_resolution_bounds: observationResolutionBoundsSchema,
+  observation_source_geometries: z.array(observationSourceGeometryInfoSchema),
   track_pool_modes: z.array(selectOptionSchema),
   race_modes: z.array(selectOptionSchema),
   track_sampling_modes: z.array(selectOptionSchema),

@@ -340,7 +340,7 @@ class FZeroXEnvEngine:
         )
 
     def render(self) -> RgbFrame:
-        return self.backend.render_display(preset=self.config.observation.preset)
+        return self.backend.render_display(**self.config.observation.native_resolution_kwargs())
 
     def close(self) -> None:
         self.backend.close()

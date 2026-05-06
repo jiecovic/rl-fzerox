@@ -371,64 +371,33 @@
     ],
     "observation_presets": [
       {
-        "height": 84,
-        "label": "84 x 116",
-        "value": "crop_84x116",
-        "width": 116
-      },
-      {
-        "height": 92,
-        "label": "92 x 124",
-        "value": "crop_92x124",
-        "width": 124
-      },
-      {
-        "height": 116,
-        "label": "116 x 164",
-        "value": "crop_116x164",
-        "width": 164
-      },
-      {
-        "height": 98,
-        "label": "98 x 130",
-        "value": "crop_98x130",
-        "width": 130
-      },
-      {
-        "height": 66,
-        "label": "66 x 82",
-        "value": "crop_66x82",
-        "width": 82
-      },
-      {
         "height": 60,
         "label": "60 x 76",
         "value": "crop_60x76",
         "width": 76
       },
       {
-        "height": 68,
-        "label": "68 x 68",
-        "value": "crop_68x68",
-        "width": 68
-      },
-      {
         "height": 84,
         "label": "84 x 84",
         "value": "crop_84x84",
         "width": 84
+      }
+    ],
+    "observation_resolution_bounds": {
+      "max_height": 208,
+      "max_width": 592,
+      "min_dimension": 32
+    },
+    "observation_source_geometries": [
+      {
+        "height": 208,
+        "renderer": "angrylion",
+        "width": 592
       },
       {
-        "height": 76,
-        "label": "76 x 100",
-        "value": "crop_76x100",
-        "width": 100
-      },
-      {
-        "height": 64,
-        "label": "64 x 64",
-        "value": "crop_64x64",
-        "width": 64
+        "height": 208,
+        "renderer": "gliden64",
+        "width": 296
       }
     ],
     "progress_sources": [
@@ -1128,11 +1097,13 @@
       "renderer": "gliden64"
     },
     "observation": {
+      "custom_resolution": null,
       "frame_stack": 2,
       "minimap_layer": false,
       "minimap_resize_filter": "nearest",
       "preset": "crop_60x76",
       "resize_filter": "bilinear",
+      "resolution_mode": "preset",
       "stack_mode": "rgb",
       "state_components": [
         {

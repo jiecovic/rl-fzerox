@@ -112,7 +112,7 @@ SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
 
 
 class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
-    """CNN extractor for the supported aspect-corrected F-Zero X observation presets."""
+    """CNN extractor for supported F-Zero X observation image geometries."""
 
     def __init__(
         self,
@@ -374,7 +374,7 @@ def _resolve_supported_image_geometry(
         supported = ", ".join(f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES)
         raise ValueError(
             f"Unsupported observation geometry {resolved_height}x{resolved_width} for "
-            f"{extractor_name}; supported presets: {supported}"
+            f"{extractor_name}; supported auto geometries: {supported}"
         ) from error
 
     ensure_conv_spec_fits_geometry(

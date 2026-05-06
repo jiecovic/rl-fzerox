@@ -15,6 +15,7 @@ from rl_fzerox.core.envs.observations import ObservationStackMode
 from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     ObservationConfig,
+    ObservationStateComponentConfig,
     RewardConfig,
 )
 from tests.core.envs.helpers import (
@@ -40,6 +41,12 @@ from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_step_status
 
 
+def _state_components(*components: object) -> tuple[ObservationStateComponentConfig, ...]:
+    return tuple(
+        ObservationStateComponentConfig.model_validate(component) for component in components
+    )
+
+
 def test_step_advances_backend_by_action_repeat():
     backend = SyntheticBackend()
     env = FZeroXEnv(
@@ -54,7 +61,7 @@ def test_step_advances_backend_by_action_repeat():
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
     obs = _image_obs(obs)
 
-    assert obs.shape == (116, 164, 12)
+    assert obs.shape == (60, 76, 12)
     assert isinstance(reward, float)
     assert not terminated
     assert not truncated
@@ -84,7 +91,7 @@ def test_watch_step_captures_each_repeated_display_frame():
     assert backend.capture_video_flags == [True, True, True]
     assert len(watch_step.display_frames) == 3
     assert watch_step.display_frames[0].shape == (444, 592, 3)
-    assert _image_obs(watch_step.observation).shape == (116, 164, 12)
+    assert _image_obs(watch_step.observation).shape == (60, 76, 12)
     assert watch_step.info["repeat_index"] == 2
 
 
@@ -210,7 +217,7 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=("vehicle_state",),
+                state_components=_state_components("vehicle_state"),
             ),
         ),
     )
@@ -220,7 +227,7 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
 
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
-    assert obs["image"].shape == (116, 164, 12)
+    assert obs["image"].shape == (60, 76, 12)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
     values = {
@@ -275,7 +282,7 @@ def test_step_updates_boost_control_history_in_image_state_observation() -> None
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {"control_history": {"length": 1, "controls": ("boost",)}},
                 ),
@@ -307,7 +314,7 @@ def test_step_updates_control_history_lean_branch() -> None:
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {"control_history": {"length": 1, "controls": ("steer", "lean")}},
                 ),
@@ -341,7 +348,7 @@ def test_step_updates_component_state_with_action_history() -> None:
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {
                         "control_history": {
@@ -399,7 +406,7 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
             ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {"control_history": {"length": 1, "controls": ("pitch",)}},
                 ),
@@ -436,7 +443,7 @@ def test_step_updates_right_lean_control_history_in_image_state_observation() ->
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {"control_history": {"length": 1, "controls": ("lean",)}},
                 ),
@@ -481,12 +488,16 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     class ObservationPresetBackend(SyntheticBackend):
         def __init__(self) -> None:
             super().__init__()
-            self.render_observation_calls: list[tuple[str, int, str, bool]] = []
+            self.render_observation_calls: list[
+                tuple[str | None, int | None, int | None, int, str, bool]
+            ] = []
 
         def render_observation(
             self,
             *,
-            preset: str,
+            preset: str | None = None,
+            height: int | None = None,
+            width: int | None = None,
             frame_stack: int,
             stack_mode: ObservationStackMode = "rgb",
             minimap_layer: bool = False,
@@ -494,9 +505,13 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
             minimap_resize_filter: object = "nearest",
         ) -> ObservationFrame:
             _ = (resize_filter, minimap_resize_filter)
-            self.render_observation_calls.append((preset, frame_stack, stack_mode, minimap_layer))
+            self.render_observation_calls.append(
+                (preset, height, width, frame_stack, stack_mode, minimap_layer)
+            )
             return super().render_observation(
                 preset=preset,
+                height=height,
+                width=width,
                 frame_stack=frame_stack,
                 stack_mode=stack_mode,
                 minimap_layer=minimap_layer,
@@ -511,9 +526,68 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (116, 164, 12)
-    assert info["observation_frame_shape"] == (116, 164, 3)
-    assert backend.render_observation_calls == [("crop_116x164", 4, "rgb", False)]
+    assert obs.shape == (60, 76, 12)
+    assert info["observation_frame_shape"] == (60, 76, 3)
+    assert backend.render_observation_calls == [("crop_60x76", None, None, 4, "rgb", False)]
+
+
+def test_env_reset_passes_custom_resolution_to_render_observation() -> None:
+    class CustomResolutionBackend(SyntheticBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.render_observation_calls: list[tuple[str | None, int | None, int | None]] = []
+
+        def render_observation(
+            self,
+            *,
+            preset: str | None = None,
+            height: int | None = None,
+            width: int | None = None,
+            frame_stack: int,
+            stack_mode: ObservationStackMode = "rgb",
+            minimap_layer: bool = False,
+            resize_filter: object = "nearest",
+            minimap_resize_filter: object = "nearest",
+        ) -> ObservationFrame:
+            _ = (frame_stack, stack_mode, minimap_layer, resize_filter, minimap_resize_filter)
+            self.render_observation_calls.append((preset, height, width))
+            return super().render_observation(
+                preset=preset,
+                height=height,
+                width=width,
+                frame_stack=frame_stack,
+                stack_mode=stack_mode,
+                minimap_layer=minimap_layer,
+                resize_filter=resize_filter,
+                minimap_resize_filter=minimap_resize_filter,
+            )
+
+    backend = CustomResolutionBackend()
+    config = EnvConfig.model_validate(
+        {
+            "action_repeat": 1,
+            "observation": {
+                "mode": "image",
+                "resolution_mode": "custom",
+                "preset": "crop_60x76",
+                "custom_resolution": {"height": 72, "width": 96},
+                "frame_stack": 4,
+                "stack_mode": "rgb",
+                "minimap_layer": False,
+                "resize_filter": "nearest",
+                "minimap_resize_filter": "nearest",
+            },
+        }
+    )
+
+    env = FZeroXEnv(backend=backend, config=config)
+
+    obs, info = env.reset(seed=13)
+    obs = _image_obs(obs)
+
+    assert obs.shape == (72, 96, 12)
+    assert info["observation_frame_shape"] == (72, 96, 3)
+    assert backend.render_observation_calls == [(None, 72, 96)]
 
 
 def test_env_reset_uses_rgb_stack_shape() -> None:
@@ -521,7 +595,7 @@ def test_env_reset_uses_rgb_stack_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                preset="crop_98x130",
+                preset="crop_84x84",
                 frame_stack=4,
                 stack_mode="rgb",
             ),
@@ -531,9 +605,9 @@ def test_env_reset_uses_rgb_stack_shape() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (98, 130, 12)
+    assert obs.shape == (84, 84, 12)
     assert isinstance(env.observation_space, Box)
-    assert env.observation_space.shape == (98, 130, 12)
+    assert env.observation_space.shape == (84, 84, 12)
     assert info["observation_stack"] == 4
     assert info["observation_stack_mode"] == "rgb"
 
@@ -543,7 +617,7 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                preset="crop_66x82",
+                preset="crop_84x84",
                 frame_stack=4,
                 stack_mode="rgb",
                 minimap_layer=True,
@@ -554,9 +628,9 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (66, 82, 13)
+    assert obs.shape == (84, 84, 13)
     assert isinstance(env.observation_space, Box)
-    assert env.observation_space.shape == (66, 82, 13)
+    assert env.observation_space.shape == (84, 84, 13)
     assert info["observation_minimap_layer"] is True
 
 
@@ -802,7 +876,7 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
             ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_components=(
+                state_components=_state_components(
                     "vehicle_state",
                     {"control_history": {"length": 1, "controls": ("thrust",)}},
                 ),
@@ -897,7 +971,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     obs = _image_obs(obs)
 
-    assert obs.shape == (116, 164, 12)
+    assert obs.shape == (60, 76, 12)
     assert terminated
     assert not truncated
     assert info["repeat_index"] == 0

@@ -9,6 +9,7 @@ from fzerox_emulator.base import (
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
+    normalize_observation_resolution,
 )
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.frames import (
@@ -21,7 +22,9 @@ from fzerox_emulator.frames import (
 @dataclass(frozen=True, slots=True)
 class RepeatStepConfig:
     action_repeat: int
-    preset: str
+    preset: str | None
+    height: int | None
+    width: int | None
     frame_stack: int
     stack_mode: ObservationStackMode
     minimap_layer: bool
@@ -44,9 +47,16 @@ def run_repeat_step(
     spec: ObservationSpec,
 ) -> BackendStepResult:
     state = controller_state.clamped()
+    preset, height, width = normalize_observation_resolution(
+        preset=config.preset,
+        height=config.height,
+        width=config.width,
+    )
     observation, summary, status, telemetry = native.step_repeat_raw(
         action_repeat=config.action_repeat,
-        preset=config.preset,
+        preset="" if preset is None else preset,
+        height=height,
+        width=width,
         frame_stack=config.frame_stack,
         stack_mode=config.stack_mode,
         minimap_layer=config.minimap_layer,
@@ -92,9 +102,16 @@ def run_repeat_watch_step(
     spec: ObservationSpec,
 ) -> BackendStepResult:
     state = controller_state.clamped()
+    preset, height, width = normalize_observation_resolution(
+        preset=config.preset,
+        height=config.height,
+        width=config.width,
+    )
     observation, display_frames, summary, status, telemetry = native.step_repeat_watch_raw(
         action_repeat=config.action_repeat,
-        preset=config.preset,
+        preset="" if preset is None else preset,
+        height=height,
+        width=width,
         frame_stack=config.frame_stack,
         stack_mode=config.stack_mode,
         minimap_layer=config.minimap_layer,

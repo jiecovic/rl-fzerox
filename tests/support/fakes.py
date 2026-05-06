@@ -22,7 +22,8 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from fzerox_emulator.base import RaceStartMode
+from fzerox_emulator.base import RaceStartMode, normalize_observation_resolution
+from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
@@ -133,43 +134,48 @@ class SyntheticBackend:
     def render(self) -> RgbFrame:
         return self._last_frame.copy()
 
-    def observation_spec(self, preset: str) -> ObservationSpec:
-        canonical_preset = _canonical_observation_preset(preset)
-        if canonical_preset is None:
-            raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
+    def observation_spec(
+        self,
+        preset: str | None = None,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpec:
+        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
+            preset=preset,
+            height=height,
+            width=width,
+        )
         cropped = _crop_visible_game_area(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
-        if canonical_preset == "crop_84x116":
-            width, height = (116, 84)
-        elif canonical_preset == "crop_92x124":
-            width, height = (124, 92)
-        elif canonical_preset == "crop_116x164":
-            width, height = (164, 116)
-        elif canonical_preset == "crop_98x130":
-            width, height = (130, 98)
-        elif canonical_preset == "crop_66x82":
-            width, height = (82, 66)
-        elif canonical_preset == "crop_60x76":
-            width, height = (76, 60)
-        elif canonical_preset == "crop_68x68":
-            width, height = (68, 68)
-        elif canonical_preset == "crop_84x84":
-            width, height = (84, 84)
-        elif canonical_preset == "crop_76x100":
-            width, height = (100, 76)
+        if resolved_preset is not None:
+            canonical_preset = _canonical_observation_preset(resolved_preset)
+            if canonical_preset is None:
+                raise ValueError(f"Unsupported synthetic observation preset {resolved_preset!r}")
+            resolved_height, resolved_width = preset_geometry(canonical_preset)
         else:
-            width, height = (64, 64)
+            assert resolved_height is not None and resolved_width is not None
         return ObservationSpec(
-            preset=canonical_preset,
-            width=width,
-            height=height,
+            preset=(
+                resolved_preset
+                if resolved_preset is not None
+                else f"custom_{resolved_height}x{resolved_width}"
+            ),
+            width=resolved_width,
+            height=resolved_height,
             channels=3,
             display_width=display_width,
             display_height=display_height,
         )
 
-    def render_display(self, *, preset: str) -> RgbFrame:
-        spec = self.observation_spec(preset)
+    def render_display(
+        self,
+        *,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> RgbFrame:
+        spec = self.observation_spec(preset, height=height, width=width)
         cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
             cropped,
@@ -181,7 +187,9 @@ class SyntheticBackend:
     def render_observation(
         self,
         *,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -189,7 +197,7 @@ class SyntheticBackend:
         minimap_resize_filter: object = "nearest",
     ) -> ObservationFrame:
         _ = (resize_filter, minimap_resize_filter)
-        spec = self.observation_spec(preset)
+        spec = self.observation_spec(preset, height=height, width=width)
         cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
             cropped,
@@ -273,7 +281,9 @@ class SyntheticBackend:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -318,6 +328,8 @@ class SyntheticBackend:
             self._state.progress_frontier_stalled_frames = 0
         observation = self.render_observation(
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -361,7 +373,9 @@ class SyntheticBackend:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -389,7 +403,7 @@ class SyntheticBackend:
         self._capture_video_flags.extend([True] * action_repeat)
         for _ in range(action_repeat):
             self.step_frame()
-            display_frames.append(self.render_display(preset=preset))
+            display_frames.append(self.render_display(preset=preset, height=height, width=width))
         self._state.step_count += action_repeat
         if self._state.progress_frontier_initialized:
             frontier_reached = (
@@ -407,6 +421,8 @@ class SyntheticBackend:
             self._state.progress_frontier_stalled_frames = 0
         observation = self.render_observation(
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -580,18 +596,10 @@ class SyntheticBackend:
         return frame
 
 
-def _canonical_observation_preset(preset: str) -> str | None:
-    aliases = {
-        "crop_84x116": "crop_84x116",
-        "crop_92x124": "crop_92x124",
-        "crop_116x164": "crop_116x164",
-        "crop_98x130": "crop_98x130",
-        "crop_66x82": "crop_66x82",
+def _canonical_observation_preset(preset: str) -> ObservationPresetName | None:
+    aliases: dict[str, ObservationPresetName] = {
         "crop_60x76": "crop_60x76",
-        "crop_68x68": "crop_68x68",
         "crop_84x84": "crop_84x84",
-        "crop_76x100": "crop_76x100",
-        "crop_64x64": "crop_64x64",
     }
     return aliases.get(preset)
 
