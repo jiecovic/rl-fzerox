@@ -15,7 +15,6 @@ from rl_fzerox.core.envs.observations.state.history import (
     validate_action_history_controls,
 )
 from rl_fzerox.core.envs.observations.state.types import (
-    OBSERVATION_STATE_DEFAULTS,
     ActionHistoryControl,
     StateFeature,
     StateVectorSpec,
@@ -44,13 +43,7 @@ def state_vector_spec_from_components(
             )
         )
 
-    return StateVectorSpec(
-        features=tuple(features),
-        speed_normalizer_kph=OBSERVATION_STATE_DEFAULTS.speed_normalizer_kph,
-        lean_tap_guard_frames=OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames,
-        recent_boost_window_frames=OBSERVATION_STATE_DEFAULTS.recent_boost_window_frames,
-        recent_steer_window_frames=OBSERVATION_STATE_DEFAULTS.recent_steer_window_frames,
-    )
+    return StateVectorSpec(features=tuple(features))
 
 
 def component_state_values(

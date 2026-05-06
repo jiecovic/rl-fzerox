@@ -9,7 +9,6 @@ from rl_fzerox.core.training.runs import (
     RUN_LAYOUT,
     resolve_model_artifact_path,
     resolve_policy_artifact_path,
-    resolve_train_run_config_path,
 )
 from rl_fzerox.core.training.session import load_policy_artifact_metadata
 
@@ -40,7 +39,6 @@ def snapshot_fork_source(
     resolved_destination_dir = destination_dir.expanduser().resolve()
     model_path = resolve_model_artifact_path(resolved_source_run_dir, artifact=artifact)
     policy_path = resolve_policy_artifact_path(resolved_source_run_dir, artifact=artifact)
-    config_path = resolve_train_run_config_path(resolved_source_run_dir)
     metadata = load_policy_artifact_metadata(policy_path)
     if metadata is None or metadata.num_timesteps is None:
         raise ValueError(
@@ -50,10 +48,6 @@ def snapshot_fork_source(
 
     reset_fork_source_dir(resolved_destination_dir)
     resolved_destination_dir.mkdir(parents=True, exist_ok=True)
-    _link_or_copy_file(
-        config_path,
-        resolved_destination_dir / RUN_LAYOUT.config_filename,
-    )
     destination_model_path = resolved_destination_dir / _artifact_model_filename(artifact)
     destination_policy_path = resolved_destination_dir / _artifact_policy_filename(artifact)
     destination_model_path.parent.mkdir(parents=True, exist_ok=True)

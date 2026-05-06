@@ -6,13 +6,10 @@ from dataclasses import dataclass, field
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 from rl_fzerox.core.envs.actions import BOOST_MASK
-from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer, clamp
+from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 from rl_fzerox.core.envs.engine.controls.boost import BoostTimingState
 from rl_fzerox.core.envs.engine.controls.lean import LeanControlState
-from rl_fzerox.core.envs.observations import (
-    OBSERVATION_STATE_DEFAULTS,
-    ActionHistoryControl,
-)
+from rl_fzerox.core.envs.observations import ActionHistoryControl
 
 
 @dataclass(slots=True)

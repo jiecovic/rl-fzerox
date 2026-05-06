@@ -67,24 +67,6 @@ def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
     parent_dir.mkdir(parents=True)
     (tmp_path / "core.so").touch()
     (tmp_path / "rom.n64").touch()
-    (parent_dir / "train_config.yaml").write_text(
-        "\n".join(
-            [
-                "seed: 7",
-                "emulator:",
-                f"  core_path: {tmp_path / 'core.so'}",
-                f"  rom_path: {tmp_path / 'rom.n64'}",
-                "env: {}",
-                "reward: {}",
-                "policy: {}",
-                "curriculum: {}",
-                "train:",
-                "  algorithm: maskable_ppo",
-                "  total_timesteps: 1000",
-            ]
-        ),
-        encoding="utf-8",
-    )
     latest_model_path = parent_dir / RUN_LAYOUT.model_artifacts.latest
     latest_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
     latest_model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -134,7 +116,6 @@ def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
     assert resumed.started_at is not None
     assert refreshed is not None
     assert refreshed.source_snapshot_dir is not None
-    assert (refreshed.source_snapshot_dir / "train_config.yaml").is_file()
     assert (refreshed.source_snapshot_dir / RUN_LAYOUT.model_artifacts.latest).is_file()
     assert refreshed.source_num_timesteps == 816_040
 

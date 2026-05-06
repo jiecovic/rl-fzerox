@@ -41,6 +41,25 @@ def _latest_model_path(run_dir: Path) -> Path:
     return path
 
 
+def _configured_discrete_action_config(*axes: str) -> dict[str, object]:
+    return {
+        "name": "configured_discrete",
+        "layout_discrete_axes": list(axes),
+    }
+
+
+def _configured_hybrid_action_config(
+    *,
+    continuous_axes: tuple[str, ...],
+    discrete_axes: tuple[str, ...] = (),
+) -> dict[str, object]:
+    return {
+        "name": "configured_hybrid",
+        "layout_continuous_axes": list(continuous_axes),
+        "layout_discrete_axes": list(discrete_axes),
+    }
+
+
 class _FakePolicy:
     def __init__(self, action: list[int]) -> None:
         self._action = np.array(action, dtype=np.int64)
@@ -174,7 +193,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]
@@ -349,7 +368,7 @@ def test_policy_runner_exposes_reload_error_until_success(
     )
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": (_ for _ in ()).throw(
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: (_ for _ in ()).throw(
             RuntimeError("bad checkpoint")
         ),
     )
@@ -361,7 +380,7 @@ def test_policy_runner_exposes_reload_error_until_success(
 
     monkeypatch.setattr(
         "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]
@@ -446,7 +465,14 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -479,7 +505,14 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -511,7 +544,11 @@ def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "continuous_steer_drive"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "sac",
@@ -542,7 +579,12 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_sac(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_sac",
@@ -573,7 +615,12 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -603,7 +650,12 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -638,7 +690,14 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -704,7 +763,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -769,7 +833,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_sac_runs
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_sac",
@@ -835,7 +904,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,

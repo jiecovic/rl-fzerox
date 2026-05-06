@@ -278,6 +278,7 @@ def test_manager_training_bridge_supports_weight_fork_from_parent_run(
     assert train_config.train.explicit_run_dir == run_dir
     assert train_config.train.continue_run_dir is None
     assert train_config.train.resume_run_dir == source_run_dir
+    assert train_config.train.resume_source_algorithm == train_config.train.algorithm
     assert train_config.train.resume_artifact == "best"
     assert train_config.train.resume_mode == "weights_only"
     assert train_config.train.tensorboard_step_offset == 816_040
@@ -299,6 +300,7 @@ def test_manager_training_bridge_preserves_tensorboard_offset_for_full_resume(
     assert train_config.train.explicit_run_dir == run_dir
     assert train_config.train.continue_run_dir == run_dir
     assert train_config.train.resume_run_dir == run_dir
+    assert train_config.train.resume_source_algorithm == train_config.train.algorithm
     assert train_config.train.resume_mode == "full_model"
     assert train_config.train.tensorboard_step_offset == 816_040
 

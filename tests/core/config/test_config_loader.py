@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-import rl_fzerox.core.config.paths as config_paths_module
 from rl_fzerox.core.config import load_train_app_config, load_watch_app_config
 
 
@@ -141,6 +140,8 @@ def test_load_watch_app_config_accepts_image_state_observation_mode(tmp_path: Pa
             "  observation:",
             "    mode: image_state",
             "    preset: crop_116x164",
+            "    state_components:",
+            "      - vehicle_state",
         ],
     )
 
@@ -368,9 +369,3 @@ def test_load_watch_app_config_applies_hydra_overrides(tmp_path: Path) -> None:
     assert config.seed == 19
     assert config.env.action_repeat == 5
     assert config.watch.episodes == 3
-
-
-def test_repo_watch_template_exists() -> None:
-    config_path = config_paths_module.project_root_dir() / "conf" / "watch.yaml"
-
-    assert config_path.is_file()

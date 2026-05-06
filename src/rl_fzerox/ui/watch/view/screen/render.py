@@ -9,7 +9,6 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.domain.action_adapters import CONTINUOUS_DRIVE_ACTION_ADAPTERS
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
@@ -129,13 +128,13 @@ def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
 
 
 def _thrust_deadzone_threshold(action_config: ActionRuntimeConfig) -> float | None:
-    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+    if not action_config.uses_continuous_drive():
         return None
     return float(action_config.continuous_drive_deadzone)
 
 
 def _thrust_full_threshold(action_config: ActionRuntimeConfig) -> float | None:
-    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+    if not action_config.uses_continuous_drive():
         return None
     return float(action_config.continuous_drive_full_threshold)
 

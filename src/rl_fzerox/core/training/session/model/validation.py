@@ -4,7 +4,7 @@ from __future__ import annotations
 from stable_baselines3.common.vec_env import VecEnv
 
 from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
-from rl_fzerox.core.domain.action_adapters import HYBRID_ACTION_ADAPTERS, SAC_ACTION_ADAPTERS
+from rl_fzerox.core.domain.action_adapters import ACTION_ADAPTERS
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
 from rl_fzerox.core.training.session.model.replay_layout import SUPPORTED_LAZY_REPLAY_STACK_MODES
 
@@ -51,16 +51,10 @@ def validate_recurrent_configuration_alignment(
 
 
 def _validate_sac_training_config(config: TrainAppConfig) -> None:
-    action_config = config.env.action.runtime()
-    if action_config.name not in SAC_ACTION_ADAPTERS:
-        raise RuntimeError(
-            "SAC requires a continuous steer-drive action adapter so the action space is Box"
-        )
-    if action_config.mask_overrides is not None:
-        raise RuntimeError("SAC does not support env.action.mask; use the continuous adapter")
-    if config.curriculum.enabled:
-        raise RuntimeError("SAC does not support curriculum stages")
-    _validate_sac_lazy_replay_support(config)
+    raise RuntimeError(
+        "SAC is not supported by the configured action layouts on this branch; "
+        "use one of the configured hybrid/discrete manager-supported algorithms."
+    )
 
 
 def _validate_hybrid_action_sac_training_config(config: TrainAppConfig) -> None:
@@ -108,9 +102,9 @@ def _validate_hybrid_action_adapter(
     algorithm_label: str,
 ) -> None:
     action_config = config.env.action.runtime()
-    if action_config.name not in HYBRID_ACTION_ADAPTERS:
+    if action_config.name != ACTION_ADAPTERS.configured_hybrid:
         raise RuntimeError(
-            f"{algorithm_label} requires a hybrid steer-drive action adapter "
+            f"{algorithm_label} requires the configured_hybrid action layout "
             "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"
         )
 

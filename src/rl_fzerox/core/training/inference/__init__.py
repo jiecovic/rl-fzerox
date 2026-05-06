@@ -35,6 +35,7 @@ class LoadedPolicy:
     policy_path: Path
     artifact: str
     device: str = "cpu"
+    algorithm: str | None = None
     curriculum_stage_index: int | None = None
     curriculum_stage_name: str | None = None
     num_timesteps: int | None = None
@@ -175,6 +176,7 @@ class PolicyRunner:
                     policy_path,
                     run_dir=self._loaded_policy.run_dir,
                     device=self._loaded_policy.device,
+                    algorithm=self._loaded_policy.algorithm,
                 )
             except Exception as exc:
                 self._reload_error = str(exc)
@@ -192,6 +194,7 @@ class PolicyRunner:
             policy_path=policy_path,
             artifact=self._loaded_policy.artifact,
             device=self._loaded_policy.device,
+            algorithm=self._loaded_policy.algorithm,
             **_loaded_policy_metadata_fields(policy_path=policy_path),
         )
         self._policy_metadata_mtime_ns = policy_metadata_mtime_ns
@@ -202,6 +205,7 @@ def load_policy_runner(
     *,
     artifact: str = "latest",
     device: str = "cpu",
+    algorithm: str | None = None,
 ) -> PolicyRunner:
     """Load one saved policy artifact from one run directory."""
 
@@ -211,6 +215,7 @@ def load_policy_runner(
         policy_path,
         run_dir=resolved_run_dir,
         device=device,
+        algorithm=algorithm,
     )
     return PolicyRunner(
         LoadedPolicy(
@@ -218,6 +223,7 @@ def load_policy_runner(
             policy_path=policy_path,
             artifact=artifact,
             device=device,
+            algorithm=algorithm,
             **_loaded_policy_metadata_fields(policy_path=policy_path),
         ),
         policy=policy,

@@ -730,32 +730,32 @@
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "steer_1"
+            "name": "control_history.prev_steer_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "gas_1"
+            "name": "control_history.prev_thrust_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "air_brake_1"
+            "name": "control_history.prev_air_brake_1"
           },
           {
             "high": 1.0,
             "low": 0.0,
-            "name": "boost_1"
+            "name": "control_history.prev_boost_1"
           },
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "lean_1"
+            "name": "control_history.prev_lean_1"
           },
           {
             "high": 1.0,
             "low": -1.0,
-            "name": "pitch_1"
+            "name": "control_history.prev_pitch_1"
           }
         ],
         "label": "control history",
@@ -1321,8 +1321,8 @@
     },
     "vehicle": {
       "engine_mode": "fixed",
-      "engine_setting_max_raw_value": 50,
-      "engine_setting_min_raw_value": 50,
+      "engine_setting_max_raw_value": 80,
+      "engine_setting_min_raw_value": 20,
       "engine_setting_raw_value": 50,
       "selected_vehicle_ids": ["blue_falcon"],
       "selection_mode": "pool"
@@ -1798,32 +1798,32 @@
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "steer_1"
+        "name": "control_history.prev_steer_1"
       },
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "gas_1"
+        "name": "control_history.prev_thrust_1"
       },
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "air_brake_1"
+        "name": "control_history.prev_air_brake_1"
       },
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "boost_1"
+        "name": "control_history.prev_boost_1"
       },
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "lean_1"
+        "name": "control_history.prev_lean_1"
       },
       {
         "component": "control_history",
         "dropout_prob": 0.0,
-        "name": "pitch_1"
+        "name": "control_history.prev_pitch_1"
       }
     ],
     "state_features_dim": 64,

@@ -250,7 +250,7 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
 
 
-def test_save_train_run_config_persists_action_branches_without_adapter_fields(
+def test_save_train_run_config_persists_configured_action_layout_without_runtime_fields(
     tmp_path: Path,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
@@ -267,25 +267,15 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
         env=EnvConfig(
             action=ActionConfig.model_validate(
                 {
-                    "branches": {
-                        "steer": {
-                            "type": "continuous",
-                            "response_power": 1.0,
-                        },
-                        "gas": {
-                            "type": "discrete",
-                            "mask": ("idle", "engaged"),
-                        },
-                        "boost": {
-                            "type": "discrete",
-                            "mask": ("idle",),
-                        },
-                        "lean": {
-                            "type": "discrete",
-                            "mask": ("idle", "left", "right"),
-                            "mode": "release_cooldown",
-                        },
-                    }
+                    "name": "configured_hybrid",
+                    "layout_continuous_axes": ["steer"],
+                    "layout_discrete_axes": ["gas", "boost", "lean"],
+                    "configured_mask_overrides": {
+                        "gas": [0, 1],
+                        "boost": [0],
+                        "lean": [0, 1, 2],
+                    },
+                    "lean_mode": "release_cooldown",
                 }
             ),
         ),
@@ -306,18 +296,18 @@ def test_save_train_run_config_persists_action_branches_without_adapter_fields(
     assert isinstance(env_data, dict)
     action_data = env_data["action"]
     assert isinstance(action_data, dict)
-    assert set(action_data) == {"branches"}
-    branches_data = action_data["branches"]
-    assert isinstance(branches_data, dict)
-    boost_data = branches_data["boost"]
-    assert isinstance(boost_data, dict)
-    assert "decision_interval_frames" not in boost_data
-    assert "request_lockout_frames" not in boost_data
+    assert action_data["name"] == "configured_hybrid"
+    assert action_data["layout_continuous_axes"] == ["steer"]
+    assert action_data["layout_discrete_axes"] == ["gas", "boost", "lean"]
+    assert "boost_decision_interval_frames" not in action_data
+    assert "boost_request_lockout_frames" not in action_data
 
     loaded_config = load_train_run_config(run_paths.run_dir)
     action_config = loaded_config.env.action.runtime()
 
-    assert action_config.name == "hybrid_steer_gas_boost_lean"
+    assert action_config.name == "configured_hybrid"
+    assert action_config.layout_continuous_axes == ("steer",)
+    assert action_config.layout_discrete_axes == ("gas", "boost", "lean")
     assert action_config.boost_decision_interval_frames == 1
     assert action_config.boost_request_lockout_frames == 5
 

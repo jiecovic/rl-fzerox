@@ -156,54 +156,9 @@ def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
 
 
 def _train_config_snapshot_data(config: TrainAppConfig) -> dict[str, object]:
-    data = {
+    return {
         str(key): value for key, value in config.model_dump(mode="json", exclude_none=True).items()
     }
-    _prefer_action_branch_snapshot(data)
-    _prefer_observation_component_snapshot(data)
-    return data
-
-
-def _prefer_action_branch_snapshot(config_data: dict[str, object]) -> None:
-    env_data = config_data.get("env")
-    if not isinstance(env_data, dict):
-        return
-
-    action_data = env_data.get("action")
-    if not isinstance(action_data, dict):
-        return
-
-    branches_data = action_data.get("branches")
-    if branches_data is None:
-        return
-
-    # Runtime bridge: branch configs compile to adapter-era fields internally.
-    # Do not persist those generated fields in fresh run manifests; keeping the
-    # branch declaration as the only saved source makes this bridge removable.
-    action_data.clear()
-    action_data["branches"] = branches_data
-
-
-def _prefer_observation_component_snapshot(config_data: dict[str, object]) -> None:
-    env_data = config_data.get("env")
-    if not isinstance(env_data, dict):
-        return
-
-    observation_data = env_data.get("observation")
-    if not isinstance(observation_data, dict):
-        return
-
-    if observation_data.get("state_components") is None:
-        return
-
-    for key in (
-        "state_profile",
-        "course_context",
-        "ground_effect_context",
-        "action_history_len",
-        "action_history_controls",
-    ):
-        observation_data.pop(key, None)
 
 
 def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
