@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/api/client.ts
+import type { ZodType } from "zod";
 import {
   type ConfigMetadata,
   configMetadataSchema,
@@ -25,23 +26,31 @@ import {
 } from "@/shared/api/contract";
 
 export type RunMetricRangeMode = "recent" | "full";
+export const API_SCHEMA_MISMATCH_MESSAGE = "Run-manager backend is outdated. Restart run-manager.";
+
+export class ApiSchemaMismatchError extends Error {
+  constructor() {
+    super(API_SCHEMA_MISMATCH_MESSAGE);
+    this.name = "ApiSchemaMismatchError";
+  }
+}
 
 const RECENT_RUN_METRIC_LIMIT = 240;
 const runMetricsCache = new Map<string, ManagedRunMetricSample[]>();
 const inflightRunMetrics = new Map<string, Promise<ManagedRunMetricSample[]>>();
 
 export async function fetchTemplates(): Promise<ManagedTemplate[]> {
-  const payload = templatesResponseSchema.parse(await getJson("/api/templates"));
+  const payload = parseApiPayload(templatesResponseSchema, await getJson("/api/templates"));
   return payload.templates;
 }
 
 export async function fetchDrafts(): Promise<ManagedDraft[]> {
-  const payload = draftsResponseSchema.parse(await getJson("/api/drafts"));
+  const payload = parseApiPayload(draftsResponseSchema, await getJson("/api/drafts"));
   return payload.drafts;
 }
 
 export async function fetchRuns(): Promise<ManagedRun[]> {
-  const payload = runsResponseSchema.parse(await getJson("/api/runs"));
+  const payload = parseApiPayload(runsResponseSchema, await getJson("/api/runs"));
   return payload.runs;
 }
 
@@ -55,7 +64,8 @@ export async function fetchRunMetrics(
 export async function fetchRunTrackSamplingState(
   runId: string,
 ): Promise<TrackSamplingRuntimeState | null> {
-  const payload = runTrackSamplingResponseSchema.parse(
+  const payload = parseApiPayload(
+    runTrackSamplingResponseSchema,
     await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling`),
   );
   return payload.state;
@@ -65,7 +75,7 @@ export async function resetRunTrackSamplingState(runId: string): Promise<void> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/track-sampling/reset`, {
     method: "POST",
   });
-  resetTrackSamplingResponseSchema.parse(await parseJson(response));
+  parseApiPayload(resetTrackSamplingResponseSchema, await parseJson(response));
 }
 
 export function getCachedRunMetrics(
@@ -91,14 +101,14 @@ export async function fetchFreshRunMetrics(
 }
 
 export async function fetchConfigMetadata(): Promise<ConfigMetadata> {
-  return configMetadataSchema.parse(await getJson("/api/config-metadata"));
+  return parseApiPayload(configMetadataSchema, await getJson("/api/config-metadata"));
 }
 
 export async function fetchPolicyPreview(
   config: ManagedRunConfig,
 ): Promise<PolicyArchitecturePreview> {
   const response = await postPolicyPreview(config);
-  return policyArchitecturePreviewSchema.parse(await parseJson(response));
+  return parseApiPayload(policyArchitecturePreviewSchema, await parseJson(response));
 }
 
 async function postPolicyPreview(config: ManagedRunConfig): Promise<Response> {
@@ -129,7 +139,7 @@ export async function createDraftWithSource(
       source_artifact: sourceArtifact,
     }),
   });
-  const payload = createDraftResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(createDraftResponseSchema, await parseJson(response));
   return payload.draft;
 }
 
@@ -158,7 +168,7 @@ export async function updateDraftWithSource(
       source_artifact: sourceArtifact,
     }),
   });
-  const payload = createDraftResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(createDraftResponseSchema, await parseJson(response));
   return payload.draft;
 }
 
@@ -180,7 +190,7 @@ export async function launchRun(
       source_artifact: sourceArtifact,
     }),
   });
-  const payload = createRunResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(createRunResponseSchema, await parseJson(response));
   return payload.run;
 }
 
@@ -199,7 +209,7 @@ export async function forkRun(
       ...(config === undefined ? {} : { config }),
     }),
   });
-  const payload = forkRunResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(forkRunResponseSchema, await parseJson(response));
   return payload.run;
 }
 
@@ -217,7 +227,7 @@ export async function renameRun(runId: string, name: string): Promise<ManagedRun
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-  const payload = createRunResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(createRunResponseSchema, await parseJson(response));
   return payload.run;
 }
 
@@ -226,7 +236,7 @@ export async function openRunDirectory(runId: string): Promise<void> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
-  openRunDirectoryResponseSchema.parse(await parseJson(response));
+  parseApiPayload(openRunDirectoryResponseSchema, await parseJson(response));
 }
 
 export async function watchRun(
@@ -240,7 +250,7 @@ export async function watchRun(
       headers: { "Content-Type": "application/json" },
     },
   );
-  const payload = watchRunResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(watchRunResponseSchema, await parseJson(response));
   return payload.status;
 }
 
@@ -251,12 +261,12 @@ export async function deleteDraft(id: string): Promise<void> {
 
 export async function deleteRun(id: string): Promise<void> {
   const response = await fetch(`/api/runs/${encodeURIComponent(id)}`, { method: "DELETE" });
-  deleteRunResponseSchema.parse(await parseJson(response));
+  parseApiPayload(deleteRunResponseSchema, await parseJson(response));
 }
 
 export async function deleteLineage(id: string): Promise<void> {
   const response = await fetch(`/api/lineages/${encodeURIComponent(id)}`, { method: "DELETE" });
-  deleteRunResponseSchema.parse(await parseJson(response));
+  parseApiPayload(deleteRunResponseSchema, await parseJson(response));
 }
 
 async function getJson(url: string): Promise<unknown> {
@@ -278,7 +288,8 @@ async function refreshRunMetrics(
     if (rangeMode === "recent") {
       query.set("limit", String(RECENT_RUN_METRIC_LIMIT));
     }
-    const payload = runMetricsResponseSchema.parse(
+    const payload = parseApiPayload(
+      runMetricsResponseSchema,
       await getJson(`/api/runs/${encodeURIComponent(runId)}/metrics?${query.toString()}`),
     );
     runMetricsCache.set(cacheKey, payload.samples);
@@ -307,8 +318,16 @@ async function postRunAction(url: string): Promise<ManagedRun> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
-  const payload = createRunResponseSchema.parse(await parseJson(response));
+  const payload = parseApiPayload(createRunResponseSchema, await parseJson(response));
   return payload.run;
+}
+
+function parseApiPayload<T>(schema: ZodType<T>, payload: unknown): T {
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) {
+    throw new ApiSchemaMismatchError();
+  }
+  return parsed.data;
 }
 
 async function parseJson(response: Response): Promise<unknown> {
