@@ -658,7 +658,7 @@ def test_load_train_app_config_reads_policy_activation(tmp_path: Path) -> None:
     assert config.policy.activation == "gelu"
 
 
-def test_load_train_app_config_reads_course_context(tmp_path: Path) -> None:
+def test_load_train_app_config_reads_state_component_settings(tmp_path: Path) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
     rom_path = tmp_path / "fzerox.n64"
     config_path = tmp_path / "train.yaml"
@@ -674,9 +674,11 @@ def test_load_train_app_config_reads_course_context(tmp_path: Path) -> None:
             "env:",
             "  observation:",
             "    mode: image_state",
-            "    state_profile: race_core",
-            "    course_context: one_hot_builtin",
-            "    ground_effect_context: effect_flags",
+            "    state_components:",
+            "      - vehicle_state",
+            "      - surface_state",
+            "      - course_context:",
+            "          encoding: one_hot_builtin",
             "train:",
             "  total_timesteps: 1000",
         ],
@@ -684,8 +686,14 @@ def test_load_train_app_config_reads_course_context(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.env.observation.course_context == "one_hot_builtin"
-    assert config.env.observation.ground_effect_context == "effect_flags"
+    assert config.env.observation.state_components_data() == (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="surface_state"),
+        ObservationStateComponentSettings(
+            name="course_context",
+            encoding="one_hot_builtin",
+        ),
+    )
 
 
 def test_load_train_app_config_reads_auto_extractor_features_dim(tmp_path: Path) -> None:
@@ -1234,7 +1242,9 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
             f"  rom_path: {rom_path}",
             "env:",
             "  action:",
-            "    name: continuous_steer_drive",
+            "    name: configured_hybrid",
+            "    layout_continuous_axes: [steer, drive]",
+            "    layout_discrete_axes: []",
             "    steer_response_power: 0.7",
             "    continuous_drive_deadzone: 0.15",
             "    continuous_drive_min_thrust: 1.0",
@@ -1251,7 +1261,8 @@ def test_load_train_app_config_reads_sac_fields(tmp_path: Path) -> None:
 
     config = load_train_app_config(config_path)
 
-    assert config.env.action.name == "continuous_steer_drive"
+    assert config.env.action.name == "configured_hybrid"
+    assert config.env.action.layout_continuous_axes == ("steer", "drive")
     assert config.env.action.steer_response_power == 0.7
     assert config.env.action.continuous_drive_deadzone == 0.15
     assert config.env.action.continuous_drive_min_thrust == 1.0

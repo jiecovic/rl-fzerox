@@ -16,11 +16,6 @@ from pydantic import (
     model_validator,
 )
 
-from rl_fzerox.core.config.action_branches import (
-    ActionBranchCompilation,
-    ActionBranchesConfig,
-    compile_action_branches,
-)
 from rl_fzerox.core.config.schema_models.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,
@@ -28,7 +23,6 @@ from rl_fzerox.core.config.schema_models.common import (
 from rl_fzerox.core.domain.action_adapters import (
     ACTION_ADAPTERS,
     DEFAULT_ACTION_ADAPTER_NAME,
-    LEGACY_ACTION_ADAPTERS,
     ActionAdapterName,
 )
 from rl_fzerox.core.domain.action_values import (
@@ -40,7 +34,6 @@ from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
 ConfiguredContinuousAxis: TypeAlias = Literal["steer", "drive", "air_brake", "pitch"]
 ConfiguredDiscreteAxis: TypeAlias = Literal[
     "steer",
-    "drive",
     "gas",
     "air_brake",
     "boost",
@@ -49,7 +42,13 @@ ConfiguredDiscreteAxis: TypeAlias = Literal[
 ]
 _CONFIGURED_CONTINUOUS_AXES = frozenset(("steer", "drive", "air_brake", "pitch"))
 _CONFIGURED_DISCRETE_AXES = frozenset(
-    ("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch")
+    ("steer", "gas", "air_brake", "boost", "lean", "pitch")
+)
+_DEFAULT_CONFIGURED_DISCRETE_AXES: tuple[ConfiguredDiscreteAxis, ...] = (
+    "steer",
+    "gas",
+    "boost",
+    "lean",
 )
 
 
@@ -70,14 +69,13 @@ class ActionMaskConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     steer: ActionMaskSpec | None = None
-    drive: ActionMaskSpec | None = None
     gas: ActionMaskSpec | None = None
     air_brake: ActionMaskSpec | None = None
     boost: ActionMaskSpec | None = None
     lean: ActionMaskSpec | None = None
     pitch: ActionMaskSpec | None = None
 
-    @field_validator("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch")
+    @field_validator("steer", "gas", "air_brake", "boost", "lean", "pitch")
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
@@ -94,7 +92,7 @@ class ActionMaskConfig(BaseModel):
         """Return the explicitly configured branch restrictions only."""
 
         overrides: dict[str, tuple[int, ...]] = {}
-        for branch_name in ("steer", "drive", "gas", "air_brake", "boost", "lean", "pitch"):
+        for branch_name in ("steer", "gas", "air_brake", "boost", "lean", "pitch"):
             values = getattr(self, branch_name)
             if values is not None:
                 overrides[branch_name] = compile_action_mask_values(branch_name, values)
@@ -133,28 +131,22 @@ class ActionRuntimeConfig:
     def continuous_drive_axis_index(self) -> int | None:
         """Return the continuous drive-axis index when this layout exposes one."""
 
-        if self.name == ACTION_ADAPTERS.configured_hybrid:
-            try:
-                return self.layout_continuous_axes.index("drive")
-            except ValueError:
-                return None
-        if self.name == LEGACY_ACTION_ADAPTERS.continuous_steer_drive:
-            return 1
-        if self.name in LEGACY_ACTION_ADAPTERS.continuous_drive:
-            return 1
-        return None
+        if self.name != ACTION_ADAPTERS.configured_hybrid:
+            return None
+        try:
+            return self.layout_continuous_axes.index("drive")
+        except ValueError:
+            return None
 
     def continuous_air_brake_axis_index(self) -> int | None:
         """Return the continuous air-brake axis index when this layout exposes one."""
 
-        if self.name == ACTION_ADAPTERS.configured_hybrid:
-            try:
-                return self.layout_continuous_axes.index("air_brake")
-            except ValueError:
-                return None
-        if self.name == LEGACY_ACTION_ADAPTERS.hybrid_steer_drive_boost_lean_primitive:
-            return 2
-        return None
+        if self.name != ACTION_ADAPTERS.configured_hybrid:
+            return None
+        try:
+            return self.layout_continuous_axes.index("air_brake")
+        except ValueError:
+            return None
 
     def uses_continuous_drive(self) -> bool:
         """Return whether the action layout carries a live continuous throttle axis."""
@@ -207,67 +199,6 @@ class ActionRuntimeConfig:
             ),
         )
 
-    @classmethod
-    def from_branch_config(
-        cls,
-        config: ActionConfig,
-        compilation: ActionBranchCompilation,
-    ) -> ActionRuntimeConfig:
-        return cls(
-            name=compilation.name,
-            steer_buckets=int(config.steer_buckets),
-            steer_response_power=float(
-                config.steer_response_power
-                if compilation.steer_response_power is None
-                else compilation.steer_response_power
-            ),
-            continuous_drive_deadzone=float(
-                config.continuous_drive_deadzone
-                if compilation.continuous_drive_deadzone is None
-                else compilation.continuous_drive_deadzone
-            ),
-            continuous_drive_full_threshold=float(
-                config.continuous_drive_full_threshold
-                if compilation.continuous_drive_full_threshold is None
-                else compilation.continuous_drive_full_threshold
-            ),
-            continuous_drive_min_thrust=float(
-                config.continuous_drive_min_thrust
-                if compilation.continuous_drive_min_thrust is None
-                else compilation.continuous_drive_min_thrust
-            ),
-            continuous_air_brake_deadzone=float(config.continuous_air_brake_deadzone),
-            continuous_air_brake_full_threshold=float(config.continuous_air_brake_full_threshold),
-            continuous_air_brake_min_duty=float(config.continuous_air_brake_min_duty),
-            force_full_throttle=bool(config.force_full_throttle),
-            mask_air_brake_on_ground=bool(config.mask_air_brake_on_ground),
-            continuous_air_brake_mode=(
-                config.continuous_air_brake_mode
-                if compilation.continuous_air_brake_mode is None
-                else compilation.continuous_air_brake_mode
-            ),
-            continuous_lean_deadzone=float(config.continuous_lean_deadzone),
-            lean_mode=config.lean_mode if compilation.lean_mode is None else compilation.lean_mode,
-            boost_unmask_max_speed_kph=compilation.boost_unmask_max_speed_kph,
-            boost_decision_interval_frames=ACTION_RUNTIME_DEFAULTS.boost_decision_interval_frames,
-            boost_request_lockout_frames=ACTION_RUNTIME_DEFAULTS.boost_request_lockout_frames,
-            lean_unmask_min_speed_kph=compilation.lean_unmask_min_speed_kph,
-            lean_initial_lockout_frames=(
-                int(config.lean_initial_lockout_frames)
-                if compilation.lean_initial_lockout_frames is None
-                else int(compilation.lean_initial_lockout_frames)
-            ),
-            pitch_buckets=int(config.pitch_buckets),
-            independent_lean_buttons=bool(config.independent_lean_buttons),
-            layout_continuous_axes=tuple(config.layout_continuous_axes),
-            layout_discrete_axes=tuple(config.layout_discrete_axes),
-            mask_overrides=(
-                config.configured_mask_overrides
-                if config.configured_mask_overrides is not None
-                else compilation.mask_overrides
-            ),
-        )
-
 
 class ActionConfig(BaseModel):
     """Policy action adapter settings for the current env."""
@@ -294,18 +225,14 @@ class ActionConfig(BaseModel):
     pitch_buckets: int = Field(default=5, ge=3)
     independent_lean_buttons: bool = False
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()
-    layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = ()
+    layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = _DEFAULT_CONFIGURED_DISCRETE_AXES
     configured_mask_overrides: ActionMaskOverrides | None = None
     mask: ActionMaskConfig | None = None
-    branches: ActionBranchesConfig | None = None
 
     def runtime(self) -> ActionRuntimeConfig:
         """Return the concrete adapter config consumed by env/runtime code."""
 
-        if self.branches is None:
-            return ActionRuntimeConfig.from_config(self)
-        compiled = compile_action_branches(self.branches)
-        return ActionRuntimeConfig.from_branch_config(self, compiled)
+        return ActionRuntimeConfig.from_config(self)
 
     @field_validator("steer_buckets", "pitch_buckets")
     @classmethod
@@ -356,6 +283,4 @@ class ActionConfig(BaseModel):
             raise ValueError("independent_lean_buttons requires a discrete lean axis")
         if self.configured_mask_overrides is not None and self.mask is not None:
             raise ValueError("configured_mask_overrides cannot be combined with env.action.mask")
-        if self.branches is not None:
-            compile_action_branches(self.branches)
         return self

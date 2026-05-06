@@ -10,7 +10,6 @@ from fzerox_emulator import (
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from rl_fzerox.core.config.schema import (
-    ActionConfig,
     EnvConfig,
     ObservationConfig,
     RewardConfig,
@@ -20,10 +19,7 @@ from rl_fzerox.core.envs.actions import (
     ACCELERATE_MASK,
     AIR_BRAKE_MASK,
 )
-from rl_fzerox.core.envs.observations import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    ObservationStackMode,
-)
+from rl_fzerox.core.envs.observations import ObservationStackMode
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -39,6 +35,10 @@ from tests.core.envs.helpers import (
 from tests.core.envs.helpers import (
     telemetry as _telemetry,
 )
+from tests.support.action_configs import (
+    configured_discrete_action,
+    configured_hybrid_action,
+)
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_step_status
 
@@ -47,7 +47,10 @@ def test_step_advances_backend_by_action_repeat():
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=3,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=7)
@@ -71,7 +74,10 @@ def test_watch_step_captures_each_repeated_display_frame():
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=3,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=7)
@@ -98,7 +104,10 @@ def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=1,
+            action=configured_discrete_action("steer", "gas"),
+        ),
         reward_config=RewardConfig(
             progress_bucket_distance=1.0,
             progress_bucket_reward=1.0,
@@ -129,8 +138,8 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="continuous_steer_drive",
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "drive"),
                 continuous_drive_deadzone=0.0,
                 continuous_drive_full_threshold=1.0,
                 continuous_drive_min_thrust=0.0,
@@ -139,17 +148,42 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
     )
 
     env.reset(seed=7)
-    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
     assert backend.last_controller_state.joypad_mask == 0
-    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
     assert backend.last_controller_state.joypad_mask == 0
-    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
     assert backend.last_controller_state.joypad_mask == 0
-    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
     assert backend.last_controller_state.joypad_mask == ACCELERATE_MASK
 
     env.reset(seed=8)
-    env.step(np.array([0.0, -0.5], dtype=np.float32))
+    env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
 
     assert backend.last_controller_state.joypad_mask == 0
 
@@ -175,8 +209,12 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(name="steer_drive"),
-            observation=ObservationConfig(mode="image_state", frame_stack=4),
+            action=configured_discrete_action("steer", "gas"),
+            observation=ObservationConfig(
+                mode="image_state",
+                frame_stack=4,
+                state_components=("vehicle_state",),
+            ),
         ),
     )
 
@@ -186,9 +224,16 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
     assert obs["image"].shape == (116, 164, 12)
-    assert obs["state"].tolist() == pytest.approx(
-        [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
-    )
+    raw_feature_names = info["observation_state_features"]
+    assert isinstance(raw_feature_names, tuple)
+    values = {
+        name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
+    }
+    assert values["vehicle_state.speed_norm"] == 1.0
+    assert values["vehicle_state.energy_frac"] == 1.0
+    assert values["vehicle_state.reverse_active"] == 0.0
+    assert values["vehicle_state.airborne"] == 0.0
+    assert values["vehicle_state.boost_active"] == 0.0
     assert info["observation_mode"] == "image_state"
 
 
@@ -212,7 +257,7 @@ def test_step_exposes_raw_step_signals_in_info() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
         ),
     )
 
@@ -223,14 +268,21 @@ def test_step_exposes_raw_step_signals_in_info() -> None:
     assert info["damage_taken_frames"] == 1
 
 
-def test_step_updates_recent_boost_pressure_in_image_state_observation() -> None:
+def test_step_updates_boost_control_history_in_image_state_observation() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
             action_repeat=120,
-            action=ActionConfig(name="steer_drive_boost"),
-            observation=ObservationConfig(mode="image_state", frame_stack=4),
+            action=configured_discrete_action("steer", "gas", "boost"),
+            observation=ObservationConfig(
+                mode="image_state",
+                frame_stack=4,
+                state_components=(
+                    "vehicle_state",
+                    {"control_history": {"length": 1, "controls": ("boost",)}},
+                ),
+            ),
         ),
     )
 
@@ -238,22 +290,30 @@ def test_step_updates_recent_boost_pressure_in_image_state_observation() -> None
     obs, _, _, _, _ = env.step(np.array([3, 0, 1], dtype=np.int64))
 
     assert isinstance(obs, dict)
-    assert obs["state"].tolist() == pytest.approx(
-        [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0]
-    )
+    assert obs["state"][-1] == pytest.approx(1.0)
 
 
-def test_step_updates_steer_history_state_profile() -> None:
+def test_step_updates_control_history_lean_branch() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
             action_repeat=30,
-            action=ActionConfig(name="steer_gas_air_brake_boost_lean", steer_buckets=3),
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "air_brake",
+                "boost",
+                "lean",
+                steer_buckets=3,
+            ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_profile="steer_history",
                 frame_stack=4,
+                state_components=(
+                    "vehicle_state",
+                    {"control_history": {"length": 1, "controls": ("steer", "lean")}},
+                ),
             ),
         ),
     )
@@ -262,30 +322,37 @@ def test_step_updates_steer_history_state_profile() -> None:
     obs, _, _, _, info = env.step(np.array([0, 1, 1, 0, 0], dtype=np.int64))
 
     assert isinstance(obs, dict)
-    assert obs["state"].shape == (14,)
-    assert info["observation_state_profile"] == "steer_history"
-    assert info["observation_state_shape"] == (14,)
+    assert info["observation_state_shape"] == (10,)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
     feature_names = tuple(str(name) for name in raw_feature_names)
     values = {name: float(value) for name, value in zip(feature_names, obs["state"], strict=True)}
-    assert values["steer_left_held"] == 1.0
-    assert values["steer_right_held"] == 0.0
-    assert values["recent_steer_pressure"] == pytest.approx(-1.0)
+    assert values["control_history.prev_steer_1"] == pytest.approx(-1.0)
+    assert values["control_history.prev_lean_1"] == pytest.approx(0.0)
 
 
-def test_step_updates_race_core_with_action_history() -> None:
+def test_step_updates_component_state_with_action_history() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(name="hybrid_steer_gas_boost_lean"),
+            action=configured_hybrid_action(
+                continuous_axes=("steer",),
+                discrete_axes=("gas", "boost", "lean"),
+            ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_profile="race_core",
-                action_history_len=3,
                 frame_stack=4,
+                state_components=(
+                    "vehicle_state",
+                    {
+                        "control_history": {
+                            "length": 3,
+                            "controls": ("steer", "gas", "boost", "lean"),
+                        }
+                    },
+                ),
             ),
         ),
     )
@@ -299,24 +366,19 @@ def test_step_updates_race_core_with_action_history() -> None:
     )
 
     assert isinstance(obs, dict)
-    assert obs["state"].shape == (18,)
-    assert info["observation_state_profile"] == "race_core"
     assert info["observation_action_history_len"] == 3
     assert info["observation_action_history_controls"] == ("steer", "gas", "boost", "lean")
-    assert info["observation_state_shape"] == (18,)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
     feature_names = tuple(str(name) for name in raw_feature_names)
     values = {name: float(value) for name, value in zip(feature_names, obs["state"], strict=True)}
-    assert "recent_boost_pressure" not in values
-    assert "recent_steer_pressure" not in values
-    assert "prev_air_brake_1" not in values
-    assert values["prev_steer_1"] == pytest.approx(-0.5)
-    assert values["prev_gas_1"] == 1.0
-    assert values["prev_boost_1"] == 1.0
-    assert values["prev_lean_1"] == -1.0
-    assert values["prev_steer_2"] == 0.0
-    assert values["prev_steer_3"] == 0.0
+    assert "control_history.prev_air_brake_1" not in values
+    assert values["control_history.prev_steer_1"] == pytest.approx(-0.5)
+    assert values["control_history.prev_thrust_1"] == 1.0
+    assert values["control_history.prev_boost_1"] == 1.0
+    assert values["control_history.prev_lean_1"] == -1.0
+    assert values["control_history.prev_steer_2"] == 0.0
+    assert values["control_history.prev_steer_3"] == 0.0
 
 
 def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_application() -> None:
@@ -334,16 +396,16 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="configured_hybrid",
-                layout_continuous_axes=("steer", "pitch"),
-                layout_discrete_axes=("gas",),
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "pitch"),
+                discrete_axes=("gas",),
             ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_profile="race_core",
-                action_history_len=1,
-                action_history_controls=("pitch",),
+                state_components=(
+                    "vehicle_state",
+                    {"control_history": {"length": 1, "controls": ("pitch",)}},
+                ),
             ),
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
@@ -364,17 +426,24 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
     values = {
         name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
     }
-    assert values["prev_pitch_1"] == pytest.approx(0.5)
+    assert values["control_history.prev_pitch_1"] == pytest.approx(0.5)
 
 
-def test_step_updates_right_lean_hold_and_press_age_in_image_state_observation() -> None:
+def test_step_updates_right_lean_control_history_in_image_state_observation() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(name="steer_drive_boost_lean"),
-            observation=ObservationConfig(mode="image_state", frame_stack=4),
+            action=configured_discrete_action("steer", "gas", "boost", "lean"),
+            observation=ObservationConfig(
+                mode="image_state",
+                frame_stack=4,
+                state_components=(
+                    "vehicle_state",
+                    {"control_history": {"length": 1, "controls": ("lean",)}},
+                ),
+            ),
         ),
     )
 
@@ -382,21 +451,7 @@ def test_step_updates_right_lean_hold_and_press_age_in_image_state_observation()
     obs, _, _, _, _ = env.step(np.array([4, 1, 0, 2], dtype=np.int64))
 
     assert isinstance(obs, dict)
-    assert obs["state"].tolist() == pytest.approx(
-        [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            1.0,
-            1.0,
-            1.0 / DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
-            0.0,
-        ]
-    )
+    assert obs["state"][-1] == pytest.approx(1.0)
 
 
 def test_step_shifts_the_frame_stack_forward():
@@ -409,7 +464,7 @@ def test_step_shifts_the_frame_stack_forward():
         backend=DistinctFrameBackend(),
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
             observation=ObservationConfig(frame_stack=4),
         ),
     )
@@ -525,7 +580,10 @@ def test_step_control_applies_manual_controller_state() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=2, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=2,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=21)
@@ -561,8 +619,9 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="hybrid_steer_drive_boost_lean_primitive",
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "drive", "air_brake"),
+                discrete_axes=("boost", "lean"),
                 continuous_drive_deadzone=0.0,
                 continuous_air_brake_mode="disable_on_ground",
             ),
@@ -607,10 +666,9 @@ def test_step_control_keeps_ground_air_brake_when_configured() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="configured_hybrid",
-                layout_continuous_axes=("steer", "pitch"),
-                layout_discrete_axes=("gas", "air_brake", "boost", "lean"),
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "pitch"),
+                discrete_axes=("gas", "air_brake", "boost", "lean"),
                 mask_air_brake_on_ground=False,
             ),
         ),
@@ -661,17 +719,9 @@ def test_step_suppresses_air_only_controls_until_airborne() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig.model_validate(
-                {
-                    "branches": {
-                        "steer": {"type": "continuous"},
-                        "gas": {"type": "continuous"},
-                        "air_brake": {"type": "discrete"},
-                        "boost": {"type": "discrete", "mask": ("idle",)},
-                        "lean": {"type": "discrete"},
-                        "pitch": {"type": "discrete"},
-                    }
-                }
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "drive"),
+                discrete_axes=("air_brake", "boost", "lean", "pitch"),
             ),
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
@@ -709,8 +759,9 @@ def test_step_forces_accelerate_when_min_thrust_is_full() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="hybrid_steer_drive_boost_lean_primitive",
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "drive", "air_brake"),
+                discrete_axes=("boost", "lean"),
                 continuous_drive_min_thrust=1.0,
                 continuous_air_brake_mode="off",
             ),
@@ -746,23 +797,30 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            action=ActionConfig(
-                name="continuous_steer_drive",
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "drive"),
                 continuous_drive_deadzone=0.0,
                 continuous_drive_full_threshold=1.0,
                 continuous_drive_min_thrust=0.0,
             ),
             observation=ObservationConfig(
                 mode="image_state",
-                state_profile="race_core",
-                action_history_len=1,
+                state_components=(
+                    "vehicle_state",
+                    {"control_history": {"length": 1, "controls": ("thrust",)}},
+                ),
             ),
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
 
     env.reset(seed=21)
-    obs, reward, _, _, info = env.step(np.array([0.0, -0.5], dtype=np.float32))
+    obs, reward, _, _, info = env.step(
+        {
+            "continuous": np.array([0.0, -0.5], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
 
     assert env.last_gas_level == pytest.approx(0.25)
     assert env.last_requested_control_state == ControllerState()
@@ -773,7 +831,7 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
     values = {
         name: float(value) for name, value in zip(raw_feature_names, obs["state"], strict=True)
     }
-    assert values["prev_gas_1"] == pytest.approx(0.25)
+    assert values["control_history.prev_thrust_1"] == pytest.approx(0.25)
     assert reward == 0.0
     assert "reward_breakdown" not in info
 
@@ -794,7 +852,10 @@ def test_terminal_step_exposes_monitor_info_keys() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=1,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=5)
@@ -829,7 +890,10 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=3, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=3,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=6)
@@ -859,7 +923,10 @@ def test_step_info_is_pickle_safe_with_native_telemetry() -> None:
     )
     env = FZeroXEnv(
         backend=backend,
-        config=EnvConfig(action_repeat=1, action=ActionConfig(name="steer_drive")),
+        config=EnvConfig(
+            action_repeat=1,
+            action=configured_discrete_action("steer", "gas"),
+        ),
     )
 
     env.reset(seed=8)

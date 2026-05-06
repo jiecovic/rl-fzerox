@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from fzerox_emulator import ResetState
-from rl_fzerox.core.config.schema import ActionConfig, EnvConfig
+from fzerox_emulator.arrays import Int64Array
+from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
@@ -17,8 +18,13 @@ from tests.core.envs.helpers import (
 from tests.core.envs.helpers import (
     telemetry as _telemetry,
 )
+from tests.support.action_configs import configured_discrete_action
 from tests.support.fakes import SyntheticBackend
 from tests.support.native_objects import make_step_status
+
+
+def _neutral_action() -> Int64Array:
+    return np.array([2, 0], dtype=np.int64)
 
 
 def test_reset_to_race_requires_custom_baseline():
@@ -60,16 +66,16 @@ def test_step_truncates_on_timeout() -> None:
         config=EnvConfig(
             action_repeat=1,
             max_episode_steps=2,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
         ),
     )
 
     env.reset(seed=3)
-    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, _, terminated, truncated, _ = env.step(_neutral_action())
     assert not terminated
     assert not truncated
 
-    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, _, terminated, truncated, info = env.step(_neutral_action())
 
     assert not terminated
     assert truncated
@@ -99,12 +105,12 @@ def test_step_keeps_running_when_speed_is_low() -> None:
             action_repeat=1,
             max_episode_steps=100,
             stuck_min_speed_kph=50.0,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
         ),
     )
 
     env.reset(seed=4)
-    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, reward, terminated, truncated, info = env.step(_neutral_action())
 
     assert not terminated
     assert not truncated
@@ -138,12 +144,12 @@ def test_step_keeps_running_when_driving_in_reverse() -> None:
         config=EnvConfig(
             action_repeat=1,
             max_episode_steps=100,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
         ),
     )
 
     env.reset(seed=4)
-    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, reward, terminated, truncated, info = env.step(_neutral_action())
 
     assert reward == pytest.approx(-0.01)
     assert not terminated
@@ -191,17 +197,17 @@ def test_step_truncates_when_progress_frontier_stalls() -> None:
             max_episode_steps=100,
             progress_frontier_stall_limit_frames=5,
             progress_frontier_epsilon=100.0,
-            action=ActionConfig(name="steer_drive"),
+            action=configured_discrete_action("steer", "gas"),
         ),
     )
 
     env.reset(seed=11)
-    _, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, _, terminated, truncated, info = env.step(_neutral_action())
     assert not terminated
     assert not truncated
     assert info["progress_frontier_stalled_frames"] == 0
 
-    _, reward, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
+    _, reward, terminated, truncated, info = env.step(_neutral_action())
 
     assert not terminated
     assert truncated

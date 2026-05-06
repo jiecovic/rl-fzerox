@@ -50,8 +50,11 @@ def maybe_resume_training_model(
         return model
 
     resume_run_dir = train_config.resume_run_dir.resolve()
-    source_train_config = load_train_run_train_config(resume_run_dir)
-    source_algorithm = resolve_effective_training_algorithm(train_config=source_train_config)
+    if train_config.resume_source_algorithm is not None:
+        source_algorithm = train_config.resume_source_algorithm
+    else:
+        source_train_config = load_train_run_train_config(resume_run_dir)
+        source_algorithm = resolve_effective_training_algorithm(train_config=source_train_config)
     current_algorithm = resolve_effective_training_algorithm(train_config=train_config)
     if source_algorithm != current_algorithm:
         raise RuntimeError(

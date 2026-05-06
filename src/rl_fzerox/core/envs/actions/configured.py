@@ -18,21 +18,18 @@ from rl_fzerox.core.envs.actions.base import (
     parse_discrete_action,
     steer_values,
 )
+from rl_fzerox.core.envs.actions.buttons import (
+    ACCELERATE_MASK,
+    AIR_BRAKE_MASK,
+    BOOST_MASK,
+    LEAN_LEFT_MASK,
+    LEAN_RIGHT_MASK,
+)
 from rl_fzerox.core.envs.actions.continuous_controls import (
     ContinuousButtonPwmDecoder,
     ContinuousDriveDecoder,
     continuous_action_array,
     discrete_action_array,
-)
-from rl_fzerox.core.envs.actions.discrete.steer_drive import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    DRIVE_MODES,
-)
-from rl_fzerox.core.envs.actions.discrete.steer_drive_boost_lean import (
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
 )
 from rl_fzerox.core.envs.actions.hybrid.layouts import HybridActionLayout
 from rl_fzerox.core.envs.actions.hybrid.spaces import hybrid_action_mask, hybrid_action_space
@@ -50,8 +47,6 @@ def _configured_dimensions(
 def _discrete_axis_size(axis: str, config: ActionRuntimeConfig) -> int:
     if axis == "steer":
         return int(config.steer_buckets)
-    if axis == "drive":
-        return len(DRIVE_MODES)
     if axis in {"gas", "air_brake", "boost"}:
         return 2
     if axis == "lean":
@@ -139,8 +134,6 @@ class ConfiguredDiscreteActionAdapter:
         for dimension, value in zip(self._dimensions, parsed, strict=True):
             if dimension.label == "steer":
                 steer = float(self._steer_values[value])
-            elif dimension.label == "drive":
-                joypad_mask |= DRIVE_MODES[value].joypad_mask
             elif dimension.label == "gas" and value == 1:
                 joypad_mask |= ACCELERATE_MASK
             elif dimension.label == "air_brake" and value == 1:
@@ -268,8 +261,6 @@ class ConfiguredHybridActionAdapter:
             value = int(raw_value)
             if dimension.label == "steer":
                 steer = float(self._steer_values[value])
-            elif dimension.label == "drive":
-                joypad_mask |= DRIVE_MODES[value].joypad_mask
             elif dimension.label == "gas" and value == 1:
                 joypad_mask |= ACCELERATE_MASK
             elif dimension.label == "air_brake" and value == 1:

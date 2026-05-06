@@ -116,7 +116,7 @@ def _compose_config_data(
 
     hydra_overrides = list(overrides or [])
     config_root = config_root_dir().resolve()
-    if config_dir.resolve() != config_root:
+    if config_dir.resolve() != config_root and config_root.is_dir():
         hydra_overrides = [
             f"hydra.searchpath=[file://{config_root.as_posix()}]",
             *hydra_overrides,

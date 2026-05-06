@@ -73,6 +73,47 @@ def test_maybe_resume_training_model_loads_weights_only_artifact(tmp_path: Path)
     assert model.calls == [(str(model_path.resolve()), True, "cpu")]
 
 
+def test_maybe_resume_training_model_uses_explicit_resume_source_algorithm(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "runs" / "ppo_cnn_0042"
+    run_dir.mkdir(parents=True)
+    model_path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    model_path.write_bytes(b"checkpoint")
+
+    class _FakeModel:
+        def __init__(self) -> None:
+            self.device = "cpu"
+            self.calls: list[tuple[str, bool, str]] = []
+
+        def set_parameters(
+            self,
+            load_path_or_dict: str,
+            *,
+            exact_match: bool,
+            device: str,
+        ) -> None:
+            self.calls.append((load_path_or_dict, exact_match, device))
+
+    model = _FakeModel()
+
+    resumed_model = maybe_resume_training_model(
+        model=model,
+        train_env=None,
+        train_config=TrainConfig(
+            algorithm="maskable_ppo",
+            resume_run_dir=run_dir,
+            resume_source_algorithm="maskable_ppo",
+            resume_artifact="latest",
+            resume_mode="weights_only",
+        ),
+    )
+
+    assert resumed_model is model
+    assert model.calls == [(str(model_path.resolve()), True, "cpu")]
+
+
 def test_maybe_resume_training_model_loads_full_model_artifact(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

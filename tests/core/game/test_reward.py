@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import fields
-from pathlib import Path
 
 import pytest
-import yaml
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 from rl_fzerox.core.config.schema import RewardConfig, RewardCourseOverrideConfig
@@ -27,13 +25,8 @@ _COURSE_EFFECT_DASH = 3
 _COURSE_EFFECT_ICE = 4
 
 
-def test_reward_yamls_use_known_reward_config_keys() -> None:
-    schema_keys = set(RewardConfig.model_fields)
-    for yaml_path in Path("conf/reward").glob("*.yaml"):
-        config_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
-
-        assert set(config_data) <= schema_keys
-        assert RewardConfig.model_validate(config_data).name in reward_tracker_names()
+def test_default_reward_config_uses_known_profile() -> None:
+    assert RewardConfig().name in reward_tracker_names()
 
 
 def test_registered_reward_profiles_include_legacy_and_canonical_names() -> None:

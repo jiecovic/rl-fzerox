@@ -10,13 +10,9 @@ from rl_fzerox.core.envs.actions import (
     AIR_BRAKE_MASK,
     BOOST_MASK,
     LEAN_RIGHT_MASK,
-    ContinuousSteerDriveActionAdapter,
-    HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter,
-    HybridSteerGasAirBrakeBoostLeanActionAdapter,
-    HybridSteerGasAirBrakeBoostLeanPitchActionAdapter,
-    HybridSteerGasBoostLeanActionAdapter,
-    SteerDriveActionAdapter,
-    SteerGasAirBrakeBoostLeanActionAdapter,
+    ConfiguredDiscreteActionAdapter,
+    ConfiguredHybridActionAdapter,
+    ResettableActionAdapter,
     build_action_adapter,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import (
@@ -24,21 +20,37 @@ from rl_fzerox.core.envs.actions.continuous_controls import (
     continuous_drive_gas_level,
     requested_gas_level,
 )
+from tests.support.action_configs import (
+    configured_discrete_action,
+    configured_hybrid_action,
+)
 
 
-def test_steer_drive_adapter_uses_default_seven_bucket_multidiscrete_space() -> None:
-    adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive"))
+def test_configured_discrete_action_space_matches_gas_air_brake_layout() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("steer", "gas", "air_brake")
+    )
 
     assert isinstance(adapter.action_space, MultiDiscrete)
-    assert adapter.action_space.nvec.tolist() == [7, 3]
-    assert np.array_equal(adapter.idle_action, np.array([3, 0], dtype=np.int64))
+    assert adapter.action_space.nvec.tolist() == [7, 2, 2]
+    assert np.array_equal(adapter.idle_action, np.array([3, 0, 0], dtype=np.int64))
 
 
-def test_steer_drive_adapter_supports_custom_bucket_counts() -> None:
-    adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
+def test_configured_discrete_action_space_matches_full_button_layout() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action(
+            "steer",
+            "gas",
+            "air_brake",
+            "boost",
+            "lean",
+            steer_buckets=3,
+        )
+    )
 
-    assert adapter.action_space.nvec.tolist() == [7, 3]
-    assert np.array_equal(adapter.idle_action, np.array([3, 0], dtype=np.int64))
+    assert isinstance(adapter.action_space, MultiDiscrete)
+    assert adapter.action_space.nvec.tolist() == [3, 2, 2, 2, 3]
+    assert np.array_equal(adapter.idle_action, np.array([1, 0, 0, 0, 0], dtype=np.int64))
 
 
 def test_action_config_rejects_even_steer_bucket_counts() -> None:
@@ -54,20 +66,27 @@ def test_action_config_rejects_non_positive_steer_response_power() -> None:
         ActionConfig(steer_response_power=0.0)
 
 
-def test_steer_drive_adapter_decodes_center_accelerate_action() -> None:
-    adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
+def test_configured_discrete_gas_air_brake_layout_decodes_buttons() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("steer", "gas", "air_brake")
+    )
 
-    control_state = adapter.decode(np.array([3, 1], dtype=np.int64))
+    accelerate_state = adapter.decode(np.array([3, 1, 0], dtype=np.int64))
+    air_brake_state = adapter.decode(np.array([3, 0, 1], dtype=np.int64))
 
-    assert control_state == ControllerState(
+    assert accelerate_state == ControllerState(
         joypad_mask=ACCELERATE_MASK,
+        left_stick_x=0.0,
+    )
+    assert air_brake_state == ControllerState(
+        joypad_mask=AIR_BRAKE_MASK,
         left_stick_x=0.0,
     )
 
 
-def test_steer_drive_adapter_applies_steer_response_power_to_buckets() -> None:
-    adapter = SteerDriveActionAdapter(
-        ActionConfig(name="steer_drive", steer_buckets=5, steer_response_power=0.5)
+def test_configured_discrete_applies_steer_curve() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("steer", "gas", steer_buckets=5, steer_response_power=0.5)
     )
 
     control_state = adapter.decode(np.array([1, 0], dtype=np.int64))
@@ -75,38 +94,16 @@ def test_steer_drive_adapter_applies_steer_response_power_to_buckets() -> None:
     assert control_state.left_stick_x == pytest.approx(-(0.5**0.5))
 
 
-def test_steer_drive_adapter_decodes_center_air_brake_action() -> None:
-    adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
-
-    control_state = adapter.decode(np.array([3, 2], dtype=np.int64))
-
-    assert control_state == ControllerState(
-        joypad_mask=AIR_BRAKE_MASK,
-        left_stick_x=0.0,
-    )
-
-
-def test_steer_drive_adapter_rejects_wrong_action_shape() -> None:
-    adapter = SteerDriveActionAdapter(ActionConfig(name="steer_drive", steer_buckets=7))
+def test_configured_discrete_rejects_wrong_action_shape() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(configured_discrete_action("steer", "gas"))
 
     with pytest.raises(ValueError):
         adapter.decode(np.array([3], dtype=np.int64))
 
 
-def test_steer_gas_air_brake_boost_lean_adapter_uses_full_discrete_heads() -> None:
-    adapter = SteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="steer_gas_air_brake_boost_lean", steer_buckets=3)
-    )
-
-    assert isinstance(adapter.action_space, MultiDiscrete)
-    assert adapter.action_space.nvec.tolist() == [3, 2, 2, 2, 3]
-    assert np.array_equal(adapter.idle_action, np.array([1, 0, 0, 0, 0], dtype=np.int64))
-    assert adapter.action_mask().tolist() == [True] * (3 + 2 + 2 + 2 + 3)
-
-
-def test_steer_gas_air_brake_boost_lean_adapter_decodes_parallel_buttons() -> None:
-    adapter = SteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="steer_gas_air_brake_boost_lean", steer_buckets=3)
+def test_configured_discrete_full_button_layout_decodes_parallel_buttons() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("steer", "gas", "air_brake", "boost", "lean", steer_buckets=3)
     )
 
     control_state = adapter.decode(np.array([0, 1, 1, 1, 2], dtype=np.int64))
@@ -117,9 +114,9 @@ def test_steer_gas_air_brake_boost_lean_adapter_decodes_parallel_buttons() -> No
     )
 
 
-def test_steer_gas_air_brake_boost_lean_adapter_masks_branches_separately() -> None:
-    adapter = SteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="steer_gas_air_brake_boost_lean", steer_buckets=3)
+def test_configured_discrete_masks_branches_separately() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("steer", "gas", "air_brake", "boost", "lean", steer_buckets=3)
     )
 
     mask = adapter.action_mask(
@@ -147,8 +144,13 @@ def test_steer_gas_air_brake_boost_lean_adapter_masks_branches_separately() -> N
     ]
 
 
-def test_hybrid_steer_gas_boost_lean_adapter_uses_one_continuous_axis() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
+def test_configured_hybrid_steer_gas_boost_lean_uses_expected_space() -> None:
+    adapter = ConfiguredHybridActionAdapter(
+        configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("gas", "boost", "lean"),
+        )
+    )
 
     assert isinstance(adapter.action_space, Dict)
     assert isinstance(adapter.action_space.spaces["continuous"], Box)
@@ -164,8 +166,13 @@ def test_hybrid_steer_gas_boost_lean_adapter_uses_one_continuous_axis() -> None:
     )
 
 
-def test_hybrid_steer_gas_boost_lean_adapter_decodes_discrete_buttons() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
+def test_configured_hybrid_steer_gas_boost_lean_decodes_discrete_buttons() -> None:
+    adapter = ConfiguredHybridActionAdapter(
+        configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("gas", "boost", "lean"),
+        )
+    )
 
     control_state = adapter.decode(
         {
@@ -180,87 +187,12 @@ def test_hybrid_steer_gas_boost_lean_adapter_decodes_discrete_buttons() -> None:
     )
 
 
-def test_hybrid_steer_gas_boost_lean_adapter_masks_discrete_heads() -> None:
-    adapter = HybridSteerGasBoostLeanActionAdapter(ActionConfig(name="hybrid_steer_gas_boost_lean"))
-
-    mask = adapter.action_mask(
-        base_overrides={
-            "gas": (1,),
-            "boost": (0,),
-            "lean": (0,),
-        },
-    )
-
-    assert mask.tolist() == [
-        False,
-        True,
-        True,
-        False,
-        True,
-        False,
-        False,
-    ]
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_adapter_uses_one_continuous_axis() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean")
-    )
-
-    assert isinstance(adapter.action_space, Dict)
-    assert isinstance(adapter.action_space.spaces["continuous"], Box)
-    assert adapter.action_space.spaces["continuous"].shape == (1,)
-    assert isinstance(adapter.action_space.spaces["discrete"], MultiDiscrete)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2, 2, 3]
-    assert adapter.idle_action["continuous"].tolist() == [0.0]
-    assert adapter.idle_action["discrete"].tolist() == [0, 0, 0, 0]
-    assert tuple(dimension.label for dimension in adapter.action_dimensions) == (
-        "gas",
-        "air_brake",
-        "boost",
-        "lean",
-    )
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_adapter_decodes_discrete_buttons() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean")
-    )
-
-    control_state = adapter.decode(
-        {
-            "continuous": np.array([-0.75], dtype=np.float32),
-            "discrete": np.array([1, 1, 1, 2], dtype=np.int64),
-        }
-    )
-
-    assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=-0.75,
-    )
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_adapter_applies_steer_curve() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(
-            name="hybrid_steer_gas_air_brake_boost_lean",
-            steer_response_power=0.5,
+def test_configured_hybrid_steer_gas_air_brake_boost_lean_masks_heads() -> None:
+    adapter = ConfiguredHybridActionAdapter(
+        configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("gas", "air_brake", "boost", "lean"),
         )
-    )
-
-    control_state = adapter.decode(
-        {
-            "continuous": np.array([-0.25], dtype=np.float32),
-            "discrete": np.array([0, 0, 0, 0], dtype=np.int64),
-        }
-    )
-
-    assert control_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_adapter_masks_discrete_heads() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean")
     )
 
     mask = adapter.action_mask(
@@ -285,13 +217,12 @@ def test_hybrid_steer_gas_air_brake_boost_lean_adapter_masks_discrete_heads() ->
     ]
 
 
-def test_action_drive_axis_is_none_when_configured_layout_has_no_drive_axis() -> None:
-    config = ActionConfig(
-        name="configured_hybrid",
-        layout_continuous_axes=("steer", "pitch"),
-        layout_discrete_axes=("gas",),
+def test_action_drive_axis_is_none_when_layout_has_no_drive_axis() -> None:
+    config = configured_hybrid_action(
+        continuous_axes=("steer", "pitch"),
+        discrete_axes=("gas",),
     )
-    adapter = config.runtime()
+    runtime = config.runtime()
     action = {
         "continuous": np.array([0.1, 0.6], dtype=np.float32),
         "discrete": np.array([1], dtype=np.int64),
@@ -300,7 +231,7 @@ def test_action_drive_axis_is_none_when_configured_layout_has_no_drive_axis() ->
     drive_axis = action_drive_axis(
         action,
         build_action_adapter(config).action_space,
-        drive_axis_index=adapter.continuous_drive_axis_index(),
+        drive_axis_index=runtime.continuous_drive_axis_index(),
     )
 
     assert drive_axis is None
@@ -318,12 +249,11 @@ def test_requested_gas_level_uses_discrete_accelerate_when_no_drive_axis_exists(
     assert gas_level == 1.0
 
 
-def test_configured_hybrid_adapter_decodes_continuous_air_brake_lane() -> None:
+def test_configured_hybrid_decodes_continuous_air_brake_lane() -> None:
     adapter = build_action_adapter(
-        ActionConfig(
-            name="configured_hybrid",
-            layout_continuous_axes=("steer", "air_brake"),
-            layout_discrete_axes=("gas", "boost"),
+        configured_hybrid_action(
+            continuous_axes=("steer", "air_brake"),
+            discrete_axes=("gas", "boost"),
             continuous_air_brake_deadzone=0.0,
             continuous_air_brake_full_threshold=1.0,
             continuous_air_brake_min_duty=0.0,
@@ -343,136 +273,41 @@ def test_configured_hybrid_adapter_decodes_continuous_air_brake_lane() -> None:
     )
 
 
-def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:
-    adapter = HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter(
-        ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
+def test_configured_hybrid_steer_drive_action_space_uses_dict_branches() -> None:
+    adapter = build_action_adapter(
+        configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=(),
+        )
     )
 
+    assert isinstance(adapter, ConfiguredHybridActionAdapter)
     assert isinstance(adapter.action_space, Dict)
-    assert isinstance(adapter.action_space.spaces["continuous"], Box)
     assert adapter.action_space.spaces["continuous"].shape == (2,)
-    assert isinstance(adapter.action_space.spaces["discrete"], MultiDiscrete)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2, 3, 5]
-    assert adapter.idle_action["continuous"].tolist() == [0.0, 0.0]
-    assert adapter.idle_action["discrete"].tolist() == [0, 0, 0, 2]
-    assert tuple(dimension.label for dimension in adapter.action_dimensions) == (
-        "air_brake",
-        "boost",
-        "lean",
-        "pitch",
+    assert adapter.action_space.spaces["discrete"].nvec.tolist() == []
+
+
+def test_configured_hybrid_steer_drive_decodes_accelerate_and_coast() -> None:
+    adapter = build_action_adapter(
+        configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=(),
+            continuous_drive_deadzone=0.2,
+        )
     )
 
-
-def test_hybrid_steer_drive_air_brake_boost_lean_pitch_adapter_decodes_pitch() -> None:
-    adapter = HybridSteerDriveAirBrakeBoostLeanPitchActionAdapter(
-        ActionConfig(name="hybrid_steer_drive_air_brake_boost_lean_pitch")
-    )
-
-    control_state = adapter.decode(
+    accelerate_state = adapter.decode(
         {
-            "continuous": np.array([-0.25, 1.0], dtype=np.float32),
-            "discrete": np.array([1, 1, 2, 4], dtype=np.int64),
+            "continuous": np.array([0.5, 0.7], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
         }
     )
-
-    assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=-0.25,
-        left_stick_y=1.0,
-    )
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_uses_expected_space() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
-    )
-
-    assert isinstance(adapter.action_space, Dict)
-    assert isinstance(adapter.action_space.spaces["continuous"], Box)
-    assert adapter.action_space.spaces["continuous"].shape == (1,)
-    assert isinstance(adapter.action_space.spaces["discrete"], MultiDiscrete)
-    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2, 2, 3, 5]
-    assert adapter.idle_action["continuous"].tolist() == [0.0]
-    assert adapter.idle_action["discrete"].tolist() == [0, 0, 0, 0, 2]
-    assert tuple(dimension.label for dimension in adapter.action_dimensions) == (
-        "gas",
-        "air_brake",
-        "boost",
-        "lean",
-        "pitch",
-    )
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_decodes_buttons_and_pitch() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
-    )
-
-    control_state = adapter.decode(
+    coast_state = adapter.decode(
         {
-            "continuous": np.array([-0.25], dtype=np.float32),
-            "discrete": np.array([1, 1, 1, 2, 4], dtype=np.int64),
+            "continuous": np.array([-0.5, -0.7], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
         }
     )
-
-    assert control_state == ControllerState(
-        joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK | BOOST_MASK | LEAN_RIGHT_MASK,
-        left_stick_x=-0.25,
-        left_stick_y=1.0,
-    )
-
-
-def test_hybrid_steer_gas_air_brake_boost_lean_pitch_adapter_masks_discrete_heads() -> None:
-    adapter = HybridSteerGasAirBrakeBoostLeanPitchActionAdapter(
-        ActionConfig(name="hybrid_steer_gas_air_brake_boost_lean_pitch")
-    )
-
-    mask = adapter.action_mask(
-        base_overrides={
-            "gas": (1,),
-            "air_brake": (0,),
-            "boost": (0,),
-            "lean": (0,),
-            "pitch": (0, 1, 2),
-        },
-    )
-
-    assert mask.tolist() == [
-        False,
-        True,
-        True,
-        False,
-        True,
-        False,
-        True,
-        False,
-        False,
-        True,
-        True,
-        True,
-        False,
-        False,
-    ]
-
-
-def test_continuous_steer_drive_adapter_uses_two_axis_box_space() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(ActionConfig(name="continuous_steer_drive"))
-
-    assert isinstance(adapter.action_space, Box)
-    assert adapter.action_space.shape == (2,)
-    assert adapter.action_space.dtype == np.float32
-    assert np.array_equal(adapter.action_space.low, np.array([-1.0, -1.0], dtype=np.float32))
-    assert np.array_equal(adapter.action_space.high, np.array([1.0, 1.0], dtype=np.float32))
-    assert np.array_equal(adapter.idle_action, np.array([0.0, 0.0], dtype=np.float32))
-
-
-def test_continuous_steer_drive_adapter_decodes_accelerate_and_coast() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(
-        ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
-    )
-
-    accelerate_state = adapter.decode(np.array([0.5, 0.7], dtype=np.float32))
-    coast_state = adapter.decode(np.array([-0.5, -0.7], dtype=np.float32))
 
     assert accelerate_state == ControllerState(
         joypad_mask=ACCELERATE_MASK,
@@ -481,61 +316,61 @@ def test_continuous_steer_drive_adapter_decodes_accelerate_and_coast() -> None:
     assert coast_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
 
 
-def test_continuous_steer_drive_adapter_applies_steer_curve() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive",
-            continuous_drive_deadzone=0.2,
-            steer_response_power=0.5,
-        )
-    )
-
-    control_state = adapter.decode(np.array([0.25, -1.0], dtype=np.float32))
-
-    assert control_state == ControllerState(joypad_mask=0, left_stick_x=0.5)
-
-
-def test_continuous_steer_drive_adapter_coasts_inside_min_thrust_zone() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(
-        ActionConfig(name="continuous_steer_drive", continuous_drive_deadzone=0.2)
-    )
-
-    control_state = adapter.decode(np.array([2.0, -0.95], dtype=np.float32))
-
-    assert control_state == ControllerState(joypad_mask=0, left_stick_x=1.0)
-    assert adapter.action_mask().tolist() == []
-
-
-def test_continuous_steer_drive_adapter_pwm_defaults_to_full_throttle() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive",
+def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
+    adapter = build_action_adapter(
+        configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=(),
             continuous_drive_deadzone=0.0,
             continuous_drive_full_threshold=1.0,
             continuous_drive_min_thrust=0.0,
         )
     )
+    assert isinstance(adapter, ResettableActionAdapter)
 
-    coast_mask = adapter.decode(np.array([0.0, -1.0], dtype=np.float32)).joypad_mask
-    partial_accelerate_masks = [
-        adapter.decode(np.array([0.0, -0.5], dtype=np.float32)).joypad_mask for _ in range(4)
+    coast_mask = adapter.decode(
+        {
+            "continuous": np.array([0.0, -1.0], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    ).joypad_mask
+    partial_masks = [
+        adapter.decode(
+            {
+                "continuous": np.array([0.0, -0.5], dtype=np.float32),
+                "discrete": np.array([], dtype=np.int64),
+            }
+        ).joypad_mask
+        for _ in range(4)
     ]
     adapter.reset()
-    mid_accelerate_masks = [
-        adapter.decode(np.array([0.0, 0.0], dtype=np.float32)).joypad_mask for _ in range(4)
+    mid_masks = [
+        adapter.decode(
+            {
+                "continuous": np.array([0.0, 0.0], dtype=np.float32),
+                "discrete": np.array([], dtype=np.int64),
+            }
+        ).joypad_mask
+        for _ in range(4)
     ]
     adapter.reset()
-    full_accelerate_masks = [
-        adapter.decode(np.array([0.0, 1.0], dtype=np.float32)).joypad_mask for _ in range(3)
+    full_masks = [
+        adapter.decode(
+            {
+                "continuous": np.array([0.0, 1.0], dtype=np.float32),
+                "discrete": np.array([], dtype=np.int64),
+            }
+        ).joypad_mask
+        for _ in range(3)
     ]
 
     assert coast_mask == 0
-    assert partial_accelerate_masks == [0, 0, 0, ACCELERATE_MASK]
-    assert mid_accelerate_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
-    assert full_accelerate_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
+    assert partial_masks == [0, 0, 0, ACCELERATE_MASK]
+    assert mid_masks == [0, ACCELERATE_MASK, 0, ACCELERATE_MASK]
+    assert full_masks == [ACCELERATE_MASK, ACCELERATE_MASK, ACCELERATE_MASK]
 
 
-def test_continuous_drive_pwm_supports_deadzone_and_full_zone() -> None:
+def test_continuous_drive_curve_supports_deadzone_and_full_zone() -> None:
     assert (
         continuous_drive_gas_level(
             -0.95,
@@ -583,15 +418,21 @@ def test_continuous_drive_curve_applies_min_thrust_inside_deadzone() -> None:
     )
 
 
-def test_continuous_steer_drive_adapter_can_force_full_thrust() -> None:
-    adapter = ContinuousSteerDriveActionAdapter(
-        ActionConfig(
-            name="continuous_steer_drive",
+def test_configured_hybrid_can_force_full_thrust() -> None:
+    adapter = build_action_adapter(
+        configured_hybrid_action(
+            continuous_axes=("steer", "drive"),
+            discrete_axes=(),
             continuous_drive_min_thrust=1.0,
         )
     )
 
-    control_state = adapter.decode(np.array([-0.5, -1.0], dtype=np.float32))
+    control_state = adapter.decode(
+        {
+            "continuous": np.array([-0.5, -1.0], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
 
     assert control_state == ControllerState(
         joypad_mask=ACCELERATE_MASK,

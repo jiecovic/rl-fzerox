@@ -22,8 +22,6 @@ class LeanControlState:
     initial_lockout_frames: int = 0
     left_held: bool = False
     right_held: bool = False
-    left_press_age_frames: int = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
-    right_press_age_frames: int = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
     _lock_index: int = 0
     _lock_remaining_frames: int = 0
     _cooldown_remaining_frames: int = 0
@@ -33,8 +31,6 @@ class LeanControlState:
 
         self.left_held = False
         self.right_held = False
-        self.left_press_age_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
-        self.right_press_age_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
         self._lock_index = 0
         self._lock_remaining_frames = 0
         self._cooldown_remaining_frames = 0
@@ -58,18 +54,6 @@ class LeanControlState:
             right_held=self.right_held,
         )
         current_lean_index = lean_index_from_mask(joypad_mask)
-        self.left_press_age_frames = advance_press_age(
-            self.left_press_age_frames,
-            was_held=self.left_held,
-            is_held=left_held,
-            frames_elapsed=frames_elapsed,
-        )
-        self.right_press_age_frames = advance_press_age(
-            self.right_press_age_frames,
-            was_held=self.right_held,
-            is_held=right_held,
-            frames_elapsed=frames_elapsed,
-        )
         self._update_semantics(
             previous_lean_index=previous_lean_index,
             current_lean_index=current_lean_index,
@@ -77,18 +61,6 @@ class LeanControlState:
         )
         self.left_held = left_held
         self.right_held = right_held
-
-    def observation_fields(self) -> dict[str, float]:
-        """Return lean-history features passed into state observations."""
-
-        return {
-            "left_lean_held": float(self.left_held),
-            "right_lean_held": float(self.right_held),
-            # Normalize against the game's 15-frame double-tap window so the
-            # policy can distinguish a fresh tap from an old one.
-            "left_press_age_norm": lean_press_age_norm(self.left_press_age_frames),
-            "right_press_age_norm": lean_press_age_norm(self.right_press_age_frames),
-        }
 
     def action_mask_override(self, *, episode_frame_index: int) -> tuple[int, ...] | None:
         """Return live lean branch restrictions implied by the selected mode."""
@@ -237,22 +209,3 @@ def replace_lean_index(control_state: ControllerState, lean_index: int) -> Contr
         right_stick_x=control_state.right_stick_x,
         right_stick_y=control_state.right_stick_y,
     )
-
-
-def advance_press_age(
-    previous_age_frames: int,
-    *,
-    was_held: bool,
-    is_held: bool,
-    frames_elapsed: int,
-) -> int:
-    guard_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
-    if is_held and not was_held:
-        return min(frames_elapsed, guard_frames)
-    return min(previous_age_frames + frames_elapsed, guard_frames)
-
-
-def lean_press_age_norm(frames: int) -> float:
-    guard_frames = OBSERVATION_STATE_DEFAULTS.lean_tap_guard_frames
-    clamped_frames = min(max(int(frames), 0), guard_frames)
-    return clamped_frames / guard_frames

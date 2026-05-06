@@ -114,6 +114,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             config_path=args.config_path,
             policy_run_dir=args.policy_run_dir,
             policy_artifact=args.policy_artifact,
+            manager_db_path=None,
+            managed_run_id=None,
             overrides=args.overrides,
         )
         config = with_deterministic_policy(config, deterministic=args.deterministic)

@@ -40,6 +40,7 @@ def _load_saved_policy(
     *,
     run_dir: Path | None = None,
     device: str = "cpu",
+    algorithm: str | None = None,
 ) -> _HasPredict:
     """Load one saved policy-only SB3 artifact."""
 
@@ -48,7 +49,7 @@ def _load_saved_policy(
 
     _ensure_policy_dependencies_loaded()
 
-    algorithm = _load_saved_policy_algorithm(run_dir)
+    algorithm = _load_saved_policy_algorithm(run_dir, explicit_algorithm=algorithm)
     if algorithm in TRAINING_ALGORITHMS.full_model_policy:
         if run_dir is None:
             raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
@@ -174,7 +175,12 @@ def _full_model_class_for_algorithm(algorithm: str):
     raise ValueError(f"Unsupported full-model policy algorithm: {algorithm!r}")
 
 
-def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
+def _load_saved_policy_algorithm(
+    run_dir: Path | None,
+    explicit_algorithm: str | None = None,
+) -> str:
+    if explicit_algorithm is not None:
+        return explicit_algorithm
     if run_dir is None:
         raise RuntimeError("Saved policy loading requires the source run directory")
 

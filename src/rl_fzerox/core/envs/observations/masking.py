@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from typing import overload
 
 import numpy as np
 
 from fzerox_emulator.arrays import StateVector
 
 from .value import ObservationValue
+
 
 def state_feature_indices(
     feature_names: Sequence[str],
@@ -25,27 +25,11 @@ def state_feature_indices(
     )
 
 
-@overload
 def mask_observation_state(
     observation: ObservationValue,
     *,
     feature_indices: Sequence[int],
-) -> ObservationValue: ...
-
-
-@overload
-def mask_observation_state(
-    observation: dict[str, object],
-    *,
-    feature_indices: Sequence[int],
-) -> dict[str, object]: ...
-
-
-def mask_observation_state(
-    observation: ObservationValue | dict[str, object],
-    *,
-    feature_indices: Sequence[int],
-) -> ObservationValue | dict[str, object]:
+) -> ObservationValue:
     """Return one observation with the selected state-vector indices zeroed."""
 
     if not feature_indices:

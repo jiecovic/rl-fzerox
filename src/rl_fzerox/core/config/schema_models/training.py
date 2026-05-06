@@ -91,6 +91,7 @@ class TrainConfig(BaseModel):
     explicit_run_dir: Path | None = None
     continue_run_dir: Path | None = None
     resume_run_dir: Path | None = None
+    resume_source_algorithm: TrainAlgorithmName | None = None
     resume_artifact: ResumeArtifact = "latest"
     resume_mode: ResumeMode = "weights_only"
 

@@ -54,7 +54,7 @@ def test_reset_returns_stacked_observation():
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 3, 2, 3]
+    assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
 
 
 def test_reset_can_return_image_state_observation() -> None:
@@ -73,7 +73,11 @@ def test_reset_can_return_image_state_observation() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            observation=ObservationConfig(mode="image_state", frame_stack=4),
+            observation=ObservationConfig(
+                mode="image_state",
+                frame_stack=4,
+                state_components=("vehicle_state",),
+            ),
         ),
     )
 
@@ -83,26 +87,23 @@ def test_reset_can_return_image_state_observation() -> None:
     assert set(obs) == {"image", "state"}
     assert obs["image"].shape == (116, 164, 12)
     assert obs["image"].dtype == np.uint8
-    assert obs["state"].shape == (11,)
+    assert obs["state"].shape == (8,)
     assert obs["state"].dtype == np.float32
     assert obs["state"].tolist() == pytest.approx(
-        [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
+        [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
     )
     assert info["observation_mode"] == "image_state"
     assert info["observation_shape"] == (116, 164, 12)
-    assert info["observation_state_shape"] == (11,)
+    assert info["observation_state_shape"] == (8,)
     assert info["observation_state_features"] == (
-        "speed_norm",
-        "energy_frac",
-        "reverse_active",
-        "airborne",
-        "can_boost",
-        "boost_active",
-        "left_lean_held",
-        "right_lean_held",
-        "left_press_age_norm",
-        "right_press_age_norm",
-        "recent_boost_pressure",
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "vehicle_state.lateral_velocity_norm",
+        "vehicle_state.sliding_active",
     )
 
 

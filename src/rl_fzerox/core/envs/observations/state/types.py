@@ -8,10 +8,11 @@ import numpy as np
 
 from fzerox_emulator.arrays import Float32Array
 from rl_fzerox.core.domain.observation_components import (
-    ActionHistoryControlName as ActionHistoryControl,
+    ActionHistoryControlName,
 )
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
+ActionHistoryControl: TypeAlias = ActionHistoryControlName
 
 
 @dataclass(frozen=True, slots=True)
@@ -21,8 +22,6 @@ class ObservationStateDefaults:
     builtin_course_count: int = 24
     speed_normalizer_kph: float = 1_500.0
     lean_tap_guard_frames: int = 15
-    recent_boost_window_frames: int = 120
-    recent_steer_window_frames: int = 30
     lateral_velocity_normalizer: float = 32.0
     sliding_lateral_velocity_threshold: float = 8.0
 
@@ -44,10 +43,6 @@ class StateVectorSpec:
     """Ordered scalar state schema appended to image observations."""
 
     features: tuple[StateFeature, ...]
-    speed_normalizer_kph: float
-    lean_tap_guard_frames: int
-    recent_boost_window_frames: int
-    recent_steer_window_frames: int
 
     @property
     def names(self) -> tuple[str, ...]:

@@ -9,8 +9,17 @@ import numpy as np
 
 from rl_fzerox.core.config.schema import EnvConfig, TrainConfig
 from rl_fzerox.core.envs.observations import mask_observation_state, state_feature_names
+from rl_fzerox.core.seed import derive_seed
 
-_STATE_FEATURE_DROPOUT_SEED_DOMAIN = 0x34C2_2E5B_7B67_021D
+
+@dataclass(frozen=True, slots=True)
+class _TrainingAugmentationSeedDomains:
+    """Domain separators for train-only observation augmentation RNG streams."""
+
+    state_feature_dropout: int = 0x34C2_2E5B_7B67_021D
+
+
+_TRAINING_AUGMENTATION_SEED_DOMAINS = _TrainingAugmentationSeedDomains()
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,8 +67,12 @@ class EpisodeStateFeatureDropoutWrapper(gym.ObservationWrapper):
         options: dict[str, object] | None = None,
     ):
         observation, info = self.env.reset(seed=seed, options=options)
-        if seed is not None:
-            self._rng = np.random.default_rng(seed ^ _STATE_FEATURE_DROPOUT_SEED_DOMAIN)
+        derived_seed = derive_seed(
+            seed,
+            _TRAINING_AUGMENTATION_SEED_DOMAINS.state_feature_dropout,
+        )
+        if derived_seed is not None:
+            self._rng = np.random.default_rng(derived_seed)
         dropped_indices: set[int] = set()
         for group in self._dropout_groups:
             if group.dropout_prob >= 1.0:

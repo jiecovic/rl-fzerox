@@ -117,7 +117,6 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
         assert source_run_dir == source_run.run_dir
         assert artifact == "latest"
         destination_dir.mkdir(parents=True, exist_ok=True)
-        (destination_dir / "train_config.yaml").write_text("train: {}\n", encoding="utf-8")
         return 123_456
 
     monkeypatch.setattr(
@@ -333,7 +332,7 @@ def test_manager_store_rejects_legacy_state_modes(
         store.list_drafts()
 
 
-def test_manager_store_normalizes_legacy_vehicle_fields(tmp_path: Path) -> None:
+def test_manager_store_rejects_legacy_vehicle_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -365,14 +364,8 @@ def test_manager_store_normalizes_legacy_vehicle_fields(tmp_path: Path) -> None:
             ),
         )
 
-    draft = store.list_drafts()[0]
-
-    assert draft.config.vehicle.selection_mode == "pool"
-    assert draft.config.vehicle.selected_vehicle_ids == ("golden_fox",)
-    assert draft.config.vehicle.engine_mode == "fixed"
-    assert draft.config.vehicle.engine_setting_raw_value == 65
-    assert draft.config.vehicle.engine_setting_min_raw_value == 65
-    assert draft.config.vehicle.engine_setting_max_raw_value == 65
+    with pytest.raises(ValidationError):
+        store.list_drafts()
 
 
 def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
@@ -407,9 +400,24 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     draft = store.list_drafts()[0]
 
     assert draft.config.action.action_repeat == 2
+    assert draft.config.action.steering_mode == "continuous"
+    assert draft.config.action.drive_mode == "on_off"
+    assert draft.config.action.force_full_throttle is False
+    assert draft.config.action.include_air_brake is True
+    assert draft.config.action.enable_air_brake is True
+    assert draft.config.action.boost_unmask_max_speed_kph is None
+    assert draft.config.action.boost_min_energy_fraction == 0.1
+    assert draft.config.action.lean_output_mode == "three_way"
+    assert draft.config.action.lean_mode == "release_cooldown"
+    assert draft.config.action.lean_unmask_min_speed_kph is None
+    assert draft.config.action.lean_initial_lockout_frames == 0
+    assert draft.config.action.include_pitch is True
+    assert draft.config.action.enable_pitch is True
+    assert draft.config.action.pitch_mode == "discrete"
+    assert draft.config.action.pitch_buckets == 5
 
 
-def test_manager_store_normalizes_legacy_progress_suspend_field(tmp_path: Path) -> None:
+def test_manager_store_rejects_legacy_progress_suspend_field(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -440,24 +448,8 @@ def test_manager_store_normalizes_legacy_progress_suspend_field(tmp_path: Path) 
             ),
         )
 
-    draft = store.list_drafts()[0]
-
-    assert draft.config.reward.suspend_progress_while_outside_track_bounds is True
-    assert draft.config.action.steering_mode == "continuous"
-    assert draft.config.action.drive_mode == "on_off"
-    assert draft.config.action.force_full_throttle is False
-    assert draft.config.action.include_air_brake is True
-    assert draft.config.action.enable_air_brake is True
-    assert draft.config.action.boost_unmask_max_speed_kph is None
-    assert draft.config.action.boost_min_energy_fraction == 0.1
-    assert draft.config.action.lean_output_mode == "three_way"
-    assert draft.config.action.lean_mode == "release_cooldown"
-    assert draft.config.action.lean_unmask_min_speed_kph is None
-    assert draft.config.action.lean_initial_lockout_frames == 0
-    assert draft.config.action.include_pitch is True
-    assert draft.config.action.enable_pitch is True
-    assert draft.config.action.pitch_mode == "discrete"
-    assert draft.config.action.pitch_buckets == 5
+    with pytest.raises(ValidationError):
+        store.list_drafts()
 
 
 def test_manager_store_creates_run_record_without_filesystem_artifacts(tmp_path: Path) -> None:
