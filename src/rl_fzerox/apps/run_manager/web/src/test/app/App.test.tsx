@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/app/App";
+import { ApiSchemaMismatchError } from "@/shared/api/client";
 import {
   configMetadataFixture,
   draftFixture,
@@ -213,6 +214,17 @@ describe("App", () => {
     );
     await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
     expect(screen.getByRole("button", { name: /^ppo_test_1 draft/i })).toBeInTheDocument();
+  });
+
+  it("shows a generic restart message for backend schema mismatch", async () => {
+    loadManagerDataMock.mockRejectedValueOnce(new ApiSchemaMismatchError());
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("Run-manager backend is outdated. Restart run-manager."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/\[\s*\{/)).not.toBeInTheDocument();
   });
 
   it("shows forked sim game time with lineage step offset included", async () => {
