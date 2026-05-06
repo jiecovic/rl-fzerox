@@ -10,22 +10,42 @@ const LEGACY_SAMPLE_FIELD_BY_METRIC_KEY: Partial<Record<string, keyof ManagedRun
   "train/value_loss": "value_loss",
 };
 
+const metricPointsCache = new WeakMap<
+  readonly ManagedRunMetricSample[],
+  Map<string, RunPlotPoint[]>
+>();
+const envStepRatePointsCache = new WeakMap<
+  readonly ManagedRunMetricSample[],
+  Map<string, RunPlotPoint[]>
+>();
+
 export function metricPoints(samples: ManagedRunMetricSample[], key: string) {
-  return samples
+  const cached = cachedPoints(metricPointsCache, samples, key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const points = samples
     .map((sample) => {
       const value = metricValueFromSample(sample, key);
       return value === undefined ? null : { step: chartStep(sample), value };
     })
     .filter((point): point is RunPlotPoint => point !== null);
+  return withCachedPoints(metricPointsCache, samples, key, points);
 }
 
 export function buildEnvStepRatePoints(run: ManagedRun, samples: ManagedRunMetricSample[]) {
-  return samples
+  const cacheKey = `${run.id}:${run.started_at ?? run.created_at}`;
+  const cached = cachedPoints(envStepRatePointsCache, samples, cacheKey);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const points = samples
     .map((sample, index) => {
       const value = sampleEnvStepRateValue(run, samples, index);
       return value === null ? null : { step: chartStep(sample), value };
     })
     .filter((point): point is RunPlotPoint => point !== null);
+  return withCachedPoints(envStepRatePointsCache, samples, cacheKey, points);
 }
 
 function metricValueFromSample(sample: ManagedRunMetricSample, key: string) {
@@ -76,4 +96,44 @@ function sampleEnvStepRateValue(run: ManagedRun, samples: ManagedRunMetricSample
 
 function chartStep(sample: ManagedRunMetricSample) {
   return sample.lineage_num_timesteps;
+}
+
+function cachedPoints(
+  cache: WeakMap<readonly ManagedRunMetricSample[], Map<string, RunPlotPoint[]>>,
+  samples: readonly ManagedRunMetricSample[],
+  key: string,
+) {
+  return cache.get(samples)?.get(key);
+}
+
+function withCachedPoints(
+  cache: WeakMap<readonly ManagedRunMetricSample[], Map<string, RunPlotPoint[]>>,
+  samples: readonly ManagedRunMetricSample[],
+  key: string,
+  points: RunPlotPoint[],
+) {
+  const adjusted = withForkBoundaryPoint(samples, points);
+  const entry = cache.get(samples);
+  if (entry === undefined) {
+    cache.set(samples, new Map([[key, adjusted]]));
+  } else {
+    entry.set(key, adjusted);
+  }
+  return adjusted;
+}
+
+function withForkBoundaryPoint(
+  samples: readonly ManagedRunMetricSample[],
+  points: readonly RunPlotPoint[],
+): RunPlotPoint[] {
+  const firstSample = samples[0];
+  const firstPoint = points[0];
+  if (firstSample === undefined || firstPoint === undefined) {
+    return [...points];
+  }
+  const offset = firstSample.lineage_num_timesteps - firstSample.num_timesteps;
+  if (offset <= 0 || firstPoint.step <= offset) {
+    return [...points];
+  }
+  return [{ step: offset, value: firstPoint.value }, ...points];
 }

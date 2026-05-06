@@ -79,13 +79,16 @@ def test_watch_rejects_artifact_without_run_dir(
 
     with pytest.raises(
         SystemExit,
-        match="--artifact requires --run-dir or watch.policy_run_dir",
+        match="--artifact requires --run-dir, --managed-run-id, or watch.policy_run_dir",
     ):
         main(["--config", str(tmp_path / "watch.yaml"), "--artifact", "best"])
 
 
 def test_watch_rejects_missing_config_without_run_dir() -> None:
-    with pytest.raises(SystemExit, match="--config is required unless --run-dir is provided"):
+    with pytest.raises(
+        SystemExit,
+        match="--config is required unless --run-dir or --managed-run-id is provided",
+    ):
         main([])
 
 
@@ -177,6 +180,8 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
         config_path=None,
         policy_run_dir=run_dir,
         policy_artifact="best",
+        manager_db_path=None,
+        managed_run_id=None,
         overrides=[],
     )
 
@@ -234,6 +239,8 @@ def test_resolve_watch_app_config_disables_track_sampling_for_x_cup_watch(
         config_path=None,
         policy_run_dir=run_dir,
         policy_artifact="latest",
+        manager_db_path=None,
+        managed_run_id=None,
         overrides=["watch.x_cup.enabled=true"],
     )
 
@@ -408,10 +415,12 @@ def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.Mon
         *,
         artifact: str,
         device: str,
+        algorithm: str | None = None,
     ) -> str:
         captured["run_dir"] = run_dir
         captured["artifact"] = artifact
         captured["device"] = device
+        captured["algorithm"] = algorithm
         return "runner"
 
     monkeypatch.setattr(
@@ -425,6 +434,7 @@ def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.Mon
         "run_dir": run_dir,
         "artifact": "best",
         "device": "cpu",
+        "algorithm": None,
     }
 
 

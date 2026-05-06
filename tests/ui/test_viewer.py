@@ -8,10 +8,6 @@ from rl_fzerox.core.config.schema import (
     PolicyConfig,
     TrainConfig,
 )
-from rl_fzerox.core.envs.observations import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    state_feature_names,
-)
 from rl_fzerox.ui.watch.view.components.macro_legend import (
     MACRO_LEGEND_HINTS,
     _macro_legend_rows,
@@ -409,6 +405,16 @@ def test_macro_legend_wraps_inside_preview_column() -> None:
 
 
 def test_side_panel_can_show_policy_observation_state_vector() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "vehicle_state.lateral_velocity_norm",
+        "vehicle_state.sliding_active",
+    )
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -425,35 +431,47 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         observation_state=np.array(
-            [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.2, 0.25],
+            [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.25, 1.0],
             dtype=np.float32,
         ),
-        observation_state_feature_names=DEFAULT_STATE_VECTOR_SPEC.names,
+        observation_state_feature_names=feature_names,
         telemetry=_sample_telemetry(),
     )
 
     state_vector_section = next(
         section for section in columns.stats if section.title == "State Vector"
     )
-    values = _panel_group_values(state_vector_section, "State")
+    values = _panel_group_values(state_vector_section, "Vehicle")
 
     assert values == {
         "speed_norm": "0.500",
         "energy_frac": "0.750",
         "reverse_active": "1.000",
         "airborne": "0.000",
-        "can_boost": "1.000",
+        "boost_unlocked": "1.000",
         "boost_active": "0.000",
-        "left_lean_held": "0.000",
-        "right_lean_held": "1.000",
-        "left_press_age_norm": "1.000",
-        "right_press_age_norm": "0.200",
-        "recent_boost_pressure": "0.250",
+        "lateral_velocity_norm": "0.250",
+        "sliding_active": "1.000",
     }
 
 
-def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
-    feature_names = state_feature_names("race_core", action_history_len=2)
+def test_side_panel_splits_component_action_history_from_state_vector() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "control_history.prev_steer_1",
+        "control_history.prev_steer_2",
+        "control_history.prev_thrust_1",
+        "control_history.prev_thrust_2",
+        "control_history.prev_boost_1",
+        "control_history.prev_boost_2",
+        "control_history.prev_lean_1",
+        "control_history.prev_lean_2",
+    )
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -478,19 +496,19 @@ def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
         section for section in columns.stats if section.title == "State Vector"
     )
 
-    assert _panel_group_labels(state_vector_section, "State") == [
+    assert _panel_group_labels(state_vector_section, "Vehicle") == [
         "speed_norm",
         "energy_frac",
         "reverse_active",
         "airborne",
-        "can_boost",
+        "boost_unlocked",
         "boost_active",
     ]
     assert _panel_group_labels(state_vector_section, "Control History") == [
         "prev_steer_1",
         "prev_steer_2",
-        "prev_gas_1",
-        "prev_gas_2",
+        "prev_thrust_1",
+        "prev_thrust_2",
         "prev_boost_1",
         "prev_boost_2",
         "prev_lean_1",

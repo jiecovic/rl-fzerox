@@ -2,6 +2,12 @@ import { useEffect, useState } from "react";
 import type { ManagedRun, TrackSamplingRuntimeState } from "@/shared/api/contract";
 
 export type CheckpointArtifact = "latest" | "best";
+export type WatchToastTone = "info" | "error";
+
+export interface WatchToastState {
+  message: string;
+  tone: WatchToastTone;
+}
 
 export interface RunWorkspaceActionsProps {
   clearTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
@@ -19,7 +25,6 @@ export interface RunWorkspaceActionsProps {
 
 export interface RunWorkspaceActionState {
   canRename: boolean;
-  controlNotice: string | null;
   canResume: boolean;
   canStop: boolean;
   controlError: string | null;
@@ -41,6 +46,7 @@ export interface RunWorkspaceActionState {
   selectedArtifact: CheckpointArtifact;
   setSelectedArtifact: (artifact: CheckpointArtifact) => void;
   stopRun: () => Promise<void>;
+  watchToast: WatchToastState | null;
   watchRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
   watchingArtifact: CheckpointArtifact | null;
 }
@@ -59,7 +65,7 @@ export function useRunWorkspaceActions({
   runName,
 }: RunWorkspaceActionsProps): RunWorkspaceActionState {
   const [controlError, setControlError] = useState<string | null>(null);
-  const [controlNotice, setControlNotice] = useState<string | null>(null);
+  const [watchToast, setWatchToast] = useState<WatchToastState | null>(null);
   const [copiedRunId, setCopiedRunId] = useState(false);
   const [isOpeningDirectory, setIsOpeningDirectory] = useState(false);
   const [isCreatingDraftFromRun, setIsCreatingDraftFromRun] = useState(false);
@@ -84,21 +90,21 @@ export function useRunWorkspaceActions({
   }, [copiedRunId]);
 
   useEffect(() => {
-    if (controlNotice === null) {
+    if (watchToast === null) {
       return undefined;
     }
     const timeoutId = window.setTimeout(() => {
-      setControlNotice(null);
-    }, 1_800);
+      setWatchToast(null);
+    }, 3_200);
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [controlNotice]);
+  }, [watchToast]);
 
   async function resumeRun() {
     setIsResuming(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onResume(run.id);
     } catch (caught) {
@@ -111,7 +117,7 @@ export function useRunWorkspaceActions({
   async function stopRun() {
     setIsStopping(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onStop(run.id);
     } catch (caught) {
@@ -124,7 +130,7 @@ export function useRunWorkspaceActions({
   async function renameRunLabel() {
     setIsRenaming(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onRename(run.id, runName.trim());
     } catch (caught) {
@@ -137,7 +143,7 @@ export function useRunWorkspaceActions({
   async function openRunDirectoryInBrowser() {
     setIsOpeningDirectory(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onOpenDirectory(run.id);
     } catch (caught) {
@@ -150,7 +156,7 @@ export function useRunWorkspaceActions({
   async function forkRunArtifact(artifact: CheckpointArtifact) {
     setIsForking(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onFork(run.id, artifact);
     } catch (caught) {
@@ -163,7 +169,7 @@ export function useRunWorkspaceActions({
   async function createDraftFromRun() {
     setIsCreatingDraftFromRun(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onCreateDraftFromRun(run.id);
     } catch (caught) {
@@ -176,14 +182,20 @@ export function useRunWorkspaceActions({
   async function watchRunArtifact(artifact: CheckpointArtifact) {
     setWatchingArtifact(artifact);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       const status = await onWatch(run.id, artifact);
       if (status === "already_running") {
-        setControlNotice(`${artifact} watch is already running`);
+        setWatchToast({
+          message: `${artifact} watch is already running`,
+          tone: "info",
+        });
       }
     } catch (caught) {
-      setControlError(caught instanceof Error ? caught.message : `failed to watch ${artifact}`);
+      setWatchToast({
+        message: caught instanceof Error ? caught.message : `failed to watch ${artifact}`,
+        tone: "error",
+      });
     } finally {
       setWatchingArtifact((current) => (current === artifact ? null : current));
     }
@@ -192,7 +204,7 @@ export function useRunWorkspaceActions({
   async function resetTrackPoolState() {
     setIsResettingTrackPool(true);
     setControlError(null);
-    setControlNotice(null);
+    setWatchToast(null);
     try {
       await onResetTrackPool(run.id);
       clearTrackSamplingState(null);
@@ -210,7 +222,7 @@ export function useRunWorkspaceActions({
       await navigator.clipboard.writeText(run.id);
       setCopiedRunId(true);
       setControlError(null);
-      setControlNotice(null);
+      setWatchToast(null);
     } catch {
       setControlError("failed to copy run id");
     }
@@ -232,7 +244,6 @@ export function useRunWorkspaceActions({
     canResume,
     canStop,
     controlError,
-    controlNotice,
     copiedRunId,
     copyRunId,
     createDraftFromRun,
@@ -251,6 +262,7 @@ export function useRunWorkspaceActions({
     selectedArtifact,
     setSelectedArtifact,
     stopRun,
+    watchToast,
     watchRunArtifact,
     watchingArtifact,
   };

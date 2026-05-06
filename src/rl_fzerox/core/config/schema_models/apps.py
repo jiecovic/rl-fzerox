@@ -12,7 +12,7 @@ from rl_fzerox.core.config.schema_models.env import EmulatorConfig, EnvConfig, R
 from rl_fzerox.core.config.schema_models.policy import PolicyConfig
 from rl_fzerox.core.config.schema_models.tracks import TrackConfig
 from rl_fzerox.core.config.schema_models.training import TrainConfig
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 
 
 class WatchXCupConfig(BaseModel):
@@ -35,6 +35,7 @@ class WatchConfig(BaseModel):
     device: Literal["auto", "cpu", "cuda"] = "cpu"
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
+    policy_algorithm: TrainAlgorithmName | None = None
     x_cup: WatchXCupConfig = Field(default_factory=WatchXCupConfig)
 
     @model_validator(mode="after")

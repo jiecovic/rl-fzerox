@@ -5,7 +5,6 @@ import numpy as np
 import pygame
 
 from fzerox_emulator import ControllerState, display_size
-from rl_fzerox.core.envs.observations import state_feature_names
 from rl_fzerox.ui.watch.app import _next_panel_tab_index
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.view.panels.core.model import (
@@ -228,7 +227,16 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
 
     try:
         fonts = _create_fonts(pygame)
-        feature_names = state_feature_names("steer_history")
+        feature_names = (
+            "vehicle_state.speed_norm",
+            "vehicle_state.energy_frac",
+            "vehicle_state.reverse_active",
+            "vehicle_state.airborne",
+            "vehicle_state.boost_unlocked",
+            "vehicle_state.boost_active",
+            "control_history.prev_steer_1",
+            "control_history.prev_lean_1",
+        )
         observation_shape = (84, 116, 3)
         columns = _build_panel_columns(
             episode=0,

@@ -43,4 +43,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Which saved policy artifact to load from the run directory.",
     )
+    parser.add_argument(
+        "--manager-db-path",
+        dest="manager_db_path",
+        type=Path,
+        default=None,
+        help="Optional manager SQLite path for manager-owned watch sessions.",
+    )
+    parser.add_argument(
+        "--managed-run-id",
+        dest="managed_run_id",
+        default=None,
+        help="Optional run-manager run id to resolve watch config from SQLite.",
+    )
     return parser.parse_args(argv)
