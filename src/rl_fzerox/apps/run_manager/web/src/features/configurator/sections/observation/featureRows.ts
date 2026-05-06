@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/featureRows.ts
 import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
 
 import { stateFeatureInfo } from "../stateFeatureInfo";

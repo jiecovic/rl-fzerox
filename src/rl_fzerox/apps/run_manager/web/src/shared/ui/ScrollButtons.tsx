@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/ScrollButtons.tsx
 import { useEffect, useState } from "react";
 import { ArrowDownIcon, ArrowUpIcon } from "@/shared/ui/icons";
 

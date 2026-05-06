@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/runtime_spec/__init__.py
 """Public runtime-spec façade used by env, training, and manifest IO.
 
 The run-manager-owned ``core.manager.run_spec`` package is the canonical

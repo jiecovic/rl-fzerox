@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/disclosureState.ts
 export type RewardDisclosureId =
   | "time"
   | "progress"

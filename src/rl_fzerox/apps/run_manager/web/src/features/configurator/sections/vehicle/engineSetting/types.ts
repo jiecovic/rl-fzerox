@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/vehicle/engineSetting/types.ts
 export type EngineMode = "fixed" | "random_range";
 export type RangeHandle = "min" | "max";
 

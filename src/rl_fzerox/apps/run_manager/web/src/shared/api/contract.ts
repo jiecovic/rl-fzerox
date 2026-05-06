@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/api/contract.ts
 import { z } from "zod";
 
 const runStatusSchema = z.enum(["created", "running", "paused", "stopped", "finished", "failed"]);

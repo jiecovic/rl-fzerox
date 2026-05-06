@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts/run_plot_card/types.ts
 import type UPlot from "uplot";
 
 export type RunPlotPoint = { step: number; value: number };

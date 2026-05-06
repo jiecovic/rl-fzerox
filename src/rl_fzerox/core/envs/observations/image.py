@@ -1,4 +1,3 @@
-# src/rl_fzerox/core/envs/observation_image.py
 # src/rl_fzerox/core/envs/observations/image.py
 from __future__ import annotations
 

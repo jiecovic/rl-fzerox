@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/envs/actions/buttons.py
 """Canonical RetroPad-to-F-Zero control masks.
 
 The emulator button wiring is fixed for the managed runtime surface, so this

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/format.ts
 export function formatDate(value: string) {
   return value.replace("T", " ").replace("+00:00", " UTC");
 }

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/drafts/DraftsPanel.tsx
 import { useState } from "react";
 import type { ManagedDraft } from "@/shared/api/contract";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";

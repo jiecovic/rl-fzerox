@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/FieldInputs.test.tsx
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 

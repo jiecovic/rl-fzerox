@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/Panel.tsx
 import type { ReactNode } from "react";
 
 interface PanelProps {

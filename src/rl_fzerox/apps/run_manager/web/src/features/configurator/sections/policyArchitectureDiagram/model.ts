@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/model.ts
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk.bundled.js";
 import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";

@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/projection/compat.py
 """Compatibility checks for forking from existing managed checkpoints."""
 
 from __future__ import annotations

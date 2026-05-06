@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/StateComponentPanels.tsx
 import { useEffect, useState } from "react";
 
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";

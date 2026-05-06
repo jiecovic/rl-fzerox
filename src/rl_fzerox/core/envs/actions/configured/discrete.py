@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/envs/actions/configured/discrete.py
 """Configured fully discrete action adapter."""
 
 from __future__ import annotations

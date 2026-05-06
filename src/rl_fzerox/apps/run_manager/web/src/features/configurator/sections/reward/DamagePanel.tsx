@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/DamagePanel.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { IntegerField, NumberField, OptionalRangePairField } from "@/features/configurator/fields";
 import { damageDefaults } from "@/features/configurator/sections/rewardDefaults";

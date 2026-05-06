@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/catalog.ts
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 

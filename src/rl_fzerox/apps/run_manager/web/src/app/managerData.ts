@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/managerData.ts
 import { fetchConfigMetadata, fetchDrafts, fetchRuns, fetchTemplates } from "@/shared/api/client";
 import type {
   ConfigMetadata,

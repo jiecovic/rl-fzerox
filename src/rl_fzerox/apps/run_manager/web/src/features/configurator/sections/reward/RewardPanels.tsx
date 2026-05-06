@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/RewardPanels.tsx
 import { DamagePanel } from "./DamagePanel";
 import { TimeProgressPanels } from "./TimeProgressPanels";
 import { TrackActionPanels } from "./TrackActionPanels";

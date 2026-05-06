@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/test/features/drafts/DraftsPanel.test.tsx
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/workspace/sessions/names.ts
 import type { DraftEditorSession, ForkSource } from "@/app/workspace/types";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 

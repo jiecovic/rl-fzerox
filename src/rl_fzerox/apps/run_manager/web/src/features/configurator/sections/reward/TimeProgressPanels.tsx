@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/TimeProgressPanels.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import {
   BooleanField,

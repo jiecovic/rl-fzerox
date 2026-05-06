@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/AuxiliaryBranchesDisclosure.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { BranchToggles } from "@/features/configurator/sections/action/auxiliary_branches/BranchToggles";
 import { resetAuxiliaryBranchesAction } from "@/features/configurator/sections/action/auxiliary_branches/model";

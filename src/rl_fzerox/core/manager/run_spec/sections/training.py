@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/run_spec/sections/training.py
 """Training-optimizer section of the manager-owned run-spec model."""
 
 from __future__ import annotations

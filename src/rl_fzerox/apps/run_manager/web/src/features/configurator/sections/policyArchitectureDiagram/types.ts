@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/types.ts
 import type { ElkNode } from "elkjs/lib/elk.bundled.js";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 

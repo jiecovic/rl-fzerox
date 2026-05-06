@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/RunActivityIndicator.tsx
 import { latestFailureMessage } from "@/features/runs/workspace/model";
 import type { ManagedRun } from "@/shared/api/contract";
 import { formatRelativeTime } from "@/shared/ui/format";

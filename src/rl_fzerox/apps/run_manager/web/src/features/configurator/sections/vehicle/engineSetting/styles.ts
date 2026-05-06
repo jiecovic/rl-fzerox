@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/vehicle/engineSetting/styles.ts
 import type { CSSProperties } from "react";
 
 export function thumbStyle(ratio: number): CSSProperties {

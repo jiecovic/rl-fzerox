@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/points.ts
 import type { RunPlotPoint } from "@/features/runs/charts/RunPlotCard";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
 

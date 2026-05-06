@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/disclosureState.ts
 import { useEffect, useState } from "react";
 
 export function usePersistentDisclosureMap<T extends Record<string, boolean>>(

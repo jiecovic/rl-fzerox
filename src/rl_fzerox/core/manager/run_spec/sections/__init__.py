@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/run_spec/sections/__init__.py
 """Section models for the manager-owned run-spec surface.
 
 Each module in this package maps cleanly to one editable surface in the

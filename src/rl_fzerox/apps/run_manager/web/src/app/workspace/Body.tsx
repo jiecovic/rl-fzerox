@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/workspace/Body.tsx
 import type { WorkspaceActions } from "@/app/workspace/actions";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import { Configurator } from "@/features/configurator/Configurator";

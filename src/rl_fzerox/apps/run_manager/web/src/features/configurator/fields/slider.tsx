@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/slider.tsx
 import type { CSSProperties } from "react";
 import { useState } from "react";
 

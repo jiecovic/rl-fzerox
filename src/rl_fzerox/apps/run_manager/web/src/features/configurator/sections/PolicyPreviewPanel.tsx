@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyPreviewPanel.tsx
 import { PolicyArchitectureDiagram } from "@/features/configurator/sections/PolicyArchitectureDiagram";
 import {
   formatConvSpatial,

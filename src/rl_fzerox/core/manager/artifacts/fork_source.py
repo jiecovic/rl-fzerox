@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/artifacts/fork_source.py
 """Pinned checkpoint snapshots used for managed forks and resumes.
 
 Each pinned fork source must be self-contained enough for a resumed child run

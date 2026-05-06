@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/ActionToggleRow.tsx
 import { ToggleSwitch } from "@/features/configurator/fields";
 
 export function ActionToggleRow({

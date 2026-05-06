@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/FeatureDimField.tsx
 import { useEffect, useState } from "react";
 import { SegmentedChoiceStrip } from "@/features/configurator/fields";
 import { formatInteger } from "@/features/configurator/fields/format";

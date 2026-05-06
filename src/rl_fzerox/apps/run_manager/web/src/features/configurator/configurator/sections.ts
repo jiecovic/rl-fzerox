@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/configurator/sections.ts
 export type ConfigSection =
   | "training"
   | "observation"

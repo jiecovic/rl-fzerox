@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/BranchToggles.tsx
 import { ActionToggleRow } from "@/features/configurator/sections/action/ActionToggleRow";
 import type {
   AuxiliaryActionConfig,

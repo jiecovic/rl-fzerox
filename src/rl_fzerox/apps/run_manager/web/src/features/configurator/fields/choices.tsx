@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/choices.tsx
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
 

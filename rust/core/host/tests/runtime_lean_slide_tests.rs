@@ -1,4 +1,4 @@
-// rust/core/host/runtime/lean_slide/tests.rs
+// rust/core/host/tests/runtime_lean_slide_tests.rs
 
 use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R};
 

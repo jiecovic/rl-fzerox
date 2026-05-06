@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/envs/actions/configured/layout.py
 """Shared configured-action layout rules.
 
 The configured discrete and hybrid adapters both derive branch sizes, neutral

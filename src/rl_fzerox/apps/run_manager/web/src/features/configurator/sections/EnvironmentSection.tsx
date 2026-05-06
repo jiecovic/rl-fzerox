@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/EnvironmentSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   BooleanField,
