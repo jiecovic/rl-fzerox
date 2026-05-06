@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/layout.ts
 import type { ElkNode } from "elkjs/lib/elk.bundled.js";
 
 import { elkLayoutOptions } from "./constants";

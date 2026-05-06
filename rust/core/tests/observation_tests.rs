@@ -1,4 +1,4 @@
-// rust/core/observation/tests.rs
+// rust/core/tests/observation_tests.rs
 
 use super::{ObservationCropProfile, ObservationPreset, ObservationStackMode};
 use crate::core::video::VideoCrop;

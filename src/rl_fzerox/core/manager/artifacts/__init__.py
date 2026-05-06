@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/artifacts/__init__.py
 """Disk-side helpers owned by the run manager.
 
 This package covers managed-run paths, pinned fork snapshots, and persisted

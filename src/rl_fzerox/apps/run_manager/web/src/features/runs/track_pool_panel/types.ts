@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/track_pool_panel/types.ts
 import type { ConfigMetadata, ManagedRun, TrackSamplingRuntimeState } from "@/shared/api/contract";
 
 export interface RunTrackPoolPanelProps {

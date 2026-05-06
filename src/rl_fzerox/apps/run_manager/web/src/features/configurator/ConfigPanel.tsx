@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/ConfigPanel.tsx
 import type { ReactNode } from "react";
 
 import { ResetIcon } from "@/shared/ui/icons";

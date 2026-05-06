@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/courseMinimapData.ts
 export const COURSE_MINIMAP_VIEW_BOX = "0 0 64 64";
 
 // Generated from local wiki-source minimap PNGs via contour tracing.

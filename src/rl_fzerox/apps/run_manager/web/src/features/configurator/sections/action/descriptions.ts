@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/descriptions.ts
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 export function leanModeDescription(mode: ManagedRunConfig["action"]["lean_mode"]) {

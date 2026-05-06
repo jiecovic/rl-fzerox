@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/types.ts
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 
 export interface ActionSectionProps {

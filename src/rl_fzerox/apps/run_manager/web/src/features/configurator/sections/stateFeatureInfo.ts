@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/stateFeatureInfo.ts
 interface FeatureInfo {
   label: string;
   help: string;

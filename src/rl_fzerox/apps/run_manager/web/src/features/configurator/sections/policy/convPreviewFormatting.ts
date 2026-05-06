@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/convPreviewFormatting.ts
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 
 type ConvLayerPreview = PolicyArchitecturePreview["conv_layers"][number];

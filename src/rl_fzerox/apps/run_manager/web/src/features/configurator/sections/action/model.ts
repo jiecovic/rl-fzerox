@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/model.ts
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 type ManagedActionConfig = ManagedRunConfig["action"];

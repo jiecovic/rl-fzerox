@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/ProgressSourceToggle.tsx
 import type { StateComponentConfig } from "@/shared/api/contract";
 
 import { progressOptionLabel, progressSourceOptions } from "./featureRows";

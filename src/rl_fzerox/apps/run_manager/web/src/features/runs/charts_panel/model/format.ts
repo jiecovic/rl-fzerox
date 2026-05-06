@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/format.ts
 const RUN_CHART_SERIES_PALETTE = [
   "var(--accent)",
   "var(--run-accent)",

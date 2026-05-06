@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/DisclosureToolbar.tsx
 import { CollapseAllIcon, ExpandAllIcon } from "@/shared/ui/icons";
 
 interface DisclosureToolbarProps {

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/ThemeToggle.tsx
 import { MoonIcon, SunIcon } from "@/shared/ui/icons";
 
 export type Theme = "light" | "dark";

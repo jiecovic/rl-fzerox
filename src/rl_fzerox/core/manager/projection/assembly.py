@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/projection/assembly.py
 """Assemble concrete training-schema fragments from manager config sections."""
 
 from __future__ import annotations

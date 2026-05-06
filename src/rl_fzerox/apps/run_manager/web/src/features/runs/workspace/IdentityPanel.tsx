@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/IdentityPanel.tsx
 import { FieldLabel } from "@/features/configurator/fields";
 import type { ManagedRun } from "@/shared/api/contract";
 

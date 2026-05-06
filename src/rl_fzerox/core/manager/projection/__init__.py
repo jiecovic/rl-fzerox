@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/projection/__init__.py
 """Projection from manager-owned run specs into launch/runtime training config."""
 
 from rl_fzerox.core.manager.projection.actions import (

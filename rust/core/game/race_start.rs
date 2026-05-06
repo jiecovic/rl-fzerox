@@ -1,3 +1,4 @@
+// rust/core/game/race_start.rs
 //! Native-owned RAM patching for deterministic F-Zero X race-start baselines.
 
 use crate::core::error::CoreError;

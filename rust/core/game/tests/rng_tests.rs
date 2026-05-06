@@ -1,4 +1,4 @@
-// rust/core/game/rng/tests.rs
+// rust/core/game/tests/rng_tests.rs
 
 use super::*;
 

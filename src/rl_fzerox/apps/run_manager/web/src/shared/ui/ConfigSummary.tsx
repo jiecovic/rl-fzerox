@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/ConfigSummary.tsx
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 export function ConfigSummary({ config }: { config: ManagedRunConfig }) {

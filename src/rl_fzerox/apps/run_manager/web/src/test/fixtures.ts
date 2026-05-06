@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/test/fixtures.ts
 import type {
   ConfigMetadata,
   ManagedDraft,

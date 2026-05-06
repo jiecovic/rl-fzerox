@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/auxiliary_branches/model.ts
 import type { AuxiliaryActionConfig } from "@/features/configurator/sections/action/auxiliary_branches/types";
 
 export function resetAuxiliaryBranchesAction({

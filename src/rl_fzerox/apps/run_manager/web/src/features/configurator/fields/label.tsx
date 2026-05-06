@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/label.tsx
 import type { FieldLabelProps } from "@/features/configurator/fields/types";
 import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 import { ResetIcon } from "@/shared/ui/icons";

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/Tabs.tsx
 import { CloseIcon } from "@/shared/ui/icons";
 
 export interface TabItem<T extends string> {

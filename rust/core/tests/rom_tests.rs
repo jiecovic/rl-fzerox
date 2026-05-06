@@ -1,4 +1,4 @@
-// rust/core/rom/tests.rs
+// rust/core/tests/rom_tests.rs
 
 use std::path::Path;
 

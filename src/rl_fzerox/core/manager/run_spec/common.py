@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/run_spec/common.py
 """Shared literals and aliases used across manager config sections."""
 
 from __future__ import annotations

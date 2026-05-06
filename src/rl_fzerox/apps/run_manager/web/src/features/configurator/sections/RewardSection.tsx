@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/RewardSection.tsx
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import type { ManagedRunConfig } from "@/shared/api/contract";

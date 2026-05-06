@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/basicNumbers.tsx
 import { useEffect, useState } from "react";
 
 import { formatEditableDecimal, formatInteger } from "@/features/configurator/fields/format";

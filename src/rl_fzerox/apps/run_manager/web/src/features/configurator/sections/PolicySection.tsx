@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicySection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { BooleanField, IntegerField, SelectField } from "@/features/configurator/fields";
 import { PolicyPreviewPanel } from "@/features/configurator/sections/PolicyPreviewPanel";

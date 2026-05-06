@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/configurator/ActionBar.tsx
 import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 interface ActionBarProps {

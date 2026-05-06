@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/TrackMinimap.tsx
 import {
   COURSE_MINIMAP_PATHS,
   COURSE_MINIMAP_VIEW_BOX,

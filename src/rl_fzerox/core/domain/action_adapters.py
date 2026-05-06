@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/domain/action_adapters.py
 """Shared action-adapter name type for the managed runtime surface."""
 
 from __future__ import annotations

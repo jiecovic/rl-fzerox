@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/vite.config.ts
 import { fileURLToPath, URL } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";

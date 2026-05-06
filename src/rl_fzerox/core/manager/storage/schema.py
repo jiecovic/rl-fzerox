@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/storage/schema.py
 """Current-schema bootstrap for the SQLite-backed manager registry."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/cup_banners/index.ts
 import jackBannerUrl from "./jack.svg";
 import jokerBannerUrl from "./joker.svg";
 import kingBannerUrl from "./king.svg";

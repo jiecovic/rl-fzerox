@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/VehicleSection.tsx
 import { useMemo } from "react";
 
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/runs/panel/LineageCard.tsx
 import { RunRow } from "@/features/runs/panel/RunRow";
 import type { RunLineageGroup } from "@/features/runs/panel/types";
 import type { ManagedRun } from "@/shared/api/contract";

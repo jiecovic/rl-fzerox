@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/TrackCupBanner.tsx
 import {
   CUP_BANNER_ASSETS,
   type CupBannerId,

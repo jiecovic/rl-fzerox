@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/artifacts/paths.py
 """Managed-run directory conventions under the local artifact tree."""
 
 from __future__ import annotations

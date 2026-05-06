@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/run_spec/run.py
 """Root manager-owned run-spec model.
 
 This module assembles the section models from ``run_spec.sections`` into the

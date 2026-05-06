@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyArchitectureDiagram.tsx
 import { useEffect, useState } from "react";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 

@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/constants.ts
 export const diagramMetrics = {
   canvasMinHeight: 230,
   canvasMinWidth: 1456,

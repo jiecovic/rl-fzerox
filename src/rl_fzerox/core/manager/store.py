@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/store.py
 """Public store facade over manager registry, storage bootstrap, and artifacts."""
 
 from __future__ import annotations

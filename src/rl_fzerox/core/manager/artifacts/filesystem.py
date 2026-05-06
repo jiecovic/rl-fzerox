@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/artifacts/filesystem.py
 """Persisted filesystem mutations owned by the manager registry."""
 
 from __future__ import annotations

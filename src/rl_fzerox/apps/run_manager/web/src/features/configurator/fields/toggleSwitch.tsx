@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/toggleSwitch.tsx
 interface ToggleSwitchProps {
   checked: boolean;
   disabled?: boolean;

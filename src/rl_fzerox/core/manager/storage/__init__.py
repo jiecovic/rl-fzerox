@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/storage/__init__.py
 """SQLite schema and serialization helpers for the manager registry."""
 
 from rl_fzerox.core.manager.storage.schema import initialize_manager_schema

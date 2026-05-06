@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/storage/serialization.py
 """Canonical JSON serialization for manager-owned run-spec snapshots."""
 
 from __future__ import annotations

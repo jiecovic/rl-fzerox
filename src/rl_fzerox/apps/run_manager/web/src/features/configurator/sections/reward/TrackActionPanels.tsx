@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/TrackActionPanels.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { IntegerField, NumberField } from "@/features/configurator/fields";
 import {

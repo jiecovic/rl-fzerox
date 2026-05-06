@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/fixtures/web.py
 """Export frontend test fixtures from the canonical manager backend surface."""
 
 from __future__ import annotations

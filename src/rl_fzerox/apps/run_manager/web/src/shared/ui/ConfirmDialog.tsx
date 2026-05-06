@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/shared/ui/ConfirmDialog.tsx
 import { useEffect } from "react";
 
 interface ConfirmDialogProps {

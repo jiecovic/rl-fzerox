@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/workspace/types.ts
 import type { ManagedDraft, ManagedRunConfig } from "@/shared/api/contract";
 
 export type WorkspaceTabId = "drafts" | "runs" | "charts" | `editor:${string}` | `run:${string}`;

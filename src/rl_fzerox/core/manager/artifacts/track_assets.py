@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/artifacts/track_assets.py
 """Local optional artwork assets used by manager metadata and previews."""
 
 from __future__ import annotations

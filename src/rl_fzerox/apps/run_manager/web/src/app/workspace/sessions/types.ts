@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/workspace/sessions/types.ts
 import type { Dispatch, SetStateAction } from "react";
 
 import type {

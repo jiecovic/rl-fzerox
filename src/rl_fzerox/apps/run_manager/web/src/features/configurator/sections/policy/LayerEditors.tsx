@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policy/LayerEditors.tsx
 import { useRef } from "react";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import {

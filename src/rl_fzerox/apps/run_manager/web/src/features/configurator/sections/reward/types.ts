@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/types.ts
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 import type { RewardDisclosureState } from "./disclosureState";

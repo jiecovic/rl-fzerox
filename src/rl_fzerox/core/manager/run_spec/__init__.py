@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/manager/run_spec/__init__.py
 """Canonical manager-owned run-spec surface.
 
 The package root is intentionally small:

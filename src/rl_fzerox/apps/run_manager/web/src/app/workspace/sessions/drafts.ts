@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/app/workspace/sessions/drafts.ts
 import { draftForkSource, normalizeDraftTabTitle } from "@/app/workspace/model";
 import type { DraftEditorSession } from "@/app/workspace/types";
 import type { ManagedDraft } from "@/shared/api/contract";
