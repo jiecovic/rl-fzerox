@@ -1,4 +1,10 @@
-"""Pinned checkpoint snapshots used for managed forks and resumes."""
+"""Pinned checkpoint snapshots used for managed forks and resumes.
+
+Each pinned fork source must be self-contained enough for a resumed child run
+to validate and reload its source checkpoint without reaching back into the
+parent run directory. That includes the resolved checkpoint artifacts and the
+saved train manifest used by resume/preload safety checks.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +16,7 @@ from rl_fzerox.core.training.runs import (
     RUN_LAYOUT,
     resolve_model_artifact_path,
     resolve_policy_artifact_path,
+    resolve_train_run_config_path,
 )
 from rl_fzerox.core.training.session import load_policy_artifact_metadata
 
@@ -53,8 +60,11 @@ def snapshot_fork_source(
     destination_policy_path = resolved_destination_dir / _artifact_policy_filename(artifact)
     destination_model_path.parent.mkdir(parents=True, exist_ok=True)
     destination_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    source_config_path = resolve_train_run_config_path(resolved_source_run_dir)
+    destination_config_path = resolved_destination_dir / RUN_LAYOUT.config_filename
     _link_or_copy_file(model_path, destination_model_path)
     _link_or_copy_file(policy_path, destination_policy_path)
+    _link_or_copy_file(source_config_path, destination_config_path)
     return metadata.num_timesteps
 
 
@@ -71,6 +81,21 @@ def clone_fork_source(*, source_dir: Path, destination_dir: Path) -> None:
         resolved_destination_dir,
         copy_function=_link_or_copy_file_str,
     )
+
+
+def is_complete_fork_source(*, source_dir: Path, artifact: ForkArtifact) -> bool:
+    """Return whether one pinned fork source is complete enough for warm start."""
+
+    resolved_source_dir = source_dir.expanduser().resolve()
+    if not resolved_source_dir.is_dir():
+        return False
+    try:
+        resolve_model_artifact_path(resolved_source_dir, artifact=artifact)
+        resolve_policy_artifact_path(resolved_source_dir, artifact=artifact)
+        resolve_train_run_config_path(resolved_source_dir)
+    except FileNotFoundError:
+        return False
+    return True
 
 
 def reset_fork_source_dir(path: Path) -> None:

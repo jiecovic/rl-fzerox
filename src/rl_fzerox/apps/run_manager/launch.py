@@ -13,6 +13,7 @@ from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, new_managed_run_id
 from rl_fzerox.core.manager.artifacts.fork_source import (
     clone_fork_source,
+    is_complete_fork_source,
     run_fork_source_dir,
     snapshot_fork_source,
 )
@@ -227,10 +228,13 @@ class ManagerRunLauncher:
         return resumed
 
     def _ensure_fork_source_snapshot(self, run: ManagedRun) -> tuple[ManagedRun, bool]:
-        """Restore a missing pinned fork source before a warm-start relaunch."""
+        """Restore a missing or incomplete pinned fork source before warm start."""
 
         snapshot_dir = run.source_snapshot_dir or run_fork_source_dir(run_dir=run.run_dir)
-        if snapshot_dir.is_dir():
+        if run.source_artifact is not None and is_complete_fork_source(
+            source_dir=snapshot_dir,
+            artifact=run.source_artifact,
+        ):
             return run, False
         if run.source_run_id is None or run.source_artifact is None:
             raise ValueError(

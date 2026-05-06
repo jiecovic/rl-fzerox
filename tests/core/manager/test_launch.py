@@ -22,13 +22,29 @@ class _RecordingLauncher(ManagerRunLauncher):
 def test_resume_relaunches_fork_without_local_checkpoint(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()
+    parent_dir = tmp_path / "runs" / "parent-run"
     source_snapshot_dir = tmp_path / "runs" / "fork-source"
     source_snapshot_dir.mkdir(parents=True)
+    latest_model_path = parent_dir / RUN_LAYOUT.model_artifacts.latest
+    latest_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
+    train_config_path = parent_dir / RUN_LAYOUT.config_filename
+    latest_model_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_model_path.write_bytes(b"model")
+    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_policy_path.write_bytes(b"policy")
+    train_config_path.write_text(
+        "train:\n  algorithm: maskable_hybrid_recurrent_ppo\n",
+        encoding="utf-8",
+    )
+    latest_policy_path.with_name("policy.metadata.json").write_text(
+        '{"num_timesteps": 816040}\n',
+        encoding="utf-8",
+    )
     store.create_run(
         run_id="parent-run",
         name="Parent Run",
         config=config,
-        explicit_run_dir=tmp_path / "runs" / "parent-run",
+        explicit_run_dir=parent_dir,
     )
 
     run = store.create_run(
@@ -67,12 +83,17 @@ def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
     parent_dir.mkdir(parents=True)
     (tmp_path / "core.so").touch()
     (tmp_path / "rom.n64").touch()
+    train_config_path = parent_dir / RUN_LAYOUT.config_filename
     latest_model_path = parent_dir / RUN_LAYOUT.model_artifacts.latest
     latest_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
     latest_model_path.parent.mkdir(parents=True, exist_ok=True)
     latest_model_path.write_bytes(b"model")
     latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
     latest_policy_path.write_bytes(b"policy")
+    train_config_path.write_text(
+        "train:\n  algorithm: maskable_hybrid_recurrent_ppo\n",
+        encoding="utf-8",
+    )
     latest_policy_path.with_name("policy.metadata.json").write_text(
         '{"num_timesteps": 816040}\n',
         encoding="utf-8",
@@ -117,7 +138,80 @@ def test_resume_rebuilds_missing_fork_source_snapshot(tmp_path: Path) -> None:
     assert refreshed is not None
     assert refreshed.source_snapshot_dir is not None
     assert (refreshed.source_snapshot_dir / RUN_LAYOUT.model_artifacts.latest).is_file()
+    assert (refreshed.source_snapshot_dir / RUN_LAYOUT.config_filename).read_text(
+        encoding="utf-8"
+    ) == train_config_path.read_text(encoding="utf-8")
     assert refreshed.source_num_timesteps == 816_040
+
+
+def test_resume_rebuilds_incomplete_existing_fork_source_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    parent_dir = tmp_path / "runs" / "parent-run"
+    parent_dir.mkdir(parents=True)
+    latest_model_path = parent_dir / RUN_LAYOUT.model_artifacts.latest
+    latest_policy_path = parent_dir / RUN_LAYOUT.policy_artifacts.latest
+    train_config_path = parent_dir / RUN_LAYOUT.config_filename
+    latest_model_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_model_path.write_bytes(b"model")
+    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_policy_path.write_bytes(b"policy")
+    train_config_path.write_text(
+        "train:\n  algorithm: maskable_hybrid_recurrent_ppo\n",
+        encoding="utf-8",
+    )
+    latest_policy_path.with_name("policy.metadata.json").write_text(
+        '{"num_timesteps": 816040}\n',
+        encoding="utf-8",
+    )
+    parent = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=parent_dir,
+    )
+
+    run_dir = tmp_path / "runs" / "fork-run"
+    fork_source_dir = run_dir / "fork_source"
+    incomplete_model_path = fork_source_dir / RUN_LAYOUT.model_artifacts.latest
+    incomplete_policy_path = fork_source_dir / RUN_LAYOUT.policy_artifacts.latest
+    incomplete_model_path.parent.mkdir(parents=True, exist_ok=True)
+    incomplete_model_path.write_bytes(b"stale-model")
+    incomplete_policy_path.write_bytes(b"stale-policy")
+    run = store.create_run(
+        run_id="fork-run",
+        name="Fork Run",
+        config=config,
+        explicit_run_dir=run_dir,
+        lineage_id=parent.lineage_id,
+        parent_run_id="parent-run",
+        source_run_id="parent-run",
+        source_artifact="latest",
+        source_snapshot_dir=fork_source_dir,
+        source_num_timesteps=816_040,
+        lineage_step_offset=816_040,
+    )
+    store.update_run_status(
+        run_id=run.id,
+        status="failed",
+        stopped_at="2026-05-04T14:00:00+00:00",
+        message="startup failed",
+    )
+
+    launcher = _RecordingLauncher(store)
+
+    resumed = launcher.resume(run_id=run.id)
+    refreshed = store.get_run(run.id)
+    events = store.list_recent_run_events((run.id,))
+
+    assert launcher.spawn_calls == [(run.id, False)]
+    assert resumed.status == "running"
+    assert refreshed is not None
+    assert refreshed.source_snapshot_dir is not None
+    assert (refreshed.source_snapshot_dir / RUN_LAYOUT.config_filename).read_text(
+        encoding="utf-8"
+    ) == train_config_path.read_text(encoding="utf-8")
+    assert events[run.id][1].kind == "fork_source_rebuilt"
 
 
 def test_resume_requires_local_checkpoint_for_root_run(tmp_path: Path) -> None:

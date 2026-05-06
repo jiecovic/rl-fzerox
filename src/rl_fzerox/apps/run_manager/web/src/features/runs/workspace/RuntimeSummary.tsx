@@ -62,7 +62,15 @@ export function RunRuntimeSummary({
         <div aria-hidden="true" className="run-progress-bar">
           <div className="run-progress-bar-fill" style={{ width: `${progressFraction * 100}%` }} />
         </div>
-        <div className="run-runtime-progress-note">{progressNote(run)}</div>
+        <div
+          className={
+            run.status === "failed"
+              ? "run-runtime-progress-note run-runtime-progress-note-error"
+              : "run-runtime-progress-note"
+          }
+        >
+          {progressNote(run)}
+        </div>
         <div className="run-runtime-metrics-grid">
           <div className="run-runtime-metric">
             <span className="run-runtime-metric-label">Env step / s</span>
@@ -304,8 +312,12 @@ export function runWorkspaceSubtitle(run: ManagedRun) {
       <span>{run.status}</span>
       <span aria-hidden="true"> · </span>
       <span>created {formatDate(run.created_at)}</span>
-      <span aria-hidden="true"> · </span>
-      <RunActivityIndicator run={run} />
+      {run.status !== "failed" ? (
+        <>
+          <span aria-hidden="true"> · </span>
+          <RunActivityIndicator run={run} />
+        </>
+      ) : null}
     </>
   );
 }

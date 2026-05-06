@@ -93,6 +93,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.run-runtime-progress-note-error {
+  color: var(--danger);
+}
+
 .run-runtime-note {
   margin: 0 0 18px;
   padding: 10px 12px;
