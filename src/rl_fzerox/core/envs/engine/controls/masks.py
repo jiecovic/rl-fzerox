@@ -4,9 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator.arrays import ActionMask
-from rl_fzerox.core.config.schema import CurriculumConfig
 from rl_fzerox.core.envs.actions import ActionAdapter
-from rl_fzerox.core.envs.actions.hybrid.layouts import PITCH_BUCKETS
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig
 
 from .mask_config import (
     ActionMaskBranches,
@@ -36,7 +35,7 @@ class ActionMaskController:
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
     mask_air_brake_on_ground: bool
-    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index
+    pitch_neutral_index: int = 2
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
@@ -53,6 +52,7 @@ class ActionMaskController:
         boost_unmask_max_speed_kph: float | None = None,
         lean_unmask_min_speed_kph: float | None = None,
         mask_air_brake_on_ground: bool = True,
+        pitch_neutral_index: int = 2,
     ) -> ActionMaskController:
         stage_overrides = curriculum_stage_overrides(curriculum_config)
         validate_configured_overrides(
@@ -71,6 +71,7 @@ class ActionMaskController:
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
             mask_air_brake_on_ground=bool(mask_air_brake_on_ground),
+            pitch_neutral_index=int(pitch_neutral_index),
             _stage_index=0 if stage_overrides else None,
         )
 
@@ -195,7 +196,7 @@ def _dynamic_action_mask_overrides(
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
     mask_air_brake_on_ground: bool = True,
-    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index,
+    pitch_neutral_index: int = 2,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.

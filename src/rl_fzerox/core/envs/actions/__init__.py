@@ -1,37 +1,24 @@
 # src/rl_fzerox/core/envs/actions/__init__.py
 from collections.abc import Callable
 
-from rl_fzerox.core.config.schema import ActionConfig, ActionRuntimeConfig
-from rl_fzerox.core.domain.action_adapters import (
-    ACTION_ADAPTERS,
-    DEFAULT_ACTION_ADAPTER_NAME,
-    ActionAdapterName,
-)
+from rl_fzerox.core.domain.action_adapters import ActionAdapterName
 from rl_fzerox.core.envs.actions.base import (
     ActionAdapter,
     ActionValue,
     DiscreteActionDimension,
     ResettableActionAdapter,
 )
-from rl_fzerox.core.envs.actions.buttons import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    BRAKE_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-    THROTTLE_MASK,
-)
+from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.configured import (
     ConfiguredDiscreteActionAdapter,
     ConfiguredHybridActionAdapter,
 )
+from rl_fzerox.core.runtime_spec.schema import ActionConfig, ActionRuntimeConfig
 
 ActionAdapterFactory = Callable[[ActionRuntimeConfig], ActionAdapter]
-DEFAULT_ACTION_NAME: ActionAdapterName = DEFAULT_ACTION_ADAPTER_NAME
 ACTION_ADAPTER_REGISTRY: dict[ActionAdapterName, ActionAdapterFactory] = {
-    ACTION_ADAPTERS.configured_discrete: ConfiguredDiscreteActionAdapter,
-    ACTION_ADAPTERS.configured_hybrid: ConfiguredHybridActionAdapter,
+    "configured_discrete": ConfiguredDiscreteActionAdapter,
+    "configured_hybrid": ConfiguredHybridActionAdapter,
 }
 
 
@@ -53,21 +40,14 @@ def action_adapter_names() -> tuple[ActionAdapterName, ...]:
 
 __all__ = [
     "ACTION_ADAPTER_REGISTRY",
-    "ACCELERATE_MASK",
-    "AIR_BRAKE_MASK",
     "ActionAdapter",
     "ActionAdapterFactory",
     "ActionValue",
-    "BRAKE_MASK",
-    "BOOST_MASK",
     "ConfiguredDiscreteActionAdapter",
     "ConfiguredHybridActionAdapter",
-    "DEFAULT_ACTION_NAME",
     "DiscreteActionDimension",
-    "LEAN_LEFT_MASK",
-    "LEAN_RIGHT_MASK",
+    "RACE_CONTROL_MASKS",
     "ResettableActionAdapter",
-    "THROTTLE_MASK",
     "action_adapter_names",
     "build_action_adapter",
 ]

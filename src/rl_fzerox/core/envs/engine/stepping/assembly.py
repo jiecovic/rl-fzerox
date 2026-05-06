@@ -4,18 +4,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator import BackendStepResult, ControllerState, EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.config.schema_models.actions import ActionRuntimeConfig
-from rl_fzerox.core.domain.lean import LEAN_MODE_TIMER_ASSIST
-from rl_fzerox.core.envs.actions import (
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
+from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
 from ..controls import ActionMaskController, ControlStateTracker, sync_dynamic_action_masks
 from ..info import backend_step_info, set_curriculum_info, telemetry_info
@@ -87,9 +81,12 @@ class EngineStepAssembler:
             continuous_drive_min_thrust=float(self.action_config.continuous_drive_min_thrust),
         )
 
-        boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
-        lean_used = bool(applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK))
-        air_brake_used = bool(applied_control_state.joypad_mask & AIR_BRAKE_MASK)
+        boost_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
+        lean_used = bool(
+            applied_control_state.joypad_mask
+            & (RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right)
+        )
+        air_brake_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.air_brake)
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
@@ -214,7 +211,7 @@ class EngineStepAssembler:
         control_state: ControllerState,
         request: EnvStepRequest,
     ) -> BackendStepResult:
-        lean_timer_assist = self.action_config.lean_mode == LEAN_MODE_TIMER_ASSIST
+        lean_timer_assist = self.action_config.lean_mode == "timer_assist"
         if request.capture_display_frames:
             return self.backend.step_repeat_watch_raw(
                 control_state,

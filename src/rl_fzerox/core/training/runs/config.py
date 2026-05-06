@@ -8,13 +8,13 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.paths import project_root_dir, resolve_config_data_paths
+from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
+from rl_fzerox.core.runtime_spec.track_registry import expand_track_registry_metadata
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -105,7 +105,7 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     loaded = _load_train_config_mapping(config_path)
     expand_track_registry_metadata(
         loaded,
-        config_root=config_root_dir().resolve(),
+        config_root=project_root_dir().resolve(),
     )
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)

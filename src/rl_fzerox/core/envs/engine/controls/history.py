@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
-from rl_fzerox.core.envs.actions import BOOST_MASK
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 from rl_fzerox.core.envs.engine.controls.boost import BoostTimingState
 from rl_fzerox.core.envs.engine.controls.lean import LeanControlState
@@ -65,7 +65,7 @@ class ControlStateTracker:
         """Advance tracked control history by one env step."""
 
         frames_elapsed = max(int(frames_run), 0)
-        boost_requested = bool(control_state.joypad_mask & BOOST_MASK)
+        boost_requested = bool(control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
         self._boost.record(boost_requested=boost_requested, frames_elapsed=frames_elapsed)
         self._lean.record(joypad_mask=control_state.joypad_mask, frames_elapsed=frames_elapsed)
         self._action_history.record(

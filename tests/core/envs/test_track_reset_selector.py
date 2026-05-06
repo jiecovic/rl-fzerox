@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.config.schema import TrackSamplingConfig, TrackSamplingEntryConfig
 from rl_fzerox.core.envs.engine.reset import select_reset_track_by_course_id
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
 
 
 def test_select_reset_track_by_course_id_uses_matching_entry() -> None:

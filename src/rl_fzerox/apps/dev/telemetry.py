@@ -7,8 +7,9 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from fzerox_emulator import Emulator
+from rl_fzerox.apps.watch_cli.args import require_policy_run_locator
+from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.boot import boot_into_first_race
-from rl_fzerox.core.config.loader import load_watch_app_config
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -19,13 +20,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         allow_abbrev=False,
     )
     parser.add_argument(
-        "-c",
-        "--config",
-        "--config-file",
-        dest="config_path",
-        required=True,
+        "--run-dir",
+        dest="policy_run_dir",
         type=Path,
-        help="Path to the watch config YAML.",
+        default=None,
+        help="Training run directory to inspect.",
+    )
+    parser.add_argument(
+        "--manager-db-path",
+        dest="manager_db_path",
+        type=Path,
+        default=None,
+        help="Optional manager SQLite path for manager-owned watch sessions.",
+    )
+    parser.add_argument(
+        "--managed-run-id",
+        dest="managed_run_id",
+        default=None,
+        help="Optional run-manager run id to resolve the watch session from SQLite.",
     )
     parser.add_argument(
         "--frames",
@@ -33,7 +45,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0,
         help="Additional frames to advance after reset/bootstrap.",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    require_policy_run_locator(
+        policy_run_dir=args.policy_run_dir,
+        managed_run_id=args.managed_run_id,
+    )
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -43,7 +60,13 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.frames < 0:
         raise SystemExit("--frames must be >= 0")
 
-    config = load_watch_app_config(args.config_path)
+    config = resolve_watch_app_config(
+        policy_run_dir=args.policy_run_dir,
+        policy_artifact="latest",
+        manager_db_path=args.manager_db_path,
+        managed_run_id=args.managed_run_id,
+        overrides=[],
+    )
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,

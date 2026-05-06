@@ -5,7 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fzerox_emulator.base import RaceStartMode
-from rl_fzerox.core.config.vehicle_catalog import resolve_engine_setting
+from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
     course_vehicle_cache_payload,

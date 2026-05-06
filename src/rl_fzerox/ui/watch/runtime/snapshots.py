@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import observations as observation_access
-from rl_fzerox.core.envs.actions import BOOST_MASK, ActionValue
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
@@ -282,7 +282,7 @@ def _next_boost_lamp_level(
     boost_active: bool,
     action_repeat: int,
 ) -> float:
-    if control_state.joypad_mask & BOOST_MASK:
+    if control_state.joypad_mask & RACE_CONTROL_MASKS.boost:
         return BOOST_LAMP_CONFIG.manual_level
 
     target = BOOST_LAMP_CONFIG.active_level if boost_active else 0.0

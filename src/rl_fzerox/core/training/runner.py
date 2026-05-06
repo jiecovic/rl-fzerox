@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from operator import attrgetter
 
-from rl_fzerox.core.config.schema import TrainAppConfig
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.core.training.runs import (
     continue_run_paths,
@@ -89,7 +89,6 @@ def run_training(
         )
         model = build_training_model(
             train_env=train_env,
-            env_config=run_config.env,
             train_config=run_config.train,
             policy_config=run_config.policy,
             tensorboard_log=None,
@@ -250,33 +249,6 @@ def _learn_model(
     """Train one configured SB3 model with the shared learn kwargs."""
 
     from sb3_contrib import MaskablePPO
-    from stable_baselines3 import SAC
-
-    try:
-        from sb3x import MaskableHybridActionSAC
-    except ImportError:
-        MaskableHybridActionSAC = None
-
-    if MaskableHybridActionSAC is not None and isinstance(model, MaskableHybridActionSAC):
-        _call_learn(
-            model,
-            total_timesteps=total_timesteps,
-            callback=callback,
-            use_masking=use_masking,
-            progress_bar=progress_bar,
-            reset_num_timesteps=reset_num_timesteps,
-        )
-        return
-
-    if isinstance(model, SAC):
-        _call_learn(
-            model,
-            total_timesteps=total_timesteps,
-            callback=callback,
-            progress_bar=progress_bar,
-            reset_num_timesteps=reset_num_timesteps,
-        )
-        return
 
     if isinstance(model, MaskablePPO):
         _call_learn(

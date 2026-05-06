@@ -11,23 +11,17 @@ TrainAlgorithmName: TypeAlias = Literal[
     "maskable_recurrent_ppo",
     "maskable_hybrid_action_ppo",
     "maskable_hybrid_recurrent_ppo",
-    "sac",
-    "hybrid_action_sac",
-    "maskable_hybrid_action_sac",
 ]
 
 
 @dataclass(frozen=True, slots=True)
 class TrainingAlgorithmRegistry:
-    """Stable YAML names plus capability groups for supported trainers."""
+    """Stable runtime-spec names plus capability groups for supported trainers."""
 
     maskable_ppo: TrainAlgorithmName = "maskable_ppo"
     maskable_recurrent_ppo: TrainAlgorithmName = "maskable_recurrent_ppo"
     maskable_hybrid_action_ppo: TrainAlgorithmName = "maskable_hybrid_action_ppo"
     maskable_hybrid_recurrent_ppo: TrainAlgorithmName = "maskable_hybrid_recurrent_ppo"
-    sac: TrainAlgorithmName = "sac"
-    hybrid_action_sac: TrainAlgorithmName = "hybrid_action_sac"
-    maskable_hybrid_action_sac: TrainAlgorithmName = "maskable_hybrid_action_sac"
 
     @property
     def default(self) -> TrainAlgorithmName:
@@ -41,7 +35,6 @@ class TrainingAlgorithmRegistry:
                 self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
-                self.maskable_hybrid_action_sac,
             )
         )
 
@@ -61,14 +54,8 @@ class TrainingAlgorithmRegistry:
                 self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
-                self.hybrid_action_sac,
-                self.maskable_hybrid_action_sac,
             )
         )
-
-    @property
-    def sac_family(self) -> frozenset[TrainAlgorithmName]:
-        return frozenset((self.sac, self.hybrid_action_sac, self.maskable_hybrid_action_sac))
 
     @property
     def full_model_policy(self) -> frozenset[TrainAlgorithmName]:
@@ -77,8 +64,6 @@ class TrainingAlgorithmRegistry:
                 self.maskable_recurrent_ppo,
                 self.maskable_hybrid_action_ppo,
                 self.maskable_hybrid_recurrent_ppo,
-                self.hybrid_action_sac,
-                self.maskable_hybrid_action_sac,
             )
         )
 

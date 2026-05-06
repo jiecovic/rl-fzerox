@@ -5,7 +5,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-from rl_fzerox.core.config.schema import EnvConfig, ObservationConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, ObservationConfig, TrainConfig
 from rl_fzerox.core.training.session.observation_augmentation import (
     EpisodeStateFeatureDropoutWrapper,
     _StateFeatureDropoutGroup,

@@ -11,7 +11,7 @@ from importlib import import_module
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from rl_fzerox.core.config.schema import TrainAppConfig
+    from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
     from rl_fzerox.core.training.runs import (
         RunPaths,
         apply_train_run_to_watch_config,

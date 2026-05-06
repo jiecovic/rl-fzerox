@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,

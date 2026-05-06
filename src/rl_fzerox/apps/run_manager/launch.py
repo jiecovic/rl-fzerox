@@ -10,21 +10,21 @@ from typing import Literal
 from uuid import uuid4
 
 from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
-from rl_fzerox.core.config.paths import project_root_dir
-from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, new_managed_run_id
-from rl_fzerox.core.manager.fork_source import (
+from rl_fzerox.core.manager.artifacts.fork_source import (
     clone_fork_source,
     run_fork_source_dir,
     snapshot_fork_source,
 )
+from rl_fzerox.core.manager.artifacts.paths import predicted_managed_run_dir
 from rl_fzerox.core.manager.models import RunCommand
-from rl_fzerox.core.manager.paths import predicted_managed_run_dir
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
     build_managed_fork_train_app_config,
     build_managed_train_app_config,
 )
+from rl_fzerox.core.runtime_spec.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import (
     resolve_model_artifact_path,
     save_train_run_config,
@@ -282,7 +282,6 @@ class ManagerRunLauncher:
         ) is not None:
             return "already_running"
         resolve_watch_app_config(
-            config_path=None,
             policy_run_dir=None,
             policy_artifact="best" if artifact == "best" else "latest",
             manager_db_path=self._store.db_path,

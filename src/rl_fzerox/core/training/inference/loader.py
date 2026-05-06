@@ -138,10 +138,6 @@ def _policy_classes_for_algorithm(*, algorithm: str):
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == TRAINING_ALGORITHMS.sac:
-        from stable_baselines3.sac import CnnPolicy, MultiInputPolicy
-
-        return CnnPolicy, MultiInputPolicy
 
     raise ValueError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
@@ -160,14 +156,6 @@ def _full_model_class_for_algorithm(algorithm: str):
             from sb3x import MaskableHybridRecurrentPPO
 
             return MaskableHybridRecurrentPPO
-        if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_sac:
-            from sb3x import MaskableHybridActionSAC
-
-            return MaskableHybridActionSAC
-        if algorithm == TRAINING_ALGORITHMS.hybrid_action_sac:
-            from sb3x import HybridActionSAC
-
-            return HybridActionSAC
     except ImportError as exc:
         raise RuntimeError(
             f"Loading {algorithm} checkpoints requires sb3x in the active environment."
@@ -188,10 +176,9 @@ def _load_saved_policy_algorithm(
     if not config_path.is_file():
         raise RuntimeError(f"Saved policy run is missing {RUN_LAYOUT.config_filename}")
 
-    from rl_fzerox.core.config import load_train_app_config
+    from rl_fzerox.core.training.runs import load_train_run_config
 
-    config = load_train_app_config(config_path)
-    return config.train.algorithm
+    return load_train_run_config(run_dir).train.algorithm
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:

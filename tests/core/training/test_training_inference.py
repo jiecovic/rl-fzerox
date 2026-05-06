@@ -43,7 +43,6 @@ def _latest_model_path(run_dir: Path) -> Path:
 
 def _configured_discrete_action_config(*axes: str) -> dict[str, object]:
     return {
-        "name": "configured_discrete",
         "layout_discrete_axes": list(axes),
     }
 
@@ -54,7 +53,6 @@ def _configured_hybrid_action_config(
     discrete_axes: tuple[str, ...] = (),
 ) -> dict[str, object]:
     return {
-        "name": "configured_hybrid",
         "layout_continuous_axes": list(continuous_axes),
         "layout_discrete_axes": list(discrete_axes),
     }
@@ -528,77 +526,6 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
-
-
-def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                    )
-                },
-                "policy": {},
-                "train": {
-                    "algorithm": "sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "sac"
-
-
-def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_sac(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_action_sac"
-
-
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
     tmp_path: Path,
 ) -> None:
@@ -814,79 +741,6 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
         "path": str(model_path.resolve()),
         "device": "cpu",
     }
-
-
-def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_sac_runs(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {
-                    "action": _configured_hybrid_action_config(
-                        continuous_axes=("steer", "drive"),
-                        discrete_axes=("boost", "lean"),
-                    )
-                },
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-    policy_path = _latest_policy_path(tmp_path)
-    policy_path.write_bytes(b"policy")
-    model_path = _latest_model_path(tmp_path)
-    model_path.write_bytes(b"model")
-
-    captured: dict[str, object] = {}
-
-    class _FakeLoadedMaskableHybridSacModel:
-        def predict(
-            self,
-            observation: ObservationValue,
-            state: PolicyState = None,
-            episode_start: BoolArray | None = None,
-            deterministic: bool = True,
-            action_masks: ActionMask | None = None,
-        ) -> tuple[dict[str, NumpyArray], PolicyState]:
-            _ = (observation, state, episode_start, deterministic, action_masks)
-            return {
-                "continuous": np.array([0.0, 0.0], dtype=np.float32),
-                "discrete": np.array([0, 0], dtype=np.int64),
-            }, None
-
-    def _fake_load(path: str, *, device: str) -> _FakeLoadedMaskableHybridSacModel:
-        captured["path"] = path
-        captured["device"] = device
-        return _FakeLoadedMaskableHybridSacModel()
-
-    monkeypatch.setattr("sb3x.MaskableHybridActionSAC.load", _fake_load)
-
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
-
-    assert isinstance(loaded, _FakeLoadedMaskableHybridSacModel)
-    assert captured == {
-        "path": str(model_path.resolve()),
-        "device": "cpu",
-    }
-
-
 def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurrent_runs(
     tmp_path: Path,
     monkeypatch,

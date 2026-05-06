@@ -7,7 +7,7 @@ import numpy as np
 
 from fzerox_emulator.arrays import StateVector
 
-from .value import ObservationValue
+from .value import ImageStateObservation, ObservationValue
 
 
 def state_feature_indices(
@@ -38,10 +38,13 @@ def mask_observation_state(
     if not isinstance(observation, dict):
         return observation
     state = observation.get("state")
-    if not isinstance(state, np.ndarray):
+    image = observation.get("image")
+    if not isinstance(state, np.ndarray) or not isinstance(image, np.ndarray):
         return observation
-    masked_observation = dict(observation)
-    masked_observation["state"] = mask_state_vector(state, feature_indices=feature_indices)
+    masked_observation: ImageStateObservation = {
+        "image": image,
+        "state": mask_state_vector(state, feature_indices=feature_indices),
+    }
     return masked_observation
 
 

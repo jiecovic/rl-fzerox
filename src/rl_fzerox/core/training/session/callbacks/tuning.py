@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
-from rl_fzerox.core.config.schema import CurriculumTrainOverridesConfig
+from rl_fzerox.core.runtime_spec.schema import CurriculumTrainOverridesConfig
 
 from .metrics import CallbackLogger
 

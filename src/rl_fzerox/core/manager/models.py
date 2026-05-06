@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.manager.config import ManagedRunConfig
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 
 RunStatus = Literal["created", "running", "paused", "stopped", "finished", "failed"]
 RunCommand = Literal["pause", "stop"]

@@ -1,10 +1,8 @@
-# src/rl_fzerox/core/training/session/callbacks/checkpoints.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.core.config.schema import TrainConfig
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.runtime_spec.schema import TrainConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,6 +35,4 @@ def resolve_checkpoint_policy(train_config: TrainConfig) -> CheckpointPolicy:
 
 
 def _rollout_checkpoint_interval(train_config: TrainConfig) -> int | None:
-    if train_config.algorithm in TRAINING_ALGORITHMS.sac_family:
-        return None
     return train_config.checkpoint_every_rollouts

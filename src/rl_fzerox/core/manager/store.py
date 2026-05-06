@@ -1,11 +1,12 @@
-# src/rl_fzerox/core/manager/store.py
+"""Public store facade over manager registry, storage bootstrap, and artifacts."""
+
 from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.manager.config import ManagedRunConfig
+from rl_fzerox.core.manager.artifacts.paths import manager_runs_root
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunDraft,
@@ -14,46 +15,12 @@ from rl_fzerox.core.manager.models import (
     RunCommand,
     RunStatus,
 )
-from rl_fzerox.core.manager.paths import manager_runs_root
-from rl_fzerox.core.manager.registry import common, rows
+from rl_fzerox.core.manager.registry import drafts as draft_registry
+from rl_fzerox.core.manager.registry import lineages as lineage_registry
+from rl_fzerox.core.manager.registry import runs as run_registry
 from rl_fzerox.core.manager.registry.common import new_run_id
-from rl_fzerox.core.manager.registry.drafts import (
-    create_draft,
-    default_template,
-    delete_draft,
-    get_draft,
-    list_drafts,
-    list_templates,
-    update_draft,
-)
-from rl_fzerox.core.manager.registry.lineages import (
-    backfill_lineage_ids,
-    delete_lineage,
-    delete_run,
-    migrate_lineage_layout,
-    migrate_lineage_layout_rows,
-)
-from rl_fzerox.core.manager.registry.runs import (
-    append_run_event,
-    clear_run_command,
-    clear_run_runtime,
-    clear_run_worker,
-    create_run,
-    drain_pending_filesystem_operations,
-    get_run,
-    heartbeat_run_worker,
-    list_recent_run_events,
-    list_runs,
-    list_visible_runs,
-    pending_run_command,
-    reconcile_orphaned_runs,
-    register_run_worker,
-    request_run_command,
-    update_run_fork_source,
-    update_run_status,
-    upsert_run_runtime,
-)
-from rl_fzerox.core.manager.schema import initialize_manager_schema
+from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.storage.schema import initialize_manager_schema
 
 
 def default_manager_db_path() -> Path:
@@ -70,7 +37,12 @@ def new_managed_run_id(name: str) -> str:
 
 
 class ManagerStore:
-    """SQLite-backed source of truth for managed training runs."""
+    """SQLite-backed source of truth for managed training runs.
+
+    The store owns database lifecycle and exposes a narrow domain API, while
+    concrete SQL and filesystem behavior lives in registry/storage/artifact
+    subpackages.
+    """
 
     def __init__(self, db_path: Path | None = None) -> None:
         self.db_path = (db_path or default_manager_db_path()).expanduser().resolve()
@@ -95,8 +67,11 @@ class ManagerStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             initialize_manager_schema(connection, applied_at=self.utc_now())
-            backfill_lineage_ids(connection)
-            migrate_lineage_layout_rows(connection, migrated_at=self.utc_now())
+            lineage_registry.backfill_lineage_ids(connection)
+            lineage_registry.migrate_lineage_layout_rows(
+                connection,
+                migrated_at=self.utc_now(),
+            )
         self._schema_initialized = True
 
     def manager_runs_root(self, *, output_root: Path | None = None) -> Path:
@@ -122,7 +97,7 @@ class ManagerStore:
         source_num_timesteps: int | None = None,
         exclude_draft_id: str | None = None,
     ) -> ManagedRun:
-        return create_run(
+        return run_registry.create_run(
             self,
             run_id=run_id,
             name=name,
@@ -140,7 +115,7 @@ class ManagerStore:
         )
 
     def get_run(self, run_id: str) -> ManagedRun | None:
-        return get_run(self, run_id)
+        return run_registry.get_run(self, run_id)
 
     def create_draft(
         self,
@@ -150,7 +125,7 @@ class ManagerStore:
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
     ) -> ManagedRunDraft:
-        return create_draft(
+        return draft_registry.create_draft(
             self,
             name=name,
             config=config,
@@ -159,10 +134,10 @@ class ManagerStore:
         )
 
     def list_runs(self) -> tuple[ManagedRun, ...]:
-        return list_runs(self)
+        return run_registry.list_runs(self)
 
     def list_visible_runs(self) -> tuple[ManagedRun, ...]:
-        return list_visible_runs(self)
+        return run_registry.list_visible_runs(self)
 
     def list_recent_run_events(
         self,
@@ -170,7 +145,11 @@ class ManagerStore:
         *,
         limit_per_run: int = 6,
     ) -> dict[str, tuple[ManagedRunEvent, ...]]:
-        return list_recent_run_events(self, run_ids, limit_per_run=limit_per_run)
+        return run_registry.list_recent_run_events(
+            self,
+            run_ids,
+            limit_per_run=limit_per_run,
+        )
 
     def update_run_status(
         self,
@@ -181,7 +160,7 @@ class ManagerStore:
         started_at: str | None = None,
         stopped_at: str | None = None,
     ) -> ManagedRun | None:
-        return update_run_status(
+        return run_registry.update_run_status(
             self,
             run_id=run_id,
             status=status,
@@ -191,7 +170,7 @@ class ManagerStore:
         )
 
     def clear_run_runtime(self, run_id: str) -> None:
-        clear_run_runtime(self, run_id)
+        run_registry.clear_run_runtime(self, run_id)
 
     def register_run_worker(
         self,
@@ -201,7 +180,7 @@ class ManagerStore:
         pid: int,
         launched_at: str,
     ) -> bool:
-        return register_run_worker(
+        return run_registry.register_run_worker(
             self,
             run_id=run_id,
             launch_token=launch_token,
@@ -216,7 +195,7 @@ class ManagerStore:
         launch_token: str,
         heartbeat_at: str,
     ) -> bool:
-        return heartbeat_run_worker(
+        return run_registry.heartbeat_run_worker(
             self,
             run_id=run_id,
             launch_token=launch_token,
@@ -224,7 +203,7 @@ class ManagerStore:
         )
 
     def clear_run_worker(self, run_id: str, *, launch_token: str | None = None) -> None:
-        clear_run_worker(self, run_id, launch_token=launch_token)
+        run_registry.clear_run_worker(self, run_id, launch_token=launch_token)
 
     def upsert_run_runtime(
         self,
@@ -242,7 +221,7 @@ class ManagerStore:
         value_loss: float | None = None,
         policy_gradient_loss: float | None = None,
     ) -> None:
-        upsert_run_runtime(
+        run_registry.upsert_run_runtime(
             self,
             run_id=run_id,
             total_timesteps=total_timesteps,
@@ -266,7 +245,7 @@ class ManagerStore:
         message: str,
         created_at: str | None = None,
     ) -> None:
-        append_run_event(
+        run_registry.append_run_event(
             self,
             run_id=run_id,
             kind=kind,
@@ -282,7 +261,7 @@ class ManagerStore:
         source_num_timesteps: int,
         lineage_step_offset: int | None = None,
     ) -> ManagedRun | None:
-        return update_run_fork_source(
+        return run_registry.update_run_fork_source(
             self,
             run_id=run_id,
             source_snapshot_dir=source_snapshot_dir,
@@ -296,10 +275,10 @@ class ManagerStore:
         run_id: str,
         command: RunCommand,
     ) -> ManagedRun | None:
-        return request_run_command(self, run_id=run_id, command=command)
+        return run_registry.request_run_command(self, run_id=run_id, command=command)
 
     def pending_run_command(self, run_id: str) -> RunCommand | None:
-        return pending_run_command(self, run_id)
+        return run_registry.pending_run_command(self, run_id)
 
     def clear_run_command(
         self,
@@ -307,54 +286,25 @@ class ManagerStore:
         *,
         command: RunCommand | None = None,
     ) -> None:
-        clear_run_command(self, run_id, command=command)
+        run_registry.clear_run_command(self, run_id, command=command)
 
     def list_drafts(self) -> tuple[ManagedRunDraft, ...]:
-        return list_drafts(self)
+        return draft_registry.list_drafts(self)
 
     def delete_draft(self, draft_id: str) -> bool:
-        return delete_draft(self, draft_id)
+        return draft_registry.delete_draft(self, draft_id)
 
     def delete_run(self, run_id: str) -> bool:
-        return delete_run(self, run_id)
+        return lineage_registry.delete_run(self, run_id)
 
     def delete_lineage(self, lineage_id: str) -> bool:
-        return delete_lineage(self, lineage_id)
+        return lineage_registry.delete_lineage(self, lineage_id)
 
     def migrate_lineage_layout(self) -> int:
-        return migrate_lineage_layout(self)
+        return lineage_registry.migrate_lineage_layout(self)
 
     def update_run_name(self, *, run_id: str, name: str) -> ManagedRun | None:
-        normalized_name = name.strip() or run_id
-        renamed_at = self.utc_now()
-        try:
-            with self._connect() as connection:
-                row = connection.execute(
-                    """
-                    UPDATE runs
-                    SET name = ?
-                    WHERE id = ?
-                    RETURNING id
-                    """,
-                    (normalized_name, run_id),
-                ).fetchone()
-                if row is None:
-                    return None
-                connection.execute(
-                    """
-                    INSERT INTO run_events(run_id, created_at, kind, message)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (run_id, renamed_at, "renamed", f"run renamed to {normalized_name}"),
-                )
-                selected_row = connection.execute(
-                    rows.run_select_sql(where_clause="WHERE runs.id = ?"),
-                    (run_id,),
-                ).fetchone()
-        except sqlite3.IntegrityError as error:
-            common.raise_name_conflict(error, table="runs", kind="run", name=normalized_name)
-            raise
-        return None if selected_row is None else rows.run_from_row(selected_row)
+        return run_registry.update_run_name(self, run_id=run_id, name=name)
 
     def update_draft(
         self,
@@ -365,7 +315,7 @@ class ManagerStore:
         source_run_id: str | None = None,
         source_artifact: Literal["latest", "best"] | None = None,
     ) -> ManagedRunDraft | None:
-        return update_draft(
+        return draft_registry.update_draft(
             self,
             draft_id=draft_id,
             name=name,
@@ -375,19 +325,19 @@ class ManagerStore:
         )
 
     def get_draft(self, draft_id: str) -> ManagedRunDraft | None:
-        return get_draft(self, draft_id)
+        return draft_registry.get_draft(self, draft_id)
 
     def list_templates(self) -> tuple[ManagedRunTemplate, ...]:
-        return list_templates(self)
+        return draft_registry.list_templates(self)
 
     def default_template(self) -> ManagedRunTemplate:
-        return default_template(self)
+        return draft_registry.default_template(self)
 
     def reconcile_orphaned_runs(self) -> None:
-        reconcile_orphaned_runs(self)
+        run_registry.reconcile_orphaned_runs(self)
 
     def _drain_pending_filesystem_operations(self) -> None:
-        drain_pending_filesystem_operations(self)
+        run_registry.drain_pending_filesystem_operations(self)
 
     @staticmethod
     def utc_now() -> str:

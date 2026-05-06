@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     CurriculumConfig,
     EmulatorConfig,
@@ -17,15 +18,12 @@ from rl_fzerox.core.config.schema import (
     TrainAppConfig,
     TrainConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
-    build_training_model,
     resolve_effective_training_algorithm,
     training_requires_action_masks,
     validate_training_algorithm_config,
 )
-from rl_fzerox.core.training.session.model.replay import LazyMaskableReplayBuffer
 from tests.support.action_configs import (
     configured_discrete_action,
     configured_hybrid_action,
@@ -60,19 +58,7 @@ def test_training_requires_action_masks_for_current_supported_algorithms(
                 env=hybrid_env,
                 policy=PolicyConfig(),
                 curriculum=CurriculumConfig(),
-                train=TrainConfig(algorithm="hybrid_action_sac", ent_coef="auto"),
-            )
-        )
-        is False
-    )
-    assert (
-        training_requires_action_masks(
-            TrainAppConfig(
-                emulator=emulator,
-                env=hybrid_env,
-                policy=PolicyConfig(),
-                curriculum=CurriculumConfig(),
-                train=TrainConfig(algorithm="maskable_hybrid_action_sac", ent_coef="auto"),
+                train=TrainConfig(algorithm="maskable_hybrid_action_ppo"),
             )
         )
         is True
@@ -134,28 +120,6 @@ def test_resolve_effective_training_algorithm_returns_configured_algorithm(
     assert resolve_effective_training_algorithm(train_config=config.train) == (
         "maskable_hybrid_action_ppo"
     )
-
-
-def test_validate_training_algorithm_config_rejects_plain_sac_on_this_branch(
-    tmp_path: Path,
-) -> None:
-    config = TrainAppConfig(
-        emulator=_emulator_config(tmp_path),
-        env=EnvConfig(
-            action=configured_hybrid_action(
-                continuous_axes=("steer", "drive"),
-                discrete_axes=(),
-            )
-        ),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(algorithm="sac", ent_coef="auto"),
-    )
-
-    with pytest.raises(RuntimeError, match="SAC is not supported"):
-        validate_training_algorithm_config(config)
-
-
 def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_action(
     tmp_path: Path,
 ) -> None:
@@ -169,126 +133,6 @@ def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_ac
 
     with pytest.raises(RuntimeError, match="configured_hybrid"):
         validate_training_algorithm_config(config)
-
-
-def test_validate_training_algorithm_config_rejects_hybrid_sac_masks(
-    tmp_path: Path,
-) -> None:
-    config = TrainAppConfig(
-        emulator=_emulator_config(tmp_path),
-        env=EnvConfig(
-            action=configured_hybrid_action(
-                continuous_axes=("steer", "drive"),
-                discrete_axes=("boost", "lean"),
-                mask=ActionMaskConfig(boost=(0,)),
-            )
-        ),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(algorithm="hybrid_action_sac", ent_coef="auto"),
-    )
-
-    with pytest.raises(RuntimeError, match="not maskable yet"):
-        validate_training_algorithm_config(config)
-
-
-def test_validate_training_algorithm_config_accepts_maskable_hybrid_sac_masks(
-    tmp_path: Path,
-) -> None:
-    config = TrainAppConfig(
-        emulator=_emulator_config(tmp_path),
-        env=EnvConfig(
-            action=configured_hybrid_action(
-                continuous_axes=("steer", "drive"),
-                discrete_axes=("boost", "lean"),
-                mask=ActionMaskConfig(boost=(0,), lean=(0, 1, 2)),
-            )
-        ),
-        policy=PolicyConfig(),
-        curriculum=CurriculumConfig(),
-        train=TrainConfig(algorithm="maskable_hybrid_action_sac", ent_coef="auto"),
-    )
-
-    validate_training_algorithm_config(config)
-
-
-def test_build_training_model_can_construct_hybrid_action_sac() -> None:
-    from sb3x import HybridActionSAC
-    from stable_baselines3.common.vec_env import DummyVecEnv
-
-    env_config = EnvConfig(
-        action=configured_hybrid_action(
-            continuous_axes=("steer", "drive"),
-            discrete_axes=("boost", "lean"),
-        ),
-        observation=ObservationConfig(
-            mode="image_state",
-            state_components=("vehicle_state",),
-        ),
-    )
-    env = DummyVecEnv(vec_env_fns(lambda: FZeroXEnv(backend=SyntheticBackend(), config=env_config)))
-
-    try:
-        model = build_training_model(
-            train_env=env,
-            env_config=env_config,
-            train_config=TrainConfig(
-                algorithm="hybrid_action_sac",
-                buffer_size=4,
-                learning_starts=0,
-                ent_coef="auto",
-                device="cpu",
-            ),
-            policy_config=PolicyConfig(),
-            tensorboard_log=None,
-        )
-    finally:
-        env.close()
-
-    assert isinstance(model, HybridActionSAC)
-
-
-def test_build_training_model_can_construct_maskable_hybrid_action_sac() -> None:
-    from sb3x import MaskableHybridActionSAC
-    from stable_baselines3.common.vec_env import DummyVecEnv
-
-    env_config = EnvConfig(
-        action=configured_hybrid_action(
-            continuous_axes=("steer", "drive"),
-            discrete_axes=("boost", "lean"),
-        ),
-        observation=ObservationConfig(
-            mode="image_state",
-            state_components=("vehicle_state",),
-            stack_mode="gray",
-        ),
-    )
-    env = DummyVecEnv(vec_env_fns(lambda: FZeroXEnv(backend=SyntheticBackend(), config=env_config)))
-
-    try:
-        model = build_training_model(
-            train_env=env,
-            env_config=env_config,
-            train_config=TrainConfig(
-                algorithm="maskable_hybrid_action_sac",
-                buffer_size=4,
-                learning_starts=0,
-                ent_coef="auto",
-                optimize_memory_usage=True,
-                device="cpu",
-            ),
-            policy_config=PolicyConfig(),
-            tensorboard_log=None,
-        )
-    finally:
-        env.close()
-
-    if not isinstance(model, MaskableHybridActionSAC):
-        raise AssertionError(f"unexpected model type: {type(model).__name__}")
-    replay_buffer = getattr(model, "replay_buffer", None)
-    assert isinstance(replay_buffer, LazyMaskableReplayBuffer)
-
-
 def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
     from sb3x import MaskableHybridActionPPO
     from stable_baselines3.common.vec_env import DummyVecEnv

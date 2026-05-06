@@ -10,7 +10,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from rl_fzerox.core.config.vehicle_catalog import vehicle_by_id
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.paths import RunPaths
 
 from .models import BaselineMaterializerContext

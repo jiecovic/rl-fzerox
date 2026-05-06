@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.apps.train import main, parse_args
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     EnvConfig,
     PolicyConfig,
@@ -18,7 +18,6 @@ from rl_fzerox.core.config.schema import (
 def test_parse_args_accepts_continue_run_dir_without_config() -> None:
     args = parse_args(["--continue-run-dir", "local/runs/probe_0001"])
 
-    assert args.config_path is None
     assert args.continue_run_dir == Path("local/runs/probe_0001")
     assert args.continue_artifact == "latest"
 

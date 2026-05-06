@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 import torch as th
 from gymnasium import spaces
 
-from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.model.algorithms import resolve_effective_training_algorithm
 
@@ -179,16 +178,6 @@ def _training_summary_parts(
     ]
     if train_config.resume_run_dir is not None:
         parts.append(f"resume={train_config.resume_mode}:{train_config.resume_artifact}")
-    if effective_algorithm in TRAINING_ALGORITHMS.sac_family:
-        parts.extend(
-            [
-                f"buffer_size={train_config.buffer_size}",
-                f"learning_starts={train_config.learning_starts}",
-                f"train_freq={train_config.train_freq}",
-                f"gradient_steps={train_config.gradient_steps}",
-            ]
-        )
-        return parts
     parts.append(f"n_steps={train_config.n_steps}")
     return parts
 

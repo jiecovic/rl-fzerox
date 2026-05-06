@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol
 
-from rl_fzerox.core.config.schema import TrainAppConfig
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import RunPaths, materialize_train_run_config
 
 POLICY_METADATA_SUFFIX = ".metadata.json"

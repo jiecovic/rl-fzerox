@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Sequence
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
     CurriculumTrainOverridesConfig,

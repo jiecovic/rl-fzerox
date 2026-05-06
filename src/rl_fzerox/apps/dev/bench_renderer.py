@@ -12,7 +12,7 @@ from pathlib import Path
 
 from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, Emulator, joypad_mask
 from fzerox_emulator.base import BackendStepResult
-from rl_fzerox.core.config.renderers import KNOWN_RENDERERS, RendererName
+from rl_fzerox.core.runtime_spec.renderers import KNOWN_RENDERERS, RendererName
 
 RENDERERS: tuple[RendererName, ...] = KNOWN_RENDERERS
 

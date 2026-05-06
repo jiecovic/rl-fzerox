@@ -2,9 +2,9 @@
 import numpy as np
 
 from fzerox_emulator.arrays import Int64Array
-from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import LEAN_LEFT_MASK, LEAN_RIGHT_MASK
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from tests.core.envs.helpers import (
     ScriptedStepBackend,
 )
@@ -69,13 +69,13 @@ def test_env_releases_lean_input_without_python_side_latch() -> None:
     env.reset(seed=3)
     env.step(_lean_action(1))
 
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK != 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left != 0
     assert backend.last_lean_timer_assist is True
     assert env.action_masks().tolist()[-3:] == [True, True, True]
 
     env.step(_lean_action(0))
 
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
     assert env.action_masks().tolist()[-3:] == [True, True, True]
 
 
@@ -126,7 +126,7 @@ def test_env_minimum_hold_mode_keeps_lean_pressed_for_guard_window() -> None:
 
     env.step(_lean_action(0))
 
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK != 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left != 0
     assert env.action_masks().tolist()[-3:] == [False, True, False]
 
 
@@ -175,16 +175,16 @@ def test_env_release_cooldown_mode_blocks_retap_after_short_lean() -> None:
 
     env.reset(seed=3)
     env.step(_lean_action(1))
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK != 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left != 0
     assert backend.last_lean_timer_assist is False
     assert env.action_masks().tolist()[-3:] == [True, True, False]
 
     env.step(_lean_action(0))
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
     assert env.action_masks().tolist()[-3:] == [True, False, False]
 
     env.step(_lean_action(1))
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
     assert env.action_masks().tolist()[-3:] == [True, False, False]
 
     env.step(_lean_action(0))
@@ -229,7 +229,7 @@ def test_env_release_cooldown_mode_blocks_direct_lean_switch() -> None:
     assert env.action_masks().tolist()[-3:] == [True, True, False]
 
     env.step(_lean_action(2))
-    assert backend.last_controller_state.joypad_mask & LEAN_RIGHT_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_right == 0
     assert env.action_masks().tolist()[-3:] == [True, False, False]
 
 

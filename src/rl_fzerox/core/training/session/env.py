@@ -9,9 +9,9 @@ from typing import Protocol
 import gymnasium as gym
 
 from fzerox_emulator import Emulator
-from rl_fzerox.core.config.schema import TrainAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.seed import derive_seed
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.observation_augmentation import (

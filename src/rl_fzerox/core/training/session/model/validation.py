@@ -3,24 +3,13 @@ from __future__ import annotations
 
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.config.schema import PolicyConfig, TrainAppConfig
-from rl_fzerox.core.domain.action_adapters import ACTION_ADAPTERS
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
-from rl_fzerox.core.training.session.model.replay_layout import SUPPORTED_LAZY_REPLAY_STACK_MODES
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainAppConfig
 
 
 def validate_training_algorithm_config(config: TrainAppConfig) -> None:
     """Reject incompatible algorithm/config combinations before training starts."""
 
-    if config.train.algorithm == TRAINING_ALGORITHMS.sac:
-        _validate_sac_training_config(config)
-        return
-    if config.train.algorithm == TRAINING_ALGORITHMS.hybrid_action_sac:
-        _validate_hybrid_action_sac_training_config(config)
-        return
-    if config.train.algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_sac:
-        _validate_maskable_hybrid_sac_config(config)
-        return
     if config.train.algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
         _validate_maskable_hybrid_ppo_config(config)
         return
@@ -50,41 +39,11 @@ def validate_recurrent_configuration_alignment(
         raise RuntimeError(f"{effective_algorithm} requires policy.recurrent.enabled=true")
 
 
-def _validate_sac_training_config(config: TrainAppConfig) -> None:
-    raise RuntimeError(
-        "SAC is not supported by the configured action layouts on this branch; "
-        "use one of the configured hybrid/discrete manager-supported algorithms."
-    )
-
-
-def _validate_hybrid_action_sac_training_config(config: TrainAppConfig) -> None:
-    _validate_hybrid_action_adapter(
-        config,
-        algorithm_label="Hybrid action SAC",
-    )
-    action_config = config.env.action.runtime()
-    if action_config.mask_overrides is not None:
-        raise RuntimeError(
-            "Hybrid action SAC is not maskable yet; do not configure env.action.mask"
-        )
-    if config.curriculum.enabled:
-        raise RuntimeError("Hybrid action SAC does not support curriculum stages yet")
-    _validate_sac_lazy_replay_support(config)
-
-
 def _validate_maskable_hybrid_ppo_config(config: TrainAppConfig) -> None:
     _validate_hybrid_action_adapter(
         config,
         algorithm_label="Maskable hybrid action PPO",
     )
-
-
-def _validate_maskable_hybrid_sac_config(config: TrainAppConfig) -> None:
-    _validate_hybrid_action_adapter(
-        config,
-        algorithm_label="Maskable hybrid action SAC",
-    )
-    _validate_sac_lazy_replay_support(config)
 
 
 def _validate_maskable_recurrent_hybrid_ppo_config(
@@ -102,21 +61,8 @@ def _validate_hybrid_action_adapter(
     algorithm_label: str,
 ) -> None:
     action_config = config.env.action.runtime()
-    if action_config.name != ACTION_ADAPTERS.configured_hybrid:
+    if action_config.name != "configured_hybrid":
         raise RuntimeError(
             f"{algorithm_label} requires the configured_hybrid action layout "
             "so the action space is Dict(continuous=Box, discrete=MultiDiscrete)"
-        )
-
-
-def _validate_sac_lazy_replay_support(config: TrainAppConfig) -> None:
-    if config.env.observation.mode != "image_state" or not config.train.optimize_memory_usage:
-        return
-
-    stack_mode = config.env.observation.stack_mode
-    if stack_mode not in SUPPORTED_LAZY_REPLAY_STACK_MODES:
-        supported = ", ".join(sorted(SUPPORTED_LAZY_REPLAY_STACK_MODES))
-        raise RuntimeError(
-            "SAC lazy replay does not support "
-            f"observation.stack_mode={stack_mode!r}; use one of: {supported}"
         )

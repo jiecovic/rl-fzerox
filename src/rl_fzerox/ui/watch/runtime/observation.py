@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs.observations import (
     ObservationValue,
     mask_observation_state,
@@ -12,6 +11,7 @@ from rl_fzerox.core.envs.observations import (
     state_feature_indices,
 )
 from rl_fzerox.core.envs.observations.state.components import state_component_features
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +55,9 @@ def configured_watch_zeroed_features(config: WatchAppConfig) -> frozenset[str]:
         if group.dropout_prob < 1.0:
             continue
         group_feature_names = frozenset(
-            feature_name for feature_name in group.feature_names if feature_name in active_feature_names
+            feature_name
+            for feature_name in group.feature_names
+            if feature_name in active_feature_names
         )
         if not group_feature_names:
             continue

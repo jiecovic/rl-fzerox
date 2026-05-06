@@ -5,11 +5,6 @@ from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend
 from fzerox_emulator.arrays import ActionMask, RgbFrame
-from rl_fzerox.core.config.schema import (
-    CurriculumConfig,
-    EnvConfig,
-    RewardConfig,
-)
 from rl_fzerox.core.envs.actions import (
     ActionValue,
     DiscreteActionDimension,
@@ -19,6 +14,11 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.runtime_spec.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    RewardConfig,
+)
 
 from .controls import (
     ActionMaskBranches,
@@ -83,6 +83,7 @@ class FZeroXEnvEngine:
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
             mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
+            pitch_neutral_index=self._action_config.pitch_buckets // 2,
         )
         self._reset_coordinator = EngineResetCoordinator(
             backend=backend,

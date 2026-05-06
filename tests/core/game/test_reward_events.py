@@ -4,11 +4,11 @@ from __future__ import annotations
 import pytest
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
-from rl_fzerox.core.config.schema import RewardConfig
 from rl_fzerox.core.envs.rewards import (
     RewardActionContext,
     build_reward_tracker,
 )
+from rl_fzerox.core.runtime_spec.schema import RewardConfig
 from tests.support.native_objects import encode_state_flags, make_step_summary, make_telemetry
 
 _COURSE_EFFECT_PIT = 1

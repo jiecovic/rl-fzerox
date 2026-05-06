@@ -6,13 +6,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.view.screen.types import (
     MouseRect,
     PygameModule,
@@ -170,15 +164,15 @@ def _poll_viewer_input(
     keys: _PressedKeyState = pygame.key.get_pressed()
     manual_mask = 0
     if keys[pygame.K_z]:
-        manual_mask |= ACCELERATE_MASK
+        manual_mask |= RACE_CONTROL_MASKS.accelerate
     if keys[pygame.K_x]:
-        manual_mask |= AIR_BRAKE_MASK
+        manual_mask |= RACE_CONTROL_MASKS.air_brake
     if keys[pygame.K_SPACE]:
-        manual_mask |= BOOST_MASK
+        manual_mask |= RACE_CONTROL_MASKS.boost
     if keys[pygame.K_a]:
-        manual_mask |= LEAN_LEFT_MASK
+        manual_mask |= RACE_CONTROL_MASKS.lean_left
     if keys[pygame.K_s]:
-        manual_mask |= LEAN_RIGHT_MASK
+        manual_mask |= RACE_CONTROL_MASKS.lean_right
     pressed_buttons: list[int] = []
     if keys[pygame.K_RETURN]:
         pressed_buttons.append(JOYPAD_BUTTONS.start)

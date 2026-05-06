@@ -53,6 +53,7 @@ def create_manager_api_app(
 ) -> FastAPI:
     """Create the local REST API app for the run manager."""
 
+    store.initialize()
     app = FastAPI(title="F-Zero X Run Manager", version="0.1.0")
     launcher = run_launcher or ManagerRunLauncher(store)
 

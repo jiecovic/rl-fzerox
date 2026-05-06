@@ -7,7 +7,9 @@ import pytest
 from gymnasium.spaces import MultiDiscrete
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
+from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
     EnvConfig,
@@ -17,8 +19,6 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
 from tests.core.envs.helpers import (
     CameraSyncAfterIntroBackend,
     CameraSyncBackend,

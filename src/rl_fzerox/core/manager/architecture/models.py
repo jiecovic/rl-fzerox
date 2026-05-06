@@ -4,7 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentName
-from rl_fzerox.core.manager.config import ObservationPreset
+from rl_fzerox.core.manager.run_spec import ObservationPreset
 
 
 class SelectOption(BaseModel):

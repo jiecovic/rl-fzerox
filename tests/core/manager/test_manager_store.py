@@ -9,13 +9,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import rl_fzerox.core.manager.filesystem_ops as filesystem_ops_module
-import rl_fzerox.core.manager.registry.drafts as drafts_registry
+import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops_module
+import rl_fzerox.core.manager.registry.drafts.fork_sources as draft_fork_sources
 import rl_fzerox.core.manager.registry.paths as registry_paths
-import rl_fzerox.core.manager.registry.runs as runs_registry
+import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 import rl_fzerox.core.manager.store as store_module
 from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
-from rl_fzerox.core.manager.filesystem_ops import FilesystemOperation
+from rl_fzerox.core.manager.artifacts.filesystem import FilesystemOperation
 
 
 def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
@@ -120,7 +120,7 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
         return 123_456
 
     monkeypatch.setattr(
-        drafts_registry,
+        draft_fork_sources,
         "snapshot_fork_source",
         fake_snapshot_fork_source,
     )
@@ -710,7 +710,7 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
             "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
             (stale_heartbeat, run.id),
         )
-    monkeypatch.setattr(runs_registry, "pid_exists", lambda pid: False)
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
 
     store.reconcile_orphaned_runs()
     failed = store.get_run(run.id)
@@ -757,7 +757,7 @@ def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
             "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
             (stale_heartbeat, run.id),
         )
-    monkeypatch.setattr(runs_registry, "pid_exists", lambda pid: True)
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: True)
 
     store.reconcile_orphaned_runs()
     refreshed = store.get_run(run.id)

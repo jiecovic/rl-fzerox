@@ -8,7 +8,7 @@ from fzerox_emulator import (
     joypad_mask,
 )
 from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
-from rl_fzerox.core.config.vehicle_catalog import vehicle_menu_row_and_column
+from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_menu_row_and_column
 from rl_fzerox.core.training.runs.race_start.exact import write_engine_settings
 from rl_fzerox.core.training.runs.race_start.models import MENU_TIMING, RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.validation import (

@@ -26,8 +26,8 @@ from rl_fzerox.apps.recording.video import (
     resolve_ffmpeg_path,
     temp_session_id,
 )
-from rl_fzerox.core.config.schema import WatchAppConfig
 from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.training.inference import PolicyRunner
 
 

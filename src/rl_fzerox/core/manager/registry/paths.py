@@ -3,7 +3,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.manager.paths import manager_runs_root, predicted_managed_run_dir
+from rl_fzerox.core.manager.artifacts.paths import (
+    manager_runs_root,
+    predicted_managed_run_dir,
+)
 
 
 def manager_root(*, output_root: Path | None = None) -> Path:

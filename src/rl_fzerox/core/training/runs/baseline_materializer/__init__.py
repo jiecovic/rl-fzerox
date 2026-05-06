@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fzerox_emulator import Emulator
-    from rl_fzerox.core.config.schema import TrainAppConfig
+    from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
     from rl_fzerox.core.training.runs.baseline_materializer.models import (
         BaselineArtifact,
         BaselineMaterializerContext,

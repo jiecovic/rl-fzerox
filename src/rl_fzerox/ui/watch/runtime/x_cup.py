@@ -12,7 +12,7 @@ from fzerox_emulator import (
     joypad_mask,
 )
 from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
-from rl_fzerox.core.config.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 
 
 @dataclass(frozen=True, slots=True)

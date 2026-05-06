@@ -10,12 +10,12 @@ from pathlib import Path
 from random import Random, choice, random
 
 from fzerox_emulator import EmulatorBackend
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
-from rl_fzerox.core.config.vehicle_catalog import EngineSetting, resolve_engine_setting
+from rl_fzerox.core.runtime_spec.vehicle_catalog import EngineSetting, resolve_engine_setting
 
 
 @dataclass(frozen=True, slots=True)

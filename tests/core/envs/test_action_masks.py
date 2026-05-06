@@ -3,15 +3,15 @@ import numpy as np
 import pytest
 
 from fzerox_emulator.arrays import Float32Array, Int64Array
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     CurriculumConfig,
     CurriculumStageConfig,
     CurriculumTriggerConfig,
     EnvConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import AIR_BRAKE_MASK, BOOST_MASK, LEAN_LEFT_MASK
 from tests.core.envs.helpers import ScriptedStepBackend
 from tests.core.envs.helpers import backend_step_result as _backend_step_result
 from tests.core.envs.helpers import step_summary as _step_summary
@@ -403,7 +403,7 @@ def test_env_control_gates_suppress_masked_lean_request() -> None:
     env.reset(seed=1)
     env.step(_discrete_gas_boost_lean_action(lean_index=1))
 
-    assert backend.last_controller_state.joypad_mask & LEAN_LEFT_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
 
 
 def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
@@ -454,7 +454,7 @@ def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
         }
     )
 
-    assert backend.last_controller_state.joypad_mask & AIR_BRAKE_MASK == 0
+    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.air_brake == 0
     assert backend.last_controller_state.left_stick_y == 0.0
     assert env.action_masks().tolist() == [True] * 12
 
@@ -501,7 +501,10 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
 
     env.step(_discrete_gas_boost_action(boost_index=1))
-    assert backend.last_controller_state.joypad_mask & BOOST_MASK == BOOST_MASK
+    assert (
+        backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.boost
+        == RACE_CONTROL_MASKS.boost
+    )
     assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
 
     env.step(_discrete_gas_boost_action())
