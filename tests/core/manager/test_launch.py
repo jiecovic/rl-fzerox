@@ -1,6 +1,8 @@
 # tests/core/manager/test_launch.py
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -302,3 +304,65 @@ def test_watch_artifact_skips_duplicate_window(
     )
 
     launcher.watch_artifact(run_id=run.id, artifact="latest")
+
+
+def test_watch_artifact_passes_pid_file_to_watch_process(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    run = store.create_run(
+        run_id="watch-run",
+        name="Watch Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "watch-run",
+    )
+    launcher = ManagerRunLauncher(store)
+    captured: dict[str, object] = {}
+
+    class _FakeProcess:
+        pid = 4321
+
+        def wait(self, timeout: float | None = None) -> int:
+            raise subprocess.TimeoutExpired(cmd="watch", timeout=timeout or 0.0)
+
+    def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
+        captured["command"] = command
+        return _FakeProcess()
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.resolve_model_artifact_path",
+        lambda *_args, **_kwargs: run.run_dir / RUN_LAYOUT.model_artifacts.latest,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.resolve_watch_app_config",
+        lambda **_kwargs: None,
+    )
+    pid_path = tmp_path / "manager" / "watch" / f"{run.id}.watch-latest.json"
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch._manager_watch_pid_path",
+        lambda *_args, **_kwargs: pid_path,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.run_manager.launch.subprocess.Popen",
+        _fake_popen,
+    )
+
+    status = launcher.watch_artifact(run_id=run.id, artifact="latest")
+
+    assert status == "started"
+    assert captured["command"] == [
+        sys.executable,
+        "-m",
+        "rl_fzerox.apps.watch",
+        "--manager-db-path",
+        str(store.db_path),
+        "--managed-run-id",
+        run.id,
+        "--artifact",
+        "latest",
+        "--watch-pid-file",
+        str(pid_path),
+    ]
+    assert pid_path.is_file()

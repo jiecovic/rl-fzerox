@@ -122,9 +122,8 @@ def draw_watch_frame(
 
 
 def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
-    if config.reward.gas_underuse_penalty >= 0.0:
-        return None
-    return float(config.reward.gas_underuse_threshold)
+    del config
+    return None
 
 
 def _thrust_deadzone_threshold(action_config: ActionRuntimeConfig) -> float | None:
