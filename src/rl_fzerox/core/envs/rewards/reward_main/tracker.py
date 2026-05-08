@@ -8,31 +8,31 @@ from rl_fzerox.core.envs.rewards.common import (
     RewardActionContext,
     RewardStep,
     RewardSummaryConfig,
-    apply_event_penalty,
 )
 from rl_fzerox.core.envs.rewards.progress import DamagePenaltyState
-from rl_fzerox.core.envs.rewards.race_v3.bounds import (
+from rl_fzerox.core.envs.rewards.reward_main.bounds import (
     cap_outside_bounds_reentry_reward,
 )
-from rl_fzerox.core.envs.rewards.race_v3.events import (
+from rl_fzerox.core.envs.rewards.reward_main.controls import (
+    air_brake_request_penalty,
+    airborne_pitch_up_penalty,
+    grounded_pitch_penalty,
+    lean_request_penalty,
+    manual_boost_reward,
+    outside_track_frame_penalty,
+)
+from rl_fzerox.core.envs.rewards.reward_main.energy import EnergyRefillRewardTracker
+from rl_fzerox.core.envs.rewards.reward_main.events import (
     BadSurfaceEntryPenaltyTracker,
     BoostPadRewardTracker,
     LapRewardTracker,
     landing_reward,
     terminal_or_truncation_penalty,
 )
-from rl_fzerox.core.envs.rewards.race_v3.progress import (
+from rl_fzerox.core.envs.rewards.reward_main.progress import (
     FrontierProgressRewardTracker,
     FrontierReward,
 )
-from rl_fzerox.core.envs.rewards.reward_main.controls import (
-    air_brake_request_penalty,
-    airborne_pitch_up_penalty,
-    lean_request_penalty,
-    manual_boost_reward,
-    outside_track_frame_penalty,
-)
-from rl_fzerox.core.envs.rewards.reward_main.energy import EnergyRefillRewardTracker
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
 from rl_fzerox.core.envs.track_bounds import telemetry_outside_track_bounds
 
@@ -117,7 +117,7 @@ class RewardMainTracker:
             and not outside_track_bounds
             and not telemetry.player.airborne
         )
-        self._energy.start_collision_cooldown(summary, weights=self._weights)
+        self._energy.start_collision_cooldown(summary, telemetry, weights=self._weights)
         reward = summary.frames_run * self._weights.time_penalty_per_frame
         breakdown: dict[str, float] = {}
         if reward:
@@ -173,7 +173,8 @@ class RewardMainTracker:
             reward += lap_reward
 
         boost_pad_reward = self._boost_pads.reward(
-            summary,
+            summary.entered_dash_surface,
+            summary.reverse_active_frames,
             relative_progress=self._progress.relative_distance(summary.max_race_distance),
             frontier_distance_before_step=frontier_distance_before_step,
             weights=self._weights,
@@ -218,6 +219,16 @@ class RewardMainTracker:
             reward += pitch_penalty
             breakdown["airborne_pitch_up"] = pitch_penalty
 
+        grounded_pitch = grounded_pitch_penalty(
+            summary,
+            telemetry,
+            action_context,
+            weights=self._weights,
+        )
+        if grounded_pitch:
+            reward += grounded_pitch
+            breakdown["grounded_pitch"] = grounded_pitch
+
         boost_reward = manual_boost_reward(action_context, weights=self._weights)
         if boost_reward:
             reward += boost_reward
@@ -242,12 +253,13 @@ class RewardMainTracker:
             reward += damage_penalty
             breakdown["damage_taken"] = damage_penalty
 
-        reward += apply_event_penalty(
-            summary.entered_collision_recoil,
-            self._weights.collision_recoil_penalty,
-            "collision_recoil",
-            breakdown,
-        )
+        if summary.collision_recoil_active_frames > 0:
+            collision_recoil_penalty = (
+                summary.collision_recoil_active_frames
+                * self._weights.collision_recoil_penalty
+            )
+            reward += collision_recoil_penalty
+            breakdown["collision_recoil"] = collision_recoil_penalty
 
         terminal_penalty = terminal_or_truncation_penalty(
             status,
@@ -352,7 +364,6 @@ class RewardMainTracker:
             status,
             weights=self._weights,
             progress_multiplier=progress_multiplier,
-            airborne=telemetry.player.airborne,
             outside_track_bounds=outside_track_bounds,
             race_distance=race_distance,
             energy_refill_bonus_for_progress=energy_refill_bonus_for_progress,

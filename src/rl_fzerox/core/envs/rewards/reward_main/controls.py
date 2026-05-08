@@ -64,6 +64,30 @@ def airborne_pitch_up_penalty(
     return max(int(summary.frames_run), 0) * penalty * pitch_up_level
 
 
+def grounded_pitch_penalty(
+    summary: StepSummary,
+    telemetry: FZeroXTelemetry,
+    action_context: RewardActionContext | None,
+    *,
+    weights: RewardMainWeights,
+) -> float:
+    penalty = weights.grounded_pitch_penalty
+    if (
+        penalty >= 0.0
+        or telemetry.player.airborne
+        or action_context is None
+        or action_context.pitch_level is None
+    ):
+        return 0.0
+
+    pitch_magnitude = abs(max(-1.0, min(1.0, float(action_context.pitch_level))))
+    deadzone = max(0.0, min(1.0, float(weights.grounded_pitch_deadzone)))
+    if pitch_magnitude <= deadzone:
+        return 0.0
+    scale = (pitch_magnitude - deadzone) / max(1.0 - deadzone, 1e-9)
+    return max(int(summary.frames_run), 0) * penalty * scale
+
+
 def manual_boost_reward(
     action_context: RewardActionContext | None,
     *,

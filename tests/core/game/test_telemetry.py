@@ -164,6 +164,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         frames_run=2,
         max_race_distance=42.0,
         reverse_active_frames=1,
+        collision_recoil_active_frames=2,
         low_speed_frames=2,
         energy_loss_total=4.0,
         energy_gain_total=2.5,
@@ -174,12 +175,12 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         final_frame_index=12,
     )
 
-    assert summary.entered_collision_recoil is True
     assert summary.entered_finished is True
     assert summary.entered_crashed is False
     assert summary.energy_gain_total == 2.5
     assert summary.damage_taken_frames == 1
     assert summary.reverse_active_frames == 1
+    assert summary.collision_recoil_active_frames == 2
     assert summary.low_speed_frames == 2
     assert summary.entered_state_labels == ("collision_recoil", "finished")
     assert summary.entered_course_effects == 1 << 3

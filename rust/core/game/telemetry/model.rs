@@ -3,6 +3,7 @@
 
 #[derive(Clone, Copy, Debug)]
 struct RacerStateFlags {
+    collision_recoil: u32,
     retired: u32,
     falling_off_track: u32,
     finished: u32,
@@ -20,6 +21,7 @@ struct CourseEffectBits {
 }
 
 const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
+    collision_recoil: 1 << 13,
     retired: 1 << 18,
     falling_off_track: 1 << 19,
     finished: 1 << 25,
@@ -95,6 +97,10 @@ pub(crate) struct StepTelemetrySample {
 }
 
 impl StepTelemetrySample {
+    pub(crate) fn collision_recoil(&self) -> bool {
+        (self.state_flags & RACER_STATE_FLAGS.collision_recoil) != 0
+    }
+
     pub(crate) fn damage_taken(&self) -> bool {
         (self.state_flags & RACER_STATE_FLAGS.received_damage) != 0
             || self.damage_rumble_counter > 0

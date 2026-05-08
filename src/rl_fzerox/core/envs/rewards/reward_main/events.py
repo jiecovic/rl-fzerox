@@ -1,7 +1,7 @@
-# src/rl_fzerox/core/envs/rewards/race_v3/events.py
+# src/rl_fzerox/core/envs/rewards/reward_main/events.py
 from __future__ import annotations
 
-from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
+from fzerox_emulator import FZeroXTelemetry, StepStatus
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.laps import completed_race_laps
 from rl_fzerox.core.envs.rewards.common import finish_placement_bonus
@@ -27,14 +27,15 @@ class BoostPadRewardTracker:
 
     def reward(
         self,
-        summary: StepSummary,
+        entered_dash_surface: bool,
+        reverse_active_frames: int,
         *,
         relative_progress: float,
         frontier_distance_before_step: float,
         weights: SharedRewardWeights,
     ) -> float:
         reward = weights.boost_pad_reward
-        if reward <= 0.0 or not summary.entered_dash_surface or summary.reverse_active_frames > 0:
+        if reward <= 0.0 or not entered_dash_surface or reverse_active_frames > 0:
             return 0.0
         if relative_progress < frontier_distance_before_step:
             return 0.0

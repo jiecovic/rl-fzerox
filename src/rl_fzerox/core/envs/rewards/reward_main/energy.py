@@ -25,13 +25,14 @@ class EnergyRefillRewardTracker:
     def start_collision_cooldown(
         self,
         summary: StepSummary,
+        telemetry: FZeroXTelemetry,
         *,
         weights: RewardMainWeights,
     ) -> None:
         cooldown_frames = max(int(weights.energy_refill_collision_cooldown_frames), 0)
         if cooldown_frames <= 0:
             return
-        if not summary.entered_collision_recoil and summary.damage_taken_frames <= 0:
+        if summary.collision_recoil_active_frames <= 0 and summary.damage_taken_frames <= 0:
             return
         self._cooldown_frames_remaining = max(
             self._cooldown_frames_remaining,

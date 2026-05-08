@@ -26,6 +26,7 @@ impl PyStepSummary {
         frames_run,
         max_race_distance,
         reverse_active_frames=0,
+        collision_recoil_active_frames=0,
         low_speed_frames=0,
         energy_loss_total=0.0,
         energy_gain_total=0.0,
@@ -44,6 +45,7 @@ impl PyStepSummary {
         frames_run: usize,
         max_race_distance: f32,
         reverse_active_frames: usize,
+        collision_recoil_active_frames: usize,
         low_speed_frames: usize,
         energy_loss_total: f32,
         energy_gain_total: f32,
@@ -59,6 +61,7 @@ impl PyStepSummary {
                 frames_run,
                 max_race_distance,
                 reverse_active_frames,
+                collision_recoil_active_frames,
                 low_speed_frames,
                 energy_loss_total,
                 energy_gain_total,
@@ -85,6 +88,11 @@ impl PyStepSummary {
     #[getter]
     fn reverse_active_frames(&self) -> usize {
         self.inner.reverse_active_frames
+    }
+
+    #[getter]
+    fn collision_recoil_active_frames(&self) -> usize {
+        self.inner.collision_recoil_active_frames
     }
 
     #[getter]
@@ -132,15 +140,6 @@ impl PyStepSummary {
         PyTuple::new(py, state_flag_labels(self.inner.entered_state_flags))
     }
 
-    #[getter]
-    fn entered_collision_recoil(&self) -> bool {
-        has_state_flag(
-            self.inner.entered_state_flags,
-            RACER_STATE_FLAGS.collision_recoil,
-        )
-    }
-
-    #[getter]
     fn entered_spinning_out(&self) -> bool {
         has_state_flag(
             self.inner.entered_state_flags,
@@ -195,6 +194,10 @@ impl PyStepSummary {
         dict.set_item("frames_run", self.frames_run())?;
         dict.set_item("max_race_distance", self.max_race_distance())?;
         dict.set_item("reverse_active_frames", self.reverse_active_frames())?;
+        dict.set_item(
+            "collision_recoil_active_frames",
+            self.collision_recoil_active_frames(),
+        )?;
         dict.set_item("low_speed_frames", self.low_speed_frames())?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
