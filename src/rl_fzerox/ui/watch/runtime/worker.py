@@ -10,7 +10,7 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
-from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig, WatchAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
@@ -156,12 +156,21 @@ def _run_simulation_loop(
         cnn_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
-        locked_reset_course_id: str | None = None
+        persistent_locked_reset_course_id: str | None = None
+        one_shot_reset_course_id: str | None = None
+        sequential_course_ids = _watch_sequential_course_ids(config.env.track_sampling.entries)
         watch_zeroed_state_features = configured_watch_zeroed_features(config)
 
         while config.watch.episodes is None or episode < config.watch.episodes:
+            effective_reset_course_id = (
+                one_shot_reset_course_id
+                if one_shot_reset_course_id is not None
+                else persistent_locked_reset_course_id
+            )
+            env.set_locked_reset_course(effective_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
+            one_shot_reset_course_id = None
             if x_cup_info is not None:
                 raw_info.update(x_cup_info)
             observation, info = apply_watch_state_feature_zeroing(
@@ -273,13 +282,25 @@ def _run_simulation_loop(
                         ),
                     )
                 if commands.toggle_track_course_lock_id is not None:
-                    locked_reset_course_id = _toggle_locked_reset_course(
+                    persistent_locked_reset_course_id = _toggle_locked_reset_course(
                         env,
-                        locked_reset_course_id=locked_reset_course_id,
+                        locked_reset_course_id=persistent_locked_reset_course_id,
                         requested_course_id=commands.toggle_track_course_lock_id,
                     )
+                    one_shot_reset_course_id = None
                     break
-                if commands.reset_requested:
+                if commands.reset_mode == "current":
+                    one_shot_reset_course_id = _current_watch_course_id(info)
+                    break
+                if commands.reset_mode == "previous":
+                    one_shot_reset_course_id = _adjacent_watch_course_id(
+                        current_course_id=_current_watch_course_id(info),
+                        ordered_course_ids=sequential_course_ids,
+                        offset=-1,
+                    )
+                    break
+                if commands.reset_mode == "next":
+                    one_shot_reset_course_id = None
                     break
                 if commands.reset_control_fps:
                     target_control_fps = native_control_fps
@@ -525,3 +546,51 @@ def _toggle_locked_reset_course(
     next_course_id = None if requested_course_id == locked_reset_course_id else requested_course_id
     env.set_locked_reset_course(next_course_id)
     return next_course_id
+
+
+def _current_watch_course_id(info: dict[str, object]) -> str | None:
+    course_id = info.get("track_course_id")
+    return course_id if isinstance(course_id, str) and course_id else None
+
+
+def _watch_sequential_course_ids(
+    entries: tuple[TrackSamplingEntryConfig, ...],
+) -> tuple[str, ...]:
+    seen_course_keys: set[str] = set()
+    ordered_course_ids: list[str] = []
+    for entry in entries:
+        course_key = _watch_entry_course_key(entry)
+        if course_key in seen_course_keys:
+            continue
+        seen_course_keys.add(course_key)
+        if entry.course_id:
+            ordered_course_ids.append(entry.course_id)
+    return tuple(ordered_course_ids)
+
+
+def _watch_entry_course_key(entry: TrackSamplingEntryConfig) -> str:
+    if entry.course_id:
+        return f"course_id:{entry.course_id}"
+    if entry.course_ref:
+        return f"course_ref:{entry.course_ref}"
+    if entry.course_index is not None:
+        return f"course_index:{int(entry.course_index)}"
+    return f"entry:{entry.id}"
+
+
+def _adjacent_watch_course_id(
+    *,
+    current_course_id: str | None,
+    ordered_course_ids: tuple[str, ...],
+    offset: int,
+) -> str | None:
+    if current_course_id is None:
+        return None
+    if not ordered_course_ids:
+        return current_course_id
+    try:
+        current_index = ordered_course_ids.index(current_course_id)
+    except ValueError:
+        return current_course_id
+    next_index = (current_index + offset) % len(ordered_course_ids)
+    return ordered_course_ids[next_index]

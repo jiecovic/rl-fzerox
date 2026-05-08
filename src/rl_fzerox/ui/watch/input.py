@@ -27,7 +27,7 @@ class ViewerInput:
     toggle_pause: bool = False
     step_once: bool = False
     save_state: bool = False
-    force_reset: bool = False
+    reset_mode: str | None = None
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
     toggle_cnn_normalization: bool = False
@@ -86,7 +86,7 @@ def _poll_viewer_input(
     toggle_pause = False
     step_once = False
     save_state = False
-    force_reset = False
+    reset_mode: str | None = None
     toggle_deterministic_policy = False
     toggle_manual_control = False
     toggle_cnn_normalization = False
@@ -147,7 +147,11 @@ def _poll_viewer_input(
             elif event.key == pygame.K_k:
                 save_state = True
             elif event.key == pygame.K_r:
-                force_reset = True
+                reset_mode = "current"
+            elif event.key == pygame.K_e:
+                reset_mode = "previous"
+            elif event.key == pygame.K_t:
+                reset_mode = "next"
             elif event.key == pygame.K_d:
                 toggle_deterministic_policy = True
             elif event.key == pygame.K_m:
@@ -203,7 +207,7 @@ def _poll_viewer_input(
         toggle_pause=toggle_pause,
         step_once=step_once,
         save_state=save_state,
-        force_reset=force_reset,
+        reset_mode=reset_mode,
         toggle_deterministic_policy=toggle_deterministic_policy,
         toggle_manual_control=toggle_manual_control,
         toggle_cnn_normalization=toggle_cnn_normalization,
