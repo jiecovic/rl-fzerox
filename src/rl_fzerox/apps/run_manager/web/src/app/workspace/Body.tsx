@@ -35,6 +35,12 @@ export function WorkspaceBody({
   runs,
   sessions,
 }: WorkspaceBodyProps) {
+  const activeRunTab = sessions.activeRunTab;
+  const activeRun =
+    activeRunTab === null
+      ? null
+      : (runs.find((candidate) => candidate.id === activeRunTab.runId) ?? null);
+
   return (
     <div className="workspace">
       {error !== null ? <Notice tone="error">{error}</Notice> : null}
@@ -66,33 +72,26 @@ export function WorkspaceBody({
           runs={runs}
         />
       ) : null}
-      {!isLoading && sessions.activeRunTab !== null && metadata !== null
-        ? sessions.runTabs.map((session) => {
-            const run = runs.find((candidate) => candidate.id === session.runId) ?? null;
-            return (
-              <div hidden={sessions.activeTabId !== session.sessionId} key={session.sessionId}>
-                {run === null ? (
-                  <Notice tone="error">This run is no longer available.</Notice>
-                ) : (
-                  <RunWorkspace
-                    allRuns={runs}
-                    metadata={metadata}
-                    onCreateDraftFromRun={actions.createDraftFromManagedRun}
-                    onFork={actions.forkManagedRun}
-                    onOpenDirectory={actions.openManagedRunDirectory}
-                    onRename={actions.renameManagedRun}
-                    onResetTrackPool={actions.resetManagedRunTrackPool}
-                    onResume={actions.resumeManagedRun}
-                    onShowCharts={sessions.showRunCharts}
-                    onStop={actions.stopManagedRun}
-                    onWatch={actions.watchManagedRun}
-                    run={run}
-                  />
-                )}
-              </div>
-            );
-          })
-        : null}
+      {!isLoading && activeRunTab !== null && metadata !== null ? (
+        activeRun === null ? (
+          <Notice tone="error">This run is no longer available.</Notice>
+        ) : (
+          <RunWorkspace
+            allRuns={runs}
+            metadata={metadata}
+            onCreateDraftFromRun={actions.createDraftFromManagedRun}
+            onFork={actions.forkManagedRun}
+            onOpenDirectory={actions.openManagedRunDirectory}
+            onRename={actions.renameManagedRun}
+            onResetTrackPool={actions.resetManagedRunTrackPool}
+            onResume={actions.resumeManagedRun}
+            onShowCharts={sessions.showRunCharts}
+            onStop={actions.stopManagedRun}
+            onWatch={actions.watchManagedRun}
+            run={activeRun}
+          />
+        )
+      ) : null}
       {!isLoading && sessions.activeDraftEditor !== null ? (
         defaultConfig !== null && metadata !== null ? (
           sessions.draftEditors.map((session) => (

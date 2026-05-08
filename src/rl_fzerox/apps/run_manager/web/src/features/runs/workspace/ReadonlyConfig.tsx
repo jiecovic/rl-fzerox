@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/ReadonlyConfig.tsx
-import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 import {
   CONFIG_SECTION_TABS,
@@ -19,8 +19,10 @@ import { Tabs } from "@/shared/ui/Tabs";
 
 interface RunReadonlyConfigProps {
   metadata: ConfigMetadata;
+  onSectionChange: (section: ConfigSection) => void;
   policyPreview: PolicyArchitecturePreview | null;
   run: ManagedRun;
+  section: ConfigSection;
 }
 
 interface ReadonlySectionRendererProps {
@@ -93,30 +95,13 @@ const SECTION_RENDERERS: Record<ConfigSection, (props: ReadonlySectionRendererPr
     ),
   };
 
-export function RunReadonlyConfig({ metadata, policyPreview, run }: RunReadonlyConfigProps) {
-  const [section, setSection] = useState<ConfigSection>("training");
-  const shellRef = useRef<HTMLDivElement | null>(null);
-
-  useLayoutEffect(() => {
-    const shell = shellRef.current;
-    if (shell === null) {
-      return;
-    }
-    // Readonly run config still reuses editable form components. Disable native
-    // controls at the DOM boundary so spinner arrows and keyboard input cannot
-    // mutate displayed values.
-    for (const control of shell.querySelectorAll<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >("input, select, textarea")) {
-      control.disabled = true;
-      if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
-        control.readOnly = true;
-      }
-      control.tabIndex = -1;
-      control.setAttribute("aria-readonly", "true");
-    }
-  });
-
+export function RunReadonlyConfig({
+  metadata,
+  onSectionChange,
+  policyPreview,
+  run,
+  section,
+}: RunReadonlyConfigProps) {
   return (
     <>
       <div className="section-tabs-row">
@@ -125,13 +110,15 @@ export function RunReadonlyConfig({ metadata, policyPreview, run }: RunReadonlyC
           activeId={section}
           items={CONFIG_SECTION_TABS}
           variant="section"
-          onSelect={(id) => setSection(id)}
+          onSelect={onSectionChange}
         />
       </div>
 
-      <div ref={shellRef} className="readonly-config-shell">
-        {SECTION_RENDERERS[section]({ metadata, policyPreview, run })}
-      </div>
+      <fieldset className="readonly-config-fieldset" disabled>
+        <div className="readonly-config-shell">
+          {SECTION_RENDERERS[section]({ metadata, policyPreview, run })}
+        </div>
+      </fieldset>
     </>
   );
 }

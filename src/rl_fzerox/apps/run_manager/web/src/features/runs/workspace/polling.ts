@@ -26,7 +26,10 @@ export function useRunClock(status: ManagedRun["status"]): number {
   return nowMs;
 }
 
-export function useRunPolicyPreview(config: ManagedRun["config"]): {
+export function useRunPolicyPreview(
+  config: ManagedRun["config"],
+  enabled: boolean,
+): {
   policyPreview: PolicyArchitecturePreview | null;
   previewError: string | null;
 } {
@@ -34,6 +37,11 @@ export function useRunPolicyPreview(config: ManagedRun["config"]): {
   const [previewError, setPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setPreviewError(null);
+      return undefined;
+    }
+
     let ignore = false;
     setPreviewError(null);
     void fetchPolicyPreview(config)
@@ -53,7 +61,7 @@ export function useRunPolicyPreview(config: ManagedRun["config"]): {
     return () => {
       ignore = true;
     };
-  }, [config]);
+  }, [config, enabled]);
 
   return { policyPreview, previewError };
 }
