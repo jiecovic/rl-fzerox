@@ -10,6 +10,7 @@ from rl_fzerox.ui.watch.runtime.cnn import (
     _activation_grid,
     next_cnn_activation_normalization,
 )
+from rl_fzerox.ui.watch.runtime.worker import _refresh_paused_cnn_activations
 from rl_fzerox.ui.watch.view.panels.visuals.cnn import (
     _separator_positions,
     _unused_tile_rects,
@@ -109,3 +110,43 @@ def test_cnn_activation_sampler_refreshes_when_normalization_changes() -> None:
     assert second is not first
     assert second.layers[0].normalization == "layer_percentile"
     assert policy_runner.calls == 2
+
+
+def test_cnn_activation_sampler_can_force_refresh_without_stepping() -> None:
+    policy_runner = _PolicyRunner()
+    sampler = CnnActivationSampler(refresh_interval_steps=3)
+    observation = np.zeros((2, 3, 3), dtype=np.uint8)
+
+    first = sampler.capture(enabled=True, policy_runner=policy_runner, observation=observation)
+    second = sampler.capture(
+        enabled=True,
+        policy_runner=policy_runner,
+        observation=observation,
+        force_refresh=True,
+    )
+
+    assert first is not None
+    assert second is not None
+    assert second is not first
+    assert policy_runner.calls == 2
+
+
+def test_refresh_paused_cnn_activations_captures_when_tab_is_opened() -> None:
+    policy_runner = _PolicyRunner()
+    sampler = CnnActivationSampler(refresh_interval_steps=3)
+    observation = np.zeros((2, 3, 3), dtype=np.uint8)
+
+    activations, changed = _refresh_paused_cnn_activations(
+        current_activations=None,
+        cnn_sampler=sampler,
+        cnn_visualization_enabled=True,
+        previous_cnn_visualization_enabled=False,
+        cnn_normalization="channel",
+        previous_cnn_normalization="channel",
+        policy_runner=policy_runner,
+        observation=observation,
+    )
+
+    assert activations is not None
+    assert changed is True
+    assert policy_runner.calls == 1

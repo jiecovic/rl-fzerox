@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from multiprocessing.queues import Queue as ProcessQueue
+from typing import TYPE_CHECKING
 
 from fzerox_emulator import ControllerState, Emulator
 from rl_fzerox.core.envs import FZeroXEnv
@@ -14,7 +15,9 @@ from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+    CnnActivationNormalizationMode,
     CnnActivationSampler,
+    CnnActivationSnapshot,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
@@ -54,6 +57,34 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _target_seconds,
 )
 from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.envs.observations import ObservationValue
+    from rl_fzerox.ui.watch.runtime.cnn import _CnnActivationRunner
+
+
+def _refresh_paused_cnn_activations(
+    *,
+    current_activations: CnnActivationSnapshot | None,
+    cnn_sampler: CnnActivationSampler,
+    cnn_visualization_enabled: bool,
+    previous_cnn_visualization_enabled: bool,
+    cnn_normalization: CnnActivationNormalizationMode,
+    previous_cnn_normalization: CnnActivationNormalizationMode,
+    policy_runner: _CnnActivationRunner | None,
+    observation: ObservationValue,
+) -> tuple[CnnActivationSnapshot | None, bool]:
+    next_activations = cnn_sampler.capture(
+        enabled=cnn_visualization_enabled,
+        policy_runner=policy_runner,
+        observation=observation,
+        normalization=cnn_normalization,
+        force_refresh=(
+            cnn_visualization_enabled != previous_cnn_visualization_enabled
+            or cnn_normalization != previous_cnn_normalization
+        ),
+    )
+    return next_activations, next_activations is not current_activations
 
 
 def run_simulation_worker(
@@ -168,6 +199,7 @@ def _run_simulation_loop(
                     control_state=current_control_state,
                     gas_level=current_gas_level,
                     boost_lamp_level=boost_lamp_level,
+                    action_mask_branches=committed_action_mask_branches,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
                     deterministic_policy=deterministic_policy,
@@ -183,6 +215,8 @@ def _run_simulation_loop(
             )
 
             while not (terminated or truncated):
+                previous_cnn_visualization_enabled = cnn_visualization_enabled
+                previous_cnn_normalization = cnn_normalization
                 commands, paused, manual_control_state = drain_worker_commands(
                     command_queue,
                     paused=paused,
@@ -279,6 +313,47 @@ def _run_simulation_loop(
                 )
 
                 if commands.paused and commands.step_requests <= 0:
+                    cnn_activations, cnn_snapshot_changed = _refresh_paused_cnn_activations(
+                        current_activations=cnn_activations,
+                        cnn_sampler=cnn_sampler,
+                        cnn_visualization_enabled=cnn_visualization_enabled,
+                        previous_cnn_visualization_enabled=previous_cnn_visualization_enabled,
+                        cnn_normalization=cnn_normalization,
+                        previous_cnn_normalization=previous_cnn_normalization,
+                        policy_runner=policy_runner,
+                        observation=observation,
+                    )
+                    if cnn_snapshot_changed:
+                        publish_worker_message(
+                            snapshot_queue,
+                            _build_snapshot(
+                                config=config,
+                                env=env,
+                                emulator=emulator,
+                                observation=observation,
+                                info=info,
+                                reset_info=reset_info,
+                                episode=episode,
+                                episode_reward=episode_reward,
+                                control_fps=control_rate.rate_hz(),
+                                target_control_fps=target_control_fps,
+                                control_state=current_control_state,
+                                gas_level=current_gas_level,
+                                boost_lamp_level=boost_lamp_level,
+                                action_mask_branches=committed_action_mask_branches,
+                                policy_action=current_policy_action,
+                                policy_runner=policy_runner,
+                                deterministic_policy=deterministic_policy,
+                                manual_control_enabled=manual_control_enabled,
+                                policy_reload_error=policy_reload_error,
+                                cnn_activations=cnn_activations,
+                                best_finish_position=best_finish_position,
+                                best_finish_times=best_finish_times,
+                                latest_finish_times=latest_finish_times,
+                                latest_finish_deltas_ms=latest_finish_deltas_ms,
+                                failed_track_attempts=failed_track_attempts,
+                            ),
+                        )
                     time.sleep(0.01)
                     continue
                 if not commands.paused and target_control_seconds is not None:

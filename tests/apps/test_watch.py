@@ -1,6 +1,8 @@
 # tests/apps/test_watch.py
 from __future__ import annotations
 
+import json
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -61,6 +63,44 @@ def test_watch_rejects_artifact_without_run_dir() -> None:
 def test_watch_rejects_missing_run_locator() -> None:
     with pytest.raises(SystemExit, match="--run-dir or --managed-run-id is required"):
         main([])
+
+
+def test_watch_removes_owned_pid_file_on_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    pid_path = tmp_path / "watch.json"
+    pid_path.write_text(json.dumps({"pid": os.getpid()}) + "\n", encoding="utf-8")
+    train_config = TrainAppConfig(
+        seed=7,
+        emulator=EmulatorConfig(
+            core_path=core_path,
+            rom_path=rom_path,
+        ),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch_cli.resolve.load_train_run_config_for_watch",
+        lambda *_args, **_kwargs: train_config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
+        lambda config, *, run_dir: config,
+    )
+    monkeypatch.setattr("rl_fzerox.apps.watch.run_viewer", lambda _config: None)
+
+    main(["--run-dir", str(run_dir), "--watch-pid-file", str(pid_path)])
+
+    assert not pid_path.exists()
 
 
 def test_watch_allows_run_dir_overrides_without_config(

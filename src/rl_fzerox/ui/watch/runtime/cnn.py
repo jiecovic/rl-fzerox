@@ -63,11 +63,14 @@ class CnnActivationSampler:
         policy_runner: _CnnActivationRunner | None,
         observation: ObservationValue,
         normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+        force_refresh: bool = False,
     ) -> CnnActivationSnapshot | None:
         if not enabled or policy_runner is None:
             self._steps_until_refresh = 0
             return None
         if (
+            not force_refresh
+            and
             self._cached is not None
             and self._cached.normalization == normalization
             and self._steps_until_refresh > 0

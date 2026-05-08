@@ -304,6 +304,8 @@ class ManagerRunLauncher:
             run.id,
             "--artifact",
             artifact,
+            "--watch-pid-file",
+            str(pid_path),
         ]
         with log_path.open("ab") as log_handle:
             process = subprocess.Popen(

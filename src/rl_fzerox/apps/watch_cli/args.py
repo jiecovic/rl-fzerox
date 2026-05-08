@@ -56,6 +56,13 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional run-manager run id to resolve watch config from SQLite.",
     )
+    parser.add_argument(
+        "--watch-pid-file",
+        dest="watch_pid_file",
+        type=Path,
+        default=None,
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     if (
         args.policy_artifact is not None
