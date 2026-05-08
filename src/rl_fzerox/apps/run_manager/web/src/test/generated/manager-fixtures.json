@@ -1213,6 +1213,8 @@
       "energy_refill_collision_cooldown_frames": 120,
       "energy_refill_progress_multiplier": 3.0,
       "failure_penalty": -30.0,
+      "grounded_pitch_deadzone": 0.1,
+      "grounded_pitch_penalty": 0.0,
       "ice_entry_penalty": 0.0,
       "ice_progress_multiplier": 1.0,
       "lap_completion_bonus": 5.0,

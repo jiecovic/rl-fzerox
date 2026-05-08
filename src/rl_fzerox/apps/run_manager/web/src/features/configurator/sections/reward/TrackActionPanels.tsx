@@ -164,6 +164,22 @@ export function TrackActionPanels({
             value={config.reward.airborne_pitch_up_penalty}
             onChange={(value) => updateReward({ airborne_pitch_up_penalty: value })}
           />
+          <NumberField
+            help="Small penalty for grounded pitch input outside the deadzone. This regularizes useless on-ground continuous pitch without affecting airborne control."
+            label="Grounded pitch penalty"
+            resetValue={defaultConfig.reward.grounded_pitch_penalty}
+            step="0.001"
+            value={config.reward.grounded_pitch_penalty}
+            onChange={(value) => updateReward({ grounded_pitch_penalty: value })}
+          />
+          <NumberField
+            help="Symmetric grounded pitch deadzone around zero before the grounded pitch penalty starts ramping in."
+            label="Grounded pitch deadzone"
+            resetValue={defaultConfig.reward.grounded_pitch_deadzone}
+            step="0.01"
+            value={config.reward.grounded_pitch_deadzone}
+            onChange={(value) => updateReward({ grounded_pitch_deadzone: value })}
+          />
         </div>
       </ConfigDisclosure>
     </>
