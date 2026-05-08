@@ -14,6 +14,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     CurriculumStageConfig,
     EnvConfig,
     ObservationConfig,
+    ObservationStateComponentConfig,
     TrackRecordEntryConfig,
     TrackRecordsConfig,
     TrackSamplingConfig,
@@ -43,12 +44,12 @@ def test_reset_returns_stacked_observation():
     obs, info = env.reset(seed=123)
     obs = image_obs(obs)
 
-    assert obs.shape == (116, 164, 12)
+    assert obs.shape == (60, 76, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
-    assert info["observation_shape"] == (116, 164, 12)
-    assert info["observation_frame_shape"] == (116, 164, 3)
+    assert info["observation_shape"] == (60, 76, 12)
+    assert info["observation_frame_shape"] == (60, 76, 3)
     assert info["observation_stack"] == 4
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
@@ -76,7 +77,7 @@ def test_reset_can_return_image_state_observation() -> None:
             observation=ObservationConfig(
                 mode="image_state",
                 frame_stack=4,
-                state_components=("vehicle_state",),
+                state_components=(ObservationStateComponentConfig(name="vehicle_state"),),
             ),
         ),
     )
@@ -85,7 +86,7 @@ def test_reset_can_return_image_state_observation() -> None:
 
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
-    assert obs["image"].shape == (116, 164, 12)
+    assert obs["image"].shape == (60, 76, 12)
     assert obs["image"].dtype == np.uint8
     assert obs["state"].shape == (8,)
     assert obs["state"].dtype == np.float32
@@ -93,7 +94,7 @@ def test_reset_can_return_image_state_observation() -> None:
         [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
     )
     assert info["observation_mode"] == "image_state"
-    assert info["observation_shape"] == (116, 164, 12)
+    assert info["observation_shape"] == (60, 76, 12)
     assert info["observation_state_shape"] == (8,)
     assert info["observation_state_features"] == (
         "vehicle_state.speed_norm",

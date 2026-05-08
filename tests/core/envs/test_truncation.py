@@ -114,14 +114,14 @@ def test_step_keeps_running_when_speed_is_low() -> None:
 
     assert not terminated
     assert not truncated
-    assert reward == pytest.approx(-0.01)
+    assert reward == pytest.approx(-0.005)
     assert info["truncation_reason"] is None
     assert info["stalled_steps"] == 1
-    assert info["step_reward"] == pytest.approx(-0.01)
+    assert info["step_reward"] == pytest.approx(-0.005)
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["time"] == -0.005
-    assert reward_breakdown["low_speed_time"] == -0.005
+    assert "low_speed_time" not in reward_breakdown
 
 
 def test_step_keeps_running_when_driving_in_reverse() -> None:
