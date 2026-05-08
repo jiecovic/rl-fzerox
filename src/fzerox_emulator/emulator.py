@@ -1,15 +1,18 @@
 # src/fzerox_emulator/emulator.py
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import (
+    BackendMultiObservationStepResult,
     BackendStepResult,
     FrameObservationOptions,
     FrameStep,
+    ObservationImageRecipe,
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
@@ -24,7 +27,12 @@ from fzerox_emulator.frames import (
     validated_observation_frame,
     validated_raw_rgb_frame,
 )
-from fzerox_emulator.repeat import RepeatStepConfig, run_repeat_step, run_repeat_watch_step
+from fzerox_emulator.repeat import (
+    RepeatStepConfig,
+    run_repeat_multi_observation_step,
+    run_repeat_step,
+    run_repeat_watch_step,
+)
 from fzerox_emulator.video import display_size
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
@@ -325,14 +333,6 @@ class Emulator:
 
         config = RepeatStepConfig(
             action_repeat=action_repeat,
-            preset=preset,
-            height=height,
-            width=width,
-            frame_stack=frame_stack,
-            stack_mode=stack_mode,
-            minimap_layer=minimap_layer,
-            resize_filter=resize_filter,
-            minimap_resize_filter=minimap_resize_filter,
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
@@ -341,10 +341,21 @@ class Emulator:
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
         )
+        recipe = ObservationImageRecipe(
+            preset=preset,
+            height=height,
+            width=width,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
+        )
         return run_repeat_step(
             self._native,
             controller_state,
             config=config,
+            recipe=recipe,
             spec=self.observation_spec(preset, height=height, width=width),
         )
 
@@ -373,14 +384,6 @@ class Emulator:
 
         config = RepeatStepConfig(
             action_repeat=action_repeat,
-            preset=preset,
-            height=height,
-            width=width,
-            frame_stack=frame_stack,
-            stack_mode=stack_mode,
-            minimap_layer=minimap_layer,
-            resize_filter=resize_filter,
-            minimap_resize_filter=minimap_resize_filter,
             stuck_min_speed_kph=stuck_min_speed_kph,
             energy_loss_epsilon=energy_loss_epsilon,
             max_episode_steps=max_episode_steps,
@@ -389,11 +392,60 @@ class Emulator:
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
         )
+        recipe = ObservationImageRecipe(
+            preset=preset,
+            height=height,
+            width=width,
+            frame_stack=frame_stack,
+            stack_mode=stack_mode,
+            minimap_layer=minimap_layer,
+            resize_filter=resize_filter,
+            minimap_resize_filter=minimap_resize_filter,
+        )
         return run_repeat_watch_step(
             self._native,
             controller_state,
             config=config,
+            recipe=recipe,
             spec=self.observation_spec(preset, height=height, width=width),
+        )
+
+    def step_repeat_multi_observation_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        observation_recipes: Sequence[ObservationImageRecipe],
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendMultiObservationStepResult:
+        """Execute one repeated env step and return multiple observation views."""
+
+        config = RepeatStepConfig(
+            action_repeat=action_repeat,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            energy_loss_epsilon=energy_loss_epsilon,
+            max_episode_steps=max_episode_steps,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=progress_frontier_epsilon,
+            terminate_on_energy_depleted=terminate_on_energy_depleted,
+            lean_timer_assist=lean_timer_assist,
+        )
+        specs = tuple(
+            self.observation_spec(recipe.preset, height=recipe.height, width=recipe.width)
+            for recipe in observation_recipes
+        )
+        return run_repeat_multi_observation_step(
+            self._native,
+            controller_state,
+            config=config,
+            recipes=observation_recipes,
+            specs=specs,
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:

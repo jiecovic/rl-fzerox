@@ -3,9 +3,7 @@
 use super::step_accumulator::StepAccumulator;
 use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationLayout, ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::StepTelemetrySample;
-use crate::core::video::VideoResizeFilter;
 
 const AIRBORNE_FLAG: u32 = 1 << 26;
 const ACTIVE_FLAG: u32 = 1 << 30;
@@ -204,12 +202,6 @@ fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> Repea
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
-        layout: ObservationLayout::Preset(ObservationPreset::Crop84x116),
-        frame_stack: 4,
-        stack_mode: ObservationStackMode::Rgb,
-        minimap_layer: false,
-        resize_filter: VideoResizeFilter::Nearest,
-        minimap_resize_filter: VideoResizeFilter::Nearest,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,

@@ -10,6 +10,7 @@ import fzerox_emulator._native as native
 STUB_ONLY_TYPES = frozenset(
     {
         "FrameObservationOptionsDict",
+        "ObservationImageRequestDict",
         "ObservationSpecDict",
         "VehicleSetupInfoDict",
     }

@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry
+from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry, ObservationImageRecipe
 from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry
 
 
@@ -211,6 +211,85 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     assert len(result.display_frames) == 2
     assert result.display_frames[0].shape == (444, 592, 3)
     assert result.display_frames[1][0, 0, 0] == 2
+
+
+def test_step_repeat_multi_observation_raw_returns_multiple_validated_views() -> None:
+    emulator = object.__new__(Emulator)
+    emulator._observation_specs = {}
+
+    class NativeStub:
+        def observation_spec(
+            self,
+            preset: str,
+            *,
+            height: int | None = None,
+            width: int | None = None,
+        ) -> dict[str, object]:
+            if preset == "crop_84x84":
+                return {
+                    "preset": preset,
+                    "width": 84,
+                    "height": 84,
+                    "channels": 3,
+                    "display_width": 592,
+                    "display_height": 444,
+                }
+            assert preset == ""
+            assert height == 72
+            assert width == 96
+            return {
+                "preset": "custom_72x96",
+                "width": 96,
+                "height": 72,
+                "channels": 3,
+                "display_width": 592,
+                "display_height": 444,
+            }
+
+        def step_repeat_multi_observation_raw(self, **kwargs: object):
+            requests = kwargs["observation_requests"]
+            assert isinstance(requests, list)
+            assert requests[0]["preset"] == "crop_84x84"
+            assert requests[1]["preset"] == ""
+            assert requests[1]["height"] == 72
+            assert requests[1]["width"] == 96
+            observations = [
+                np.zeros((84, 84, 6), dtype=np.uint8),
+                np.zeros((72, 96, 1), dtype=np.uint8),
+            ]
+            summary = make_step_summary(frames_run=2, max_race_distance=42.0)
+            status = make_step_status(step_count=2, stalled_steps=0)
+            telemetry = make_telemetry(race_distance=42.0)
+            return observations, summary, status, telemetry
+
+    emulator.__dict__["_native"] = NativeStub()
+
+    result = emulator.step_repeat_multi_observation_raw(
+        controller_state=ControllerState(),
+        action_repeat=2,
+        observation_recipes=(
+            ObservationImageRecipe(preset="crop_84x84", frame_stack=2),
+            ObservationImageRecipe(
+                height=72,
+                width=96,
+                frame_stack=1,
+                stack_mode="gray",
+            ),
+        ),
+        stuck_min_speed_kph=50.0,
+        energy_loss_epsilon=0.1,
+        max_episode_steps=1_000,
+        progress_frontier_stall_limit_frames=900,
+        progress_frontier_epsilon=100.0,
+        terminate_on_energy_depleted=True,
+    )
+
+    assert len(result.observations) == 2
+    assert result.observations[0].shape == (84, 84, 6)
+    assert result.observations[1].shape == (72, 96, 1)
+    assert result.summary.frames_run == 2
+    assert result.telemetry is not None
+    assert result.telemetry.player.race_distance == 42.0
 
 
 def test_render_observation_supports_custom_resolution() -> None:

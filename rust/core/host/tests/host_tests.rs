@@ -5,9 +5,7 @@ use super::{
     step::{RepeatedStepConfig, StepCounters, StepStatus, StepSummary},
 };
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationLayout, ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
-use crate::core::video::VideoResizeFilter;
 
 #[test]
 fn resolve_display_aspect_ratio_prefers_reported_ratio() {
@@ -260,12 +258,6 @@ fn repeated_step_config(
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
-        layout: ObservationLayout::Preset(ObservationPreset::Crop84x116),
-        frame_stack: 4,
-        stack_mode: ObservationStackMode::Rgb,
-        minimap_layer: false,
-        resize_filter: VideoResizeFilter::Nearest,
-        minimap_resize_filter: VideoResizeFilter::Nearest,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
