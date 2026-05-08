@@ -6,13 +6,18 @@ from queue import Empty
 from pytest import MonkeyPatch
 
 from fzerox_emulator import ControllerState
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
 from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
     WatchWorker,
     WorkerClosed,
     drain_worker_commands,
 )
-from rl_fzerox.ui.watch.runtime.worker import run_simulation_worker
+from rl_fzerox.ui.watch.runtime.worker import (
+    _adjacent_watch_course_id,
+    _watch_sequential_course_ids,
+    run_simulation_worker,
+)
 
 
 class _CommandQueue:
@@ -65,8 +70,8 @@ class _InterruptingProcess:
         self._alive = False
 
 
-def test_drain_worker_commands_coalesces_force_reset() -> None:
-    command_queue = _CommandQueue([ViewerCommand(force_reset=True)])
+def test_drain_worker_commands_coalesces_reset_mode() -> None:
+    command_queue = _CommandQueue([ViewerCommand(reset_mode="current")])
 
     commands, paused, control_state = drain_worker_commands(
         command_queue,
@@ -74,9 +79,49 @@ def test_drain_worker_commands_coalesces_force_reset() -> None:
         control_state=ControllerState(),
     )
 
-    assert commands.reset_requested is True
+    assert commands.reset_mode == "current"
     assert paused is False
     assert control_state == ControllerState()
+
+
+def test_drain_worker_commands_last_reset_mode_wins() -> None:
+    command_queue = _CommandQueue(
+        [
+            ViewerCommand(reset_mode="current"),
+            ViewerCommand(reset_mode="next"),
+        ]
+    )
+
+    commands, _, _ = drain_worker_commands(
+        command_queue,
+        paused=False,
+        control_state=ControllerState(),
+    )
+
+    assert commands.reset_mode == "next"
+
+
+def test_watch_sequential_course_ids_follow_unique_course_order() -> None:
+    entries = (
+        TrackSamplingEntryConfig(id="a1", course_id="mute_city"),
+        TrackSamplingEntryConfig(id="a2", course_id="mute_city"),
+        TrackSamplingEntryConfig(id="b1", course_id="silence"),
+    )
+
+    assert _watch_sequential_course_ids(entries) == ("mute_city", "silence")
+
+
+def test_adjacent_watch_course_id_wraps_to_previous_course() -> None:
+    ordered_course_ids = ("mute_city", "silence", "devils_forest")
+
+    assert (
+        _adjacent_watch_course_id(
+            current_course_id="mute_city",
+            ordered_course_ids=ordered_course_ids,
+            offset=-1,
+        )
+        == "devils_forest"
+    )
 
 
 def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:

@@ -33,6 +33,8 @@ class _FakePygame:
     K_0 = 40
     K_KP0 = 41
     K_r = 26
+    K_e = 43
+    K_t = 42
     K_d = 27
     K_m = 35
     K_c = 39
@@ -157,10 +159,22 @@ def test_poll_viewer_input_does_not_double_count_initial_held_speed_key() -> Non
     assert viewer_input.control_fps_delta == 1
 
 
-def test_poll_viewer_input_maps_r_to_force_reset() -> None:
+def test_poll_viewer_input_maps_r_to_current_course_reset() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_r,)))
 
-    assert viewer_input.force_reset is True
+    assert viewer_input.reset_mode == "current"
+
+
+def test_poll_viewer_input_maps_e_to_previous_course_reset() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_e,)))
+
+    assert viewer_input.reset_mode == "previous"
+
+
+def test_poll_viewer_input_maps_t_to_next_course_reset() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_t,)))
+
+    assert viewer_input.reset_mode == "next"
 
 
 def test_poll_viewer_input_maps_d_to_policy_mode_toggle() -> None:

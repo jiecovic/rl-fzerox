@@ -22,7 +22,7 @@ class ViewerCommand:
     toggle_pause: bool = False
     step_once: bool = False
     save_state: bool = False
-    force_reset: bool = False
+    reset_mode: str | None = None
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
     toggle_track_course_lock_id: str | None = None
@@ -42,7 +42,7 @@ class WorkerCommandBatch:
     paused: bool
     step_requests: int
     save_requests: int
-    reset_requested: bool
+    reset_mode: str | None
     toggle_deterministic_policy: bool
     manual_control_enabled: bool
     toggle_track_course_lock_id: str | None

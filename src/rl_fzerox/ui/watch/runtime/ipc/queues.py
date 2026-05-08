@@ -137,7 +137,7 @@ def drain_worker_commands(
     quit_requested = False
     step_requests = 0
     save_requests = 0
-    reset_requested = False
+    reset_mode: str | None = None
     toggle_deterministic_policy = False
     toggle_track_course_lock_id: str | None = None
     toggle_zeroed_state_feature_name: str | None = None
@@ -155,7 +155,7 @@ def drain_worker_commands(
                     paused=next_paused,
                     step_requests=step_requests,
                     save_requests=save_requests,
-                    reset_requested=reset_requested,
+                    reset_mode=reset_mode,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     manual_control_enabled=next_manual_control_enabled,
                     toggle_track_course_lock_id=toggle_track_course_lock_id,
@@ -179,8 +179,8 @@ def drain_worker_commands(
             step_requests += 1
         if command.save_state:
             save_requests += 1
-        if command.force_reset:
-            reset_requested = True
+        if command.reset_mode is not None:
+            reset_mode = command.reset_mode
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
         if command.toggle_manual_control:
@@ -213,7 +213,7 @@ def apply_viewer_input(
             toggle_pause=viewer_input.toggle_pause,
             step_once=viewer_input.step_once,
             save_state=viewer_input.save_state,
-            force_reset=viewer_input.force_reset,
+            reset_mode=viewer_input.reset_mode,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             toggle_manual_control=viewer_input.toggle_manual_control,
             toggle_track_course_lock_id=viewer_input.toggle_record_course_lock_id,
