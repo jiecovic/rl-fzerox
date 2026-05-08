@@ -16,6 +16,7 @@ import {
   showsLineageTotals,
   trainFpsLabel,
 } from "@/features/runs/workspace/model";
+import { useRunClock } from "@/features/runs/workspace/polling";
 import type { ConfigMetadata, ManagedRun, TrackSamplingRuntimeState } from "@/shared/api/contract";
 import { formatDate } from "@/shared/ui/format";
 import {
@@ -33,7 +34,6 @@ interface RunRuntimeSummaryProps {
   actions: RunWorkspaceActionState;
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
-  nowMs: number;
   onShowCharts: (runId: string) => void;
   run: ManagedRun;
   trackSamplingState: TrackSamplingRuntimeState | null;
@@ -43,11 +43,11 @@ export function RunRuntimeSummary({
   actions,
   allRuns,
   metadata,
-  nowMs,
   onShowCharts,
   run,
   trackSamplingState,
 }: RunRuntimeSummaryProps) {
+  const nowMs = useRunClock(run.status);
   const runtime = run.runtime;
   const progressFraction = runtime?.progress_fraction ?? 0;
   const hasLineageTotals = showsLineageTotals(run);

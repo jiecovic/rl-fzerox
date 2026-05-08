@@ -1,12 +1,9 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/RunWorkspace.tsx
 import { useEffect, useState } from "react";
+import type { ConfigSection } from "@/features/configurator/configurator/sections";
 import { useRunWorkspaceActions } from "@/features/runs/workspace/actions";
 import { RunIdentityPanel } from "@/features/runs/workspace/IdentityPanel";
-import {
-  useRunClock,
-  useRunPolicyPreview,
-  useRunTrackSamplingState,
-} from "@/features/runs/workspace/polling";
+import { useRunPolicyPreview, useRunTrackSamplingState } from "@/features/runs/workspace/polling";
 import { RunReadonlyConfig } from "@/features/runs/workspace/ReadonlyConfig";
 import { RunRuntimeSummary, runWorkspaceSubtitle } from "@/features/runs/workspace/RuntimeSummary";
 import type { ConfigMetadata, ManagedRun } from "@/shared/api/contract";
@@ -42,8 +39,9 @@ export function RunWorkspace({
   run,
 }: RunWorkspaceProps) {
   const [runName, setRunName] = useState(run.name);
-  const nowMs = useRunClock(run.status);
-  const { policyPreview, previewError } = useRunPolicyPreview(run.config);
+  const [configSection, setConfigSection] = useState<ConfigSection>("training");
+  const previewEnabled = configSection === "observation" || configSection === "policy";
+  const { policyPreview, previewError } = useRunPolicyPreview(run.config, previewEnabled);
   const { setTrackSamplingState, trackSamplingState } = useRunTrackSamplingState(
     run.id,
     run.status,
@@ -74,18 +72,19 @@ export function RunWorkspace({
         actions={actions}
         allRuns={allRuns}
         metadata={metadata}
-        nowMs={nowMs}
         onShowCharts={onShowCharts}
         run={run}
         trackSamplingState={trackSamplingState}
       />
 
-      {actions.controlError !== null || previewError !== null ? (
+      {actions.controlError !== null || (previewEnabled && previewError !== null) ? (
         <div className="configurator-feedback-stack">
           {actions.controlError !== null ? (
             <Notice tone="error">{actions.controlError}</Notice>
           ) : null}
-          {previewError !== null ? <Notice tone="error">{previewError}</Notice> : null}
+          {previewEnabled && previewError !== null ? (
+            <Notice tone="error">{previewError}</Notice>
+          ) : null}
         </div>
       ) : null}
 
@@ -98,7 +97,13 @@ export function RunWorkspace({
         runName={runName}
       />
 
-      <RunReadonlyConfig metadata={metadata} policyPreview={policyPreview} run={run} />
+      <RunReadonlyConfig
+        metadata={metadata}
+        onSectionChange={setConfigSection}
+        policyPreview={policyPreview}
+        run={run}
+        section={configSection}
+      />
     </Panel>
   );
 }

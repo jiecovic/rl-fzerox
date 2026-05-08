@@ -195,6 +195,13 @@
   justify-content: flex-end;
 }
 
+.readonly-config-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .readonly-config-shell {
   min-width: 0;
 }
