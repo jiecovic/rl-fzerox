@@ -323,6 +323,7 @@ export const managedRunSchema = z.object({
   source_artifact: z.enum(["latest", "best"]).nullable(),
   source_num_timesteps: z.number().int().nonnegative().nullable(),
   pending_command: runCommandSchema.nullable(),
+  worker_heartbeat_at: z.string().nullable(),
   runtime: z
     .object({
       total_timesteps: z.number().int().nonnegative(),

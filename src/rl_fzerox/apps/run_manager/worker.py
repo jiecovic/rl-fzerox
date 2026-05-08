@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from rl_fzerox.core.training.runner import run_training
 from rl_fzerox.core.training.runs import RUN_LAYOUT, RunPaths, continue_run_paths
 
 LOGGER = logging.getLogger(__name__)
+WORKER_HEARTBEAT_INTERVAL_SECONDS = 3.0
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -41,8 +43,15 @@ def main(argv: list[str] | None = None) -> None:
         LOGGER.error("managed run not found: %s", args.run_id)
         raise SystemExit(f"managed run not found: {args.run_id}")
 
+    heartbeat_loop: _WorkerHeartbeatLoop | None = None
     try:
         _heartbeat_or_die(store=store, run_id=run.id, launch_token=args.launch_token)
+        heartbeat_loop = _WorkerHeartbeatLoop(
+            store=store,
+            run_id=run.id,
+            launch_token=args.launch_token,
+        )
+        heartbeat_loop.start()
         LOGGER.info(
             "loaded run status=%s run_dir=%s pending_command=%s",
             run.status,
@@ -120,6 +129,8 @@ def main(argv: list[str] | None = None) -> None:
             message="training finished",
         )
     finally:
+        if heartbeat_loop is not None:
+            heartbeat_loop.stop()
         store.clear_run_worker(run.id, launch_token=args.launch_token)
 
 
@@ -244,6 +255,49 @@ def _heartbeat_or_die(*, store: ManagerStore, run_id: str, launch_token: str) ->
     )
     if not heartbeat_ok:
         raise RuntimeError("manager worker lease is missing or stale")
+
+
+class _WorkerHeartbeatLoop:
+    def __init__(
+        self,
+        *,
+        store: ManagerStore,
+        run_id: str,
+        launch_token: str,
+        interval_seconds: float = WORKER_HEARTBEAT_INTERVAL_SECONDS,
+    ) -> None:
+        self._store = store
+        self._run_id = run_id
+        self._launch_token = launch_token
+        self._interval_seconds = interval_seconds
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=f"manager-heartbeat-{run_id}",
+            daemon=True,
+        )
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop_event.set()
+        self._thread.join(timeout=self._interval_seconds + 1.0)
+
+    def _run(self) -> None:
+        while not self._stop_event.wait(self._interval_seconds):
+            heartbeat_ok = self._store.heartbeat_run_worker(
+                run_id=self._run_id,
+                launch_token=self._launch_token,
+                heartbeat_at=_now(),
+            )
+            if heartbeat_ok:
+                continue
+            LOGGER.error(
+                "manager worker lease lost in background heartbeat run_id=%s",
+                self._run_id,
+            )
+            return
 
 
 if __name__ == "__main__":

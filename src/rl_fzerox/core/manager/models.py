@@ -78,6 +78,7 @@ class ManagedRun:
     source_num_timesteps: int | None = None
     started_at: str | None = None
     stopped_at: str | None = None
+    worker_heartbeat_at: str | None = None
     runtime: ManagedRunRuntime | None = None
     pending_command: RunCommand | None = None
 
