@@ -122,37 +122,39 @@ def test_resolve_ffmpeg_path_uses_bundled_fallback(monkeypatch: pytest.MonkeyPat
 
 
 def test_parse_args_records_deterministically_by_default() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.deterministic is True
 
 
 def test_parse_args_can_record_stochastically() -> None:
-    args = parse_args(["--out", "race.mp4", "--no-deterministic"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--no-deterministic"])
 
     assert args.deterministic is False
 
 
 def test_parse_args_uses_live_progress_by_default() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.progress_interval == 2.0
 
 
 def test_parse_args_can_disable_live_progress() -> None:
-    args = parse_args(["--out", "race.mp4", "--progress-interval", "0"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--progress-interval", "0"])
 
     assert args.progress_interval == 0.0
 
 
 def test_parse_args_defaults_to_stream_all_record_mode() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.record_mode == "stream-all"
 
 
 def test_parse_args_accepts_probe_then_record_mode() -> None:
-    args = parse_args(["--out", "race.mp4", "--record-mode", "probe-then-record"])
+    args = parse_args(
+        ["--run-dir", "run-dir", "--out", "race.mp4", "--record-mode", "probe-then-record"]
+    )
 
     assert args.record_mode == "probe-then-record"
 

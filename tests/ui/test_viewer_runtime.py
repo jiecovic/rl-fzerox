@@ -126,7 +126,6 @@ def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: 
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
         env=EnvConfig(
             action=ActionConfig(
-                name="configured_hybrid",
                 layout_continuous_axes=("steer",),
                 layout_discrete_axes=("gas", "boost", "lean"),
             ),

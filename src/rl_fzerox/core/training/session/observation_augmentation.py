@@ -7,7 +7,11 @@ from dataclasses import dataclass
 import gymnasium as gym
 import numpy as np
 
-from rl_fzerox.core.envs.observations import mask_observation_state, state_feature_names
+from rl_fzerox.core.envs.observations import (
+    mask_observation_state,
+    mask_state_vector,
+    state_feature_names,
+)
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, TrainConfig
 from rl_fzerox.core.seed import derive_seed
 
@@ -88,17 +92,24 @@ class EpisodeStateFeatureDropoutWrapper(gym.ObservationWrapper):
             return observation
         if not isinstance(observation, dict):
             return observation
-        image = observation.get("image")
         state = observation.get("state")
-        if not isinstance(image, np.ndarray) or not isinstance(state, np.ndarray):
+        if not isinstance(state, np.ndarray):
             return observation
-        return mask_observation_state(
-            {
-                "image": image,
-                "state": state,
-            },
+        image = observation.get("image")
+        if isinstance(image, np.ndarray):
+            return mask_observation_state(
+                {
+                    "image": image,
+                    "state": state,
+                },
+                feature_indices=self._dropped_feature_indices,
+            )
+        masked_observation = dict(observation)
+        masked_observation["state"] = mask_state_vector(
+            state,
             feature_indices=self._dropped_feature_indices,
         )
+        return masked_observation
 
 
 def _state_feature_dropout_groups(
