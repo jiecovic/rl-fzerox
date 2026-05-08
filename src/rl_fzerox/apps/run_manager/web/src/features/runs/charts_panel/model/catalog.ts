@@ -104,7 +104,6 @@ const METRIC_TITLE_OVERRIDES: Record<string, string> = {
   "rollout/ep_rew_mean": "Episode reward",
   "state/airborne_frame_ratio": "Airborne frame ratio",
   "state/boost_pad_entry_step_rate": "Boost-pad entry rate",
-  "state/collision_recoil_entry_rate": "Collision recoil rate",
   "state/damage_taken_step_rate": "Damage-taken rate",
   "state/lap_mean": "Lap",
   "state/position_mean": "Position",

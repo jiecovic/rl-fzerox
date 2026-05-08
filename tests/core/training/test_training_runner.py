@@ -240,7 +240,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "damage_taken_frames": 0,
             "frames_run": 2,
             "airborne_frames": 1,
-            "collision_recoil_entered": False,
             "boost_pad_entered": True,
             "boost_used": True,
             "lean_used": False,
@@ -271,7 +270,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "damage_taken_frames": 2,
             "frames_run": 3,
             "airborne_frames": 3,
-            "collision_recoil_entered": True,
             "boost_pad_entered": False,
             "boost_used": False,
             "lean_used": True,
@@ -297,7 +295,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["step_reward_raw"].mean() == 25.0
     assert accumulator.state_metrics["step_reward_clip_abs_excess"].mean() == 12.5
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
-    assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
@@ -324,7 +321,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     accumulator.record_to(logger)
 
     assert logger.records["state/damage_taken_step_rate"] == 0.5
-    assert logger.records["state/collision_recoil_entry_rate"] == 0.5
     assert logger.records["state/boost_pad_entry_step_rate"] == 0.5
     assert logger.records["state/airborne_frame_ratio"] == 0.8
     assert logger.records["action/boost_used_step_rate"] == 0.5
@@ -902,10 +898,9 @@ def test_monitor_info_keys_include_position_context() -> None:
     assert "course_index" in MONITOR_INFO_KEYS
 
 
-def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> None:
+def test_monitor_info_keys_include_finished_timing_and_damage_metrics() -> None:
     assert "race_time_ms" in MONITOR_INFO_KEYS
     assert "damage_taken_frames" in MONITOR_INFO_KEYS
-    assert "collision_recoil_entered" in MONITOR_INFO_KEYS
     assert "boost_pad_entries" in MONITOR_INFO_KEYS
     assert "boost_pad_entries_per_lap" in MONITOR_INFO_KEYS
     assert "episode_airborne_frames" in MONITOR_INFO_KEYS

@@ -134,7 +134,6 @@ class EngineStepAssembler:
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["episode_airborne_frames"] = episode_airborne_frames
-        info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
         info["boost_pad_entered"] = boost_pad_entered
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used

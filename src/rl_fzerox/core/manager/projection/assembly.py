@@ -111,6 +111,8 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "boost_pad_reward_progress_window": reward.boost_pad_reward_progress_window,
         "lean_request_penalty": reward.lean_request_penalty,
         "airborne_pitch_up_penalty": reward.airborne_pitch_up_penalty,
+        "grounded_pitch_penalty": reward.grounded_pitch_penalty,
+        "grounded_pitch_deadzone": reward.grounded_pitch_deadzone,
         "damage_taken_frame_penalty": reward.damage_taken_frame_penalty,
         "damage_taken_streak_ramp_penalty": reward.damage_taken_streak_ramp_penalty,
         "damage_taken_streak_cap_frames": reward.damage_taken_streak_cap_frames,

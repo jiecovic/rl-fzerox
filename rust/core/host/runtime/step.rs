@@ -24,6 +24,8 @@ pub struct StepSummary {
     pub max_race_distance: f32,
     /// Number of internal frames spent with the game reverse timer active.
     pub reverse_active_frames: usize,
+    /// Number of internal frames spent in collision recoil.
+    pub collision_recoil_active_frames: usize,
     /// Number of internal frames spent below the configured stuck-speed threshold.
     pub low_speed_frames: usize,
     /// Total energy lost during the repeated step.

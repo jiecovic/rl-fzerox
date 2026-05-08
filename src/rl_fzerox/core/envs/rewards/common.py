@@ -69,18 +69,6 @@ class RewardTracker(Protocol):
         ...
 
 
-def apply_event_penalty(
-    entered: bool,
-    penalty: float,
-    label: str,
-    breakdown: dict[str, float],
-) -> float:
-    if not entered:
-        return 0.0
-    breakdown[label] = penalty
-    return penalty
-
-
 def finish_placement_bonus(*, position: int, total_racers: int, scale: float) -> float:
     clamped_total_racers = max(total_racers, 1)
     clamped_position = min(max(position, 1), clamped_total_racers)
