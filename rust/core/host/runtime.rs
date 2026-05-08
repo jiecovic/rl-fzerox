@@ -17,7 +17,10 @@ mod step;
 mod step_accumulator;
 
 pub use host::Host;
-pub use step::{DisplayFrameBatch, RepeatedStepConfig, StepCounters, StepStatus, StepSummary};
+pub use step::{
+    DisplayFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepCounters, StepStatus,
+    StepSummary,
+};
 
 #[cfg(test)]
 use bootstrap::resolve_display_aspect_ratio;

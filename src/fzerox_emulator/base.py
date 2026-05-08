@@ -1,6 +1,7 @@
 # src/fzerox_emulator/base.py
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol, TypeAlias, TypedDict
@@ -39,6 +40,27 @@ class ObservationSpec:
     channels: int
     display_width: int
     display_height: int
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationImageRecipe:
+    """One native image-render recipe for an observation view."""
+
+    preset: str | None = None
+    height: int | None = None
+    width: int | None = None
+    frame_stack: int = 1
+    stack_mode: ObservationStackMode = "rgb"
+    minimap_layer: bool = False
+    resize_filter: ObservationResizeFilter = "nearest"
+    minimap_resize_filter: ObservationResizeFilter = "nearest"
+
+    def normalized_resolution(self) -> tuple[str | None, int | None, int | None]:
+        return normalize_observation_resolution(
+            preset=self.preset,
+            height=self.height,
+            width=self.width,
+        )
 
 
 ObservationStackMode: TypeAlias = Literal["rgb", "gray", "luma_chroma"]
@@ -104,6 +126,16 @@ class BackendStepResult:
     status: StepStatus
     telemetry: FZeroXTelemetry | None
     display_frames: tuple[RgbFrame, ...] = ()
+
+
+@dataclass(frozen=True)
+class BackendMultiObservationStepResult:
+    """Native repeated-step payload with multiple rendered observation views."""
+
+    observations: tuple[ObservationFrame, ...]
+    summary: StepSummary
+    status: StepStatus
+    telemetry: FZeroXTelemetry | None
 
 
 class EmulatorBackend(Protocol):
@@ -181,6 +213,21 @@ class EmulatorBackend(Protocol):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
     ) -> BackendStepResult: ...
+
+    def step_repeat_multi_observation_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        observation_recipes: Sequence[ObservationImageRecipe],
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendMultiObservationStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...
 

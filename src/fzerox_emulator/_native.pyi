@@ -20,6 +20,16 @@ class FrameObservationOptionsDict(TypedDict, total=False):
     height: int
     width: int
 
+class ObservationImageRequestDict(TypedDict, total=False):
+    preset: str
+    frame_stack: int
+    stack_mode: Literal["rgb", "gray", "luma_chroma"]
+    minimap_layer: bool
+    resize_filter: Literal["nearest", "bilinear"]
+    minimap_resize_filter: Literal["nearest", "bilinear"]
+    height: int
+    width: int
+
 class VehicleSetupInfoDict(TypedDict):
     player_character_index_ram: int
     racer_character_index_ram: int
@@ -354,6 +364,23 @@ class Emulator:
         height: int | None = None,
         width: int | None = None,
     ) -> tuple[npt.NDArray[np.uint8], StepSummary, StepStatus, FZeroXTelemetry]: ...
+    def step_repeat_multi_observation_raw(
+        self,
+        action_repeat: int,
+        observation_requests: list[ObservationImageRequestDict],
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool = True,
+        lean_timer_assist: bool = False,
+        joypad_mask: int = 0,
+        left_stick_x: float = 0.0,
+        left_stick_y: float = 0.0,
+        right_stick_x: float = 0.0,
+        right_stick_y: float = 0.0,
+    ) -> tuple[list[npt.NDArray[np.uint8]], StepSummary, StepStatus, FZeroXTelemetry]: ...
     def step_repeat_watch_raw(
         self,
         action_repeat: int,

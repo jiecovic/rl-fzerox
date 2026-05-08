@@ -5,7 +5,7 @@ use std::path::Path;
 
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict, PyTuple};
+use pyo3::types::{PyBytes, PyDict, PyList, PyTuple};
 
 use crate::bindings::error::map_core_error;
 use crate::core::error::CoreError;
@@ -53,6 +53,66 @@ impl FrameObservationOptions {
             return Ok(parsed);
         };
 
+        if let Some(value) = options.get_item("stack_mode")? {
+            parsed.stack_mode = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_layer")? {
+            parsed.minimap_layer = value.extract()?;
+        }
+        if let Some(value) = options.get_item("resize_filter")? {
+            parsed.resize_filter = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_resize_filter")? {
+            parsed.minimap_resize_filter = value.extract()?;
+        }
+        if let Some(value) = options.get_item("height")? {
+            parsed.height = Some(value.extract()?);
+        }
+        if let Some(value) = options.get_item("width")? {
+            parsed.width = Some(value.extract()?);
+        }
+        Ok(parsed)
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::bindings::emulator) struct ObservationImageRequest {
+    preset: String,
+    frame_stack: usize,
+    stack_mode: String,
+    minimap_layer: bool,
+    resize_filter: String,
+    minimap_resize_filter: String,
+    height: Option<usize>,
+    width: Option<usize>,
+}
+
+impl Default for ObservationImageRequest {
+    fn default() -> Self {
+        Self {
+            preset: String::new(),
+            frame_stack: 1,
+            stack_mode: "rgb".to_owned(),
+            minimap_layer: false,
+            resize_filter: "nearest".to_owned(),
+            minimap_resize_filter: "nearest".to_owned(),
+            height: None,
+            width: None,
+        }
+    }
+}
+
+impl ObservationImageRequest {
+    pub(in crate::bindings::emulator) fn from_py_dict(
+        options: &Bound<'_, PyDict>,
+    ) -> PyResult<Self> {
+        let mut parsed = Self::default();
+        if let Some(value) = options.get_item("preset")? {
+            parsed.preset = value.extract()?;
+        }
+        if let Some(value) = options.get_item("frame_stack")? {
+            parsed.frame_stack = value.extract()?;
+        }
         if let Some(value) = options.get_item("stack_mode")? {
             parsed.stack_mode = value.extract()?;
         }
@@ -233,8 +293,6 @@ impl PyEmulator {
             py,
             methods::repeat::RepeatStepArgs {
                 action_repeat,
-                preset,
-                frame_stack,
                 stuck_min_speed_kph,
                 energy_loss_epsilon,
                 max_episode_steps,
@@ -242,18 +300,82 @@ impl PyEmulator {
                 progress_frontier_epsilon,
                 terminate_on_energy_depleted,
                 lean_timer_assist,
-                stack_mode,
-                minimap_layer,
-                resize_filter,
-                minimap_resize_filter,
-                height,
-                width,
                 joypad_mask,
                 left_stick_x,
                 left_stick_y,
                 right_stick_x,
                 right_stick_y,
             },
+            ObservationImageRequest {
+                preset: preset.to_owned(),
+                frame_stack,
+                stack_mode: stack_mode.to_owned(),
+                minimap_layer,
+                resize_filter: resize_filter.to_owned(),
+                minimap_resize_filter: minimap_resize_filter.to_owned(),
+                height,
+                width,
+            },
+        )
+    }
+
+    #[pyo3(signature = (
+        action_repeat,
+        observation_requests,
+        stuck_min_speed_kph,
+        energy_loss_epsilon,
+        max_episode_steps,
+        progress_frontier_stall_limit_frames=None,
+        progress_frontier_epsilon=100.0,
+        terminate_on_energy_depleted=true,
+        lean_timer_assist=false,
+        joypad_mask=0,
+        left_stick_x=0.0,
+        left_stick_y=0.0,
+        right_stick_x=0.0,
+        right_stick_y=0.0,
+    ))]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "PyO3 method signature is the stable Python training API"
+    )]
+    fn step_repeat_multi_observation_raw<'py>(
+        &mut self,
+        py: Python<'py>,
+        action_repeat: usize,
+        observation_requests: &Bound<'_, PyList>,
+        stuck_min_speed_kph: f32,
+        energy_loss_epsilon: f32,
+        max_episode_steps: usize,
+        progress_frontier_stall_limit_frames: Option<usize>,
+        progress_frontier_epsilon: f32,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool,
+        joypad_mask: u16,
+        left_stick_x: f32,
+        left_stick_y: f32,
+        right_stick_x: f32,
+        right_stick_y: f32,
+    ) -> PyResult<Bound<'py, PyTuple>> {
+        methods::repeat::step_repeat_multi_observation_raw(
+            self,
+            py,
+            methods::repeat::RepeatStepArgs {
+                action_repeat,
+                stuck_min_speed_kph,
+                energy_loss_epsilon,
+                max_episode_steps,
+                progress_frontier_stall_limit_frames,
+                progress_frontier_epsilon,
+                terminate_on_energy_depleted,
+                lean_timer_assist,
+                joypad_mask,
+                left_stick_x,
+                left_stick_y,
+                right_stick_x,
+                right_stick_y,
+            },
+            observation_requests,
         )
     }
 
@@ -314,8 +436,6 @@ impl PyEmulator {
             py,
             methods::repeat::RepeatStepArgs {
                 action_repeat,
-                preset,
-                frame_stack,
                 stuck_min_speed_kph,
                 energy_loss_epsilon,
                 max_episode_steps,
@@ -323,17 +443,21 @@ impl PyEmulator {
                 progress_frontier_epsilon,
                 terminate_on_energy_depleted,
                 lean_timer_assist,
-                stack_mode,
-                minimap_layer,
-                resize_filter,
-                minimap_resize_filter,
-                height,
-                width,
                 joypad_mask,
                 left_stick_x,
                 left_stick_y,
                 right_stick_x,
                 right_stick_y,
+            },
+            ObservationImageRequest {
+                preset: preset.to_owned(),
+                frame_stack,
+                stack_mode: stack_mode.to_owned(),
+                minimap_layer,
+                resize_filter: resize_filter.to_owned(),
+                minimap_resize_filter: minimap_resize_filter.to_owned(),
+                height,
+                width,
             },
         )
     }

@@ -198,11 +198,65 @@ fn carried_progress_frontier(
     }
 }
 
+/// Native observation render request for one post-step image view.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ObservationRenderConfig {
+    /// Observation image layout used for the rendered tensor.
+    pub layout: ObservationLayout,
+    /// Number of observation frames stacked in the returned tensor.
+    pub frame_stack: usize,
+    /// Channel encoding used for stacked observation frames.
+    pub stack_mode: ObservationStackMode,
+    /// Append a masked one-channel minimap crop after the stacked image channels.
+    pub minimap_layer: bool,
+    /// Resize filter for camera observation frames.
+    pub resize_filter: VideoResizeFilter,
+    /// Resize filter for the optional minimap layer.
+    pub minimap_resize_filter: VideoResizeFilter,
+}
+
 /// Native env-step payload returned after executing a repeated step.
 #[derive(Clone, Debug)]
 pub struct NativeStepResult<'a> {
     /// Final stacked observation tensor for this outer env step.
     pub observation: &'a [u8],
+    /// Aggregated step features spanning the internal repeated frames.
+    pub summary: StepSummary,
+    /// Native counter/stop state after the repeated env step completed.
+    pub status: StepStatus,
+    /// Final telemetry snapshot after the repeated step completed.
+    pub final_telemetry: TelemetrySnapshot,
+}
+
+/// Owned observation-frame storage for one repeated step.
+///
+/// Multi-view repeated steps render several observations from the same
+/// post-step emulator state. Those renders reuse callback-owned scratch
+/// buffers internally, so the batch stores owned frame copies before returning
+/// to Python.
+#[derive(Clone, Debug, Default)]
+pub struct ObservationFrameBatch {
+    pub frames: Vec<Vec<u8>>,
+}
+
+impl ObservationFrameBatch {
+    pub fn with_capacity(frame_count: usize) -> Self {
+        Self {
+            frames: Vec::with_capacity(frame_count),
+        }
+    }
+
+    pub fn push_frame(&mut self, frame: &[u8]) {
+        self.frames.push(frame.to_vec());
+    }
+}
+
+/// Native env-step payload returned after executing a repeated step with
+/// multiple rendered observations.
+#[derive(Clone, Debug)]
+pub struct NativeMultiObservationStepResult {
+    /// Final stacked observation tensors for this outer env step.
+    pub observations: ObservationFrameBatch,
     /// Aggregated step features spanning the internal repeated frames.
     pub summary: StepSummary,
     /// Native counter/stop state after the repeated env step completed.
@@ -262,18 +316,6 @@ pub struct RepeatedStepConfig {
     pub controller_state: ControllerState,
     /// Number of internal emulator frames to execute.
     pub action_repeat: usize,
-    /// Observation image layout used for the final stacked observation.
-    pub layout: ObservationLayout,
-    /// Number of observation frames stacked in the returned tensor.
-    pub frame_stack: usize,
-    /// Channel encoding used for stacked observation frames.
-    pub stack_mode: ObservationStackMode,
-    /// Append a masked one-channel minimap crop after the stacked image channels.
-    pub minimap_layer: bool,
-    /// Resize filter for camera observation frames.
-    pub resize_filter: VideoResizeFilter,
-    /// Resize filter for the optional minimap layer.
-    pub minimap_resize_filter: VideoResizeFilter,
     /// Speed threshold used for low-speed counters and reward summaries.
     pub stuck_min_speed_kph: f32,
     /// Epsilon used for reward-side energy-loss aggregation.

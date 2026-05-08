@@ -1,7 +1,7 @@
 # tests/support/fakes.py
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypeVar
@@ -10,10 +10,12 @@ import numpy as np
 from gymnasium import Env
 
 from fzerox_emulator import (
+    BackendMultiObservationStepResult,
     BackendStepResult,
     ControllerState,
     FrameStep,
     FZeroXTelemetry,
+    ObservationImageRecipe,
     ObservationSpec,
     ObservationStackMode,
     ResetState,
@@ -462,6 +464,63 @@ class SyntheticBackend:
             ),
             telemetry=None,
             display_frames=tuple(display_frames),
+        )
+
+    def step_repeat_multi_observation_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        observation_recipes: Sequence[ObservationImageRecipe],
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendMultiObservationStepResult:
+        if len(observation_recipes) == 0:
+            raise ValueError("At least one observation recipe is required")
+
+        first_recipe = observation_recipes[0]
+        result = self.step_repeat_raw(
+            controller_state,
+            action_repeat=action_repeat,
+            preset=first_recipe.preset,
+            height=first_recipe.height,
+            width=first_recipe.width,
+            frame_stack=first_recipe.frame_stack,
+            stack_mode=first_recipe.stack_mode,
+            minimap_layer=first_recipe.minimap_layer,
+            resize_filter=first_recipe.resize_filter,
+            minimap_resize_filter=first_recipe.minimap_resize_filter,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            energy_loss_epsilon=energy_loss_epsilon,
+            max_episode_steps=max_episode_steps,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=progress_frontier_epsilon,
+            terminate_on_energy_depleted=terminate_on_energy_depleted,
+            lean_timer_assist=lean_timer_assist,
+        )
+        observations = tuple(
+            self.render_observation(
+                preset=recipe.preset,
+                height=recipe.height,
+                width=recipe.width,
+                frame_stack=recipe.frame_stack,
+                stack_mode=recipe.stack_mode,
+                minimap_layer=recipe.minimap_layer,
+                resize_filter=recipe.resize_filter,
+                minimap_resize_filter=recipe.minimap_resize_filter,
+            )
+            for recipe in observation_recipes
+        )
+        return BackendMultiObservationStepResult(
+            observations=observations,
+            summary=result.summary,
+            status=result.status,
+            telemetry=result.telemetry,
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:

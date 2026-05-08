@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     import fzerox_emulator.emulator as _emulator
     import fzerox_emulator.video as _video
 
+    BackendMultiObservationStepResult = _base.BackendMultiObservationStepResult
     BackendStepResult = _base.BackendStepResult
     ControllerState = _control.ControllerState
     CoreInfo = _native.CoreInfo
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     JOYPAD_BUTTONS = _buttons.JOYPAD_BUTTONS
     JoypadButtons = _buttons.JoypadButtons
     ObservationResizeFilter = _base.ObservationResizeFilter
+    ObservationImageRecipe = _base.ObservationImageRecipe
     ObservationSpec = _base.ObservationSpec
     ObservationStackMode = _base.ObservationStackMode
     PlayerTelemetry = _native.PlayerTelemetry
@@ -50,9 +52,11 @@ _EXPORT_MODULES = {
     "joypad_mask": "fzerox_emulator._native",
     "probe_core": "fzerox_emulator._native",
     "BackendStepResult": "fzerox_emulator.base",
+    "BackendMultiObservationStepResult": "fzerox_emulator.base",
     "EmulatorBackend": "fzerox_emulator.base",
     "FrameStep": "fzerox_emulator.base",
     "ObservationResizeFilter": "fzerox_emulator.base",
+    "ObservationImageRecipe": "fzerox_emulator.base",
     "ObservationSpec": "fzerox_emulator.base",
     "ObservationStackMode": "fzerox_emulator.base",
     "ResetState": "fzerox_emulator.base",
@@ -65,6 +69,7 @@ _EXPORT_MODULES = {
 }
 
 __all__ = [
+    "BackendMultiObservationStepResult",
     "BackendStepResult",
     "ControllerState",
     "CoreInfo",
@@ -74,6 +79,7 @@ __all__ = [
     "FrameStep",
     "JOYPAD_BUTTONS",
     "JoypadButtons",
+    "ObservationImageRecipe",
     "ObservationResizeFilter",
     "ObservationSpec",
     "ObservationStackMode",
