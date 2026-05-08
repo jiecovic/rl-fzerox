@@ -766,6 +766,42 @@ def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
     assert refreshed.status == "running"
 
 
+def test_manager_store_exposes_worker_heartbeat_on_runs(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Heartbeat Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    launched_at = datetime.now(UTC).isoformat(timespec="seconds")
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=launched_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=launched_at,
+    )
+    heartbeat_at = datetime.now(UTC).isoformat(timespec="seconds")
+    assert store.heartbeat_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        heartbeat_at=heartbeat_at,
+    )
+
+    refreshed = store.get_run(run.id)
+
+    assert refreshed is not None
+    assert refreshed.worker_heartbeat_at == heartbeat_at
+
+
 def test_manager_store_skips_running_runs_without_worker_lease(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(

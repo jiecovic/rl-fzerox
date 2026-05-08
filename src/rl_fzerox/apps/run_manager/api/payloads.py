@@ -53,6 +53,7 @@ def run_payload(
         "source_artifact": run.source_artifact,
         "source_num_timesteps": run.source_num_timesteps,
         "pending_command": run.pending_command,
+        "worker_heartbeat_at": run.worker_heartbeat_at,
         "runtime": None
         if run.runtime is None
         else {

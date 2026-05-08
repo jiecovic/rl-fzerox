@@ -50,6 +50,7 @@ def run_from_row(row: sqlite3.Row) -> ManagedRun:
         lineage_step_offset=int(row["lineage_step_offset"]),
         started_at=optional_str(row["started_at"]),
         stopped_at=optional_str(row["stopped_at"]),
+        worker_heartbeat_at=optional_str(row["worker_heartbeat_at"]),
         runtime=runtime_from_row(row),
         pending_command=run_command(row["pending_command"]),
     )
@@ -132,6 +133,7 @@ def run_select_sql(
             runs.created_at,
             runs.started_at,
             runs.stopped_at,
+            run_workers.heartbeat_at AS worker_heartbeat_at,
             run_runtime.total_timesteps AS runtime_total_timesteps,
             run_runtime.num_timesteps AS runtime_num_timesteps,
             run_runtime.progress_fraction AS runtime_progress_fraction,
@@ -147,6 +149,8 @@ def run_select_sql(
         FROM runs
         LEFT JOIN run_runtime
             ON run_runtime.run_id = runs.id
+        LEFT JOIN run_workers
+            ON run_workers.run_id = runs.id
         LEFT JOIN run_commands
             ON run_commands.run_id = runs.id
         {where_clause}

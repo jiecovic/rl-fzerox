@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from pathlib import Path
 from typing import Literal
@@ -613,6 +614,54 @@ def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"runs": []}
+
+
+def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Running Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    now = datetime.now(UTC)
+    started_at = now.isoformat(timespec="seconds")
+    heartbeat_at = (now + timedelta(seconds=3)).isoformat(timespec="seconds")
+    runtime_updated_at = (now + timedelta(seconds=1)).isoformat(timespec="seconds")
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+    if launched is None:
+        raise RuntimeError("launch status update failed")
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=started_at,
+    )
+    assert store.heartbeat_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        heartbeat_at=heartbeat_at,
+    )
+    store.upsert_run_runtime(
+        run_id=run.id,
+        total_timesteps=1000,
+        num_timesteps=500,
+        progress_fraction=0.5,
+        updated_at=runtime_updated_at,
+    )
+    client = _ApiClient(create_manager_api_app(store))
+
+    response = client.get("/api/runs")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["runs"][0]["worker_heartbeat_at"] == heartbeat_at
+    assert payload["runs"][0]["runtime"]["updated_at"] == runtime_updated_at
 
 
 def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
