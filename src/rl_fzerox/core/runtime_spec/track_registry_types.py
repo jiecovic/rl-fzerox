@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+
 
 @dataclass(frozen=True, slots=True)
 class RegistryRoots:
@@ -46,6 +48,7 @@ class BaselineVariant:
     """Concrete race-start baseline flavor applied to selected courses."""
 
     mode: str
+    gp_difficulty: RaceDifficultyName | None
     vehicle: str
     engine_setting: str
     engine_setting_raw_value: int | None

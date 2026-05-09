@@ -473,6 +473,7 @@ class Emulator:
         engine_setting_raw_value: int,
         machine_skin_index: int = -1,
         total_lap_count: int = 3,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
     def patch_gp_race_machine_settings(
         self,
@@ -481,6 +482,7 @@ class Emulator:
         engine_setting_raw_value: int,
         machine_skin_index: int = -1,
         total_lap_count: int = 3,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
     def patch_gp_race_engine_settings(
         self,
@@ -503,6 +505,7 @@ class Emulator:
         engine_setting_raw_value: int,
         machine_skin_index: int = -1,
         total_lap_count: int = 3,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
     def vehicle_setup_info(self) -> VehicleSetupInfoDict: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...

@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator.base import RaceStartMode
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,5 +43,6 @@ class RaceStartVariant:
     character_index: int
     engine_setting_raw_value: int
     race_intro_target_timer: int | None
+    gp_difficulty: RaceDifficultyName | None = None
     machine_select_slot: int | None = None
     total_lap_count: int = RACE_DEFAULTS.lap_count

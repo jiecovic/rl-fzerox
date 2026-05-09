@@ -5,6 +5,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fzerox_emulator.base import RaceStartMode
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, is_race_difficulty_name
 from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     atomic_write_json,
@@ -46,11 +47,13 @@ def materialize_baseline_impl(
         return reused_artifact
     source_course_index = _required_request_course_index(request)
     source_vehicle_id = _request_vehicle_id(request)
+    source_gp_difficulty = _request_gp_difficulty(request)
     source_engine = _source_engine_setting()
     cache_state_path = ensure_course_vehicle_baseline(
         mode=_validated_request_mode(_required_request_mode(request)),
         label=request.label,
         course_index=source_course_index,
+        gp_difficulty=source_gp_difficulty,
         vehicle_id=source_vehicle_id,
         camera_setting=request.camera_setting,
         cache_root=cache_root,
@@ -62,6 +65,7 @@ def materialize_baseline_impl(
     payload = course_vehicle_cache_payload(
         mode=_required_request_mode(request),
         course_index=source_course_index,
+        gp_difficulty=source_gp_difficulty,
         vehicle_id=source_vehicle_id,
         camera_setting=request.camera_setting,
         race_intro_target_timer=context.race_intro_target_timer,
@@ -85,6 +89,7 @@ def materialize_baseline_impl(
                 ),
                 "source_course_index": source_course_index,
                 "source_vehicle": source_vehicle_id,
+                "source_gp_difficulty": source_gp_difficulty,
                 "source_engine_setting": source_engine.id,
                 "source_engine_setting_raw_value": source_engine.raw_value,
             },
@@ -95,6 +100,7 @@ def materialize_baseline_impl(
         cache_key=cache_key,
         source_course_index=source_course_index,
         source_vehicle=source_vehicle_id,
+        source_gp_difficulty=source_gp_difficulty,
         source_engine_setting=source_engine.id,
         source_engine_setting_raw_value=source_engine.raw_value,
     )
@@ -142,6 +148,7 @@ def _reuse_existing_run_baseline(
         cache_key=cache_key,
         source_course_index=_optional_metadata_int(metadata, "source_course_index"),
         source_vehicle=_optional_metadata_str(metadata, "source_vehicle"),
+        source_gp_difficulty=_optional_metadata_race_difficulty(metadata, "source_gp_difficulty"),
         source_engine_setting=_optional_metadata_str(metadata, "source_engine_setting"),
         source_engine_setting_raw_value=_optional_metadata_int(
             metadata,
@@ -172,6 +179,10 @@ def _required_request_course_index(request: BaselineRequest) -> int:
     return course_index
 
 
+def _request_gp_difficulty(request: BaselineRequest) -> RaceDifficultyName | None:
+    return request.gp_difficulty if request.mode == "gp_race" else None
+
+
 def _source_engine_setting():
     return resolve_engine_setting(
         BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline.engine_setting_raw_value,
@@ -197,6 +208,16 @@ def _optional_metadata_str(metadata: dict[str, object], key: str) -> str | None:
     if isinstance(value, str) and value:
         return value
     return None
+
+
+def _optional_metadata_race_difficulty(
+    metadata: dict[str, object],
+    key: str,
+) -> RaceDifficultyName | None:
+    value = _optional_metadata_str(metadata, key)
+    if value is None or not is_race_difficulty_name(value):
+        return None
+    return value
 
 
 def _required_materialized_state_sha256(metadata_path: Path) -> str:

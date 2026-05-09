@@ -115,6 +115,7 @@ pub(in crate::bindings::emulator) fn patch_time_attack_race_start_setup(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value: -1,
     };
     py.detach(|| emulator.host.patch_time_attack_race_start_setup(setup))
         .map_err(map_core_error)
@@ -135,6 +136,7 @@ pub(in crate::bindings::emulator) fn patch_time_attack_machine_settings(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value: -1,
     };
     py.detach(|| emulator.host.patch_time_attack_machine_settings(setup))
         .map_err(map_core_error)
@@ -169,6 +171,7 @@ pub(in crate::bindings::emulator) fn patch_gp_race_start_setup(
     engine_setting_raw_value: i32,
     machine_skin_index: i16,
     total_lap_count: i32,
+    gp_difficulty_raw_value: i32,
 ) -> PyResult<()> {
     let setup = RaceStartSetup {
         course_index,
@@ -176,6 +179,7 @@ pub(in crate::bindings::emulator) fn patch_gp_race_start_setup(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value,
     };
     py.detach(|| emulator.host.patch_gp_race_start_setup(setup))
         .map_err(map_core_error)
@@ -189,6 +193,7 @@ pub(in crate::bindings::emulator) fn patch_gp_race_machine_settings(
     engine_setting_raw_value: i32,
     machine_skin_index: i16,
     total_lap_count: i32,
+    gp_difficulty_raw_value: i32,
 ) -> PyResult<()> {
     let setup = RaceStartSetup {
         course_index,
@@ -196,6 +201,7 @@ pub(in crate::bindings::emulator) fn patch_gp_race_machine_settings(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value,
     };
     py.detach(|| emulator.host.patch_gp_race_machine_settings(setup))
         .map_err(map_core_error)
@@ -245,6 +251,7 @@ pub(in crate::bindings::emulator) fn validate_time_attack_race_start_setup(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value: -1,
     };
     py.detach(|| emulator.host.validate_time_attack_race_start_setup(setup))
         .map_err(map_core_error)
@@ -258,6 +265,7 @@ pub(in crate::bindings::emulator) fn validate_gp_race_start_setup(
     engine_setting_raw_value: i32,
     machine_skin_index: i16,
     total_lap_count: i32,
+    gp_difficulty_raw_value: i32,
 ) -> PyResult<()> {
     let setup = RaceStartSetup {
         course_index,
@@ -265,6 +273,7 @@ pub(in crate::bindings::emulator) fn validate_gp_race_start_setup(
         machine_skin_index,
         engine_setting_raw_value,
         total_lap_count,
+        gp_difficulty_raw_value,
     };
     py.detach(|| emulator.host.validate_gp_race_start_setup(setup))
         .map_err(map_core_error)

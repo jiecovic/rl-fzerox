@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from fzerox_emulator.base import RaceStartMode
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.envs.engine.info import read_live_telemetry
 from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
@@ -37,6 +38,7 @@ def ensure_course_vehicle_baseline(
     mode: RaceStartMode,
     label: str,
     course_index: int,
+    gp_difficulty: RaceDifficultyName | None,
     vehicle_id: str,
     camera_setting: str | None,
     cache_root: Path,
@@ -48,6 +50,7 @@ def ensure_course_vehicle_baseline(
     payload = course_vehicle_cache_payload(
         mode=mode,
         course_index=course_index,
+        gp_difficulty=gp_difficulty,
         vehicle_id=vehicle_id,
         camera_setting=camera_setting,
         race_intro_target_timer=context.race_intro_target_timer,
@@ -77,6 +80,7 @@ def ensure_course_vehicle_baseline(
             materialized_sha256 = generate_course_vehicle_state(
                 mode=mode,
                 course_index=course_index,
+                gp_difficulty=gp_difficulty,
                 vehicle_id=vehicle_id,
                 camera_setting=camera_setting,
                 cache_state_path=cache_state_path,
@@ -212,6 +216,7 @@ def generate_course_vehicle_state(
     *,
     mode: RaceStartMode,
     course_index: int,
+    gp_difficulty: RaceDifficultyName | None,
     vehicle_id: str,
     camera_setting: str | None,
     cache_state_path: Path,
@@ -248,6 +253,7 @@ def generate_course_vehicle_state(
             variant=RaceStartVariant(
                 course_index=course_index,
                 mode=mode,
+                gp_difficulty=gp_difficulty,
                 character_index=vehicle.character_index,
                 machine_select_slot=vehicle.machine_select_slot,
                 engine_setting_raw_value=defaults.engine_setting_raw_value,

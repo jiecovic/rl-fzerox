@@ -177,13 +177,7 @@ def materialize_gp_race_start_from_boot(
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
     _press_until_mode(emulator, target_mode="machine_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-
-    _select_machine(emulator, variant)
-    _wait_until_mode(emulator, target_mode="machine_settings")
-    emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-
-    write_engine_settings(emulator, variant)
-    _press_until_mode(emulator, target_mode="gp_race", require_race_mode=True)
+    _apply_exact_race_start_setup(emulator, variant)
     _step_until_ready_from_boot(emulator, variant)
 
 
@@ -223,13 +217,7 @@ def materialize_gp_race_start_from_menu_seed(
     _release_input(emulator)
     _wait_until_mode(emulator, target_mode="machine_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-
-    _select_machine(emulator, variant)
-    _wait_until_mode(emulator, target_mode="machine_settings")
-    emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
-
-    write_engine_settings(emulator, variant)
-    _press_until_mode(emulator, target_mode="gp_race", require_race_mode=True)
+    _apply_exact_race_start_setup(emulator, variant)
     _step_until_ready_from_boot(emulator, variant)
 
 
@@ -300,6 +288,26 @@ def _machine_select_row_and_column(variant: RaceStartVariant) -> tuple[int, int]
     if variant.machine_select_slot is not None:
         return vehicle_menu_row_and_column(variant.machine_select_slot)
     return vehicle_menu_row_and_column(variant.character_index)
+
+
+def _apply_exact_race_start_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
+    emulator.patch_machine_settings(
+        mode=variant.mode,
+        course_index=variant.course_index,
+        character_index=variant.character_index,
+        engine_setting_raw_value=variant.engine_setting_raw_value,
+        total_lap_count=variant.total_lap_count,
+        gp_difficulty=variant.gp_difficulty,
+    )
+    emulator.patch_race_start_setup(
+        mode=variant.mode,
+        course_index=variant.course_index,
+        character_index=variant.character_index,
+        engine_setting_raw_value=variant.engine_setting_raw_value,
+        total_lap_count=variant.total_lap_count,
+        gp_difficulty=variant.gp_difficulty,
+    )
+    emulator.force_race_reinit(mode=variant.mode)
 
 
 def _press_until_mode(

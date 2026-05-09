@@ -34,6 +34,10 @@ from fzerox_emulator.repeat import (
     run_repeat_watch_step,
 )
 from fzerox_emulator.video import display_size
+from rl_fzerox.core.domain.race_difficulty import (
+    RaceDifficultyName,
+    race_difficulty_raw_value,
+)
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
 
@@ -158,20 +162,26 @@ class Emulator:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         """Patch one live race start using native-owned RAM layout rules."""
 
-        native_patch = (
-            self._native.patch_time_attack_race_start_setup
-            if mode == "time_attack"
-            else self._native.patch_gp_race_start_setup
-        )
-        native_patch(
+        if mode == "time_attack":
+            self._native.patch_time_attack_race_start_setup(
+                course_index=course_index,
+                character_index=character_index,
+                machine_skin_index=-1,
+                engine_setting_raw_value=engine_setting_raw_value,
+                total_lap_count=total_lap_count,
+            )
+            return
+        self._native.patch_gp_race_start_setup(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
+            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
         )
 
     def patch_machine_settings(
@@ -182,20 +192,26 @@ class Emulator:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         """Patch menu-level machine settings before race initialization."""
 
-        native_patch = (
-            self._native.patch_time_attack_machine_settings
-            if mode == "time_attack"
-            else self._native.patch_gp_race_machine_settings
-        )
-        native_patch(
+        if mode == "time_attack":
+            self._native.patch_time_attack_machine_settings(
+                course_index=course_index,
+                character_index=character_index,
+                machine_skin_index=-1,
+                engine_setting_raw_value=engine_setting_raw_value,
+                total_lap_count=total_lap_count,
+            )
+            return
+        self._native.patch_gp_race_machine_settings(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
+            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
         )
 
     def patch_engine_settings(
@@ -236,20 +252,26 @@ class Emulator:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         """Validate that the native race-start RAM view matches the requested setup."""
 
-        native_validate = (
-            self._native.validate_time_attack_race_start_setup
-            if mode == "time_attack"
-            else self._native.validate_gp_race_start_setup
-        )
-        native_validate(
+        if mode == "time_attack":
+            self._native.validate_time_attack_race_start_setup(
+                course_index=course_index,
+                character_index=character_index,
+                machine_skin_index=-1,
+                engine_setting_raw_value=engine_setting_raw_value,
+                total_lap_count=total_lap_count,
+            )
+            return
+        self._native.validate_gp_race_start_setup(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
+            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
         )
 
     def patch_time_attack_race_start_setup(
@@ -626,3 +648,7 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
+
+
+def _gp_difficulty_raw_value(gp_difficulty: RaceDifficultyName | None) -> int:
+    return -1 if gp_difficulty is None else race_difficulty_raw_value(gp_difficulty)

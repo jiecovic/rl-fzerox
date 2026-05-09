@@ -14,6 +14,7 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
 
 
@@ -77,6 +78,7 @@ class TrackSamplingEntryConfig(BaseModel):
     weight: PositiveFloat = 1.0
     course_index: NonNegativeInt | None = None
     mode: str | None = None
+    gp_difficulty: RaceDifficultyName | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
@@ -85,6 +87,7 @@ class TrackSamplingEntryConfig(BaseModel):
     engine_setting_min_raw_value: NonNegativeInt | None = None
     engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
+    source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
     records: TrackRecordsConfig | None = None
@@ -124,6 +127,7 @@ class TrackConfig(BaseModel):
     course_name: str | None = None
     course_index: NonNegativeInt | None = None
     mode: str | None = None
+    gp_difficulty: RaceDifficultyName | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
@@ -132,6 +136,7 @@ class TrackConfig(BaseModel):
     engine_setting_min_raw_value: NonNegativeInt | None = None
     engine_setting_max_raw_value: NonNegativeInt | None = None
     source_course_index: NonNegativeInt | None = None
+    source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
     baseline_state_path: Path | None = None
