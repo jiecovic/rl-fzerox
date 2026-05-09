@@ -49,6 +49,38 @@ class BoostPadRewardTracker:
         return reward
 
 
+class LandingRewardTracker:
+    """Reward landings only after advancing into a new frontier bucket."""
+
+    def __init__(self) -> None:
+        self._last_rewarded_frontier_bucket_index = 0
+
+    @property
+    def last_rewarded_frontier_bucket_index(self) -> int:
+        return self._last_rewarded_frontier_bucket_index
+
+    def reset(self) -> None:
+        self._last_rewarded_frontier_bucket_index = 0
+
+    def reward(
+        self,
+        *,
+        previous_airborne: bool,
+        telemetry: FZeroXTelemetry,
+        frontier_bucket_index: int,
+        weights: SharedRewardWeights,
+    ) -> float:
+        reward = weights.airborne_landing_reward
+        if reward == 0.0:
+            return 0.0
+        if not previous_airborne or telemetry.player.airborne:
+            return 0.0
+        if frontier_bucket_index <= self._last_rewarded_frontier_bucket_index:
+            return 0.0
+        self._last_rewarded_frontier_bucket_index = frontier_bucket_index
+        return reward
+
+
 class BadSurfaceEntryPenaltyTracker:
     """Penalize transitions into bad course surfaces once per entry."""
 
@@ -127,20 +159,6 @@ class LapRewardTracker:
             breakdown["lap_position"] = lap_position_bonus
         self._awarded_laps_completed = race_laps_completed
         return lap_bonus + lap_position_bonus
-
-
-def landing_reward(
-    *,
-    previous_airborne: bool,
-    telemetry: FZeroXTelemetry,
-    weights: SharedRewardWeights,
-) -> float:
-    reward = weights.airborne_landing_reward
-    if reward == 0.0:
-        return 0.0
-    if not previous_airborne or telemetry.player.airborne:
-        return 0.0
-    return reward
 
 
 def terminal_or_truncation_penalty(
