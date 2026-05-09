@@ -1,10 +1,7 @@
 # src/rl_fzerox/apps/run_manager/api/routes.py
 from __future__ import annotations
 
-import asyncio
-from collections.abc import Callable
-from functools import partial
-from typing import Annotated, Literal, TypeVar
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.encoders import jsonable_encoder
@@ -43,8 +40,6 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     load_track_sampling_runtime_state,
 )
 
-SyncReturn = TypeVar("SyncReturn")
-
 
 def create_manager_api_app(
     store: ManagerStore,
@@ -74,19 +69,18 @@ def create_manager_api_app(
 
     @app.get("/api/templates")
     async def templates() -> dict[str, list[dict[str, object]]]:
-        items = await _run_sync(store.list_templates)
+        items = store.list_templates()
         return {"templates": [template_payload(item) for item in items]}
 
     @app.get("/api/drafts")
     async def drafts() -> dict[str, list[dict[str, object]]]:
-        items = await _run_sync(store.list_drafts)
+        items = store.list_drafts()
         return {"drafts": [draft_payload(item) for item in items]}
 
     @app.get("/api/runs")
     async def runs() -> dict[str, list[dict[str, object]]]:
-        visible_runs = await _run_sync(store.list_visible_runs)
-        recent_events = await _run_sync(
-            store.list_recent_run_events,
+        visible_runs = store.list_visible_runs()
+        recent_events = store.list_recent_run_events(
             tuple(run.id for run in visible_runs),
             limit_per_run=6,
         )
@@ -106,12 +100,12 @@ def create_manager_api_app(
         if not name:
             raise HTTPException(status_code=400, detail="run name is required")
         try:
-            run = await _run_sync(store.update_run_name, run_id=run_id, name=name)
+            run = store.update_run_name(run_id=run_id, name=name)
         except ManagerNameConflictError as error:
             raise HTTPException(status_code=409, detail=str(error)) from error
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.get("/api/runs/{run_id}/metrics")
     async def run_metrics(
@@ -119,9 +113,8 @@ def create_manager_api_app(
         mode: Literal["recent", "full"] = Query(default="recent"),
         limit: int = Query(default=240, ge=1, le=2_000),
     ) -> dict[str, list[dict[str, object]]]:
-        run = await _require_run(store, run_id)
-        samples = await _run_sync(
-            load_run_metric_samples_from_tensorboard,
+        run = _require_run(store, run_id)
+        samples = load_run_metric_samples_from_tensorboard(
             run,
             limit=None if mode == "full" else limit,
         )
@@ -131,9 +124,8 @@ def create_manager_api_app(
     async def run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, object]:
-        run = await _require_run(store, run_id)
-        state = await _run_sync(
-            load_track_sampling_runtime_state,
+        run = _require_run(store, run_id)
+        state = load_track_sampling_runtime_state(
             run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename,
         )
         return {"state": None if state is None else track_sampling_state_payload(state)}
@@ -142,13 +134,13 @@ def create_manager_api_app(
     async def reset_run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, bool]:
-        run = await _require_run(store, run_id)
+        run = _require_run(store, run_id)
         if run.status != "stopped":
             raise HTTPException(
                 status_code=400,
                 detail="track-pool stats can only be reset while the run is stopped",
             )
-        await _run_sync(_reset_track_sampling_state, store, run)
+        _reset_track_sampling_state(store, run)
         return {"reset": True}
 
     @app.post("/api/runs", status_code=201)
@@ -166,8 +158,7 @@ def create_manager_api_app(
                 detail="fork launches must come from a persisted fork draft",
             )
         try:
-            run = await _run_sync(
-                launcher.launch,
+            run = launcher.launch(
                 name=name,
                 config=request.config,
                 draft_id=request.draft_id,
@@ -178,7 +169,7 @@ def create_manager_api_app(
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/fork", status_code=201)
     async def fork_run(
@@ -186,8 +177,7 @@ def create_manager_api_app(
         request: ForkRunRequest,
     ) -> dict[str, dict[str, object]]:
         try:
-            run = await _run_sync(
-                launcher.fork,
+            run = launcher.fork(
                 run_id=run_id,
                 artifact=request.artifact,
                 name=request.name,
@@ -197,44 +187,44 @@ def create_manager_api_app(
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/pause")
     async def pause_run(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, dict[str, object]]:
         try:
-            run = await _run_sync(launcher.request_pause, run_id=run_id)
+            run = launcher.request_pause(run_id=run_id)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/stop")
     async def stop_run(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, dict[str, object]]:
         try:
-            run = await _run_sync(launcher.request_stop, run_id=run_id)
+            run = launcher.request_stop(run_id=run_id)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/resume")
     async def resume_run(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, dict[str, object]]:
         try:
-            run = await _run_sync(launcher.resume, run_id=run_id)
+            run = launcher.resume(run_id=run_id)
         except FileNotFoundError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return await _run_response(store, run)
+        return _run_response(store, run)
 
     @app.delete("/api/runs/{run_id}")
     async def delete_run(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
         try:
-            deleted = await _run_sync(store.delete_run, run_id)
+            deleted = store.delete_run(run_id)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         if not deleted:
@@ -244,7 +234,7 @@ def create_manager_api_app(
     @app.delete("/api/lineages/{lineage_id}")
     async def delete_lineage(lineage_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
         try:
-            deleted = await _run_sync(store.delete_lineage, lineage_id)
+            deleted = store.delete_lineage(lineage_id)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         if not deleted:
@@ -253,9 +243,9 @@ def create_manager_api_app(
 
     @app.post("/api/runs/{run_id}/open-dir")
     async def open_run_dir(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:
-        run = await _require_run(store, run_id)
+        run = _require_run(store, run_id)
         try:
-            await _run_sync(open_directory, run.run_dir)
+            open_directory(run.run_dir)
         except RuntimeError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         return {"opened": True}
@@ -266,7 +256,7 @@ def create_manager_api_app(
         artifact: str = Query(default="latest"),
     ) -> dict[str, str]:
         try:
-            status = await _run_sync(launcher.watch_artifact, run_id=run_id, artifact=artifact)
+            status = launcher.watch_artifact(run_id=run_id, artifact=artifact)
         except FileNotFoundError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except RuntimeError as error:
@@ -277,12 +267,12 @@ def create_manager_api_app(
 
     @app.get("/api/config-metadata")
     async def config_metadata() -> dict[str, object]:
-        metadata = await _run_sync(run_manager_config_metadata)
+        metadata = run_manager_config_metadata()
         return metadata.model_dump(mode="json")
 
     @app.post("/api/policy-preview")
     async def policy_preview(config: ManagedRunConfig) -> dict[str, object]:
-        preview = await _run_sync(policy_architecture_preview, config)
+        preview = policy_architecture_preview(config)
         return preview.model_dump(mode="json")
 
     @app.post("/api/drafts", status_code=201)
@@ -295,8 +285,7 @@ def create_manager_api_app(
             source_artifact=request.source_artifact,
         )
         try:
-            draft = await _run_sync(
-                store.create_draft,
+            draft = store.create_draft(
                 name=name,
                 config=request.config,
                 source_run_id=request.source_run_id,
@@ -321,8 +310,7 @@ def create_manager_api_app(
             source_artifact=request.source_artifact,
         )
         try:
-            draft = await _run_sync(
-                store.update_draft,
+            draft = store.update_draft(
                 draft_id=draft_id,
                 name=name,
                 config=request.config,
@@ -341,7 +329,7 @@ def create_manager_api_app(
     async def delete_draft(
         draft_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, bool]:
-        deleted = await _run_sync(store.delete_draft, draft_id)
+        deleted = store.delete_draft(draft_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="draft not found")
         return {"deleted": True}
@@ -349,13 +337,13 @@ def create_manager_api_app(
     return app
 
 
-async def _run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, object]]:
-    recent_events = await _run_sync(store.list_recent_run_events, (run.id,), limit_per_run=6)
+def _run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, object]]:
+    recent_events = store.list_recent_run_events((run.id,), limit_per_run=6)
     return {"run": run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
 
-async def _require_run(store: ManagerStore, run_id: str) -> ManagedRun:
-    run = await _run_sync(store.get_run, run_id)
+def _require_run(store: ManagerStore, run_id: str) -> ManagedRun:
+    run = store.get_run(run_id)
     if run is None:
         raise HTTPException(status_code=404, detail="run not found")
     return run
@@ -384,12 +372,3 @@ def _reset_track_sampling_state(store: ManagerStore, run: ManagedRun) -> None:
         kind="track_sampling_reset",
         message="track-pool stats reset from manager",
     )
-
-
-async def _run_sync(
-    function: Callable[..., SyncReturn],
-    /,
-    *args: object,
-    **kwargs: object,
-) -> SyncReturn:
-    return await asyncio.to_thread(partial(function, *args, **kwargs))
