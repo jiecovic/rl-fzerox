@@ -4,7 +4,7 @@ from __future__ import annotations
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend
-from fzerox_emulator.arrays import ActionMask, RgbFrame
+from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import (
     ActionValue,
     DiscreteActionDimension,
@@ -14,6 +14,9 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.policy.auxiliary_state.targets import (
+    auxiliary_state_target_vector_or_zeros,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -186,6 +189,11 @@ class FZeroXEnvEngine:
         """Return the active curriculum stage name, if any."""
 
         return self._mask_controller.stage_name
+
+    def auxiliary_state_targets(self) -> StateVector:
+        """Return the current hidden auxiliary-state target vector."""
+
+        return auxiliary_state_target_vector_or_zeros(self._episode.last_telemetry)
 
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""

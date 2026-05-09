@@ -142,6 +142,8 @@ def _poll_viewer_input(
                 panel_tab_index = 4
             elif event.key == pygame.K_6:
                 panel_tab_index = 5
+            elif event.key == pygame.K_7:
+                panel_tab_index = 6
             elif event.key == pygame.K_p:
                 toggle_pause = True
             elif event.key == pygame.K_n:

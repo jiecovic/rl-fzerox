@@ -13,6 +13,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
@@ -43,7 +44,11 @@ class FrameRenderData:
     raw_frame: RgbFrame
     observation: ObservationFrame
     observation_state: StateVector | None
+    observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
+    policy_auxiliary_state_predictions: dict[str, object] | None
+    policy_auxiliary_state_targets: dict[str, object] | None
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
     episode: int
     info: dict[str, object]
     reset_info: dict[str, object]
@@ -297,7 +302,11 @@ def _draw_frame(
             game_display_size=game_display_size,
             observation_shape=data.observation.shape,
             observation_state=data.observation_state,
+            observation_state_reference=data.observation_state_reference,
             observation_state_feature_names=data.observation_state_feature_names,
+            policy_auxiliary_state_predictions=data.policy_auxiliary_state_predictions,
+            policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
+            auxiliary_episode_metrics=data.auxiliary_episode_metrics,
             telemetry=data.telemetry,
             train_config=data.train_config,
             policy_config=data.policy_config,

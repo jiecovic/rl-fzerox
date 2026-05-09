@@ -1,10 +1,9 @@
-# src/rl_fzerox/core/envs/env.py
 from __future__ import annotations
 
 import gymnasium as gym
 
 from fzerox_emulator import ControllerState, EmulatorBackend
-from fzerox_emulator.arrays import ActionMask, RgbFrame
+from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
@@ -126,6 +125,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Return the active curriculum stage name, if any."""
 
         return self._engine.curriculum_stage_name
+
+    def auxiliary_state_targets(self) -> StateVector:
+        """Return the current hidden auxiliary-state target vector."""
+
+        return self._engine.auxiliary_state_targets()
 
     def step_control(self, control_state: ControllerState):
         return self._engine.step_control(control_state)

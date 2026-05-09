@@ -8,6 +8,7 @@ from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentSettings,
     StateComponentsSettings,
+    default_excluded_state_feature_names,
 )
 from rl_fzerox.core.envs.observations.state.history import (
     action_history_control_name,
@@ -55,21 +56,25 @@ def component_state_values(
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
+        raw_features = raw_state_component_features(
+            component,
+            independent_lean_buttons=independent_lean_buttons,
+        )
         definition = state_component_definition(component)
         if component.name == "control_history":
-            component_values = definition.values(
+            raw_values = definition.values(
                 telemetry,
                 component,
                 action_history,
                 independent_lean_buttons=independent_lean_buttons,
             )
         else:
-            component_values = definition.values(
+            raw_values = definition.values(
                 telemetry,
                 component,
                 action_history,
             )
-        values.extend(component_values)
+        values.extend(selected_state_component_values(component, raw_features, raw_values))
 
     return values
 
@@ -95,12 +100,81 @@ def state_component_features(
     *,
     independent_lean_buttons: bool = False,
 ) -> tuple[StateFeature, ...]:
+    return selected_state_component_features(
+        component,
+        raw_state_component_features(
+            component,
+            independent_lean_buttons=independent_lean_buttons,
+        ),
+    )
+
+
+def raw_state_component_features(
+    component: ObservationStateComponentSettings,
+    *,
+    independent_lean_buttons: bool = False,
+) -> tuple[StateFeature, ...]:
+    """Return every feature one component can emit before inclusion filtering."""
+
     definition = state_component_definition(component)
     if component.name != "control_history":
         return definition.features(component)
     return definition.features(
         component,
         independent_lean_buttons=independent_lean_buttons,
+    )
+
+
+def selected_state_component_features(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+) -> tuple[StateFeature, ...]:
+    """Apply the component's explicit/default feature inclusion policy."""
+
+    selected_indexes = selected_state_component_feature_indexes(component, raw_features)
+    return tuple(raw_features[index] for index in selected_indexes)
+
+
+def selected_state_component_values(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+    raw_values: list[float],
+) -> list[float]:
+    """Apply the same feature inclusion policy to runtime values."""
+
+    if len(raw_features) != len(raw_values):
+        raise ValueError(
+            f"{component.name} emitted {len(raw_values)} value(s) for "
+            f"{len(raw_features)} feature(s)"
+        )
+    selected_indexes = selected_state_component_feature_indexes(component, raw_features)
+    return [raw_values[index] for index in selected_indexes]
+
+
+def selected_state_component_feature_indexes(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+) -> tuple[int, ...]:
+    raw_names = tuple(feature.name for feature in raw_features)
+    raw_name_set = set(raw_names)
+    if component.included_features is None:
+        default_excluded = set(default_excluded_state_feature_names(component.name))
+        return tuple(
+            index
+            for index, feature_name in enumerate(raw_names)
+            if feature_name not in default_excluded
+        )
+
+    included = tuple(component.included_features)
+    if len(set(included)) != len(included):
+        raise ValueError(f"{component.name}.included_features must not contain duplicates")
+    unsupported = sorted(set(included) - raw_name_set)
+    if unsupported:
+        joined = ", ".join(unsupported)
+        raise ValueError(f"{component.name} does not support included feature(s): {joined}")
+    included_set = set(included)
+    return tuple(
+        index for index, feature_name in enumerate(raw_names) if feature_name in included_set
     )
 
 

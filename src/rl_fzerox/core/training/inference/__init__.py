@@ -4,12 +4,23 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
+from gymnasium import spaces
 
 from fzerox_emulator.arrays import ActionMask, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.policy.auxiliary_state import (
+    AuxiliaryStateTargetName,
+    auxiliary_state_target_spec,
+)
+from rl_fzerox.core.policy.auxiliary_state.observations import (
+    auxiliary_state_targets_field,
+    mapping_has_auxiliary_state_targets,
+    mapping_with_auxiliary_state_targets,
+)
 from rl_fzerox.core.training.inference.activations import (
     PolicyCnnActivation,
     collect_policy_cnn_activations,
@@ -40,6 +51,17 @@ class LoadedPolicy:
     curriculum_stage_name: str | None = None
     num_timesteps: int | None = None
     lineage_num_timesteps: int | None = None
+
+
+class _AuxiliaryStatePredictor(Protocol):
+    def predict_auxiliary_state(
+        self,
+        observation: ObservationValue,
+        *,
+        state: PolicyState = None,
+        episode_start: np.ndarray | None = None,
+        target_names: tuple[AuxiliaryStateTargetName, ...] | None = None,
+    ) -> dict[str, object]: ...
 
 
 class PolicyRunner:
@@ -128,9 +150,10 @@ class PolicyRunner:
 
         if refresh:
             self._maybe_reload()
+        policy_observation = self._observation_for_policy(observation)
         action, next_state = _predict_policy_action(
             self._policy,
-            observation,
+            policy_observation,
             state=self._predict_state,
             episode_start=self._episode_start,
             deterministic=deterministic,
@@ -146,7 +169,41 @@ class PolicyRunner:
     ) -> tuple[PolicyCnnActivation, ...]:
         """Return watch/debug CNN activations for the current policy."""
 
-        return collect_policy_cnn_activations(self._policy, observation)
+        policy_observation = self._observation_for_policy(observation)
+        return collect_policy_cnn_activations(self._policy, policy_observation)
+
+    def auxiliary_state_predictions(
+        self,
+        observation: ObservationValue,
+        *,
+        target_names: tuple[AuxiliaryStateTargetName, ...] | None = None,
+    ) -> dict[str, object] | None:
+        """Return decoded auxiliary-state predictions for the current observation."""
+
+        predictor = _policy_auxiliary_state_predictor(self._policy)
+        if predictor is None:
+            return None
+        return predictor.predict_auxiliary_state(
+            self._observation_for_policy(observation),
+            state=self._predict_state,
+            episode_start=self._episode_start,
+            target_names=target_names,
+        )
+
+    def _observation_for_policy(self, observation: ObservationValue) -> ObservationValue:
+        observation_space = _policy_observation_space(self._policy)
+        if not isinstance(observation_space, spaces.Dict):
+            return observation
+        field_name = auxiliary_state_targets_field()
+        if field_name not in observation_space.spaces:
+            return observation
+        if not isinstance(observation, dict):
+            raise TypeError("Auxiliary-state policy expects dict observations")
+        if mapping_has_auxiliary_state_targets(observation):
+            return observation
+
+        zeros = np.zeros(auxiliary_state_target_spec().count, dtype=np.float32)
+        return mapping_with_auxiliary_state_targets(observation, targets=zeros)
 
     def _maybe_reload(self) -> None:
         try:
@@ -236,3 +293,22 @@ __all__ = [
     "PolicyRunner",
     "load_policy_runner",
 ]
+
+
+def _policy_observation_space(policy: object) -> object | None:
+    observation_space = getattr(policy, "observation_space", None)
+    if observation_space is not None:
+        return observation_space
+    inner_policy = getattr(policy, "policy", None)
+    return getattr(inner_policy, "observation_space", None)
+
+
+def _policy_auxiliary_state_predictor(policy: object) -> _AuxiliaryStatePredictor | None:
+    predictor = getattr(policy, "predict_auxiliary_state", None)
+    if callable(predictor):
+        return policy  # pyright: ignore[reportReturnType]
+    inner_policy = getattr(policy, "policy", None)
+    inner_predictor = getattr(inner_policy, "predict_auxiliary_state", None)
+    if callable(inner_predictor):
+        return inner_policy  # pyright: ignore[reportReturnType]
+    return None

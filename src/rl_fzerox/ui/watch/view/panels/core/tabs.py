@@ -34,6 +34,14 @@ class PanelTabRegistry:
     def records_index(self) -> int:
         return self.index("records")
 
+    @property
+    def state_index(self) -> int:
+        return self.index("state")
+
+    @property
+    def aux_index(self) -> int:
+        return self.index("aux")
+
     def index(self, key: str) -> int:
         for index, tab in enumerate(self.tabs):
             if tab.key == key:
@@ -52,6 +60,7 @@ PANEL_TABS = PanelTabRegistry(
         PanelTab(key="run", label="Run"),
         PanelTab(key="details", label="Details"),
         PanelTab(key="state", label="State"),
+        PanelTab(key="aux", label="Aux"),
         PanelTab(key="cnn", label="CNN"),
         PanelTab(key="records", label="Records"),
         PanelTab(key="train", label="Train"),

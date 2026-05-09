@@ -12,11 +12,17 @@ from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     EnvConfig,
     ObservationConfig,
+    ObservationStateComponentConfig,
     PolicyActionBiasConfig,
+    PolicyAuxiliaryStateConfig,
+    PolicyAuxiliaryStateLossConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
     TrainAppConfig,
     TrainConfig,
+)
+from rl_fzerox.core.training.session.auxiliary_state import (
+    maybe_wrap_training_auxiliary_state_observation,
 )
 from rl_fzerox.core.training.session.model import (
     build_ppo_model,
@@ -29,6 +35,8 @@ from tests.support.action_configs import (
     configured_hybrid_action,
 )
 from tests.support.fakes import SyntheticBackend, vec_env_fns
+
+_VEHICLE_STATE_COMPONENT = (ObservationStateComponentConfig(name="vehicle_state"),)
 
 
 def _emulator_config(tmp_path: Path) -> EmulatorConfig:
@@ -148,7 +156,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
                     ),
                     observation=ObservationConfig(
                         mode="image_state",
-                        state_components=("vehicle_state",),
+                        state_components=_VEHICLE_STATE_COMPONENT,
                     ),
                 ),
             )
@@ -188,7 +196,7 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
                     ),
                     observation=ObservationConfig(
                         mode="image_state",
-                        state_components=("vehicle_state",),
+                        state_components=_VEHICLE_STATE_COMPONENT,
                     ),
                 ),
             )
@@ -220,6 +228,249 @@ def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
     assert model.policy.state_dict()["lstm_actor.weight_ih_l0"].shape[0] == 4 * 512
 
 
+def test_build_ppo_model_rejects_auxiliary_state_for_maskable_ppo() -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=EnvConfig(
+                        action=configured_discrete_action("steer", "gas", "boost", "lean"),
+                        observation=ObservationConfig(
+                            mode="image_state",
+                            state_components=_VEHICLE_STATE_COMPONENT,
+                        ),
+                    ),
+                ),
+                policy_config=PolicyConfig(
+                    auxiliary_state=PolicyAuxiliaryStateConfig(enabled=True)
+                ),
+            )
+        )
+    )
+
+    try:
+        with pytest.raises(RuntimeError, match="maskable_ppo"):
+            build_ppo_model(
+                train_env=env,
+                train_config=TrainConfig(
+                    algorithm="maskable_ppo",
+                    n_steps=4,
+                    batch_size=4,
+                    device="cpu",
+                ),
+                policy_config=PolicyConfig(
+                    auxiliary_state=PolicyAuxiliaryStateConfig(enabled=True)
+                ),
+                tensorboard_log=None,
+            )
+    finally:
+        env.close()
+
+
+def test_maskable_hybrid_action_ppo_learns_with_auxiliary_state_loss() -> None:
+    from sb3x import MaskableHybridActionPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    policy_config = PolicyConfig(
+        auxiliary_state=PolicyAuxiliaryStateConfig(
+            enabled=True,
+            losses=(
+                PolicyAuxiliaryStateLossConfig(
+                    name="track_position.edge_ratio",
+                    weight=0.25,
+                    grounded_only=True,
+                ),
+            ),
+        )
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=EnvConfig(
+                        action=configured_hybrid_action(
+                            continuous_axes=("steer", "drive"),
+                            discrete_axes=("boost", "lean"),
+                        ),
+                        observation=ObservationConfig(
+                            mode="image_state",
+                            state_components=_VEHICLE_STATE_COMPONENT,
+                        ),
+                    ),
+                ),
+                policy_config=policy_config,
+            )
+        )
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_action_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=policy_config,
+            tensorboard_log=None,
+        )
+        # On-policy training metrics are recorded during train() and dumped on the
+        # next log cycle, so run two short rollouts here.
+        model.learn(total_timesteps=8, log_interval=1)
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridActionPPO)
+    assert hasattr(model.policy, "evaluate_actions_with_aux")
+
+
+def test_maskable_hybrid_recurrent_ppo_learns_with_auxiliary_state_loss() -> None:
+    from sb3x import MaskableHybridRecurrentPPO
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    policy_config = PolicyConfig(
+        recurrent=PolicyRecurrentConfig(
+            enabled=True,
+            hidden_size=64,
+            n_lstm_layers=1,
+        ),
+        auxiliary_state=PolicyAuxiliaryStateConfig(
+            enabled=True,
+            losses=(
+                PolicyAuxiliaryStateLossConfig(
+                    name="track_position.edge_ratio",
+                    weight=0.25,
+                    grounded_only=True,
+                ),
+            ),
+        ),
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=EnvConfig(
+                        action=configured_hybrid_action(
+                            continuous_axes=("steer", "drive"),
+                            discrete_axes=("boost", "lean"),
+                        ),
+                        observation=ObservationConfig(
+                            mode="image_state",
+                            state_components=_VEHICLE_STATE_COMPONENT,
+                        ),
+                    ),
+                ),
+                policy_config=policy_config,
+            )
+        )
+    )
+
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_recurrent_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=policy_config,
+            tensorboard_log=None,
+        )
+        model.learn(total_timesteps=4)
+    finally:
+        env.close()
+
+    assert isinstance(model, MaskableHybridRecurrentPPO)
+    assert hasattr(model.policy, "evaluate_actions_with_aux")
+
+
+def test_auxiliary_state_losses_are_logged_to_tensorboard(tmp_path: Path) -> None:
+    from stable_baselines3.common import logger as sb3_logger
+    from stable_baselines3.common.vec_env import DummyVecEnv
+    event_accumulator = pytest.importorskip(
+        "tensorboard.backend.event_processing.event_accumulator"
+    )
+
+    policy_config = PolicyConfig(
+        auxiliary_state=PolicyAuxiliaryStateConfig(
+            enabled=True,
+            losses=(
+                PolicyAuxiliaryStateLossConfig(
+                    name="track_position.edge_ratio",
+                    weight=0.25,
+                    grounded_only=True,
+                ),
+                PolicyAuxiliaryStateLossConfig(
+                    name="vehicle_state.airborne",
+                    weight=0.1,
+                ),
+            ),
+        )
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: maybe_wrap_training_auxiliary_state_observation(
+                FZeroXEnv(
+                    backend=SyntheticBackend(),
+                    config=EnvConfig(
+                        action=configured_hybrid_action(
+                            continuous_axes=("steer", "drive"),
+                            discrete_axes=("boost", "lean"),
+                        ),
+                        observation=ObservationConfig(
+                            mode="image_state",
+                            state_components=_VEHICLE_STATE_COMPONENT,
+                        ),
+                    ),
+                ),
+                policy_config=policy_config,
+            )
+        )
+    )
+
+    tensorboard_dir = tmp_path / "tensorboard"
+    try:
+        model = build_ppo_model(
+            train_env=env,
+            train_config=TrainConfig(
+                algorithm="maskable_hybrid_action_ppo",
+                n_steps=4,
+                batch_size=4,
+                device="cpu",
+            ),
+            policy_config=policy_config,
+            tensorboard_log=None,
+        )
+        model.set_logger(sb3_logger.configure(str(tensorboard_dir), ["tensorboard"]))
+        # On-policy train metrics are dumped on the next log cycle, so run
+        # two short rollouts here.
+        model.learn(total_timesteps=8, log_interval=1)
+    finally:
+        env.close()
+
+    event_dirs = {path.parent for path in tensorboard_dir.rglob("events.out.tfevents.*")}
+    assert event_dirs
+    scalar_tags: set[str] = set()
+    for event_dir in event_dirs:
+        accumulator = event_accumulator.EventAccumulator(
+            str(event_dir),
+            size_guidance={"scalars": 0},
+        )
+        accumulator.Reload()
+        scalar_tags.update(accumulator.Tags().get("scalars", ()))
+
+    assert "train/aux_loss" in scalar_tags
+    assert "train_aux/track_position.edge_ratio" in scalar_tags
+    assert "train_aux/vehicle_state.airborne" in scalar_tags
+
+
 def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
     from stable_baselines3.common.vec_env import DummyVecEnv
 
@@ -234,7 +485,7 @@ def test_build_ppo_model_applies_hybrid_gas_on_logit_bias() -> None:
                     ),
                     observation=ObservationConfig(
                         mode="image_state",
-                        state_components=("vehicle_state",),
+                        state_components=_VEHICLE_STATE_COMPONENT,
                     ),
                 ),
             )
@@ -285,7 +536,7 @@ def test_build_ppo_model_can_construct_maskable_recurrent_ppo() -> None:
                     ),
                     observation=ObservationConfig(
                         mode="image_state",
-                        state_components=("vehicle_state",),
+                        state_components=_VEHICLE_STATE_COMPONENT,
                     ),
                 ),
             )

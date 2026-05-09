@@ -34,12 +34,22 @@ class ManagedStateComponentConfig(BaseModel):
     progress_source: TrackPositionProgressSourceName | None = None
     length: PositiveInt | None = Field(default=None, le=16)
     controls: tuple[ActionHistoryControlName, ...] | None = None
+    included_features: tuple[str, ...] | None = None
+    optional_features: tuple[str, ...] | None = Field(default=None, exclude=True, repr=False)
 
     @model_validator(mode="after")
     def _validate_component_settings(self) -> ManagedStateComponentConfig:
+        self._normalize_legacy_optional_features()
         configured_fields = {
             name
-            for name in ("encoding", "progress_source", "length", "controls")
+            for name in (
+                "encoding",
+                "progress_source",
+                "length",
+                "controls",
+                "included_features",
+                "optional_features",
+            )
             if getattr(self, name) is not None
         }
         invalid_fields = configured_fields - self._allowed_fields()
@@ -52,18 +62,45 @@ class ManagedStateComponentConfig(BaseModel):
             normalized = {"gas" if control == "thrust" else control for control in self.controls}
             if len(normalized) != len(self.controls):
                 raise ValueError("control_history.controls cannot contain both gas and thrust")
+        if self.included_features is not None:
+            if len(set(self.included_features)) != len(self.included_features):
+                raise ValueError("state component included_features must not contain duplicates")
+            supported = set(_supported_state_feature_names(self))
+            unsupported = sorted(set(self.included_features) - supported)
+            if unsupported:
+                joined = ", ".join(unsupported)
+                raise ValueError(f"{self.name} does not support included feature(s): {joined}")
         return self
+
+    def _normalize_legacy_optional_features(self) -> None:
+        if self.optional_features is None:
+            return
+        if self.included_features is not None:
+            raise ValueError(
+                "state component cannot define both included_features and optional_features"
+            )
+        if len(set(self.optional_features)) != len(self.optional_features):
+            raise ValueError("state component optional_features must not contain duplicates")
+        supported_names = _supported_state_feature_names(self)
+        default_names = set(_default_state_feature_names(self))
+        requested_names = default_names | set(self.optional_features)
+        unsupported = sorted(requested_names - set(supported_names))
+        if unsupported:
+            joined = ", ".join(unsupported)
+            raise ValueError(f"{self.name} does not support included feature(s): {joined}")
+        self.included_features = tuple(name for name in supported_names if name in requested_names)
+        self.optional_features = None
 
     def _allowed_fields(self) -> frozenset[str]:
         match self.name:
             case "course_context":
-                return frozenset({"encoding"})
+                return frozenset({"encoding", "included_features", "optional_features"})
             case "control_history":
-                return frozenset({"length", "controls"})
+                return frozenset({"length", "controls", "included_features", "optional_features"})
             case "track_position":
-                return frozenset({"progress_source"})
+                return frozenset({"progress_source", "included_features", "optional_features"})
             case "vehicle_state" | "machine_context" | "surface_state":
-                return frozenset()
+                return frozenset({"included_features", "optional_features"})
             case _:
                 raise ValueError(f"Unsupported state component: {self.name!r}")
 
@@ -74,6 +111,7 @@ class ManagedStateComponentConfig(BaseModel):
             progress_source=self.progress_source,
             length=None if self.length is None else int(self.length),
             controls=self.controls,
+            included_features=self.included_features,
         )
 
 
@@ -183,3 +221,32 @@ def managed_state_component_feature_names(
         ):
             names.add(feature.name)
     return frozenset(names)
+
+
+def _supported_state_feature_names(component: ManagedStateComponentConfig) -> tuple[str, ...]:
+    from rl_fzerox.core.envs.observations.state.components import raw_state_component_features
+
+    settings = _component_settings(component, included_features=None)
+    return tuple(feature.name for feature in raw_state_component_features(settings))
+
+
+def _default_state_feature_names(component: ManagedStateComponentConfig) -> tuple[str, ...]:
+    from rl_fzerox.core.envs.observations.state.components import state_component_features
+
+    settings = _component_settings(component, included_features=None)
+    return tuple(feature.name for feature in state_component_features(settings))
+
+
+def _component_settings(
+    component: ManagedStateComponentConfig,
+    *,
+    included_features: tuple[str, ...] | None,
+) -> ObservationStateComponentSettings:
+    return ObservationStateComponentSettings(
+        name=component.name,
+        encoding=component.encoding,
+        progress_source=component.progress_source,
+        length=None if component.length is None else int(component.length),
+        controls=component.controls,
+        included_features=included_features,
+    )

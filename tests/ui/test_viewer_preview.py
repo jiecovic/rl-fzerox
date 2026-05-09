@@ -38,7 +38,7 @@ def test_preview_frame_shows_grayscale_observations_as_grid() -> None:
             stacked.shape,
             info=info,
         )
-        == "3x2 gray x4 stack"
+        == "2x3 gray x4 stack"
     )
 
 
@@ -57,5 +57,5 @@ def test_preview_frame_shows_luma_chroma_observations_as_grid() -> None:
             stacked.shape,
             info=info,
         )
-        == "3x2 y+c x4 stack"
+        == "2x3 y+c x4 stack"
     )

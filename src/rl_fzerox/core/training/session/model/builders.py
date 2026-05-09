@@ -11,9 +11,10 @@ from rl_fzerox.core.training.session.model.algorithms import (
 )
 from rl_fzerox.core.training.session.model.policy import (
     build_policy_kwargs,
-    resolve_policy_name,
+    resolve_policy_entry,
 )
 from rl_fzerox.core.training.session.model.validation import (
+    validate_auxiliary_state_configuration,
     validate_masking_configuration,
     validate_recurrent_configuration_alignment,
 )
@@ -79,11 +80,18 @@ def _build_ppo_family_model(
         train_env=train_env,
         effective_algorithm=effective_algorithm,
     )
+    validate_auxiliary_state_configuration(
+        train_env=train_env,
+        policy_config=policy_config,
+        effective_algorithm=effective_algorithm,
+    )
 
     algorithm_class = resolve_ppo_training_algorithm_class(effective_algorithm)
     recurrent_enabled = policy_config.recurrent.enabled
-    policy_name = resolve_policy_name(
+    policy_entry = resolve_policy_entry(
         train_env=train_env,
+        effective_algorithm=effective_algorithm,
+        policy_config=policy_config,
         recurrent_enabled=recurrent_enabled,
     )
     policy_kwargs = build_policy_kwargs(
@@ -102,7 +110,7 @@ def _build_ppo_family_model(
         )
 
     model = algorithm_class(
-        policy=policy_name,
+        policy=policy_entry,
         env=train_env,
         learning_rate=train_config.learning_rate,
         n_steps=train_config.n_steps,

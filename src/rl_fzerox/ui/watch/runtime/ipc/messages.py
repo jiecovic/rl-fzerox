@@ -31,6 +31,7 @@ class ViewerCommand:
     control_fps_delta: int = 0
     reset_control_fps: bool = False
     cnn_visualization_enabled: bool = False
+    auxiliary_visualization_enabled: bool = False
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
     control_state: ControllerState | None = None
 
@@ -52,6 +53,7 @@ class WorkerCommandBatch:
     control_fps_delta: int
     reset_control_fps: bool
     cnn_visualization_enabled: bool
+    auxiliary_visualization_enabled: bool
     cnn_normalization: CnnActivationNormalizationMode
     control_state: ControllerState
 
@@ -73,6 +75,7 @@ class WatchSnapshot:
     raw_frame: RgbFrame
     observation_image: ObservationFrame
     observation_state: StateVector | None
+    observation_state_reference: StateVector | None
     info: dict[str, object]
     reset_info: dict[str, object]
     episode: int
@@ -100,6 +103,8 @@ class WatchSnapshot:
     failed_track_attempts: frozenset[str]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
+    policy_auxiliary_state_predictions: dict[str, object] | None = None
+    policy_auxiliary_state_targets: dict[str, object] | None = None
     action_hold_frame: int = 1
     action_hold_frames: int = 1
     policy_decision_frame: bool = True

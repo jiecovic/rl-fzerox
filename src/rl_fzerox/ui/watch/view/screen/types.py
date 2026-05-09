@@ -126,6 +126,7 @@ class PanelColumns:
     left: list[PanelSection]
     middle: list[PanelSection]
     stats: list[PanelSection]
+    aux: list[PanelSection]
     records: list[PanelSection]
     train: list[PanelSection]
 

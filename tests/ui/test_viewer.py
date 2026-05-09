@@ -113,6 +113,7 @@ def test_game_speed_overlay_label_formats_actual_speedup() -> None:
 def test_policy_state_sections_expose_watch_ablation_toggles() -> None:
     sections = policy_state_sections(
         observation_state=np.asarray([0.5, 1.0, 0.0], dtype=np.float32),
+        observation_state_reference=np.asarray([0.5, 1.0, 0.0], dtype=np.float32),
         feature_names=(
             "vehicle_state.speed_kph_norm",
             "machine_context.energy_norm",
@@ -207,6 +208,71 @@ def test_train_tab_shows_current_training_hparams() -> None:
     assert training_values["LR"] == "2e-04"
     assert policy_values["Conv"] == "nature"
     assert policy_values["Pi net"] == "[256, 256]"
+
+
+def test_state_tab_shows_auxiliary_state_predictions_next_to_targets() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        policy_config=PolicyConfig.model_validate(
+            {
+                "auxiliary_state": {
+                    "enabled": True,
+                    "losses": [
+                        {
+                            "name": "track_position.edge_ratio",
+                            "weight": 0.5,
+                            "grounded_only": True,
+                        },
+                        {
+                            "name": "surface_state.on_refill_surface",
+                            "weight": 0.25,
+                            "grounded_only": False,
+                        },
+                        {
+                            "name": "course_context.builtin_course_id",
+                            "weight": 1.0,
+                            "grounded_only": False,
+                        },
+                    ],
+                }
+            }
+        ),
+        policy_auxiliary_state_predictions={
+            "track_position.edge_ratio": 0.125,
+            "surface_state.on_refill_surface": 0.26,
+            "course_context.builtin_course_id": {"index": 7, "confidence": 0.82},
+        },
+        policy_auxiliary_state_targets={
+            "track_position.edge_ratio": 0.25,
+            "surface_state.on_refill_surface": 0.0,
+            "course_context.builtin_course_id": {"index": 3},
+        },
+    )
+
+    state_section = next(section for section in columns.stats if section.title == "State Vector")
+    edge_ratio_line = next(
+        line for line in state_section.lines if line.label == "edge_ratio (ground)"
+    )
+    refill_line = next(line for line in state_section.lines if line.label == "on_refill_surface")
+    course_line = next(line for line in state_section.lines if line.label == "course id")
+
+    assert edge_ratio_line.value == "  0.12 |   0.25 |    6% |       "
+    assert refill_line.value == "  0.26 |   0.00 |  hit  |       "
+    assert course_line.value == " 7@82% |      3 | miss  |       "
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -395,6 +461,8 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
 
     assert "Keys" not in key_map
     assert "More keys" not in key_map
+    assert key_map["Game"] == "444x592"
+    assert key_map["Obs"] == "84x116x12"
     assert hint_map == {
         "Esc": (None, "close"),
         "P": (None, "pause"),
@@ -406,7 +474,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "K": (None, "save"),
         "M": (None, "manual"),
         "D": (None, "policy"),
-        "Tab / 1-6": (None, "tabs"),
+        "Tab / 1-7": (None, "tabs"),
         "+/-": (None, "speed"),
         "0": (None, "reset speed"),
         "Arrow keys": ("stick X/Y", "steer/pitch"),

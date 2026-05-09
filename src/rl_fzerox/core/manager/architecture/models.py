@@ -45,6 +45,9 @@ class StateFeatureInfo(BaseModel):
     name: str
     low: float
     high: float
+    default_enabled: bool = True
+    auxiliary_target_name: str | None = None
+    auxiliary_supports_grounded_only: bool = False
 
 
 class StateComponentInfo(BaseModel):
@@ -103,6 +106,7 @@ class RunManagerConfigMetadata(BaseModel):
     observation_source_geometries: tuple[ObservationSourceGeometryInfo, ...]
     track_pool_modes: tuple[SelectOption, ...]
     race_modes: tuple[SelectOption, ...]
+    gp_difficulties: tuple[SelectOption, ...]
     track_sampling_modes: tuple[SelectOption, ...]
     track_cups: tuple[TrackCupInfo, ...]
     built_in_courses: tuple[BuiltInCourseInfo, ...]

@@ -30,6 +30,18 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
                 config.policy.gas_on_logit if config.action.drive_mode == "on_off" else 0.0
             )
         },
+        "auxiliary_state": {
+            "enabled": config.policy.auxiliary_state_enabled,
+            "head_arch": list(config.policy.auxiliary_state_head_arch),
+            "losses": [
+                {
+                    "name": loss.name,
+                    "weight": float(loss.weight),
+                    "grounded_only": bool(loss.grounded_only),
+                }
+                for loss in config.policy.auxiliary_state_losses
+            ],
+        },
         "net_arch": {
             "pi": list(config.policy.pi_net_arch),
             "vf": list(config.policy.vf_net_arch),

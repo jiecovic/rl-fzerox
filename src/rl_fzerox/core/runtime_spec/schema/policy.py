@@ -5,6 +5,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
+from rl_fzerox.core.policy.auxiliary_state.targets import (
+    AuxiliaryStateTargetName,
+    auxiliary_state_target_supports_grounded_only,
+)
+
 
 class NetArchConfig(BaseModel):
     """SB3 actor/critic head sizes after the shared CNN extractor."""
@@ -73,6 +78,43 @@ class PolicyActionBiasConfig(BaseModel):
     gas_on_logit: float = 0.0
 
 
+class PolicyAuxiliaryStateLossConfig(BaseModel):
+    """One supervised RAM-derived target predicted from shared policy latent."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: AuxiliaryStateTargetName
+    weight: float = Field(default=1.0, gt=0.0)
+    grounded_only: bool = False
+
+    @model_validator(mode="after")
+    def _validate_grounded_only(self) -> PolicyAuxiliaryStateLossConfig:
+        if self.grounded_only and not auxiliary_state_target_supports_grounded_only(self.name):
+            raise ValueError("grounded_only is not supported for this auxiliary-state target")
+        return self
+
+
+class PolicyAuxiliaryStateConfig(BaseModel):
+    """Optional fixed aux-head bank plus active supervised loss terms."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    head_arch: tuple[PositiveInt, ...] = (128,)
+    losses: tuple[PolicyAuxiliaryStateLossConfig, ...] = ()
+
+    @model_validator(mode="after")
+    def _validate_losses(self) -> PolicyAuxiliaryStateConfig:
+        loss_names = [loss.name for loss in self.losses]
+        if len(set(loss_names)) != len(loss_names):
+            raise ValueError("policy.auxiliary_state.losses must not contain duplicates")
+        if self.losses and not self.enabled:
+            raise ValueError(
+                "policy.auxiliary_state.enabled must be true when losses are configured"
+            )
+        return self
+
+
 class PolicyConfig(BaseModel):
     """SB3 policy and feature-extractor sizes."""
 
@@ -81,5 +123,8 @@ class PolicyConfig(BaseModel):
     extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
     recurrent: PolicyRecurrentConfig = Field(default_factory=PolicyRecurrentConfig)
     action_bias: PolicyActionBiasConfig = Field(default_factory=PolicyActionBiasConfig)
+    auxiliary_state: PolicyAuxiliaryStateConfig = Field(
+        default_factory=PolicyAuxiliaryStateConfig
+    )
     activation: Literal["tanh", "relu", "gelu"] = "tanh"
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)

@@ -47,6 +47,8 @@ from rl_fzerox.ui.watch.runtime.policy import (
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _build_snapshot,
     _next_boost_lamp_level,
+    _policy_auxiliary_state_predictions,
+    _policy_auxiliary_state_targets,
     _publish_step_snapshots,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
@@ -59,7 +61,10 @@ from rl_fzerox.ui.watch.runtime.timing import (
 from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
 
 if TYPE_CHECKING:
+    from fzerox_emulator import FZeroXTelemetry
     from rl_fzerox.core.envs.observations import ObservationValue
+    from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
+    from rl_fzerox.core.training.inference import PolicyRunner
     from rl_fzerox.ui.watch.runtime.cnn import _CnnActivationRunner
 
 
@@ -154,12 +159,18 @@ def _run_simulation_loop(
         committed_policy_action: ActionValue | None = None
         committed_action_mask_branches = env.action_mask_branches()
         cnn_visualization_enabled = False
+        auxiliary_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         persistent_locked_reset_course_id: str | None = None
         one_shot_reset_course_id: str | None = None
         sequential_course_ids = _watch_sequential_course_ids(config.env.track_sampling.entries)
         watch_zeroed_state_features = configured_watch_zeroed_features(config)
+        auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
+            ()
+            if config.policy is None
+            else tuple(loss.name for loss in config.policy.auxiliary_state.losses)
+        )
 
         while config.watch.episodes is None or episode < config.watch.episodes:
             effective_reset_course_id = (
@@ -183,6 +194,18 @@ def _run_simulation_loop(
             current_control_state = env.last_requested_control_state
             current_gas_level = env.last_gas_level
             committed_action_mask_branches = env.action_mask_branches()
+            current_telemetry = _read_live_telemetry(emulator)
+            current_auxiliary_predictions = _current_auxiliary_predictions(
+                policy_runner=policy_runner,
+                enabled=auxiliary_visualization_enabled,
+                observation=observation,
+                target_names=auxiliary_target_names,
+            )
+            current_auxiliary_targets = _current_auxiliary_targets(
+                telemetry=current_telemetry,
+                enabled=auxiliary_visualization_enabled,
+                target_names=auxiliary_target_names,
+            )
             boost_lamp_level = 0.0
             current_policy_action: ActionValue | None = committed_policy_action
             cnn_activations = None
@@ -211,6 +234,10 @@ def _run_simulation_loop(
                     action_mask_branches=committed_action_mask_branches,
                     policy_action=current_policy_action,
                     policy_runner=policy_runner,
+                    policy_auxiliary_state_predictions=current_auxiliary_predictions,
+                    policy_auxiliary_state_targets=current_auxiliary_targets,
+                    include_auxiliary_state=auxiliary_visualization_enabled,
+                    auxiliary_target_names=auxiliary_target_names,
                     deterministic_policy=deterministic_policy,
                     manual_control_enabled=manual_control_enabled,
                     policy_reload_error=policy_reload_error,
@@ -225,6 +252,7 @@ def _run_simulation_loop(
 
             while not (terminated or truncated):
                 previous_cnn_visualization_enabled = cnn_visualization_enabled
+                previous_auxiliary_visualization_enabled = auxiliary_visualization_enabled
                 previous_cnn_normalization = cnn_normalization
                 commands, paused, manual_control_state = drain_worker_commands(
                     command_queue,
@@ -232,12 +260,16 @@ def _run_simulation_loop(
                     control_state=manual_control_state,
                     manual_control_enabled=manual_control_enabled,
                     cnn_visualization_enabled=cnn_visualization_enabled,
+                    auxiliary_visualization_enabled=auxiliary_visualization_enabled,
                     cnn_normalization=cnn_normalization,
                 )
                 manual_control_enabled = (
                     True if policy_runner is None else commands.manual_control_enabled
                 )
                 cnn_visualization_enabled = commands.cnn_visualization_enabled
+                auxiliary_visualization_enabled = (
+                    bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
+                )
                 cnn_normalization = commands.cnn_normalization
                 lock_state_changed = False
                 if commands.quit_requested:
@@ -271,6 +303,10 @@ def _run_simulation_loop(
                             action_mask_branches=committed_action_mask_branches,
                             policy_action=current_policy_action,
                             policy_runner=policy_runner,
+                            policy_auxiliary_state_predictions=current_auxiliary_predictions,
+                            policy_auxiliary_state_targets=current_auxiliary_targets,
+                            include_auxiliary_state=auxiliary_visualization_enabled,
+                            auxiliary_target_names=auxiliary_target_names,
                             deterministic_policy=deterministic_policy,
                             manual_control_enabled=manual_control_enabled,
                             policy_reload_error=policy_reload_error,
@@ -353,6 +389,10 @@ def _run_simulation_loop(
                             action_mask_branches=committed_action_mask_branches,
                             policy_action=current_policy_action,
                             policy_runner=policy_runner,
+                            policy_auxiliary_state_predictions=current_auxiliary_predictions,
+                            policy_auxiliary_state_targets=current_auxiliary_targets,
+                            include_auxiliary_state=auxiliary_visualization_enabled,
+                            auxiliary_target_names=auxiliary_target_names,
                             deterministic_policy=deterministic_policy,
                             manual_control_enabled=manual_control_enabled,
                             policy_reload_error=policy_reload_error,
@@ -394,6 +434,21 @@ def _run_simulation_loop(
                     runtime_dir=config.emulator.runtime_dir,
                     last_logged_reload_error=last_logged_reload_error,
                 )
+                if (
+                    auxiliary_visualization_enabled != previous_auxiliary_visualization_enabled
+                    or commands.toggle_zeroed_state_feature_name is not None
+                ):
+                    current_auxiliary_predictions = _current_auxiliary_predictions(
+                        policy_runner=policy_runner,
+                        enabled=auxiliary_visualization_enabled,
+                        observation=observation,
+                        target_names=auxiliary_target_names,
+                    )
+                    current_auxiliary_targets = _current_auxiliary_targets(
+                        telemetry=current_telemetry,
+                        enabled=auxiliary_visualization_enabled,
+                        target_names=auxiliary_target_names,
+                    )
 
                 if commands.paused and commands.step_requests <= 0:
                     cnn_activations, cnn_snapshot_changed = _refresh_paused_cnn_activations(
@@ -406,7 +461,11 @@ def _run_simulation_loop(
                         policy_runner=policy_runner,
                         observation=observation,
                     )
-                    if cnn_snapshot_changed:
+                    if (
+                        cnn_snapshot_changed
+                        or auxiliary_visualization_enabled
+                        != previous_auxiliary_visualization_enabled
+                    ):
                         publish_worker_message(
                             snapshot_queue,
                             _build_snapshot(
@@ -426,6 +485,10 @@ def _run_simulation_loop(
                                 action_mask_branches=committed_action_mask_branches,
                                 policy_action=current_policy_action,
                                 policy_runner=policy_runner,
+                                policy_auxiliary_state_predictions=current_auxiliary_predictions,
+                                policy_auxiliary_state_targets=current_auxiliary_targets,
+                                include_auxiliary_state=auxiliary_visualization_enabled,
+                                auxiliary_target_names=auxiliary_target_names,
                                 deterministic_policy=deterministic_policy,
                                 manual_control_enabled=manual_control_enabled,
                                 policy_reload_error=policy_reload_error,
@@ -454,6 +517,8 @@ def _run_simulation_loop(
                 previous_gas_level = current_gas_level
                 previous_policy_action = committed_policy_action
                 previous_action_mask_branches = committed_action_mask_branches
+                previous_auxiliary_predictions = current_auxiliary_predictions
+                previous_auxiliary_targets = current_auxiliary_targets
                 decision_action_mask = env.action_mask_snapshot()
                 if manual_control_enabled:
                     if single_frame_manual:
@@ -516,6 +581,17 @@ def _run_simulation_loop(
                 )
                 final_action_mask_branches = env.action_mask_branches()
                 live_telemetry = _read_live_telemetry(emulator)
+                final_auxiliary_predictions = _current_auxiliary_predictions(
+                    policy_runner=policy_runner,
+                    enabled=auxiliary_visualization_enabled,
+                    observation=observation,
+                    target_names=auxiliary_target_names,
+                )
+                final_auxiliary_targets = _current_auxiliary_targets(
+                    telemetry=live_telemetry,
+                    enabled=auxiliary_visualization_enabled,
+                    target_names=auxiliary_target_names,
+                )
                 boost_lamp_level = _next_boost_lamp_level(
                     previous=boost_lamp_level,
                     control_state=current_control_state,
@@ -572,6 +648,10 @@ def _run_simulation_loop(
                     final_gas_level=current_gas_level,
                     final_action_mask_branches=final_action_mask_branches,
                     final_policy_action=current_policy_action,
+                    previous_auxiliary_predictions=previous_auxiliary_predictions,
+                    previous_auxiliary_targets=previous_auxiliary_targets,
+                    final_auxiliary_predictions=final_auxiliary_predictions,
+                    final_auxiliary_targets=final_auxiliary_targets,
                     reset_info=reset_info,
                     episode=episode,
                     control_fps=control_rate.rate_hz(),
@@ -591,6 +671,9 @@ def _run_simulation_loop(
                 )
                 committed_policy_action = current_policy_action
                 committed_action_mask_branches = final_action_mask_branches
+                current_telemetry = live_telemetry
+                current_auxiliary_predictions = final_auxiliary_predictions
+                current_auxiliary_targets = final_auxiliary_targets
                 if target_control_seconds is not None:
                     now = time.perf_counter()
                     next_step_time = max(next_step_time + target_control_seconds, now)
@@ -638,6 +721,35 @@ def _watch_entry_course_key(entry: TrackSamplingEntryConfig) -> str:
     if entry.course_index is not None:
         return f"course_index:{int(entry.course_index)}"
     return f"entry:{entry.id}"
+
+
+def _current_auxiliary_predictions(
+    *,
+    policy_runner: PolicyRunner | None,
+    enabled: bool,
+    observation: ObservationValue,
+    target_names: tuple[AuxiliaryStateTargetName, ...],
+) -> dict[str, object] | None:
+    if not enabled:
+        return None
+    return _policy_auxiliary_state_predictions(
+        policy_runner=policy_runner,
+        observation=observation,
+        target_names=target_names,
+    )
+
+
+def _current_auxiliary_targets(
+    *,
+    telemetry: FZeroXTelemetry | None,
+    enabled: bool,
+    target_names: tuple[AuxiliaryStateTargetName, ...],
+) -> dict[str, object] | None:
+    if not enabled:
+        return None
+    if telemetry is None:
+        return {}
+    return _policy_auxiliary_state_targets(telemetry, target_names=target_names)
 
 
 def _adjacent_watch_course_id(

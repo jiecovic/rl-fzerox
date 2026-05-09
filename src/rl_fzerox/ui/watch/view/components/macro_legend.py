@@ -61,7 +61,7 @@ VIEWER_HOTKEY_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("K", "save"),
     MacroLegendHint("M", "manual"),
     MacroLegendHint("D", "policy"),
-    MacroLegendHint("Tab / 1-6", "tabs"),
+    MacroLegendHint("Tab / 1-7", "tabs"),
     MacroLegendHint("+/-", "speed"),
     MacroLegendHint("0", "reset speed"),
 )

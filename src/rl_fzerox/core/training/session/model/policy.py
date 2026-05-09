@@ -3,13 +3,39 @@ from __future__ import annotations
 
 from stable_baselines3.common.vec_env import VecEnv
 
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.policy.auxiliary_state.policies import (
+    AuxiliaryStateMaskableHybridActionMultiInputPolicy,
+    AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy,
+    AuxiliaryStateMaskableRecurrentMultiInputPolicy,
+)
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig
 
 
-def resolve_policy_name(*, train_env: VecEnv, recurrent_enabled: bool) -> str:
+def resolve_policy_entry(
+    *,
+    train_env: VecEnv,
+    effective_algorithm: str,
+    policy_config: PolicyConfig,
+    recurrent_enabled: bool,
+):
     """Select the SB3 policy class name for the env observation shape."""
 
     from gymnasium import spaces
+
+    auxiliary_state_enabled = policy_config.auxiliary_state.enabled
+    if auxiliary_state_enabled:
+        if not isinstance(train_env.observation_space, spaces.Dict):
+            raise RuntimeError("policy auxiliary state requires a dict observation space")
+        if effective_algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
+            return AuxiliaryStateMaskableRecurrentMultiInputPolicy
+        if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
+            return AuxiliaryStateMaskableHybridActionMultiInputPolicy
+        if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo:
+            return AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy
+        raise RuntimeError(
+            f"policy auxiliary state is not supported for train.algorithm={effective_algorithm}"
+        )
 
     if isinstance(train_env.observation_space, spaces.Dict):
         return "MultiInputLstmPolicy" if recurrent_enabled else "MultiInputPolicy"
@@ -52,7 +78,7 @@ def build_policy_kwargs(
             "layer_norm": policy_config.extractor.layer_norm,
         }
 
-    return {
+    policy_kwargs: dict[str, object] = {
         "features_extractor_class": extractor_class,
         "features_extractor_kwargs": extractor_kwargs,
         "net_arch": {
@@ -61,6 +87,9 @@ def build_policy_kwargs(
         },
         "activation_fn": resolve_policy_activation_fn(policy_config.activation),
     }
+    if policy_config.auxiliary_state.enabled:
+        policy_kwargs["auxiliary_state"] = policy_config.auxiliary_state.model_dump(mode="python")
+    return policy_kwargs
 
 
 def resolve_policy_activation_fn(name: str):
