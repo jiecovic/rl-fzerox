@@ -310,6 +310,57 @@ def test_reward_main_rewards_manual_boost_request_once_per_env_step() -> None:
     assert step.breakdown == {"manual_boost": 0.25}
 
 
+def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            airborne_landing_reward=5.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+
+    first_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0),
+        _status(step_count=1),
+        _telemetry(race_distance=350.0),
+    )
+    takeoff_without_progress = tracker.step_summary(
+        _summary(max_race_distance=350.0),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+    )
+    repeated_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0),
+        _status(step_count=3),
+        _telemetry(race_distance=350.0),
+    )
+    takeoff_with_progress = tracker.step_summary(
+        _summary(max_race_distance=450.0),
+        _status(step_count=4),
+        _telemetry(race_distance=450.0, state_labels=("active", "airborne")),
+    )
+    next_bucket_landing = tracker.step_summary(
+        _summary(max_race_distance=450.0),
+        _status(step_count=5),
+        _telemetry(race_distance=450.0),
+    )
+
+    assert first_landing.reward == 5.0
+    assert first_landing.breakdown == {"landing": 5.0}
+    assert takeoff_without_progress.reward == 0.0
+    assert takeoff_without_progress.breakdown == {}
+    assert repeated_landing.reward == 0.0
+    assert repeated_landing.breakdown == {}
+    assert takeoff_with_progress.reward == 0.0
+    assert takeoff_with_progress.breakdown == {}
+    assert next_bucket_landing.reward == 5.0
+    assert next_bucket_landing.breakdown == {"landing": 5.0}
+
+
 def _telemetry(
     *,
     race_distance: float,

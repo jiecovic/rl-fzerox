@@ -25,8 +25,8 @@ from rl_fzerox.core.envs.rewards.reward_main.energy import EnergyRefillRewardTra
 from rl_fzerox.core.envs.rewards.reward_main.events import (
     BadSurfaceEntryPenaltyTracker,
     BoostPadRewardTracker,
+    LandingRewardTracker,
     LapRewardTracker,
-    landing_reward,
     terminal_or_truncation_penalty,
 )
 from rl_fzerox.core.envs.rewards.reward_main.progress import (
@@ -54,6 +54,7 @@ class RewardMainTracker:
         self._progress = FrontierProgressRewardTracker()
         self._energy = EnergyRefillRewardTracker()
         self._boost_pads = BoostPadRewardTracker()
+        self._landings = LandingRewardTracker()
         self._bad_surfaces = BadSurfaceEntryPenaltyTracker()
         self._laps = LapRewardTracker()
         self._damage = DamagePenaltyState()
@@ -76,6 +77,7 @@ class RewardMainTracker:
         self._progress.reset(telemetry)
         self._energy.reset(telemetry)
         self._boost_pads.reset()
+        self._landings.reset()
         self._bad_surfaces.reset(telemetry)
         self._laps.reset(telemetry)
         self._damage.reset()
@@ -234,9 +236,10 @@ class RewardMainTracker:
             reward += boost_reward
             breakdown["manual_boost"] = boost_reward
 
-        landing = landing_reward(
+        landing = self._landings.reward(
             previous_airborne=self._previous_airborne,
             telemetry=telemetry,
+            frontier_bucket_index=self._progress.frontier_bucket_index,
             weights=self._weights,
         )
         if landing:
@@ -288,6 +291,9 @@ class RewardMainTracker:
             "reward_profile": "reward_main",
             "boost_pad_reward_progress_window": self._weights.boost_pad_reward_progress_window,
             "rewarded_boost_pad_progress_windows": self._boost_pads.rewarded_window_count,
+            "landing_reward_frontier_bucket_index": (
+                self._landings.last_rewarded_frontier_bucket_index
+            ),
             "damage_taken_streak_frames": self._damage.streak_frames,
             "rewarded_laps_completed": self._laps.awarded_laps_completed,
         }
