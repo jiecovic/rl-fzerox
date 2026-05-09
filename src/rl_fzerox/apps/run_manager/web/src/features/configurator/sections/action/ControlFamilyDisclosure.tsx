@@ -225,26 +225,22 @@ export function ControlFamilyDisclosure({
           </div>
           <div className="field-shell action-inline-toggle-field">
             <FieldLabel
-              help="Keep the gas branch in the action output, but force runtime throttle to stay fully engaged."
+              help="Legacy compatibility control. New runs should keep throttle policy-driven instead of forcing it fully engaged."
               label="Force full throttle"
             />
             <div className="action-inline-toggle">
               <div className="action-inline-toggle-copy action-inline-toggle-copy-plain">
                 <small>
-                  {action.drive_mode === "pwm"
-                    ? "Clamp runtime throttle to full while keeping the continuous throttle lane in the output."
-                    : "Force the discrete throttle branch to engaged while keeping its logits in the output."}
+                  Existing configs preserve this flag, but the configurator no longer enables it for
+                  new experiments.
                 </small>
               </div>
               <ToggleSwitch
                 checked={action.force_full_throttle}
+                disabled
                 hideLabel
                 label="Force full throttle"
-                tooltip={
-                  action.force_full_throttle
-                    ? "Force full throttle enabled"
-                    : "Force full throttle disabled"
-                }
+                tooltip="Legacy option disabled in the configurator"
                 onChange={(checked) => updateAction({ force_full_throttle: checked })}
               />
             </div>
