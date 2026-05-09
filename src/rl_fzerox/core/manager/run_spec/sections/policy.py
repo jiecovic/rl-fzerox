@@ -17,6 +17,26 @@ from rl_fzerox.core.manager.run_spec.common import (
     ConvProfile,
     FeatureDim,
 )
+from rl_fzerox.core.policy.auxiliary_state.targets import (
+    AuxiliaryStateTargetName,
+    auxiliary_state_target_supports_grounded_only,
+)
+
+
+class ManagedPolicyAuxiliaryStateLossConfig(BaseModel):
+    """One optional aux prediction loss term exposed for advanced experiments."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: AuxiliaryStateTargetName
+    weight: float = Field(default=1.0, gt=0.0)
+    grounded_only: bool = False
+
+    @model_validator(mode="after")
+    def _validate_grounded_only(self) -> ManagedPolicyAuxiliaryStateLossConfig:
+        if self.grounded_only and not auxiliary_state_target_supports_grounded_only(self.name):
+            raise ValueError("grounded_only is not supported for this auxiliary-state target")
+        return self
 
 
 class ManagedPolicyConfig(BaseModel):
@@ -49,11 +69,22 @@ class ManagedPolicyConfig(BaseModel):
     pi_net_arch: tuple[PositiveInt, ...] = (256, 128)
     vf_net_arch: tuple[PositiveInt, ...] = (256, 128)
     gas_on_logit: float = 0.0
+    auxiliary_state_enabled: bool = False
+    auxiliary_state_head_arch: tuple[PositiveInt, ...] = (128,)
+    auxiliary_state_losses: tuple[ManagedPolicyAuxiliaryStateLossConfig, ...] = ()
 
     @model_validator(mode="after")
     def _validate_custom_conv_layers(self) -> ManagedPolicyConfig:
         if self.conv_profile == "custom" and not self.custom_conv_layers:
             raise ValueError("policy.custom_conv_layers must not be empty for conv_profile=custom")
+        loss_names = [loss.name for loss in self.auxiliary_state_losses]
+        if len(set(loss_names)) != len(loss_names):
+            raise ValueError("policy.auxiliary_state_losses must not contain duplicates")
+        if self.auxiliary_state_losses and not self.auxiliary_state_enabled:
+            raise ValueError(
+                "policy.auxiliary_state_enabled must be true when "
+                "auxiliary_state_losses are configured"
+            )
         return self
 
 

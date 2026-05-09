@@ -9,6 +9,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column
@@ -78,7 +79,11 @@ class SidePanelData:
     game_display_size: tuple[int, int]
     observation_shape: tuple[int, ...]
     observation_state: StateVector | None
+    observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
+    policy_auxiliary_state_predictions: dict[str, object] | None
+    policy_auxiliary_state_targets: dict[str, object] | None
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
     telemetry: FZeroXTelemetry | None
     train_config: TrainConfig | None
     policy_config: PolicyConfig | None
@@ -144,7 +149,11 @@ def _draw_side_panel(
         game_display_size=data.game_display_size,
         observation_shape=data.observation_shape,
         observation_state=data.observation_state,
+        observation_state_reference=data.observation_state_reference,
         observation_state_feature_names=data.observation_state_feature_names,
+        policy_auxiliary_state_predictions=data.policy_auxiliary_state_predictions,
+        policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
+        auxiliary_episode_metrics=data.auxiliary_episode_metrics,
         telemetry=data.telemetry,
         train_config=data.train_config,
         policy_config=data.policy_config,
@@ -249,6 +258,8 @@ def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[Pane
         return columns.middle
     if tab_key == "state":
         return columns.stats
+    if tab_key == "aux":
+        return columns.aux
     if tab_key == "records":
         return columns.records
     if tab_key == "train":

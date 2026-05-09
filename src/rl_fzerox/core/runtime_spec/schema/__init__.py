@@ -48,6 +48,8 @@ from rl_fzerox.core.runtime_spec.schema.policy import (
     ExtractorConfig,
     NetArchConfig,
     PolicyActionBiasConfig,
+    PolicyAuxiliaryStateConfig,
+    PolicyAuxiliaryStateLossConfig,
     PolicyConfig,
     PolicyRecurrentConfig,
 )
@@ -82,6 +84,8 @@ __all__ = [
     "ObservationStateComponentConfig",
     "PerTrackLapsCompletedTriggerConfig",
     "PolicyActionBiasConfig",
+    "PolicyAuxiliaryStateConfig",
+    "PolicyAuxiliaryStateLossConfig",
     "PolicyConfig",
     "PolicyRecurrentConfig",
     "RewardConfig",

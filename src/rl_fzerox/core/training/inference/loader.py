@@ -83,6 +83,7 @@ def _ensure_policy_dependencies_loaded() -> None:
     """Import custom policy modules before SB3 deserializes saved artifacts."""
 
     import_module("rl_fzerox.core.policy.extractors")
+    import_module("rl_fzerox.core.policy.auxiliary_state.policies")
 
 
 def _policy_predict_fn(policy: object) -> Callable[..., tuple[ActionValue, PolicyState]]:

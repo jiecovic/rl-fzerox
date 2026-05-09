@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Protocol, TypeVar, cast
 
 from stable_baselines3.common.utils import FloatSchedule
+from torch import nn
 
 from rl_fzerox.core.runtime_spec.schema import TrainConfig
 from rl_fzerox.core.training.runs import (
+    load_train_run_config,
     load_train_run_train_config,
     resolve_model_artifact_path,
 )
@@ -18,6 +20,7 @@ from rl_fzerox.core.training.session.model.algorithms import (
 
 _ModelT = TypeVar("_ModelT")
 _ModelT_co = TypeVar("_ModelT_co", covariant=True)
+_AuxiliaryStateSignature = tuple[int, ...] | None
 
 
 class _FullModelLoader(Protocol[_ModelT_co]):
@@ -42,6 +45,10 @@ def maybe_resume_training_model(
         return model
 
     resume_run_dir = train_config.resume_run_dir.resolve()
+    source_run_config = load_train_run_config(resume_run_dir)
+    source_auxiliary_state_signature = _auxiliary_state_signature_from_config(
+        source_run_config.policy
+    )
     if train_config.resume_source_algorithm is not None:
         source_algorithm = train_config.resume_source_algorithm
     else:
@@ -53,6 +60,11 @@ def maybe_resume_training_model(
             "Resume checkpoint algorithm mismatch: "
             f"source={source_algorithm}, current={current_algorithm}. "
             "Use a checkpoint produced by the same training algorithm."
+        )
+    if train_config.resume_mode == "full_model":
+        _validate_full_model_resume_compatibility(
+            model,
+            source_auxiliary_state_signature=source_auxiliary_state_signature,
         )
 
     model_path = resolve_model_artifact_path(
@@ -77,16 +89,84 @@ def maybe_resume_training_model(
         )
         return loaded_model
 
-    _set_model_parameters(model, model_path)
+    _set_model_parameters(
+        model,
+        model_path,
+        exact_match=_resume_parameter_exact_match(
+            model,
+            source_auxiliary_state_signature=source_auxiliary_state_signature,
+        ),
+    )
     return model
 
 
-def _set_model_parameters(model: object, model_path: Path) -> None:
+def _set_model_parameters(
+    model: object,
+    model_path: Path,
+    *,
+    exact_match: bool,
+) -> None:
     set_parameters = getattr(model, "set_parameters", None)
     if not callable(set_parameters):
         raise TypeError("Training model does not expose set_parameters(...)")
     device = getattr(model, "device", "auto")
-    set_parameters(str(model_path), exact_match=True, device=device)
+    set_parameters(str(model_path), exact_match=exact_match, device=device)
+
+
+def _resume_parameter_exact_match(
+    model: object,
+    *,
+    source_auxiliary_state_signature: _AuxiliaryStateSignature,
+) -> bool:
+    current_auxiliary_state_signature = _current_model_auxiliary_state_signature(model)
+    return current_auxiliary_state_signature == source_auxiliary_state_signature
+
+
+def _validate_full_model_resume_compatibility(
+    model: object,
+    *,
+    source_auxiliary_state_signature: _AuxiliaryStateSignature,
+) -> None:
+    current_auxiliary_state_signature = _current_model_auxiliary_state_signature(model)
+    if current_auxiliary_state_signature == source_auxiliary_state_signature:
+        return
+    raise RuntimeError(
+        "Full-model resume requires the same auxiliary-state head-bank "
+        "architecture as the source checkpoint. Use train.resume_mode=weights_only "
+        "for aux-bank upgrades, downgrades, or trunk-width changes."
+    )
+
+
+def _auxiliary_state_signature_from_config(
+    policy: object,
+) -> _AuxiliaryStateSignature:
+    auxiliary_state = getattr(policy, "auxiliary_state", None)
+    if auxiliary_state is None:
+        enabled = bool(getattr(policy, "auxiliary_state_enabled", False))
+        head_arch = tuple(getattr(policy, "auxiliary_state_head_arch", ()))
+    else:
+        enabled = bool(getattr(auxiliary_state, "enabled", False))
+        head_arch = tuple(getattr(auxiliary_state, "head_arch", ()))
+    if not enabled:
+        return None
+    return tuple(int(width) for width in head_arch)
+
+
+def _current_model_auxiliary_state_signature(model: object) -> _AuxiliaryStateSignature:
+    policy = getattr(model, "policy", None)
+    heads = getattr(policy, "_auxiliary_state_heads", None)
+    if heads is None:
+        return None
+    trunk = getattr(heads, "trunk", None)
+    if isinstance(trunk, nn.Identity) or trunk is None:
+        return ()
+    if not isinstance(trunk, nn.Sequential):
+        raise TypeError("Auxiliary-state trunk must be Identity or Sequential")
+    widths: list[int] = []
+    for layer in trunk:
+        if isinstance(layer, nn.Linear):
+            widths.append(int(layer.out_features))
+    return tuple(widths)
 
 
 def _sync_loaded_model_training_config(
@@ -135,6 +215,8 @@ def _sync_loaded_ppo_training_config(model: object, *, train_config: TrainConfig
     if rollout_buffer is not None:
         _set_attr_if_present(rollout_buffer, "gamma", train_config.gamma)
         _set_attr_if_present(rollout_buffer, "gae_lambda", train_config.gae_lambda)
+
+
 def _set_attr_if_present(model: object, attr: str, value: object) -> None:
     if hasattr(model, attr):
         _set_attr(model, attr, value)

@@ -4,6 +4,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
+from rl_fzerox.core.domain.observation_components import (
+    ObservationStateComponentName,
+    state_feature_default_enabled,
+)
 from rl_fzerox.core.domain.observation_image import (
     MAX_CUSTOM_OBSERVATION_HEIGHT,
     MAX_CUSTOM_OBSERVATION_WIDTH,
@@ -11,6 +15,7 @@ from rl_fzerox.core.domain.observation_image import (
     OBSERVATION_PRESET_GEOMETRIES,
     OBSERVATION_SOURCE_GEOMETRIES,
 )
+from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.envs.observations.state.components import state_component_definition
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.manager.architecture.models import (
@@ -29,6 +34,10 @@ from rl_fzerox.core.manager.architecture.models import (
 from rl_fzerox.core.manager.run_spec import (
     ManagedStateComponentConfig,
     default_state_components,
+)
+from rl_fzerox.core.policy.auxiliary_state.targets import (
+    auxiliary_state_target_name_for_feature,
+    auxiliary_state_target_supports_grounded_only,
 )
 from rl_fzerox.core.runtime_spec.vehicle_catalog import CATALOG, vehicle_menu_row_and_column
 
@@ -64,6 +73,9 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             SelectOption(value="x_cup", label="X Cup"),
         ),
         race_modes=_options(("time_attack", "gp_race")),
+        gp_difficulties=tuple(
+            SelectOption(value=name, label=name.title()) for name in race_difficulty_names()
+        ),
         track_sampling_modes=_options(("step_balanced", "equal")),
         track_cups=tuple(cup_infos()),
         built_in_courses=tuple(course_infos()),
@@ -98,7 +110,7 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
                 name=component.name,
                 label=component.name.replace("_", " "),
                 features=tuple(
-                    StateFeatureInfo(name=feature.name, low=feature.low, high=feature.high)
+                    _state_feature_info(feature, component_name=component.name)
                     for feature in component_features(component)
                 ),
             )
@@ -131,6 +143,27 @@ def component_features(
     return state_component_definition(settings).features(
         settings,
         independent_lean_buttons=independent_lean_buttons,
+    )
+
+
+def _state_feature_info(
+    feature: StateFeature,
+    *,
+    component_name: ObservationStateComponentName,
+) -> StateFeatureInfo:
+    auxiliary_target_name = auxiliary_state_target_name_for_feature(feature.name)
+    return StateFeatureInfo(
+        # Metadata lists every currently supported row, including opt-in entries.
+        name=feature.name,
+        low=feature.low,
+        high=feature.high,
+        default_enabled=state_feature_default_enabled(component_name, feature.name),
+        auxiliary_target_name=auxiliary_target_name,
+        auxiliary_supports_grounded_only=(
+            False
+            if auxiliary_target_name is None
+            else auxiliary_state_target_supports_grounded_only(auxiliary_target_name)
+        ),
     )
 
 

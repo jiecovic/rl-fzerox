@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TypeAlias, TypedDict
+from typing import NotRequired, TypeAlias, TypedDict
 
 import numpy as np
 from gymnasium import spaces
@@ -20,6 +20,7 @@ ImageObservation: TypeAlias = ObservationFrame
 class ImageStateObservation(TypedDict):
     image: ObservationFrame
     state: StateVector
+    auxiliary_state_targets: NotRequired[StateVector]
 
 
 ObservationValue: TypeAlias = ImageObservation | ImageStateObservation

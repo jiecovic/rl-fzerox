@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/session/model/validation.py
 from __future__ import annotations
 
+from gymnasium import spaces
 from stable_baselines3.common.vec_env import VecEnv
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
@@ -37,6 +38,27 @@ def validate_recurrent_configuration_alignment(
         raise RuntimeError("Recurrent policy config requires a recurrent train.algorithm")
     if not recurrent_enabled and effective_algorithm in TRAINING_ALGORITHMS.recurrent:
         raise RuntimeError(f"{effective_algorithm} requires policy.recurrent.enabled=true")
+
+
+def validate_auxiliary_state_configuration(
+    *,
+    train_env: VecEnv,
+    policy_config: PolicyConfig,
+    effective_algorithm: str,
+) -> None:
+    auxiliary_state = policy_config.auxiliary_state
+    if not auxiliary_state.enabled:
+        return
+    if not isinstance(train_env.observation_space, spaces.Dict):
+        raise RuntimeError(
+            "policy.auxiliary_state requires observation.mode=image_state "
+            "so hidden aux targets can ride alongside dict observations"
+        )
+    if effective_algorithm == TRAINING_ALGORITHMS.maskable_ppo:
+        raise RuntimeError(
+            "policy.auxiliary_state is not wired for maskable_ppo yet; "
+            "use a recurrent or hybrid sb3x PPO variant"
+        )
 
 
 def _validate_maskable_hybrid_ppo_config(config: TrainAppConfig) -> None:

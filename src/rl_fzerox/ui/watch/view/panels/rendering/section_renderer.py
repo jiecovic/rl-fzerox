@@ -80,6 +80,14 @@ def _draw_section(
     y += section_title.get_height() + LAYOUT.section_title_gap
     pygame.draw.line(screen, PALETTE.panel_border, (x, y), (x + width, y), width=1)
     y += LAYOUT.section_rule_gap
+    label_column_width = max(
+        (
+            fonts.small.render(line.label, True, PALETTE.text_muted).get_width()
+            for line in section.lines
+            if line.label and not line.divider and not line.heading
+        ),
+        default=0,
+    )
 
     for line in section.lines:
         if line.divider:
@@ -107,6 +115,7 @@ def _draw_section(
                 y=y,
                 width=width,
                 line=line,
+                label_column_width=label_column_width,
             )
             if record_hitbox is not None:
                 record_course_hitboxes.append(record_hitbox)
@@ -207,6 +216,7 @@ def _draw_labeled_value_line(
     y: int,
     width: int,
     line: PanelLine,
+    label_column_width: int = 0,
 ) -> tuple[int, RecordCourseHitbox | None, StateFeatureHitbox | None]:
     label_font = fonts.record_header if line.heading else fonts.small
     label_color = line.label_color or (PALETTE.text_primary if line.heading else PALETTE.text_muted)
@@ -235,10 +245,12 @@ def _draw_labeled_value_line(
 
     screen.blit(label_surface, (x, _centered_text_y(y, row_height, label_surface)))
 
-    inline_value_space = max(
-        0,
-        width - label_surface.get_width() - LAYOUT.inline_value_gap,
+    effective_label_width = (
+        label_surface.get_width()
+        if line.heading
+        else max(label_surface.get_width(), label_column_width)
     )
+    inline_value_space = max(0, width - effective_label_width - LAYOUT.inline_value_gap)
 
     if line.status_icon is not None:
         icon_slot_width = row_height

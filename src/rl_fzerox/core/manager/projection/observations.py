@@ -116,4 +116,6 @@ def _state_component_data(component: ManagedStateComponentConfig) -> dict[str, o
         data["length"] = component.length
     if component.controls is not None:
         data["controls"] = component.controls
+    if component.included_features is not None:
+        data["included_features"] = component.included_features
     return data

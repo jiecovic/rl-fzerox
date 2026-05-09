@@ -129,6 +129,7 @@ def drain_worker_commands(
     control_state: ControllerState,
     manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
+    auxiliary_visualization_enabled: bool = False,
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> tuple[WorkerCommandBatch, bool, ControllerState]:
     next_paused = paused
@@ -145,6 +146,7 @@ def drain_worker_commands(
     control_fps_delta = 0
     reset_control_fps = False
     next_cnn_visualization_enabled = cnn_visualization_enabled
+    next_auxiliary_visualization_enabled = auxiliary_visualization_enabled
     next_cnn_normalization = cnn_normalization
     while True:
         try:
@@ -165,6 +167,7 @@ def drain_worker_commands(
                     control_fps_delta=control_fps_delta,
                     reset_control_fps=reset_control_fps,
                     cnn_visualization_enabled=next_cnn_visualization_enabled,
+                    auxiliary_visualization_enabled=next_auxiliary_visualization_enabled,
                     cnn_normalization=next_cnn_normalization,
                     control_state=next_control_state,
                 ),
@@ -196,6 +199,7 @@ def drain_worker_commands(
         control_fps_delta += command.control_fps_delta
         reset_control_fps = reset_control_fps or command.reset_control_fps
         next_cnn_visualization_enabled = command.cnn_visualization_enabled
+        next_auxiliary_visualization_enabled = command.auxiliary_visualization_enabled
         next_cnn_normalization = command.cnn_normalization
         if command.control_state is not None:
             next_control_state = command.control_state
@@ -207,6 +211,7 @@ def apply_viewer_input(
     *,
     paused: bool,
     cnn_visualization_enabled: bool = False,
+    auxiliary_visualization_enabled: bool = False,
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> bool:
     next_paused = not paused if viewer_input.toggle_pause else paused
@@ -226,6 +231,7 @@ def apply_viewer_input(
             control_fps_delta=viewer_input.control_fps_delta,
             reset_control_fps=viewer_input.reset_control_fps,
             cnn_visualization_enabled=cnn_visualization_enabled,
+            auxiliary_visualization_enabled=auxiliary_visualization_enabled,
             cnn_normalization=cnn_normalization,
             control_state=viewer_input.control_state,
         ),

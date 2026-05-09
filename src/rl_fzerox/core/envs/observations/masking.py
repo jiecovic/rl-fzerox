@@ -6,6 +6,10 @@ from collections.abc import Collection, Sequence
 import numpy as np
 
 from fzerox_emulator.arrays import StateVector
+from rl_fzerox.core.policy.auxiliary_state.observations import (
+    auxiliary_state_targets_field,
+    auxiliary_state_targets_from_mapping,
+)
 
 from .value import ImageStateObservation, ObservationValue
 
@@ -45,6 +49,9 @@ def mask_observation_state(
         "image": image,
         "state": mask_state_vector(state, feature_indices=feature_indices),
     }
+    auxiliary_targets = auxiliary_state_targets_from_mapping(observation)
+    if auxiliary_targets is not None:
+        masked_observation[auxiliary_state_targets_field()] = auxiliary_targets
     return masked_observation
 
 

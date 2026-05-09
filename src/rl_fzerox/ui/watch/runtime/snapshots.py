@@ -6,11 +6,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from fzerox_emulator.arrays import RgbFrame
+from fzerox_emulator.arrays import RgbFrame, StateVector
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.policy.auxiliary_state import (
+    AuxiliaryStateTargetName,
+    auxiliary_state_target_values,
+)
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
@@ -103,6 +107,10 @@ def _publish_step_snapshots(
     gas_level: float | None = None,
     action_mask_branches: ActionMaskBranches | None = None,
     policy_action: ActionValue | None = None,
+    previous_auxiliary_predictions: dict[str, object] | None = None,
+    previous_auxiliary_targets: dict[str, object] | None = None,
+    final_auxiliary_predictions: dict[str, object] | None = None,
+    final_auxiliary_targets: dict[str, object] | None = None,
 ) -> None:
     resolved_control_state = control_state
     if previous_control_state is None:
@@ -170,6 +178,14 @@ def _publish_step_snapshots(
                 telemetry=final_telemetry if is_final_frame else previous_telemetry,
                 policy_action=final_policy_action if is_final_frame else previous_policy_action,
                 policy_runner=policy_runner,
+                policy_auxiliary_state_predictions=(
+                    final_auxiliary_predictions
+                    if is_final_frame
+                    else previous_auxiliary_predictions
+                ),
+                policy_auxiliary_state_targets=(
+                    final_auxiliary_targets if is_final_frame else previous_auxiliary_targets
+                ),
                 deterministic_policy=deterministic_policy,
                 manual_control_enabled=manual_control_enabled,
                 policy_reload_error=policy_reload_error,
@@ -217,6 +233,10 @@ def _build_snapshot(
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
     telemetry: FZeroXTelemetry | None = None,
+    policy_auxiliary_state_predictions: dict[str, object] | None = None,
+    policy_auxiliary_state_targets: dict[str, object] | None = None,
+    include_auxiliary_state: bool = False,
+    auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (),
     action_hold_frame: int = 1,
     action_hold_frames: int = 1,
     policy_decision_frame: bool = True,
@@ -228,6 +248,12 @@ def _build_snapshot(
         raw_frame=env.render() if raw_frame is None else raw_frame,
         observation_image=observation_access.observation_image(observation),
         observation_state=observation_access.observation_state(observation),
+        observation_state_reference=_reference_observation_state(
+            config=config,
+            observation=observation,
+            telemetry=telemetry,
+            info=info,
+        ),
         info=dict(info),
         reset_info=dict(reset_info),
         episode=episode,
@@ -260,10 +286,72 @@ def _build_snapshot(
         failed_track_attempts=failed_track_attempts,
         continuous_air_brake_disabled=_continuous_air_brake_disabled(config, telemetry),
         telemetry_data=_telemetry_to_data(telemetry),
+        policy_auxiliary_state_predictions=(
+            _policy_auxiliary_state_predictions(
+                policy_runner=policy_runner,
+                observation=observation,
+                target_names=auxiliary_target_names,
+            )
+            if include_auxiliary_state and policy_auxiliary_state_predictions is None
+            else policy_auxiliary_state_predictions
+        ),
+        policy_auxiliary_state_targets=(
+            _policy_auxiliary_state_targets(telemetry, target_names=auxiliary_target_names)
+            if include_auxiliary_state and policy_auxiliary_state_targets is None
+            else policy_auxiliary_state_targets
+        ),
         action_hold_frame=max(1, int(action_hold_frame)),
         action_hold_frames=max(1, int(action_hold_frames)),
         policy_decision_frame=bool(policy_decision_frame),
     )
+
+
+def _reference_observation_state(
+    *,
+    config: WatchAppConfig,
+    observation: ObservationValue,
+    telemetry: FZeroXTelemetry | None,
+    info: dict[str, object],
+) -> StateVector | None:
+    observed_state = observation_access.observation_state(observation)
+    if config.env.observation.mode != "image_state":
+        return observed_state
+    state_components = config.env.observation.state_components_data()
+    if state_components is None:
+        return observed_state
+    return observation_access.telemetry_state_vector(
+        telemetry,
+        state_components=state_components,
+        action_history=_reference_action_history(
+            observed_state=observed_state,
+            info=info,
+        ),
+        independent_lean_buttons=config.env.action.independent_lean_buttons,
+    )
+
+
+def _reference_action_history(
+    *,
+    observed_state: StateVector | None,
+    info: dict[str, object],
+) -> dict[str, float]:
+    if observed_state is None:
+        return {}
+    raw_feature_names = info.get("observation_state_features")
+    if isinstance(raw_feature_names, list):
+        feature_names = tuple(str(name) for name in raw_feature_names)
+    elif isinstance(raw_feature_names, tuple):
+        feature_names = tuple(str(name) for name in raw_feature_names)
+    else:
+        return {}
+    flat_state = observed_state.reshape(-1)
+    if len(feature_names) != int(flat_state.size):
+        return {}
+    return {
+        name.removeprefix("control_history."): float(value)
+        for name, value in zip(feature_names, flat_state, strict=True)
+        if name.startswith("control_history.")
+    }
 
 
 def _continuous_air_brake_disabled(
@@ -273,6 +361,35 @@ def _continuous_air_brake_disabled(
     if config.env.action.runtime().continuous_air_brake_mode != "disable_on_ground":
         return False
     return telemetry is not None and not telemetry.player.airborne
+
+
+def _policy_auxiliary_state_predictions(
+    *,
+    policy_runner: PolicyRunner | None,
+    observation: ObservationValue,
+    target_names: tuple[AuxiliaryStateTargetName, ...],
+) -> dict[str, object] | None:
+    if policy_runner is None:
+        return None
+    return policy_runner.auxiliary_state_predictions(
+        observation,
+        target_names=target_names,
+    )
+
+
+def _policy_auxiliary_state_targets(
+    telemetry: FZeroXTelemetry | None,
+    *,
+    target_names: tuple[AuxiliaryStateTargetName, ...],
+) -> dict[str, object]:
+    if telemetry is None:
+        return {}
+    all_targets = auxiliary_state_target_values(telemetry)
+    return {
+        str(name): value
+        for name, value in all_targets.items()
+        if name in target_names
+    }
 
 
 def _next_boost_lamp_level(

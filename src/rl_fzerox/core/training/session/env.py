@@ -14,6 +14,9 @@ from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.seed import derive_seed
 from rl_fzerox.core.training.runs import RunPaths
+from rl_fzerox.core.training.session.auxiliary_state import (
+    maybe_wrap_training_auxiliary_state_observation,
+)
 from rl_fzerox.core.training.session.observation_augmentation import (
     maybe_wrap_training_observation_augmentation,
 )
@@ -92,6 +95,10 @@ def _make_env_factory(
             reward_config=config.reward,
             curriculum_config=config.curriculum,
             env_index=env_index,
+        )
+        env = maybe_wrap_training_auxiliary_state_observation(
+            env,
+            policy_config=config.policy,
         )
         env = maybe_wrap_training_observation_augmentation(
             env,

@@ -80,6 +80,10 @@ def _display_aspect_ratio(info: dict[str, object]) -> float:
     return 0.0
 
 
+def _format_height_width(height: int, width: int) -> str:
+    return f"{height}x{width}"
+
+
 def _format_observation_summary(
     observation_shape: tuple[int, ...],
     info: Mapping[str, object] | None = None,
@@ -99,12 +103,12 @@ def _format_observation_summary(
         color_mode = "gray"
     if _observation_minimap_layer(info):
         color_mode = f"{color_mode}+map"
-    return f"{width}x{height} {color_mode} x{stack_size} stack"
+    return f"{_format_height_width(height, width)} {color_mode} x{stack_size} stack"
 
 
 def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
     height, width, channels = observation_shape
-    return f"{width}x{height}x{channels}"
+    return f"{_format_height_width(height, width)}x{channels}"
 
 
 def _format_progress_frontier_counter(

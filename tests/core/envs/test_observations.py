@@ -330,6 +330,7 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["control_history.prev_boost_2"] == 1.0
     assert values["control_history.prev_lean_1"] == -1.0
 
+
 def test_state_components_can_feed_segment_progress_through_progress_slot() -> None:
     components = (
         ObservationStateComponentSettings(name="vehicle_state"),
@@ -404,6 +405,64 @@ def test_state_components_can_disable_progress_slot_without_changing_shape() -> 
     values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
 
     assert values["track_position.lap_progress"] == 0.0
+
+
+def test_state_components_can_opt_into_ground_height_without_affecting_defaults() -> None:
+    default_components = _clean_state_components(control_history_enabled=False)
+    components_with_height = (
+        ObservationStateComponentSettings(name="vehicle_state"),
+        ObservationStateComponentSettings(name="machine_context"),
+        ObservationStateComponentSettings(
+            name="track_position",
+            included_features=(
+                "track_position.lap_progress",
+                "track_position.edge_ratio",
+                "track_position.outside_track_bounds",
+                "track_position.height_above_ground_norm",
+            ),
+        ),
+        ObservationStateComponentSettings(name="surface_state"),
+        ObservationStateComponentSettings(
+            name="course_context",
+            encoding="one_hot_builtin",
+        ),
+    )
+    telemetry = make_telemetry(height_above_ground=500.0)
+
+    default_feature_names = state_feature_names(state_components=default_components)
+    feature_names = state_feature_names(state_components=components_with_height)
+    values = {
+        name: float(value)
+        for name, value in zip(
+            feature_names,
+            telemetry_state_vector(telemetry, state_components=components_with_height),
+            strict=True,
+        )
+    }
+
+    assert "track_position.height_above_ground_norm" not in default_feature_names
+    assert "track_position.height_above_ground_norm" in feature_names
+    assert values["track_position.height_above_ground_norm"] == pytest.approx(0.5)
+
+
+def test_state_components_can_include_individual_features() -> None:
+    components = (
+        ObservationStateComponentSettings(
+            name="track_position",
+            included_features=("track_position.edge_ratio",),
+        ),
+        ObservationStateComponentSettings(
+            name="vehicle_state",
+            included_features=("vehicle_state.airborne",),
+        ),
+    )
+    telemetry = make_telemetry(signed_lateral_offset=25.0, current_radius_left=100.0)
+
+    feature_names = state_feature_names(state_components=components)
+    vector = telemetry_state_vector(telemetry, state_components=components)
+
+    assert feature_names == ("track_position.edge_ratio", "vehicle_state.airborne")
+    assert vector.tolist() == pytest.approx([0.25, 0.0])
 
 
 def test_state_components_clamp_edge_ratio_and_mark_outside_bounds() -> None:

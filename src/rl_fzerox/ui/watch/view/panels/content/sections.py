@@ -6,6 +6,10 @@ from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.panels.content.auxiliary import (
+    auxiliary_episode_sections,
+)
 from rl_fzerox.ui.watch.view.panels.content.game import (
     game_detail_section,
     game_overview_section,
@@ -22,6 +26,7 @@ from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_episode_frames,
     _format_game_rate,
     _format_game_speed,
+    _format_height_width,
     _format_observation_shape,
     _format_policy_action,
     _format_progress_frontier_counter,
@@ -79,7 +84,11 @@ def _build_panel_columns(
     max_episode_steps: int = 50_000,
     progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: StateVector | None = None,
+    observation_state_reference: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
+    policy_auxiliary_state_predictions: dict[str, object] | None = None,
+    policy_auxiliary_state_targets: dict[str, object] | None = None,
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
     train_config: TrainConfig | None = None,
     policy_config: PolicyConfig | None = None,
 ) -> PanelColumns:
@@ -232,7 +241,7 @@ def _build_panel_columns(
                 lines=[
                     _panel_line(
                         "Game",
-                        f"{game_display_size[0]}x{game_display_size[1]}",
+                        _format_height_width(game_display_size[1], game_display_size[0]),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
@@ -249,11 +258,16 @@ def _build_panel_columns(
         stats=[
             *policy_state_sections(
                 observation_state=observation_state,
+                observation_state_reference=observation_state_reference,
                 feature_names=observation_state_feature_names,
+                policy_config=policy_config,
+                auxiliary_predictions=policy_auxiliary_state_predictions,
+                auxiliary_targets=policy_auxiliary_state_targets,
                 zeroed_features=_zeroed_state_features(info),
                 watch_zeroed_features=_watch_zeroed_state_features(info),
             ),
         ],
+        aux=auxiliary_episode_sections(auxiliary_episode_metrics),
         records=[
             *track_record_sections(
                 current_info=info,
@@ -269,6 +283,8 @@ def _build_panel_columns(
             policy_config=policy_config,
         ),
     )
+
+
 def _zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     raw_features = info.get("observation_zeroed_state_features")
     if isinstance(raw_features, tuple | list):
@@ -281,7 +297,6 @@ def _watch_zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     if isinstance(raw_features, tuple | list):
         return frozenset(str(feature) for feature in raw_features)
     return frozenset()
-
 
 def _format_reward_value(value: float) -> str:
     return f"{value:.4f}"

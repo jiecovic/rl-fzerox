@@ -8,7 +8,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from gymnasium import spaces
 from omegaconf import OmegaConf
+from pytest import MonkeyPatch
 
 from fzerox_emulator.arrays import (
     ActionMask,
@@ -159,6 +161,36 @@ class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
         return action, next_state
 
 
+class _FakeAuxiliaryStatePolicy(_FakeMaskablePolicy):
+    def __init__(self) -> None:
+        super().__init__([1])
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
+                "state": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+                "auxiliary_state_targets": spaces.Box(
+                    low=0.0,
+                    high=1.0,
+                    shape=(39,),
+                    dtype=np.float32,
+                ),
+            }
+        )
+        self.last_aux_observation: ObservationValue | None = None
+
+    def predict_auxiliary_state(
+        self,
+        observation: ObservationValue,
+        *,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
+        target_names: tuple[str, ...] | None = None,
+    ) -> dict[str, object]:
+        _ = (state, episode_start, target_names)
+        self.last_aux_observation = observation
+        return {"track_position.edge_ratio": 0.25}
+
+
 def _array_action(action: object) -> NumpyArray:
     assert isinstance(action, np.ndarray)
     return action
@@ -166,7 +198,7 @@ def _array_action(action: object) -> NumpyArray:
 
 def test_policy_runner_reloads_updated_policy_artifact(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
@@ -301,6 +333,38 @@ def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) 
     assert np.array_equal(recorded_masks, action_masks)
 
 
+def test_policy_runner_injects_zero_auxiliary_targets_for_aux_enabled_policy(
+    tmp_path: Path,
+) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeAuxiliaryStatePolicy()
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation: ObservationValue = {
+        "image": np.zeros((84, 84, 3), dtype=np.uint8),
+        "state": np.array([0.0, 0.0], dtype=np.float32),
+    }
+
+    _array_action(runner.predict(observation, action_masks=np.array([True], dtype=bool)))
+    predictions = runner.auxiliary_state_predictions(observation)
+
+    assert predictions == {"track_position.edge_ratio": 0.25}
+    assert isinstance(fake_policy.last_aux_observation, dict)
+    aux_targets = fake_policy.last_aux_observation.get("auxiliary_state_targets")
+    assert isinstance(aux_targets, np.ndarray)
+    assert aux_targets.shape == (39,)
+    assert float(np.max(aux_targets)) == 0.0
+
+
 def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path) -> None:
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
@@ -342,7 +406,7 @@ def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path)
 
 def test_policy_runner_exposes_reload_error_until_success(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
@@ -602,7 +666,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
 
 def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -675,7 +739,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
 
 def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -741,9 +805,11 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
         "path": str(model_path.resolve()),
         "device": "cpu",
     }
+
+
 def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurrent_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
