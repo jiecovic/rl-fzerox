@@ -27,14 +27,7 @@ LeanOutputMode = Literal["three_way", "independent_buttons"]
 ObservationPreset = ObservationPresetName
 ObservationResizeFilter = DomainObservationResizeFilter
 ConvProfile = Literal[
-    "auto",
     "nature",
-    "nature_32_64_128",
-    "nature_wide",
-    "nature_extra_k3",
-    "compact_deep",
-    "compact_bottleneck",
-    "tiny_256",
     "custom",
 ]
 FeatureDim: TypeAlias = PositiveInt | Literal["auto"]

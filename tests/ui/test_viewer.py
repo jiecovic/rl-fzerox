@@ -173,7 +173,7 @@ def test_train_tab_shows_current_training_hparams() -> None:
             output_root=Path("local/runs"),
             run_name="wide_ppo",
         ),
-        policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature_wide"}}),
+        policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature"}}),
     )
 
     training_section = next(section for section in columns.train if section.title == "Training")
@@ -185,7 +185,7 @@ def test_train_tab_shows_current_training_hparams() -> None:
     assert "Run" not in training_values
     assert training_values["Target steps"] == "50,000,000"
     assert training_values["LR"] == "2e-04"
-    assert policy_values["Conv"] == "nature_wide"
+    assert policy_values["Conv"] == "nature"
     assert policy_values["Pi net"] == "[256, 256]"
 
 

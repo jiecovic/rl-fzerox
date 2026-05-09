@@ -63,11 +63,6 @@ class ManagedRunConfig(BaseModel):
         )
 
         height, width = self.observation.image_geometry()
-        if self.observation.resolution_mode == "custom" and self.policy.conv_profile == "auto":
-            raise ValueError(
-                "policy.conv_profile='auto' only supports named observation presets; "
-                "choose an explicit conv_profile for custom image resolutions"
-            )
         conv_spec = resolve_conv_spec(
             (height, width),
             conv_profile=self.policy.conv_profile,

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 ObservationPresetName: TypeAlias = Literal[
     "crop_60x76",
+    "crop_68x108",
     "crop_84x84",
 ]
 ObservationResolutionMode: TypeAlias = Literal["preset", "custom"]
@@ -62,6 +63,7 @@ class ObservationCustomResolution(BaseModel):
 
 OBSERVATION_PRESET_GEOMETRIES: Final[tuple[ObservationPresetGeometry, ...]] = (
     ObservationPresetGeometry("crop_60x76", 60, 76),
+    ObservationPresetGeometry("crop_68x108", 68, 108),
     ObservationPresetGeometry("crop_84x84", 84, 84),
 )
 OBSERVATION_PRESET_GEOMETRY_BY_NAME: Final[MappingProxyType[str, ObservationPresetGeometry]] = (

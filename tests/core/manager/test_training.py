@@ -190,21 +190,18 @@ def test_manager_training_bridge_projects_custom_observation_resolution(
     assert train_config.env.observation.custom_resolution.width == 96
 
 
-def test_manager_training_bridge_rejects_auto_conv_profile_for_custom_resolution() -> None:
+def test_manager_training_bridge_supports_nature_conv_profile_for_custom_resolution() -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.observation.resolution_mode = "custom"
     config.observation.custom_resolution = ObservationCustomResolution(height=72, width=96)
-    config.policy.conv_profile = "auto"
 
-    with pytest.raises(
-        ValueError,
-        match="policy\\.conv_profile='auto' only supports named observation presets",
-    ):
-        build_managed_train_app_config(
-            config,
-            run_id="bridge-custom-resolution-auto-conv",
-            run_dir=Path("unused"),
-        )
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-custom-resolution-nature-conv",
+        run_dir=Path("unused"),
+    )
+
+    assert train_config.policy.extractor.conv_profile == "nature"
 
 
 def test_manager_training_bridge_supports_multilayer_state_mlp(

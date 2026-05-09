@@ -3,7 +3,14 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    model_validator,
+)
 
 from rl_fzerox.core.manager.run_spec.common import (
     ActivationName,
@@ -25,7 +32,7 @@ class ManagedPolicyConfig(BaseModel):
         stride: PositiveInt
         padding: NonNegativeInt = 0
 
-    conv_profile: ConvProfile = "nature_32_64_128"
+    conv_profile: ConvProfile = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = Field(
         default_factory=lambda: default_custom_conv_layers()
     )

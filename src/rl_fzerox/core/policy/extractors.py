@@ -12,14 +12,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
 ConvProfile = Literal[
-    "auto",
     "nature",
-    "nature_32_64_128",
-    "nature_wide",
-    "nature_extra_k3",
-    "compact_deep",
-    "compact_bottleneck",
-    "tiny_256",
     "custom",
 ]
 
@@ -58,57 +51,6 @@ NATURE_CNN_CONV_SPEC: ConvSpec = (
     _conv_layer(64, kernel_size=4, stride=2),
     _conv_layer(64, kernel_size=3, stride=1),
 )
-NATURE_32_64_128_CONV_SPEC: ConvSpec = (
-    _conv_layer(32, kernel_size=8, stride=4),
-    _conv_layer(64, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=3, stride=1),
-)
-NATURE_WIDE_CONV_SPEC: ConvSpec = (
-    _conv_layer(64, kernel_size=8, stride=4),
-    _conv_layer(128, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=3, stride=1),
-)
-NATURE_EXTRA_K3_CONV_SPEC: ConvSpec = (
-    *NATURE_CNN_CONV_SPEC,
-    _conv_layer(64, kernel_size=3, stride=1),
-)
-LEGACY_DEEP_CONV_SPEC: ConvSpec = (
-    _conv_layer(64, kernel_size=8, stride=4),
-    _conv_layer(64, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=3, stride=2),
-    _conv_layer(128, kernel_size=3, stride=1),
-)
-COMPACT_DEEP_CONV_SPEC: ConvSpec = (
-    _conv_layer(64, kernel_size=8, stride=2),
-    _conv_layer(64, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=4, stride=2),
-)
-COMPACT_BOTTLENECK_CONV_SPEC: ConvSpec = (
-    _conv_layer(64, kernel_size=8, stride=2),
-    _conv_layer(64, kernel_size=8, stride=2),
-    _conv_layer(64, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=3, stride=2),
-    _conv_layer(256, kernel_size=4, stride=1),
-)
-TINY_256_CONV_SPEC: ConvSpec = (
-    _conv_layer(64, kernel_size=8, stride=2),
-    _conv_layer(64, kernel_size=4, stride=2),
-    _conv_layer(128, kernel_size=4, stride=2),
-    _conv_layer(256, kernel_size=4, stride=2),
-)
-SUPPORTED_POLICY_GEOMETRIES: dict[tuple[int, int], ConvSpec] = {
-    (84, 116): NATURE_CNN_CONV_SPEC,
-    (92, 124): NATURE_CNN_CONV_SPEC,
-    (116, 164): LEGACY_DEEP_CONV_SPEC,
-    (98, 130): COMPACT_DEEP_CONV_SPEC,
-    (66, 82): COMPACT_DEEP_CONV_SPEC,
-    (60, 76): NATURE_CNN_CONV_SPEC,
-    (68, 68): NATURE_CNN_CONV_SPEC,
-    (84, 84): NATURE_CNN_CONV_SPEC,
-    (76, 100): NATURE_CNN_CONV_SPEC,
-    (64, 64): TINY_256_CONV_SPEC,
-}
 
 
 class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
@@ -118,7 +60,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         self,
         observation_space: spaces.Box,
         features_dim: int | Literal["auto"] = 512,
-        conv_profile: ConvProfile = "auto",
+        conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         layer_norm: bool = False,
     ) -> None:
@@ -231,7 +173,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         state_features_dim: int = 64,
         state_net_arch: tuple[int, ...] | None = None,
         fusion_features_dim: int | None = None,
-        conv_profile: ConvProfile = "auto",
+        conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         layer_norm: bool = False,
     ) -> None:
@@ -347,7 +289,7 @@ def _resolve_supported_image_geometry(
     observation_space: spaces.Box,
     *,
     extractor_name: str,
-    conv_profile: ConvProfile = "auto",
+    conv_profile: ConvProfile = "nature",
     custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> _ImageGeometry:
     if len(observation_space.shape) != 3:
@@ -363,19 +305,11 @@ def _resolve_supported_image_geometry(
 
     resolved_height = int(height)
     resolved_width = int(width)
-    geometry = (resolved_height, resolved_width)
-    try:
-        conv_spec = _resolve_conv_spec(
-            geometry,
-            conv_profile=conv_profile,
-            custom_conv_layers=custom_conv_layers,
-        )
-    except KeyError as error:
-        supported = ", ".join(f"{height}x{width}" for height, width in SUPPORTED_POLICY_GEOMETRIES)
-        raise ValueError(
-            f"Unsupported observation geometry {resolved_height}x{resolved_width} for "
-            f"{extractor_name}; supported auto geometries: {supported}"
-        ) from error
+    conv_spec = _resolve_conv_spec(
+        (resolved_height, resolved_width),
+        conv_profile=conv_profile,
+        custom_conv_layers=custom_conv_layers,
+    )
 
     ensure_conv_spec_fits_geometry(
         height=resolved_height,
@@ -398,22 +332,8 @@ def _resolve_conv_spec(
     conv_profile: ConvProfile,
     custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> ConvSpec:
-    if conv_profile == "auto":
-        return SUPPORTED_POLICY_GEOMETRIES[geometry]
     if conv_profile == "nature":
         return NATURE_CNN_CONV_SPEC
-    if conv_profile == "nature_32_64_128":
-        return NATURE_32_64_128_CONV_SPEC
-    if conv_profile == "nature_wide":
-        return NATURE_WIDE_CONV_SPEC
-    if conv_profile == "nature_extra_k3":
-        return NATURE_EXTRA_K3_CONV_SPEC
-    if conv_profile == "compact_deep":
-        return COMPACT_DEEP_CONV_SPEC
-    if conv_profile == "compact_bottleneck":
-        return COMPACT_BOTTLENECK_CONV_SPEC
-    if conv_profile == "tiny_256":
-        return TINY_256_CONV_SPEC
     if conv_profile == "custom":
         return _custom_conv_spec(custom_conv_layers)
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
@@ -486,7 +406,7 @@ def _custom_conv_spec(
 def _image_flatten_dim(
     observation_space: spaces.Box,
     *,
-    conv_profile: ConvProfile = "auto",
+    conv_profile: ConvProfile = "nature",
     custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
 ) -> int:
     geometry = _resolve_supported_image_geometry(
