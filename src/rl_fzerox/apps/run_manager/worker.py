@@ -38,9 +38,25 @@ def main(argv: list[str] | None = None) -> None:
         args.db_path,
     )
     store = ManagerStore(args.db_path)
-    run = store.get_run(args.run_id)
+    try:
+        run = store.get_run(args.run_id)
+    except Exception as exc:
+        LOGGER.exception("manager worker failed before loading run_id=%s", args.run_id)
+        _mark_worker_boot_failure(
+            store=store,
+            run_id=args.run_id,
+            launch_token=args.launch_token,
+            message=f"manager worker failed before loading run: {type(exc).__name__}: {exc}",
+        )
+        raise
     if run is None:
         LOGGER.error("managed run not found: %s", args.run_id)
+        _mark_worker_boot_failure(
+            store=store,
+            run_id=args.run_id,
+            launch_token=args.launch_token,
+            message=f"managed run not found: {args.run_id}",
+        )
         raise SystemExit(f"managed run not found: {args.run_id}")
 
     heartbeat_loop: _WorkerHeartbeatLoop | None = None
@@ -219,6 +235,42 @@ def _write_manager_snapshot(run: object) -> None:
         json.dump(run.config.model_dump(mode="json"), handle, indent=2, sort_keys=True)
         handle.write("\n")
     LOGGER.info("wrote manager snapshot: %s", snapshot_path)
+
+
+def _mark_worker_boot_failure(
+    *,
+    store: ManagerStore,
+    run_id: str,
+    launch_token: str,
+    message: str,
+) -> None:
+    """Record failures that happen before the run config can be validated."""
+
+    store._ensure_schema_initialized()
+    with store._connect() as connection:
+        row = connection.execute("SELECT id FROM runs WHERE id = ?", (run_id,)).fetchone()
+        if row is None:
+            return
+        connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
+        connection.execute(
+            "DELETE FROM run_workers WHERE run_id = ? AND launch_token = ?",
+            (run_id, launch_token),
+        )
+        connection.execute(
+            """
+            UPDATE runs
+            SET status = ?, stopped_at = ?
+            WHERE id = ?
+            """,
+            ("failed", _now(), run_id),
+        )
+        connection.execute(
+            """
+            INSERT INTO run_events(run_id, created_at, kind, message)
+            VALUES (?, ?, ?, ?)
+            """,
+            (run_id, _now(), "failed", message),
+        )
 
 
 def _now() -> str:

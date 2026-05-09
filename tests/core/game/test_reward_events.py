@@ -170,59 +170,12 @@ def test_reward_main_penalizes_lean_request() -> None:
     assert step.breakdown == {"lean": -0.003}
 
 
-def test_reward_main_penalizes_airborne_pitch_up_request() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            airborne_pitch_up_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
-
-    step = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
-        _status(step_count=3),
-        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
-        RewardActionContext(pitch_level=0.5),
-    )
-
-    assert step.reward == pytest.approx(-0.015)
-    assert step.breakdown == {"airborne_pitch_up": -0.015}
-
-
-def test_reward_main_does_not_penalize_airborne_pitch_down_request() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            airborne_pitch_up_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
-
-    step = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
-        _status(step_count=3),
-        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
-        RewardActionContext(pitch_level=-1.0),
-    )
-
-    assert step.reward == 0.0
-    assert step.breakdown == {}
-
-
 def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             grounded_pitch_penalty=-0.01,
-            grounded_pitch_deadzone=0.1,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
         )
@@ -233,7 +186,7 @@ def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:
         _summary(max_race_distance=0.0, frames_run=3),
         _status(step_count=3),
         _telemetry(race_distance=0.0),
-        RewardActionContext(pitch_level=0.6),
+        RewardActionContext(pitch_level=0.6, pitch_deadzone=0.1),
     )
 
     assert step.reward == pytest.approx(-0.0166666667)
@@ -246,7 +199,6 @@ def test_reward_main_does_not_penalize_grounded_pitch_within_deadzone() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             grounded_pitch_penalty=-0.01,
-            grounded_pitch_deadzone=0.25,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
         )
@@ -257,7 +209,7 @@ def test_reward_main_does_not_penalize_grounded_pitch_within_deadzone() -> None:
         _summary(max_race_distance=0.0, frames_run=3),
         _status(step_count=3),
         _telemetry(race_distance=0.0),
-        RewardActionContext(pitch_level=0.2),
+        RewardActionContext(pitch_level=0.2, pitch_deadzone=0.25),
     )
 
     assert step.reward == 0.0

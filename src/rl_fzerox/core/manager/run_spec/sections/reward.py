@@ -45,9 +45,7 @@ class ManagedRewardConfig(BaseModel):
     boost_pad_reward: NonNegativeFloat = 10.0
     boost_pad_reward_progress_window: PositiveFloat = 800.0
     lean_request_penalty: float = Field(default=-0.003, le=0.0)
-    airborne_pitch_up_penalty: float = Field(default=-0.2, le=0.0)
     grounded_pitch_penalty: float = Field(default=0.0, le=0.0)
-    grounded_pitch_deadzone: float = Field(default=0.1, ge=0.0, le=1.0)
     damage_taken_frame_penalty: float = Field(default=-0.02, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=-0.001, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 120

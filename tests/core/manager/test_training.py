@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.core.domain.observation_image import ObservationCustomResolution
+from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
@@ -148,14 +149,38 @@ def test_manager_training_bridge_uses_explicit_state_component_membership(
     assert train_config.policy.extractor.resolved_state_net_arch() == ()
 
 
+def test_manager_training_bridge_projects_individual_state_features(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.observation.state_components = tuple(
+        component.model_copy(update={"included_features": ("track_position.edge_ratio",)})
+        if component.name == "track_position"
+        else component
+        for component in config.observation.state_components
+        if component.name == "track_position"
+    )
+    config.observation.state_feature_dropouts = ()
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-feature-membership",
+        run_dir=tmp_path / "runs" / "bridge-feature-membership_0001",
+    )
+    components = train_config.env.observation.state_components
+    assert components is not None
+
+    assert state_feature_names(
+        state_components=tuple(component.data() for component in components)
+    ) == ("track_position.edge_ratio",)
+
+
 def test_manager_training_bridge_supports_episode_state_feature_dropout(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.observation.state_feature_dropouts = (
-        config.observation.state_feature_dropouts[0].model_copy(
-            update={"dropout_prob": 0.25}
-        ),
+        config.observation.state_feature_dropouts[0].model_copy(update={"dropout_prob": 0.25}),
     )
 
     train_config = build_managed_train_app_config(
@@ -166,9 +191,7 @@ def test_manager_training_bridge_supports_episode_state_feature_dropout(
 
     assert tuple(
         group.model_dump(mode="python") for group in train_config.train.state_feature_dropout_groups
-    ) == (
-        {"dropout_prob": 0.25, "feature_names": ("track_position.edge_ratio",)},
-    )
+    ) == ({"dropout_prob": 0.25, "feature_names": ("track_position.edge_ratio",)},)
 
 
 def test_manager_training_bridge_projects_custom_observation_resolution(
@@ -287,10 +310,41 @@ def test_manager_training_bridge_supports_built_in_gp_race_launch(
     )
 
     assert {entry.mode for entry in train_config.env.track_sampling.entries} == {"gp_race"}
+    assert {entry.gp_difficulty for entry in train_config.env.track_sampling.entries} == {"novice"}
     assert {entry.course_id for entry in train_config.env.track_sampling.entries} == {
         "mute_city",
         "silence",
     }
+
+
+def test_manager_config_omits_gp_difficulty_outside_gp_race() -> None:
+    config = default_managed_run_config()
+
+    dumped = config.model_dump(mode="json")
+
+    assert dumped["tracks"]["race_mode"] == "time_attack"
+    assert "gp_difficulty" not in dumped["tracks"]
+
+
+def test_manager_training_bridge_projects_configured_gp_difficulty(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.race_mode = "gp_race"
+    config.tracks.gp_difficulty = "master"
+    config.tracks.selected_course_ids = ("mute_city",)
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-gp-master",
+        run_dir=tmp_path / "runs" / "bridge-gp-master_0001",
+    )
+
+    entries = train_config.env.track_sampling.entries
+    assert len(entries) == 1
+    assert entries[0].mode == "gp_race"
+    assert entries[0].gp_difficulty == "master"
+    assert entries[0].source_gp_difficulty == "master"
 
 
 def test_manager_training_bridge_supports_weight_fork_from_parent_run(

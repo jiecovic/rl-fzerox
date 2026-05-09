@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from rl_fzerox.apps.run_manager.launch import ManagerRunLauncher
-from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
+from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_managed_run_config
 from rl_fzerox.core.training.runs import RUN_LAYOUT
 
 
@@ -19,6 +19,50 @@ class _RecordingLauncher(ManagerRunLauncher):
 
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:
         self.spawn_calls.append((run_id, resume))
+
+
+def test_launch_allows_unsaved_fork_source(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    source_run = store.create_run(
+        run_id="parent-run",
+        name="Parent Run",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "parent-run",
+    )
+
+    class _ForkRecordingLauncher(ManagerRunLauncher):
+        def __init__(self, store: ManagerStore) -> None:
+            super().__init__(store)
+            self.fork_calls: list[tuple[str, str, str | None, object | None]] = []
+
+        def fork(
+            self,
+            *,
+            run_id: str,
+            artifact: str,
+            name: str | None = None,
+            config: object | None = None,
+            exclude_draft_id: str | None = None,
+            source_snapshot_dir: Path | None = None,
+            source_num_timesteps: int | None = None,
+        ) -> ManagedRun:
+            del exclude_draft_id, source_num_timesteps, source_snapshot_dir
+            self.fork_calls.append((run_id, artifact, name, config))
+            return source_run
+
+    launcher = _ForkRecordingLauncher(store)
+
+    launched = launcher.launch(
+        name="Forked Child",
+        config=config,
+        draft_id=None,
+        source_run_id=source_run.id,
+        source_artifact="best",
+    )
+
+    assert launched == source_run
+    assert launcher.fork_calls == [(source_run.id, "best", "Forked Child", config)]
 
 
 def test_resume_relaunches_fork_without_local_checkpoint(tmp_path: Path) -> None:

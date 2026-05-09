@@ -152,11 +152,6 @@ def create_manager_api_app(
             source_run_id=request.source_run_id,
             source_artifact=request.source_artifact,
         )
-        if request.source_run_id is not None and request.draft_id is None:
-            raise HTTPException(
-                status_code=400,
-                detail="fork launches must come from a persisted fork draft",
-            )
         try:
             run = launcher.launch(
                 name=name,
