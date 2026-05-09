@@ -69,9 +69,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "energy_refill_collision_cooldown_frames": 17,
         "air_brake_request_penalty": -0.005,
         "lean_request_penalty": -0.002,
-        "airborne_pitch_up_penalty": -0.003,
         "grounded_pitch_penalty": -0.004,
-        "grounded_pitch_deadzone": 0.2,
         "airborne_landing_reward": 5.0,
         "collision_recoil_penalty": -0.25,
         "failure_penalty": -30.0,
@@ -85,8 +83,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
 
     assert isinstance(tracker, RewardMainTracker)
     actual = {
-        field.name: getattr(tracker._weights, field.name)
-        for field in fields(RewardMainWeights)
+        field.name: getattr(tracker._weights, field.name) for field in fields(RewardMainWeights)
     }
     assert actual == overrides
 

@@ -52,7 +52,12 @@ class ManagerRunLauncher:
             raise ValueError("run name is required")
         if source_run_id is not None and source_artifact is not None:
             if draft_id is None:
-                raise ValueError("fork launches must come from a persisted fork draft")
+                return self.fork(
+                    run_id=source_run_id,
+                    artifact=source_artifact,
+                    name=normalized_name,
+                    config=config,
+                )
             draft = self._store.get_draft(draft_id)
             if draft is None:
                 raise ValueError(f"draft not found: {draft_id}")

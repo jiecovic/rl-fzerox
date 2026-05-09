@@ -18,6 +18,7 @@ from rl_fzerox.core.envs.actions.base import (
 )
 from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.configured.layout import (
+    apply_pitch_deadzone,
     configured_dimensions,
     idle_discrete_values,
     lean_mask,
@@ -79,6 +80,8 @@ class ConfiguredDiscreteActionAdapter:
                 )
             elif dimension.label == "pitch":
                 pitch = pitch_bucket_value(value, bucket_count=self._config.pitch_buckets)
+
+        pitch = apply_pitch_deadzone(pitch, deadzone=float(self._config.pitch_deadzone))
 
         if self._config.force_full_throttle:
             joypad_mask |= RACE_CONTROL_MASKS.accelerate

@@ -36,9 +36,7 @@ class RewardMainWeights:
     energy_refill_collision_cooldown_frames: int = 120
     air_brake_request_penalty: float = 0.0
     lean_request_penalty: float = -0.003
-    airborne_pitch_up_penalty: float = -0.2
     grounded_pitch_penalty: float = 0.0
-    grounded_pitch_deadzone: float = 0.1
     airborne_landing_reward: float = 1.0
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0

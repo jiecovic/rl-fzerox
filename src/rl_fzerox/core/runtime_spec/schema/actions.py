@@ -137,6 +137,7 @@ class ActionRuntimeConfig:
     boost_request_lockout_frames: int
     lean_unmask_min_speed_kph: float | None
     lean_initial_lockout_frames: int
+    pitch_deadzone: float
     pitch_buckets: int
     independent_lean_buttons: bool
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...]
@@ -203,6 +204,7 @@ class ActionRuntimeConfig:
                 else float(config.lean_unmask_min_speed_kph)
             ),
             lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
+            pitch_deadzone=float(config.pitch_deadzone),
             pitch_buckets=int(config.pitch_buckets),
             independent_lean_buttons=bool(config.independent_lean_buttons),
             layout_continuous_axes=tuple(config.layout_continuous_axes),
@@ -232,6 +234,7 @@ class ActionConfig(BaseModel):
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)
     independent_lean_buttons: bool = False
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()
@@ -248,11 +251,7 @@ class ActionConfig(BaseModel):
     def resolved_adapter_name(self) -> ActionAdapterName:
         """Return the adapter family implied by the configured action layout."""
 
-        return (
-            "configured_hybrid"
-            if self.layout_continuous_axes
-            else "configured_discrete"
-        )
+        return "configured_hybrid" if self.layout_continuous_axes else "configured_discrete"
 
     def resolved_mask_overrides(self) -> ActionMaskOverrides | None:
         """Return one canonical set of branch overrides for runtime consumers."""

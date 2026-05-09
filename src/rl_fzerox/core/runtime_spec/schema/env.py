@@ -75,9 +75,7 @@ class RewardCourseOverrideConfig(BaseModel):
     energy_refill_collision_cooldown_frames: NonNegativeInt | None = None
     air_brake_request_penalty: float | None = Field(default=None, le=0.0)
     lean_request_penalty: float | None = Field(default=None, le=0.0)
-    airborne_pitch_up_penalty: float | None = Field(default=None, le=0.0)
     grounded_pitch_penalty: float | None = Field(default=None, le=0.0)
-    grounded_pitch_deadzone: float | None = Field(default=None, ge=0.0, le=1.0)
     damage_taken_frame_penalty: float | None = Field(default=None, le=0.0)
     damage_taken_streak_ramp_penalty: float | None = Field(default=None, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt | None = None
@@ -128,9 +126,7 @@ class RewardConfig(BaseModel):
     energy_refill_collision_cooldown_frames: NonNegativeInt = 0
     air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     lean_request_penalty: float = Field(default=0.0, le=0.0)
-    airborne_pitch_up_penalty: float = Field(default=0.0, le=0.0)
     grounded_pitch_penalty: float = Field(default=0.0, le=0.0)
-    grounded_pitch_deadzone: float = Field(default=0.1, ge=0.0, le=1.0)
     damage_taken_frame_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0

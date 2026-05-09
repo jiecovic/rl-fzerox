@@ -178,6 +178,66 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
     assert payload["run"]["status"] == "running"
 
 
+async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    seen_source: list[tuple[str | None, str | None, str | None]] = []
+    source_run = store.create_run(
+        run_id="run-parent",
+        name="Parent Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+
+    class FakeLauncher(_LauncherStub):
+        def launch(
+            self,
+            *,
+            name: str,
+            config: ManagedRunConfig,
+            draft_id: str | None,
+            source_run_id: str | None,
+            source_artifact: Literal["latest", "best"] | None,
+        ):
+            seen_source.append((draft_id, source_run_id, source_artifact))
+            run = store.create_run(
+                name=name,
+                config=config,
+                managed_runs_root=tmp_path / "runs",
+                source_run_id=source_run_id,
+                source_artifact=source_artifact,
+            )
+            launched = store.update_run_status(
+                run_id=run.id,
+                status="running",
+                started_at="2026-05-03T12:00:00+00:00",
+                stopped_at=None,
+                message="worker launched",
+            )
+            if launched is None:
+                raise RuntimeError("launch status update failed")
+            return launched
+
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    config = default_managed_run_config().model_dump(mode="json")
+
+    response = await client.post(
+        "/api/runs",
+        json={
+            "name": "Launch Fork",
+            "config": config,
+            "source_run_id": source_run.id,
+            "source_artifact": "best",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["run"]["name"] == "Launch Fork"
+    assert payload["run"]["source_run_id"] == source_run.id
+    assert payload["run"]["source_artifact"] == "best"
+    assert seen_source == [(None, source_run.id, "best")]
+
+
 async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
 
@@ -656,6 +716,7 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "x_cup" in {mode["value"] for mode in payload["track_pool_modes"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
+    assert "master" in {mode["value"] for mode in payload["gp_difficulties"]}
     assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "jack" in {cup["id"] for cup in payload["track_cups"]}
     assert "mute_city" in {course["id"] for course in payload["built_in_courses"]}

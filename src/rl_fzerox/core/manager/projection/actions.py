@@ -23,6 +23,7 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
         "boost_unmask_max_speed_kph": config.action.boost_unmask_max_speed_kph,
         "lean_unmask_min_speed_kph": config.action.lean_unmask_min_speed_kph,
         "lean_initial_lockout_frames": config.action.lean_initial_lockout_frames,
+        "pitch_deadzone": config.action.pitch_deadzone,
         "pitch_buckets": config.action.pitch_buckets,
         "independent_lean_buttons": config.action.lean_output_mode == "independent_buttons",
         "layout_continuous_axes": list(continuous_axes),

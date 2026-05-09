@@ -26,6 +26,7 @@ from fzerox_emulator import (
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import RaceStartMode, normalize_observation_resolution
 from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
@@ -542,6 +543,7 @@ class SyntheticBackend:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         self.last_race_start_setup = {
             "mode": mode,
@@ -549,6 +551,7 @@ class SyntheticBackend:
             "character_index": character_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
+            "gp_difficulty": gp_difficulty,
         }
 
     def patch_machine_settings(
@@ -559,6 +562,7 @@ class SyntheticBackend:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         self.last_machine_settings = {
             "mode": mode,
@@ -566,6 +570,7 @@ class SyntheticBackend:
             "character_index": character_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
+            "gp_difficulty": gp_difficulty,
         }
 
     def patch_engine_settings(
@@ -593,6 +598,7 @@ class SyntheticBackend:
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None:
         self.patch_race_start_setup(
             mode=mode,
@@ -600,6 +606,7 @@ class SyntheticBackend:
             character_index=character_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
+            gp_difficulty=gp_difficulty,
         )
 
     def patch_time_attack_race_start_setup(

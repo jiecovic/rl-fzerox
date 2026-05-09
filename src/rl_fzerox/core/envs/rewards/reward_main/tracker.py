@@ -15,7 +15,6 @@ from rl_fzerox.core.envs.rewards.reward_main.bounds import (
 )
 from rl_fzerox.core.envs.rewards.reward_main.controls import (
     air_brake_request_penalty,
-    airborne_pitch_up_penalty,
     grounded_pitch_penalty,
     lean_request_penalty,
     manual_boost_reward,
@@ -210,16 +209,6 @@ class RewardMainTracker:
         if lean_penalty:
             reward += lean_penalty
             breakdown["lean"] = lean_penalty
-
-        pitch_penalty = airborne_pitch_up_penalty(
-            summary,
-            telemetry,
-            action_context,
-            weights=self._weights,
-        )
-        if pitch_penalty:
-            reward += pitch_penalty
-            breakdown["airborne_pitch_up"] = pitch_penalty
 
         grounded_pitch = grounded_pitch_penalty(
             summary,

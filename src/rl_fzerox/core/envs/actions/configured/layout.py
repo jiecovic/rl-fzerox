@@ -81,6 +81,13 @@ def pitch_bucket_value(index: int, *, bucket_count: int) -> float:
     return float(index - neutral_index) / float(neutral_index)
 
 
+def apply_pitch_deadzone(value: float, *, deadzone: float) -> float:
+    """Apply the configured neutral pitch band after pitch decoding."""
+
+    clamped = max(-1.0, min(1.0, float(value)))
+    return 0.0 if abs(clamped) <= deadzone else clamped
+
+
 def lean_mask(index: int, *, independent_buttons: bool) -> int:
     """Translate one configured lean branch value into joypad button bits."""
 

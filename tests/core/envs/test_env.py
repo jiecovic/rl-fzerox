@@ -136,6 +136,53 @@ def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
     assert info["episode_return"] == 5.0
 
 
+def test_grounded_pitch_penalty_uses_requested_pitch_before_ground_gate() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=0.0),
+                summary=_step_summary(max_race_distance=0.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            action=configured_hybrid_action(
+                continuous_axes=("steer", "pitch"),
+                discrete_axes=("gas",),
+                pitch_deadzone=0.05,
+            ),
+        ),
+        reward_config=RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            grounded_pitch_penalty=-0.5,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        ),
+    )
+
+    env.reset(seed=7)
+    _, reward, _, _, info = env.step(
+        {
+            "continuous": np.array([0.0, 0.82], dtype=np.float32),
+            "discrete": np.array([0], dtype=np.int64),
+        }
+    )
+
+    # Ground gating protects the emulator while reward shaping still sees the request.
+    assert backend.last_controller_state.left_stick_y == 0.0
+    expected = -0.5 * ((0.82 - 0.05) / (1.0 - 0.05))
+    assert reward == pytest.approx(expected)
+    reward_breakdown = info["reward_breakdown"]
+    assert isinstance(reward_breakdown, dict)
+    assert reward_breakdown["grounded_pitch"] == pytest.approx(expected)
+
+
 def test_reset_resets_continuous_drive_pwm_phase() -> None:
     backend = SyntheticBackend()
     env = FZeroXEnv(

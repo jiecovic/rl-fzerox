@@ -67,9 +67,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         ),
         air_brake_request_penalty=config.air_brake_request_penalty,
         lean_request_penalty=config.lean_request_penalty,
-        airborne_pitch_up_penalty=config.airborne_pitch_up_penalty,
         grounded_pitch_penalty=config.grounded_pitch_penalty,
-        grounded_pitch_deadzone=config.grounded_pitch_deadzone,
         airborne_landing_reward=config.airborne_landing_reward,
         collision_recoil_penalty=config.collision_recoil_penalty,
         failure_penalty=config.failure_penalty,
@@ -227,20 +225,10 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 if override.lean_request_penalty is not None
                 else base.lean_request_penalty
             ),
-            airborne_pitch_up_penalty=(
-                override.airborne_pitch_up_penalty
-                if override.airborne_pitch_up_penalty is not None
-                else base.airborne_pitch_up_penalty
-            ),
             grounded_pitch_penalty=(
                 override.grounded_pitch_penalty
                 if override.grounded_pitch_penalty is not None
                 else base.grounded_pitch_penalty
-            ),
-            grounded_pitch_deadzone=(
-                override.grounded_pitch_deadzone
-                if override.grounded_pitch_deadzone is not None
-                else base.grounded_pitch_deadzone
             ),
             airborne_landing_reward=(
                 override.airborne_landing_reward

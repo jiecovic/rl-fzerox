@@ -91,6 +91,18 @@ def test_configured_discrete_applies_steer_curve() -> None:
     assert control_state.left_stick_x == pytest.approx(-(0.5**0.5))
 
 
+def test_configured_discrete_applies_pitch_deadzone_after_bucket_decode() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action("pitch", pitch_buckets=5, pitch_deadzone=0.6)
+    )
+
+    neutralized = adapter.decode(np.array([1], dtype=np.int64))
+    full_pitch = adapter.decode(np.array([0], dtype=np.int64))
+
+    assert neutralized.left_stick_y == 0.0
+    assert full_pitch.left_stick_y == -1.0
+
+
 def test_configured_discrete_rejects_wrong_action_shape() -> None:
     adapter = ConfiguredDiscreteActionAdapter(configured_discrete_action("steer", "gas"))
 
@@ -187,6 +199,31 @@ def test_configured_hybrid_steer_gas_boost_lean_decodes_discrete_buttons() -> No
         | RACE_CONTROL_MASKS.lean_right,
         left_stick_x=-0.75,
     )
+
+
+def test_configured_hybrid_applies_pitch_deadzone_to_continuous_pitch() -> None:
+    adapter = ConfiguredHybridActionAdapter(
+        configured_hybrid_action(
+            continuous_axes=("pitch",),
+            pitch_deadzone=0.25,
+        )
+    )
+
+    neutralized = adapter.decode(
+        {
+            "continuous": np.array([0.2], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
+    live_pitch = adapter.decode(
+        {
+            "continuous": np.array([0.3], dtype=np.float32),
+            "discrete": np.array([], dtype=np.int64),
+        }
+    )
+
+    assert neutralized.left_stick_y == 0.0
+    assert live_pitch.left_stick_y == pytest.approx(0.3)
 
 
 def test_configured_hybrid_steer_gas_air_brake_boost_lean_masks_heads() -> None:

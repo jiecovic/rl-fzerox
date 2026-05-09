@@ -34,6 +34,7 @@ class RewardActionContext:
     gas_level: float | None = None
     steer_level: float | None = None
     pitch_level: float | None = None
+    pitch_deadzone: float = 0.0
     drive_axis: float | None = None
 
 
