@@ -192,7 +192,7 @@ def _draw_frame(
         fonts=fonts,
         surface=game_surface,
         outer_size=game_display_size,
-        course_label=_game_course_overlay_label(data.info),
+        course_label=_game_course_overlay_label(data.info, reset_info=data.reset_info),
         speed_label=_game_speed_overlay_label(data.info, action_repeat=data.action_repeat),
     )
     control_viz = _control_viz(
@@ -352,7 +352,11 @@ def _energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None:
     return max(0.0, min(1.0, energy / max_energy))
 
 
-def _game_course_overlay_label(info: dict[str, object]) -> str | None:
+def _game_course_overlay_label(
+    info: dict[str, object],
+    *,
+    reset_info: dict[str, object] | None = None,
+) -> str | None:
     course_name = info.get("track_course_name")
     if not isinstance(course_name, str) or not course_name:
         course_name = _fallback_course_name(info)
@@ -360,9 +364,26 @@ def _game_course_overlay_label(info: dict[str, object]) -> str | None:
         return None
 
     cup = _course_cup_name(info)
-    if cup is None:
-        return course_name
-    return f"{cup} : {course_name}"
+    label = course_name if cup is None else f"{cup} : {course_name}"
+    if _course_anchor_active(info, reset_info=reset_info):
+        return f"> {label} <"
+    return label
+
+
+def _course_anchor_active(
+    info: dict[str, object],
+    *,
+    reset_info: dict[str, object] | None,
+) -> bool:
+    if reset_info is None:
+        return False
+    locked_course_id = reset_info.get("track_sampling_locked_course_id")
+    if not isinstance(locked_course_id, str) or not locked_course_id:
+        return False
+    course_id = info.get("track_course_id")
+    if course_id is None:
+        return True
+    return course_id == locked_course_id
 
 
 def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) -> str | None:

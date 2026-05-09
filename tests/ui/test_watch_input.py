@@ -35,6 +35,7 @@ class _FakePygame:
     K_r = 26
     K_e = 43
     K_t = 42
+    K_f = 44
     K_d = 27
     K_m = 35
     K_c = 39
@@ -175,6 +176,12 @@ def test_poll_viewer_input_maps_t_to_next_course_reset() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_t,)))
 
     assert viewer_input.reset_mode == "next"
+
+
+def test_poll_viewer_input_maps_f_to_current_course_anchor_toggle() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_f,)))
+
+    assert viewer_input.toggle_current_course_lock is True
 
 
 def test_poll_viewer_input_maps_d_to_policy_mode_toggle() -> None:
