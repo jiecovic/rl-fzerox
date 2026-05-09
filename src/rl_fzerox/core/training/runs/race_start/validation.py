@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import Emulator
+from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.training.runs.race_start.models import RaceStartVariant
 
 
@@ -13,6 +14,12 @@ def validate_mode(mode: str) -> None:
 
 def validate_variant(variant: RaceStartVariant) -> None:
     validate_mode(variant.mode)
+    if variant.mode == "time_attack" and variant.gp_difficulty is not None:
+        raise ValueError("gp_difficulty is only supported for gp_race variants")
+    if variant.mode == "gp_race" and (
+        variant.gp_difficulty is not None and variant.gp_difficulty not in race_difficulty_names()
+    ):
+        raise ValueError(f"Unsupported gp_difficulty {variant.gp_difficulty!r}")
     if variant.course_index < 0:
         raise ValueError(f"course_index must be non-negative, got {variant.course_index}")
     if variant.character_index < 0:
@@ -36,6 +43,7 @@ def validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
+        gp_difficulty=variant.gp_difficulty,
     )
     _validate_machine_identity(emulator, variant)
 
@@ -60,6 +68,12 @@ def validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVaria
                 f"telemetry.course_index: expected {variant.course_index}, "
                 f"got {telemetry.course_index}"
             )
+        if variant.mode == "gp_race" and variant.gp_difficulty is not None:
+            if telemetry.difficulty_name != variant.gp_difficulty:
+                mismatches.append(
+                    "telemetry.difficulty_name: expected "
+                    f"{variant.gp_difficulty!r}, got {telemetry.difficulty_name!r}"
+                )
 
     if mismatches:
         raise RuntimeError(

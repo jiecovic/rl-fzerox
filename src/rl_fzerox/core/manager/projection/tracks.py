@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id
+from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting, vehicle_by_id
 
@@ -26,6 +27,11 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                     course_id=course_id,
                     course_ref=course_ref,
                     race_mode=config.tracks.race_mode,
+                    gp_difficulty=(
+                        config.tracks.gp_difficulty
+                        if config.tracks.race_mode == "gp_race"
+                        else None
+                    ),
                     target_vehicle_id=vehicle_id,
                     source_vehicle_id=source_vehicle_id,
                     source_engine_setting_id=source_engine.id,
@@ -55,6 +61,7 @@ def _track_sampling_entry(
     course_id: str,
     course_ref: str,
     race_mode: str,
+    gp_difficulty: str | None,
     target_vehicle_id: str,
     source_vehicle_id: str,
     source_engine_setting_id: str,
@@ -64,6 +71,11 @@ def _track_sampling_entry(
     random_engine_max_raw_value: int | None,
 ) -> dict[str, object]:
     vehicle = vehicle_by_id(target_vehicle_id)
+    resolved_gp_difficulty = (
+        default_gp_difficulty()
+        if race_mode == "gp_race" and gp_difficulty is None
+        else gp_difficulty
+    )
     if fixed_engine_setting_raw_value is not None:
         target_engine = resolve_engine_setting(
             fixed_engine_setting_raw_value,
@@ -80,9 +92,16 @@ def _track_sampling_entry(
         engine_suffix = f"engine_range_{random_engine_min_raw_value}_{random_engine_max_raw_value}"
 
     return {
-        "id": f"{course_id}_{race_mode}_{target_vehicle_id}_{engine_suffix}",
+        "id": _track_sampling_entry_id(
+            course_id=course_id,
+            race_mode=race_mode,
+            gp_difficulty=resolved_gp_difficulty,
+            target_vehicle_id=target_vehicle_id,
+            engine_suffix=engine_suffix,
+        ),
         "course_ref": course_ref,
         "mode": race_mode,
+        "gp_difficulty": resolved_gp_difficulty,
         "vehicle": target_vehicle_id,
         "vehicle_name": vehicle.display_name,
         "source_vehicle": source_vehicle_id,
@@ -114,3 +133,16 @@ def _course_ref(course_id: str) -> str:
     if len(matches) != 1:
         raise ValueError(f"Expected exactly one built-in course ref for {course_id!r}")
     return matches[0]
+
+
+def _track_sampling_entry_id(
+    *,
+    course_id: str,
+    race_mode: str,
+    gp_difficulty: str | None,
+    target_vehicle_id: str,
+    engine_suffix: str,
+) -> str:
+    if race_mode == "gp_race" and gp_difficulty is not None:
+        return f"{course_id}_{race_mode}_{gp_difficulty}_{target_vehicle_id}_{engine_suffix}"
+    return f"{course_id}_{race_mode}_{target_vehicle_id}_{engine_suffix}"

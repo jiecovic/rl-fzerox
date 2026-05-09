@@ -13,10 +13,12 @@ from rl_fzerox.core.domain.observation_image import (
 from rl_fzerox.core.domain.observation_image import (
     ObservationResizeFilter as DomainObservationResizeFilter,
 )
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 
 ConfigVersion = Literal[1]
 StackMode = Literal["rgb", "gray", "luma_chroma"]
 RaceMode = Literal["time_attack", "gp_race"]
+GpDifficulty = RaceDifficultyName
 TrackSamplingMode = Literal["equal", "step_balanced"]
 TrackPoolMode = Literal["built_in", "x_cup"]
 VehicleSelectionMode = Literal["fixed", "pool"]

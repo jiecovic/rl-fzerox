@@ -620,6 +620,7 @@ impl PyEmulator {
         engine_setting_raw_value,
         machine_skin_index=0,
         total_lap_count=3,
+        gp_difficulty_raw_value=-1,
     ))]
     fn patch_gp_race_start_setup(
         &mut self,
@@ -629,6 +630,7 @@ impl PyEmulator {
         engine_setting_raw_value: i32,
         machine_skin_index: i16,
         total_lap_count: i32,
+        gp_difficulty_raw_value: i32,
     ) -> PyResult<()> {
         methods::control::patch_gp_race_start_setup(
             self,
@@ -638,6 +640,7 @@ impl PyEmulator {
             engine_setting_raw_value,
             machine_skin_index,
             total_lap_count,
+            gp_difficulty_raw_value,
         )
     }
 
@@ -647,6 +650,7 @@ impl PyEmulator {
         engine_setting_raw_value,
         machine_skin_index=0,
         total_lap_count=3,
+        gp_difficulty_raw_value=-1,
     ))]
     fn patch_gp_race_machine_settings(
         &mut self,
@@ -656,6 +660,7 @@ impl PyEmulator {
         engine_setting_raw_value: i32,
         machine_skin_index: i16,
         total_lap_count: i32,
+        gp_difficulty_raw_value: i32,
     ) -> PyResult<()> {
         methods::control::patch_gp_race_machine_settings(
             self,
@@ -665,6 +670,7 @@ impl PyEmulator {
             engine_setting_raw_value,
             machine_skin_index,
             total_lap_count,
+            gp_difficulty_raw_value,
         )
     }
 
@@ -718,6 +724,7 @@ impl PyEmulator {
         engine_setting_raw_value,
         machine_skin_index=0,
         total_lap_count=3,
+        gp_difficulty_raw_value=-1,
     ))]
     fn validate_gp_race_start_setup(
         &mut self,
@@ -727,6 +734,7 @@ impl PyEmulator {
         engine_setting_raw_value: i32,
         machine_skin_index: i16,
         total_lap_count: i32,
+        gp_difficulty_raw_value: i32,
     ) -> PyResult<()> {
         methods::control::validate_gp_race_start_setup(
             self,
@@ -736,6 +744,7 @@ impl PyEmulator {
             engine_setting_raw_value,
             machine_skin_index,
             total_lap_count,
+            gp_difficulty_raw_value,
         )
     }
 

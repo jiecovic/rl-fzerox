@@ -9,6 +9,7 @@ from typing import Literal, Protocol, TypeAlias, TypedDict
 from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.control import ControllerState
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 
 
 @dataclass(frozen=True)
@@ -243,6 +244,7 @@ class EmulatorBackend(Protocol):
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None: ...
 
     def patch_machine_settings(
@@ -253,6 +255,7 @@ class EmulatorBackend(Protocol):
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None: ...
 
     def patch_time_attack_menu_mode(self) -> None: ...
@@ -274,6 +277,7 @@ class EmulatorBackend(Protocol):
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
+        gp_difficulty: RaceDifficultyName | None = None,
     ) -> None: ...
 
     def patch_time_attack_race_start_setup(

@@ -5,6 +5,12 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id, built_in_course_refs_by_cup
+from rl_fzerox.core.domain.race_difficulty import (
+    RaceDifficultyName,
+    default_gp_difficulty,
+    is_race_difficulty_name,
+    race_difficulty_names,
+)
 from rl_fzerox.core.runtime_spec.track_registry_types import (
     REGISTRY,
     BaselineVariant,
@@ -119,6 +125,7 @@ def baseline_variant(raw_baseline_spec: object, *, config_root: Path) -> Baselin
     )
     return BaselineVariant(
         mode=mode,
+        gp_difficulty=_baseline_gp_difficulty(raw_baseline_spec, mode=mode),
         vehicle=vehicle,
         engine_setting=engine_setting.id,
         engine_setting_raw_value=engine_setting.raw_value,
@@ -129,4 +136,24 @@ def required_baseline_field(raw_baseline_spec: Mapping[object, object], key: str
     value = raw_baseline_spec.get(key)
     if not isinstance(value, str) or not value:
         raise ValueError(f"track_sampling.baseline.{key} must be a non-empty string")
+    return value
+
+
+def _baseline_gp_difficulty(
+    raw_baseline_spec: Mapping[object, object],
+    *,
+    mode: str,
+) -> RaceDifficultyName | None:
+    if mode != "gp_race":
+        return None
+    value = raw_baseline_spec.get("gp_difficulty")
+    if value is None:
+        return default_gp_difficulty()
+    if not isinstance(value, str) or not value:
+        raise ValueError("track_sampling.baseline.gp_difficulty must be a non-empty string")
+    if not is_race_difficulty_name(value):
+        allowed = ", ".join(race_difficulty_names())
+        raise ValueError(
+            f"track_sampling.baseline.gp_difficulty must be one of {allowed}"
+        )
     return value

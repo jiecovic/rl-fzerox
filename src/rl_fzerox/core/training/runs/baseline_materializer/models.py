@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from fzerox_emulator import EmulatorBackend, ResetState
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,12 +20,14 @@ class BaselineRequest:
     course_name: str | None = None
     course_index: int | None = None
     mode: str | None = None
+    gp_difficulty: RaceDifficultyName | None = None
     vehicle: str | None = None
     vehicle_name: str | None = None
     source_vehicle: str | None = None
     engine_setting: str | None = None
     engine_setting_raw_value: int | None = None
     source_course_index: int | None = None
+    source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
     camera_setting: str | None = None
@@ -39,6 +42,7 @@ class BaselineArtifact:
     cache_key: str
     source_course_index: int | None = None
     source_vehicle: str | None = None
+    source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
 

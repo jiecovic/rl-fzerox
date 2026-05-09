@@ -45,6 +45,7 @@ fn gp_race_setup_writes_expected_menu_and_live_fields_without_ta_ghost_state() {
     );
 
     write_gp_race_setup(&mut memory, setup).expect("race setup should write");
+    assert_eq!(read_i32(&memory, GLOBALS.difficulty), setup.gp_difficulty_raw_value);
     validate_gp_race_setup(&memory, setup).expect("gp validation should pass");
 }
 
@@ -95,6 +96,7 @@ fn sample_setup() -> RaceStartSetup {
         machine_skin_index: 0,
         engine_setting_raw_value: 75,
         total_lap_count: 3,
+        gp_difficulty_raw_value: 2,
     }
 }
 

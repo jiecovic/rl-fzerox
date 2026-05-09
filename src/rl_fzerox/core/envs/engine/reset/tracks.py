@@ -10,6 +10,7 @@ from pathlib import Path
 from random import Random, choice, random
 
 from fzerox_emulator import EmulatorBackend
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.runtime_spec.schema import (
     TrackRecordsConfig,
     TrackSamplingConfig,
@@ -51,6 +52,7 @@ class SelectedTrack:
     weight: float
     course_index: int | None
     mode: str | None
+    gp_difficulty: RaceDifficultyName | None
     vehicle: str | None
     vehicle_name: str | None
     engine_setting: str | None
@@ -59,6 +61,7 @@ class SelectedTrack:
     engine_setting_max_raw_value: int | None
     source_vehicle: str | None
     source_course_index: int | None
+    source_gp_difficulty: RaceDifficultyName | None
     source_engine_setting: str | None
     source_engine_setting_raw_value: int | None
     records: TrackRecordsConfig | None
@@ -78,6 +81,7 @@ class SelectedTrack:
             "track_sampling_weight": self.weight,
             "track_course_index": self.course_index,
             "track_mode": self.mode,
+            "track_gp_difficulty": self.gp_difficulty,
             "track_vehicle": self.vehicle,
             "track_vehicle_name": self.vehicle_name,
             "track_engine_setting": self.engine_setting,
@@ -316,6 +320,7 @@ def _selected_track_from_entry(
         weight=float(entry.weight),
         course_index=None if entry.course_index is None else int(entry.course_index),
         mode=entry.mode,
+        gp_difficulty=entry.gp_difficulty,
         vehicle=entry.vehicle,
         vehicle_name=entry.vehicle_name,
         engine_setting=resolved_engine.id if resolved_engine is not None else entry.engine_setting,
@@ -326,6 +331,7 @@ def _selected_track_from_entry(
         engine_setting_max_raw_value=entry.engine_setting_max_raw_value,
         source_vehicle=entry.source_vehicle,
         source_course_index=entry.source_course_index,
+        source_gp_difficulty=entry.source_gp_difficulty,
         source_engine_setting=entry.source_engine_setting,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
         records=entry.records,

@@ -16,9 +16,11 @@ pub struct RaceStartSetup {
     pub machine_skin_index: i16,
     pub engine_setting_raw_value: i32,
     pub total_lap_count: i32,
+    pub gp_difficulty_raw_value: i32,
 }
 
 const PRESERVE_MACHINE_SKIN: i16 = -1;
+const PRESERVE_GP_DIFFICULTY: i32 = -1;
 
 #[derive(Clone, Copy, Debug)]
 pub struct VehicleSetupInfo {
@@ -150,7 +152,7 @@ fn write_race_setup(
     mode: RaceStartMode,
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    validate_setup(setup)?;
+    validate_setup(mode, setup)?;
     write_menu_setup(system_ram, mode, setup)?;
     write_live_racer_setup(system_ram, setup)
 }
@@ -160,7 +162,7 @@ fn write_machine_settings(
     mode: RaceStartMode,
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    validate_setup(setup)?;
+    validate_setup(mode, setup)?;
     write_menu_setup(system_ram, mode, setup)
 }
 
@@ -213,7 +215,7 @@ fn validate_race_setup(
     mode: RaceStartMode,
     setup: RaceStartSetup,
 ) -> Result<(), CoreError> {
-    validate_setup(setup)?;
+    validate_setup(mode, setup)?;
     let engine_value = setup.engine_setting_raw_value as f32 / 100.0;
     let engine_curve = engine_to_curve_value(engine_value);
     let player_base = player_racer_base();
@@ -241,6 +243,14 @@ fn validate_race_setup(
             "current_ghost_type",
             read_i32(system_ram, GLOBALS.current_ghost_type)?,
             current_ghost_type,
+        );
+    }
+    if mode == RaceStartMode::GpRace && setup.gp_difficulty_raw_value != PRESERVE_GP_DIFFICULTY {
+        push_mismatch(
+            &mut mismatches,
+            "difficulty",
+            read_i32(system_ram, GLOBALS.difficulty)?,
+            setup.gp_difficulty_raw_value,
         );
     }
     if player_character != setup.character_index && racer_character != setup.character_index {
@@ -295,6 +305,9 @@ fn write_menu_setup(
     if let Some(current_ghost_type) = mode.menu_state().current_ghost_type {
         write_i32(system_ram, GLOBALS.current_ghost_type, current_ghost_type)?;
     }
+    if mode == RaceStartMode::GpRace && setup.gp_difficulty_raw_value != PRESERVE_GP_DIFFICULTY {
+        write_i32(system_ram, GLOBALS.difficulty, setup.gp_difficulty_raw_value)?;
+    }
     write_i32(system_ram, GLOBALS.course_index, setup.course_index)?;
     write_i16(system_ram, GLOBALS.player_characters, setup.character_index)?;
     if setup.machine_skin_index != PRESERVE_MACHINE_SKIN {
@@ -334,7 +347,7 @@ fn write_live_racer_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Resul
     )
 }
 
-fn validate_setup(setup: RaceStartSetup) -> Result<(), CoreError> {
+fn validate_setup(mode: RaceStartMode, setup: RaceStartSetup) -> Result<(), CoreError> {
     if !(0..BOUNDS.course_count).contains(&setup.course_index) {
         return Err(invalid_setup(format!(
             "course_index must be in [0, {}), got {}",
@@ -352,6 +365,15 @@ fn validate_setup(setup: RaceStartSetup) -> Result<(), CoreError> {
         return Err(invalid_setup(format!(
             "total_lap_count must be at least {}, got {}",
             BOUNDS.minimum_lap_count, setup.total_lap_count
+        )));
+    }
+    if mode == RaceStartMode::GpRace
+        && setup.gp_difficulty_raw_value != PRESERVE_GP_DIFFICULTY
+        && !(0..=3).contains(&setup.gp_difficulty_raw_value)
+    {
+        return Err(invalid_setup(format!(
+            "gp_difficulty_raw_value must be in [0, 3] or preserve sentinel {}, got {}",
+            PRESERVE_GP_DIFFICULTY, setup.gp_difficulty_raw_value
         )));
     }
     Ok(())

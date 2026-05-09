@@ -41,6 +41,7 @@ def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
+        gp_difficulty=variant.gp_difficulty,
     )
 
 
@@ -51,6 +52,7 @@ def _write_full_machine_settings(emulator: Emulator, variant: RaceStartVariant) 
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
+        gp_difficulty=variant.gp_difficulty,
     )
 
 

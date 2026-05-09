@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/runs/baseline_materializer/requests.py
 from __future__ import annotations
 
+from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, default_gp_difficulty
 from rl_fzerox.core.runtime_spec.schema import TrackConfig, TrackSamplingEntryConfig
 
 from .models import BaselineRequest
@@ -37,12 +38,14 @@ def request_from_track_config(
         course_name=track.course_name or track.display_name,
         course_index=track.course_index,
         mode=track.mode,
+        gp_difficulty=_request_gp_difficulty(track.mode, track.gp_difficulty),
         vehicle=track.vehicle,
         vehicle_name=track.vehicle_name,
         source_vehicle=track.source_vehicle,
         engine_setting=track.engine_setting,
         engine_setting_raw_value=track.engine_setting_raw_value,
         source_course_index=track.source_course_index,
+        source_gp_difficulty=track.source_gp_difficulty,
         source_engine_setting=track.source_engine_setting,
         source_engine_setting_raw_value=track.source_engine_setting_raw_value,
         camera_setting=camera_setting,
@@ -70,12 +73,14 @@ def request_from_track_entry(
         course_name=entry.course_name or entry.display_name,
         course_index=entry.course_index,
         mode=entry.mode,
+        gp_difficulty=_request_gp_difficulty(entry.mode, entry.gp_difficulty),
         vehicle=entry.vehicle,
         vehicle_name=entry.vehicle_name,
         source_vehicle=entry.source_vehicle,
         engine_setting=entry.engine_setting,
         engine_setting_raw_value=entry.engine_setting_raw_value,
         source_course_index=entry.source_course_index,
+        source_gp_difficulty=entry.source_gp_difficulty,
         source_engine_setting=entry.source_engine_setting,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
         camera_setting=camera_setting,
@@ -99,3 +104,12 @@ def _baseline_request_label(
     if course_part is None or vehicle_part is None or mode is None:
         return fallback_label
     return f"{course_part}_{mode}_{vehicle_part}"
+
+
+def _request_gp_difficulty(
+    mode: str | None,
+    gp_difficulty: RaceDifficultyName | None,
+) -> RaceDifficultyName | None:
+    if mode != "gp_race":
+        return None
+    return default_gp_difficulty() if gp_difficulty is None else gp_difficulty

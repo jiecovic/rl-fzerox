@@ -27,6 +27,12 @@ def retarget_gp_race_baseline(
         raise RuntimeError("gp baseline course mismatch; stale exact baseline")
     if selected_track.vehicle != selected_track.source_vehicle:
         raise RuntimeError("gp baseline vehicle mismatch; stale exact baseline")
+    if (
+        selected_track.gp_difficulty is not None
+        and selected_track.source_gp_difficulty is not None
+        and selected_track.gp_difficulty != selected_track.source_gp_difficulty
+    ):
+        raise RuntimeError("gp baseline difficulty mismatch; stale exact baseline")
 
     backend.patch_engine_settings(
         mode="gp_race",

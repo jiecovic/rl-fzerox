@@ -36,9 +36,14 @@ def entry_from_course_variant(
     engine_display_name = engine_setting_display_name(variant.engine_setting)
     course_id = optional_str(course.get("id")) or safe_id(course_ref)
     mode_id = safe_id(variant.mode)
+    difficulty_suffix = (
+        ""
+        if variant.gp_difficulty is None
+        else f"_{safe_id(variant.gp_difficulty)}"
+    )
 
     entry: dict[str, object] = {
-        "id": f"{course_id}_{mode_id}_{variant.vehicle}_{variant.engine_setting}",
+        "id": f"{course_id}_{mode_id}{difficulty_suffix}_{variant.vehicle}_{variant.engine_setting}",
         "display_name": (
             f"{course.get('display_name', course_id)} "
             f"{variant.mode.replace('_', ' ').title()} - "
@@ -49,6 +54,7 @@ def entry_from_course_variant(
         "course_name": course.get("display_name"),
         "course_index": course.get("course_index"),
         "mode": variant.mode,
+        "gp_difficulty": variant.gp_difficulty,
         "vehicle": variant.vehicle,
         "vehicle_name": vehicle_name,
         "engine_setting": variant.engine_setting,
@@ -84,12 +90,14 @@ def enrich_entry_with_registry_metadata(
                 "course_name",
                 "course_index",
                 "mode",
+                "gp_difficulty",
                 "vehicle",
                 "vehicle_name",
                 "source_vehicle",
                 "engine_setting",
                 "engine_setting_raw_value",
                 "source_course_index",
+                "source_gp_difficulty",
                 "source_engine_setting",
                 "source_engine_setting_raw_value",
                 "records",
@@ -117,6 +125,8 @@ def enrich_track_with_registry_metadata(
                 enriched.setdefault(target_key, course[source_key])
         if "course_index" in enriched:
             enriched.setdefault("source_course_index", enriched["course_index"])
+        if "gp_difficulty" in enriched:
+            enriched.setdefault("source_gp_difficulty", enriched["gp_difficulty"])
 
     vehicle = enriched.get("vehicle")
     if isinstance(vehicle, str) and vehicle:
