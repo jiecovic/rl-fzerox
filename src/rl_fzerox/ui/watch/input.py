@@ -37,6 +37,7 @@ class ViewerInput:
     panel_tab_index: int | None = None
     record_tab_index: int | None = None
     toggle_record_course_lock_id: str | None = None
+    toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
     control_state: ControllerState = ControllerState()
 
@@ -96,6 +97,7 @@ def _poll_viewer_input(
     panel_tab_index = None
     record_tab_index = None
     toggle_record_course_lock_id = None
+    toggle_current_course_lock = False
     toggle_zeroed_state_feature_name = None
 
     mouse_button_down = getattr(pygame, "MOUSEBUTTONDOWN", None)
@@ -152,6 +154,8 @@ def _poll_viewer_input(
                 reset_mode = "previous"
             elif event.key == pygame.K_t:
                 reset_mode = "next"
+            elif event.key == pygame.K_f:
+                toggle_current_course_lock = True
             elif event.key == pygame.K_d:
                 toggle_deterministic_policy = True
             elif event.key == pygame.K_m:
@@ -217,6 +221,7 @@ def _poll_viewer_input(
         panel_tab_index=panel_tab_index,
         record_tab_index=record_tab_index,
         toggle_record_course_lock_id=toggle_record_course_lock_id,
+        toggle_current_course_lock=toggle_current_course_lock,
         toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
         control_state=ControllerState(
             joypad_mask=manual_mask,

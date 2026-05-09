@@ -26,6 +26,7 @@ class ViewerCommand:
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
     toggle_track_course_lock_id: str | None = None
+    toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
     control_fps_delta: int = 0
     reset_control_fps: bool = False
@@ -46,6 +47,7 @@ class WorkerCommandBatch:
     toggle_deterministic_policy: bool
     manual_control_enabled: bool
     toggle_track_course_lock_id: str | None
+    toggle_current_course_lock: bool
     toggle_zeroed_state_feature_name: str | None
     control_fps_delta: int
     reset_control_fps: bool

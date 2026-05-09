@@ -239,6 +239,7 @@ def _run_simulation_loop(
                 )
                 cnn_visualization_enabled = commands.cnn_visualization_enabled
                 cnn_normalization = commands.cnn_normalization
+                lock_state_changed = False
                 if commands.quit_requested:
                     return
                 if commands.toggle_zeroed_state_feature_name is not None:
@@ -288,20 +289,81 @@ def _run_simulation_loop(
                         requested_course_id=commands.toggle_track_course_lock_id,
                     )
                     one_shot_reset_course_id = None
+                    _sync_locked_course_info(
+                        info=info,
+                        reset_info=reset_info,
+                        locked_reset_course_id=persistent_locked_reset_course_id,
+                    )
                     break
+                if commands.toggle_current_course_lock:
+                    current_course_id = _current_watch_course_id(info)
+                    if current_course_id is not None:
+                        persistent_locked_reset_course_id = _toggle_locked_reset_course(
+                            env,
+                            locked_reset_course_id=persistent_locked_reset_course_id,
+                            requested_course_id=current_course_id,
+                        )
+                        one_shot_reset_course_id = None
+                        _sync_locked_course_info(
+                            info=info,
+                            reset_info=reset_info,
+                            locked_reset_course_id=persistent_locked_reset_course_id,
+                        )
+                        lock_state_changed = True
                 if commands.reset_mode == "current":
                     one_shot_reset_course_id = _current_watch_course_id(info)
                     break
                 if commands.reset_mode == "previous":
-                    one_shot_reset_course_id = _adjacent_watch_course_id(
-                        current_course_id=_current_watch_course_id(info),
-                        ordered_course_ids=sequential_course_ids,
-                        offset=-1,
+                    persistent_locked_reset_course_id, one_shot_reset_course_id = (
+                        _advance_watch_reset_course(
+                            locked_reset_course_id=persistent_locked_reset_course_id,
+                            current_course_id=_current_watch_course_id(info),
+                            ordered_course_ids=sequential_course_ids,
+                            offset=-1,
+                        )
                     )
                     break
                 if commands.reset_mode == "next":
-                    one_shot_reset_course_id = None
+                    persistent_locked_reset_course_id, one_shot_reset_course_id = (
+                        _advance_watch_reset_course(
+                            locked_reset_course_id=persistent_locked_reset_course_id,
+                            current_course_id=_current_watch_course_id(info),
+                            ordered_course_ids=sequential_course_ids,
+                            offset=1,
+                        )
+                    )
                     break
+                if lock_state_changed:
+                    publish_worker_message(
+                        snapshot_queue,
+                        _build_snapshot(
+                            config=config,
+                            env=env,
+                            emulator=emulator,
+                            observation=observation,
+                            info=info,
+                            reset_info=reset_info,
+                            episode=episode,
+                            episode_reward=episode_reward,
+                            control_fps=control_rate.rate_hz(),
+                            target_control_fps=target_control_fps,
+                            control_state=current_control_state,
+                            gas_level=current_gas_level,
+                            boost_lamp_level=boost_lamp_level,
+                            action_mask_branches=committed_action_mask_branches,
+                            policy_action=current_policy_action,
+                            policy_runner=policy_runner,
+                            deterministic_policy=deterministic_policy,
+                            manual_control_enabled=manual_control_enabled,
+                            policy_reload_error=policy_reload_error,
+                            cnn_activations=cnn_activations,
+                            best_finish_position=best_finish_position,
+                            best_finish_times=best_finish_times,
+                            latest_finish_times=latest_finish_times,
+                            latest_finish_deltas_ms=latest_finish_deltas_ms,
+                            failed_track_attempts=failed_track_attempts,
+                        ),
+                    )
                 if commands.reset_control_fps:
                     target_control_fps = native_control_fps
                     target_control_seconds = _target_seconds(target_control_fps)
@@ -594,3 +656,35 @@ def _adjacent_watch_course_id(
         return current_course_id
     next_index = (current_index + offset) % len(ordered_course_ids)
     return ordered_course_ids[next_index]
+
+
+def _advance_watch_reset_course(
+    *,
+    locked_reset_course_id: str | None,
+    current_course_id: str | None,
+    ordered_course_ids: tuple[str, ...],
+    offset: int,
+) -> tuple[str | None, str | None]:
+    base_course_id = locked_reset_course_id or current_course_id
+    next_course_id = _adjacent_watch_course_id(
+        current_course_id=base_course_id,
+        ordered_course_ids=ordered_course_ids,
+        offset=offset,
+    )
+    if locked_reset_course_id is None:
+        return None, next_course_id
+    return next_course_id, None
+
+
+def _sync_locked_course_info(
+    *,
+    info: dict[str, object],
+    reset_info: dict[str, object],
+    locked_reset_course_id: str | None,
+) -> None:
+    if locked_reset_course_id is None:
+        info.pop("track_sampling_locked_course_id", None)
+        reset_info.pop("track_sampling_locked_course_id", None)
+        return
+    info["track_sampling_locked_course_id"] = locked_reset_course_id
+    reset_info["track_sampling_locked_course_id"] = locked_reset_course_id

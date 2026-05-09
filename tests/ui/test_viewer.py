@@ -47,6 +47,12 @@ def test_pressed_button_labels_are_human_readable() -> None:
     )
 
 
+def test_macro_legend_includes_toggle_anchor_hotkey() -> None:
+    hints = {hint.keys: hint.action for hint in MACRO_LEGEND_HINTS}
+
+    assert hints["F"] == "toggle anchor"
+
+
 def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
     assert (
         _game_course_overlay_label(
@@ -56,6 +62,20 @@ def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
             }
         )
         == "Joker Cup : Big Hand"
+    )
+
+
+def test_game_course_overlay_label_marks_locked_course_lightly() -> None:
+    assert (
+        _game_course_overlay_label(
+            {
+                "track_course_id": "big_hand",
+                "track_course_ref": "joker/big_hand",
+                "track_course_name": "Big Hand",
+            },
+            reset_info={"track_sampling_locked_course_id": "big_hand"},
+        )
+        == "> Joker Cup : Big Hand <"
     )
 
 
@@ -382,6 +402,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "R": (None, "same course"),
         "E": (None, "prev course"),
         "T": (None, "next course"),
+        "F": (None, "toggle anchor"),
         "K": (None, "save"),
         "M": (None, "manual"),
         "D": (None, "policy"),
