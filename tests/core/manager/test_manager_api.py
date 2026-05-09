@@ -4,13 +4,11 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from functools import partial
 from pathlib import Path
 from typing import Literal
 
 import httpx
 import pytest
-from anyio.from_thread import start_blocking_portal
 from fastapi import FastAPI
 
 import rl_fzerox.apps.run_manager.api.routes as manager_api_routes
@@ -21,6 +19,8 @@ from rl_fzerox.core.manager import (
     ManagerStore,
     default_managed_run_config,
 )
+
+pytestmark = pytest.mark.anyio
 
 
 class _LauncherStub:
@@ -73,7 +73,7 @@ class _ApiClient:
     def __init__(self, app: FastAPI) -> None:
         self._app = app
 
-    async def _request_async(
+    async def request(
         self,
         method: str,
         url: str,
@@ -95,31 +95,10 @@ class _ApiClient:
                 json=json,
             )
 
-    def request(
-        self,
-        method: str,
-        url: str,
-        *,
-        content: str | bytes | None = None,
-        headers: Mapping[str, str] | None = None,
-        json: object | None = None,
-    ) -> httpx.Response:
-        with start_blocking_portal() as portal:
-            return portal.call(
-                partial(
-                    self._request_async,
-                    method,
-                    url,
-                    content=content,
-                    headers=headers,
-                    json=json,
-                ),
-            )
+    async def get(self, url: str) -> httpx.Response:
+        return await self.request("GET", url)
 
-    def get(self, url: str) -> httpx.Response:
-        return self.request("GET", url)
-
-    def post(
+    async def post(
         self,
         url: str,
         *,
@@ -127,38 +106,38 @@ class _ApiClient:
         headers: Mapping[str, str] | None = None,
         json: object | None = None,
     ) -> httpx.Response:
-        return self.request("POST", url, content=content, headers=headers, json=json)
+        return await self.request("POST", url, content=content, headers=headers, json=json)
 
-    def put(self, url: str, *, json: object | None = None) -> httpx.Response:
-        return self.request("PUT", url, json=json)
+    async def put(self, url: str, *, json: object | None = None) -> httpx.Response:
+        return await self.request("PUT", url, json=json)
 
-    def delete(self, url: str, **kwargs: object) -> httpx.Response:
+    async def delete(self, url: str, **kwargs: object) -> httpx.Response:
         del kwargs
-        return self.request("DELETE", url)
+        return await self.request("DELETE", url)
 
 
-def test_manager_api_lists_default_template(tmp_path: Path) -> None:
+async def test_manager_api_lists_default_template(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    response = client.get("/api/templates")
+    response = await client.get("/api/templates")
 
     assert response.status_code == 200
     payload = response.json()
     assert payload["templates"][0]["id"] == "all_cups_recurrent_ppo"
 
 
-def test_manager_api_creates_draft(tmp_path: Path) -> None:
+async def test_manager_api_creates_draft(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
 
-    response = client.post("/api/drafts", json={"name": "Draft", "config": config})
+    response = await client.post("/api/drafts", json={"name": "Draft", "config": config})
 
     assert response.status_code == 201
     payload = response.json()
     assert payload["draft"]["name"] == "Draft"
 
 
-def test_manager_api_launches_run(tmp_path: Path) -> None:
+async def test_manager_api_launches_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
 
     class FakeLauncher(_LauncherStub):
@@ -191,7 +170,7 @@ def test_manager_api_launches_run(tmp_path: Path) -> None:
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
     config = default_managed_run_config().model_dump(mode="json")
 
-    response = client.post("/api/runs", json={"name": "Launch Me", "config": config})
+    response = await client.post("/api/runs", json={"name": "Launch Me", "config": config})
 
     assert response.status_code == 201
     payload = response.json()
@@ -199,7 +178,7 @@ def test_manager_api_launches_run(tmp_path: Path) -> None:
     assert payload["run"]["status"] == "running"
 
 
-def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> None:
+async def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
 
     class FakeLauncher(_LauncherStub):
@@ -232,10 +211,10 @@ def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> 
 
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
     config = default_managed_run_config().model_dump(mode="json")
-    draft_response = client.post("/api/drafts", json={"name": "Shared", "config": config})
+    draft_response = await client.post("/api/drafts", json={"name": "Shared", "config": config})
     draft_id = draft_response.json()["draft"]["id"]
 
-    response = client.post(
+    response = await client.post(
         "/api/runs",
         json={"name": "Shared", "config": config, "draft_id": draft_id},
     )
@@ -244,7 +223,7 @@ def test_manager_api_launch_allows_same_name_as_source_draft(tmp_path: Path) -> 
     assert response.json()["run"]["name"] == "Shared"
 
 
-def test_manager_api_forks_run(tmp_path: Path) -> None:
+async def test_manager_api_forks_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     parent = store.create_run(
         run_id="parent-run",
@@ -301,7 +280,7 @@ def test_manager_api_forks_run(tmp_path: Path) -> None:
 
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
 
-    response = client.post(f"/api/runs/{parent.id}/fork", json={"artifact": "best"})
+    response = await client.post(f"/api/runs/{parent.id}/fork", json={"artifact": "best"})
 
     assert response.status_code == 201
     payload = response.json()
@@ -311,7 +290,7 @@ def test_manager_api_forks_run(tmp_path: Path) -> None:
     assert payload["run"]["source_num_timesteps"] == 816040
 
 
-def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
+async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         run_id="run-with-track-pool",
@@ -372,7 +351,7 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
 
     client = _client(tmp_path, store=store)
 
-    response = client.get(f"/api/runs/{run.id}/track-sampling")
+    response = await client.get(f"/api/runs/{run.id}/track-sampling")
 
     assert response.status_code == 200
     payload = response.json()["state"]
@@ -386,7 +365,7 @@ def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) -> None:
     assert payload["entries"][0]["step_share"] == pytest.approx(0.6)
 
 
-def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path: Path) -> None:
+async def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         run_id="run-reset-track-pool",
@@ -406,14 +385,14 @@ def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path: Path)
     state_path.write_text("{}", encoding="utf-8")
 
     client = _client(tmp_path, store=store)
-    response = client.post(f"/api/runs/{run.id}/track-sampling/reset")
+    response = await client.post(f"/api/runs/{run.id}/track-sampling/reset")
 
     assert response.status_code == 200
     assert response.json() == {"reset": True}
     assert not state_path.exists()
 
 
-def test_manager_api_rejects_track_sampling_reset_while_running(tmp_path: Path) -> None:
+async def test_manager_api_rejects_track_sampling_reset_while_running(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         run_id="run-active-track-pool",
@@ -430,13 +409,13 @@ def test_manager_api_rejects_track_sampling_reset_while_running(tmp_path: Path) 
     )
 
     client = _client(tmp_path, store=store)
-    response = client.post(f"/api/runs/{run.id}/track-sampling/reset")
+    response = await client.post(f"/api/runs/{run.id}/track-sampling/reset")
 
     assert response.status_code == 400
     assert response.json()["error"] == "track-pool stats can only be reset while the run is stopped"
 
 
-def test_manager_api_deletes_lineage(tmp_path: Path) -> None:
+async def test_manager_api_deletes_lineage(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         run_id="root-run",
@@ -457,13 +436,13 @@ def test_manager_api_deletes_lineage(tmp_path: Path) -> None:
     )
 
     client = _client(tmp_path)
-    response = client.delete(f"/api/lineages/{run.lineage_id}")
+    response = await client.delete(f"/api/lineages/{run.lineage_id}")
 
     assert response.status_code == 200
     assert response.json() == {"deleted": True}
 
 
-def test_manager_api_metrics_full_mode_disables_recent_limit(
+async def test_manager_api_metrics_full_mode_disables_recent_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -506,17 +485,17 @@ def test_manager_api_metrics_full_mode_disables_recent_limit(
 
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
 
-    recent_response = client.get(f"/api/runs/{run.id}/metrics")
-    full_response = client.get(f"/api/runs/{run.id}/metrics?mode=full")
+    recent_response = await client.get(f"/api/runs/{run.id}/metrics")
+    full_response = await client.get(f"/api/runs/{run.id}/metrics?mode=full")
 
     assert recent_response.status_code == 200
     assert full_response.status_code == 200
     assert seen_limits == [240, None]
 
 
-def test_manager_api_updates_draft(tmp_path: Path) -> None:
+async def test_manager_api_updates_draft(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    create_response = client.post(
+    create_response = await client.post(
         "/api/drafts",
         json={"name": "Draft", "config": default_managed_run_config().model_dump(mode="json")},
     )
@@ -524,7 +503,7 @@ def test_manager_api_updates_draft(tmp_path: Path) -> None:
     updated_config = default_managed_run_config().model_dump(mode="json")
     updated_config["seed"] = 999
 
-    response = client.put(
+    response = await client.put(
         f"/api/drafts/{draft_id}",
         json={"name": "Updated draft", "config": updated_config},
     )
@@ -535,27 +514,27 @@ def test_manager_api_updates_draft(tmp_path: Path) -> None:
     assert payload["draft"]["config"]["seed"] == 999
 
 
-def test_manager_api_rejects_duplicate_draft_name(tmp_path: Path) -> None:
+async def test_manager_api_rejects_duplicate_draft_name(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
-    first_response = client.post("/api/drafts", json={"name": "Draft", "config": config})
+    first_response = await client.post("/api/drafts", json={"name": "Draft", "config": config})
 
-    response = client.post("/api/drafts", json={"name": "draft", "config": config})
+    response = await client.post("/api/drafts", json={"name": "draft", "config": config})
 
     assert first_response.status_code == 201
     assert response.status_code == 409
     assert response.json()["error"] == "name already exists: draft"
 
 
-def test_manager_api_rejects_renaming_draft_to_existing_name(tmp_path: Path) -> None:
+async def test_manager_api_rejects_renaming_draft_to_existing_name(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
-    first_draft_id = client.post("/api/drafts", json={"name": "Alpha", "config": config}).json()[
-        "draft"
-    ]["id"]
-    client.post("/api/drafts", json={"name": "Beta", "config": config})
+    first_draft_id = (
+        await client.post("/api/drafts", json={"name": "Alpha", "config": config})
+    ).json()["draft"]["id"]
+    await client.post("/api/drafts", json={"name": "Beta", "config": config})
 
-    response = client.put(
+    response = await client.put(
         f"/api/drafts/{first_draft_id}",
         json={"name": "beta", "config": config},
     )
@@ -564,7 +543,7 @@ def test_manager_api_rejects_renaming_draft_to_existing_name(tmp_path: Path) -> 
     assert response.json()["error"] == "name already exists: beta"
 
 
-def test_manager_api_allows_draft_name_matching_existing_run(tmp_path: Path) -> None:
+async def test_manager_api_allows_draft_name_matching_existing_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.create_run(
         name="Shared Name",
@@ -574,16 +553,16 @@ def test_manager_api_allows_draft_name_matching_existing_run(tmp_path: Path) -> 
     client = _ApiClient(create_manager_api_app(store))
     config = default_managed_run_config().model_dump(mode="json")
 
-    response = client.post("/api/drafts", json={"name": "Shared Name", "config": config})
+    response = await client.post("/api/drafts", json={"name": "Shared Name", "config": config})
 
     assert response.status_code == 201
     assert response.json()["draft"]["name"] == "Shared Name"
 
 
-def test_manager_api_rejects_invalid_json(tmp_path: Path) -> None:
+async def test_manager_api_rejects_invalid_json(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    response = client.post(
+    response = await client.post(
         "/api/drafts",
         content="{",
         headers={"content-type": "application/json"},
@@ -593,15 +572,15 @@ def test_manager_api_rejects_invalid_json(tmp_path: Path) -> None:
     assert "error" in response.json()
 
 
-def test_manager_api_rejects_missing_draft_delete(tmp_path: Path) -> None:
+async def test_manager_api_rejects_missing_draft_delete(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    response = client.delete("/api/drafts/missing-draft")
+    response = await client.delete("/api/drafts/missing-draft")
 
     assert response.status_code == 404
     assert response.json()["error"] == "draft not found"
 
-def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
+async def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.create_run(
         name="Created Only",
@@ -610,13 +589,13 @@ def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
     )
     client = _ApiClient(create_manager_api_app(store))
 
-    response = client.get("/api/runs")
+    response = await client.get("/api/runs")
 
     assert response.status_code == 200
     assert response.json() == {"runs": []}
 
 
-def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:
+async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         name="Running Run",
@@ -656,7 +635,7 @@ def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: 
     )
     client = _ApiClient(create_manager_api_app(store))
 
-    response = client.get("/api/runs")
+    response = await client.get("/api/runs")
 
     assert response.status_code == 200
     payload = response.json()
@@ -664,10 +643,10 @@ def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: 
     assert payload["runs"][0]["runtime"]["updated_at"] == runtime_updated_at
 
 
-def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
+async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    response = client.get("/api/config-metadata")
+    response = await client.get("/api/config-metadata")
 
     assert response.status_code == 200
     payload = response.json()
@@ -696,7 +675,7 @@ def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "raw" in lean_modes
 
 
-def test_manager_api_accepts_frontend_action_layouts_even_if_runtime_support_lags(
+async def test_manager_api_accepts_frontend_action_layouts_even_if_runtime_support_lags(
     tmp_path: Path,
 ) -> None:
     client = _client(tmp_path)
@@ -706,16 +685,16 @@ def test_manager_api_accepts_frontend_action_layouts_even_if_runtime_support_lag
     config["action"]["include_air_brake"] = False
     config["action"]["include_pitch"] = False
 
-    response = client.post("/api/drafts", json={"name": "Draft", "config": config})
+    response = await client.post("/api/drafts", json={"name": "Draft", "config": config})
 
     assert response.status_code == 201
 
 
-def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
+async def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -746,12 +725,12 @@ def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
     }
 
 
-def test_manager_api_previews_raw_state_fusion_without_state_mlp(tmp_path: Path) -> None:
+async def test_manager_api_previews_raw_state_fusion_without_state_mlp(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
     config["policy"]["state_net_arch"] = []
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -761,7 +740,7 @@ def test_manager_api_previews_raw_state_fusion_without_state_mlp(tmp_path: Path)
     assert state_mlp["tone"] == "muted"
 
 
-def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
+async def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
     config["policy"]["conv_profile"] = "custom"
@@ -771,7 +750,7 @@ def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
         {"out_channels": 48, "kernel_size": 3, "stride": 1, "padding": 1},
     ]
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -781,12 +760,14 @@ def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
     assert payload["conv_layers"][0]["output_width"] == 38
 
 
-def test_manager_api_preview_keeps_masked_branch_logits_but_marks_status(tmp_path: Path) -> None:
+async def test_manager_api_preview_keeps_masked_branch_logits_but_marks_status(
+    tmp_path: Path,
+) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
     config["action"]["enable_boost"] = False
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -798,12 +779,14 @@ def test_manager_api_preview_keeps_masked_branch_logits_but_marks_status(tmp_pat
     assert boost_branch["mask_label"] == "masked idle"
 
 
-def test_manager_api_preview_keeps_gas_head_but_marks_forced_full(tmp_path: Path) -> None:
+async def test_manager_api_preview_keeps_gas_head_but_marks_forced_full(
+    tmp_path: Path,
+) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
     config["action"]["force_full_throttle"] = True
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -816,12 +799,12 @@ def test_manager_api_preview_keeps_gas_head_but_marks_forced_full(tmp_path: Path
     assert throttle_branch["mask_label"] == "forced engaged"
 
 
-def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path: Path) -> None:
+async def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path: Path) -> None:
     client = _client(tmp_path)
     config = default_managed_run_config().model_dump(mode="json")
     config["action"]["include_boost"] = False
 
-    response = client.post("/api/policy-preview", json=config)
+    response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
@@ -832,4 +815,4 @@ def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path: Path)
 
 def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> _ApiClient:
     resolved_store = store or ManagerStore(tmp_path / "manager" / "runs.db")
-    return _ApiClient(create_manager_api_app(resolved_store))
+    return _ApiClient(create_manager_api_app(resolved_store, run_launcher=_LauncherStub()))
