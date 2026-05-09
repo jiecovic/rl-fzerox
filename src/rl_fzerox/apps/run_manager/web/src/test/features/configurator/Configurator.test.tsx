@@ -498,9 +498,7 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("checkbox", { name: "Boost enabled" }));
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeChecked();
-
-    await user.click(screen.getByRole("checkbox", { name: "Force full throttle" }));
-    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeDisabled();
   });
 
   it("lets you switch image features from auto to a custom width", async () => {
@@ -611,7 +609,7 @@ describe("Configurator", () => {
         name: configMetadataFixture.drive_modes[0].label,
       }),
     ).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
+    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).toBeEnabled();
   });
