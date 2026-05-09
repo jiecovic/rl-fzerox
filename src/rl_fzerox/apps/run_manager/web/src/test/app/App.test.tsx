@@ -168,16 +168,53 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
 
     expect(launchRunMock).not.toHaveBeenCalled();
+    expect(createDraftWithSourceMock).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Forked from/i)).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Run name" })).toHaveValue("ppo_test_1 fork");
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
+    expect(
+      screen.getByText("No drafts yet. Create one to open the configurator."),
+    ).toBeInTheDocument();
+  });
+
+  it("saves and launches an unsaved fork using its in-memory fork source", async () => {
+    const user = userEvent.setup();
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+    await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
+    await user.click(await screen.findByRole("button", { name: "Save draft" }));
+
     expect(createDraftWithSourceMock).toHaveBeenCalledWith(
       "ppo_test_1 fork",
       managedRunConfigFixture,
       "run-001",
       "latest",
     );
-    expect(await screen.findByText(/Forked from/i)).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Run name" })).toHaveValue("ppo_test_1 fork");
-    await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
-    expect(screen.getByRole("button", { name: /^ppo_test_1 fork/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    expect(launchRunMock).toHaveBeenCalledWith(
+      "ppo_test_1 fork",
+      managedRunConfigFixture,
+      "ppo_test_1 fork",
+      "run-001",
+      "latest",
+    );
   });
 
   it("creates a normal editable draft from a run without fork lineage", async () => {

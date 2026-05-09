@@ -96,11 +96,13 @@ export function LayerListField({
 }
 
 export function CustomConvTableRows({
+  disabled = false,
   flattenDim,
   previewLayers,
   value,
   onChange,
 }: {
+  disabled?: boolean;
   flattenDim: number;
   previewLayers: PolicyArchitecturePreview["conv_layers"];
   value: ManagedRunConfig["policy"]["custom_conv_layers"];
@@ -155,6 +157,7 @@ export function CustomConvTableRows({
                 <input
                   aria-label={`custom conv ${index + 1} output channels`}
                   className="custom-conv-table-input"
+                  disabled={disabled}
                   min={1}
                   step={1}
                   type="number"
@@ -169,6 +172,7 @@ export function CustomConvTableRows({
               <input
                 aria-label={`custom conv ${index + 1} kernel size`}
                 className="custom-conv-table-input"
+                disabled={disabled}
                 min={1}
                 step={1}
                 type="number"
@@ -182,6 +186,7 @@ export function CustomConvTableRows({
               <input
                 aria-label={`custom conv ${index + 1} stride`}
                 className="custom-conv-table-input"
+                disabled={disabled}
                 min={1}
                 step={1}
                 type="number"
@@ -193,6 +198,7 @@ export function CustomConvTableRows({
               <input
                 aria-label={`custom conv ${index + 1} padding`}
                 className="custom-conv-table-input"
+                disabled={disabled}
                 min={0}
                 step={1}
                 type="number"
@@ -209,8 +215,14 @@ export function CustomConvTableRows({
               <button
                 aria-label={`Remove custom conv layer ${index + 1}`}
                 className="field-reset-button tooltip-anchor"
-                data-tooltip={value.length <= 1 ? "Keep at least one layer" : "Remove layer"}
-                disabled={value.length <= 1}
+                data-tooltip={
+                  disabled
+                    ? "Forked checkpoints keep the original CNN extractor."
+                    : value.length <= 1
+                      ? "Keep at least one layer"
+                      : "Remove layer"
+                }
+                disabled={disabled || value.length <= 1}
                 type="button"
                 onClick={() => removeLayer(index)}
               >
@@ -225,6 +237,7 @@ export function CustomConvTableRows({
         <td colSpan={9}>
           <button
             className="secondary-button custom-conv-add-row-button"
+            disabled={disabled}
             type="button"
             onClick={addLayer}
           >
@@ -235,7 +248,10 @@ export function CustomConvTableRows({
           <button
             aria-label="Add custom conv layer"
             className="field-reset-button layer-add-button tooltip-anchor"
-            data-tooltip="Add layer"
+            data-tooltip={
+              disabled ? "Forked checkpoints keep the original CNN extractor." : "Add layer"
+            }
+            disabled={disabled}
             type="button"
             onClick={addLayer}
           >

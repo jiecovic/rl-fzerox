@@ -188,6 +188,33 @@ describe("Configurator", () => {
     expect(screen.queryByRole("button", { name: "Mute City" })).not.toBeInTheDocument();
   });
 
+  it("enables GP difficulty selection only in GP race mode", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Tracks" }));
+
+    const masterDifficulty = screen.getByRole("button", { name: "Master" });
+    expect(masterDifficulty).toHaveAttribute("aria-disabled", "true");
+
+    await user.click(screen.getByRole("button", { name: "GP Race" }));
+
+    expect(masterDifficulty).toHaveAttribute("aria-disabled", "false");
+    await user.click(masterDifficulty);
+    expect(masterDifficulty).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("supports pooled vehicle selection and random engine ranges in the vehicle tab", async () => {
     const user = userEvent.setup();
 
@@ -276,19 +303,30 @@ describe("Configurator", () => {
     const edgeRatioInput = within(trackPositionPanel).getByRole("spinbutton", {
       name: "Edge ratio episode dropout",
     });
-    expect(edgeRatioInput).toBeDisabled();
+    expect(edgeRatioInput).toBeEnabled();
     expect(edgeRatioInput).toHaveValue(1);
 
     const edgeRatioRow = within(trackPositionPanel).getByText("Edge ratio").closest("tr");
     if (!(edgeRatioRow instanceof HTMLTableRowElement)) {
       throw new Error("Missing edge ratio row");
     }
-    const edgeRatioToggle = within(edgeRatioRow).getByRole("checkbox", { name: "entry enabled" });
+    const edgeRatioIncludedToggle = within(edgeRatioRow).getByRole("checkbox", {
+      name: "use entry as policy input",
+    });
+    const edgeRatioValueToggle = within(edgeRatioRow).getByRole("checkbox", {
+      name: "Edge ratio uses real value",
+    });
 
-    await user.click(edgeRatioToggle);
+    expect(edgeRatioIncludedToggle).toBeEnabled();
+    expect(edgeRatioIncludedToggle).toBeChecked();
+    expect(edgeRatioValueToggle).toBeEnabled();
+    expect(edgeRatioValueToggle).not.toBeChecked();
+
+    await user.click(edgeRatioValueToggle);
 
     await waitFor(() => {
-      expect(edgeRatioInput).toBeEnabled();
+      expect(edgeRatioIncludedToggle).toBeChecked();
+      expect(edgeRatioValueToggle).toBeChecked();
       expect(edgeRatioInput).toHaveValue(0);
     });
 
@@ -298,18 +336,22 @@ describe("Configurator", () => {
 
     await waitFor(() => expect(edgeRatioInput).toHaveValue(0.25));
 
-    await user.click(edgeRatioToggle);
+    await user.clear(edgeRatioInput);
+    await user.type(edgeRatioInput, "1");
+    edgeRatioInput.blur();
 
     await waitFor(() => {
-      expect(edgeRatioInput).toBeDisabled();
+      expect(edgeRatioInput).toBeEnabled();
       expect(edgeRatioInput).toHaveValue(1);
+      expect(edgeRatioValueToggle).not.toBeChecked();
     });
 
-    await user.click(edgeRatioToggle);
+    await user.click(edgeRatioValueToggle);
 
     await waitFor(() => {
       expect(edgeRatioInput).toBeEnabled();
       expect(edgeRatioInput).toHaveValue(0);
+      expect(edgeRatioValueToggle).toBeChecked();
     });
   });
 
@@ -352,6 +394,118 @@ describe("Configurator", () => {
           observation: expect.objectContaining({
             state_feature_dropouts: expect.arrayContaining([
               { dropout_prob: 0.1, name: "track_position.lap_progress" },
+            ]),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("persists auxiliary state loss settings from the observation table", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="aux loss draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.click(screen.getByText("track position"));
+
+    const trackPositionPanel = screen.getByText("track position").closest("details");
+    if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing track position panel");
+    }
+
+    await user.click(
+      within(trackPositionPanel).getByRole("checkbox", {
+        name: "Edge ratio auxiliary loss enabled",
+      }),
+    );
+    const weightInput = within(trackPositionPanel).getByRole("spinbutton", {
+      name: "Edge ratio auxiliary loss weight",
+    });
+    await user.clear(weightInput);
+    await user.type(weightInput, "0.25");
+    await user.click(
+      within(trackPositionPanel).getByRole("checkbox", {
+        name: "grounded only",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "aux loss draft",
+        expect.objectContaining({
+          policy: expect.objectContaining({
+            auxiliary_state_enabled: true,
+            auxiliary_state_losses: expect.arrayContaining([
+              {
+                name: "track_position.edge_ratio",
+                weight: 0.25,
+                grounded_only: true,
+              },
+            ]),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("persists ground-height inclusion from the observation table", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="ground height draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.click(screen.getByText("track position"));
+
+    const groundHeightRow = screen.getByText("Ground height").closest("tr");
+    if (!(groundHeightRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing ground height row");
+    }
+
+    await user.click(
+      within(groundHeightRow).getByRole("checkbox", {
+        name: "use entry as policy input",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "ground height draft",
+        expect.objectContaining({
+          observation: expect.objectContaining({
+            state_components: expect.arrayContaining([
+              expect.objectContaining({
+                name: "track_position",
+                included_features: expect.arrayContaining([
+                  "track_position.height_above_ground_norm",
+                ]),
+              }),
             ]),
           }),
         }),
@@ -498,7 +652,7 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("checkbox", { name: "Boost enabled" }));
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
   });
 
   it("lets you switch image features from auto to a custom width", async () => {
@@ -539,6 +693,13 @@ describe("Configurator", () => {
   it("locks only checkpoint-incompatible fork controls", async () => {
     const user = userEvent.setup();
     const loadedDraft = draftFixture({
+      config: {
+        ...managedRunConfigFixture,
+        policy: {
+          ...managedRunConfigFixture.policy,
+          conv_profile: "custom",
+        },
+      },
       source_artifact: "latest",
       source_run_id: "run-001",
       source_num_timesteps: 123_456,
@@ -572,17 +733,26 @@ describe("Configurator", () => {
     if (!(gasRow instanceof HTMLTableRowElement)) {
       throw new Error("Missing gas row");
     }
-    const gasToggle = within(gasRow).getByRole("checkbox", { name: "entry enabled" });
-    expect(gasToggle).toBeEnabled();
+    const gasToggle = within(gasRow).getByRole("checkbox", {
+      name: "use entry as policy input",
+    });
+    expect(gasToggle).toBeDisabled();
     expect(gasToggle).toBeChecked();
-    await user.click(gasToggle);
-    expect(gasToggle).not.toBeChecked();
+    expect(
+      within(gasRow).getByRole("spinbutton", { name: "Gas at time t-1 episode dropout" }),
+    ).toBeEnabled();
+    expect(
+      within(gasRow).getByRole("checkbox", { name: "Gas at time t-1 uses real value" }),
+    ).toBeEnabled();
 
     await user.click(screen.getByText("track position"));
     const trackPositionPanel = screen.getByText("track position").closest("details");
     if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
       throw new Error("Missing track position panel");
     }
+    expect(
+      screen.getByRole("checkbox", { name: "auxiliary state supervision enabled" }),
+    ).toBeEnabled();
     const lapProgressRow = within(trackPositionPanel).getByText("Progress scalar").closest("tr");
     if (!(lapProgressRow instanceof HTMLTableRowElement)) {
       throw new Error("Missing lap progress row");
@@ -594,9 +764,22 @@ describe("Configurator", () => {
     expect(within(progressSourceGroup).getByRole("button", { name: "Lap segment" })).toHaveClass(
       "active",
     );
+    const edgeRatioAuxToggle = within(trackPositionPanel).getByRole("checkbox", {
+      name: "Edge ratio auxiliary loss enabled",
+    });
+    expect(edgeRatioAuxToggle).toBeEnabled();
+    const groundHeightRow = within(trackPositionPanel).getByText("Ground height").closest("tr");
+    if (!(groundHeightRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing ground height row");
+    }
+    expect(
+      within(groundHeightRow).getByRole("checkbox", { name: "use entry as policy input" }),
+    ).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Policy" }));
     expect(screen.getByRole("combobox", { name: "CNN profile" })).toBeDisabled();
+    expect(screen.getByLabelText("custom conv 1 output channels")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add custom conv layer" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Activation" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Action" }));
@@ -609,8 +792,48 @@ describe("Configurator", () => {
         name: configMetadataFixture.drive_modes[0].label,
       }),
     ).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
     expect(screen.getByRole("checkbox", { name: "Boost in output" })).toBeDisabled();
     expect(screen.getByRole("checkbox", { name: "Boost enabled" })).toBeEnabled();
+  });
+
+  it("locks checkpoint-incompatible controls before a fork draft is saved", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        forkSourceArtifact="latest"
+        forkSourceRunLabel="source run"
+        initialConfig={managedRunConfigFixture}
+        initialDraftName="source run fork"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    expect(screen.getByRole("combobox", { name: "Input resolution" })).toBeDisabled();
+
+    await user.click(screen.getByText("track position"));
+    const trackPositionPanel = screen.getByText("track position").closest("details");
+    if (!(trackPositionPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing track position panel");
+    }
+    const edgeRatioRow = within(trackPositionPanel).getByText("Edge ratio").closest("tr");
+    if (!(edgeRatioRow instanceof HTMLTableRowElement)) {
+      throw new Error("Missing edge ratio row");
+    }
+
+    expect(
+      within(edgeRatioRow).getByRole("checkbox", { name: "use entry as policy input" }),
+    ).toBeDisabled();
+    expect(
+      within(edgeRatioRow).getByRole("checkbox", { name: "Edge ratio uses real value" }),
+    ).toBeEnabled();
   });
 });

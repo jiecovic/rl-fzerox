@@ -296,6 +296,22 @@ export function RuntimeCards({
           className="dependent-fieldset action-runtime-fields"
           disabled={!action.include_pitch}
         >
+          <RangeNumberField
+            help="Neutral pitch band used by both pitch decoding and the grounded pitch penalty."
+            label="Pitch deadzone"
+            max={0.5}
+            min={0}
+            rangeStep={0.01}
+            resetValue={defaultAction.pitch_deadzone}
+            ticks={[
+              { label: "0", value: 0 },
+              { label: "0.1", value: 0.1 },
+              { label: "0.25", value: 0.25 },
+              { label: "0.5", value: 0.5 },
+            ]}
+            value={action.pitch_deadzone}
+            onChange={(value) => updateAction({ pitch_deadzone: value })}
+          />
           <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
             <div className="field-shell">
               <FieldLabel

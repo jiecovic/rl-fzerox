@@ -190,9 +190,12 @@ export function useWorkspaceActions({
           ? `${sourceRun.name} best fork`
           : `${sourceRun.name} fork`;
     const initialDraftName = nextAvailableDraftName(baseName, allKnownNames());
-    const draft = await createDraftWithSource(initialDraftName, sourceConfig, runId, artifact);
-    setDrafts((current) => upsertDraft(current, draft));
-    sessions.openDraft(draft);
+    sessions.createForkDraft({
+      artifact,
+      initialConfig: sourceConfig,
+      initialDraftName,
+      runId,
+    });
   }
 
   async function createDraftFromManagedRun(runId: string) {

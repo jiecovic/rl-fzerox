@@ -295,6 +295,24 @@
         "raw_value": 100
       }
     ],
+    "gp_difficulties": [
+      {
+        "label": "Novice",
+        "value": "novice"
+      },
+      {
+        "label": "Standard",
+        "value": "standard"
+      },
+      {
+        "label": "Expert",
+        "value": "expert"
+      },
+      {
+        "label": "Master",
+        "value": "master"
+      }
+    ],
     "lean_modes": [
       {
         "label": "Release cooldown",
@@ -430,41 +448,65 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.speed_norm",
+            "default_enabled": true,
             "high": 2.0,
             "low": 0.0,
             "name": "vehicle_state.speed_norm"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.energy_frac",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.energy_frac"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.reverse_active",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.reverse_active"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.airborne",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.airborne"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.boost_unlocked",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.boost_unlocked"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.boost_active",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.boost_active"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.lateral_velocity_norm",
+            "default_enabled": true,
             "high": 1.0,
             "low": -1.0,
             "name": "vehicle_state.lateral_velocity_norm"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "vehicle_state.sliding_active",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "vehicle_state.sliding_active"
@@ -476,26 +518,41 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "machine_context.body_stat"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "machine_context.boost_stat"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "machine_context.grip_stat"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "machine_context.weight"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "machine_context.engine"
@@ -507,19 +564,36 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "track_position.lap_progress",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "track_position.lap_progress"
           },
           {
+            "auxiliary_supports_grounded_only": true,
+            "auxiliary_target_name": "track_position.edge_ratio",
+            "default_enabled": true,
             "high": 1.0,
             "low": -1.0,
             "name": "track_position.edge_ratio"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "track_position.outside_track_bounds",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "track_position.outside_track_bounds"
+          },
+          {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "track_position.height_above_ground_norm",
+            "default_enabled": false,
+            "high": 1.0,
+            "low": 0.0,
+            "name": "track_position.height_above_ground_norm"
           }
         ],
         "label": "track position",
@@ -528,16 +602,25 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "surface_state.on_refill_surface",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "surface_state.on_refill_surface"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "surface_state.on_dirt_surface",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "surface_state.on_dirt_surface"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "surface_state.on_ice_surface",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "surface_state.on_ice_surface"
@@ -549,121 +632,193 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_00"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_01"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_02"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_03"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_04"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_05"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_06"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_07"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_08"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_09"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_10"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_11"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_12"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_13"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_14"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_15"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_16"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_17"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_18"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_19"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_20"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_21"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_22"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": "course_context.builtin_course_id",
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "course_context.course_builtin_23"
@@ -675,31 +830,49 @@
       {
         "features": [
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": -1.0,
             "name": "control_history.prev_steer_1"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "control_history.prev_thrust_1"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "control_history.prev_air_brake_1"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": 0.0,
             "name": "control_history.prev_boost_1"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": -1.0,
             "name": "control_history.prev_lean_1"
           },
           {
+            "auxiliary_supports_grounded_only": false,
+            "auxiliary_target_name": null,
+            "default_enabled": true,
             "high": 1.0,
             "low": -1.0,
             "name": "control_history.prev_pitch_1"
@@ -1064,6 +1237,7 @@
       "lean_unmask_min_speed_kph": null,
       "mask_air_brake_on_ground": false,
       "pitch_buckets": 5,
+      "pitch_deadzone": 0.1,
       "pitch_mode": "discrete",
       "steer_buckets": 7,
       "steering_mode": "continuous"
@@ -1087,6 +1261,7 @@
         {
           "controls": null,
           "encoding": null,
+          "included_features": null,
           "length": null,
           "name": "vehicle_state",
           "progress_source": null
@@ -1094,6 +1269,7 @@
         {
           "controls": null,
           "encoding": null,
+          "included_features": null,
           "length": null,
           "name": "machine_context",
           "progress_source": null
@@ -1101,6 +1277,7 @@
         {
           "controls": null,
           "encoding": null,
+          "included_features": null,
           "length": null,
           "name": "track_position",
           "progress_source": "segment_progress"
@@ -1108,6 +1285,7 @@
         {
           "controls": null,
           "encoding": null,
+          "included_features": null,
           "length": null,
           "name": "surface_state",
           "progress_source": null
@@ -1115,6 +1293,7 @@
         {
           "controls": null,
           "encoding": "one_hot_builtin",
+          "included_features": null,
           "length": null,
           "name": "course_context",
           "progress_source": null
@@ -1122,6 +1301,7 @@
         {
           "controls": ["steer", "thrust", "air_brake", "boost", "lean", "pitch"],
           "encoding": null,
+          "included_features": null,
           "length": 1,
           "name": "control_history",
           "progress_source": null
@@ -1140,6 +1320,9 @@
     },
     "policy": {
       "activation": "relu",
+      "auxiliary_state_enabled": false,
+      "auxiliary_state_head_arch": [128],
+      "auxiliary_state_losses": [],
       "conv_profile": "nature",
       "custom_conv_layers": [
         {
@@ -1178,7 +1361,6 @@
     "reward": {
       "air_brake_request_penalty": 0.0,
       "airborne_landing_reward": 1.0,
-      "airborne_pitch_up_penalty": -0.2,
       "boost_pad_reward": 10.0,
       "boost_pad_reward_progress_window": 800.0,
       "collision_recoil_penalty": -4.0,
@@ -1191,7 +1373,6 @@
       "energy_refill_collision_cooldown_frames": 120,
       "energy_refill_progress_multiplier": 3.0,
       "failure_penalty": -30.0,
-      "grounded_pitch_deadzone": 0.1,
       "grounded_pitch_penalty": 0.0,
       "ice_entry_penalty": 0.0,
       "ice_progress_multiplier": 1.0,
@@ -1357,17 +1538,17 @@
         "label": "State branch",
         "nodes": [
           {
-            "detail": "49 scalars",
+            "detail": "50 scalars",
             "id": "state",
             "label": "State vector",
             "params": null,
             "tone": "normal"
           },
           {
-            "detail": "49 \u2192 [64]",
+            "detail": "50 \u2192 [64]",
             "id": "state_mlp",
             "label": "State MLP",
-            "params": 3200,
+            "params": 3264,
             "tone": "normal"
           }
         ]
@@ -1504,7 +1685,7 @@
       },
       {
         "name": "State MLP",
-        "params": 3200
+        "params": 3264
       },
       {
         "name": "Fusion",
@@ -1528,7 +1709,7 @@
       }
     ],
     "policy_input_dim": 256,
-    "state_dim": 49,
+    "state_dim": 50,
     "state_features": [
       {
         "component": "vehicle_state",
@@ -1609,6 +1790,11 @@
         "component": "track_position",
         "dropout_prob": 1.0,
         "name": "track_position.outside_track_bounds"
+      },
+      {
+        "component": "track_position",
+        "dropout_prob": 0.0,
+        "name": "track_position.height_above_ground_norm"
       },
       {
         "component": "surface_state",
@@ -1777,6 +1963,6 @@
       }
     ],
     "state_features_dim": 64,
-    "total_params": 3617072
+    "total_params": 3617136
   }
 }

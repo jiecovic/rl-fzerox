@@ -10,11 +10,13 @@ import { CustomConvTableRows } from "@/features/configurator/sections/policy/Lay
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 
 export function PolicyPreviewPanel({
+  checkpointLocked = false,
   convProfile,
   customConvLayers,
   preview,
   setCustomConvLayers,
 }: {
+  checkpointLocked?: boolean;
   convProfile: ManagedRunConfig["policy"]["conv_profile"];
   customConvLayers: ManagedRunConfig["policy"]["custom_conv_layers"];
   preview: PolicyArchitecturePreview | null;
@@ -66,6 +68,7 @@ export function PolicyPreviewPanel({
           <tbody>
             {convProfile === "custom" ? (
               <CustomConvTableRows
+                disabled={checkpointLocked}
                 flattenDim={preview.flatten_dim}
                 previewLayers={preview.conv_layers}
                 value={customConvLayers}

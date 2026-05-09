@@ -54,10 +54,8 @@ export function energyDefaults(reward: RewardConfig): RewardPatch {
 export function actionDefaults(reward: RewardConfig): RewardPatch {
   return {
     air_brake_request_penalty: reward.air_brake_request_penalty,
-    airborne_pitch_up_penalty: reward.airborne_pitch_up_penalty,
     boost_pad_reward: reward.boost_pad_reward,
     boost_pad_reward_progress_window: reward.boost_pad_reward_progress_window,
-    grounded_pitch_deadzone: reward.grounded_pitch_deadzone,
     grounded_pitch_penalty: reward.grounded_pitch_penalty,
     lean_request_penalty: reward.lean_request_penalty,
     manual_boost_reward: reward.manual_boost_reward,

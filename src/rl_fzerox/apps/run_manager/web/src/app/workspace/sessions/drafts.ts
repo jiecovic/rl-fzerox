@@ -25,9 +25,13 @@ export function openDraftSession(current: DraftEditorSession[], draft: ManagedDr
 export function createDraftSession(
   current: DraftEditorSession[],
   {
+    forkSource = null,
+    initialConfig = null,
     initialDraftName,
     sessionId,
   }: {
+    forkSource?: DraftEditorSession["forkSource"];
+    initialConfig?: DraftEditorSession["initialConfig"];
     initialDraftName: string;
     sessionId: DraftEditorSession["sessionId"];
   },
@@ -36,9 +40,9 @@ export function createDraftSession(
     ...current,
     {
       draftId: null,
-      forkSource: null,
+      forkSource,
       initialDraftName,
-      initialConfig: null,
+      initialConfig,
       loadedDraft: null,
       sessionId,
       title: initialDraftName,

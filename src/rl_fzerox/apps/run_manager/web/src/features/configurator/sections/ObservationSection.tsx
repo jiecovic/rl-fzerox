@@ -33,6 +33,9 @@ export function ObservationSection({
   const updateObservation = (patch: Partial<ManagedRunConfig["observation"]>) => {
     setConfig({ ...config, observation: { ...config.observation, ...patch } });
   };
+  const updatePolicy = (patch: Partial<ManagedRunConfig["policy"]>) => {
+    setConfig({ ...config, policy: { ...config.policy, ...patch } });
+  };
   const stackModeOptions = metadata.stack_modes.map(
     (option) => option.value,
   ) as ManagedRunConfig["observation"]["stack_mode"][];
@@ -236,6 +239,7 @@ export function ObservationSection({
           defaultConfig={defaultConfig}
           metadata={metadata}
           updateObservation={updateObservation}
+          updatePolicy={updatePolicy}
         />
       </ConfigPanel>
     </div>
