@@ -89,7 +89,7 @@ def test_observation_extractor_accepts_large_preset() -> None:
     assert tuple(features.shape) == (2, 512)
 
 
-def test_observation_extractor_auto_features_dim_uses_large_deep_flatten() -> None:
+def test_observation_extractor_auto_features_dim_uses_large_nature_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(116, 164, 12), dtype=np.uint8),
         features_dim="auto",
@@ -100,11 +100,11 @@ def test_observation_extractor_auto_features_dim_uses_large_deep_flatten() -> No
 
     assert extractor.features_dim == extractor._flatten_dim
     assert isinstance(extractor._linear, torch.nn.Identity)
-    assert extractor._flatten_dim == 3_584
+    assert extractor._flatten_dim == 11_968
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
-def test_observation_extractor_auto_features_dim_uses_compact_deep_flatten() -> None:
+def test_observation_extractor_auto_features_dim_uses_wide_nature_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(98, 130, 9), dtype=np.uint8),
         features_dim="auto",
@@ -115,22 +115,22 @@ def test_observation_extractor_auto_features_dim_uses_compact_deep_flatten() -> 
 
     assert extractor.features_dim == extractor._flatten_dim
     assert isinstance(extractor._linear, torch.nn.Identity)
-    assert extractor._flatten_dim == 3_072
+    assert extractor._flatten_dim == 6_144
     assert tuple(features.shape) == (2, extractor._flatten_dim)
 
 
-def test_observation_extractor_compact_deep_profile_can_override_small_geometry() -> None:
+def test_observation_extractor_nature_profile_supports_wide_68x108_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(84, 116, 9), dtype=np.uint8),
+        spaces.Box(low=0, high=255, shape=(68, 108, 9), dtype=np.uint8),
         features_dim="auto",
-        conv_profile="compact_deep",
+        conv_profile="nature",
     )
 
-    observations = torch.zeros((2, 84, 116, 9), dtype=torch.float32)
+    observations = torch.zeros((2, 68, 108, 9), dtype=torch.float32)
     features = extractor(observations)
 
-    assert extractor._flatten_dim == 1_920
-    assert tuple(features.shape) == (2, 1_920)
+    assert extractor._flatten_dim == 3_200
+    assert tuple(features.shape) == (2, 3_200)
 
 
 def test_observation_extractor_nature_profile_supports_square_dqn_geometry() -> None:
@@ -159,37 +159,6 @@ def test_observation_extractor_nature_profile_supports_compact_aspect_geometry()
 
     assert extractor._flatten_dim == 3_456
     assert tuple(features.shape) == (2, 3_456)
-
-
-def test_observation_extractor_nature_wide_doubles_nature_channels() -> None:
-    extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(60, 76, 5), dtype=np.uint8),
-        features_dim="auto",
-        conv_profile="nature_wide",
-    )
-
-    observations = torch.zeros((2, 60, 76, 5), dtype=torch.float32)
-    features = extractor(observations)
-
-    assert extractor._flatten_dim == 3_072
-    assert tuple(features.shape) == (2, 3_072)
-
-
-def test_observation_extractor_nature_32_64_128_widens_only_final_conv() -> None:
-    extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(60, 76, 12), dtype=np.uint8),
-        features_dim="auto",
-        conv_profile="nature_32_64_128",
-    )
-
-    observations = torch.zeros((2, 60, 76, 12), dtype=torch.float32)
-    features = extractor(observations)
-
-    assert extractor._flatten_dim == 3_072
-    assert tuple(features.shape) == (2, 3_072)
-    assert [
-        module.out_channels for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)
-    ] == [32, 64, 128]
 
 
 def test_observation_extractor_custom_profile_uses_configured_layers() -> None:
@@ -250,7 +219,7 @@ def test_observation_extractor_reports_convolution_activations() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(60, 76, 5), dtype=np.uint8),
         features_dim="auto",
-        conv_profile="nature_wide",
+        conv_profile="nature",
     )
 
     activations = extractor.convolution_activations(
@@ -258,41 +227,13 @@ def test_observation_extractor_reports_convolution_activations() -> None:
     )
 
     assert [(name, tuple(values.shape)) for name, values in activations] == [
-        ("conv1", (1, 64, 14, 18)),
-        ("conv2", (1, 128, 6, 8)),
-        ("conv3", (1, 128, 4, 6)),
+        ("conv1", (1, 32, 14, 18)),
+        ("conv2", (1, 64, 6, 8)),
+        ("conv3", (1, 64, 4, 6)),
     ]
 
 
-def test_observation_extractor_nature_extra_k3_compresses_aspect_geometry() -> None:
-    extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(84, 116, 13), dtype=np.uint8),
-        features_dim="auto",
-        conv_profile="nature_extra_k3",
-    )
-
-    observations = torch.zeros((2, 84, 116, 13), dtype=torch.float32)
-    features = extractor(observations)
-
-    assert extractor._flatten_dim == 2_880
-    assert tuple(features.shape) == (2, 2_880)
-
-
-def test_observation_extractor_compact_bottleneck_profile_uses_compact_input() -> None:
-    extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(98, 130, 6), dtype=np.uint8),
-        features_dim="auto",
-        conv_profile="compact_bottleneck",
-    )
-
-    observations = torch.zeros((2, 98, 130, 6), dtype=torch.float32)
-    features = extractor(observations)
-
-    assert extractor._flatten_dim == 768
-    assert tuple(features.shape) == (2, 768)
-
-
-def test_observation_extractor_compact_deep_supports_tiny_geometry() -> None:
+def test_observation_extractor_nature_profile_supports_66x82_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(66, 82, 6), dtype=np.uint8),
         features_dim="auto",
@@ -301,8 +242,8 @@ def test_observation_extractor_compact_deep_supports_tiny_geometry() -> None:
     observations = torch.zeros((2, 66, 82, 6), dtype=torch.float32)
     features = extractor(observations)
 
-    assert extractor._flatten_dim == 768
-    assert tuple(features.shape) == (2, 768)
+    assert extractor._flatten_dim == 1_536
+    assert tuple(features.shape) == (2, 1_536)
 
 
 def test_observation_extractor_nature_profile_supports_clean_compact_aspect_geometry() -> None:
@@ -329,20 +270,6 @@ def test_observation_extractor_nature_profile_supports_clean_square_geometry() -
 
     assert extractor._flatten_dim == 1_600
     assert tuple(features.shape) == (2, 1_600)
-
-
-def test_observation_extractor_tiny_256_profile_uses_square_geometry() -> None:
-    extractor = FZeroXObservationCnnExtractor(
-        spaces.Box(low=0, high=255, shape=(64, 64, 5), dtype=np.uint8),
-        features_dim="auto",
-        conv_profile="tiny_256",
-    )
-
-    observations = torch.zeros((2, 64, 64, 5), dtype=torch.float32)
-    features = extractor(observations)
-
-    assert extractor._flatten_dim == 256
-    assert tuple(features.shape) == (2, 256)
 
 
 def test_image_state_extractor_concatenates_cnn_and_state_features() -> None:
@@ -403,7 +330,6 @@ def test_image_state_extractor_can_layer_norm_fused_features() -> None:
         ),
         features_dim="auto",
         state_features_dim=64,
-        conv_profile="compact_deep",
         layer_norm=True,
     )
 
@@ -414,8 +340,8 @@ def test_image_state_extractor_can_layer_norm_fused_features() -> None:
         }
     )
 
-    assert extractor.features_dim == 832
-    assert tuple(features.shape) == (2, 832)
+    assert extractor.features_dim == 1_600
+    assert tuple(features.shape) == (2, 1_600)
     assert isinstance(extractor._layer_norm, torch.nn.LayerNorm)
 
 
@@ -438,29 +364,28 @@ def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_b
         }
     )
 
-    assert extractor.features_dim == 3_648
-    assert tuple(features.shape) == (2, 3_648)
+    assert extractor.features_dim == 12_032
+    assert tuple(features.shape) == (2, 12_032)
 
 
-def test_image_state_extractor_auto_features_dim_respects_conv_profile() -> None:
+def test_image_state_extractor_auto_features_dim_supports_68x108_geometry() -> None:
     extractor = FZeroXImageStateExtractor(
         spaces.Dict(
             {
-                "image": spaces.Box(low=0, high=255, shape=(98, 130, 9), dtype=np.uint8),
+                "image": spaces.Box(low=0, high=255, shape=(68, 108, 9), dtype=np.uint8),
                 "state": spaces.Box(low=0.0, high=1.0, shape=(14,), dtype=np.float32),
             }
         ),
         features_dim="auto",
         state_features_dim=32,
-        conv_profile="compact_deep",
     )
 
     features = extractor(
         {
-            "image": torch.zeros((2, 98, 130, 9), dtype=torch.float32),
+            "image": torch.zeros((2, 68, 108, 9), dtype=torch.float32),
             "state": torch.zeros((2, 14), dtype=torch.float32),
         }
     )
 
-    assert extractor.features_dim == 3_104
-    assert tuple(features.shape) == (2, 3_104)
+    assert extractor.features_dim == 3_232
+    assert tuple(features.shape) == (2, 3_232)

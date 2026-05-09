@@ -106,14 +106,7 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         ),
         conv_profiles=_options(
             (
-                "auto",
                 "nature",
-                "nature_32_64_128",
-                "nature_wide",
-                "nature_extra_k3",
-                "compact_deep",
-                "compact_bottleneck",
-                "tiny_256",
                 "custom",
             )
         ),

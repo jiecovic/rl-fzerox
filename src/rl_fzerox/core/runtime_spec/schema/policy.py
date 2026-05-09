@@ -29,16 +29,9 @@ class ExtractorConfig(BaseModel):
         padding: int = Field(default=0, ge=0)
 
     conv_profile: Literal[
-        "auto",
         "nature",
-        "nature_32_64_128",
-        "nature_wide",
-        "nature_extra_k3",
-        "compact_deep",
-        "compact_bottleneck",
-        "tiny_256",
         "custom",
-    ] = "auto"
+    ] = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = ()
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64

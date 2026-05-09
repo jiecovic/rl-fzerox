@@ -672,7 +672,8 @@ def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.json()
     assert "crop_60x76" in {preset["value"] for preset in payload["observation_presets"]}
-    assert "nature_32_64_128" in {profile["value"] for profile in payload["conv_profiles"]}
+    assert "crop_68x108" in {preset["value"] for preset in payload["observation_presets"]}
+    assert "nature" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "x_cup" in {mode["value"] for mode in payload["track_pool_modes"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}

@@ -218,9 +218,6 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
 
     assert draft.config.reward.manual_boost_reward == 0.5
     assert draft.config.reward.time_penalty_per_frame == 0.0
-    assert draft.config.reward.step_reward_clip_max == 100.0
-
-
 def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()

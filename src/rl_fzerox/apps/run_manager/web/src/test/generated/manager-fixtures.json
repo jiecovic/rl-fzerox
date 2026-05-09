@@ -260,36 +260,8 @@
     ],
     "conv_profiles": [
       {
-        "label": "auto",
-        "value": "auto"
-      },
-      {
         "label": "nature",
         "value": "nature"
-      },
-      {
-        "label": "nature 32 64 128",
-        "value": "nature_32_64_128"
-      },
-      {
-        "label": "nature wide",
-        "value": "nature_wide"
-      },
-      {
-        "label": "nature extra k3",
-        "value": "nature_extra_k3"
-      },
-      {
-        "label": "compact deep",
-        "value": "compact_deep"
-      },
-      {
-        "label": "compact bottleneck",
-        "value": "compact_bottleneck"
-      },
-      {
-        "label": "tiny 256",
-        "value": "tiny_256"
       },
       {
         "label": "custom",
@@ -375,6 +347,12 @@
         "label": "60 x 76",
         "value": "crop_60x76",
         "width": 76
+      },
+      {
+        "height": 68,
+        "label": "68 x 108",
+        "value": "crop_68x108",
+        "width": 108
       },
       {
         "height": 84,
@@ -1162,7 +1140,7 @@
     },
     "policy": {
       "activation": "relu",
-      "conv_profile": "nature_32_64_128",
+      "conv_profile": "nature",
       "custom_conv_layers": [
         {
           "kernel_size": 8,
@@ -1359,14 +1337,14 @@
             "tone": "normal"
           },
           {
-            "detail": "nature_32_64_128 \u2192 3072",
+            "detail": "nature \u2192 1536",
             "id": "cnn",
             "label": "CNN",
-            "params": 119008,
+            "params": 82080,
             "tone": "normal"
           },
           {
-            "detail": "identity 3072",
+            "detail": "identity 1536",
             "id": "image_projection",
             "label": "Image projection",
             "params": 0,
@@ -1399,17 +1377,17 @@
         "label": "Fusion and heads",
         "nodes": [
           {
-            "detail": "3136",
+            "detail": "1600",
             "id": "concat",
             "label": "Concat",
             "params": null,
             "tone": "normal"
           },
           {
-            "detail": "3136 \u2192 768",
+            "detail": "1600 \u2192 768",
             "id": "fusion",
             "label": "Fusion MLP",
-            "params": 2409216,
+            "params": 1229568,
             "tone": "normal"
           },
           {
@@ -1497,19 +1475,19 @@
         "input_width": 8,
         "kernel_size": 3,
         "name": "conv3",
-        "out_channels": 128,
+        "out_channels": 64,
         "output_height": 4,
         "output_width": 6,
         "padding": 0,
-        "params": 73856,
+        "params": 36928,
         "stride": 1
       }
     ],
     "discrete_action_logits": 14,
     "extractor_output_dim": 768,
-    "flatten_dim": 3072,
-    "fusion_input_dim": 3136,
-    "image_features_dim": 3072,
+    "flatten_dim": 1536,
+    "fusion_input_dim": 1600,
+    "image_features_dim": 1536,
     "image_shape": {
       "channels": 6,
       "height": 60,
@@ -1518,7 +1496,7 @@
     "parameter_groups": [
       {
         "name": "CNN convolutions",
-        "params": 119008
+        "params": 82080
       },
       {
         "name": "Image projection",
@@ -1530,7 +1508,7 @@
       },
       {
         "name": "Fusion",
-        "params": 2409216
+        "params": 1229568
       },
       {
         "name": "LayerNorm",
@@ -1799,6 +1777,6 @@
       }
     ],
     "state_features_dim": 64,
-    "total_params": 4833648
+    "total_params": 3617072
   }
 }

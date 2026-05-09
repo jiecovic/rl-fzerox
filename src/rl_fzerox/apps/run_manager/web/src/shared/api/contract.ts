@@ -3,7 +3,7 @@ import { z } from "zod";
 
 const runStatusSchema = z.enum(["created", "running", "paused", "stopped", "finished", "failed"]);
 const runCommandSchema = z.enum(["pause", "stop"]);
-const observationPresetSchema = z.enum(["crop_60x76", "crop_84x84"]);
+const observationPresetSchema = z.enum(["crop_60x76", "crop_68x108", "crop_84x84"]);
 const observationResolutionModeSchema = z.enum(["preset", "custom"]);
 const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
@@ -32,17 +32,7 @@ const actionHistoryControlSchema = z.enum([
   "lean",
   "pitch",
 ]);
-const convProfileSchema = z.enum([
-  "auto",
-  "nature",
-  "nature_32_64_128",
-  "nature_wide",
-  "nature_extra_k3",
-  "compact_deep",
-  "compact_bottleneck",
-  "tiny_256",
-  "custom",
-]);
+const convProfileSchema = z.enum(["nature", "custom"]);
 
 const customConvLayerSchema = z.object({
   out_channels: z.number().int().positive(),

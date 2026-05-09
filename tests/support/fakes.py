@@ -660,6 +660,7 @@ class SyntheticBackend:
 def _canonical_observation_preset(preset: str) -> ObservationPresetName | None:
     aliases: dict[str, ObservationPresetName] = {
         "crop_60x76": "crop_60x76",
+        "crop_68x108": "crop_68x108",
         "crop_84x84": "crop_84x84",
     }
     return aliases.get(preset)

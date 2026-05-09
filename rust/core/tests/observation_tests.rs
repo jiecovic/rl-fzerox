@@ -40,7 +40,7 @@ fn gliden64_crop_resolves_to_half_size_watch_display() {
 }
 
 #[test]
-fn crop_98x130_resolves_to_compact_deep_geometry() {
+fn crop_98x130_resolves_to_wide_legacy_geometry() {
     let spec = ObservationPreset::Crop98x130
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_98x130 should resolve");
@@ -67,6 +67,16 @@ fn crop_60x76_resolves_to_compact_aspect_geometry() {
 
     assert_eq!(spec.layout_name, "crop_60x76");
     assert_eq!((spec.frame_width, spec.frame_height), (76, 60));
+}
+
+#[test]
+fn crop_68x108_resolves_to_wide_nature_geometry() {
+    let spec = ObservationPreset::Crop68x108
+        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+        .expect("crop_68x108 should resolve");
+
+    assert_eq!(spec.layout_name, "crop_68x108");
+    assert_eq!((spec.frame_width, spec.frame_height), (108, 68));
 }
 
 #[test]
