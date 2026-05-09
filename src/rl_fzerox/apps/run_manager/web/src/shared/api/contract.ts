@@ -7,6 +7,7 @@ const observationPresetSchema = z.enum(["crop_60x76", "crop_68x108", "crop_84x84
 const observationResolutionModeSchema = z.enum(["preset", "custom"]);
 const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
+const gpDifficultySchema = z.enum(["novice", "standard", "expert", "master"]);
 const trackSamplingModeSchema = z.enum(["equal", "step_balanced"]);
 const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 const engineSettingModeSchema = z.enum(["fixed", "random_range"]);
@@ -33,6 +34,24 @@ const actionHistoryControlSchema = z.enum([
   "pitch",
 ]);
 const convProfileSchema = z.enum(["nature", "custom"]);
+const auxiliaryStateTargetNameSchema = z.enum([
+  "vehicle_state.speed_norm",
+  "vehicle_state.energy_frac",
+  "vehicle_state.reverse_active",
+  "vehicle_state.airborne",
+  "vehicle_state.boost_unlocked",
+  "vehicle_state.boost_active",
+  "vehicle_state.lateral_velocity_norm",
+  "vehicle_state.sliding_active",
+  "track_position.lap_progress",
+  "track_position.edge_ratio",
+  "track_position.height_above_ground_norm",
+  "track_position.outside_track_bounds",
+  "surface_state.on_refill_surface",
+  "surface_state.on_dirt_surface",
+  "surface_state.on_ice_surface",
+  "course_context.builtin_course_id",
+]);
 
 const customConvLayerSchema = z.object({
   out_channels: z.number().int().positive(),
@@ -68,6 +87,7 @@ const trainConfigSchema = z.object({
 const tracksConfigSchema = z.object({
   pool_mode: trackPoolModeSchema,
   race_mode: raceModeSchema,
+  gp_difficulty: gpDifficultySchema.nullable().optional(),
   sampling_mode: trackSamplingModeSchema,
   selected_course_ids: z.array(z.string()),
 });
@@ -119,6 +139,7 @@ const actionConfigSchema = z
     include_pitch: z.boolean(),
     enable_pitch: z.boolean(),
     pitch_mode: actionAxisModeSchema,
+    pitch_deadzone: z.number().min(0).lt(1),
     pitch_buckets: z.number().int().min(3),
   })
   .refine((action) => action.steer_buckets % 2 === 1, {
@@ -155,6 +176,7 @@ const stateComponentConfigSchema = z.object({
   progress_source: z.enum(["lap_progress", "segment_progress", "none"]).nullable(),
   length: z.number().int().positive().max(16).nullable(),
   controls: z.array(actionHistoryControlSchema).nullable(),
+  included_features: z.array(z.string()).nullable(),
 });
 
 const stateFeatureDropoutConfigSchema = z.object({
@@ -213,6 +235,15 @@ const policyConfigSchema = z.object({
   pi_net_arch: z.array(z.number().int().positive()),
   vf_net_arch: z.array(z.number().int().positive()),
   gas_on_logit: z.number(),
+  auxiliary_state_enabled: z.boolean(),
+  auxiliary_state_head_arch: z.array(z.number().int().positive()),
+  auxiliary_state_losses: z.array(
+    z.object({
+      name: auxiliaryStateTargetNameSchema,
+      weight: z.number().positive(),
+      grounded_only: z.boolean(),
+    }),
+  ),
 });
 
 const rewardConfigSchema = z
@@ -242,9 +273,7 @@ const rewardConfigSchema = z
     boost_pad_reward: z.number().nonnegative(),
     boost_pad_reward_progress_window: z.number().positive(),
     lean_request_penalty: z.number().max(0),
-    airborne_pitch_up_penalty: z.number().max(0),
     grounded_pitch_penalty: z.number().max(0),
-    grounded_pitch_deadzone: z.number().min(0).max(1),
     damage_taken_frame_penalty: z.number().max(0),
     damage_taken_streak_ramp_penalty: z.number().max(0),
     damage_taken_streak_cap_frames: z.number().int().nonnegative(),
@@ -487,6 +516,9 @@ const stateComponentInfoSchema = z.object({
   name: z.string(),
   low: z.number(),
   high: z.number(),
+  default_enabled: z.boolean().default(true),
+  auxiliary_target_name: auxiliaryStateTargetNameSchema.nullable().default(null),
+  auxiliary_supports_grounded_only: z.boolean().default(false),
 });
 
 const stateComponentSchema = z.object({
@@ -501,6 +533,7 @@ export const configMetadataSchema = z.object({
   observation_source_geometries: z.array(observationSourceGeometryInfoSchema),
   track_pool_modes: z.array(selectOptionSchema),
   race_modes: z.array(selectOptionSchema),
+  gp_difficulties: z.array(selectOptionSchema),
   track_sampling_modes: z.array(selectOptionSchema),
   track_cups: z.array(trackCupInfoSchema),
   built_in_courses: z.array(builtInCourseInfoSchema),

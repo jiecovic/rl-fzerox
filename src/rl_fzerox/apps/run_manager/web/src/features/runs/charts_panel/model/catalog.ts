@@ -116,6 +116,7 @@ const METRIC_TITLE_OVERRIDES: Record<string, string> = {
   "time/total_timesteps": "Total steps",
   "track_sampling/coverage": "Track coverage",
   "train/approx_kl": "Approx KL",
+  "train/aux_loss": "Auxiliary loss",
   "train/clip_fraction": "Clip fraction",
   "train/clip_range": "Clip range",
   "train/entropy_loss": "Entropy loss",
@@ -178,6 +179,9 @@ function chartGroupForMetricKey(key: string): RunChartGroupId {
   if (key.startsWith("train/")) {
     return "optimization";
   }
+  if (key.startsWith("train_aux/")) {
+    return "optimization";
+  }
   if (key.startsWith("reward/") || key.startsWith("reward_clip/")) {
     return "reward";
   }
@@ -200,6 +204,9 @@ function chartGroupForMetricKey(key: string): RunChartGroupId {
 }
 
 function metricTitle(key: string) {
+  if (key.startsWith("train_aux/")) {
+    return `Aux: ${humanizeAuxiliaryMetricKey(key.slice("train_aux/".length))}`;
+  }
   const override = METRIC_TITLE_OVERRIDES[key];
   if (override !== undefined) {
     return override;
@@ -208,9 +215,15 @@ function metricTitle(key: string) {
   return humanizeMetricToken(leaf);
 }
 
+function humanizeAuxiliaryMetricKey(token: string) {
+  const leaf = token.includes(".") ? token.slice(token.lastIndexOf(".") + 1) : token;
+  return humanizeMetricToken(leaf);
+}
+
 function humanizeMetricToken(token: string) {
   return token
     .replaceAll("_", " ")
+    .replaceAll(".", " ")
     .replaceAll(" kph", " (kph)")
     .replace(/\bep\b/giu, "episode")
     .replace(/\bkl\b/giu, "KL")

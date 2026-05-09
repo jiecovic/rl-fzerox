@@ -41,6 +41,10 @@ const FEATURE_INFO: Record<string, FeatureInfo> = {
     label: "Edge ratio",
     help: "Signed distance to track center relative to local track half width.",
   },
+  "track_position.height_above_ground_norm": {
+    label: "Ground height",
+    help: "Height above ground clipped to non-negative values and normalized by the current ground-height normalizer.",
+  },
   "track_position.lap_progress": {
     label: "Progress scalar",
     help: "Configured progress scalar, either lap progress or normalized segment index.",

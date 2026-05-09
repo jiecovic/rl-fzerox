@@ -16,6 +16,7 @@ interface TracksSectionProps {
 }
 
 type BuiltInCourse = ConfigMetadata["built_in_courses"][number];
+type GpDifficulty = NonNullable<ManagedRunConfig["tracks"]["gp_difficulty"]>;
 
 const TRACK_POOL_MODE_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["pool_mode"], string> = {
   built_in: "Fixed cup courses grouped by the original roster.",
@@ -27,12 +28,20 @@ const RACE_MODE_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["race_mode"], st
   gp_race: "Grand Prix race rules across the selected pool.",
 };
 
+const GP_DIFFICULTY_DESCRIPTIONS: Record<GpDifficulty, string> = {
+  novice: "Lightest GP difficulty and the current default.",
+  standard: "Standard GP AI and race pressure.",
+  expert: "More aggressive GP field behavior.",
+  master: "Highest GP difficulty tier.",
+};
+
 const TRACK_SAMPLING_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["sampling_mode"], string> = {
   equal: "Sample courses uniformly by episode.",
   step_balanced: "Bias toward courses with fewer recent frames.",
 };
 
 export function TracksSection({ config, defaultConfig, metadata, setConfig }: TracksSectionProps) {
+  const defaultGpDifficulty: GpDifficulty = defaultConfig.tracks.gp_difficulty ?? "novice";
   const allCourseIds = useMemo(
     () => metadata.built_in_courses.map((course) => course.id),
     [metadata.built_in_courses],
@@ -81,6 +90,12 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     const nextTracks = { ...config.tracks, ...patch };
     if (nextTracks.pool_mode === "x_cup") {
       nextTracks.race_mode = "gp_race";
+    }
+    if (nextTracks.race_mode === "gp_race" && nextTracks.gp_difficulty == null) {
+      nextTracks.gp_difficulty = defaultGpDifficulty;
+    }
+    if (nextTracks.race_mode !== "gp_race") {
+      nextTracks.gp_difficulty = null;
     }
     setConfig({ ...config, tracks: nextTracks });
   };
@@ -179,6 +194,34 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
               onClick: () =>
                 updateTracks({
                   race_mode: option.value as ManagedRunConfig["tracks"]["race_mode"],
+                }),
+            }))}
+          />
+        </ConfigPanel>
+
+        <ConfigPanel
+          onReset={() => updateTracks({ gp_difficulty: defaultGpDifficulty })}
+          title="GP difficulty"
+        >
+          <ChoiceStrip
+            description={
+              config.tracks.race_mode === "gp_race"
+                ? (GP_DIFFICULTY_DESCRIPTIONS[config.tracks.gp_difficulty ?? defaultGpDifficulty] ??
+                  GP_DIFFICULTY_DESCRIPTIONS.novice)
+                : "Only used when GP race mode is selected."
+            }
+            options={metadata.gp_difficulties.map((option) => ({
+              active: (config.tracks.gp_difficulty ?? defaultGpDifficulty) === option.value,
+              disabled: config.tracks.race_mode !== "gp_race",
+              key: option.value,
+              label: option.label,
+              tooltip:
+                config.tracks.race_mode !== "gp_race"
+                  ? "GP difficulty is only applied to GP race baselines."
+                  : undefined,
+              onClick: () =>
+                updateTracks({
+                  gp_difficulty: option.value as GpDifficulty,
                 }),
             }))}
           />

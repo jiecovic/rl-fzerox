@@ -26,6 +26,12 @@ export interface WorkspaceSessions {
   closeRunTabsForRuns: (runIds: readonly string[]) => void;
   closeWorkspaceTab: (id: WorkspaceTabId) => void;
   createNewDraft: () => void;
+  createForkDraft: (options: {
+    artifact: ForkSource["artifact"];
+    initialConfig: DraftEditorSession["initialConfig"];
+    initialDraftName: string;
+    runId: string;
+  }) => void;
   draftEditors: DraftEditorSession[];
   forkSourceRunLabel: (source: ForkSource | null) => string | null;
   openDraft: (draft: ManagedDraft) => void;

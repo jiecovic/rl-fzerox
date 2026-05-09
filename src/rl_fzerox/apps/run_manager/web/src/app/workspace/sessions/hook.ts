@@ -8,7 +8,12 @@ import {
   nextAvailableDraftName,
   runSessionId,
 } from "@/app/workspace/model";
-import type { DraftEditorSession, RunSession, WorkspaceTabId } from "@/app/workspace/types";
+import type {
+  DraftEditorSession,
+  ForkSource,
+  RunSession,
+  WorkspaceTabId,
+} from "@/app/workspace/types";
 
 import {
   closeDraftSession,
@@ -80,6 +85,29 @@ export function useWorkspaceSessions({
     );
     setDraftEditors((current) =>
       createDraftSession(current, {
+        initialDraftName,
+        sessionId,
+      }),
+    );
+    setActiveTabId(sessionId);
+  }
+
+  function createForkDraft({
+    artifact,
+    initialConfig,
+    initialDraftName,
+    runId,
+  }: {
+    artifact: ForkSource["artifact"];
+    initialConfig: DraftEditorSession["initialConfig"];
+    initialDraftName: string;
+    runId: string;
+  }) {
+    const sessionId = editorSessionId(crypto.randomUUID());
+    setDraftEditors((current) =>
+      createDraftSession(current, {
+        forkSource: { artifact, runId },
+        initialConfig,
         initialDraftName,
         sessionId,
       }),
@@ -193,6 +221,7 @@ export function useWorkspaceSessions({
     closeRunTabsForRun,
     closeRunTabsForRuns,
     closeWorkspaceTab,
+    createForkDraft,
     createNewDraft,
     draftEditors,
     forkSourceRunLabel,

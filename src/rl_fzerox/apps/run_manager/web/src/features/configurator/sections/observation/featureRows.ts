@@ -10,6 +10,9 @@ export interface StateFeatureRow {
   kind: string;
   range: string;
   featureNames: readonly string[];
+  defaultEnabled: boolean;
+  auxiliaryTargetName?: ManagedRunConfig["policy"]["auxiliary_state_losses"][number]["name"];
+  auxiliarySupportsGroundedOnly: boolean;
 }
 
 export function stateFeatureRows(
@@ -17,6 +20,10 @@ export function stateFeatureRows(
   features: ConfigMetadata["state_components"][number]["features"],
 ): StateFeatureRow[] {
   if (componentName === "course_context" && features.length > 0) {
+    const auxiliaryTargetName = features[0]?.auxiliary_target_name ?? undefined;
+    const auxiliarySupportsGroundedOnly = features.some(
+      (feature) => feature.auxiliary_supports_grounded_only,
+    );
     return [
       {
         id: "course_context.course_id",
@@ -25,6 +32,9 @@ export function stateFeatureRows(
         kind: "one-hot",
         range: `${features.length} entries`,
         featureNames: features.map((feature) => feature.name),
+        defaultEnabled: true,
+        auxiliaryTargetName,
+        auxiliarySupportsGroundedOnly,
       },
     ];
   }
@@ -37,6 +47,9 @@ export function stateFeatureRows(
       kind: featureKind(feature.name, feature.low),
       range: formatFeatureRange(feature.low, feature.high),
       featureNames: [feature.name],
+      defaultEnabled: feature.default_enabled,
+      auxiliaryTargetName: feature.auxiliary_target_name ?? undefined,
+      auxiliarySupportsGroundedOnly: feature.auxiliary_supports_grounded_only,
     };
   });
 }
@@ -46,20 +59,30 @@ export function componentSummary(
   rowCount: number,
   featureCount: number,
   zeroedCount: number,
+  notIncludedCount: number,
   enabled: boolean,
 ) {
   if (!enabled) {
     return "category off";
   }
   if (componentName === "course_context") {
+    if (notIncludedCount > 0) {
+      return `${featureCount}-wide one-hot · not included`;
+    }
     return zeroedCount > 0
       ? `${featureCount}-wide one-hot · zeroed`
       : `${featureCount}-wide one-hot`;
   }
   if (zeroedCount === 0) {
-    return `${rowCount} entries`;
+    if (notIncludedCount === 0) {
+      return `${rowCount} entries`;
+    }
+    return `${rowCount} entries · ${notIncludedCount} not included`;
   }
-  return `${rowCount} entries · ${zeroedCount} zeroed`;
+  if (notIncludedCount === 0) {
+    return `${rowCount} entries · ${zeroedCount} zeroed`;
+  }
+  return `${rowCount} entries · ${zeroedCount} zeroed · ${notIncludedCount} not included`;
 }
 
 export function allStateComponentsOpen(metadata: ConfigMetadata, open: boolean) {

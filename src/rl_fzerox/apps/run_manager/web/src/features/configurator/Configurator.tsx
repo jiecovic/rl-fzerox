@@ -120,9 +120,10 @@ export function Configurator({
       forkSourceArtifact ?? "",
     ].join(":");
   const checkpointLocked =
-    loadedDraft !== null &&
-    loadedDraft.source_run_id !== null &&
-    loadedDraft.source_artifact !== null;
+    (loadedDraft !== null &&
+      loadedDraft.source_run_id !== null &&
+      loadedDraft.source_artifact !== null) ||
+    forkSourceArtifact !== null;
 
   useEffect(() => {
     if (resetSourceKeyRef.current === resetSourceKey) {

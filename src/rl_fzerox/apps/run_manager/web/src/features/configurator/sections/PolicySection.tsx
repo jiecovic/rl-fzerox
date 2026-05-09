@@ -186,6 +186,7 @@ export function PolicySection({
           title="Heads"
           onReset={() =>
             updatePolicy({
+              auxiliary_state_head_arch: defaultConfig.policy.auxiliary_state_head_arch,
               pi_net_arch: checkpointLocked
                 ? config.policy.pi_net_arch
                 : defaultConfig.policy.pi_net_arch,
@@ -205,6 +206,15 @@ export function PolicySection({
               value={config.policy.activation}
               onChange={(value) => updatePolicy({ activation: value })}
             />
+            <fieldset className="fork-lock-fieldset" disabled={false}>
+              <LayerListField
+                help="Shared MLP trunk used by the grouped auxiliary-state heads before their scalar, binary, and categorical outputs."
+                label="Aux head"
+                resetValue={defaultConfig.policy.auxiliary_state_head_arch}
+                value={config.policy.auxiliary_state_head_arch}
+                onChange={(value) => updatePolicy({ auxiliary_state_head_arch: value })}
+              />
+            </fieldset>
             <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
               <LayerListField
                 help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
@@ -227,6 +237,7 @@ export function PolicySection({
 
       <ConfigPanel title="Architecture preview" wide>
         <PolicyPreviewPanel
+          checkpointLocked={checkpointLocked}
           convProfile={config.policy.conv_profile}
           customConvLayers={config.policy.custom_conv_layers}
           preview={preview}

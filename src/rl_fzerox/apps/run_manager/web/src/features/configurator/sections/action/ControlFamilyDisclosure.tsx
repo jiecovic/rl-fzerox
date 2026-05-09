@@ -225,22 +225,14 @@ export function ControlFamilyDisclosure({
           </div>
           <div className="field-shell action-inline-toggle-field">
             <FieldLabel
-              help="Legacy compatibility control. New runs should keep throttle policy-driven instead of forcing it fully engaged."
+              help="Force discrete throttle fully engaged at runtime. This is useful when you want to remove throttle variation without changing the action head shape."
               label="Force full throttle"
             />
             <div className="action-inline-toggle">
-              <div className="action-inline-toggle-copy action-inline-toggle-copy-plain">
-                <small>
-                  Existing configs preserve this flag, but the configurator no longer enables it for
-                  new experiments.
-                </small>
-              </div>
               <ToggleSwitch
                 checked={action.force_full_throttle}
-                disabled
                 hideLabel
                 label="Force full throttle"
-                tooltip="Legacy option disabled in the configurator"
                 onChange={(checked) => updateAction({ force_full_throttle: checked })}
               />
             </div>
