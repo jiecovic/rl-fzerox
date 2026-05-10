@@ -78,6 +78,7 @@ class FrameRenderData:
     failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    cnn_layer_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
     continuous_drive_enabled: bool
@@ -287,6 +288,7 @@ def _draw_frame(
             failed_track_attempts=data.failed_track_attempts,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,
+            cnn_layer_tab_index=data.cnn_layer_tab_index,
             record_tab_index=data.record_tab_index,
             continuous_drive_deadzone=data.continuous_drive_deadzone,
             continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
@@ -316,6 +318,7 @@ def _draw_frame(
     return ViewerHitboxes(
         deterministic_toggle=control_hitboxes.deterministic_toggle,
         panel_tabs=side_panel_hitboxes.panel_tabs,
+        cnn_layer_tabs=side_panel_hitboxes.cnn_layer_tabs,
         record_tabs=side_panel_hitboxes.record_tabs,
         record_courses=side_panel_hitboxes.record_courses,
         state_features=side_panel_hitboxes.state_features,

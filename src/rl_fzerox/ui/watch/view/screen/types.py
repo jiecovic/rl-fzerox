@@ -148,6 +148,7 @@ class ViewerHitboxes:
 
     deterministic_toggle: MouseRect | None = None
     panel_tabs: tuple[MouseRect | None, ...] = ()
+    cnn_layer_tabs: tuple[MouseRect | None, ...] = ()
     record_tabs: tuple[MouseRect | None, ...] = ()
     record_courses: tuple[RecordCourseHitbox, ...] = ()
     state_features: tuple[StateFeatureHitbox, ...] = ()

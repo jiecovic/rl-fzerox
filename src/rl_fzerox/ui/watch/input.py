@@ -35,6 +35,7 @@ class ViewerInput:
     reset_control_fps: bool = False
     panel_tab_delta: int = 0
     panel_tab_index: int | None = None
+    cnn_layer_tab_index: int | None = None
     record_tab_index: int | None = None
     toggle_record_course_lock_id: str | None = None
     toggle_current_course_lock: bool = False
@@ -77,6 +78,7 @@ def _poll_viewer_input(
     *,
     deterministic_toggle_rect: MouseRect | None = None,
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
+    cnn_layer_tab_rects: tuple[MouseRect | None, ...] = (),
     record_tab_rects: tuple[MouseRect | None, ...] = (),
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
     state_feature_hitboxes: tuple[StateFeatureHitbox, ...] = (),
@@ -95,6 +97,7 @@ def _poll_viewer_input(
     reset_control_fps = False
     panel_tab_delta = 0
     panel_tab_index = None
+    cnn_layer_tab_index = None
     record_tab_index = None
     toggle_record_course_lock_id = None
     toggle_current_course_lock = False
@@ -112,19 +115,26 @@ def _poll_viewer_input(
                 if selected_tab is not None:
                     panel_tab_index = selected_tab
                 else:
-                    selected_record_tab = _clicked_panel_tab_index(event.pos, record_tab_rects)
-                    if selected_record_tab is not None:
-                        record_tab_index = selected_record_tab
+                    selected_cnn_layer_tab = _clicked_panel_tab_index(
+                        event.pos,
+                        cnn_layer_tab_rects,
+                    )
+                    if selected_cnn_layer_tab is not None:
+                        cnn_layer_tab_index = selected_cnn_layer_tab
                     else:
-                        toggle_record_course_lock_id = _clicked_record_course_id(
-                            event.pos,
-                            record_course_hitboxes,
-                        )
-                        if toggle_record_course_lock_id is None:
-                            toggle_zeroed_state_feature_name = _clicked_state_feature_name(
+                        selected_record_tab = _clicked_panel_tab_index(event.pos, record_tab_rects)
+                        if selected_record_tab is not None:
+                            record_tab_index = selected_record_tab
+                        else:
+                            toggle_record_course_lock_id = _clicked_record_course_id(
                                 event.pos,
-                                state_feature_hitboxes,
+                                record_course_hitboxes,
                             )
+                            if toggle_record_course_lock_id is None:
+                                toggle_zeroed_state_feature_name = _clicked_state_feature_name(
+                                    event.pos,
+                                    state_feature_hitboxes,
+                                )
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 quit_requested = True
@@ -221,6 +231,7 @@ def _poll_viewer_input(
         reset_control_fps=reset_control_fps,
         panel_tab_delta=panel_tab_delta,
         panel_tab_index=panel_tab_index,
+        cnn_layer_tab_index=cnn_layer_tab_index,
         record_tab_index=record_tab_index,
         toggle_record_course_lock_id=toggle_record_course_lock_id,
         toggle_current_course_lock=toggle_current_course_lock,
@@ -298,6 +309,7 @@ def mouse_over_clickable(
     *,
     deterministic_toggle_rect: MouseRect | None = None,
     panel_tab_rects: tuple[MouseRect | None, ...] = (),
+    cnn_layer_tab_rects: tuple[MouseRect | None, ...] = (),
     record_tab_rects: tuple[MouseRect | None, ...] = (),
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = (),
     state_feature_hitboxes: tuple[StateFeatureHitbox, ...] = (),
@@ -307,6 +319,7 @@ def mouse_over_clickable(
     return (
         _point_in_rect(position, deterministic_toggle_rect)
         or _clicked_panel_tab_index(position, panel_tab_rects) is not None
+        or _clicked_panel_tab_index(position, cnn_layer_tab_rects) is not None
         or _clicked_panel_tab_index(position, record_tab_rects) is not None
         or _clicked_record_course_id(position, record_course_hitboxes) is not None
         or _clicked_state_feature_name(position, state_feature_hitboxes) is not None

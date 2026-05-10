@@ -61,6 +61,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         fonts = _create_fonts(pygame)
         paused = False
         panel_tab_index = 0
+        cnn_layer_tab_index = 0
         record_tab_index = 0
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         hitboxes = ViewerHitboxes()
@@ -76,12 +77,15 @@ def run_viewer(config: WatchAppConfig) -> None:
                 pygame,
                 deterministic_toggle_rect=hitboxes.deterministic_toggle,
                 panel_tab_rects=hitboxes.panel_tabs,
+                cnn_layer_tab_rects=hitboxes.cnn_layer_tabs,
                 record_tab_rects=hitboxes.record_tabs,
                 record_course_hitboxes=hitboxes.record_courses,
                 state_feature_hitboxes=hitboxes.state_features,
                 speed_repeat=speed_repeat,
             )
             panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
+            if viewer_input.cnn_layer_tab_index is not None:
+                cnn_layer_tab_index = viewer_input.cnn_layer_tab_index
             if viewer_input.record_tab_index is not None:
                 record_tab_index = viewer_input.record_tab_index
             if viewer_input.toggle_cnn_normalization:
@@ -129,6 +133,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 target_render_fps=target_render_fps,
                 auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
                 panel_tab_index=panel_tab_index,
+                cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,
             )
             _sync_mouse_cursor(pygame, hitboxes)
@@ -156,6 +161,7 @@ def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
         mouse_pos,
         deterministic_toggle_rect=hitboxes.deterministic_toggle,
         panel_tab_rects=hitboxes.panel_tabs,
+        cnn_layer_tab_rects=hitboxes.cnn_layer_tabs,
         record_tab_rects=hitboxes.record_tabs,
         record_course_hitboxes=hitboxes.record_courses,
         state_feature_hitboxes=hitboxes.state_features,
