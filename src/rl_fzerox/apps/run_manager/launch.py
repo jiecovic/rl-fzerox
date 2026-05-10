@@ -1,15 +1,10 @@
 # src/rl_fzerox/apps/run_manager/launch.py
 from __future__ import annotations
 
-import json
-import subprocess
-import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
-from uuid import uuid4
 
-from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
+import rl_fzerox.apps.run_manager.launching as launching
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig, ManagerStore, new_managed_run_id
 from rl_fzerox.core.manager.artifacts.fork_source import (
     clone_fork_source,
@@ -24,11 +19,8 @@ from rl_fzerox.core.manager.training import (
     build_managed_fork_train_app_config,
     build_managed_train_app_config,
 )
-from rl_fzerox.core.runtime_spec.paths import project_root_dir
-from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
 from rl_fzerox.core.training.runs import (
     resolve_model_artifact_path,
-    save_train_run_config,
 )
 
 
@@ -92,14 +84,14 @@ class ManagerRunLauncher:
             lineage_id=run_id,
             exclude_draft_id=draft_id,
         )
-        _persist_launch_manifest(run_dir=run.run_dir, train_config=train_config)
+        launching.persist_launch_manifest(run_dir=run.run_dir, train_config=train_config)
         self._spawn_worker(run_id=run.id, resume=False)
         launched = self._store.update_run_status(
             run_id=run.id,
             status="running",
-            started_at=_utc_now(),
+            started_at=launching.utc_now(),
             stopped_at=None,
-            message=f"training worker launched; log: {_manager_worker_log_path(run.id)}",
+            message=f"training worker launched; log: {launching.manager_worker_log_path(run.id)}",
         )
         if launched is None:
             raise RuntimeError(f"managed run disappeared during launch: {run.id}")
@@ -124,7 +116,7 @@ class ManagerRunLauncher:
         if artifact not in {"latest", "best"}:
             raise ValueError(f"unsupported fork artifact: {artifact}")
 
-        normalized_name = (name or _default_fork_name(source_run.name, artifact)).strip()
+        normalized_name = (name or launching.default_fork_name(source_run.name, artifact)).strip()
         if not normalized_name:
             raise ValueError("run name is required")
         child_config = config or source_run.config
@@ -169,16 +161,16 @@ class ManagerRunLauncher:
             source_num_timesteps=source_num_timesteps,
             exclude_draft_id=exclude_draft_id,
         )
-        _persist_launch_manifest(run_dir=child_run.run_dir, train_config=train_config)
+        launching.persist_launch_manifest(run_dir=child_run.run_dir, train_config=train_config)
         self._spawn_worker(run_id=child_run.id, resume=False)
         launched = self._store.update_run_status(
             run_id=child_run.id,
             status="running",
-            started_at=_utc_now(),
+            started_at=launching.utc_now(),
             stopped_at=None,
             message=(
                 f"forked from {source_run.name} ({artifact} @ {source_num_timesteps:,} steps); "
-                f"log: {_manager_worker_log_path(child_run.id)}"
+                f"log: {launching.manager_worker_log_path(child_run.id)}"
             ),
         )
         if launched is None:
@@ -210,13 +202,13 @@ class ManagerRunLauncher:
             message = (
                 "training worker relaunched from "
                 f"{'rebuilt ' if restored else ''}pinned fork source; "
-                f"log: {_manager_worker_log_path(run.id)}"
+                f"log: {launching.manager_worker_log_path(run.id)}"
             )
         else:
             self._spawn_worker(run_id=run.id, resume=True)
             message = (
                 "training worker resumed from latest checkpoint; "
-                f"log: {_manager_worker_log_path(run.id)}"
+                f"log: {launching.manager_worker_log_path(run.id)}"
             )
 
         if reset_local_clock:
@@ -224,7 +216,7 @@ class ManagerRunLauncher:
         resumed = self._store.update_run_status(
             run_id=run.id,
             status="running",
-            started_at=_utc_now() if reset_local_clock else None,
+            started_at=launching.utc_now() if reset_local_clock else None,
             stopped_at=None,
             message=message,
         )
@@ -273,63 +265,10 @@ class ManagerRunLauncher:
 
         return self._request_command(run_id=run_id, command="stop")
 
-    def watch_artifact(self, *, run_id: str, artifact: str) -> WatchLaunchStatus:
+    def watch_artifact(self, *, run_id: str, artifact: str) -> launching.WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
-        run = self._store.get_run(run_id)
-        if run is None:
-            raise ValueError(f"run not found: {run_id}")
-        if artifact not in {"latest", "best"}:
-            raise ValueError(f"unsupported watch artifact: {artifact}")
-        resolve_model_artifact_path(run.run_dir, artifact=artifact)
-        pid_path = _manager_watch_pid_path(run.id, artifact=artifact)
-        if _active_watch_pid(
-            pid_path=pid_path,
-            run_id=run.id,
-            run_dir=run.run_dir,
-            artifact=artifact,
-        ) is not None:
-            return "already_running"
-        resolve_watch_app_config(
-            policy_run_dir=None,
-            policy_artifact="best" if artifact == "best" else "latest",
-            manager_db_path=self._store.db_path,
-            managed_run_id=run.id,
-            overrides=(),
-        )
-        log_path = _manager_watch_log_path(run.id, artifact=artifact)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        command = [
-            sys.executable,
-            "-m",
-            "rl_fzerox.apps.watch",
-            "--manager-db-path",
-            str(self._store.db_path),
-            "--managed-run-id",
-            run.id,
-            "--artifact",
-            artifact,
-            "--watch-pid-file",
-            str(pid_path),
-        ]
-        with log_path.open("ab") as log_handle:
-            process = subprocess.Popen(
-                command,
-                cwd=project_root_dir(),
-                stdin=subprocess.DEVNULL,
-                stdout=log_handle,
-                stderr=subprocess.STDOUT,
-                start_new_session=True,
-            )
-        _write_watch_pid_file(
-            pid_path=pid_path,
-            pid=process.pid,
-            run_id=run.id,
-            run_dir=run.run_dir,
-            artifact=artifact,
-        )
-        _raise_if_watch_exited_early(process=process, log_path=log_path, pid_path=pid_path)
-        return "started"
+        return launching.launch_watch_artifact(store=self._store, run_id=run_id, artifact=artifact)
 
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:
         run = self._store.get_run(run_id)
@@ -343,179 +282,4 @@ class ManagerRunLauncher:
         return updated
 
     def _spawn_worker(self, *, run_id: str, resume: bool) -> None:
-        log_path = _manager_worker_log_path(run_id)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        launch_token = uuid4().hex
-        command = [
-            sys.executable,
-            "-m",
-            "rl_fzerox.apps.run_manager.worker",
-            "--db-path",
-            str(self._store.db_path),
-            "--run-id",
-            run_id,
-            "--launch-token",
-            launch_token,
-        ]
-        if resume:
-            command.append("--resume")
-        with log_path.open("ab") as log_handle:
-            try:
-                process = subprocess.Popen(
-                    command,
-                    cwd=project_root_dir(),
-                    stdin=subprocess.DEVNULL,
-                    stdout=log_handle,
-                    stderr=subprocess.STDOUT,
-                    start_new_session=True,
-                )
-                registered = self._store.register_run_worker(
-                    run_id=run_id,
-                    launch_token=launch_token,
-                    pid=process.pid,
-                    launched_at=_utc_now(),
-                )
-                if not registered:
-                    raise RuntimeError(
-                        f"managed run disappeared before worker registration: {run_id}"
-                    )
-            except Exception:
-                self._store.clear_run_worker(run_id)
-                self._store.update_run_status(
-                    run_id=run_id,
-                    status="failed",
-                    stopped_at=_utc_now(),
-                    message=f"failed to launch manager worker; see {log_path}",
-                )
-                raise
-
-
-def _manager_worker_log_path(run_id: str) -> Path:
-    return (project_root_dir() / "local" / "manager" / "logs" / f"{run_id}.log").resolve()
-
-
-WatchLaunchStatus = Literal["started", "already_running"]
-
-
-def _manager_watch_log_path(run_id: str, *, artifact: str) -> Path:
-    return (
-        project_root_dir() / "local" / "manager" / "logs" / f"{run_id}.watch-{artifact}.log"
-    ).resolve()
-
-
-def _manager_watch_pid_path(run_id: str, *, artifact: str) -> Path:
-    return (
-        project_root_dir() / "local" / "manager" / "watch" / f"{run_id}.watch-{artifact}.json"
-    ).resolve()
-
-
-def _persist_launch_manifest(*, run_dir: Path, train_config: TrainAppConfig) -> None:
-    run_dir.mkdir(parents=True, exist_ok=True)
-    save_train_run_config(config=train_config, run_dir=run_dir)
-
-
-def _default_fork_name(source_name: str, artifact: Literal["latest", "best"]) -> str:
-    suffix = "best fork" if artifact == "best" else "fork"
-    return f"{source_name} {suffix}"
-
-
-def _utc_now() -> str:
-    return datetime.now(UTC).isoformat(timespec="seconds")
-
-
-def _raise_if_watch_exited_early(
-    *,
-    process: subprocess.Popen[bytes],
-    log_path: Path,
-    pid_path: Path,
-) -> None:
-    try:
-        return_code = process.wait(timeout=0.35)
-    except subprocess.TimeoutExpired:
-        return
-
-    pid_path.unlink(missing_ok=True)
-    detail = _watch_failure_detail(log_path)
-    if detail is None:
-        raise RuntimeError(f"watch exited immediately with code {return_code}; see {log_path}")
-    raise RuntimeError(f"watch exited immediately with code {return_code}: {detail}")
-
-
-def _watch_failure_detail(log_path: Path) -> str | None:
-    try:
-        lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
-        return None
-    for line in reversed(lines):
-        detail = line.strip()
-        if detail:
-            return detail
-    return None
-
-
-def _active_watch_pid(*, pid_path: Path, run_id: str, run_dir: Path, artifact: str) -> int | None:
-    payload = _read_watch_pid_file(pid_path)
-    if payload is None:
-        return None
-    pid = payload.get("pid")
-    if not isinstance(pid, int):
-        pid_path.unlink(missing_ok=True)
-        return None
-    if _watch_process_matches(pid=pid, run_id=run_id, run_dir=run_dir, artifact=artifact):
-        return pid
-    pid_path.unlink(missing_ok=True)
-    return None
-
-
-def _write_watch_pid_file(
-    *,
-    pid_path: Path,
-    pid: int,
-    run_id: str,
-    run_dir: Path,
-    artifact: str,
-) -> None:
-    pid_path.parent.mkdir(parents=True, exist_ok=True)
-    pid_path.write_text(
-        json.dumps(
-            {
-                "pid": pid,
-                "run_id": run_id,
-                "run_dir": str(run_dir),
-                "artifact": artifact,
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-
-def _read_watch_pid_file(pid_path: Path) -> dict[str, object] | None:
-    try:
-        return json.loads(pid_path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return None
-    except (OSError, json.JSONDecodeError):
-        pid_path.unlink(missing_ok=True)
-        return None
-
-
-def _watch_process_matches(*, pid: int, run_id: str, run_dir: Path, artifact: str) -> bool:
-    proc_dir = Path("/proc") / str(pid)
-    if not proc_dir.is_dir():
-        return False
-    try:
-        cmdline = (proc_dir / "cmdline").read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return False
-    normalized = cmdline.replace("\x00", " ")
-    return (
-        "rl_fzerox.apps.watch" in normalized
-        and f"--artifact {artifact}" in normalized
-        and (
-            f"--managed-run-id {run_id}" in normalized
-            or f"--run-dir {run_dir}" in normalized
-        )
-    )
+        launching.spawn_manager_worker(store=self._store, run_id=run_id, resume=resume)
