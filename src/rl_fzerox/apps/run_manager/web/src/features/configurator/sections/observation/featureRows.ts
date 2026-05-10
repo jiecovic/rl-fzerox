@@ -3,6 +3,8 @@ import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/s
 
 import { stateFeatureInfo } from "../stateFeatureInfo";
 
+export const TRACK_POSITION_PROGRESS_ROW_ID = "track_position.lap_progress";
+
 export interface StateFeatureRow {
   id: string;
   label: string;
