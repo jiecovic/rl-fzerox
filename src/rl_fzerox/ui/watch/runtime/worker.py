@@ -10,14 +10,30 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
-from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig, WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
-    CnnActivationNormalizationMode,
     CnnActivationSampler,
-    CnnActivationSnapshot,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    adjacent_watch_course_id as _adjacent_watch_course_id,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    advance_watch_reset_course as _advance_watch_reset_course,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    current_watch_course_id as _current_watch_course_id,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    sync_locked_course_info as _sync_locked_course_info,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    toggle_locked_reset_course as _toggle_locked_reset_course,
+)
+from rl_fzerox.ui.watch.runtime.course_navigation import (
+    watch_sequential_course_ids as _watch_sequential_course_ids,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
@@ -47,8 +63,6 @@ from rl_fzerox.ui.watch.runtime.policy import (
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _build_snapshot,
     _next_boost_lamp_level,
-    _policy_auxiliary_state_predictions,
-    _policy_auxiliary_state_targets,
     _publish_step_snapshots,
 )
 from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
@@ -58,38 +72,27 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_control_fps,
     _target_seconds,
 )
+from rl_fzerox.ui.watch.runtime.visualization import (
+    current_auxiliary_predictions as _current_auxiliary_predictions,
+)
+from rl_fzerox.ui.watch.runtime.visualization import (
+    current_auxiliary_targets as _current_auxiliary_targets,
+)
+from rl_fzerox.ui.watch.runtime.visualization import (
+    refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
+)
 from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
 
 if TYPE_CHECKING:
-    from fzerox_emulator import FZeroXTelemetry
-    from rl_fzerox.core.envs.observations import ObservationValue
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
-    from rl_fzerox.core.training.inference import PolicyRunner
-    from rl_fzerox.ui.watch.runtime.cnn import _CnnActivationRunner
 
-
-def _refresh_paused_cnn_activations(
-    *,
-    current_activations: CnnActivationSnapshot | None,
-    cnn_sampler: CnnActivationSampler,
-    cnn_visualization_enabled: bool,
-    previous_cnn_visualization_enabled: bool,
-    cnn_normalization: CnnActivationNormalizationMode,
-    previous_cnn_normalization: CnnActivationNormalizationMode,
-    policy_runner: _CnnActivationRunner | None,
-    observation: ObservationValue,
-) -> tuple[CnnActivationSnapshot | None, bool]:
-    next_activations = cnn_sampler.capture(
-        enabled=cnn_visualization_enabled,
-        policy_runner=policy_runner,
-        observation=observation,
-        normalization=cnn_normalization,
-        force_refresh=(
-            cnn_visualization_enabled != previous_cnn_visualization_enabled
-            or cnn_normalization != previous_cnn_normalization
-        ),
-    )
-    return next_activations, next_activations is not current_activations
+__all__ = (
+    "_adjacent_watch_course_id",
+    "_advance_watch_reset_course",
+    "_refresh_paused_cnn_activations",
+    "_watch_sequential_course_ids",
+    "run_simulation_worker",
+)
 
 
 def run_simulation_worker(
@@ -680,123 +683,3 @@ def _run_simulation_loop(
             episode += 1
     finally:
         env.close()
-
-
-def _toggle_locked_reset_course(
-    env: FZeroXEnv,
-    *,
-    locked_reset_course_id: str | None,
-    requested_course_id: str,
-) -> str | None:
-    next_course_id = None if requested_course_id == locked_reset_course_id else requested_course_id
-    env.set_locked_reset_course(next_course_id)
-    return next_course_id
-
-
-def _current_watch_course_id(info: dict[str, object]) -> str | None:
-    course_id = info.get("track_course_id")
-    return course_id if isinstance(course_id, str) and course_id else None
-
-
-def _watch_sequential_course_ids(
-    entries: tuple[TrackSamplingEntryConfig, ...],
-) -> tuple[str, ...]:
-    seen_course_keys: set[str] = set()
-    ordered_course_ids: list[str] = []
-    for entry in entries:
-        course_key = _watch_entry_course_key(entry)
-        if course_key in seen_course_keys:
-            continue
-        seen_course_keys.add(course_key)
-        if entry.course_id:
-            ordered_course_ids.append(entry.course_id)
-    return tuple(ordered_course_ids)
-
-
-def _watch_entry_course_key(entry: TrackSamplingEntryConfig) -> str:
-    if entry.course_id:
-        return f"course_id:{entry.course_id}"
-    if entry.course_ref:
-        return f"course_ref:{entry.course_ref}"
-    if entry.course_index is not None:
-        return f"course_index:{int(entry.course_index)}"
-    return f"entry:{entry.id}"
-
-
-def _current_auxiliary_predictions(
-    *,
-    policy_runner: PolicyRunner | None,
-    enabled: bool,
-    observation: ObservationValue,
-    target_names: tuple[AuxiliaryStateTargetName, ...],
-) -> dict[str, object] | None:
-    if not enabled:
-        return None
-    return _policy_auxiliary_state_predictions(
-        policy_runner=policy_runner,
-        observation=observation,
-        target_names=target_names,
-    )
-
-
-def _current_auxiliary_targets(
-    *,
-    telemetry: FZeroXTelemetry | None,
-    enabled: bool,
-    target_names: tuple[AuxiliaryStateTargetName, ...],
-) -> dict[str, object] | None:
-    if not enabled:
-        return None
-    if telemetry is None:
-        return {}
-    return _policy_auxiliary_state_targets(telemetry, target_names=target_names)
-
-
-def _adjacent_watch_course_id(
-    *,
-    current_course_id: str | None,
-    ordered_course_ids: tuple[str, ...],
-    offset: int,
-) -> str | None:
-    if current_course_id is None:
-        return None
-    if not ordered_course_ids:
-        return current_course_id
-    try:
-        current_index = ordered_course_ids.index(current_course_id)
-    except ValueError:
-        return current_course_id
-    next_index = (current_index + offset) % len(ordered_course_ids)
-    return ordered_course_ids[next_index]
-
-
-def _advance_watch_reset_course(
-    *,
-    locked_reset_course_id: str | None,
-    current_course_id: str | None,
-    ordered_course_ids: tuple[str, ...],
-    offset: int,
-) -> tuple[str | None, str | None]:
-    base_course_id = locked_reset_course_id or current_course_id
-    next_course_id = _adjacent_watch_course_id(
-        current_course_id=base_course_id,
-        ordered_course_ids=ordered_course_ids,
-        offset=offset,
-    )
-    if locked_reset_course_id is None:
-        return None, next_course_id
-    return next_course_id, None
-
-
-def _sync_locked_course_info(
-    *,
-    info: dict[str, object],
-    reset_info: dict[str, object],
-    locked_reset_course_id: str | None,
-) -> None:
-    if locked_reset_course_id is None:
-        info.pop("track_sampling_locked_course_id", None)
-        reset_info.pop("track_sampling_locked_course_id", None)
-        return
-    info["track_sampling_locked_course_id"] = locked_reset_course_id
-    reset_info["track_sampling_locked_course_id"] = locked_reset_course_id
