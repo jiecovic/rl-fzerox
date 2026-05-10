@@ -88,7 +88,7 @@ def test_energy_refill_course_effect_lights_refill_flag() -> None:
     assert "refill" in active_labels
 
 
-def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
+def test_refill_surface_flag_ignores_energy_fullness() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -116,7 +116,7 @@ def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
-    assert "refill" not in active_labels
+    assert "refill" in active_labels
 
 
 def test_game_section_shows_current_and_max_progress() -> None:

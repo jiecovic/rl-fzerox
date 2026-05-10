@@ -331,6 +331,22 @@ def test_state_components_build_clean_prefixed_state_vector() -> None:
     assert values["control_history.prev_lean_1"] == -1.0
 
 
+def test_surface_state_refill_surface_ignores_energy_fullness() -> None:
+    components = (ObservationStateComponentSettings(name="surface_state"),)
+    telemetry = make_telemetry(
+        state_flags=1,
+        energy=178.0,
+        max_energy=178.0,
+    )
+
+    vector = telemetry_state_vector(telemetry, state_components=components)
+    feature_names = state_feature_names(state_components=components)
+    values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
+
+    assert telemetry.player.on_energy_refill is False
+    assert values["surface_state.on_refill_surface"] == 1.0
+
+
 def test_state_components_can_feed_segment_progress_through_progress_slot() -> None:
     components = (
         ObservationStateComponentSettings(name="vehicle_state"),
