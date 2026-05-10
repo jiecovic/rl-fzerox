@@ -168,14 +168,14 @@ def test_panel_tabs_fit_side_panel_content_width() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1064, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1064, 980)
+    assert _window_size((592, 444), (84, 116, 12)) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1204, 980)
 
 
 def test_side_panel_fits_default_watch_window_height() -> None:

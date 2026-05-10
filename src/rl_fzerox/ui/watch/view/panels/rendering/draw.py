@@ -64,6 +64,7 @@ class SidePanelData:
     failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    cnn_layer_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
     continuous_air_brake_axis_index: int | None
@@ -186,10 +187,11 @@ def _draw_side_panel(
     y += LAYOUT.title_section_gap
 
     record_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
+    cnn_layer_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = ()
     state_feature_hitboxes = ()
     if selected_tab_index == PANEL_TABS.cnn_index:
-        _draw_cnn_tab(
+        _, cnn_layer_tab_rects = _draw_cnn_tab(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -197,6 +199,7 @@ def _draw_side_panel(
             y=y,
             width=panel_width,
             activations=data.cnn_activations,
+            selected_layer_page_index=data.cnn_layer_tab_index,
         )
     elif selected_tab_index == PANEL_TABS.records_index:
         record_sections = columns.records
@@ -236,6 +239,7 @@ def _draw_side_panel(
         state_feature_hitboxes = panel_hitboxes.state_features
     return ViewerHitboxes(
         panel_tabs=tab_rects,
+        cnn_layer_tabs=cnn_layer_tab_rects,
         record_tabs=record_tab_rects,
         record_courses=record_course_hitboxes,
         state_features=state_feature_hitboxes,

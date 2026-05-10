@@ -244,6 +244,16 @@ def test_poll_viewer_input_selects_record_tab_with_mouse_click() -> None:
     assert viewer_input.record_tab_index == 1
 
 
+def test_poll_viewer_input_selects_cnn_layer_tab_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 42)),
+        panel_tab_rects=((0, 0, 40, 20),),
+        cnn_layer_tab_rects=((0, 30, 40, 20), (50, 30, 40, 20)),
+    )
+
+    assert viewer_input.cnn_layer_tab_index == 1
+
+
 def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
     viewer_input = _poll_viewer_input(
         _FakePygame((), mouse_click=(75, 72)),
@@ -283,6 +293,10 @@ def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
     assert mouse_over_clickable(
         (75, 42),
         record_tab_rects=((50, 30, 40, 20),),
+    )
+    assert mouse_over_clickable(
+        (75, 52),
+        cnn_layer_tab_rects=((50, 40, 40, 20),),
     )
     assert mouse_over_clickable((75, 72), record_course_hitboxes=(record_hitbox,))
     assert mouse_over_clickable((75, 102), state_feature_hitboxes=(state_feature_hitbox,))

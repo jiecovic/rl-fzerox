@@ -36,6 +36,7 @@ def draw_watch_frame(
     target_render_fps: float | None,
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
     panel_tab_index: int = 0,
+    cnn_layer_tab_index: int = 0,
     record_tab_index: int = 0,
 ) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
@@ -102,6 +103,7 @@ def draw_watch_frame(
             failed_track_attempts=snapshot.failed_track_attempts,
             track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,
+            cnn_layer_tab_index=cnn_layer_tab_index,
             record_tab_index=record_tab_index,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
             continuous_drive_enabled=action_config.uses_continuous_drive(),

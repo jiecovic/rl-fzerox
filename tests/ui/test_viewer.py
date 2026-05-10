@@ -51,6 +51,7 @@ def test_macro_legend_includes_toggle_anchor_hotkey() -> None:
     hints = {hint.keys: hint.action for hint in MACRO_LEGEND_HINTS}
 
     assert hints["F"] == "toggle anchor"
+    assert hints["C"] == "cnn mode"
 
 
 def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
@@ -475,6 +476,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         "M": (None, "manual"),
         "D": (None, "policy"),
         "Tab / 1-7": (None, "tabs"),
+        "C": (None, "cnn mode"),
         "+/-": (None, "speed"),
         "0": (None, "reset speed"),
         "Arrow keys": ("stick X/Y", "steer/pitch"),
@@ -698,6 +700,7 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         "// edge_ratio",
         "// outside_track_bounds",
     ]
+
 
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
