@@ -178,6 +178,55 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
     assert payload["run"]["status"] == "running"
 
 
+async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+
+    class FakeLauncher(_LauncherStub):
+        def launch(
+            self,
+            *,
+            name: str,
+            config: ManagedRunConfig,
+            draft_id: str | None,
+            source_run_id: str | None,
+            source_artifact: Literal["latest", "best"] | None,
+        ):
+            del draft_id, source_artifact, source_run_id
+            run = store.create_run(
+                name=name,
+                config=config,
+                managed_runs_root=tmp_path / "runs",
+            )
+            launched = store.update_run_status(
+                run_id=run.id,
+                status="running",
+                started_at="2026-05-03T12:00:00+00:00",
+                stopped_at=None,
+                message="worker launched",
+            )
+            if launched is None:
+                raise RuntimeError("launch status update failed")
+            return launched
+
+    client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
+    config = default_managed_run_config().model_copy(
+        update={
+            "train": default_managed_run_config().train.model_copy(
+                update={"clip_range": 0.17}
+            )
+        }
+    )
+
+    response = await client.post(
+        "/api/runs",
+        json={"name": "Launch Clip", "config": config.model_dump(mode="json")},
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["run"]["config"]["train"]["clip_range"] == 0.17
+
+
 async def test_manager_api_launches_unsaved_fork_run(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     seen_source: list[tuple[str | None, str | None, str | None]] = []
