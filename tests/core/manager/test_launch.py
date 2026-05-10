@@ -327,21 +327,21 @@ def test_watch_artifact_skips_duplicate_window(
     launcher = ManagerRunLauncher(store)
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.resolve_model_artifact_path",
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_model_artifact_path",
         lambda *_args, **_kwargs: run.run_dir / RUN_LAYOUT.model_artifacts.latest,
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch._active_watch_pid",
+        "rl_fzerox.apps.run_manager.launching.watch.active_watch_pid",
         lambda **_kwargs: 4321,
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.resolve_watch_app_config",
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_watch_app_config",
         lambda **_kwargs: (_ for _ in ()).throw(
             AssertionError("duplicate watch should not resolve config")
         ),
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.subprocess.Popen",
+        "rl_fzerox.apps.run_manager.launching.watch.subprocess.Popen",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("duplicate watch should not spawn a process")
         ),
@@ -376,20 +376,20 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         return _FakeProcess()
 
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.resolve_model_artifact_path",
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_model_artifact_path",
         lambda *_args, **_kwargs: run.run_dir / RUN_LAYOUT.model_artifacts.latest,
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.resolve_watch_app_config",
+        "rl_fzerox.apps.run_manager.launching.watch.resolve_watch_app_config",
         lambda **_kwargs: None,
     )
     pid_path = tmp_path / "manager" / "watch" / f"{run.id}.watch-latest.json"
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch._manager_watch_pid_path",
+        "rl_fzerox.apps.run_manager.launching.watch.manager_watch_pid_path",
         lambda *_args, **_kwargs: pid_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.apps.run_manager.launch.subprocess.Popen",
+        "rl_fzerox.apps.run_manager.launching.watch.subprocess.Popen",
         _fake_popen,
     )
 
