@@ -1,14 +1,64 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/FieldInputs.test.tsx
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   OptionalNumberField,
   OptionalRangePairField,
+  RangeNumberField,
   RangePairField,
 } from "@/features/configurator/fields";
 
 describe("Configurator field inputs", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("commits valid range number edits before blur", () => {
+    const onChange = vi.fn();
+
+    render(
+      <RangeNumberField
+        help="test"
+        label="Clip range"
+        max={0.5}
+        min={0.01}
+        rangeStep={0.01}
+        numberStep="0.001"
+        value={0.2}
+        onChange={onChange}
+      />,
+    );
+
+    const input = screen.getByRole("spinbutton", { name: "Clip range" });
+    fireEvent.change(input, { target: { value: "0.17" } });
+
+    expect(onChange).toHaveBeenLastCalledWith(0.17);
+  });
+
+  it("does not coerce a cleared range number input to zero", () => {
+    const onChange = vi.fn();
+
+    render(
+      <RangeNumberField
+        help="test"
+        label="Clip range"
+        max={0.5}
+        min={0.01}
+        rangeStep={0.01}
+        numberStep="0.001"
+        value={0.2}
+        onChange={onChange}
+      />,
+    );
+
+    const input = screen.getByRole("spinbutton", { name: "Clip range" });
+    fireEvent.change(input, { target: { value: "" } });
+
+    expect(onChange).not.toHaveBeenCalledWith(0);
+    expect(input).toHaveValue(null);
+  });
+
   it("does not coerce a cleared optional number input to zero", () => {
     const onChange = vi.fn();
 

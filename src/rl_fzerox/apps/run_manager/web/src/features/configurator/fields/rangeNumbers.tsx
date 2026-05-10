@@ -65,6 +65,15 @@ export function RangeNumberField({
     setRawValue(formatDecimalInput(normalized, numberStep));
   }
 
+  function changeManualValue(nextRawValue: string) {
+    setRawValue(nextRawValue);
+    const parsed = Number(nextRawValue);
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      return;
+    }
+    onChange(roundToStepPrecision(parsed, numberStep));
+  }
+
   return (
     <div className="field-shell range-field">
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
@@ -87,7 +96,7 @@ export function RangeNumberField({
           type="number"
           value={rawValue}
           onBlur={commitValue}
-          onChange={(event) => setRawValue(event.target.value)}
+          onChange={(event) => changeManualValue(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.currentTarget.blur();

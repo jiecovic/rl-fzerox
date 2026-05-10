@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/app/App.test.tsx
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,19 +78,21 @@ describe("App", () => {
     createDraftWithSourceMock.mockImplementation(
       async (
         name: string,
-        _config: typeof managedRunConfigFixture,
+        config: typeof managedRunConfigFixture,
         sourceRunId: string | null,
         sourceArtifact: "latest" | "best" | null,
       ) =>
         draftFixture({
+          config,
           id: name,
           name,
           source_artifact: sourceArtifact,
           source_run_id: sourceRunId,
         }),
     );
-    updateDraftWithSourceMock.mockImplementation(async (id: string, name: string) =>
-      draftFixture({ id, name }),
+    updateDraftWithSourceMock.mockImplementation(
+      async (id: string, name: string, config: typeof managedRunConfigFixture) =>
+        draftFixture({ config, id, name }),
     );
     deleteDraftMock.mockResolvedValue(undefined);
     deleteRunMock.mockResolvedValue(undefined);
@@ -214,6 +216,81 @@ describe("App", () => {
       "ppo_test_1 fork",
       "run-001",
       "latest",
+    );
+  });
+
+  it("launches an unsaved fork with edited PPO clip range", async () => {
+    const user = userEvent.setup();
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [runFixture({ id: "run-001", name: "ppo_test_1" })],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+    await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
+    await user.click(screen.getByRole("button", { name: "Training" }));
+
+    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    await user.clear(clipRangeInput);
+    await user.type(clipRangeInput, "0.17");
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    expect(launchRunMock).toHaveBeenCalledWith(
+      "ppo_test_1 fork",
+      expect.objectContaining({
+        train: expect.objectContaining({
+          clip_range: 0.17,
+        }),
+      }),
+      null,
+      "run-001",
+      "latest",
+    );
+  });
+
+  it("launches a saved draft with the edited PPO clip range", async () => {
+    const user = userEvent.setup();
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    await user.click(await screen.findByRole("button", { name: "Create draft" }));
+    await user.click(screen.getByRole("button", { name: "Training" }));
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Clip range" }), {
+      target: { value: "0.17" },
+    });
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(createDraftWithSourceMock).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    expect(launchRunMock).toHaveBeenCalledWith(
+      "ppo_allcups_recurrent",
+      expect.objectContaining({
+        train: expect.objectContaining({
+          clip_range: 0.17,
+        }),
+      }),
+      "ppo_allcups_recurrent",
+      null,
+      null,
     );
   });
 

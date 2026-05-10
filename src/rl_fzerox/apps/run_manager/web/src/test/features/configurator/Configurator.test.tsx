@@ -631,6 +631,82 @@ describe("Configurator", () => {
     );
   });
 
+  it("persists PPO clip range without requiring a blur before saving", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="clip range draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Training" }));
+
+    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    await user.clear(clipRangeInput);
+    await user.type(clipRangeInput, "0.17");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "clip range draft",
+        expect.objectContaining({
+          train: expect.objectContaining({
+            clip_range: 0.17,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("launches with edited PPO clip range from an unsaved fork draft", async () => {
+    const user = userEvent.setup();
+    const onLaunchRun = vi.fn().mockResolvedValue(runFixture({ name: "run" }));
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        forkSourceArtifact="latest"
+        forkSourceRunLabel="source run"
+        initialDraftName="clip range fork"
+        initialConfig={managedRunConfigFixture}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={onLaunchRun}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Training" }));
+
+    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    await user.clear(clipRangeInput);
+    await user.type(clipRangeInput, "0.17");
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    await waitFor(() =>
+      expect(onLaunchRun).toHaveBeenCalledWith(
+        "clip range fork",
+        expect.objectContaining({
+          train: expect.objectContaining({
+            clip_range: 0.17,
+          }),
+        }),
+        null,
+      ),
+    );
+  });
+
   it("separates head presence from runtime masking in the action tab", async () => {
     const user = userEvent.setup();
 
