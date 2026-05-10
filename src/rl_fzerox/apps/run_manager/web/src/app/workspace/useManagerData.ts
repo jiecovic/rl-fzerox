@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/app/workspace/useManagerData.ts
-import { useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 
 import { loadManagerData } from "@/app/managerData";
 import { compareRuns } from "@/app/workspace/model";
@@ -42,7 +42,12 @@ export function useManagerData() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       void fetchRuns()
-        .then((nextRuns) => setRuns([...nextRuns].sort(compareRuns)))
+        .then((nextRuns) => {
+          const sortedRuns = [...nextRuns].sort(compareRuns);
+          startTransition(() => {
+            setRuns((current) => (sameRunPayload(current, sortedRuns) ? current : sortedRuns));
+          });
+        })
         .catch(() => undefined);
     }, 2_000);
     return () => window.clearInterval(intervalId);
@@ -60,4 +65,16 @@ export function useManagerData() {
     setDrafts,
     setRuns,
   };
+}
+
+function sameRunPayload(left: readonly ManagedRun[], right: readonly ManagedRun[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (JSON.stringify(left[index]) !== JSON.stringify(right[index])) {
+      return false;
+    }
+  }
+  return true;
 }
