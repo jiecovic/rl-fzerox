@@ -31,6 +31,7 @@ import { Notice, Panel } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
 
 interface ConfiguratorProps {
+  active?: boolean;
   baseConfig: ManagedRunConfig;
   existingNames: string[];
   forkSourceArtifact?: "latest" | "best" | null;
@@ -49,7 +50,10 @@ interface ConfiguratorProps {
   onUpdateDraft: (id: string, name: string, config: ManagedRunConfig) => Promise<ManagedDraft>;
 }
 
+const POLICY_PREVIEW_DEBOUNCE_MS = 250;
+
 export function Configurator({
+  active = true,
   baseConfig,
   existingNames,
   forkSourceArtifact = null,
@@ -137,10 +141,16 @@ export function Configurator({
     setPreviewError(null);
   }, [baselineConfig, baselineDraftName, resetSourceKey]);
 
+  const previewConfig = useDebouncedValue(config, POLICY_PREVIEW_DEBOUNCE_MS);
+
   useEffect(() => {
+    if (!active) {
+      setPreviewError(null);
+      return undefined;
+    }
     let ignore = false;
     setPreviewError(null);
-    void fetchPolicyPreview(config)
+    void fetchPolicyPreview(previewConfig)
       .then((preview) => {
         if (!ignore) {
           setPolicyPreview(preview);
@@ -157,7 +167,7 @@ export function Configurator({
     return () => {
       ignore = true;
     };
-  }, [config]);
+  }, [active, previewConfig]);
 
   useEffect(() => {
     notifyDraftNameChange(draftName);
@@ -416,4 +426,19 @@ export function Configurator({
       ) : null}
     </Panel>
   );
+}
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedValue(value);
+    }, delayMs);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }

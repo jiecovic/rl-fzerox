@@ -97,6 +97,7 @@ export function WorkspaceBody({
           sessions.draftEditors.map((session) => (
             <div hidden={sessions.activeTabId !== session.sessionId} key={session.sessionId}>
               <Configurator
+                active={sessions.activeTabId === session.sessionId}
                 baseConfig={defaultConfig}
                 existingNames={sessions.reservedNamesForSession(session.sessionId)}
                 forkSourceArtifact={session.forkSource?.artifact ?? null}

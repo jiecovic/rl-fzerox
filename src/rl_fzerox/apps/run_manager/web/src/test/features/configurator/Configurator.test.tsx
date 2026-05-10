@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/Configurator.test.tsx
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -34,7 +34,38 @@ describe("Configurator", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
+  });
+
+  it("debounces policy preview updates while editing config", async () => {
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(fetchPolicyPreviewMock).toHaveBeenCalledTimes(1));
+    fetchPolicyPreviewMock.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Training" }));
+    const clipRangeInput = screen.getByRole("spinbutton", { name: "Clip range" });
+    fireEvent.change(clipRangeInput, { target: { value: "0.17" } });
+    fireEvent.change(clipRangeInput, { target: { value: "0.18" } });
+
+    expect(fetchPolicyPreviewMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchPolicyPreviewMock).toHaveBeenCalledTimes(1));
+    expect(fetchPolicyPreviewMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        train: expect.objectContaining({ clip_range: 0.18 }),
+      }),
+    );
   });
 
   it("loads an opened draft into the configurator and updates it in place", async () => {
