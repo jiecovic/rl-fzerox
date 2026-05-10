@@ -13,6 +13,7 @@ from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_spec,
     auxiliary_state_target_vector,
     auxiliary_state_target_vector_or_zeros,
+    resolve_auxiliary_state_target,
 )
 from rl_fzerox.core.training.session.auxiliary_state import (
     AuxiliaryStateObservationWrapper,
@@ -52,6 +53,20 @@ def test_auxiliary_state_target_vector_returns_zeros_without_telemetry() -> None
     assert np.count_nonzero(vector) == 0
 
 
+def test_auxiliary_state_refill_surface_target_ignores_energy_fullness() -> None:
+    telemetry = make_telemetry(
+        state_flags=1,
+        energy=178.0,
+        max_energy=178.0,
+    )
+
+    vector = auxiliary_state_target_vector(telemetry)
+    refill_surface = resolve_auxiliary_state_target("surface_state.on_refill_surface")
+
+    assert telemetry.player.on_energy_refill is False
+    assert float(vector[refill_surface.vector_start]) == 1.0
+
+
 def test_course_one_hot_features_map_to_course_auxiliary_target() -> None:
     assert (
         auxiliary_state_target_name_for_feature("course_context.course_builtin_00")
@@ -63,7 +78,7 @@ def test_course_one_hot_features_map_to_course_auxiliary_target() -> None:
     )
 
 
-class _DummyDictEnv(gym.Env[dict[str, np.ndarray], int]):
+class _DummyDictEnv(gym.Env[dict[str, np.ndarray], np.int64]):
     observation_space = spaces.Dict(
         {
             "image": spaces.Box(low=0, high=255, shape=(4, 4, 3), dtype=np.uint8),
@@ -81,7 +96,7 @@ class _DummyDictEnv(gym.Env[dict[str, np.ndarray], int]):
         info = {auxiliary_state_targets_field(): np.array([1.0, 2.0, 3.0], dtype=np.float32)}
         return observation, info
 
-    def step(self, action: object):
+    def step(self, action: np.int64):
         del action
         observation = {
             "image": np.ones((4, 4, 3), dtype=np.uint8),

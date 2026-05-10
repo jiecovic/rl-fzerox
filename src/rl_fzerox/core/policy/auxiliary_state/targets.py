@@ -10,7 +10,7 @@ from gymnasium import spaces
 from fzerox_emulator import FZeroXTelemetry
 from fzerox_emulator.arrays import Float32Array, StateVector
 from rl_fzerox.core.domain.track_position import height_above_ground_feature
-from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
+from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.envs.track_bounds import track_edge_state
 
@@ -332,7 +332,7 @@ def auxiliary_state_target_vector(telemetry: FZeroXTelemetry) -> StateVector:
     _set_scalar(
         vector,
         "surface_state.on_refill_surface",
-        1.0 if player.on_energy_refill else 0.0,
+        1.0 if on_refill_surface(telemetry) else 0.0,
     )
     _set_scalar(
         vector,
