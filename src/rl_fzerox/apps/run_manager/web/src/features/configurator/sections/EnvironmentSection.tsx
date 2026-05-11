@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/EnvironmentSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import {
   BooleanField,
   RangeIntegerField,
@@ -17,15 +18,12 @@ import type { ManagedRunConfig } from "@/shared/api/contract";
 interface EnvironmentSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function EnvironmentSection({ config, defaultConfig, setConfig }: EnvironmentSectionProps) {
   const updateEnvironment = (patch: Partial<ManagedRunConfig["environment"]>) => {
-    setConfig({
-      ...config,
-      environment: { ...config.environment, ...patch },
-    });
+    patchConfigSection(setConfig, "environment", patch);
   };
   const stallTruncationEnabled = config.environment.progress_frontier_stall_limit_frames !== null;
 

@@ -324,7 +324,10 @@ export function Configurator({
               aria-label="Seed"
               type="number"
               value={config.seed}
-              onChange={(event) => setConfig({ ...config, seed: Number(event.target.value) })}
+              onChange={(event) => {
+                const seed = Number(event.target.value);
+                setConfig((currentConfig) => ({ ...currentConfig, seed }));
+              }}
             />
           </div>
           <button

@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/action/types.ts
+import type { ConfigSectionPatch, ConfigSetter } from "@/features/configurator/configurator/state";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 
 export interface ActionSectionProps {
@@ -6,7 +7,7 @@ export interface ActionSectionProps {
   defaultConfig: ManagedRunConfig;
   checkpointLocked?: boolean;
   metadata: ConfigMetadata;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export interface ActionUpdateContext {
@@ -14,7 +15,7 @@ export interface ActionUpdateContext {
   checkpointLocked?: boolean;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
-  updateAction: (patch: Partial<ManagedRunConfig["action"]>) => void;
-  updatePolicy: (patch: Partial<ManagedRunConfig["policy"]>) => void;
-  setConfig: (config: ManagedRunConfig) => void;
+  updateAction: (patch: ConfigSectionPatch<"action">) => void;
+  updatePolicy: (patch: ConfigSectionPatch<"policy">) => void;
+  setConfig: ConfigSetter;
 }

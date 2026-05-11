@@ -259,6 +259,55 @@ describe("App", () => {
     );
   });
 
+  it("launches a fork with edited course pool", async () => {
+    const user = userEvent.setup();
+    const sourceConfig = {
+      ...managedRunConfigFixture,
+      tracks: {
+        ...managedRunConfigFixture.tracks,
+        selected_course_ids: [
+          "mute_city",
+          "silence",
+          "sand_ocean",
+          "devils_forest",
+          "sector_alpha",
+        ],
+      },
+    };
+    loadManagerDataMock.mockResolvedValueOnce({
+      drafts: [],
+      metadata: configMetadataFixture,
+      runs: [runFixture({ id: "run-001", name: "ppo_test_1", config: sourceConfig })],
+      templates: [{ config: managedRunConfigFixture, id: "template-001", name: "default" }],
+    });
+
+    render(<App />);
+
+    const workspaceTabs = await screen.findByRole("navigation", { name: "Run manager sections" });
+    await user.click(within(workspaceTabs).getByRole("button", { name: "Runs" }));
+    const runOpenButtons = screen.getAllByRole("button", { name: "Open run ppo_test_1" });
+    const openRunButton = runOpenButtons.at(-1);
+    if (openRunButton === undefined) {
+      throw new Error("expected at least one open-run button");
+    }
+    await user.click(openRunButton);
+    await user.click(await screen.findByRole("button", { name: "Fork latest checkpoint" }));
+    await user.click(screen.getByRole("button", { name: "Big Blue" }));
+    await user.click(screen.getByRole("button", { name: "Port Town" }));
+    await user.click(screen.getByRole("button", { name: "Train" }));
+
+    const launchedConfig = launchRunMock.mock.calls[0]?.[1] as typeof managedRunConfigFixture;
+    expect(launchedConfig.tracks.selected_course_ids).toEqual([
+      "mute_city",
+      "silence",
+      "sand_ocean",
+      "devils_forest",
+      "big_blue",
+      "port_town",
+      "sector_alpha",
+    ]);
+  });
+
   it("launches a saved draft with the edited PPO clip range", async () => {
     const user = userEvent.setup();
     loadManagerDataMock.mockResolvedValueOnce({

@@ -1,6 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/ObservationSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
+  type ConfigSectionPatch,
+  type ConfigSetter,
+  patchConfigSection,
+} from "@/features/configurator/configurator/state";
+import {
   BooleanField,
   DiscreteSliderNumberField,
   IntegerField,
@@ -19,7 +24,7 @@ interface ObservationSectionProps {
   metadata: ConfigMetadata;
   checkpointLocked?: boolean;
   preview: PolicyArchitecturePreview | null;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function ObservationSection({
@@ -30,11 +35,11 @@ export function ObservationSection({
   preview,
   setConfig,
 }: ObservationSectionProps) {
-  const updateObservation = (patch: Partial<ManagedRunConfig["observation"]>) => {
-    setConfig({ ...config, observation: { ...config.observation, ...patch } });
+  const updateObservation = (patch: ConfigSectionPatch<"observation">) => {
+    patchConfigSection(setConfig, "observation", patch);
   };
-  const updatePolicy = (patch: Partial<ManagedRunConfig["policy"]>) => {
-    setConfig({ ...config, policy: { ...config.policy, ...patch } });
+  const updatePolicy = (patch: ConfigSectionPatch<"policy">) => {
+    patchConfigSection(setConfig, "policy", patch);
   };
   const stackModeOptions = metadata.stack_modes.map(
     (option) => option.value,

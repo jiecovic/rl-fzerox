@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/TrainingSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import {
   BooleanField,
   DiscreteSliderNumberField,
@@ -14,12 +15,12 @@ import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 interface ConfigSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSectionProps) {
   const updateTrain = (patch: Partial<ManagedRunConfig["train"]>) => {
-    setConfig({ ...config, train: { ...config.train, ...patch } });
+    patchConfigSection(setConfig, "train", patch);
   };
   const derived = trainingDerivedValues(config.train);
   const rolloutStepValues = compatibleRolloutSteps(config.train);

@@ -1,5 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicySection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import {
+  type ConfigSectionPatch,
+  type ConfigSetter,
+  patchConfigSection,
+} from "@/features/configurator/configurator/state";
 import { BooleanField, IntegerField, SelectField } from "@/features/configurator/fields";
 import { PolicyPreviewPanel } from "@/features/configurator/sections/PolicyPreviewPanel";
 import { FeatureDimField } from "@/features/configurator/sections/policy/FeatureDimField";
@@ -17,7 +22,7 @@ interface PolicySectionProps {
   metadata: ConfigMetadata;
   checkpointLocked?: boolean;
   preview: PolicyArchitecturePreview | null;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function PolicySection({
@@ -28,17 +33,17 @@ export function PolicySection({
   preview,
   setConfig,
 }: PolicySectionProps) {
-  const updatePolicy = (patch: Partial<ManagedRunConfig["policy"]>) => {
-    setConfig({ ...config, policy: { ...config.policy, ...patch } });
+  const updatePolicy = (patch: ConfigSectionPatch<"policy">) => {
+    patchConfigSection(setConfig, "policy", patch);
   };
   const updateConvProfile = (value: ManagedRunConfig["policy"]["conv_profile"]) => {
-    updatePolicy({
+    patchConfigSection(setConfig, "policy", (currentConfig) => ({
       conv_profile: value,
       custom_conv_layers:
-        value === "custom" && config.policy.custom_conv_layers.length === 0
+        value === "custom" && currentConfig.policy.custom_conv_layers.length === 0
           ? defaultConfig.policy.custom_conv_layers
-          : config.policy.custom_conv_layers,
-    });
+          : currentConfig.policy.custom_conv_layers,
+    }));
   };
   const jumpToCnnConfigurator = () => {
     document.getElementById("policy-cnn-configurator")?.scrollIntoView({

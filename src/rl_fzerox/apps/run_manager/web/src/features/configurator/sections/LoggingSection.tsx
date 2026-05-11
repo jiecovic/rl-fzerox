@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/LoggingSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import { BooleanField, RangeIntegerField } from "@/features/configurator/fields";
 import {
   checkpointCadenceSummary,
@@ -11,12 +12,12 @@ import type { ManagedRunConfig } from "@/shared/api/contract";
 interface LoggingSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSectionProps) {
   const updateTrain = (patch: Partial<ManagedRunConfig["train"]>) => {
-    setConfig({ ...config, train: { ...config.train, ...patch } });
+    patchConfigSection(setConfig, "train", patch);
   };
 
   return (
