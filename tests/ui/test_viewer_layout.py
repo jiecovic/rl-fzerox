@@ -19,7 +19,7 @@ from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
     _draw_panel_tabs,
     _panel_tab_hint,
 )
-from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
+from rl_fzerox.ui.watch.view.screen.frame import _create_fonts, _watch_window_size
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine
@@ -176,6 +176,25 @@ def test_window_size_adds_sidebar_width() -> None:
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1204, 980)
+
+
+def test_watch_window_size_fits_native_observation_preview() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        size = _watch_window_size(
+            (592, 444),
+            (180, 240, 6),
+            fonts=fonts,
+            info={"observation_stack": 2, "observation_stack_mode": "rgb"},
+        )
+
+        assert size[0] >= 240 * 2 + (2 * LAYOUT.preview_padding) + LAYOUT.preview_gap
+        assert size[1] > 980
+    finally:
+        pygame.quit()
 
 
 def test_side_panel_fits_default_watch_window_height() -> None:

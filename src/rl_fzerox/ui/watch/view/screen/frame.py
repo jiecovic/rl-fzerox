@@ -18,6 +18,8 @@ from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
     _draw_observation_preview_in_rect,
+    _native_observation_preview_height,
+    _native_observation_preview_width,
 )
 from rl_fzerox.ui.watch.view.panels.core.model import (
     _observation_preview_size,
@@ -25,7 +27,7 @@ from rl_fzerox.ui.watch.view.panels.core.model import (
     _window_size,
 )
 from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
-from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
+from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz, _control_viz_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -125,13 +127,17 @@ def _create_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
     panel_tab_index: int = 0,
 ) -> PygameSurface:
     _apply_window_position_hint()
     screen = pygame.display.set_mode(
-        _window_size(
+        _watch_window_size(
             game_display_size,
             observation_shape,
+            fonts=fonts,
+            info=info,
             panel_tab_index=panel_tab_index,
         )
     )
@@ -145,6 +151,8 @@ def _ensure_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
     panel_tab_index: int = 0,
 ) -> PygameSurface:
     if screen is None:
@@ -152,11 +160,15 @@ def _ensure_screen(
             pygame,
             game_display_size,
             observation_shape,
+            fonts=fonts,
+            info=info,
             panel_tab_index=panel_tab_index,
         )
-    if screen.get_size() == _window_size(
+    if screen.get_size() == _watch_window_size(
         game_display_size,
         observation_shape,
+        fonts=fonts,
+        info=info,
         panel_tab_index=panel_tab_index,
     ):
         return screen
@@ -164,12 +176,65 @@ def _ensure_screen(
         pygame,
         game_display_size,
         observation_shape,
+        fonts=fonts,
+        info=info,
         panel_tab_index=panel_tab_index,
     )
 
 
 def _watch_game_display_size() -> tuple[int, int]:
     return LAYOUT.game_display_size
+
+
+def _watch_left_column_width(
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+    *,
+    info: dict[str, object],
+) -> int:
+    native_preview_width = _native_observation_preview_width(
+        observation_shape=observation_shape,
+        info=info,
+    )
+    return max(game_display_size[0], native_preview_width + (2 * LAYOUT.preview_padding))
+
+
+def _watch_window_size(
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+    *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
+    panel_tab_index: int = 0,
+) -> tuple[int, int]:
+    left_column_width = _watch_left_column_width(
+        game_display_size,
+        observation_shape,
+        info=info,
+    )
+    left_content_width = left_column_width - (2 * LAYOUT.preview_padding)
+    left_column_height = (
+        game_display_size[1]
+        + LAYOUT.preview_gap
+        + _control_viz_height(fonts)
+        + LAYOUT.preview_gap
+        + _native_observation_preview_height(
+            fonts=fonts,
+            observation_shape=observation_shape,
+            info=info,
+            width=left_content_width,
+        )
+        + LAYOUT.preview_padding
+    )
+    _, baseline_height = _window_size(
+        game_display_size,
+        observation_shape,
+        panel_tab_index=panel_tab_index,
+    )
+    return (
+        left_column_width + LAYOUT.preview_gap + LAYOUT.panel_width,
+        max(baseline_height, left_column_height),
+    )
 
 
 def _draw_frame(
@@ -180,6 +245,11 @@ def _draw_frame(
     data: FrameRenderData,
 ) -> ViewerHitboxes:
     game_display_size = _watch_game_display_size()
+    left_column_width = _watch_left_column_width(
+        game_display_size,
+        data.observation.shape,
+        info=data.info,
+    )
     game_surface = _rgb_surface(pygame, data.raw_frame)
 
     preview_frame = _preview_frame(data.observation, info=data.info)
@@ -230,7 +300,7 @@ def _draw_frame(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        game_display_size=game_display_size,
+        left_column_size=(left_column_width, game_display_size[1]),
         control_viz=control_viz,
     )
     _draw_observation_preview_in_rect(
@@ -240,18 +310,20 @@ def _draw_frame(
         surface=observation_surface,
         x=LAYOUT.preview_padding,
         y=control_bottom + LAYOUT.preview_gap,
-        width=game_display_size[0] - (2 * LAYOUT.preview_padding),
+        width=left_column_width - (2 * LAYOUT.preview_padding),
         height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
         observation_shape=data.observation.shape,
         info=data.info,
     )
     panel_rect = pygame.Rect(
-        game_display_size[0] + LAYOUT.preview_gap,
+        left_column_width + LAYOUT.preview_gap,
         0,
         LAYOUT.panel_width,
-        _window_size(
+        _watch_window_size(
             game_display_size,
             data.observation.shape,
+            fonts=fonts,
+            info=data.info,
             panel_tab_index=data.panel_tab_index,
         )[1],
     )

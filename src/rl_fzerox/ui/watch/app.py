@@ -119,6 +119,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 screen,
                 game_display_size,
                 snapshot.observation_image.shape,
+                fonts=fonts,
+                info=snapshot.info,
                 panel_tab_index=panel_tab_index,
             )
             render_rate.tick()
