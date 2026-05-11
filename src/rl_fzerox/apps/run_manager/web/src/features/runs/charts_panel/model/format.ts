@@ -1,16 +1,4 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model/format.ts
-const RUN_CHART_SERIES_PALETTE = [
-  "var(--accent)",
-  "var(--run-accent)",
-  "#b7791f",
-  "#7c3aed",
-  "#c2410c",
-  "#0f766e",
-] as const;
-
-export function chartSeriesColor(index: number) {
-  return RUN_CHART_SERIES_PALETTE[index % RUN_CHART_SERIES_PALETTE.length];
-}
 
 export function latestPointValue(points: { value: number }[]) {
   return points.at(-1)?.value ?? null;
