@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchPolicyPreview, fetchRunTrackSamplingState } from "@/shared/api/client";
 import type {
   ManagedRun,
+  ManagedRunConfig,
   PolicyArchitecturePreview,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
@@ -27,7 +28,7 @@ export function useRunClock(status: ManagedRun["status"]): number {
 }
 
 export function useRunPolicyPreview(
-  config: ManagedRun["config"],
+  config: ManagedRunConfig,
   enabled: boolean,
 ): {
   policyPreview: PolicyArchitecturePreview | null;

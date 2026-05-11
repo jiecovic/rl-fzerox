@@ -14,6 +14,7 @@ from rl_fzerox.core.manager.models import (
     ManagedRunEvent,
     ManagedRunMetricSample,
     ManagedRunRuntime,
+    ManagedRunSummary,
     ManagedRunTemplate,
 )
 from rl_fzerox.core.manager.run_spec import (
@@ -34,6 +35,7 @@ __all__ = [
     "ManagedRunEvent",
     "ManagedRunMetricSample",
     "ManagedRunRuntime",
+    "ManagedRunSummary",
     "ManagedRunTemplate",
     "ManagerStore",
     "default_managed_run_config",

@@ -6,7 +6,7 @@ import type {
 } from "@/features/runs/track_pool_panel/types";
 import type {
   ConfigMetadata,
-  ManagedRun,
+  ManagedRunDetail,
   TrackSamplingRuntimeEntry,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
@@ -14,7 +14,7 @@ import { formatRelativeTime } from "@/shared/ui/format";
 
 export function buildTrackPoolView(
   metadata: ConfigMetadata,
-  run: ManagedRun,
+  run: ManagedRunDetail,
   state: TrackSamplingRuntimeState | null,
 ): TrackPoolView {
   const cupOrder = metadata.track_cups.map((cup) => cup.id);
@@ -83,11 +83,11 @@ export function showTrackSamplingState(state: TrackSamplingRuntimeState | null) 
   return state !== null && state.entries.length > 1;
 }
 
-export function expectsTrackSamplingState(run: ManagedRun, totalCourses: number) {
+export function expectsTrackSamplingState(run: ManagedRunDetail, totalCourses: number) {
   return run.config.tracks.sampling_mode === "step_balanced" && totalCourses > 1;
 }
 
-export function trackSamplingUpdatedLabel(run: ManagedRun) {
+export function trackSamplingUpdatedLabel(run: ManagedRunDetail) {
   const updatedAt = run.runtime?.updated_at;
   if (updatedAt === undefined || updatedAt === null) {
     return "recently";
@@ -121,7 +121,7 @@ export function shortCupLabel(label: string) {
   return label.replace(/\s+Cup$/u, "");
 }
 
-export function trackPoolEmptyMessage(run: ManagedRun) {
+export function trackPoolEmptyMessage(run: ManagedRunDetail) {
   return run.status === "running"
     ? "Waiting for the worker to publish the current track-pool distribution."
     : "No track-pool stats yet. Resume the run to accumulate a fresh distribution.";

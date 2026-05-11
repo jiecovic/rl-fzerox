@@ -8,6 +8,40 @@
   gap: 10px;
 }
 
+.run-lineage-bucket-list {
+  display: grid;
+  gap: 14px;
+}
+
+.run-lineage-bucket {
+  display: grid;
+  gap: 8px;
+}
+
+.run-lineage-bucket-header {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0 2px;
+  text-align: left;
+}
+
+.run-lineage-bucket-meta {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .run-lineage-card {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -63,6 +97,35 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+.run-lineage-group-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.run-lineage-group-form input {
+  width: 220px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--text);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.compact-lineage-group-button {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.run-lineage-group-error {
+  border-top: 1px solid var(--border);
+  color: var(--danger);
+  font-size: 12px;
+  padding: 7px 12px;
 }
 
 .run-lineage-body {

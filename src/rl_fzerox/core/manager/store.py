@@ -7,11 +7,19 @@ import sqlite3
 from pathlib import Path
 from typing import Literal
 
-from rl_fzerox.core.manager.artifacts.paths import manager_runs_root
+from rl_fzerox.core.manager.artifacts.paths import (
+    manager_runs_root,
+    manager_tensorboard_views_root,
+)
+from rl_fzerox.core.manager.artifacts.tensorboard_views import (
+    TensorboardViewGroup,
+    rebuild_tensorboard_views,
+)
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunDraft,
     ManagedRunEvent,
+    ManagedRunSummary,
     ManagedRunTemplate,
     RunCommand,
     RunStatus,
@@ -78,6 +86,11 @@ class ManagerStore:
     def manager_runs_root(self, *, output_root: Path | None = None) -> Path:
         return manager_runs_root(output_root=output_root)
 
+    def tensorboard_views_root(self, *, output_root: Path | None = None) -> Path:
+        if output_root is None:
+            return self.db_path.parent.parent / "tensorboard_views"
+        return manager_tensorboard_views_root(output_root=output_root)
+
     def path(self, value: str | Path) -> Path:
         return Path(value).expanduser().resolve()
 
@@ -139,6 +152,9 @@ class ManagerStore:
 
     def list_visible_runs(self) -> tuple[ManagedRun, ...]:
         return run_registry.list_visible_runs(self)
+
+    def list_visible_run_summaries(self) -> tuple[ManagedRunSummary, ...]:
+        return run_registry.list_visible_run_summaries(self)
 
     def list_recent_run_events(
         self,
@@ -300,6 +316,24 @@ class ManagerStore:
 
     def delete_lineage(self, lineage_id: str) -> bool:
         return lineage_registry.delete_lineage(self, lineage_id)
+
+    def update_lineage_groups(
+        self,
+        *,
+        lineage_id: str,
+        group_names: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        return lineage_registry.update_lineage_groups(
+            self,
+            lineage_id=lineage_id,
+            group_names=group_names,
+        )
+
+    def rebuild_tensorboard_views(self) -> tuple[TensorboardViewGroup, ...]:
+        return rebuild_tensorboard_views(
+            self.list_visible_runs(),
+            view_root=self.tensorboard_views_root(),
+        )
 
     def migrate_lineage_layout(self) -> int:
         return lineage_registry.migrate_lineage_layout(self)

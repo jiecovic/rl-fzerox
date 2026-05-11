@@ -1,6 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/TrackActionPanels.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
-import { IntegerField, NumberField } from "@/features/configurator/fields";
+import { IntegerField, NumberField, RangeNumberField } from "@/features/configurator/fields";
 import {
   actionDefaults,
   energyDefaults,
@@ -14,6 +14,7 @@ export function TrackActionPanels({
   defaultConfig,
   openSections,
   setSectionOpen,
+  updateAction,
   updateReward,
 }: RewardPanelProps) {
   return (
@@ -40,14 +41,6 @@ export function TrackActionPanels({
             step="0.1"
             value={config.reward.lap_position_scale}
             onChange={(value) => updateReward({ lap_position_scale: value })}
-          />
-          <NumberField
-            help="Minimum energy loss treated as meaningful damage."
-            label="Energy loss epsilon"
-            resetValue={defaultConfig.reward.energy_loss_epsilon}
-            step="0.001"
-            value={config.reward.energy_loss_epsilon}
-            onChange={(value) => updateReward({ energy_loss_epsilon: value })}
           />
           <NumberField
             help="Progress reward multiplier while on dirt."
@@ -113,7 +106,10 @@ export function TrackActionPanels({
         open={openSections.actions}
         title="Actions"
         onToggle={(open) => setSectionOpen("actions", open)}
-        onReset={() => updateReward(actionDefaults(defaultConfig.reward))}
+        onReset={() => {
+          updateReward(actionDefaults(defaultConfig.reward));
+          updateAction({ pitch_deadzone: defaultConfig.action.pitch_deadzone });
+        }}
       >
         <div className="config-field-grid">
           <NumberField
@@ -157,12 +153,28 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ lean_request_penalty: value })}
           />
           <NumberField
-            help="Small penalty for grounded pitch input outside the deadzone. This regularizes useless on-ground continuous pitch without affecting airborne control."
+            help="Small penalty for grounded pitch requests above the penalty threshold. This does not clamp controller pitch."
             label="Grounded pitch penalty"
             resetValue={defaultConfig.reward.grounded_pitch_penalty}
             step="0.001"
             value={config.reward.grounded_pitch_penalty}
             onChange={(value) => updateReward({ grounded_pitch_penalty: value })}
+          />
+          <RangeNumberField
+            help="Threshold used only by grounded pitch penalty. It does not alter the pitch sent to the controller."
+            label="Pitch penalty threshold"
+            max={0.5}
+            min={0}
+            rangeStep={0.01}
+            resetValue={defaultConfig.action.pitch_deadzone}
+            ticks={[
+              { label: "0", value: 0 },
+              { label: "0.1", value: 0.1 },
+              { label: "0.25", value: 0.25 },
+              { label: "0.5", value: 0.5 },
+            ]}
+            value={config.action.pitch_deadzone}
+            onChange={(value) => updateAction({ pitch_deadzone: value })}
           />
         </div>
       </ConfigDisclosure>

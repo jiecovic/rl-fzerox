@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/panel/model.ts
 import type {
   PendingDelete,
+  RunLineageBucket,
   RunLineageGroup,
   RunLineageRun,
   RunSource,
@@ -42,6 +43,38 @@ export function buildLineageGroups(
       buildLineageGroup(lineageId, lineageRuns, dependentDraftCountByRunId),
     )
     .sort((left, right) => compareIso(right.latestUpdatedAt, left.latestUpdatedAt));
+}
+
+export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLineageBucket[] {
+  const bucketsById = new Map<string, RunLineageBucket>();
+  for (const lineage of lineages) {
+    const groupNames = lineage.groupNames.length === 0 ? [null] : lineage.groupNames;
+    for (const groupName of groupNames) {
+      const id = groupName === null ? "ungrouped" : slugifyGroupName(groupName);
+      const existing = bucketsById.get(id);
+      if (existing === undefined) {
+        bucketsById.set(id, {
+          groupName,
+          id,
+          label: groupName ?? "Ungrouped",
+          lineages: [lineage],
+          slug: id,
+        });
+      } else {
+        existing.lineages.push(lineage);
+      }
+    }
+  }
+  return [...bucketsById.values()].sort((left, right) => {
+    if (left.groupName === null || right.groupName === null) {
+      return left.groupName === null && right.groupName === null
+        ? 0
+        : left.groupName === null
+          ? 1
+          : -1;
+    }
+    return left.label.localeCompare(right.label);
+  });
 }
 
 export function progressLabel(run: ManagedRun) {
@@ -148,11 +181,21 @@ function buildLineageGroup(
   return {
     canDeleteLineage,
     createdAt,
+    groupNames: rootRun?.lineage_groups ?? [],
     id: lineageId,
     label,
     latestUpdatedAt,
     runs,
   };
+}
+
+function slugifyGroupName(groupName: string) {
+  return (
+    groupName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "unnamed"
+  );
 }
 
 function parentLineageRun(run: ManagedRun, runById: ReadonlyMap<string, ManagedRun>) {

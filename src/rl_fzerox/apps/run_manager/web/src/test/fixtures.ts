@@ -2,8 +2,8 @@
 import type {
   ConfigMetadata,
   ManagedDraft,
-  ManagedRun,
   ManagedRunConfig,
+  ManagedRunDetail,
   ManagedRunMetricSample,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
@@ -35,13 +35,17 @@ export function draftFixture(overrides: Partial<ManagedDraft> = {}): ManagedDraf
   };
 }
 
-export function runFixture(overrides: Partial<ManagedRun> = {}): ManagedRun {
+export function runFixture(overrides: Partial<ManagedRunDetail> = {}): ManagedRunDetail {
+  const config = overrides.config ?? managedRunConfigFixture;
   return {
     id: "run-001",
     name: "ppo_test_1",
     status: "running",
+    config_hash: "test-config-hash",
+    action_repeat: config.action.action_repeat,
     created_at: "2026-05-03T18:52:02+00:00",
     lineage_id: "run-001",
+    lineage_groups: [],
     lineage_step_offset: 0,
     started_at: "2026-05-03T18:52:10+00:00",
     stopped_at: null,
@@ -65,7 +69,7 @@ export function runFixture(overrides: Partial<ManagedRun> = {}): ManagedRun {
       value_loss: 0.27,
       policy_gradient_loss: -0.03,
     },
-    config: managedRunConfigFixture,
+    config,
     ...overrides,
   };
 }

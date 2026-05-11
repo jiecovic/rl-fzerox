@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/types.ts
+import type { ConfigSectionPatch } from "@/features/configurator/configurator/state";
 import type { ManagedRunConfig } from "@/shared/api/contract";
 
 import type { RewardDisclosureState } from "./disclosureState";
@@ -8,5 +9,6 @@ export interface RewardPanelProps {
   defaultConfig: ManagedRunConfig;
   openSections: RewardDisclosureState;
   setSectionOpen: (id: keyof RewardDisclosureState, open: boolean) => void;
+  updateAction: (patch: ConfigSectionPatch<"action">) => void;
   updateReward: (patch: Partial<ManagedRunConfig["reward"]>) => void;
 }

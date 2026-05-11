@@ -58,7 +58,7 @@ class ManagedPolicyConfig(BaseModel):
     )
     features_dim: FeatureDim = "auto"
     state_net_arch: tuple[PositiveInt, ...] = (64,)
-    fusion_features_dim: PositiveInt = 768
+    fusion_features_dim: PositiveInt | None = 768
     layer_norm: bool = True
     activation: ActivationName = "relu"
     recurrent_enabled: bool = True

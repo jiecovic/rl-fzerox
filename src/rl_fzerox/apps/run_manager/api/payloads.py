@@ -6,8 +6,10 @@ from rl_fzerox.core.manager import (
     ManagedRunDraft,
     ManagedRunEvent,
     ManagedRunMetricSample,
+    ManagedRunSummary,
     ManagedRunTemplate,
 )
+from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
 from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingRuntimeState
 
 
@@ -39,12 +41,33 @@ def run_payload(
     *,
     recent_events: tuple[ManagedRunEvent, ...] = (),
 ) -> dict[str, object]:
+    payload = run_summary_payload(run, recent_events=recent_events)
+    payload["config"] = run.config.model_dump(mode="json")
+    return payload
+
+
+def run_summary_payload(
+    run: ManagedRun | ManagedRunSummary,
+    *,
+    recent_events: tuple[ManagedRunEvent, ...] = (),
+    action_repeat: int | None = None,
+) -> dict[str, object]:
+    resolved_action_repeat = (
+        action_repeat
+        if action_repeat is not None
+        else run.action_repeat
+        if isinstance(run, ManagedRunSummary)
+        else run.config.action.action_repeat
+    )
     return {
         "id": run.id,
         "name": run.name,
         "status": run.status,
+        "config_hash": run.config_hash,
+        "action_repeat": resolved_action_repeat,
         "created_at": run.created_at,
         "lineage_id": run.lineage_id,
+        "lineage_groups": list(run.lineage_groups),
         "lineage_step_offset": run.lineage_step_offset,
         "started_at": run.started_at,
         "stopped_at": run.stopped_at,
@@ -77,7 +100,16 @@ def run_payload(
             }
             for event in recent_events
         ],
-        "config": run.config.model_dump(mode="json"),
+    }
+
+
+def tensorboard_view_group_payload(group: TensorboardViewGroup) -> dict[str, object]:
+    return {
+        "name": group.name,
+        "slug": group.slug,
+        "path": str(group.path),
+        "lineage_count": group.lineage_count,
+        "run_count": group.run_count,
     }
 
 

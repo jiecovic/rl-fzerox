@@ -44,6 +44,14 @@ export function DamagePanel({
           onChange={(value) => updateReward({ damage_taken_streak_cap_frames: value })}
         />
         <NumberField
+          help="Minimum repeated-step energy drop treated as real damage, filtering tiny native noise."
+          label="Energy loss epsilon"
+          resetValue={defaultConfig.reward.energy_loss_epsilon}
+          step="0.001"
+          value={config.reward.energy_loss_epsilon}
+          onChange={(value) => updateReward({ energy_loss_epsilon: value })}
+        />
+        <NumberField
           help="Penalty when collision recoil is entered."
           label="Collision recoil penalty"
           resetValue={defaultConfig.reward.collision_recoil_penalty}

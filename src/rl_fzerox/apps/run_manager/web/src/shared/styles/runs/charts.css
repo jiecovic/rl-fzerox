@@ -19,6 +19,23 @@
   font-size: 12px;
 }
 
+.run-chart-group-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-chart-group-filter select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 6px 8px;
+  font: inherit;
+}
+
 .run-chart-selection-list {
   display: grid;
   gap: 10px;

@@ -17,7 +17,12 @@ import {
   trainFpsLabel,
 } from "@/features/runs/workspace/model";
 import { useRunClock } from "@/features/runs/workspace/polling";
-import type { ConfigMetadata, ManagedRun, TrackSamplingRuntimeState } from "@/shared/api/contract";
+import type {
+  ConfigMetadata,
+  ManagedRun,
+  ManagedRunDetail,
+  TrackSamplingRuntimeState,
+} from "@/shared/api/contract";
 import { formatDate } from "@/shared/ui/format";
 import {
   ChartIcon,
@@ -35,7 +40,7 @@ interface RunRuntimeSummaryProps {
   allRuns: ManagedRun[];
   metadata: ConfigMetadata;
   onShowCharts: (runId: string) => void;
-  run: ManagedRun;
+  run: ManagedRunDetail;
   trackSamplingState: TrackSamplingRuntimeState | null;
 }
 
@@ -306,7 +311,7 @@ export function RunRuntimeSummary({
   );
 }
 
-export function runWorkspaceSubtitle(run: ManagedRun) {
+export function runWorkspaceSubtitle(run: ManagedRunDetail) {
   return (
     <>
       <span>{run.status}</span>

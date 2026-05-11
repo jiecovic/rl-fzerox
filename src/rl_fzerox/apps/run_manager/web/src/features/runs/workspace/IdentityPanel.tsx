@@ -1,13 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/IdentityPanel.tsx
 import { FieldLabel } from "@/features/configurator/fields";
-import type { ManagedRun } from "@/shared/api/contract";
+import type { ManagedRunDetail } from "@/shared/api/contract";
 
 interface RunIdentityPanelProps {
   canRename: boolean;
   isRenaming: boolean;
   onRename: () => Promise<void>;
   onRunNameChange: (name: string) => void;
-  run: ManagedRun;
+  run: ManagedRunDetail;
   runName: string;
 }
 

@@ -21,22 +21,32 @@ from rl_fzerox.core.manager.artifacts.fork_source import (
 )
 from rl_fzerox.core.manager.artifacts.paths import (
     manager_runs_root,
+    manager_tensorboard_views_root,
     predicted_managed_lineage_dir,
     predicted_managed_run_dir,
+)
+from rl_fzerox.core.manager.artifacts.tensorboard_views import (
+    TensorboardViewGroup,
+    rebuild_tensorboard_views,
+    slugify_path_segment,
 )
 
 __all__ = [
     "FilesystemOperation",
+    "TensorboardViewGroup",
     "apply_filesystem_operation",
     "clone_fork_source",
     "draft_fork_source_dir",
     "filesystem_operation_from_row",
     "manager_runs_root",
+    "manager_tensorboard_views_root",
     "predicted_managed_lineage_dir",
     "predicted_managed_run_dir",
     "queue_delete_tree",
     "queue_move_tree",
+    "rebuild_tensorboard_views",
     "reset_fork_source_dir",
     "run_fork_source_dir",
+    "slugify_path_segment",
     "snapshot_fork_source",
 ]

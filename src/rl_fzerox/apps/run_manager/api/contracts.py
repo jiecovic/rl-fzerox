@@ -38,6 +38,14 @@ class UpdateRunRequest(BaseModel):
     name: str
 
 
+class UpdateLineageGroupsRequest(BaseModel):
+    """Request body for assigning one lineage to UI/TensorBoard groups."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    group_names: tuple[str, ...] = ()
+
+
 class LaunchRunRequest(BaseModel):
     """Request body for launching one managed training run."""
 

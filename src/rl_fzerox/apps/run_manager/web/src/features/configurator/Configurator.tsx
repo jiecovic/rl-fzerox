@@ -110,7 +110,7 @@ export function Configurator({
     if (normalizedDraftName !== normalizedBaselineDraftName) {
       return true;
     }
-    return JSON.stringify(config) !== JSON.stringify(baselineConfig);
+    return stableJson(config) !== stableJson(baselineConfig);
   }, [baselineConfig, config, normalizedBaselineDraftName, normalizedDraftName]);
   const notifyDraftNameChange = useEffectEvent((name: string) => {
     onDraftNameChange?.(name);
@@ -197,7 +197,9 @@ export function Configurator({
     setIsSaving(true);
     setError(null);
     try {
-      await onSaveDraft(normalizedDraftName, committedConfig);
+      const savedDraft = await onSaveDraft(normalizedDraftName, committedConfig);
+      setDraftName(savedDraft.name);
+      setConfig(savedDraft.config);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to save draft");
     } finally {
@@ -216,7 +218,9 @@ export function Configurator({
     setIsUpdating(true);
     setError(null);
     try {
-      await onUpdateDraft(loadedDraft.id, normalizedDraftName, committedConfig);
+      const savedDraft = await onUpdateDraft(loadedDraft.id, normalizedDraftName, committedConfig);
+      setDraftName(savedDraft.name);
+      setConfig(savedDraft.config);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "failed to update draft");
     } finally {
@@ -444,4 +448,22 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
   }, [delayMs, value]);
 
   return debouncedValue;
+}
+
+function stableJson(value: unknown): string {
+  return JSON.stringify(sortObjectKeys(value));
+}
+
+function sortObjectKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sortObjectKeys);
+  }
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, nestedValue]) => [key, sortObjectKeys(nestedValue)]),
+  );
 }

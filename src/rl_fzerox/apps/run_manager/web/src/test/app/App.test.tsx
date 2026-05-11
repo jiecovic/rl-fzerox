@@ -19,6 +19,7 @@ const createDraftWithSourceMock = vi.fn();
 const updateDraftWithSourceMock = vi.fn();
 const deleteDraftMock = vi.fn();
 const deleteRunMock = vi.fn();
+const fetchRunMock = vi.fn();
 const fetchRunsMock = vi.fn();
 const fetchRunMetricsMock = vi.fn();
 const fetchRunTrackSamplingStateMock = vi.fn();
@@ -46,6 +47,7 @@ vi.mock("@/shared/api/client", async () => {
     ) => createDraftWithSourceMock(name, config, sourceRunId, sourceArtifact),
     deleteDraft: (id: string) => deleteDraftMock(id),
     deleteRun: (id: string) => deleteRunMock(id),
+    fetchRun: (runId: string) => fetchRunMock(runId),
     fetchRuns: () => fetchRunsMock(),
     fetchRunMetrics: (runId: string) => fetchRunMetricsMock(runId),
     fetchRunTrackSamplingState: (runId: string) => fetchRunTrackSamplingStateMock(runId),
@@ -96,6 +98,7 @@ describe("App", () => {
     );
     deleteDraftMock.mockResolvedValue(undefined);
     deleteRunMock.mockResolvedValue(undefined);
+    fetchRunMock.mockResolvedValue(runFixture());
     fetchRunsMock.mockResolvedValue([]);
     fetchRunMetricsMock.mockResolvedValue([runMetricSampleFixture()]);
     fetchRunTrackSamplingStateMock.mockResolvedValue(null);

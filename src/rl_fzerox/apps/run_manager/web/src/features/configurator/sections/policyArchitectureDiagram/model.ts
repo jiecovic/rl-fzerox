@@ -14,7 +14,6 @@ export function buildArchitectureGraph(preview: PolicyArchitecturePreview): Arch
     lane.nodes.filter(isVisibleArchitectureNode),
   );
   const sourceNodes = visibleLanes.flat();
-  const sourceById = new Map(sourceNodes.map((node) => [node.id, node]));
 
   for (const node of sourceNodes) {
     addVisualNode(node, visuals, children);
@@ -40,14 +39,14 @@ export function buildArchitectureGraph(preview: PolicyArchitecturePreview): Arch
   addEdgeFromLastNode(visibleLanes[0] ?? [], "concat:image", edges);
   addEdgeFromLastNode(visibleLanes[1] ?? [], "concat:state", edges);
 
-  if (visuals.has("fusion")) {
-    addEdge("concat:out", "fusion", edges);
+  const postConcatPath = ["fusion", "layer_norm", "lstm"].filter((id) => visuals.has(id));
+  const firstPostConcatNode = postConcatPath[0];
+  if (firstPostConcatNode !== undefined) {
+    addEdge("concat:out", firstPostConcatNode, edges);
   }
+  connectIds(postConcatPath, edges);
 
-  const fusionPath = ["fusion", "layer_norm", "lstm"].filter((id) => visuals.has(id));
-  connectIds(fusionPath, edges);
-
-  const headSource = sourceById.has("lstm") ? "lstm" : lastId(fusionPath);
+  const headSource = lastId(postConcatPath) ?? "concat:out";
   for (const headId of ["policy_head", "value_head", "heads"]) {
     if (headSource !== undefined && visuals.has(headId)) {
       addEdge(headSource, headId, edges);
@@ -185,12 +184,21 @@ function detailLinesForNode(node: ArchitectureNode) {
   if (node.id === "lstm") {
     return detail.split(", ").map((part) => part.trim());
   }
-  if (node.id === "policy_head" || node.id === "value_head") {
+  if (activationDetailNodeIds.has(node.id)) {
     const [shape, activation] = splitAtLastComma(detail);
     return activation === undefined ? [shape] : [shape, activation];
   }
   return wrapDetailLine(detail);
 }
+
+const activationDetailNodeIds = new Set([
+  "cnn",
+  "image_projection",
+  "state_mlp",
+  "fusion",
+  "policy_head",
+  "value_head",
+]);
 
 function normalizeDetail(value: string) {
   return value.replaceAll(" -> ", " → ").replaceAll(", ", ",").replaceAll(",", ", ");

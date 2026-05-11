@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import {
   draftForkSource,
   nextAvailableDraftName,
+  runSummaryFromDetail,
   upsertDraft,
   upsertRun,
 } from "@/app/workspace/model";
@@ -20,18 +21,25 @@ import {
   resumeRun,
   stopRun,
   updateDraftWithSource,
+  updateLineageGroups,
   watchRun,
 } from "@/shared/api/client";
-import type { ManagedDraft, ManagedRun, ManagedRunConfig } from "@/shared/api/contract";
+import type {
+  ManagedDraft,
+  ManagedRun,
+  ManagedRunConfig,
+  ManagedRunDetail,
+} from "@/shared/api/contract";
 
 interface UseWorkspaceActionsOptions {
-  defaultConfig: ManagedRunConfig | null;
   drafts: ManagedDraft[];
+  loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   reloadManagerData: () => Promise<void>;
   runs: ManagedRun[];
   sessions: WorkspaceSessions;
   setDrafts: Dispatch<SetStateAction<ManagedDraft[]>>;
   setRuns: Dispatch<SetStateAction<ManagedRun[]>>;
+  upsertRunDetail: (run: ManagedRunDetail) => void;
 }
 
 export interface WorkspaceActions {
@@ -42,7 +50,7 @@ export interface WorkspaceActions {
     name: string,
     config: ManagedRunConfig,
     draftId: string | null,
-  ) => Promise<ManagedRun>;
+  ) => Promise<ManagedRunDetail>;
   openManagedRunDirectory: (runId: string) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
@@ -56,6 +64,7 @@ export interface WorkspaceActions {
     config: ManagedRunConfig,
   ) => Promise<ManagedDraft>;
   stopManagedRun: (runId: string) => Promise<void>;
+  updateManagedLineageGroups: (lineageId: string, groupNames: readonly string[]) => Promise<void>;
   updateExistingDraft: (
     sessionId: DraftEditorSession["sessionId"],
     id: string,
@@ -69,13 +78,14 @@ export interface WorkspaceActions {
 }
 
 export function useWorkspaceActions({
-  defaultConfig,
   drafts: _drafts,
+  loadRunDetail,
   reloadManagerData,
   runs,
   sessions,
   setDrafts,
   setRuns,
+  upsertRunDetail,
 }: UseWorkspaceActionsOptions): WorkspaceActions {
   async function saveDraft(
     sessionId: DraftEditorSession["sessionId"],
@@ -170,17 +180,15 @@ export function useWorkspaceActions({
       session?.forkSource?.runId ?? null,
       session?.forkSource?.artifact ?? null,
     );
-    setRuns((current) => upsertRun(current, run));
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    upsertRunDetail(run);
     sessions.openRun(run);
     return run;
   }
 
   async function forkManagedRun(runId: string, artifact: "latest" | "best") {
     const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
-    const sourceConfig = sourceRun?.config ?? defaultConfig;
-    if (sourceConfig === null) {
-      throw new Error("fork source config is unavailable");
-    }
+    const sourceDetail = await loadRunDetail(runId);
     const baseName =
       sourceRun === null
         ? artifact === "best"
@@ -192,7 +200,7 @@ export function useWorkspaceActions({
     const initialDraftName = nextAvailableDraftName(baseName, allKnownNames());
     sessions.createForkDraft({
       artifact,
-      initialConfig: sourceConfig,
+      initialConfig: sourceDetail.config,
       initialDraftName,
       runId,
     });
@@ -200,28 +208,39 @@ export function useWorkspaceActions({
 
   async function createDraftFromManagedRun(runId: string) {
     const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
-    if (sourceRun === null) {
-      throw new Error("run config is unavailable");
-    }
-    const initialDraftName = nextAvailableDraftName(`${sourceRun.name} draft`, allKnownNames());
-    const draft = await createDraftWithSource(initialDraftName, sourceRun.config, null, null);
+    const sourceDetail = await loadRunDetail(runId);
+    const sourceName = sourceRun?.name ?? sourceDetail.name;
+    const initialDraftName = nextAvailableDraftName(`${sourceName} draft`, allKnownNames());
+    const draft = await createDraftWithSource(initialDraftName, sourceDetail.config, null, null);
     setDrafts((current) => upsertDraft(current, draft));
     sessions.openDraft(draft);
   }
 
   async function stopManagedRun(runId: string) {
     const run = await stopRun(runId);
-    setRuns((current) => upsertRun(current, run));
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    upsertRunDetail(run);
   }
 
   async function resumeManagedRun(runId: string) {
     const run = await resumeRun(runId);
-    setRuns((current) => upsertRun(current, run));
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    upsertRunDetail(run);
   }
 
   async function renameManagedRun(runId: string, name: string) {
     const run = await renameRun(runId, name);
-    setRuns((current) => upsertRun(current, run));
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    upsertRunDetail(run);
+  }
+
+  async function updateManagedLineageGroups(lineageId: string, groupNames: readonly string[]) {
+    const lineageGroups = await updateLineageGroups(lineageId, groupNames);
+    setRuns((current) =>
+      current.map((run) =>
+        run.lineage_id === lineageId ? { ...run, lineage_groups: lineageGroups } : run,
+      ),
+    );
   }
 
   async function openManagedRunDirectory(runId: string) {
@@ -266,6 +285,7 @@ export function useWorkspaceActions({
     resumeManagedRun,
     saveDraft,
     stopManagedRun,
+    updateManagedLineageGroups,
     updateExistingDraft,
     watchManagedRun,
   };

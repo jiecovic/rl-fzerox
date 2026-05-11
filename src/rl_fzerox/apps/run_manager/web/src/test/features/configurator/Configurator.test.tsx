@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Configurator } from "@/features/configurator/Configurator";
+import type { ManagedRunConfig } from "@/shared/api/contract";
 import {
   configMetadataFixture,
   draftFixture,
@@ -26,6 +27,22 @@ vi.mock("@/shared/api/client", async () => {
       fetchPolicyPreviewMock(...args),
   };
 });
+
+function reorderConfigKeys(config: ManagedRunConfig): ManagedRunConfig {
+  return {
+    reward: config.reward,
+    policy: config.policy,
+    observation: config.observation,
+    train: config.train,
+    tracks: config.tracks,
+    vehicle: config.vehicle,
+    action: config.action,
+    environment: config.environment,
+    preset_name: config.preset_name,
+    seed: config.seed,
+    version: config.version,
+  };
+}
 
 describe("Configurator", () => {
   beforeEach(() => {
@@ -128,6 +145,47 @@ describe("Configurator", () => {
       screen.queryByText("This draft name is already used by another draft or open editor."),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeEnabled();
+  });
+
+  it("does not mark a saved draft dirty when only config key order changes", async () => {
+    const loadedDraft = draftFixture({
+      config: managedRunConfigFixture,
+      name: "ppo_allcups_recurrent",
+    });
+    const { rerender } = render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={loadedDraft}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Save draft" })).not.toHaveClass(
+      "dirty-action-button",
+    );
+
+    rerender(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={draftFixture({
+          ...loadedDraft,
+          config: reorderConfigKeys(managedRunConfigFixture),
+        })}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Save draft" })).not.toHaveClass(
+      "dirty-action-button",
+    );
   });
 
   it("blocks saving a duplicate draft name before hitting the API", async () => {

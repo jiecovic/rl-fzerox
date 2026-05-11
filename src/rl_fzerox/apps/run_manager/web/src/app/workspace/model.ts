@@ -5,7 +5,7 @@ import type {
   RunSession,
   WorkspaceTab,
 } from "@/app/workspace/types";
-import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
+import type { ManagedDraft, ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
 
 export function editorSessionId(seed: string): `editor:${string}` {
   return `editor:${seed}`;
@@ -53,6 +53,12 @@ export function compareDrafts(left: ManagedDraft, right: ManagedDraft) {
 export function upsertRun(current: ManagedRun[], nextRun: ManagedRun) {
   const withoutPrevious = current.filter((run) => run.id !== nextRun.id);
   return [nextRun, ...withoutPrevious].sort(compareRuns);
+}
+
+export function runSummaryFromDetail(run: ManagedRunDetail): ManagedRun {
+  const { config: _config, ...summary } = run;
+  void _config;
+  return summary;
 }
 
 export function compareRuns(left: ManagedRun, right: ManagedRun) {

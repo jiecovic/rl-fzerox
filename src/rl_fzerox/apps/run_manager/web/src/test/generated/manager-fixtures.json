@@ -1518,7 +1518,7 @@
             "tone": "normal"
           },
           {
-            "detail": "nature \u2192 1536",
+            "detail": "nature \u2192 1536, relu",
             "id": "cnn",
             "label": "CNN",
             "params": 82080,
@@ -1545,7 +1545,7 @@
             "tone": "normal"
           },
           {
-            "detail": "50 \u2192 [64]",
+            "detail": "50 \u2192 [64], relu",
             "id": "state_mlp",
             "label": "State MLP",
             "params": 3264,
@@ -1565,7 +1565,7 @@
             "tone": "normal"
           },
           {
-            "detail": "1600 \u2192 768",
+            "detail": "1600 \u2192 768, relu",
             "id": "fusion",
             "label": "Fusion MLP",
             "params": 1229568,

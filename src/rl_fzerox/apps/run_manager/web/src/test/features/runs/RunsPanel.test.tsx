@@ -35,6 +35,7 @@ describe("RunsPanel", () => {
         onOpenRun={onOpenRun}
         onResumeRun={onResumeRun}
         onStopRun={onStopRun}
+        onUpdateLineageGroups={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -94,6 +95,7 @@ describe("RunsPanel", () => {
         onOpenRun={vi.fn()}
         onResumeRun={vi.fn().mockResolvedValue(undefined)}
         onStopRun={vi.fn().mockResolvedValue(undefined)}
+        onUpdateLineageGroups={vi.fn().mockResolvedValue(undefined)}
       />,
     );
 
@@ -108,5 +110,81 @@ describe("RunsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "Delete lineage" }));
     expect(onDeleteLineage).toHaveBeenCalledWith(run.lineage_id);
+  });
+
+  it("groups lineages and updates a lineage group", async () => {
+    const user = userEvent.setup();
+    const oldRun = runFixture({
+      id: "old-run",
+      lineage_groups: ["Old test runs"],
+      lineage_id: "old-lineage",
+      name: "old experiment",
+      status: "stopped",
+    });
+    const newRun = runFixture({
+      id: "new-run",
+      lineage_groups: ["CNN sweep", "Current ablations"],
+      lineage_id: "new-lineage",
+      name: "medium cnn",
+      status: "stopped",
+    });
+    const onUpdateLineageGroups = vi.fn().mockResolvedValue(undefined);
+
+    const { rerender } = render(
+      <RunsPanel
+        drafts={[]}
+        runs={[oldRun, newRun]}
+        onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
+        onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onOpenRun={vi.fn()}
+        onResumeRun={vi.fn().mockResolvedValue(undefined)}
+        onStopRun={vi.fn().mockResolvedValue(undefined)}
+        onUpdateLineageGroups={onUpdateLineageGroups}
+      />,
+    );
+
+    expect(screen.getByText("Old test runs")).toBeInTheDocument();
+    expect(screen.getByText("CNN sweep")).toBeInTheDocument();
+    expect(screen.getByText("Current ablations")).toBeInTheDocument();
+    expect(screen.getByText(/local\/tensorboard_views\/old-test-runs/)).toBeInTheDocument();
+
+    const oldGroupSection = screen.getByLabelText("Old test runs lineage group");
+    expect(within(oldGroupSection).getAllByText("old experiment")).not.toHaveLength(0);
+    await user.click(screen.getByRole("button", { name: "Collapse group Old test runs" }));
+    expect(within(oldGroupSection).queryByText("old experiment")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Expand group Old test runs" }));
+    expect(within(oldGroupSection).getAllByText("old experiment")).not.toHaveLength(0);
+
+    const groupInput = screen.getAllByRole("textbox", {
+      name: "Groups for lineage medium cnn",
+    })[0];
+    await user.clear(groupInput);
+    await user.type(groupInput, "Recurrent sweep, Current ablations");
+    rerender(
+      <RunsPanel
+        drafts={[]}
+        runs={[{ ...oldRun }, { ...newRun, lineage_groups: [...newRun.lineage_groups] }]}
+        onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
+        onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onOpenRun={vi.fn()}
+        onResumeRun={vi.fn().mockResolvedValue(undefined)}
+        onStopRun={vi.fn().mockResolvedValue(undefined)}
+        onUpdateLineageGroups={onUpdateLineageGroups}
+      />,
+    );
+    const savedGroupInput = screen.getAllByRole("textbox", {
+      name: "Groups for lineage medium cnn",
+    })[0];
+    expect(savedGroupInput).toHaveValue("Recurrent sweep, Current ablations");
+    const groupForm = savedGroupInput.closest("form");
+    if (!(groupForm instanceof HTMLElement)) {
+      throw new Error("lineage group form not found");
+    }
+    await user.click(within(groupForm).getByRole("button", { name: "Save" }));
+
+    expect(onUpdateLineageGroups).toHaveBeenCalledWith("new-lineage", [
+      "Current ablations",
+      "Recurrent sweep",
+    ]);
   });
 });

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunEvent,
+    ManagedRunSummary,
     RunStatus,
 )
 from rl_fzerox.core.manager.registry.common import (
@@ -16,7 +17,12 @@ from rl_fzerox.core.manager.registry.common import (
     sql_placeholders,
     utc_now,
 )
-from rl_fzerox.core.manager.registry.rows import run_from_row, run_select_sql
+from rl_fzerox.core.manager.registry.rows import (
+    run_from_row,
+    run_select_sql,
+    run_summary_from_row,
+    run_summary_select_sql,
+)
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
@@ -174,6 +180,21 @@ def list_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
 
 def list_visible_runs(store: ManagerStore) -> tuple[ManagedRun, ...]:
     return tuple(run for run in list_runs(store) if run.status != "created")
+
+
+def list_visible_run_summaries(store: ManagerStore) -> tuple[ManagedRunSummary, ...]:
+    store.initialize()
+    from rl_fzerox.core.manager.registry.runs.maintenance import reconcile_orphaned_runs
+
+    reconcile_orphaned_runs(store)
+    with store._connect() as connection:
+        rows = connection.execute(
+            run_summary_select_sql(
+                where_clause="WHERE runs.status != 'created'",
+                order_clause="ORDER BY runs.created_at DESC, runs.id DESC",
+            )
+        ).fetchall()
+    return tuple(run_summary_from_row(row) for row in rows)
 
 
 def list_recent_run_events(

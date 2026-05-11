@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from inspect import signature
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,9 @@ from fzerox_emulator.arrays import (
     PolicyState,
 )
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.policy.auxiliary_state.policies import (
+    AuxiliaryStateMaskableHybridActionMultiInputPolicy,
+)
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.core.training.inference.loader import (
     _artifact_kind_from_policy_path,
@@ -363,6 +367,15 @@ def test_policy_runner_injects_zero_auxiliary_targets_for_aux_enabled_policy(
     assert isinstance(aux_targets, np.ndarray)
     assert aux_targets.shape == (39,)
     assert float(np.max(aux_targets)) == 0.0
+
+
+def test_non_recurrent_auxiliary_policy_accepts_runner_recurrent_kwargs() -> None:
+    parameters = signature(
+        AuxiliaryStateMaskableHybridActionMultiInputPolicy.predict_auxiliary_state
+    ).parameters
+
+    assert "state" in parameters
+    assert "episode_start" in parameters
 
 
 def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path) -> None:

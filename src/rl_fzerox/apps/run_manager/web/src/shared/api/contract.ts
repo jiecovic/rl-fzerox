@@ -224,7 +224,7 @@ const policyConfigSchema = z.object({
   custom_conv_layers: z.array(customConvLayerSchema),
   features_dim: z.union([z.literal("auto"), z.number().int().positive()]),
   state_net_arch: z.array(z.number().int().positive()),
-  fusion_features_dim: z.number().int().positive(),
+  fusion_features_dim: z.number().int().positive().nullable(),
   layer_norm: z.boolean(),
   activation: z.enum(["relu", "gelu", "tanh"]).default("relu"),
   recurrent_enabled: z.boolean(),
@@ -328,12 +328,15 @@ export const managedDraftSchema = z.object({
   config: managedRunConfigSchema,
 });
 
-export const managedRunSchema = z.object({
+export const managedRunSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
   status: runStatusSchema,
+  config_hash: z.string(),
+  action_repeat: z.number().int().positive(),
   created_at: z.string(),
   lineage_id: z.string(),
+  lineage_groups: z.array(z.string()),
   lineage_step_offset: z.number().int().nonnegative(),
   started_at: z.string().nullable(),
   stopped_at: z.string().nullable(),
@@ -365,6 +368,9 @@ export const managedRunSchema = z.object({
       message: z.string(),
     }),
   ),
+});
+
+export const managedRunSchema = managedRunSummarySchema.extend({
   config: managedRunConfigSchema,
 });
 
@@ -419,7 +425,11 @@ export const draftsResponseSchema = z.object({
 });
 
 export const runsResponseSchema = z.object({
-  runs: z.array(managedRunSchema),
+  runs: z.array(managedRunSummarySchema),
+});
+
+export const runResponseSchema = z.object({
+  run: managedRunSchema,
 });
 
 export const createDraftResponseSchema = z.object({
@@ -454,6 +464,24 @@ export const runMetricsResponseSchema = z.object({
 
 export const runTrackSamplingResponseSchema = z.object({
   state: trackSamplingRuntimeStateSchema.nullable(),
+});
+
+export const tensorboardViewGroupSchema = z.object({
+  name: z.string(),
+  slug: z.string(),
+  path: z.string(),
+  lineage_count: z.number().int().nonnegative(),
+  run_count: z.number().int().nonnegative(),
+});
+
+export const updateLineageGroupsResponseSchema = z.object({
+  lineage_id: z.string(),
+  lineage_groups: z.array(z.string()),
+  tensorboard_views: z.array(tensorboardViewGroupSchema),
+});
+
+export const rebuildTensorboardViewsResponseSchema = z.object({
+  tensorboard_views: z.array(tensorboardViewGroupSchema),
 });
 
 const selectOptionSchema = z.object({
@@ -634,10 +662,12 @@ export const policyArchitecturePreviewSchema = z.object({
 export type ManagedRunConfig = z.infer<typeof managedRunConfigSchema>;
 export type ManagedTemplate = z.infer<typeof managedTemplateSchema>;
 export type ManagedDraft = z.infer<typeof managedDraftSchema>;
-export type ManagedRun = z.infer<typeof managedRunSchema>;
+export type ManagedRun = z.infer<typeof managedRunSummarySchema>;
+export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
 export type TrackSamplingRuntimeEntry = z.infer<typeof trackSamplingRuntimeEntrySchema>;
 export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeStateSchema>;
+export type TensorboardViewGroup = z.infer<typeof tensorboardViewGroupSchema>;
 export type ConfigMetadata = z.infer<typeof configMetadataSchema>;
 export type PolicyArchitecturePreview = z.infer<typeof policyArchitecturePreviewSchema>;
 export type StateComponentConfig = z.infer<typeof stateComponentConfigSchema>;
