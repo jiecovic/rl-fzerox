@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/model.ts
+
 export {
   buildChartGroups,
   CHART_RANGE_OPTIONS,
@@ -8,7 +9,10 @@ export {
   type RunChartGroupId,
 } from "@/features/runs/charts_panel/model/catalog";
 export {
+  buildChartColorByRunId,
   chartSeriesColor,
+} from "@/features/runs/charts_panel/model/colors";
+export {
   formatChartValue,
   latestPointValue,
 } from "@/features/runs/charts_panel/model/format";

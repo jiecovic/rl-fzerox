@@ -140,6 +140,75 @@ describe("ChartsPanel", () => {
     expect(screen.getByText("1 runs")).toBeInTheDocument();
   });
 
+  it("colors selected runs individually when one lineage is selected", async () => {
+    window.localStorage.clear();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[forkRun, rootRun]} />);
+
+    expect(legendSwatchStyle(forkRun.name)).not.toBe(legendSwatchStyle(rootRun.name));
+    expect(selectedLegendNames()).toEqual([forkRun.name, rootRun.name]);
+  });
+
+  it("colors runs by lineage when multiple lineages are selected", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const rootRun = runFixture({
+      id: "run-root",
+      name: "ppo_test_1",
+      lineage_id: "lineage-a",
+      created_at: "2026-05-03T18:52:02+00:00",
+      status: "stopped",
+    });
+    const forkRun = runFixture({
+      id: "run-fork",
+      name: "ppo_test_1 fork",
+      lineage_id: "lineage-a",
+      parent_run_id: "run-root",
+      source_run_id: "run-root",
+      created_at: "2026-05-04T08:39:23+00:00",
+      status: "stopped",
+    });
+    const secondRootRun = runFixture({
+      id: "run-other-root",
+      name: "ppo_masked_lidar",
+      lineage_id: "lineage-b",
+      created_at: "2026-05-04T09:30:00+00:00",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[forkRun, secondRootRun, rootRun]} />);
+
+    await user.click(within(rowForRun(rootRun.name)).getByRole("checkbox"));
+
+    expect(selectedLegendNames()).toEqual(["ppo_test_1", "ppo_masked_lidar"]);
+    expect(within(latestLegend()).queryByText(forkRun.name)).not.toBeInTheDocument();
+    expect(selectionSwatchStyle(forkRun.name)).toBe(selectionSwatchStyle(rootRun.name));
+    expect(selectionSwatchStyle(forkRun.name)).not.toBe(selectionSwatchStyle(secondRootRun.name));
+    expect(selectionSwatchStyle(rootRun.name)).toBe(legendSwatchStyle(rootRun.name));
+  });
+
   it("selects and clears a whole lineage from its header checkbox", async () => {
     window.localStorage.clear();
     const user = userEvent.setup();
@@ -280,33 +349,49 @@ function rowForRun(runName: string) {
 }
 
 function selectedLegendNames() {
-  return within(latestLegend())
-    .getAllByRole("button")
-    .map((button) => button.textContent?.trim() ?? "");
+  return [...latestLegend().querySelectorAll(".run-chart-global-legend-name")].map(
+    (name) => name.textContent?.trim() ?? "",
+  );
 }
 
 function selectionSwatchColor(runName: string) {
+  return selectionSwatch(runName).style.background;
+}
+
+function selectionSwatchStyle(runName: string) {
+  return selectionSwatch(runName).getAttribute("style") ?? "";
+}
+
+function selectionSwatch(runName: string) {
   const row = rowForRun(runName);
   const swatch = row.querySelector(".run-chart-selection-swatch");
   if (!(swatch instanceof HTMLElement)) {
     throw new Error(`selection swatch not found for ${runName}`);
   }
-  return swatch.style.background;
+  return swatch;
 }
 
 function legendSwatchColor(runName: string) {
+  return legendSwatch(runName).style.background;
+}
+
+function legendSwatchStyle(runName: string) {
+  return legendSwatch(runName).getAttribute("style") ?? "";
+}
+
+function legendSwatch(runName: string) {
   const legend = latestLegend();
-  const button = within(legend)
-    .getAllByRole("button")
-    .find((item) => item.textContent?.trim() === runName);
-  if (!(button instanceof HTMLElement)) {
-    throw new Error(`legend button not found for ${runName}`);
+  const entry = [...legend.querySelectorAll(".run-chart-global-legend-button")].find(
+    (item) => item.textContent?.trim() === runName,
+  );
+  if (!(entry instanceof HTMLElement)) {
+    throw new Error(`legend entry not found for ${runName}`);
   }
-  const swatch = button.querySelector(".run-chart-legend-swatch");
+  const swatch = entry.querySelector(".run-chart-legend-swatch");
   if (!(swatch instanceof HTMLElement)) {
     throw new Error(`legend swatch not found for ${runName}`);
   }
-  return swatch.style.background;
+  return swatch;
 }
 
 function latestLegend() {

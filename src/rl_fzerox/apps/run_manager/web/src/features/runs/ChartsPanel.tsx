@@ -6,11 +6,11 @@ import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import { SegmentedChoiceStrip } from "@/features/configurator/fields/choices";
 import {
+  buildChartColorByRunId,
   buildChartGroups,
   buildLineageInfoById,
   buildLineageRunGroups,
   CHART_RANGE_OPTIONS,
-  chartSeriesColor,
   DEFAULT_CHART_RANGE_MODE,
   defaultSelectedRunIds,
   INITIAL_GROUP_OPEN,
@@ -79,10 +79,6 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
   }, [focusedRunId, runs, setSelectedRuns]);
 
   const runsById = useMemo(() => new Map(runs.map((run) => [run.id, run] as const)), [runs]);
-  const colorByRunId = useMemo(
-    () => new Map(runs.map((run, index) => [run.id, chartSeriesColor(index)] as const)),
-    [runs],
-  );
   const lineageInfoById = useMemo(() => buildLineageInfoById(runs), [runs]);
   const selectionLineageGroups = useMemo(
     () => buildLineageRunGroups(runs, lineageInfoById),
@@ -104,10 +100,15 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         .filter((run): run is ManagedRun => run !== undefined),
     [runsById, selectedRunIds],
   );
+  const colorByRunId = useMemo(
+    () => buildChartColorByRunId(runs, selectedRuns),
+    [runs, selectedRuns],
+  );
   const selectedLineageGroups = useMemo(
     () => buildLineageRunGroups(selectedRuns, lineageInfoById),
     [lineageInfoById, selectedRuns],
   );
+  const chartColorMode = selectedLineageGroups.length > 1 ? "lineage" : "run";
   const chartGroups = useMemo(
     () => buildChartGroups(selectedRuns, metricsByRun),
     [metricsByRun, selectedRuns],
@@ -225,6 +226,7 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
       ) : (
         <div className="run-chart-content">
           <RunChartLegend
+            colorMode={chartColorMode}
             colorByRunId={colorByRunId}
             groups={selectedLineageGroups}
             onOpenRun={onOpenRun}
