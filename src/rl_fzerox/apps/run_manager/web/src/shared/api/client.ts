@@ -11,17 +11,22 @@ import {
   type ManagedDraft,
   type ManagedRun,
   type ManagedRunConfig,
+  type ManagedRunDetail,
   type ManagedRunMetricSample,
   type ManagedTemplate,
   openRunDirectoryResponseSchema,
   type PolicyArchitecturePreview,
   policyArchitecturePreviewSchema,
+  rebuildTensorboardViewsResponseSchema,
   resetTrackSamplingResponseSchema,
   runMetricsResponseSchema,
+  runResponseSchema,
   runsResponseSchema,
   runTrackSamplingResponseSchema,
+  type TensorboardViewGroup,
   type TrackSamplingRuntimeState,
   templatesResponseSchema,
+  updateLineageGroupsResponseSchema,
   watchRunResponseSchema,
 } from "@/shared/api/contract";
 
@@ -52,6 +57,14 @@ export async function fetchDrafts(): Promise<ManagedDraft[]> {
 export async function fetchRuns(): Promise<ManagedRun[]> {
   const payload = parseApiPayload(runsResponseSchema, await getJson("/api/runs"));
   return payload.runs;
+}
+
+export async function fetchRun(runId: string): Promise<ManagedRunDetail> {
+  const payload = parseApiPayload(
+    runResponseSchema,
+    await getJson(`/api/runs/${encodeURIComponent(runId)}`),
+  );
+  return payload.run;
 }
 
 export async function fetchRunMetrics(
@@ -178,7 +191,7 @@ export async function launchRun(
   draftId: string | null,
   sourceRunId: string | null = null,
   sourceArtifact: "latest" | "best" | null = null,
-): Promise<ManagedRun> {
+): Promise<ManagedRunDetail> {
   const response = await fetch("/api/runs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -199,7 +212,7 @@ export async function forkRun(
   artifact: "latest" | "best",
   name?: string,
   config?: ManagedRunConfig,
-): Promise<ManagedRun> {
+): Promise<ManagedRunDetail> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/fork`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -213,15 +226,15 @@ export async function forkRun(
   return payload.run;
 }
 
-export async function stopRun(runId: string): Promise<ManagedRun> {
+export async function stopRun(runId: string): Promise<ManagedRunDetail> {
   return postRunAction(`/api/runs/${encodeURIComponent(runId)}/stop`);
 }
 
-export async function resumeRun(runId: string): Promise<ManagedRun> {
+export async function resumeRun(runId: string): Promise<ManagedRunDetail> {
   return postRunAction(`/api/runs/${encodeURIComponent(runId)}/resume`);
 }
 
-export async function renameRun(runId: string, name: string): Promise<ManagedRun> {
+export async function renameRun(runId: string, name: string): Promise<ManagedRunDetail> {
   const response = await fetch(`/api/runs/${encodeURIComponent(runId)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -269,6 +282,25 @@ export async function deleteLineage(id: string): Promise<void> {
   parseApiPayload(deleteRunResponseSchema, await parseJson(response));
 }
 
+export async function updateLineageGroups(
+  lineageId: string,
+  groupNames: readonly string[],
+): Promise<string[]> {
+  const response = await fetch(`/api/lineages/${encodeURIComponent(lineageId)}/groups`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ group_names: groupNames }),
+  });
+  const payload = parseApiPayload(updateLineageGroupsResponseSchema, await parseJson(response));
+  return payload.lineage_groups;
+}
+
+export async function rebuildTensorboardViews(): Promise<TensorboardViewGroup[]> {
+  const response = await fetch("/api/tensorboard-views/rebuild", { method: "POST" });
+  const payload = parseApiPayload(rebuildTensorboardViewsResponseSchema, await parseJson(response));
+  return payload.tensorboard_views;
+}
+
 async function getJson(url: string): Promise<unknown> {
   const response = await fetch(url);
   return parseJson(response);
@@ -313,7 +345,7 @@ function runMetricsCacheKey(runId: string, rangeMode: RunMetricRangeMode) {
   return `${runId}:${rangeMode}`;
 }
 
-async function postRunAction(url: string): Promise<ManagedRun> {
+async function postRunAction(url: string): Promise<ManagedRunDetail> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

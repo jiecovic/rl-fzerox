@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/model.ts
-import type { ManagedRun } from "@/shared/api/contract";
+import type { ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
 
 export function progressHeadline(run: ManagedRun): string {
   const runtime = run.runtime;
@@ -11,7 +11,7 @@ export function progressHeadline(run: ManagedRun): string {
     : `${(runtime.progress_fraction * 100).toFixed(1)}% complete`;
 }
 
-export function progressNote(run: ManagedRun): string {
+export function progressNote(run: ManagedRunDetail): string {
   const runtime = run.runtime;
   const target = run.config.train.total_timesteps.toLocaleString();
   if (runtime === null) {
@@ -50,7 +50,7 @@ export function trainFpsLabel(run: ManagedRun): string {
   if (envStepRate === null) {
     return "n/a";
   }
-  return formatRate(envStepRate * Math.max(run.config.action.action_repeat, 1));
+  return formatRate(envStepRate * Math.max(run.action_repeat, 1));
 }
 
 export function localWallTimeLabel(run: ManagedRun, nowMs: number): string {
@@ -167,7 +167,7 @@ function localSimGameTimeSeconds(run: ManagedRun): number | null {
   if (runtime === null) {
     return null;
   }
-  const actionRepeat = Math.max(run.config.action.action_repeat, 1);
+  const actionRepeat = Math.max(run.action_repeat, 1);
   return (runtime.num_timesteps * actionRepeat) / 60;
 }
 

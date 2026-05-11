@@ -185,10 +185,10 @@ function leanOutputSummary(action: ManagedActionConfig): string {
 
 function pitchOutputSummary(action: ManagedActionConfig): string {
   if (action.pitch_mode === "continuous") {
-    return `pitch continuous, deadzone ${action.pitch_deadzone}`;
+    return "pitch continuous";
   }
   if (!action.enable_pitch) {
     return "pitch masked";
   }
-  return `${action.pitch_buckets} pitch logits, deadzone ${action.pitch_deadzone}`;
+  return `${action.pitch_buckets} pitch logits`;
 }

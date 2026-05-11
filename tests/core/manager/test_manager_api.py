@@ -551,6 +551,35 @@ async def test_manager_api_deletes_lineage(tmp_path: Path) -> None:
     assert response.json() == {"deleted": True}
 
 
+async def test_manager_api_updates_lineage_groups_and_tensorboard_view(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="root-run",
+        name="Root Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "root-run" / "root-run",
+    )
+    (run.run_dir / "tensorboard").mkdir(parents=True)
+    store.update_run_status(run_id=run.id, status="stopped", message="stopped")
+
+    client = _client(tmp_path, store=store)
+    response = await client.put(
+        f"/api/lineages/{run.lineage_id}/groups",
+        json={"group_names": ["Old test runs", "Current ablations"]},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["lineage_groups"] == ["Current ablations", "Old test runs"]
+    assert [view["slug"] for view in payload["tensorboard_views"]] == [
+        "current-ablations",
+        "old-test-runs",
+    ]
+    loaded = store.get_run(run.id)
+    assert loaded is not None
+    assert loaded.lineage_groups == ("Current ablations", "Old test runs")
+
+
 async def test_manager_api_metrics_full_mode_disables_recent_limit(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -702,6 +731,41 @@ async def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"runs": []}
+
+
+async def test_manager_api_lists_run_summaries_and_fetches_run_details(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config().model_copy(update={"seed": 1234})
+    run = store.create_run(
+        name="Visible Run",
+        config=config,
+        managed_runs_root=tmp_path / "runs",
+    )
+    updated = store.update_run_status(
+        run_id=run.id,
+        status="stopped",
+        message="run stopped",
+        stopped_at="2026-05-03T12:00:00+00:00",
+    )
+    if updated is None:
+        raise RuntimeError("status update failed")
+    client = _ApiClient(create_manager_api_app(store))
+
+    list_response = await client.get("/api/runs")
+
+    assert list_response.status_code == 200
+    summary = list_response.json()["runs"][0]
+    assert summary["name"] == "Visible Run"
+    assert summary["config_hash"] == run.config_hash
+    assert summary["action_repeat"] == config.action.action_repeat
+    assert "config" not in summary
+
+    detail_response = await client.get(f"/api/runs/{run.id}")
+
+    assert detail_response.status_code == 200
+    detail = detail_response.json()["run"]
+    assert detail["config"]["seed"] == 1234
+    assert detail["config_hash"] == run.config_hash
 
 
 async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:

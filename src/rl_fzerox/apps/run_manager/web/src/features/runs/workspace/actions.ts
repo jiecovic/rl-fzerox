@@ -1,6 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/actions.ts
 import { useEffect, useState } from "react";
-import type { ManagedRun, TrackSamplingRuntimeState } from "@/shared/api/contract";
+import type { ManagedRunDetail, TrackSamplingRuntimeState } from "@/shared/api/contract";
 
 export type CheckpointArtifact = "latest" | "best";
 export type WatchToastTone = "info" | "error";
@@ -20,7 +20,7 @@ export interface RunWorkspaceActionsProps {
   onResetTrackPool: (runId: string) => Promise<void>;
   onStop: (runId: string) => Promise<void>;
   onWatch: (runId: string, artifact: CheckpointArtifact) => Promise<"started" | "already_running">;
-  run: ManagedRun;
+  run: ManagedRunDetail;
   runName: string;
 }
 

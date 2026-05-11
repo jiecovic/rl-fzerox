@@ -1,6 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/RewardSection.tsx
 
-import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
+import {
+  type ConfigSectionPatch,
+  type ConfigSetter,
+  patchConfigSection,
+} from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import type { ManagedRunConfig } from "@/shared/api/contract";
@@ -26,6 +30,9 @@ export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectio
   const updateReward = (patch: Partial<ManagedRunConfig["reward"]>) => {
     patchConfigSection(setConfig, "reward", patch);
   };
+  const updateAction = (patch: ConfigSectionPatch<"action">) => {
+    patchConfigSection(setConfig, "action", patch);
+  };
 
   const setSectionOpen = (id: RewardDisclosureId, open: boolean) => {
     setOpenSections((current) => ({ ...current, [id]: open }));
@@ -44,6 +51,7 @@ export function RewardSection({ config, defaultConfig, setConfig }: ConfigSectio
         defaultConfig={defaultConfig}
         openSections={openSections}
         setSectionOpen={setSectionOpen}
+        updateAction={updateAction}
         updateReward={updateReward}
       />
     </div>

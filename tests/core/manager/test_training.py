@@ -8,6 +8,7 @@ import pytest
 from rl_fzerox.core.domain.observation_image import ObservationCustomResolution
 from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.manager import default_managed_run_config
+from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
     build_managed_fork_train_app_config,
@@ -147,6 +148,47 @@ def test_manager_training_bridge_uses_explicit_state_component_membership(
         component.name for component in train_config.env.observation.state_components or ()
     }
     assert train_config.policy.extractor.resolved_state_net_arch() == ()
+
+
+def test_manager_training_bridge_can_disable_fusion_mlp(tmp_path: Path) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.policy.fusion_features_dim = None
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-no-fusion",
+        run_dir=tmp_path / "runs" / "bridge-no-fusion_0001",
+    )
+    preview = policy_architecture_preview(config)
+    fusion_group = next(group for group in preview.parameter_groups if group.name == "Fusion")
+    fusion_node = next(
+        node
+        for lane in preview.architecture_lanes
+        for node in lane.nodes
+        if node.id == "fusion"
+    )
+
+    assert train_config.policy.extractor.fusion_features_dim is None
+    assert preview.extractor_output_dim == preview.fusion_input_dim
+    assert fusion_group.params == 0
+    assert fusion_node.detail == f"identity {preview.fusion_input_dim}"
+    assert fusion_node.tone == "muted"
+
+
+def test_policy_architecture_preview_labels_extractor_activations() -> None:
+    config = default_managed_run_config()
+    preview = policy_architecture_preview(config)
+    node_by_id = {
+        node.id: node
+        for lane in preview.architecture_lanes
+        for node in lane.nodes
+    }
+
+    assert node_by_id["cnn"].detail.endswith(", relu")
+    assert node_by_id["image_projection"].detail == "identity 1536"
+    assert node_by_id["state_mlp"].detail.endswith(", relu")
+    assert node_by_id["fusion"].detail.endswith(", relu")
+    assert node_by_id["policy_head"].detail.endswith(", relu")
 
 
 def test_manager_training_bridge_projects_individual_state_features(

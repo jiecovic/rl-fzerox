@@ -140,7 +140,7 @@ def test_manager_store_pins_and_cleans_fork_draft_snapshot(
     assert not draft.source_snapshot_dir.exists()
 
 
-def test_manager_store_persists_run_lineage_metadata(tmp_path: Path) -> None:
+def test_manager_store_persists_run_lineage_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     config = default_managed_run_config()
     store.create_run(
@@ -171,6 +171,48 @@ def test_manager_store_persists_run_lineage_metadata(tmp_path: Path) -> None:
     assert loaded.source_run_id == "parent-run"
     assert loaded.source_artifact == "best"
     assert loaded.source_num_timesteps == 816_040
+
+
+def test_manager_store_assigns_lineage_groups_and_builds_tensorboard_views(
+    tmp_path: Path,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    config = default_managed_run_config()
+    run = store.create_run(
+        run_id="run-a",
+        name="Medium CNN",
+        config=config,
+        explicit_run_dir=tmp_path / "runs" / "run-a" / "run-a",
+    )
+    tensorboard_dir = run.run_dir / "tensorboard"
+    tensorboard_dir.mkdir(parents=True)
+    store.update_run_status(run_id=run.id, status="stopped", message="stopped")
+
+    group_names = store.update_lineage_groups(
+        lineage_id=run.lineage_id,
+        group_names=("76x108 CNN sweep", "Current ablations"),
+    )
+    views = store.rebuild_tensorboard_views()
+    loaded = store.get_run(run.id)
+
+    assert group_names == ("76x108 CNN sweep", "Current ablations")
+    assert loaded is not None
+    assert loaded.lineage_groups == ("76x108 CNN sweep", "Current ablations")
+    assert views[0].slug == "76x108-cnn-sweep"
+    links = tuple(
+        path
+        for path in (store.tensorboard_views_root() / "76x108-cnn-sweep").rglob("*__run-a")
+        if path.is_symlink()
+    )
+    second_group_links = tuple(
+        path
+        for path in (store.tensorboard_views_root() / "current-ablations").rglob("*__run-a")
+        if path.is_symlink()
+    )
+    assert len(links) == 1
+    assert len(second_group_links) == 1
+    assert links[0].is_symlink()
+    assert links[0].resolve() == tensorboard_dir.resolve()
 
 
 def test_manager_store_deletes_draft(tmp_path: Path) -> None:
@@ -218,12 +260,18 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
 
     assert draft.config.reward.manual_boost_reward == 0.5
     assert draft.config.reward.time_penalty_per_frame == 0.0
+
+
 def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
 
     with sqlite3.connect(store.db_path) as connection:
         columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()}
+        group_columns = {
+            str(row[1])
+            for row in connection.execute("PRAGMA table_info(lineage_groups)").fetchall()
+        }
 
     assert columns == {
         "id",
@@ -243,6 +291,7 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "started_at",
         "stopped_at",
     }
+    assert group_columns == {"lineage_id", "group_name", "updated_at"}
 
 
 def test_manager_store_rejects_legacy_observation_fields(tmp_path: Path) -> None:

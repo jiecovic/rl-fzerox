@@ -8,6 +8,9 @@ from rl_fzerox.core.manager.architecture.models import (
     ShapePreview,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
+from rl_fzerox.core.manager.run_spec.common import ActivationName
+
+EXTRACTOR_ACTIVATION: ActivationName = "relu"
 
 
 def architecture_lanes(
@@ -30,7 +33,7 @@ def architecture_lanes(
     image_projection_detail = (
         f"identity {flatten_dim}"
         if config.policy.features_dim == "auto"
-        else f"{flatten_dim} → {config.policy.features_dim}"
+        else f"{flatten_dim} → {config.policy.features_dim}, {EXTRACTOR_ACTIVATION}"
     )
     image_projection_tone = "muted" if config.policy.features_dim == "auto" else "normal"
     layer_norm_detail = "on" if config.policy.layer_norm else "off"
@@ -41,6 +44,12 @@ def architecture_lanes(
         else "off"
     )
     recurrent_tone = "normal" if config.policy.recurrent_enabled else "muted"
+    fusion_detail = (
+        f"identity {fusion_input_dim}"
+        if config.policy.fusion_features_dim is None
+        else f"{fusion_input_dim} → {extractor_output_dim}, {EXTRACTOR_ACTIVATION}"
+    )
+    fusion_tone = "muted" if config.policy.fusion_features_dim is None else "normal"
     return (
         ArchitectureLanePreview(
             id="image_branch",
@@ -54,7 +63,7 @@ def architecture_lanes(
                 ArchitectureNodePreview(
                     id="cnn",
                     label="CNN",
-                    detail=f"{config.policy.conv_profile} → {flatten_dim}",
+                    detail=f"{config.policy.conv_profile} → {flatten_dim}, {EXTRACTOR_ACTIVATION}",
                     params=node_params.get("cnn"),
                 ),
                 ArchitectureNodePreview(
@@ -96,8 +105,9 @@ def architecture_lanes(
                 ArchitectureNodePreview(
                     id="fusion",
                     label="Fusion MLP",
-                    detail=f"{fusion_input_dim} → {extractor_output_dim}",
+                    detail=fusion_detail,
                     params=node_params.get("fusion"),
+                    tone=fusion_tone,
                 ),
                 ArchitectureNodePreview(
                     id="layer_norm",
@@ -178,7 +188,7 @@ def architecture_node_params(
 def state_mlp_detail(config: ManagedRunConfig, state_dim: int) -> str:
     if not config.policy.state_net_arch:
         return f"identity {state_dim}"
-    return f"{state_dim} → {list(config.policy.state_net_arch)}"
+    return f"{state_dim} → {list(config.policy.state_net_arch)}, {EXTRACTOR_ACTIVATION}"
 
 
 def recurrent_detail_text(config: ManagedRunConfig, extractor_output_dim: int) -> str:

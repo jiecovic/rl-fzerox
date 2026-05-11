@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/app/workspace/Body.tsx
+import { useEffect, useState } from "react";
+
 import type { WorkspaceActions } from "@/app/workspace/actions";
 import type { WorkspaceSessions } from "@/app/workspace/sessions";
 import { Configurator } from "@/features/configurator/Configurator";
@@ -11,6 +13,7 @@ import type {
   ManagedDraft,
   ManagedRun,
   ManagedRunConfig,
+  ManagedRunDetail,
 } from "@/shared/api/contract";
 import { Notice } from "@/shared/ui/Panel";
 
@@ -20,8 +23,10 @@ interface WorkspaceBodyProps {
   drafts: ManagedDraft[];
   error: string | null;
   isLoading: boolean;
+  loadRunDetail: (runId: string) => Promise<ManagedRunDetail>;
   metadata: ConfigMetadata | null;
   runs: ManagedRun[];
+  runDetailsById: Record<string, ManagedRunDetail>;
   sessions: WorkspaceSessions;
 }
 
@@ -31,15 +36,41 @@ export function WorkspaceBody({
   drafts,
   error,
   isLoading,
+  loadRunDetail,
   metadata,
   runs,
+  runDetailsById,
   sessions,
 }: WorkspaceBodyProps) {
+  const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const activeRunTab = sessions.activeRunTab;
-  const activeRun =
+  const activeRunSummary =
     activeRunTab === null
       ? null
       : (runs.find((candidate) => candidate.id === activeRunTab.runId) ?? null);
+  const activeRunDetail =
+    activeRunTab === null ? null : (runDetailsById[activeRunTab.runId] ?? null);
+  const activeRun =
+    activeRunSummary === null || activeRunDetail === null
+      ? null
+      : mergeRunDetail(activeRunSummary, activeRunDetail);
+
+  useEffect(() => {
+    if (activeRunTab === null || activeRunDetail !== null) {
+      setRunDetailError(null);
+      return undefined;
+    }
+    let ignore = false;
+    setRunDetailError(null);
+    void loadRunDetail(activeRunTab.runId).catch((caught) => {
+      if (!ignore) {
+        setRunDetailError(caught instanceof Error ? caught.message : "failed to load run details");
+      }
+    });
+    return () => {
+      ignore = true;
+    };
+  }, [activeRunDetail, activeRunTab, loadRunDetail]);
 
   return (
     <div className="workspace">
@@ -63,6 +94,7 @@ export function WorkspaceBody({
           onOpenRun={sessions.openRun}
           onResumeRun={(run) => actions.resumeManagedRun(run.id)}
           onStopRun={(run) => actions.stopManagedRun(run.id)}
+          onUpdateLineageGroups={actions.updateManagedLineageGroups}
         />
       ) : null}
       {!isLoading && sessions.activeTabId === "charts" ? (
@@ -73,8 +105,12 @@ export function WorkspaceBody({
         />
       ) : null}
       {!isLoading && activeRunTab !== null && metadata !== null ? (
-        activeRun === null ? (
+        activeRunSummary === null ? (
           <Notice tone="error">This run is no longer available.</Notice>
+        ) : activeRun === null ? (
+          <Notice tone={runDetailError === null ? undefined : "error"}>
+            {runDetailError ?? "Loading run details..."}
+          </Notice>
         ) : (
           <RunWorkspace
             allRuns={runs}
@@ -123,4 +159,12 @@ export function WorkspaceBody({
       ) : null}
     </div>
   );
+}
+
+function mergeRunDetail(summary: ManagedRun, detail: ManagedRunDetail): ManagedRunDetail {
+  return {
+    ...detail,
+    ...summary,
+    config: detail.config,
+  };
 }

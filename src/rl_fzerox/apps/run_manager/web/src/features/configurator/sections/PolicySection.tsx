@@ -57,6 +57,13 @@ export function PolicySection({
   const activationOptions = metadata.activation_functions.map(
     (option) => option.value,
   ) as ManagedRunConfig["policy"]["activation"][];
+  const fallbackFusionFeaturesDim =
+    defaultConfig.policy.fusion_features_dim ?? preview?.fusion_input_dim ?? 768;
+  const fusionFeaturesDim = config.policy.fusion_features_dim ?? fallbackFusionFeaturesDim;
+  const fusionEnabled = config.policy.fusion_features_dim !== null;
+  const updateFusionEnabled = (enabled: boolean) => {
+    updatePolicy({ fusion_features_dim: enabled ? fusionFeaturesDim : null });
+  };
 
   return (
     <div className="config-stack">
@@ -108,16 +115,25 @@ export function PolicySection({
               value={config.policy.state_net_arch}
               onChange={(value) => updatePolicy({ state_net_arch: value })}
             />
-            <IntegerField
-              help="Feature width after image/state fusion."
-              label="Fusion features"
-              min={1}
-              resetValue={defaultConfig.policy.fusion_features_dim}
-              value={config.policy.fusion_features_dim}
-              onChange={(value) => updatePolicy({ fusion_features_dim: value })}
-            />
             <BooleanField
-              help="Apply layer normalization after fusion."
+              help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
+              label="Fusion MLP"
+              resetValue={defaultConfig.policy.fusion_features_dim !== null}
+              value={fusionEnabled}
+              onChange={updateFusionEnabled}
+            />
+            <fieldset className="dependent-fieldset" disabled={checkpointLocked || !fusionEnabled}>
+              <IntegerField
+                help="Feature width of the learned fusion MLP."
+                label="Fusion features"
+                min={1}
+                resetValue={defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim}
+                value={fusionFeaturesDim}
+                onChange={(value) => updatePolicy({ fusion_features_dim: value })}
+              />
+            </fieldset>
+            <BooleanField
+              help="Apply layer normalization after the fusion stage or direct concatenation."
               label="Layer norm"
               resetValue={defaultConfig.policy.layer_norm}
               value={config.policy.layer_norm}

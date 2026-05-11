@@ -6,12 +6,21 @@ from __future__ import annotations
 from pathlib import Path
 
 _DEFAULT_MANAGER_RUNS_ROOT = Path("local/runs").resolve()
+_DEFAULT_TENSORBOARD_VIEWS_ROOT = Path("local/tensorboard_views").resolve()
 
 
 def manager_runs_root(*, output_root: Path | None = None) -> Path:
     """Return the manager-owned run root under the normal training output tree."""
 
     return (output_root or _DEFAULT_MANAGER_RUNS_ROOT).resolve()
+
+
+def manager_tensorboard_views_root(*, output_root: Path | None = None) -> Path:
+    """Return the symlink-only grouped TensorBoard view root."""
+
+    if output_root is None:
+        return _DEFAULT_TENSORBOARD_VIEWS_ROOT
+    return output_root.expanduser().resolve().parent / "tensorboard_views"
 
 
 def predicted_managed_lineage_dir(

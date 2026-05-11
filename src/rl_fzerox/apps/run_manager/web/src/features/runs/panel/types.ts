@@ -23,10 +23,19 @@ export type RunLineageRun = {
 export type RunLineageGroup = {
   canDeleteLineage: boolean;
   createdAt: string;
+  groupNames: readonly string[];
   id: string;
   label: string;
   latestUpdatedAt: string;
   runs: RunLineageRun[];
+};
+
+export type RunLineageBucket = {
+  groupName: string | null;
+  id: string;
+  label: string;
+  lineages: RunLineageGroup[];
+  slug: string;
 };
 
 export type PendingDelete =

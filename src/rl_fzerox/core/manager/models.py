@@ -70,11 +70,36 @@ class ManagedRun:
     run_dir: Path
     created_at: str
     lineage_id: str
+    lineage_groups: tuple[str, ...] = ()
     lineage_step_offset: int = 0
     parent_run_id: str | None = None
     source_run_id: str | None = None
     source_artifact: Literal["latest", "best"] | None = None
     source_snapshot_dir: Path | None = None
+    source_num_timesteps: int | None = None
+    started_at: str | None = None
+    stopped_at: str | None = None
+    worker_heartbeat_at: str | None = None
+    runtime: ManagedRunRuntime | None = None
+    pending_command: RunCommand | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ManagedRunSummary:
+    """Lightweight run-list record that avoids deserializing full configs."""
+
+    id: str
+    name: str
+    status: RunStatus
+    config_hash: str
+    action_repeat: int
+    created_at: str
+    lineage_id: str
+    lineage_groups: tuple[str, ...] = ()
+    lineage_step_offset: int = 0
+    parent_run_id: str | None = None
+    source_run_id: str | None = None
+    source_artifact: Literal["latest", "best"] | None = None
     source_num_timesteps: int | None = None
     started_at: str | None = None
     stopped_at: str | None = None

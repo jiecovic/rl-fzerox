@@ -235,8 +235,11 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         self,
         observation: np.ndarray | dict[str, np.ndarray],
         *,
+        state: tuple[np.ndarray, ...] | None = None,
+        episode_start: np.ndarray | None = None,
         target_names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
+        del state, episode_start
         self.set_training_mode(False)
         obs_tensor, _ = self.obs_to_tensor(observation)
         with torch.no_grad():

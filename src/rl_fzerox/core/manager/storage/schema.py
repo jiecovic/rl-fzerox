@@ -8,7 +8,7 @@ import sqlite3
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 12
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -112,6 +112,13 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             source_path TEXT NOT NULL,
             target_path TEXT,
             created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS lineage_groups (
+            lineage_id TEXT NOT NULL,
+            group_name TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(lineage_id, group_name)
         );
 
         DROP INDEX IF EXISTS runs_name_unique_idx;

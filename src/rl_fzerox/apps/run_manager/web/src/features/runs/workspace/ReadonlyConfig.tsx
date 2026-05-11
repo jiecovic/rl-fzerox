@@ -14,21 +14,25 @@ import { RewardSection } from "@/features/configurator/sections/RewardSection";
 import { TracksSection } from "@/features/configurator/sections/TracksSection";
 import { TrainingSection } from "@/features/configurator/sections/TrainingSection";
 import { VehicleSection } from "@/features/configurator/sections/VehicleSection";
-import type { ConfigMetadata, ManagedRun, PolicyArchitecturePreview } from "@/shared/api/contract";
+import type {
+  ConfigMetadata,
+  ManagedRunDetail,
+  PolicyArchitecturePreview,
+} from "@/shared/api/contract";
 import { Tabs } from "@/shared/ui/Tabs";
 
 interface RunReadonlyConfigProps {
   metadata: ConfigMetadata;
   onSectionChange: (section: ConfigSection) => void;
   policyPreview: PolicyArchitecturePreview | null;
-  run: ManagedRun;
+  run: ManagedRunDetail;
   section: ConfigSection;
 }
 
 interface ReadonlySectionRendererProps {
   metadata: ConfigMetadata;
   policyPreview: PolicyArchitecturePreview | null;
-  run: ManagedRun;
+  run: ManagedRunDetail;
 }
 
 const NOOP_SET_CONFIG = () => undefined;

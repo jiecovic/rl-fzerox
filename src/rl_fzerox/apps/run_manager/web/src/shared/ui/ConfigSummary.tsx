@@ -31,7 +31,11 @@ export function ConfigSummary({ config }: { config: ManagedRunConfig }) {
       />
       <SummaryItem
         label="Policy"
-        value={`${config.policy.conv_profile} · ${config.policy.recurrent_enabled ? `LSTM ${config.policy.recurrent_hidden_size}` : "no LSTM"} · fusion ${config.policy.fusion_features_dim}`}
+        value={`${config.policy.conv_profile} · ${config.policy.recurrent_enabled ? `LSTM ${config.policy.recurrent_hidden_size}` : "no LSTM"} · ${
+          config.policy.fusion_features_dim === null
+            ? "fusion off"
+            : `fusion ${config.policy.fusion_features_dim}`
+        }`}
       />
       <SummaryItem label="Vehicle" value={`${vehicleSummary} · ${engineSummary}`} />
       <SummaryItem label="Action" value={actionSummary} />

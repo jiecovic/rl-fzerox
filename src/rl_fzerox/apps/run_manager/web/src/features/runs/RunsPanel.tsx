@@ -6,6 +6,7 @@ import { usePersistentDisclosureMap } from "@/features/configurator/disclosureSt
 import { useRunsPanelActions } from "@/features/runs/panel/actions";
 import { LineageCard } from "@/features/runs/panel/LineageCard";
 import {
+  buildLineageBuckets,
   buildLineageGroups,
   deleteDescription,
   disclosureDefaults,
@@ -13,6 +14,7 @@ import {
 } from "@/features/runs/panel/model";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
+import { ChevronIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface RunsPanelProps {
@@ -22,6 +24,7 @@ interface RunsPanelProps {
   onOpenRun: (run: ManagedRun) => void;
   onResumeRun: (run: ManagedRun) => Promise<void>;
   onStopRun: (run: ManagedRun) => Promise<void>;
+  onUpdateLineageGroups: (lineageId: string, groupNames: readonly string[]) => Promise<void>;
   runs: ManagedRun[];
 }
 
@@ -32,12 +35,22 @@ export function RunsPanel({
   onOpenRun,
   onResumeRun,
   onStopRun,
+  onUpdateLineageGroups,
   runs,
 }: RunsPanelProps) {
   const lineageGroups = useMemo(() => buildLineageGroups(runs, drafts), [drafts, runs]);
+  const lineageBuckets = useMemo(() => buildLineageBuckets(lineageGroups), [lineageGroups]);
+  const bucketDisclosureDefaults = useMemo<Record<string, boolean>>(
+    () => Object.fromEntries(lineageBuckets.map((bucket) => [bucket.id, true] as const)),
+    [lineageBuckets],
+  );
   const lineageDisclosureDefaults = useMemo(
     () => disclosureDefaults(lineageGroups),
     [lineageGroups],
+  );
+  const [bucketOpen, setBucketOpen] = usePersistentDisclosureMap(
+    "run-manager-lineage-group-open",
+    bucketDisclosureDefaults,
   );
   const [lineageOpen, setLineageOpen] = usePersistentDisclosureMap(
     "run-manager-lineage-open",
@@ -75,28 +88,68 @@ export function RunsPanel({
           />
         </div>
         {actionError !== null ? <Notice tone="error">{actionError}</Notice> : null}
-        <div className="run-lineage-list">
-          {lineageGroups.map((lineage) => (
-            <LineageCard
-              busyActionRunId={busyActionRunId}
-              isDeleting={isDeleting}
-              key={lineage.id}
-              lineage={lineage}
-              onDeleteLineage={() => requestLineageDelete(lineage)}
-              onOpenRun={onOpenRun}
-              onRequestRunDelete={requestRunDelete}
-              onResumeRun={(run) => onResumeRun(run)}
-              onRunAction={runAction}
-              onStopRun={(run) => onStopRun(run)}
-              onToggle={() =>
-                setLineageOpen((current) => ({
-                  ...current,
-                  [lineage.id]: !(current[lineage.id] ?? true),
-                }))
-              }
-              open={lineageOpen[lineage.id] ?? true}
-            />
-          ))}
+        <div className="run-lineage-bucket-list">
+          {lineageBuckets.map((bucket) => {
+            const isBucketOpen = bucketOpen[bucket.id] ?? true;
+            return (
+              <section
+                aria-label={`${bucket.label} lineage group`}
+                className="run-lineage-bucket"
+                key={bucket.id}
+              >
+                <button
+                  aria-expanded={isBucketOpen}
+                  aria-label={`${isBucketOpen ? "Collapse" : "Expand"} group ${bucket.label}`}
+                  className="run-lineage-bucket-header"
+                  type="button"
+                  onClick={() =>
+                    setBucketOpen((current) => ({
+                      ...current,
+                      [bucket.id]: !(current[bucket.id] ?? true),
+                    }))
+                  }
+                >
+                  <span
+                    aria-hidden="true"
+                    className={isBucketOpen ? "run-lineage-chevron is-open" : "run-lineage-chevron"}
+                  >
+                    <ChevronIcon />
+                  </span>
+                  <strong>{bucket.label}</strong>
+                  <span className="run-lineage-bucket-meta">
+                    {bucket.lineages.length} lineages · tensorboard: local/tensorboard_views/
+                    {bucket.slug}
+                  </span>
+                </button>
+                {isBucketOpen ? (
+                  <div className="run-lineage-list">
+                    {bucket.lineages.map((lineage) => (
+                      <LineageCard
+                        busyActionRunId={busyActionRunId}
+                        isDeleting={isDeleting}
+                        key={lineage.id}
+                        lineage={lineage}
+                        onDeleteLineage={() => requestLineageDelete(lineage)}
+                        onOpenRun={onOpenRun}
+                        onRequestRunDelete={requestRunDelete}
+                        onResumeRun={(run) => onResumeRun(run)}
+                        onRunAction={runAction}
+                        onStopRun={(run) => onStopRun(run)}
+                        onToggle={() =>
+                          setLineageOpen((current) => ({
+                            ...current,
+                            [lineage.id]: !(current[lineage.id] ?? true),
+                          }))
+                        }
+                        onUpdateGroups={onUpdateLineageGroups}
+                        open={lineageOpen[lineage.id] ?? true}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
         </div>
       </Panel>
       <ConfirmDialog

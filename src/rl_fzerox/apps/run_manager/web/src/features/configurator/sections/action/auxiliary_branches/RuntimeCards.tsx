@@ -285,7 +285,7 @@ export function RuntimeCards({
       <section className="action-runtime-card">
         <div className="action-runtime-header config-disclosure-copy">
           <strong>Pitch control</strong>
-          <small>Choose whether airborne pitch is one analog lane or a discrete bucket head.</small>
+          <small>Choose whether pitch is one analog lane or a discrete bucket head.</small>
         </div>
         {action.include_pitch ? null : (
           <p className="action-note">
@@ -296,26 +296,10 @@ export function RuntimeCards({
           className="dependent-fieldset action-runtime-fields"
           disabled={!action.include_pitch}
         >
-          <RangeNumberField
-            help="Neutral pitch band used by both pitch decoding and the grounded pitch penalty."
-            label="Pitch deadzone"
-            max={0.5}
-            min={0}
-            rangeStep={0.01}
-            resetValue={defaultAction.pitch_deadzone}
-            ticks={[
-              { label: "0", value: 0 },
-              { label: "0.1", value: 0.1 },
-              { label: "0.25", value: 0.25 },
-              { label: "0.5", value: 0.5 },
-            ]}
-            value={action.pitch_deadzone}
-            onChange={(value) => updateAction({ pitch_deadzone: value })}
-          />
           <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
             <div className="field-shell">
               <FieldLabel
-                help="Choose whether airborne pitch is a continuous analog lane or a discrete bucket head."
+                help="Choose whether pitch is a continuous analog lane or a discrete bucket head."
                 label="Pitch mode"
               />
               <SegmentedChoiceStrip
@@ -353,8 +337,8 @@ export function RuntimeCards({
               />
             ) : (
               <p className="action-note">
-                Continuous pitch maps the airborne pitch axis directly, so runtime masking stays
-                unavailable.
+                Continuous pitch maps the vertical stick axis directly, matching continuous steering
+                semantics.
               </p>
             )}
           </fieldset>

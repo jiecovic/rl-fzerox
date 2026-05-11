@@ -140,6 +140,43 @@ describe("ChartsPanel", () => {
     expect(screen.getByText("1 runs")).toBeInTheDocument();
   });
 
+  it("filters chart selection by lineage group", async () => {
+    window.localStorage.clear();
+    const user = userEvent.setup();
+    fetchFreshRunMetricsMock.mockResolvedValue([]);
+    getCachedRunMetricsMock.mockReturnValue(null);
+
+    const oldRun = runFixture({
+      id: "old-run",
+      lineage_groups: ["Old test runs"],
+      lineage_id: "old-lineage",
+      name: "old experiment",
+      status: "stopped",
+    });
+    const sweepRun = runFixture({
+      id: "sweep-run",
+      lineage_groups: ["CNN sweep", "Current ablations"],
+      lineage_id: "sweep-lineage",
+      name: "cnn sweep",
+      status: "stopped",
+    });
+
+    render(<ChartsPanel focusedRunId={null} runs={[oldRun, sweepRun]} />);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Chart lineage group" }), [
+      "cnn-sweep",
+    ]);
+
+    expect(screen.getByLabelText("cnn sweep lineage runs")).toBeInTheDocument();
+    expect(screen.queryByLabelText("old experiment lineage runs")).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Chart lineage group" }), [
+      "current-ablations",
+    ]);
+
+    expect(screen.getByLabelText("cnn sweep lineage runs")).toBeInTheDocument();
+  });
+
   it("colors selected runs individually when one lineage is selected", async () => {
     window.localStorage.clear();
     fetchFreshRunMetricsMock.mockResolvedValue([]);

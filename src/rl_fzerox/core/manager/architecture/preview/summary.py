@@ -54,8 +54,16 @@ def policy_architecture_preview(config: ManagedRunConfig) -> PolicyArchitectureP
     state_features_dim = state_net_arch[-1] if state_net_arch else state_dim
     state_mlp_params = mlp_params(state_dim, state_net_arch)
     fusion_input_dim = image_features_dim + state_features_dim
-    extractor_output_dim = int(config.policy.fusion_features_dim)
-    fusion_params = linear_params(fusion_input_dim, extractor_output_dim)
+    extractor_output_dim = (
+        fusion_input_dim
+        if config.policy.fusion_features_dim is None
+        else int(config.policy.fusion_features_dim)
+    )
+    fusion_params = (
+        0
+        if config.policy.fusion_features_dim is None
+        else linear_params(fusion_input_dim, extractor_output_dim)
+    )
     layer_norm_params = extractor_output_dim * 2 if config.policy.layer_norm else 0
     recurrent_params = recurrent_param_count(config, extractor_output_dim)
     policy_input_dim = (

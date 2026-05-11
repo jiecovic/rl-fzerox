@@ -41,10 +41,21 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     INITIAL_GROUP_OPEN,
   );
   const previousFocusedRunIdRef = useRef<string | null>(focusedRunId);
+  const previousFocusedGroupRunIdRef = useRef<string | null>(focusedRunId);
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>(() =>
     readStoredSelectedRunIds(runs, focusedRunId),
   );
   const [rangeMode, setRangeMode] = useState<RunMetricRangeMode>(DEFAULT_CHART_RANGE_MODE);
+  const [groupFilter, setGroupFilter] = useState(() => defaultChartGroupFilter(runs, focusedRunId));
+  const groupOptions = useMemo(() => chartGroupOptions(runs), [runs]);
+  const fallbackGroupFilter = useMemo(
+    () => defaultChartGroupFilter(runs, focusedRunId),
+    [focusedRunId, runs],
+  );
+  const visibleRuns = useMemo(
+    () => runs.filter((run) => chartGroupValues(run.lineage_groups).includes(groupFilter)),
+    [groupFilter, runs],
+  );
   const { loadError, metricsByRun } = useRunChartMetrics(selectedRunIds, rangeMode);
 
   const setSelectedRuns = useCallback((nextValue: string[] | ((current: string[]) => string[])) => {
@@ -56,12 +67,32 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
   }, []);
 
   useEffect(() => {
-    const available = new Set(runs.map((run) => run.id));
+    const available = new Set(visibleRuns.map((run) => run.id));
     setSelectedRuns((current) => {
       const filtered = current.filter((runId) => available.has(runId));
-      return filtered.length === 0 ? defaultSelectedRunIds(runs, focusedRunId) : filtered;
+      return filtered.length === 0 ? defaultSelectedRunIds(visibleRuns, focusedRunId) : filtered;
     });
-  }, [focusedRunId, runs, setSelectedRuns]);
+  }, [focusedRunId, setSelectedRuns, visibleRuns]);
+
+  useEffect(() => {
+    if (groupOptions.some((option) => option.value === groupFilter)) {
+      return;
+    }
+    setGroupFilter(fallbackGroupFilter);
+  }, [fallbackGroupFilter, groupFilter, groupOptions]);
+
+  useEffect(() => {
+    const previousFocusedRunId = previousFocusedGroupRunIdRef.current;
+    if (focusedRunId === null || focusedRunId === previousFocusedRunId) {
+      return;
+    }
+    const focusedRun = runs.find((run) => run.id === focusedRunId);
+    if (focusedRun === undefined) {
+      return;
+    }
+    previousFocusedGroupRunIdRef.current = focusedRunId;
+    setGroupFilter(chartGroupValues(focusedRun.lineage_groups)[0] ?? fallbackGroupFilter);
+  }, [fallbackGroupFilter, focusedRunId, runs]);
 
   useEffect(() => {
     const previousFocusedRunId = previousFocusedRunIdRef.current;
@@ -69,20 +100,23 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     if (focusedRunId === null || focusedRunId === previousFocusedRunId) {
       return;
     }
-    if (!runs.some((run) => run.id === focusedRunId)) {
+    if (!visibleRuns.some((run) => run.id === focusedRunId)) {
       return;
     }
     setSelectedRuns((current) => [
       focusedRunId,
       ...current.filter((runId) => runId !== focusedRunId),
     ]);
-  }, [focusedRunId, runs, setSelectedRuns]);
+  }, [focusedRunId, setSelectedRuns, visibleRuns]);
 
-  const runsById = useMemo(() => new Map(runs.map((run) => [run.id, run] as const)), [runs]);
-  const lineageInfoById = useMemo(() => buildLineageInfoById(runs), [runs]);
+  const runsById = useMemo(
+    () => new Map(visibleRuns.map((run) => [run.id, run] as const)),
+    [visibleRuns],
+  );
+  const lineageInfoById = useMemo(() => buildLineageInfoById(visibleRuns), [visibleRuns]);
   const selectionLineageGroups = useMemo(
-    () => buildLineageRunGroups(runs, lineageInfoById),
-    [lineageInfoById, runs],
+    () => buildLineageRunGroups(visibleRuns, lineageInfoById),
+    [lineageInfoById, visibleRuns],
   );
   const selectionLineageDisclosureDefaults = useMemo(
     (): Record<string, boolean> =>
@@ -101,8 +135,8 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     [runsById, selectedRunIds],
   );
   const colorByRunId = useMemo(
-    () => buildChartColorByRunId(runs, selectedRuns),
-    [runs, selectedRuns],
+    () => buildChartColorByRunId(visibleRuns, selectedRuns),
+    [selectedRuns, visibleRuns],
   );
   const selectedLineageGroups = useMemo(
     () => buildLineageRunGroups(selectedRuns, lineageInfoById),
@@ -176,20 +210,34 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
           <button
             className="secondary-button"
             type="button"
-            onClick={() => setSelectedRuns(defaultSelectedRunIds(runs, focusedRunId))}
+            onClick={() => setSelectedRuns(defaultSelectedRunIds(visibleRuns, focusedRunId))}
           >
             Select latest
           </button>
           <button
             className="secondary-button"
             type="button"
-            onClick={() => setSelectedRuns(runs.map((run) => run.id))}
+            onClick={() => setSelectedRuns(visibleRuns.map((run) => run.id))}
           >
             Select all
           </button>
           <button className="secondary-button" type="button" onClick={() => setSelectedRuns([])}>
             Clear
           </button>
+          <label className="run-chart-group-filter">
+            <span>Group</span>
+            <select
+              aria-label="Chart lineage group"
+              value={groupFilter}
+              onChange={(event) => setGroupFilter(event.target.value)}
+            >
+              {groupOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <SegmentedChoiceStrip
             ariaLabel="Chart range"
             options={CHART_RANGE_OPTIONS.map((option) => ({
@@ -213,7 +261,7 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         openLineageById={openLineageById}
         selectedRunIds={selectedRunIds}
         selectionLineageGroups={selectionLineageGroups}
-        totalRuns={runs.length}
+        totalRuns={visibleRuns.length}
         onToggleCollapsedLineage={toggleCollapsedLineage}
         onToggleLineage={toggleSelectedLineage}
         onToggleRun={toggleSelectedRun}
@@ -260,5 +308,49 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         </div>
       )}
     </Panel>
+  );
+}
+
+function chartGroupOptions(runs: readonly ManagedRun[]) {
+  return [
+    ...new Map(
+      runs.flatMap((run) =>
+        chartGroupLabels(run.lineage_groups).map((label) => [chartGroupFilterValue(label), label]),
+      ),
+    ).entries(),
+  ]
+    .map(([value, label]) => ({ label, value }))
+    .sort((left, right) => {
+      if (left.value === "ungrouped" || right.value === "ungrouped") {
+        return left.value === "ungrouped" && right.value === "ungrouped"
+          ? 0
+          : left.value === "ungrouped"
+            ? 1
+            : -1;
+      }
+      return left.label.localeCompare(right.label);
+    });
+}
+
+function defaultChartGroupFilter(runs: readonly ManagedRun[], focusedRunId: string | null) {
+  const focusedRun =
+    focusedRunId === null ? undefined : runs.find((run) => run.id === focusedRunId);
+  return chartGroupValues(focusedRun?.lineage_groups ?? runs[0]?.lineage_groups ?? [])[0] ?? "";
+}
+
+function chartGroupLabels(groupNames: readonly string[]) {
+  return groupNames.length === 0 ? ["Ungrouped"] : groupNames;
+}
+
+function chartGroupValues(groupNames: readonly string[]) {
+  return chartGroupLabels(groupNames).map(chartGroupFilterValue);
+}
+
+function chartGroupFilterValue(groupName: string) {
+  return (
+    groupName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "unnamed"
   );
 }

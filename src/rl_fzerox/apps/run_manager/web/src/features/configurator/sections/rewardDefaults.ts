@@ -36,7 +36,6 @@ export function trackEventDefaults(reward: RewardConfig): RewardPatch {
   return {
     dirt_entry_penalty: reward.dirt_entry_penalty,
     dirt_progress_multiplier: reward.dirt_progress_multiplier,
-    energy_loss_epsilon: reward.energy_loss_epsilon,
     ice_entry_penalty: reward.ice_entry_penalty,
     ice_progress_multiplier: reward.ice_progress_multiplier,
     lap_completion_bonus: reward.lap_completion_bonus,
@@ -68,6 +67,7 @@ export function damageDefaults(reward: RewardConfig): RewardPatch {
     damage_taken_frame_penalty: reward.damage_taken_frame_penalty,
     damage_taken_streak_cap_frames: reward.damage_taken_streak_cap_frames,
     damage_taken_streak_ramp_penalty: reward.damage_taken_streak_ramp_penalty,
+    energy_loss_epsilon: reward.energy_loss_epsilon,
     failure_penalty: reward.failure_penalty,
     step_reward_clip_max: reward.step_reward_clip_max,
     step_reward_clip_min: reward.step_reward_clip_min,

@@ -15,13 +15,16 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     LaunchRunRequest,
     RunLauncher,
     UpdateDraftRequest,
+    UpdateLineageGroupsRequest,
     UpdateRunRequest,
 )
 from rl_fzerox.apps.run_manager.api.payloads import (
     draft_payload,
     run_metric_payload,
     run_payload,
+    run_summary_payload,
     template_payload,
+    tensorboard_view_group_payload,
     track_sampling_state_payload,
 )
 from rl_fzerox.apps.run_manager.desktop import open_directory
@@ -49,6 +52,7 @@ def create_manager_api_app(
     """Create the local REST API app for the run manager."""
 
     store.initialize()
+    store.rebuild_tensorboard_views()
     app = FastAPI(title="F-Zero X Run Manager", version="0.1.0")
     launcher = run_launcher or ManagerRunLauncher(store)
 
@@ -79,17 +83,23 @@ def create_manager_api_app(
 
     @app.get("/api/runs")
     async def runs() -> dict[str, list[dict[str, object]]]:
-        visible_runs = store.list_visible_runs()
+        visible_runs = store.list_visible_run_summaries()
         recent_events = store.list_recent_run_events(
             tuple(run.id for run in visible_runs),
             limit_per_run=6,
         )
         return {
             "runs": [
-                run_payload(item, recent_events=recent_events.get(item.id, ()))
+                run_summary_payload(item, recent_events=recent_events.get(item.id, ()))
                 for item in visible_runs
             ]
         }
+
+    @app.get("/api/runs/{run_id}")
+    async def run_detail(
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> dict[str, dict[str, object]]:
+        return _run_response(store, _require_run(store, run_id))
 
     @app.put("/api/runs/{run_id}")
     async def update_run(
@@ -105,6 +115,7 @@ def create_manager_api_app(
             raise HTTPException(status_code=409, detail=str(error)) from error
         if run is None:
             raise HTTPException(status_code=404, detail="run not found")
+        store.rebuild_tensorboard_views()
         return _run_response(store, run)
 
     @app.get("/api/runs/{run_id}/metrics")
@@ -164,6 +175,7 @@ def create_manager_api_app(
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        store.rebuild_tensorboard_views()
         return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/fork", status_code=201)
@@ -182,6 +194,7 @@ def create_manager_api_app(
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        store.rebuild_tensorboard_views()
         return _run_response(store, run)
 
     @app.post("/api/runs/{run_id}/pause")
@@ -224,6 +237,7 @@ def create_manager_api_app(
             raise HTTPException(status_code=400, detail=str(error)) from error
         if not deleted:
             raise HTTPException(status_code=404, detail="run not found")
+        store.rebuild_tensorboard_views()
         return {"deleted": True}
 
     @app.delete("/api/lineages/{lineage_id}")
@@ -234,7 +248,38 @@ def create_manager_api_app(
             raise HTTPException(status_code=400, detail=str(error)) from error
         if not deleted:
             raise HTTPException(status_code=404, detail="lineage not found")
+        store.rebuild_tensorboard_views()
         return {"deleted": True}
+
+    @app.put("/api/lineages/{lineage_id}/groups")
+    async def update_lineage_groups(
+        lineage_id: Annotated[str, Path(min_length=1)],
+        request: UpdateLineageGroupsRequest,
+    ) -> dict[str, object]:
+        try:
+            group_names = store.update_lineage_groups(
+                lineage_id=lineage_id,
+                group_names=request.group_names,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        view_groups = store.rebuild_tensorboard_views()
+        return {
+            "lineage_id": lineage_id,
+            "lineage_groups": list(group_names),
+            "tensorboard_views": [
+                tensorboard_view_group_payload(group) for group in view_groups
+            ],
+        }
+
+    @app.post("/api/tensorboard-views/rebuild")
+    async def rebuild_tensorboard_views_endpoint() -> dict[str, object]:
+        view_groups = store.rebuild_tensorboard_views()
+        return {
+            "tensorboard_views": [
+                tensorboard_view_group_payload(group) for group in view_groups
+            ],
+        }
 
     @app.post("/api/runs/{run_id}/open-dir")
     async def open_run_dir(run_id: Annotated[str, Path(min_length=1)]) -> dict[str, bool]:

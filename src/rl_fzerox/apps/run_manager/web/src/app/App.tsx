@@ -16,13 +16,14 @@ export function App() {
     runs: managerData.runs,
   });
   const actions = useWorkspaceActions({
-    defaultConfig: managerData.defaultConfig,
     drafts: managerData.drafts,
+    loadRunDetail: managerData.loadRunDetail,
     reloadManagerData: managerData.reloadManagerData,
     runs: managerData.runs,
     sessions,
     setDrafts: managerData.setDrafts,
     setRuns: managerData.setRuns,
+    upsertRunDetail: managerData.upsertRunDetail,
   });
 
   useEffect(() => {
@@ -62,8 +63,10 @@ export function App() {
         drafts={managerData.drafts}
         error={managerData.error}
         isLoading={managerData.isLoading}
+        loadRunDetail={managerData.loadRunDetail}
         metadata={managerData.metadata}
         runs={managerData.runs}
+        runDetailsById={managerData.runDetailsById}
         sessions={sessions}
       />
       <ScrollButtons />
