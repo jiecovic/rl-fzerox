@@ -1,5 +1,9 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/ActionSection.tsx
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import {
+  type ConfigSectionPatch,
+  patchConfigSection,
+} from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import { AuxiliaryBranchesDisclosure } from "@/features/configurator/sections/action/AuxiliaryBranchesDisclosure";
@@ -10,7 +14,6 @@ import {
   normalizedActionConfig,
 } from "@/features/configurator/sections/action/model";
 import type { ActionSectionProps } from "@/features/configurator/sections/action/types";
-import type { ManagedRunConfig } from "@/shared/api/contract";
 
 type ActionDisclosureState = Record<"auxiliary" | "family", boolean>;
 
@@ -31,17 +34,20 @@ export function ActionSection({
     },
   );
 
-  const updatePolicy = (patch: Partial<ManagedRunConfig["policy"]>) => {
-    setConfig({ ...config, policy: { ...config.policy, ...patch } });
+  const updatePolicy = (patch: ConfigSectionPatch<"policy">) => {
+    patchConfigSection(setConfig, "policy", patch);
   };
 
-  const updateAction = (patch: Partial<ManagedRunConfig["action"]>) => {
-    setConfig({
-      ...config,
-      action: normalizedActionConfig({
-        ...config.action,
-        ...patch,
-      }),
+  const updateAction = (patch: ConfigSectionPatch<"action">) => {
+    setConfig((currentConfig) => {
+      const actionPatch = typeof patch === "function" ? patch(currentConfig) : patch;
+      return {
+        ...currentConfig,
+        action: normalizedActionConfig({
+          ...currentConfig.action,
+          ...actionPatch,
+        }),
+      };
     });
   };
   const setSectionOpen = (section: keyof typeof openSections, open: boolean) => {

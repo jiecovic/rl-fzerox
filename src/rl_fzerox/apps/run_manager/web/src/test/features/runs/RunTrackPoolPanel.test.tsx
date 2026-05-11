@@ -1,7 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/runs/RunTrackPoolPanel.test.tsx
-import { render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RunTrackPoolPanel } from "@/features/runs/RunTrackPoolPanel";
 import type { TrackSamplingRuntimeState } from "@/shared/api/contract";
@@ -18,6 +18,66 @@ function enabledResetButton() {
 }
 
 describe("RunTrackPoolPanel", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("resets the selected cup when the opened run changes", async () => {
+    const user = userEvent.setup();
+    const firstCup = configMetadataFixture.track_cups[0];
+    const secondCup = configMetadataFixture.track_cups[1];
+    if (
+      firstCup?.course_ids[0] === undefined ||
+      firstCup.course_ids[1] === undefined ||
+      secondCup?.course_ids[0] === undefined
+    ) {
+      throw new Error(
+        "fixture must provide at least two first-cup courses and one second-cup course",
+      );
+    }
+    const initialCourseIds = [firstCup.course_ids[0], secondCup.course_ids[0]];
+    const expandedCourseIds = [
+      firstCup.course_ids[0],
+      firstCup.course_ids[1],
+      secondCup.course_ids[0],
+    ];
+    const state = trackSamplingStateForCourses(expandedCourseIds);
+
+    const { rerender } = render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          id: "run-before",
+          config: runConfigWithSelectedCourses(initialCourseIds),
+        })}
+        state={state}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: /queen/i }));
+    expect(screen.getByText(courseDisplayName(secondCup.course_ids[0]))).toBeInTheDocument();
+
+    rerender(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          id: "run-after",
+          config: runConfigWithSelectedCourses(expandedCourseIds),
+        })}
+        state={state}
+      />,
+    );
+
+    expect(screen.getByText(courseDisplayName(firstCup.course_ids[1]))).toBeInTheDocument();
+    expect(screen.queryByText(courseDisplayName(secondCup.course_ids[0]))).not.toBeInTheDocument();
+  });
+
   it("groups the pool into cup tabs and switches the visible course rows", async () => {
     const user = userEvent.setup();
     const firstCup = configMetadataFixture.track_cups[0];
@@ -168,3 +228,53 @@ describe("RunTrackPoolPanel", () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 });
+
+function runConfigWithSelectedCourses(courseIds: readonly string[]) {
+  return {
+    ...managedRunConfigFixture,
+    tracks: {
+      ...managedRunConfigFixture.tracks,
+      sampling_mode: "step_balanced" as const,
+      selected_course_ids: [...courseIds],
+    },
+  };
+}
+
+function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSamplingRuntimeState {
+  const selectedCourses = configMetadataFixture.built_in_courses.filter((course) =>
+    courseIds.includes(course.id),
+  );
+  const probability = selectedCourses.length === 0 ? 0 : 1 / selectedCourses.length;
+  return {
+    sampling_mode: "step_balanced",
+    action_repeat: 2,
+    update_episodes: 50,
+    update_count: 1,
+    episodes_since_update: 0,
+    entries: selectedCourses.map((course) => ({
+      track_id: course.id,
+      course_key: course.id,
+      label: course.display_name,
+      current_weight: 1,
+      current_probability: probability,
+      episode_count: 1,
+      finished_episode_count: 0,
+      success_sample_count: 1,
+      episode_share: probability,
+      success_rate: 0,
+      completed_frames: 600,
+      completed_env_steps: 300,
+      step_share: probability,
+    })),
+  };
+}
+
+function courseDisplayName(courseId: string): string {
+  const course = configMetadataFixture.built_in_courses.find(
+    (candidate) => candidate.id === courseId,
+  );
+  if (course === undefined) {
+    throw new Error(`unknown fixture course: ${courseId}`);
+  }
+  return course.display_name;
+}

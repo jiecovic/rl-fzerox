@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/StateComponentPanels.tsx
+
+import type { ConfigSectionPatch } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
@@ -25,8 +27,8 @@ interface StateComponentPanelsProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
-  updateObservation: (patch: Partial<ManagedRunConfig["observation"]>) => void;
-  updatePolicy: (patch: Partial<ManagedRunConfig["policy"]>) => void;
+  updateObservation: (patch: ConfigSectionPatch<"observation">) => void;
+  updatePolicy: (patch: ConfigSectionPatch<"policy">) => void;
 }
 
 export function StateComponentPanels({
@@ -47,14 +49,14 @@ export function StateComponentPanels({
   };
 
   function updateComponent(name: string, patch: Partial<StateComponentConfig>) {
-    updateObservation(updateComponentPatch(config, name, patch));
+    updateObservation((currentConfig) => updateComponentPatch(currentConfig, name, patch));
   }
 
   function setComponentEnabled(componentName: StateComponentConfig["name"], enabled: boolean) {
-    updateObservation(
+    updateObservation((currentConfig) =>
       setComponentEnabledPatch({
         componentName,
-        config,
+        config: currentConfig,
         defaultConfig,
         enabled,
         metadata,
@@ -68,11 +70,11 @@ export function StateComponentPanels({
     featureNames: readonly string[],
     included: boolean,
   ) {
-    updateObservation(
+    updateObservation((currentConfig) =>
       setFeatureIncludedPatch({
         componentInfo,
         componentName,
-        config,
+        config: currentConfig,
         featureNames,
         included,
       }),
@@ -85,35 +87,43 @@ export function StateComponentPanels({
     rows: readonly StateFeatureRow[],
     included: boolean,
   ) {
-    updateObservation(
+    updateObservation((currentConfig) =>
       setRowsIncludedPatch({
         active: included,
         componentInfo,
         componentName,
-        config,
+        config: currentConfig,
         rows,
       }),
     );
   }
 
   function setFeatureDropoutProb(featureNames: readonly string[], dropoutProb: number) {
-    updateObservation(setFeatureDropoutPatch(config, featureNames, dropoutProb));
+    updateObservation((currentConfig) =>
+      setFeatureDropoutPatch(currentConfig, featureNames, dropoutProb),
+    );
   }
 
   function setAuxiliaryStateEnabled(enabled: boolean) {
-    updatePolicy(setAuxiliaryStateEnabledPatch(config.policy, enabled));
+    updatePolicy((currentConfig) => setAuxiliaryStateEnabledPatch(currentConfig.policy, enabled));
   }
 
   function setAuxiliaryLossEnabled(targetName: AuxiliaryStateTargetName, enabled: boolean) {
-    updatePolicy(setAuxiliaryLossEnabledPatch(config.policy, targetName, enabled));
+    updatePolicy((currentConfig) =>
+      setAuxiliaryLossEnabledPatch(currentConfig.policy, targetName, enabled),
+    );
   }
 
   function setAuxiliaryLossWeight(targetName: AuxiliaryStateTargetName, weight: number) {
-    updatePolicy(setAuxiliaryLossWeightPatch(config.policy, targetName, weight));
+    updatePolicy((currentConfig) =>
+      setAuxiliaryLossWeightPatch(currentConfig.policy, targetName, weight),
+    );
   }
 
   function setAuxiliaryGroundedOnly(targetName: AuxiliaryStateTargetName, groundedOnly: boolean) {
-    updatePolicy(setAuxiliaryGroundedOnlyPatch(config.policy, targetName, groundedOnly));
+    updatePolicy((currentConfig) =>
+      setAuxiliaryGroundedOnlyPatch(currentConfig.policy, targetName, groundedOnly),
+    );
   }
 
   return (

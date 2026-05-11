@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentCollapsedIds } from "@/features/configurator/disclosureState";
 import { ToggleSwitch } from "@/features/configurator/fields";
@@ -20,7 +21,7 @@ interface VehicleSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 export function VehicleSection({
@@ -52,7 +53,7 @@ export function VehicleSection({
   ] as const;
 
   const updateVehicle = (patch: Partial<ManagedRunConfig["vehicle"]>) => {
-    setConfig({ ...config, vehicle: { ...config.vehicle, ...patch } });
+    patchConfigSection(setConfig, "vehicle", patch);
   };
 
   const setSelectedVehicles = (nextIds: Iterable<string>) => {
@@ -68,15 +69,18 @@ export function VehicleSection({
   };
 
   const setEngineMode = (mode: ManagedRunConfig["vehicle"]["engine_mode"]) => {
-    if (mode === "random_range" && config.vehicle.engine_mode !== "random_range") {
-      updateVehicle({
-        engine_mode: "random_range",
-        engine_setting_min_raw_value: randomEngineDefaults.min,
-        engine_setting_max_raw_value: randomEngineDefaults.max,
-      });
-      return;
-    }
-    updateVehicle({ engine_mode: mode });
+    patchConfigSection(
+      setConfig,
+      "vehicle",
+      (currentConfig): Partial<ManagedRunConfig["vehicle"]> =>
+        mode === "random_range" && currentConfig.vehicle.engine_mode !== "random_range"
+          ? {
+              engine_mode: "random_range",
+              engine_setting_min_raw_value: randomEngineDefaults.min,
+              engine_setting_max_raw_value: randomEngineDefaults.max,
+            }
+          : { engine_mode: mode },
+    );
   };
 
   const setRowCollapsed = (rowId: string, collapsed: boolean) => {
@@ -90,33 +94,59 @@ export function VehicleSection({
   };
 
   const toggleVehicle = (vehicleId: string) => {
-    const nextSet = new Set(selectedVehicleSet);
-    if (nextSet.has(vehicleId)) {
-      if (nextSet.size === 1) {
-        return;
+    setConfig((currentConfig) => {
+      const nextSet = new Set(currentConfig.vehicle.selected_vehicle_ids);
+      if (nextSet.has(vehicleId)) {
+        if (nextSet.size === 1) {
+          return currentConfig;
+        }
+        nextSet.delete(vehicleId);
+      } else {
+        nextSet.add(vehicleId);
       }
-      nextSet.delete(vehicleId);
-    } else {
-      nextSet.add(vehicleId);
-    }
-    setSelectedVehicles(nextSet);
+      const ordered = allVehicleIds.filter((currentId) => nextSet.has(currentId));
+      if (ordered.length === 0) {
+        return currentConfig;
+      }
+      return {
+        ...currentConfig,
+        vehicle: {
+          ...currentConfig.vehicle,
+          selection_mode: "pool",
+          selected_vehicle_ids: ordered,
+        },
+      };
+    });
   };
 
   const toggleRow = (rowVehicleIds: readonly string[], enabled: boolean) => {
-    const nextSet = new Set(selectedVehicleSet);
-    if (enabled) {
-      for (const vehicleId of rowVehicleIds) {
-        nextSet.add(vehicleId);
+    setConfig((currentConfig) => {
+      const nextSet = new Set(currentConfig.vehicle.selected_vehicle_ids);
+      if (enabled) {
+        for (const vehicleId of rowVehicleIds) {
+          nextSet.add(vehicleId);
+        }
+      } else {
+        for (const vehicleId of rowVehicleIds) {
+          nextSet.delete(vehicleId);
+        }
+        if (nextSet.size === 0) {
+          nextSet.add(rowVehicleIds[0] ?? allVehicleIds[0] ?? "blue_falcon");
+        }
       }
-    } else {
-      for (const vehicleId of rowVehicleIds) {
-        nextSet.delete(vehicleId);
+      const ordered = allVehicleIds.filter((currentId) => nextSet.has(currentId));
+      if (ordered.length === 0) {
+        return currentConfig;
       }
-      if (nextSet.size === 0) {
-        nextSet.add(rowVehicleIds[0] ?? allVehicleIds[0] ?? "blue_falcon");
-      }
-    }
-    setSelectedVehicles(nextSet);
+      return {
+        ...currentConfig,
+        vehicle: {
+          ...currentConfig.vehicle,
+          selection_mode: "pool",
+          selected_vehicle_ids: ordered,
+        },
+      };
+    });
   };
 
   return (

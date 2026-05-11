@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/TracksSection.tsx
 import { useMemo } from "react";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
+import type { ConfigSetter } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentCollapsedIds } from "@/features/configurator/disclosureState";
 import { SegmentedChoiceStrip } from "@/features/configurator/fields";
@@ -12,7 +13,7 @@ interface TracksSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
   metadata: ConfigMetadata;
-  setConfig: (config: ManagedRunConfig) => void;
+  setConfig: ConfigSetter;
 }
 
 type BuiltInCourse = ConfigMetadata["built_in_courses"][number];
@@ -86,8 +87,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
         : null;
     })
     .filter((value): value is string => value !== null);
-  const updateTracks = (patch: Partial<ManagedRunConfig["tracks"]>) => {
-    const nextTracks = { ...config.tracks, ...patch };
+  const normalizedTracks = (tracks: ManagedRunConfig["tracks"]) => {
+    const nextTracks = { ...tracks };
     if (nextTracks.pool_mode === "x_cup") {
       nextTracks.race_mode = "gp_race";
     }
@@ -97,47 +98,74 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     if (nextTracks.race_mode !== "gp_race") {
       nextTracks.gp_difficulty = null;
     }
-    setConfig({ ...config, tracks: nextTracks });
+    return nextTracks;
   };
 
-  const setSelectedCourses = (nextIds: Iterable<string>) => {
+  const updateTracks = (patch: Partial<ManagedRunConfig["tracks"]>) => {
+    setConfig((currentConfig) => ({
+      ...currentConfig,
+      tracks: normalizedTracks({ ...currentConfig.tracks, ...patch }),
+    }));
+  };
+
+  const orderedSelectedCourseIds = (nextIds: Iterable<string>) => {
     const nextSet = new Set(nextIds);
-    const ordered = allCourseIds.filter((courseId) => nextSet.has(courseId));
-    if (ordered.length === 0) {
-      return;
-    }
-    updateTracks({ selected_course_ids: ordered });
+    return allCourseIds.filter((courseId) => nextSet.has(courseId));
   };
 
   const toggleCourse = (courseId: string) => {
-    const nextSet = new Set(selectedCourseSet);
-    if (nextSet.has(courseId)) {
-      if (nextSet.size === 1) {
-        return;
+    setConfig((currentConfig) => {
+      const nextSet = new Set(currentConfig.tracks.selected_course_ids);
+      if (nextSet.has(courseId)) {
+        if (nextSet.size === 1) {
+          return currentConfig;
+        }
+        nextSet.delete(courseId);
+      } else {
+        nextSet.add(courseId);
       }
-      nextSet.delete(courseId);
-    } else {
-      nextSet.add(courseId);
-    }
-    setSelectedCourses(nextSet);
+      const ordered = orderedSelectedCourseIds(nextSet);
+      if (ordered.length === 0) {
+        return currentConfig;
+      }
+      return {
+        ...currentConfig,
+        tracks: normalizedTracks({
+          ...currentConfig.tracks,
+          selected_course_ids: ordered,
+        }),
+      };
+    });
   };
 
   const toggleCup = (courseIds: readonly string[]) => {
-    const nextSet = new Set(selectedCourseSet);
-    const allSelected = courseIds.every((courseId) => nextSet.has(courseId));
-    if (allSelected) {
-      if (nextSet.size === courseIds.length) {
-        return;
+    setConfig((currentConfig) => {
+      const nextSet = new Set(currentConfig.tracks.selected_course_ids);
+      const allSelected = courseIds.every((courseId) => nextSet.has(courseId));
+      if (allSelected) {
+        if (nextSet.size === courseIds.length) {
+          return currentConfig;
+        }
+        for (const courseId of courseIds) {
+          nextSet.delete(courseId);
+        }
+      } else {
+        for (const courseId of courseIds) {
+          nextSet.add(courseId);
+        }
       }
-      for (const courseId of courseIds) {
-        nextSet.delete(courseId);
+      const ordered = orderedSelectedCourseIds(nextSet);
+      if (ordered.length === 0) {
+        return currentConfig;
       }
-    } else {
-      for (const courseId of courseIds) {
-        nextSet.add(courseId);
-      }
-    }
-    setSelectedCourses(nextSet);
+      return {
+        ...currentConfig,
+        tracks: normalizedTracks({
+          ...currentConfig.tracks,
+          selected_course_ids: ordered,
+        }),
+      };
+    });
   };
 
   const setCupCollapsed = (cupId: string, collapsed: boolean) => {

@@ -41,19 +41,19 @@ export function ControlFamilyDisclosure({
       open={open}
       title="Control family"
       onReset={() =>
-        setConfig({
-          ...config,
+        setConfig((currentConfig) => ({
+          ...currentConfig,
           action: normalizedActionConfig({
-            ...config.action,
+            ...currentConfig.action,
             action_repeat: defaultConfig.action.action_repeat,
             steer_buckets: checkpointLocked
-              ? config.action.steer_buckets
+              ? currentConfig.action.steer_buckets
               : defaultConfig.action.steer_buckets,
             steering_mode: checkpointLocked
-              ? config.action.steering_mode
+              ? currentConfig.action.steering_mode
               : defaultConfig.action.steering_mode,
             drive_mode: checkpointLocked
-              ? config.action.drive_mode
+              ? currentConfig.action.drive_mode
               : defaultConfig.action.drive_mode,
             force_full_throttle: defaultConfig.action.force_full_throttle,
             continuous_drive_deadzone: defaultConfig.action.continuous_drive_deadzone,
@@ -61,10 +61,10 @@ export function ControlFamilyDisclosure({
             continuous_drive_min_thrust: defaultConfig.action.continuous_drive_min_thrust,
           }),
           policy: {
-            ...config.policy,
+            ...currentConfig.policy,
             gas_on_logit: defaultConfig.policy.gas_on_logit,
           },
-        })
+        }))
       }
     >
       <div className="action-family-stack">

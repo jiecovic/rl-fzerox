@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/RunTrackPoolPanel.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   buildTrackPoolView,
   expectsTrackSamplingState,
@@ -24,26 +24,25 @@ export function RunTrackPoolPanel({
     () => buildTrackPoolView(metadata, run, visibleState),
     [metadata, run, visibleState],
   );
-  const [activeCupId, setActiveCupId] = useState<string | null>(poolView.cups[0]?.id ?? null);
+  const poolSelectionKey = `${run.id}:${run.config.tracks.selected_course_ids.join("\0")}`;
+  const firstCupId = poolView.cups[0]?.id ?? null;
+  const [cupSelection, setCupSelection] = useState<{ cupId: string; poolKey: string } | null>(null);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const selectedCupId =
+    cupSelection?.poolKey === poolSelectionKey &&
+    poolView.cups.some((cup) => cup.id === cupSelection.cupId)
+      ? cupSelection.cupId
+      : firstCupId;
 
-  useEffect(() => {
-    setActiveCupId((current) => {
-      if (poolView.cups.length === 0) {
-        return null;
-      }
-      if (current !== null && poolView.cups.some((cup) => cup.id === current)) {
-        return current;
-      }
-      return poolView.cups[0]?.id ?? null;
-    });
-  }, [poolView.cups]);
+  function selectCup(cupId: string) {
+    setCupSelection({ cupId, poolKey: poolSelectionKey });
+  }
 
   if (!expectsTrackSamplingState(run, poolView.totalCourses)) {
     return null;
   }
 
-  const activeCup = poolView.cups.find((cup) => cup.id === activeCupId) ?? poolView.cups[0] ?? null;
+  const activeCup = poolView.cups.find((cup) => cup.id === selectedCupId) ?? null;
 
   return (
     <div className="run-track-distribution-panel">
@@ -70,7 +69,7 @@ export function RunTrackPoolPanel({
           {isResetting ? "Resetting..." : "Reset stats"}
         </button>
       </div>
-      <CupTabs activeCup={activeCup} cups={poolView.cups} onSelectCup={setActiveCupId} />
+      <CupTabs activeCup={activeCup} cups={poolView.cups} onSelectCup={selectCup} />
       {visibleState === null ? (
         <div className="run-track-distribution-empty">{trackPoolEmptyMessage(run)}</div>
       ) : activeCup === null ? null : (
