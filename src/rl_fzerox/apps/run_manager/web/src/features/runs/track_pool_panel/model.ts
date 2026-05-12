@@ -46,6 +46,7 @@ export function buildTrackPoolView(
     const courseView: TrackPoolCourseView = {
       completedEnvSteps: runtimeEntry?.completed_env_steps ?? null,
       currentProbability: runtimeEntry?.current_probability ?? null,
+      emaCompletionFraction: runtimeEntry?.ema_completion_fraction ?? null,
       episodeCount: runtimeEntry?.episode_count ?? null,
       episodeShare: runtimeEntry?.episode_share ?? null,
       finishedEpisodeCount: runtimeEntry?.finished_episode_count ?? null,
@@ -105,10 +106,15 @@ export function formatOptionalPercent(value: number | null) {
 }
 
 export function successLabel(entry: TrackPoolCourseView) {
+  const completionLabel = completionSummary(entry);
   if ((entry.successSampleCount ?? 0) <= 0 || entry.successRate === null) {
-    return "Finish rate not tracked yet";
+    return completionLabel === null
+      ? "Finish rate not tracked yet"
+      : `Finish rate not tracked yet · ${completionLabel}`;
   }
-  return `${(entry.finishedEpisodeCount ?? 0).toLocaleString()} of ${(entry.successSampleCount ?? 0).toLocaleString()} finished · ${formatPercent(entry.successRate)}`;
+  return `${(entry.finishedEpisodeCount ?? 0).toLocaleString()} of ${(entry.successSampleCount ?? 0).toLocaleString()} finished · ${formatPercent(entry.successRate)} finish${
+    completionLabel === null ? "" : ` · ${completionLabel}`
+  }`;
 }
 
 export function successSummary(entry: TrackPoolCourseView) {
@@ -116,6 +122,13 @@ export function successSummary(entry: TrackPoolCourseView) {
     return "finish n/a";
   }
   return `${formatPercent(entry.successRate)} finish`;
+}
+
+export function completionSummary(entry: TrackPoolCourseView) {
+  if (entry.emaCompletionFraction === null) {
+    return null;
+  }
+  return `${formatPercent(entry.emaCompletionFraction)} comp`;
 }
 
 export function shortCupLabel(label: string) {
