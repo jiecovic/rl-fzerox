@@ -18,7 +18,7 @@ from rl_fzerox.core.envs.rewards.reward_main.controls import (
     grounded_pitch_penalty,
     lean_request_penalty,
     manual_boost_reward,
-    outside_track_frame_penalty,
+    outside_track_recovery_reward,
 )
 from rl_fzerox.core.envs.rewards.reward_main.energy import EnergyRefillRewardTracker
 from rl_fzerox.core.envs.rewards.reward_main.events import (
@@ -58,6 +58,11 @@ class RewardMainTracker:
         self._laps = LapRewardTracker()
         self._damage = DamagePenaltyState()
         self._previous_airborne = False
+        self._landing_airborne_frames = 0
+        self._outside_track_recovery_airborne_frames = 0
+        self._outside_track_recovery_armed = False
+        self._use_visible_reentry_progress_until_grounded = False
+        self._previous_outside_recovery_offset: float | None = None
         self._deferred_outside_bounds_progress = False
         self._course_id: str | None = None
 
@@ -81,6 +86,13 @@ class RewardMainTracker:
         self._laps.reset(telemetry)
         self._damage.reset()
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
+        self._landing_airborne_frames = 0
+        self._outside_track_recovery_airborne_frames = 0
+        self._outside_track_recovery_armed = False
+        self._use_visible_reentry_progress_until_grounded = False
+        self._previous_outside_recovery_offset = _previous_outside_track_recovery_offset(
+            telemetry
+        )
         self._deferred_outside_bounds_progress = telemetry_outside_track_bounds(telemetry)
 
     def summary_config(self) -> RewardSummaryConfig:
@@ -105,18 +117,40 @@ class RewardMainTracker:
             self._laps.reset(None)
             self._damage.reset()
             self._previous_airborne = False
+            self._landing_airborne_frames = 0
+            self._outside_track_recovery_airborne_frames = 0
+            self._outside_track_recovery_armed = False
+            self._use_visible_reentry_progress_until_grounded = False
+            self._previous_outside_recovery_offset = None
             self._deferred_outside_bounds_progress = False
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
         outside_track_bounds = telemetry_outside_track_bounds(telemetry)
-        defer_outside_bounds_progress = outside_track_bounds or (
-            self._deferred_outside_bounds_progress and telemetry.player.airborne
+        landing_airborne_frames = _landing_airborne_frames(
+            previous_frames=self._landing_airborne_frames,
+            previous_airborne=self._previous_airborne,
+            current_airborne=telemetry.player.airborne,
+            summary=summary,
         )
-        returning_grounded_inside_track_bounds = (
-            self._deferred_outside_bounds_progress
-            and not outside_track_bounds
-            and not telemetry.player.airborne
+        recovery_excursion_active = (
+            self._previous_outside_recovery_offset is not None or outside_track_bounds
+        )
+        recovery_airborne_frames = _outside_track_recovery_airborne_frames(
+            previous_frames=self._outside_track_recovery_airborne_frames,
+            summary=summary,
+            excursion_active=recovery_excursion_active,
+        )
+        recovery_armed = _outside_track_recovery_armed(
+            previous_armed=self._outside_track_recovery_armed,
+            airborne_frames=recovery_airborne_frames,
+            grace_frames=self._weights.outside_track_recovery_airborne_grace_frames,
+        )
+        current_outside_recovery_offset = _outside_track_recovery_offset(telemetry)
+        defer_outside_bounds_progress = outside_track_bounds
+        use_visible_reentry_progress = (
+            self._use_visible_reentry_progress_until_grounded
+            or (self._deferred_outside_bounds_progress and not outside_track_bounds)
         )
         self._energy.start_collision_cooldown(summary, telemetry, weights=self._weights)
         reward = summary.frames_run * self._weights.time_penalty_per_frame
@@ -145,7 +179,7 @@ class RewardMainTracker:
             progress_multiplier,
             outside_track_bounds=outside_track_bounds,
             defer_outside_bounds_progress=defer_outside_bounds_progress,
-            returning_grounded_inside_track_bounds=returning_grounded_inside_track_bounds,
+            use_visible_reentry_progress=use_visible_reentry_progress,
         )
         if frontier_reward.progress:
             reward += frontier_reward.progress
@@ -156,14 +190,15 @@ class RewardMainTracker:
         if frontier_reward.energy_refill_bonus:
             reward += frontier_reward.energy_refill_bonus
             breakdown["energy_refill_progress"] = frontier_reward.energy_refill_bonus
-        offtrack_penalty = outside_track_frame_penalty(
-            summary,
+        recovery_reward = outside_track_recovery_reward(
             weights=self._weights,
-            outside_track_bounds=outside_track_bounds,
+            previous_outside_offset=self._previous_outside_recovery_offset,
+            current_outside_offset=current_outside_recovery_offset,
+            enabled=recovery_armed,
         )
-        if offtrack_penalty:
-            reward += offtrack_penalty
-            breakdown["outside_track"] = offtrack_penalty
+        if recovery_reward:
+            reward += recovery_reward
+            breakdown["outside_track_recovery"] = recovery_reward
 
         lap_reward = self._laps.reward(
             telemetry,
@@ -227,6 +262,7 @@ class RewardMainTracker:
 
         landing = self._landings.reward(
             previous_airborne=self._previous_airborne,
+            airborne_frames=landing_airborne_frames,
             telemetry=telemetry,
             frontier_bucket_index=self._progress.frontier_bucket_index,
             weights=self._weights,
@@ -268,9 +304,20 @@ class RewardMainTracker:
         self._energy.advance_cooldown(summary.frames_run)
         self._energy.finish_step(telemetry)
         self._previous_airborne = telemetry.player.airborne
-        self._deferred_outside_bounds_progress = (
-            defer_outside_bounds_progress and not returning_grounded_inside_track_bounds
+        self._landing_airborne_frames = (
+            landing_airborne_frames if telemetry.player.airborne else 0
         )
+        self._outside_track_recovery_airborne_frames = (
+            recovery_airborne_frames if outside_track_bounds else 0
+        )
+        self._outside_track_recovery_armed = recovery_armed if outside_track_bounds else False
+        self._use_visible_reentry_progress_until_grounded = (
+            use_visible_reentry_progress and telemetry.player.airborne
+        )
+        self._previous_outside_recovery_offset = _previous_outside_track_recovery_offset(
+            telemetry
+        )
+        self._deferred_outside_bounds_progress = defer_outside_bounds_progress
         return RewardStep(reward=reward, breakdown=breakdown, raw_reward=raw_reward)
 
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
@@ -330,7 +377,7 @@ class RewardMainTracker:
         *,
         outside_track_bounds: bool,
         defer_outside_bounds_progress: bool,
-        returning_grounded_inside_track_bounds: bool,
+        use_visible_reentry_progress: bool,
     ) -> FrontierReward:
         if defer_outside_bounds_progress:
             return FrontierReward(
@@ -339,7 +386,7 @@ class RewardMainTracker:
                 energy_refill_bonus=0.0,
             )
 
-        if returning_grounded_inside_track_bounds:
+        if use_visible_reentry_progress:
             progress_multiplier = 1.0
             race_distance = telemetry.player.race_distance
             energy_refill_bonus_for_progress = _zero_progress_bonus
@@ -363,7 +410,7 @@ class RewardMainTracker:
             race_distance=race_distance,
             energy_refill_bonus_for_progress=energy_refill_bonus_for_progress,
         )
-        if returning_grounded_inside_track_bounds:
+        if use_visible_reentry_progress:
             return cap_outside_bounds_reentry_reward(frontier_reward, weights=self._weights)
         return frontier_reward
 
@@ -392,3 +439,55 @@ def _ground_effect_progress_modifier(
 def _zero_progress_bonus(progress_reward: float) -> float:
     del progress_reward
     return 0.0
+
+
+def _outside_track_recovery_offset(telemetry: FZeroXTelemetry | None) -> float | None:
+    if telemetry is None:
+        return None
+    return abs(float(telemetry.player.lateral_distance))
+
+
+def _previous_outside_track_recovery_offset(telemetry: FZeroXTelemetry | None) -> float | None:
+    if telemetry is None or not telemetry_outside_track_bounds(telemetry):
+        return None
+    return _outside_track_recovery_offset(telemetry)
+
+
+def _outside_track_recovery_airborne_frames(
+    *,
+    previous_frames: int,
+    summary: StepSummary,
+    excursion_active: bool,
+) -> int:
+    if not excursion_active:
+        return 0
+    current_frames = max(int(summary.airborne_frames), 0)
+    if previous_frames <= 0 and current_frames <= 0:
+        return 0
+    return max(previous_frames, 0) + current_frames
+
+
+def _landing_airborne_frames(
+    *,
+    previous_frames: int,
+    previous_airborne: bool,
+    current_airborne: bool,
+    summary: StepSummary,
+) -> int:
+    current_frames = max(int(summary.airborne_frames), 0)
+    if not previous_airborne and not current_airborne and current_frames <= 0:
+        return 0
+    return max(previous_frames, 0) + current_frames
+
+
+def _outside_track_recovery_armed(
+    *,
+    previous_armed: bool,
+    airborne_frames: int,
+    grace_frames: int,
+) -> bool:
+    if previous_armed:
+        return True
+    if airborne_frames <= 0:
+        return False
+    return airborne_frames >= max(grace_frames, 0)

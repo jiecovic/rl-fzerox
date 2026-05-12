@@ -217,6 +217,7 @@ def make_step_summary(
     entered_state_flags: int | None = None,
     entered_course_effects: int = 0,
     final_frame_index: int = 1,
+    airborne_frames: int = 0,
 ) -> StepSummary:
     resolved_entered_state_flags = (
         encode_state_flags(entered_state_labels)
@@ -236,6 +237,7 @@ def make_step_summary(
         entered_state_flags=resolved_entered_state_flags,
         entered_course_effects=entered_course_effects,
         final_frame_index=final_frame_index,
+        airborne_frames=airborne_frames,
     )
 
 

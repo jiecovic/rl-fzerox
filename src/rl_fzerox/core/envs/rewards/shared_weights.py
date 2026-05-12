@@ -41,6 +41,9 @@ class SharedRewardWeights(Protocol):
     def airborne_landing_reward(self) -> float: ...
 
     @property
+    def airborne_landing_grace_frames(self) -> int: ...
+
+    @property
     def failure_penalty(self) -> float: ...
 
     @property

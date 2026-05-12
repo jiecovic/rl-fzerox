@@ -66,6 +66,7 @@ class LandingRewardTracker:
         self,
         *,
         previous_airborne: bool,
+        airborne_frames: int,
         telemetry: FZeroXTelemetry,
         frontier_bucket_index: int,
         weights: SharedRewardWeights,
@@ -74,6 +75,8 @@ class LandingRewardTracker:
         if reward == 0.0:
             return 0.0
         if not previous_airborne or telemetry.player.airborne:
+            return 0.0
+        if airborne_frames < max(int(weights.airborne_landing_grace_frames), 0):
             return 0.0
         if frontier_bucket_index <= self._last_rewarded_frontier_bucket_index:
             return 0.0

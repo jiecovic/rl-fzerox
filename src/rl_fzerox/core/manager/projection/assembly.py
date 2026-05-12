@@ -95,7 +95,10 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "outside_bounds_reentry_progress_distance_cap": (
             reward.outside_bounds_reentry_progress_distance_cap
         ),
-        "outside_track_frame_penalty": reward.outside_track_frame_penalty,
+        "outside_track_recovery_reward": reward.outside_track_recovery_reward,
+        "outside_track_recovery_airborne_grace_frames": (
+            reward.outside_track_recovery_airborne_grace_frames
+        ),
         "lap_completion_bonus": reward.lap_completion_bonus,
         "lap_position_scale": reward.lap_position_scale,
         "energy_loss_epsilon": reward.energy_loss_epsilon,
@@ -115,6 +118,7 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "damage_taken_streak_ramp_penalty": reward.damage_taken_streak_ramp_penalty,
         "damage_taken_streak_cap_frames": reward.damage_taken_streak_cap_frames,
         "airborne_landing_reward": reward.airborne_landing_reward,
+        "airborne_landing_grace_frames": reward.airborne_landing_grace_frames,
         "collision_recoil_penalty": reward.collision_recoil_penalty,
         "failure_penalty": reward.failure_penalty,
         "truncation_penalty": reward.truncation_penalty,

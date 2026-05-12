@@ -89,6 +89,25 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
     assert train_config.env.action.mask_air_brake_on_ground is True
 
 
+def test_manager_training_bridge_projects_outside_track_recovery_reward(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.reward.outside_track_recovery_reward = 0.0025
+    config.reward.outside_track_recovery_airborne_grace_frames = 45
+    config.reward.airborne_landing_grace_frames = 60
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-outside-track-recovery",
+        run_dir=tmp_path / "runs" / "bridge-outside-track-recovery_0001",
+    )
+
+    assert train_config.reward.outside_track_recovery_reward == pytest.approx(0.0025)
+    assert train_config.reward.outside_track_recovery_airborne_grace_frames == 45
+    assert train_config.reward.airborne_landing_grace_frames == 60
+
+
 def test_manager_training_bridge_supports_continuous_air_brake_lane(
     tmp_path: Path,
 ) -> None:

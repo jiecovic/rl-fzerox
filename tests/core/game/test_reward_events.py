@@ -269,6 +269,7 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
         )
@@ -313,6 +314,49 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
     assert next_bucket_landing.breakdown == {"landing": 5.0}
 
 
+def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=50,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=20),
+        _status(step_count=1),
+        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+    )
+    short_jump_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=20),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    tracker.reset(_telemetry(race_distance=0.0))
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=25),
+        _status(step_count=1),
+        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+    )
+    long_jump_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=25),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    assert short_jump_landing.reward == 0.0
+    assert short_jump_landing.breakdown == {}
+    assert long_jump_landing.reward == 5.0
+    assert long_jump_landing.breakdown == {"landing": 5.0}
+
+
 def _telemetry(
     *,
     race_distance: float,
@@ -354,6 +398,7 @@ def _summary(
     energy_gain_total: float = 0.0,
     damage_taken_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
+    airborne_frames: int = 0,
 ) -> StepSummary:
     return make_step_summary(
         frames_run=frames_run,
@@ -364,6 +409,7 @@ def _summary(
         damage_taken_frames=damage_taken_frames,
         entered_state_labels=entered_state_labels,
         final_frame_index=frames_run,
+        airborne_frames=airborne_frames,
     )
 
 

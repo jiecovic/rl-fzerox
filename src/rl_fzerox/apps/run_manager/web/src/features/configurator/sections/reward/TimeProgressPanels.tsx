@@ -177,20 +177,38 @@ export function TimeProgressPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Flat penalty applied every internal frame while the machine is outside track bounds, whether grounded or airborne."
-            label="Outside-track frame penalty"
-            resetValue={defaultConfig.reward.outside_track_frame_penalty}
-            step="0.01"
-            value={config.reward.outside_track_frame_penalty}
-            onChange={(value) => updateReward({ outside_track_frame_penalty: value })}
+            help="Positive shaping weight for outside-track recovery. Once the current outside-track excursion is armed, this adds weight × (previous center distance - current center distance), so moving back toward the centerline helps and drifting farther away hurts. Set to 0 to disable."
+            label="Outside-track recovery shaping"
+            resetValue={defaultConfig.reward.outside_track_recovery_reward}
+            step="0.0001"
+            value={config.reward.outside_track_recovery_reward}
+            onChange={(value) => updateReward({ outside_track_recovery_reward: value })}
+          />
+          <IntegerField
+            help="Keep outside-track recovery shaping off until the current outside-track excursion has accumulated at least this many airborne internal frames. Short off-track jumps stay ungated if they land earlier. Set to 0 to arm shaping from the first airborne frame."
+            label="Recovery airborne grace frames"
+            min={0}
+            resetValue={defaultConfig.reward.outside_track_recovery_airborne_grace_frames}
+            value={config.reward.outside_track_recovery_airborne_grace_frames}
+            onChange={(value) =>
+              updateReward({ outside_track_recovery_airborne_grace_frames: value })
+            }
           />
           <NumberField
-            help="Reward paid on landing after airborne time."
+            help="Reward paid when a jump lands after meeting the landing airborne grace."
             label="Landing reward"
             resetValue={defaultConfig.reward.airborne_landing_reward}
             step="0.5"
             value={config.reward.airborne_landing_reward}
             onChange={(value) => updateReward({ airborne_landing_reward: value })}
+          />
+          <IntegerField
+            help="Require at least this many airborne internal frames in the jump before a landing reward pays out. Set to 0 to reward any landing."
+            label="Landing airborne grace frames"
+            min={0}
+            resetValue={defaultConfig.reward.airborne_landing_grace_frames}
+            value={config.reward.airborne_landing_grace_frames}
+            onChange={(value) => updateReward({ airborne_landing_grace_frames: value })}
           />
         </div>
       </ConfigDisclosure>
