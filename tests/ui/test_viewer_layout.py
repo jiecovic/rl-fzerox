@@ -126,7 +126,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 def test_next_panel_tab_index_cycles_tabs() -> None:
     assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
-    assert _next_panel_tab_index(6, ViewerInput(panel_tab_delta=1)) == 0
+    assert _next_panel_tab_index(7, ViewerInput(panel_tab_delta=1)) == 0
 
 
 def test_next_panel_tab_index_honors_direct_selection() -> None:
@@ -134,13 +134,14 @@ def test_next_panel_tab_index_honors_direct_selection() -> None:
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:
-    assert _panel_tab_hint(0) == "Tab 1/7"
-    assert _panel_tab_hint(2) == "Tab 3/7"
-    assert _panel_tab_hint(3) == "Tab 4/7"
-    assert _panel_tab_hint(4) == "Tab 5/7"
-    assert _panel_tab_hint(5) == "Tab 6/7"
-    assert _panel_tab_hint(6) == "Tab 7/7"
-    assert _panel_tab_hint(7) == "Tab 1/7"
+    assert _panel_tab_hint(0) == "Tab 1/8"
+    assert _panel_tab_hint(2) == "Tab 3/8"
+    assert _panel_tab_hint(3) == "Tab 4/8"
+    assert _panel_tab_hint(4) == "Tab 5/8"
+    assert _panel_tab_hint(5) == "Tab 6/8"
+    assert _panel_tab_hint(6) == "Tab 7/8"
+    assert _panel_tab_hint(7) == "Tab 8/8"
+    assert _panel_tab_hint(8) == "Tab 1/8"
 
 
 def test_panel_tabs_fit_side_panel_content_width() -> None:
@@ -176,6 +177,7 @@ def test_window_size_adds_sidebar_width() -> None:
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1204, 980)
     assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=7) == (1204, 980)
 
 
 def test_watch_window_size_fits_native_observation_preview() -> None:

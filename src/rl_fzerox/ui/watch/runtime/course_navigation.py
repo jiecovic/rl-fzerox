@@ -1,19 +1,7 @@
 # src/rl_fzerox/ui/watch/runtime/course_navigation.py
 from __future__ import annotations
 
-from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
-
-
-def toggle_locked_reset_course(
-    env: FZeroXEnv,
-    *,
-    locked_reset_course_id: str | None,
-    requested_course_id: str,
-) -> str | None:
-    next_course_id = None if requested_course_id == locked_reset_course_id else requested_course_id
-    env.set_locked_reset_course(next_course_id)
-    return next_course_id
 
 
 def current_watch_course_id(info: dict[str, object]) -> str | None:
@@ -62,24 +50,6 @@ def adjacent_watch_course_id(
         return current_course_id
     next_index = (current_index + offset) % len(ordered_course_ids)
     return ordered_course_ids[next_index]
-
-
-def advance_watch_reset_course(
-    *,
-    locked_reset_course_id: str | None,
-    current_course_id: str | None,
-    ordered_course_ids: tuple[str, ...],
-    offset: int,
-) -> tuple[str | None, str | None]:
-    base_course_id = locked_reset_course_id or current_course_id
-    next_course_id = adjacent_watch_course_id(
-        current_course_id=base_course_id,
-        ordered_course_ids=ordered_course_ids,
-        offset=offset,
-    )
-    if locked_reset_course_id is None:
-        return None, next_course_id
-    return next_course_id, None
 
 
 def sync_locked_course_info(

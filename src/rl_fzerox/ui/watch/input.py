@@ -28,6 +28,7 @@ class ViewerInput:
     step_once: bool = False
     save_state: bool = False
     reset_mode: str | None = None
+    jump_course_id: str | None = None
     toggle_deterministic_policy: bool = False
     toggle_manual_control: bool = False
     toggle_cnn_normalization: bool = False
@@ -37,7 +38,6 @@ class ViewerInput:
     panel_tab_index: int | None = None
     cnn_layer_tab_index: int | None = None
     record_tab_index: int | None = None
-    toggle_record_course_lock_id: str | None = None
     toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
     control_state: ControllerState = ControllerState()
@@ -99,7 +99,7 @@ def _poll_viewer_input(
     panel_tab_index = None
     cnn_layer_tab_index = None
     record_tab_index = None
-    toggle_record_course_lock_id = None
+    jump_course_id = None
     toggle_current_course_lock = False
     toggle_zeroed_state_feature_name = None
 
@@ -126,11 +126,11 @@ def _poll_viewer_input(
                         if selected_record_tab is not None:
                             record_tab_index = selected_record_tab
                         else:
-                            toggle_record_course_lock_id = _clicked_record_course_id(
+                            jump_course_id = _clicked_record_course_id(
                                 event.pos,
                                 record_course_hitboxes,
                             )
-                            if toggle_record_course_lock_id is None:
+                            if jump_course_id is None:
                                 toggle_zeroed_state_feature_name = _clicked_state_feature_name(
                                     event.pos,
                                     state_feature_hitboxes,
@@ -154,6 +154,8 @@ def _poll_viewer_input(
                 panel_tab_index = 5
             elif event.key == pygame.K_7:
                 panel_tab_index = 6
+            elif event.key == pygame.K_8:
+                panel_tab_index = 7
             elif event.key == pygame.K_p:
                 toggle_pause = True
             elif event.key == pygame.K_n:
@@ -224,6 +226,7 @@ def _poll_viewer_input(
         step_once=step_once,
         save_state=save_state,
         reset_mode=reset_mode,
+        jump_course_id=jump_course_id,
         toggle_deterministic_policy=toggle_deterministic_policy,
         toggle_manual_control=toggle_manual_control,
         toggle_cnn_normalization=toggle_cnn_normalization,
@@ -233,7 +236,6 @@ def _poll_viewer_input(
         panel_tab_index=panel_tab_index,
         cnn_layer_tab_index=cnn_layer_tab_index,
         record_tab_index=record_tab_index,
-        toggle_record_course_lock_id=toggle_record_course_lock_id,
         toggle_current_course_lock=toggle_current_course_lock,
         toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
         control_state=ControllerState(

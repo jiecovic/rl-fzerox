@@ -46,13 +46,14 @@ class PanelLine:
     status_icon: StatusIcon | None = None
     status_text: str = ""
     label_color: Color | None = None
+    # Optional record-row click target for course jumps in the watch HUD.
     click_course_id: str | None = None
     click_state_feature_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RecordCourseHitbox:
-    """Clickable record-row region for locking watch resets to one course."""
+    """Clickable record-row region for jumping the watch reset course."""
 
     rect: MouseRect
     course_id: str

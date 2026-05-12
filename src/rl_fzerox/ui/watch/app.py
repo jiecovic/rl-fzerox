@@ -23,6 +23,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _resolve_render_fps,
 )
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsTracker
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.screen.frame import (
     _create_fonts,
@@ -67,7 +68,9 @@ def run_viewer(config: WatchAppConfig) -> None:
         hitboxes = ViewerHitboxes()
         speed_repeat = SpeedKeyRepeat()
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
+        live_series = EpisodeLiveSeriesTracker()
         auxiliary_metrics.observe_snapshot(snapshot)
+        live_series.observe_snapshot(snapshot, action_repeat=config.env.action_repeat)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -109,6 +112,7 @@ def run_viewer(config: WatchAppConfig) -> None:
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
                 auxiliary_metrics.observe_snapshot(snapshot)
+                live_series.observe_snapshot(snapshot, action_repeat=config.env.action_repeat)
             elif worker_closed and not worker.process.is_alive():
                 return
             elif not worker.process.is_alive():
@@ -134,6 +138,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
                 auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
+                live_episode_series=live_series.snapshot(),
                 panel_tab_index=panel_tab_index,
                 cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,

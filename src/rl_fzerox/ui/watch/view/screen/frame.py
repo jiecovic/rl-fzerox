@@ -21,6 +21,7 @@ from rl_fzerox.ui.watch.view.components.observation_strip import (
     _native_observation_preview_height,
     _native_observation_preview_width,
 )
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import (
     _observation_preview_size,
     _preview_frame,
@@ -51,6 +52,7 @@ class FrameRenderData:
     policy_auxiliary_state_predictions: dict[str, object] | None
     policy_auxiliary_state_targets: dict[str, object] | None
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
+    live_episode_series: EpisodeLiveSeriesSnapshot | None
     episode: int
     info: dict[str, object]
     reset_info: dict[str, object]
@@ -381,6 +383,7 @@ def _draw_frame(
             policy_auxiliary_state_predictions=data.policy_auxiliary_state_predictions,
             policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
             auxiliary_episode_metrics=data.auxiliary_episode_metrics,
+            live_episode_series=data.live_episode_series,
             telemetry=data.telemetry,
             train_config=data.train_config,
             policy_config=data.policy_config,
