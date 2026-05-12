@@ -23,6 +23,7 @@ class TrackSamplingRuntimeEntry:
     finished_episode_count: int
     success_sample_count: int
     ema_episode_frames: float | None
+    ema_completion_fraction: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,8 @@ class TrackSamplingRuntimeState:
     update_episodes: int
     ema_alpha: float
     max_weight_scale: float
+    adaptive_completion_weight: float
+    adaptive_target_completion: float
     update_count: int
     episodes_since_update: int
     entries: tuple[TrackSamplingRuntimeEntry, ...]
@@ -45,6 +48,7 @@ class _TrackStepStats:
     finished_episode_count: int = 0
     success_sample_count: int = 0
     ema_episode_frames: float | None = None
+    ema_completion_fraction: float | None = None
     current_weight: float = 1.0
 
     def record_episode(
@@ -52,6 +56,7 @@ class _TrackStepStats:
         frame_count: int,
         *,
         ema_alpha: float,
+        completion_fraction: float | None,
         finished: bool,
     ) -> None:
         self.completed_frames += frame_count
@@ -61,23 +66,35 @@ class _TrackStepStats:
             self.finished_episode_count += 1
         if self.ema_episode_frames is None:
             self.ema_episode_frames = float(frame_count)
+        else:
+            self.ema_episode_frames = (
+                1.0 - ema_alpha
+            ) * self.ema_episode_frames + ema_alpha * frame_count
+        if completion_fraction is None:
             return
-        self.ema_episode_frames = (
-            1.0 - ema_alpha
-        ) * self.ema_episode_frames + ema_alpha * frame_count
+        clamped_completion = max(0.0, min(1.0, float(completion_fraction)))
+        if self.ema_completion_fraction is None:
+            self.ema_completion_fraction = clamped_completion
+            return
+        self.ema_completion_fraction = (
+            (1.0 - ema_alpha) * self.ema_completion_fraction + ema_alpha * clamped_completion
+        )
 
 
 class StepBalancedTrackSamplingController:
-    """Adapt track reset weights so each map trends toward equal frame coverage."""
+    """Adapt track reset weights toward equal frame coverage with optional completion bias."""
 
     def __init__(
         self,
         *,
         track_base_weights: dict[str, float],
+        sampling_mode: str = "step_balanced",
         action_repeat: int,
         update_episodes: int,
         ema_alpha: float,
         max_weight_scale: float,
+        adaptive_completion_weight: float = 0.35,
+        adaptive_target_completion: float = 0.9,
         log_details: bool = False,
         track_course_keys: dict[str, str] | None = None,
         track_log_keys: dict[str, str] | None = None,
@@ -136,10 +153,15 @@ class StepBalancedTrackSamplingController:
             )
             for course_key in self._course_entry_ids
         }
+        if not _uses_dynamic_runtime_mode(sampling_mode):
+            raise ValueError(f"Unsupported dynamic track sampling mode: {sampling_mode!r}")
+        self._sampling_mode = sampling_mode
         self._action_repeat = max(1, int(action_repeat))
         self._update_episodes = max(1, int(update_episodes))
         self._ema_alpha = max(0.0, min(1.0, float(ema_alpha)))
         self._max_weight_scale = max(1.0, float(max_weight_scale))
+        self._adaptive_completion_weight = max(0.0, float(adaptive_completion_weight))
+        self._adaptive_target_completion = max(0.0, min(1.0, float(adaptive_target_completion)))
         self._log_details = log_details
         self._episodes_since_update = 0
         self.update_count = 0
@@ -153,7 +175,7 @@ class StepBalancedTrackSamplingController:
         curriculum_config: CurriculumConfig,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> StepBalancedTrackSamplingController | None:
-        configs = _step_balanced_sampling_configs(env_config, curriculum_config)
+        configs = _dynamic_step_balanced_sampling_configs(env_config, curriculum_config)
         if not configs:
             return None
 
@@ -177,10 +199,13 @@ class StepBalancedTrackSamplingController:
         settings = configs[0]
         return cls(
             track_base_weights=base_weights,
+            sampling_mode=settings.sampling_mode,
             action_repeat=env_config.action_repeat,
             update_episodes=settings.step_balance_update_episodes,
             ema_alpha=settings.step_balance_ema_alpha,
             max_weight_scale=settings.step_balance_max_weight_scale,
+            adaptive_completion_weight=settings.adaptive_step_balance_completion_weight,
+            adaptive_target_completion=settings.adaptive_step_balance_target_completion,
             log_details=settings.step_balance_log_details,
             track_course_keys=requested_course_keys,
             track_log_keys=requested_log_keys,
@@ -203,6 +228,7 @@ class StepBalancedTrackSamplingController:
             self._stats[course_key].record_episode(
                 frame_count,
                 ema_alpha=self._ema_alpha,
+                completion_fraction=_episode_completion_fraction(episode),
                 finished=_episode_finished(episode),
             )
             recorded_count += 1
@@ -246,11 +272,13 @@ class StepBalancedTrackSamplingController:
 
     def runtime_state(self) -> TrackSamplingRuntimeState:
         return TrackSamplingRuntimeState(
-            sampling_mode="step_balanced",
+            sampling_mode=self._sampling_mode,
             action_repeat=self._action_repeat,
             update_episodes=self._update_episodes,
             ema_alpha=self._ema_alpha,
             max_weight_scale=self._max_weight_scale,
+            adaptive_completion_weight=self._adaptive_completion_weight,
+            adaptive_target_completion=self._adaptive_target_completion,
             update_count=self.update_count,
             episodes_since_update=self._episodes_since_update,
             entries=tuple(
@@ -265,6 +293,7 @@ class StepBalancedTrackSamplingController:
                     finished_episode_count=stats.finished_episode_count,
                     success_sample_count=stats.success_sample_count,
                     ema_episode_frames=stats.ema_episode_frames,
+                    ema_completion_fraction=stats.ema_completion_fraction,
                 )
                 for course_key, stats in sorted(self._stats.items())
             ),
@@ -275,9 +304,14 @@ class StepBalancedTrackSamplingController:
         raw_weights: dict[str, float] = {}
         for track_id, stats in self._stats.items():
             length = stats.ema_episode_frames
-            scale = 1.0 if length is None else reference_length / max(length, 1.0)
-            scale = max(1.0 / self._max_weight_scale, min(self._max_weight_scale, scale))
-            raw_weights[track_id] = stats.base_weight * scale
+            step_scale = 1.0 if length is None else reference_length / max(length, 1.0)
+            total_scale = _clamp_weight_scale(step_scale, max_scale=self._max_weight_scale)
+            if self._sampling_mode == "adaptive_step_balanced":
+                total_scale = _clamp_weight_scale(
+                    total_scale * self._adaptive_completion_bonus(stats),
+                    max_scale=self._max_weight_scale,
+                )
+            raw_weights[track_id] = stats.base_weight * total_scale
 
         total_base_weight = sum(stats.base_weight for stats in self._stats.values())
         total_raw_weight = sum(raw_weights.values())
@@ -309,7 +343,7 @@ class StepBalancedTrackSamplingController:
         )
 
     def _restore_state(self, restored_state: TrackSamplingRuntimeState | None) -> None:
-        if restored_state is None or restored_state.sampling_mode != "step_balanced":
+        if restored_state is None or not _uses_dynamic_runtime_mode(restored_state.sampling_mode):
             return
         state_by_course_key = {
             entry.course_key: entry for entry in _aggregate_runtime_entries(restored_state.entries)
@@ -327,9 +361,21 @@ class StepBalancedTrackSamplingController:
                 if entry.ema_episode_frames is None
                 else max(0.0, float(entry.ema_episode_frames))
             )
+            stats.ema_completion_fraction = (
+                None
+                if entry.ema_completion_fraction is None
+                else max(0.0, min(1.0, float(entry.ema_completion_fraction)))
+            )
             stats.current_weight = max(0.0, float(entry.current_weight))
         self._episodes_since_update = max(0, int(restored_state.episodes_since_update))
         self.update_count = max(0, int(restored_state.update_count))
+
+    def _adaptive_completion_bonus(self, stats: _TrackStepStats) -> float:
+        completion_fraction = stats.ema_completion_fraction
+        if completion_fraction is None:
+            return 1.0
+        completion_gap = max(self._adaptive_target_completion - completion_fraction, 0.0)
+        return 1.0 + self._adaptive_completion_weight * completion_gap
 
 
 def _distribute_course_weight(
@@ -369,6 +415,7 @@ def _aggregate_runtime_entries(
                 finished_episode_count=entry.finished_episode_count,
                 success_sample_count=entry.success_sample_count,
                 ema_episode_frames=entry.ema_episode_frames,
+                ema_completion_fraction=entry.ema_completion_fraction,
             )
             continue
         grouped[course_key] = TrackSamplingRuntimeEntry(
@@ -382,6 +429,7 @@ def _aggregate_runtime_entries(
             finished_episode_count=(existing.finished_episode_count + entry.finished_episode_count),
             success_sample_count=existing.success_sample_count + entry.success_sample_count,
             ema_episode_frames=_merged_ema_episode_frames(existing, entry),
+            ema_completion_fraction=_merged_ema_completion_fraction(existing, entry),
         )
     return tuple(grouped[course_key] for course_key in sorted(grouped))
 
@@ -404,22 +452,48 @@ def _merged_ema_episode_frames(
     ) / total_weight
 
 
-def _step_balanced_sampling_configs(
+def _merged_ema_completion_fraction(
+    left: TrackSamplingRuntimeEntry,
+    right: TrackSamplingRuntimeEntry,
+) -> float | None:
+    if left.ema_completion_fraction is None:
+        return right.ema_completion_fraction
+    if right.ema_completion_fraction is None:
+        return left.ema_completion_fraction
+    left_weight = max(left.episode_count, 1)
+    right_weight = max(right.episode_count, 1)
+    total_weight = left_weight + right_weight
+    if total_weight <= 0:
+        return None
+    return (
+        left.ema_completion_fraction * left_weight
+        + right.ema_completion_fraction * right_weight
+    ) / total_weight
+
+
+def _dynamic_step_balanced_sampling_configs(
     env_config: EnvConfig,
     curriculum_config: CurriculumConfig,
 ) -> tuple[TrackSamplingConfig, ...]:
     configs: list[TrackSamplingConfig] = []
-    if _is_step_balanced(env_config.track_sampling):
+    if _uses_dynamic_step_balancing(env_config.track_sampling):
         configs.append(env_config.track_sampling)
     if curriculum_config.enabled:
         for stage in curriculum_config.stages:
-            if stage.track_sampling is not None and _is_step_balanced(stage.track_sampling):
+            if (
+                stage.track_sampling is not None
+                and _uses_dynamic_step_balancing(stage.track_sampling)
+            ):
                 configs.append(stage.track_sampling)
     return tuple(configs)
 
 
-def _is_step_balanced(config: TrackSamplingConfig) -> bool:
-    return config.enabled and config.sampling_mode == "step_balanced" and bool(config.entries)
+def _uses_dynamic_step_balancing(config: TrackSamplingConfig) -> bool:
+    return (
+        config.enabled
+        and _uses_dynamic_runtime_mode(config.sampling_mode)
+        and bool(config.entries)
+    )
 
 
 def _episode_track_id(episode: dict[str, object]) -> str | None:
@@ -450,6 +524,23 @@ def _episode_finished(episode: Mapping[str, object]) -> bool:
     return episode.get("termination_reason") == "finished"
 
 
+def _episode_completion_fraction(episode: Mapping[str, object]) -> float | None:
+    value = episode.get("episode_completion_fraction")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return max(0.0, min(1.0, float(value)))
+    if _episode_finished(episode):
+        return 1.0
+    return None
+
+
+def _uses_dynamic_runtime_mode(sampling_mode: str) -> bool:
+    return sampling_mode in {"step_balanced", "adaptive_step_balanced"}
+
+
+def _clamp_weight_scale(scale: float, *, max_scale: float) -> float:
+    return max(1.0 / max_scale, min(max_scale, scale))
+
+
 def _sanitize_log_key(value: str) -> str:
     sanitized = "".join(char if char.isalnum() else "_" for char in value.strip().lower())
     return sanitized.strip("_") or "unknown"
@@ -459,7 +550,7 @@ def save_track_sampling_runtime_state(
     path: Path,
     state: TrackSamplingRuntimeState,
 ) -> None:
-    """Persist one step-balanced sampler snapshot atomically."""
+    """Persist one dynamic step-balanced sampler snapshot atomically."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f".{path.stem}.{os.getpid()}.tmp{path.suffix}")
@@ -470,6 +561,8 @@ def save_track_sampling_runtime_state(
         "update_episodes": state.update_episodes,
         "ema_alpha": state.ema_alpha,
         "max_weight_scale": state.max_weight_scale,
+        "adaptive_completion_weight": state.adaptive_completion_weight,
+        "adaptive_target_completion": state.adaptive_target_completion,
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -484,6 +577,7 @@ def save_track_sampling_runtime_state(
                 "finished_episode_count": entry.finished_episode_count,
                 "success_sample_count": entry.success_sample_count,
                 "ema_episode_frames": entry.ema_episode_frames,
+                "ema_completion_fraction": entry.ema_completion_fraction,
             }
             for entry in state.entries
         ],
@@ -497,14 +591,15 @@ def save_track_sampling_runtime_state(
 
 
 def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState | None:
-    """Load one persisted step-balanced sampler snapshot, if present."""
+    """Load one persisted dynamic step-balanced sampler snapshot, if present."""
 
     if not path.is_file():
         return None
     loaded = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, Mapping):
         return None
-    if loaded.get("sampling_mode") != "step_balanced":
+    sampling_mode = loaded.get("sampling_mode")
+    if not isinstance(sampling_mode, str) or not _uses_dynamic_runtime_mode(sampling_mode):
         return None
     raw_entries = loaded.get("entries")
     if not isinstance(raw_entries, list):
@@ -523,6 +618,7 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
         finished_episode_count = _mapping_int(raw_entry, "finished_episode_count")
         success_sample_count = _mapping_int(raw_entry, "success_sample_count")
         ema_episode_frames = _mapping_optional_float(raw_entry, "ema_episode_frames")
+        ema_completion_fraction = _mapping_optional_float(raw_entry, "ema_completion_fraction")
         if (
             track_id is None
             or course_key is None
@@ -553,6 +649,11 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
                     else max(0, min(success_sample_count, episode_count))
                 ),
                 ema_episode_frames=ema_episode_frames,
+                ema_completion_fraction=(
+                    None
+                    if ema_completion_fraction is None
+                    else max(0.0, min(1.0, ema_completion_fraction))
+                ),
             )
         )
     if not entries:
@@ -561,6 +662,8 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
     update_episodes = _mapping_int(loaded, "update_episodes")
     ema_alpha = _mapping_float(loaded, "ema_alpha")
     max_weight_scale = _mapping_float(loaded, "max_weight_scale")
+    adaptive_completion_weight = _mapping_optional_float(loaded, "adaptive_completion_weight")
+    adaptive_target_completion = _mapping_optional_float(loaded, "adaptive_target_completion")
     update_count = _mapping_int(loaded, "update_count")
     episodes_since_update = _mapping_int(loaded, "episodes_since_update")
     if (
@@ -573,11 +676,19 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
     ):
         return None
     return TrackSamplingRuntimeState(
-        sampling_mode="step_balanced",
+        sampling_mode=sampling_mode,
         action_repeat=action_repeat,
         update_episodes=update_episodes,
         ema_alpha=ema_alpha,
         max_weight_scale=max_weight_scale,
+        adaptive_completion_weight=(
+            0.35 if adaptive_completion_weight is None else max(0.0, adaptive_completion_weight)
+        ),
+        adaptive_target_completion=(
+            0.9
+            if adaptive_target_completion is None
+            else max(0.0, min(1.0, adaptive_target_completion))
+        ),
         update_count=update_count,
         episodes_since_update=episodes_since_update,
         entries=tuple(entries),

@@ -41,6 +41,11 @@ class ManagedTracksConfig(BaseModel):
     race_mode: RaceMode = "time_attack"
     gp_difficulty: GpDifficulty | None = None
     sampling_mode: TrackSamplingMode = "step_balanced"
+    step_balance_update_episodes: int = Field(default=5, ge=1)
+    step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
+    step_balance_max_weight_scale: float = Field(default=5.0, ge=1.0)
+    adaptive_step_balance_completion_weight: float = Field(default=0.35, ge=0.0)
+    adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
 
     @model_validator(mode="after")

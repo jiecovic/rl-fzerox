@@ -108,6 +108,35 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     assert train_config.reward.airborne_landing_grace_frames == 60
 
 
+def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.sampling_mode = "adaptive_step_balanced"
+    config.tracks.step_balance_update_episodes = 7
+    config.tracks.step_balance_ema_alpha = 0.2
+    config.tracks.step_balance_max_weight_scale = 3.5
+    config.tracks.adaptive_step_balance_completion_weight = 0.45
+    config.tracks.adaptive_step_balance_target_completion = 0.85
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-adaptive-track-sampling",
+        run_dir=tmp_path / "runs" / "bridge-adaptive-track-sampling_0001",
+    )
+
+    assert train_config.env.track_sampling.sampling_mode == "adaptive_step_balanced"
+    assert train_config.env.track_sampling.step_balance_update_episodes == 7
+    assert train_config.env.track_sampling.step_balance_ema_alpha == pytest.approx(0.2)
+    assert train_config.env.track_sampling.step_balance_max_weight_scale == pytest.approx(3.5)
+    assert train_config.env.track_sampling.adaptive_step_balance_completion_weight == (
+        pytest.approx(0.45)
+    )
+    assert train_config.env.track_sampling.adaptive_step_balance_target_completion == (
+        pytest.approx(0.85)
+    )
+
+
 def test_manager_training_bridge_supports_continuous_air_brake_lane(
     tmp_path: Path,
 ) -> None:

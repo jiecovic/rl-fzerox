@@ -26,6 +26,7 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("laps_completed", None),
     _MonitorInfoField("race_laps_completed", None),
     _MonitorInfoField("raw_laps_completed", None),
+    _MonitorInfoField("episode_completion_fraction", None),
     _MonitorInfoField("race_time_ms", None),
     _MonitorInfoField("damage_taken_frames", 0),
     _MonitorInfoField("boost_pad_entries", 0),

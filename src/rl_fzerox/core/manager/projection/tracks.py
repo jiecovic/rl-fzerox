@@ -10,9 +10,25 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting, 
 def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
     return {
         "enabled": True,
-        "sampling_mode": "random" if config.tracks.sampling_mode == "equal" else "step_balanced",
+        "sampling_mode": _runtime_track_sampling_mode(config),
         "entries": _track_sampling_entries(config),
+        "step_balance_update_episodes": config.tracks.step_balance_update_episodes,
+        "step_balance_ema_alpha": config.tracks.step_balance_ema_alpha,
+        "step_balance_max_weight_scale": config.tracks.step_balance_max_weight_scale,
+        "adaptive_step_balance_completion_weight": (
+            config.tracks.adaptive_step_balance_completion_weight
+        ),
+        "adaptive_step_balance_target_completion": (
+            config.tracks.adaptive_step_balance_target_completion
+        ),
     }
+
+
+def _runtime_track_sampling_mode(config: ManagedRunConfig) -> str:
+    sampling_mode = config.tracks.sampling_mode
+    if sampling_mode == "equal":
+        return "random"
+    return sampling_mode
 
 
 def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]:
