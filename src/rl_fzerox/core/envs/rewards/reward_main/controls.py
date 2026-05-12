@@ -6,16 +6,22 @@ from rl_fzerox.core.envs.rewards.common import RewardActionContext
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
 
 
-def outside_track_frame_penalty(
-    summary: StepSummary,
+def outside_track_recovery_reward(
     *,
     weights: RewardMainWeights,
-    outside_track_bounds: bool,
+    previous_outside_offset: float | None,
+    current_outside_offset: float | None,
+    enabled: bool,
 ) -> float:
-    penalty = weights.outside_track_frame_penalty
-    if penalty >= 0.0 or not outside_track_bounds:
+    recovery_weight = weights.outside_track_recovery_reward
+    if (
+        recovery_weight <= 0.0
+        or not enabled
+        or previous_outside_offset is None
+        or current_outside_offset is None
+    ):
         return 0.0
-    return max(int(summary.frames_run), 0) * penalty
+    return recovery_weight * (previous_outside_offset - current_outside_offset)
 
 
 def lean_request_penalty(

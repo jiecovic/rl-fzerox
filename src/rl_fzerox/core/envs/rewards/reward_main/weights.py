@@ -14,7 +14,8 @@ class RewardMainWeights:
     progress_reward_interval_frames: int = 1
     suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: float | None = 10_000.0
-    outside_track_frame_penalty: float = 0.0
+    outside_track_recovery_reward: float = 0.0
+    outside_track_recovery_airborne_grace_frames: int = 30
     time_penalty_per_frame: float = 0.0
     reverse_time_penalty_scale: float = 2.0
     slow_speed_time_penalty_scale: float = 3.0
@@ -38,6 +39,7 @@ class RewardMainWeights:
     lean_request_penalty: float = -0.003
     grounded_pitch_penalty: float = 0.0
     airborne_landing_reward: float = 1.0
+    airborne_landing_grace_frames: int = 50
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0

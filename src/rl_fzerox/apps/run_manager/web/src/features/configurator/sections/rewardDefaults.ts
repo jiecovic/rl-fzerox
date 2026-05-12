@@ -28,7 +28,10 @@ export function progressDefaults(reward: RewardConfig): RewardPatch {
 export function boundsDefaults(reward: RewardConfig): RewardPatch {
   return {
     airborne_landing_reward: reward.airborne_landing_reward,
-    outside_track_frame_penalty: reward.outside_track_frame_penalty,
+    airborne_landing_grace_frames: reward.airborne_landing_grace_frames,
+    outside_track_recovery_airborne_grace_frames:
+      reward.outside_track_recovery_airborne_grace_frames,
+    outside_track_recovery_reward: reward.outside_track_recovery_reward,
   };
 }
 

@@ -43,7 +43,10 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         outside_bounds_reentry_progress_distance_cap=(
             config.outside_bounds_reentry_progress_distance_cap
         ),
-        outside_track_frame_penalty=config.outside_track_frame_penalty,
+        outside_track_recovery_reward=config.outside_track_recovery_reward,
+        outside_track_recovery_airborne_grace_frames=(
+            config.outside_track_recovery_airborne_grace_frames
+        ),
         time_penalty_per_frame=config.time_penalty_per_frame,
         reverse_time_penalty_scale=config.reverse_time_penalty_scale,
         slow_speed_time_penalty_scale=config.slow_speed_time_penalty_scale,
@@ -69,6 +72,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         lean_request_penalty=config.lean_request_penalty,
         grounded_pitch_penalty=config.grounded_pitch_penalty,
         airborne_landing_reward=config.airborne_landing_reward,
+        airborne_landing_grace_frames=config.airborne_landing_grace_frames,
         collision_recoil_penalty=config.collision_recoil_penalty,
         failure_penalty=config.failure_penalty,
         truncation_penalty=config.truncation_penalty,
@@ -115,10 +119,15 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 if override.outside_bounds_reentry_progress_distance_cap is not None
                 else base.outside_bounds_reentry_progress_distance_cap
             ),
-            outside_track_frame_penalty=(
-                override.outside_track_frame_penalty
-                if override.outside_track_frame_penalty is not None
-                else base.outside_track_frame_penalty
+            outside_track_recovery_reward=(
+                override.outside_track_recovery_reward
+                if override.outside_track_recovery_reward is not None
+                else base.outside_track_recovery_reward
+            ),
+            outside_track_recovery_airborne_grace_frames=(
+                override.outside_track_recovery_airborne_grace_frames
+                if override.outside_track_recovery_airborne_grace_frames is not None
+                else base.outside_track_recovery_airborne_grace_frames
             ),
             time_penalty_per_frame=(
                 override.time_penalty_per_frame
@@ -234,6 +243,11 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 override.airborne_landing_reward
                 if override.airborne_landing_reward is not None
                 else base.airborne_landing_reward
+            ),
+            airborne_landing_grace_frames=(
+                override.airborne_landing_grace_frames
+                if override.airborne_landing_grace_frames is not None
+                else base.airborne_landing_grace_frames
             ),
             collision_recoil_penalty=(
                 override.collision_recoil_penalty

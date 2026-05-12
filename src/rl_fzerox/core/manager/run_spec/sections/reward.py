@@ -30,7 +30,8 @@ class ManagedRewardConfig(BaseModel):
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = 10_000.0
-    outside_track_frame_penalty: float = Field(default=0.0, le=0.0)
+    outside_track_recovery_reward: NonNegativeFloat = 0.0
+    outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -50,6 +51,7 @@ class ManagedRewardConfig(BaseModel):
     damage_taken_streak_ramp_penalty: float = Field(default=-0.001, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 120
     airborne_landing_reward: float = 1.0
+    airborne_landing_grace_frames: NonNegativeInt = 50
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0

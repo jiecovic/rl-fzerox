@@ -63,7 +63,8 @@ class RewardCourseOverrideConfig(BaseModel):
     progress_reward_interval_frames: PositiveInt | None = None
     suspend_progress_while_outside_track_bounds: bool | None = None
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
-    outside_track_frame_penalty: float | None = Field(default=None, le=0.0)
+    outside_track_recovery_reward: NonNegativeFloat | None = None
+    outside_track_recovery_airborne_grace_frames: NonNegativeInt | None = None
     lap_completion_bonus: NonNegativeFloat | None = None
     lap_position_scale: NonNegativeFloat | None = None
     energy_loss_epsilon: NonNegativeFloat | None = None
@@ -80,6 +81,7 @@ class RewardCourseOverrideConfig(BaseModel):
     damage_taken_streak_ramp_penalty: float | None = Field(default=None, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt | None = None
     airborne_landing_reward: float | None = None
+    airborne_landing_grace_frames: NonNegativeInt | None = None
     manual_boost_reward: NonNegativeFloat | None = None
     boost_pad_reward: NonNegativeFloat | None = None
     boost_pad_reward_progress_window: PositiveFloat | None = None
@@ -114,7 +116,8 @@ class RewardConfig(BaseModel):
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
-    outside_track_frame_penalty: float = Field(default=0.0, le=0.0)
+    outside_track_recovery_reward: NonNegativeFloat = 0.0
+    outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
@@ -131,6 +134,7 @@ class RewardConfig(BaseModel):
     damage_taken_streak_ramp_penalty: float = Field(default=0.0, le=0.0)
     damage_taken_streak_cap_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
+    airborne_landing_grace_frames: NonNegativeInt = 50
     manual_boost_reward: NonNegativeFloat = 0.0
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
