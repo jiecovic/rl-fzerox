@@ -52,6 +52,7 @@ export function buildTrackPoolView(
       id: courseId,
       label: runtimeEntry?.label ?? courseInfo?.display_name ?? courseId,
       stepShare: runtimeEntry?.step_share ?? null,
+      targetStepShare: runtimeEntry?.target_step_share ?? null,
       successRate: runtimeEntry?.success_rate ?? null,
       successSampleCount: runtimeEntry?.success_sample_count ?? null,
     };
@@ -84,7 +85,7 @@ export function showTrackSamplingState(state: TrackSamplingRuntimeState | null) 
 }
 
 export function expectsTrackSamplingState(run: ManagedRunDetail, totalCourses: number) {
-  return run.config.tracks.sampling_mode === "step_balanced" && totalCourses > 1;
+  return usesDynamicTrackSampling(run.config.tracks.sampling_mode) && totalCourses > 1;
 }
 
 export function trackSamplingUpdatedLabel(run: ManagedRunDetail) {
@@ -125,6 +126,24 @@ export function trackPoolEmptyMessage(run: ManagedRunDetail) {
   return run.status === "running"
     ? "Waiting for the worker to publish the current track-pool distribution."
     : "No track-pool stats yet. Resume the run to accumulate a fresh distribution.";
+}
+
+export function trackSamplingModeLabel(
+  samplingMode: ManagedRunDetail["config"]["tracks"]["sampling_mode"],
+) {
+  if (samplingMode === "adaptive_step_balanced") {
+    return "adaptive step-balanced";
+  }
+  if (samplingMode === "step_balanced") {
+    return "step-balanced";
+  }
+  return samplingMode.replaceAll("_", " ");
+}
+
+function usesDynamicTrackSampling(
+  samplingMode: ManagedRunDetail["config"]["tracks"]["sampling_mode"],
+) {
+  return samplingMode === "step_balanced" || samplingMode === "adaptive_step_balanced";
 }
 
 function cupIndex(cupOrder: string[], cupId: string) {

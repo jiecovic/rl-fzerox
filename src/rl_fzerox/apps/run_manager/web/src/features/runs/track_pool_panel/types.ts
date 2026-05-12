@@ -23,6 +23,7 @@ export type TrackPoolCourseView = {
   id: string;
   label: string;
   stepShare: number | null;
+  targetStepShare: number | null;
   successRate: number | null;
   successSampleCount: number | null;
 };

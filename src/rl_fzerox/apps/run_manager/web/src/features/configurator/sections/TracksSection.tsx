@@ -4,7 +4,7 @@ import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import type { ConfigSetter } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentCollapsedIds } from "@/features/configurator/disclosureState";
-import { SegmentedChoiceStrip } from "@/features/configurator/fields";
+import { IntegerField, NumberField, SegmentedChoiceStrip } from "@/features/configurator/fields";
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinimap";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
@@ -39,6 +39,7 @@ const GP_DIFFICULTY_DESCRIPTIONS: Record<GpDifficulty, string> = {
 const TRACK_SAMPLING_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["sampling_mode"], string> = {
   equal: "Sample courses uniformly by episode.",
   step_balanced: "Bias toward courses with fewer recent frames.",
+  adaptive_step_balanced: "Keep step balance, then tilt a bit toward lower-completion courses.",
 };
 
 export function TracksSection({ config, defaultConfig, metadata, setConfig }: TracksSectionProps) {
@@ -74,6 +75,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   );
   const selectedCourseIds = config.tracks.selected_course_ids;
   const usingXCup = config.tracks.pool_mode === "x_cup";
+  const usesDynamicStepBalancing = config.tracks.sampling_mode !== "equal";
+  const usesAdaptiveStepBalancing = config.tracks.sampling_mode === "adaptive_step_balanced";
   const selectedCourseSet = useMemo(() => new Set(selectedCourseIds), [selectedCourseIds]);
   const collapsedCupIdSet = useMemo(() => new Set(collapsedCupIds), [collapsedCupIds]);
   const selectedCupCount = cups.filter((cup) =>
@@ -107,6 +110,23 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       tracks: normalizedTracks({ ...currentConfig.tracks, ...patch }),
     }));
   };
+
+  const samplingDefaults = {
+    adaptive_step_balance_completion_weight:
+      defaultConfig.tracks.adaptive_step_balance_completion_weight,
+    adaptive_step_balance_target_completion:
+      defaultConfig.tracks.adaptive_step_balance_target_completion,
+    step_balance_ema_alpha: defaultConfig.tracks.step_balance_ema_alpha,
+    step_balance_max_weight_scale: defaultConfig.tracks.step_balance_max_weight_scale,
+    step_balance_update_episodes: defaultConfig.tracks.step_balance_update_episodes,
+  } satisfies Pick<
+    ManagedRunConfig["tracks"],
+    | "adaptive_step_balance_completion_weight"
+    | "adaptive_step_balance_target_completion"
+    | "step_balance_ema_alpha"
+    | "step_balance_max_weight_scale"
+    | "step_balance_update_episodes"
+  >;
 
   const orderedSelectedCourseIds = (nextIds: Iterable<string>) => {
     const nextSet = new Set(nextIds);
@@ -254,26 +274,88 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
             }))}
           />
         </ConfigPanel>
+      </div>
 
+      <div className="form-grid track-panel-grid">
         <ConfigPanel
-          onReset={() => updateTracks({ sampling_mode: defaultConfig.tracks.sampling_mode })}
+          wide
+          onReset={() =>
+            updateTracks({
+              sampling_mode: defaultConfig.tracks.sampling_mode,
+              ...samplingDefaults,
+            })
+          }
           title="Course sampling"
         >
-          <ChoiceStrip
-            description={
-              TRACK_SAMPLING_DESCRIPTIONS[config.tracks.sampling_mode] ??
-              TRACK_SAMPLING_DESCRIPTIONS.step_balanced
-            }
-            options={metadata.track_sampling_modes.map((option) => ({
-              active: config.tracks.sampling_mode === option.value,
-              key: option.value,
-              label: formatTrackOptionLabel(option.value),
-              onClick: () =>
-                updateTracks({
-                  sampling_mode: option.value as ManagedRunConfig["tracks"]["sampling_mode"],
-                }),
-            }))}
-          />
+          <div className="track-choice-panel">
+            <ChoiceStrip
+              description={
+                TRACK_SAMPLING_DESCRIPTIONS[config.tracks.sampling_mode] ??
+                TRACK_SAMPLING_DESCRIPTIONS.step_balanced
+              }
+              options={metadata.track_sampling_modes.map((option) => ({
+                active: config.tracks.sampling_mode === option.value,
+                key: option.value,
+                label: formatTrackOptionLabel(option.value),
+                onClick: () =>
+                  updateTracks({
+                    sampling_mode: option.value as ManagedRunConfig["tracks"]["sampling_mode"],
+                  }),
+              }))}
+            />
+            {usesDynamicStepBalancing ? (
+              <div className="track-sampling-grid">
+                <IntegerField
+                  help="Episodes collected before recomputing course weights."
+                  label="Update episodes"
+                  min={1}
+                  resetValue={defaultConfig.tracks.step_balance_update_episodes}
+                  value={config.tracks.step_balance_update_episodes}
+                  onChange={(value) => updateTracks({ step_balance_update_episodes: value })}
+                />
+                <NumberField
+                  help="EMA smoothing for recent episode length and completion statistics."
+                  label="EMA alpha"
+                  resetValue={defaultConfig.tracks.step_balance_ema_alpha}
+                  step="0.01"
+                  value={config.tracks.step_balance_ema_alpha}
+                  onChange={(value) => updateTracks({ step_balance_ema_alpha: value })}
+                />
+                <NumberField
+                  help="Clamp the overall course-weight multiplier around 1x."
+                  label="Max scale"
+                  resetValue={defaultConfig.tracks.step_balance_max_weight_scale}
+                  step="0.1"
+                  value={config.tracks.step_balance_max_weight_scale}
+                  onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
+                />
+                {usesAdaptiveStepBalancing ? (
+                  <>
+                    <NumberField
+                      help="How strongly low completion raises a course's step-budget share."
+                      label="Completion weight"
+                      resetValue={defaultConfig.tracks.adaptive_step_balance_completion_weight}
+                      step="0.05"
+                      value={config.tracks.adaptive_step_balance_completion_weight}
+                      onChange={(value) =>
+                        updateTracks({ adaptive_step_balance_completion_weight: value })
+                      }
+                    />
+                    <NumberField
+                      help="Courses below this completion fraction get extra sampling pressure."
+                      label="Target completion"
+                      resetValue={defaultConfig.tracks.adaptive_step_balance_target_completion}
+                      step="0.01"
+                      value={config.tracks.adaptive_step_balance_target_completion}
+                      onChange={(value) =>
+                        updateTracks({ adaptive_step_balance_target_completion: value })
+                      }
+                    />
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </ConfigPanel>
       </div>
 

@@ -467,6 +467,7 @@ async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) ->
     assert payload["update_episodes"] == 4
     assert payload["entries"][0]["label"] == "Mute City"
     assert payload["entries"][0]["current_probability"] == pytest.approx(0.75)
+    assert payload["entries"][0]["target_step_share"] == pytest.approx(0.5)
     assert payload["entries"][0]["completed_env_steps"] == 600
     assert payload["entries"][0]["finished_episode_count"] == 2
     assert payload["entries"][0]["success_sample_count"] == 2
@@ -831,6 +832,7 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
     assert "master" in {mode["value"] for mode in payload["gp_difficulties"]}
     assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
+    assert "adaptive_step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}
     assert "jack" in {cup["id"] for cup in payload["track_cups"]}
     assert "mute_city" in {course["id"] for course in payload["built_in_courses"]}
     assert "blue_falcon" in {vehicle["id"] for vehicle in payload["vehicles"]}

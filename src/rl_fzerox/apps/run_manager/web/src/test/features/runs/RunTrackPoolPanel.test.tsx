@@ -101,6 +101,10 @@ describe("RunTrackPoolPanel", () => {
       sampling_mode: "step_balanced",
       action_repeat: 2,
       update_episodes: 50,
+      ema_alpha: 0.1,
+      max_weight_scale: 5,
+      adaptive_completion_weight: 0.35,
+      adaptive_target_completion: 0.9,
       update_count: 3,
       episodes_since_update: 17,
       entries: selectedCourses.map((course, index) => ({
@@ -114,9 +118,12 @@ describe("RunTrackPoolPanel", () => {
         success_sample_count: index + 1,
         episode_share: 0.25,
         success_rate: index / Math.max(index + 1, 1),
+        target_step_share: 0.25,
         completed_frames: (index + 1) * 600,
         completed_env_steps: (index + 1) * 300,
         step_share: 0.25,
+        ema_episode_frames: (index + 1) * 600,
+        ema_completion_fraction: Math.min(0.95, 0.3 + index * 0.1),
       })),
     };
 
@@ -166,6 +173,10 @@ describe("RunTrackPoolPanel", () => {
       sampling_mode: "step_balanced",
       action_repeat: 2,
       update_episodes: 50,
+      ema_alpha: 0.1,
+      max_weight_scale: 5,
+      adaptive_completion_weight: 0.35,
+      adaptive_target_completion: 0.9,
       update_count: 1,
       episodes_since_update: 0,
       entries: selectedCourses.map((course) => ({
@@ -179,9 +190,12 @@ describe("RunTrackPoolPanel", () => {
         success_sample_count: 1,
         episode_share: 0.5,
         success_rate: 1,
+        target_step_share: 0.5,
         completed_frames: 600,
         completed_env_steps: 300,
         step_share: 0.5,
+        ema_episode_frames: 600,
+        ema_completion_fraction: 1,
       })),
     };
     const onReset = vi.fn();
@@ -227,6 +241,79 @@ describe("RunTrackPoolPanel", () => {
 
     expect(onReset).toHaveBeenCalledTimes(1);
   });
+
+  it("renders the adaptive step-balanced mode label", () => {
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: {
+            ...managedRunConfigFixture,
+            tracks: {
+              ...managedRunConfigFixture.tracks,
+              sampling_mode: "adaptive_step_balanced",
+              selected_course_ids: selectedCourseIds as string[],
+            },
+          },
+        })}
+        state={{
+          ...trackSamplingStateForCourses(selectedCourseIds),
+          sampling_mode: "adaptive_step_balanced",
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/adaptive step-balanced/i)).toBeInTheDocument();
+  });
+
+  it("shows the target env-step share in the env-steps bar tooltip", () => {
+    const firstCup = configMetadataFixture.track_cups[0];
+    if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
+      throw new Error("fixture cup must provide at least two courses");
+    }
+    const selectedCourseIds = [firstCup.course_ids[0], firstCup.course_ids[1]];
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: {
+            ...managedRunConfigFixture,
+            tracks: {
+              ...managedRunConfigFixture.tracks,
+              sampling_mode: "adaptive_step_balanced",
+              selected_course_ids: selectedCourseIds as string[],
+            },
+          },
+        })}
+        state={{
+          ...trackSamplingStateForCourses(selectedCourseIds),
+          sampling_mode: "adaptive_step_balanced",
+          entries: trackSamplingStateForCourses(selectedCourseIds).entries.map((entry, index) => ({
+            ...entry,
+            step_share: index === 0 ? 0.4 : 0.6,
+            target_step_share: index === 0 ? 0.7 : 0.3,
+          })),
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/step target/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /target 70\.0%/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /target 30\.0%/i })).toBeInTheDocument();
+  });
 });
 
 function runConfigWithSelectedCourses(courseIds: readonly string[]) {
@@ -249,6 +336,10 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
     sampling_mode: "step_balanced",
     action_repeat: 2,
     update_episodes: 50,
+    ema_alpha: 0.1,
+    max_weight_scale: 5,
+    adaptive_completion_weight: 0.35,
+    adaptive_target_completion: 0.9,
     update_count: 1,
     episodes_since_update: 0,
     entries: selectedCourses.map((course) => ({
@@ -262,9 +353,12 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
       success_sample_count: 1,
       episode_share: probability,
       success_rate: 0,
+      target_step_share: probability,
       completed_frames: 600,
       completed_env_steps: 300,
       step_share: probability,
+      ema_episode_frames: 600,
+      ema_completion_fraction: 0,
     })),
   };
 }
