@@ -33,7 +33,7 @@ class TrackResetSelector:
                 sampling_mode=config.sampling_mode,
                 seed=seed,
             )
-        if config.sampling_mode == "step_balanced":
+        if config.sampling_mode in {"step_balanced", "adaptive_step_balanced"}:
             if not config.enabled:
                 return None
             if not config.entries:
@@ -42,7 +42,7 @@ class TrackResetSelector:
             sample = (Random(seed).random() if seed is not None else random()) * total_weight
             return _selected_track_from_entry(
                 _weighted_entry(config.entries, sample=sample),
-                sampling_mode="step_balanced",
+                sampling_mode=config.sampling_mode,
                 seed=seed,
             )
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
@@ -72,6 +72,23 @@ class TrackResetSelector:
             cycle_position=position,
             seed=seed,
         )
+
+    def set_next_sequential_course(
+        self,
+        config: TrackSamplingConfig,
+        *,
+        course_id: str,
+    ) -> bool:
+        """Align the next sequential watch reset to the requested course."""
+
+        if not config.enabled or not config.entries:
+            return False
+        self._sync_sequential_cycle(config)
+        for index, bucket in enumerate(self._sequential_course_buckets):
+            if any(entry.course_id == course_id for entry in bucket):
+                self._cursor = index
+                return True
+        return False
 
     def _select_balanced(
         self,

@@ -82,6 +82,16 @@ class EngineResetCoordinator:
 
         self._sequential_track_sampling = bool(enabled)
 
+    def set_next_sequential_course(self, course_id: str | None) -> None:
+        """Align the next sequential watch reset to one configured course."""
+
+        if not course_id:
+            return
+        self._track_selector.set_next_sequential_course(
+            self._active_track_sampling,
+            course_id=course_id,
+        )
+
     def select_episode_track(self, seed: int | None) -> SelectedTrack | None:
         self._reset_seeds.remember_reset_seed(seed)
         if self._locked_reset_course_id is not None:
@@ -165,7 +175,10 @@ class EngineResetCoordinator:
         self,
         config: TrackSamplingConfig,
     ) -> TrackSamplingConfig:
-        if config.sampling_mode != "step_balanced" or not self._track_sampling_weight_overrides:
+        if (
+            config.sampling_mode not in {"step_balanced", "adaptive_step_balanced"}
+            or not self._track_sampling_weight_overrides
+        ):
             return config
         entries = tuple(
             entry.model_copy(

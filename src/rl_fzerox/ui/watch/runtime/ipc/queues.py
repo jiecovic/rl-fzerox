@@ -139,8 +139,8 @@ def drain_worker_commands(
     step_requests = 0
     save_requests = 0
     reset_mode: str | None = None
+    jump_course_id: str | None = None
     toggle_deterministic_policy = False
-    toggle_track_course_lock_id: str | None = None
     toggle_current_course_lock = False
     toggle_zeroed_state_feature_name: str | None = None
     control_fps_delta = 0
@@ -159,9 +159,9 @@ def drain_worker_commands(
                     step_requests=step_requests,
                     save_requests=save_requests,
                     reset_mode=reset_mode,
+                    jump_course_id=jump_course_id,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     manual_control_enabled=next_manual_control_enabled,
-                    toggle_track_course_lock_id=toggle_track_course_lock_id,
                     toggle_current_course_lock=toggle_current_course_lock,
                     toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
                     control_fps_delta=control_fps_delta,
@@ -186,12 +186,12 @@ def drain_worker_commands(
             save_requests += 1
         if command.reset_mode is not None:
             reset_mode = command.reset_mode
+        if command.jump_course_id is not None:
+            jump_course_id = command.jump_course_id
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
         if command.toggle_manual_control:
             next_manual_control_enabled = not next_manual_control_enabled
-        if command.toggle_track_course_lock_id is not None:
-            toggle_track_course_lock_id = command.toggle_track_course_lock_id
         if command.toggle_current_course_lock:
             toggle_current_course_lock = True
         if command.toggle_zeroed_state_feature_name is not None:
@@ -223,9 +223,9 @@ def apply_viewer_input(
             step_once=viewer_input.step_once,
             save_state=viewer_input.save_state,
             reset_mode=viewer_input.reset_mode,
+            jump_course_id=viewer_input.jump_course_id,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             toggle_manual_control=viewer_input.toggle_manual_control,
-            toggle_track_course_lock_id=viewer_input.toggle_record_course_lock_id,
             toggle_current_course_lock=viewer_input.toggle_current_course_lock,
             toggle_zeroed_state_feature_name=viewer_input.toggle_zeroed_state_feature_name,
             control_fps_delta=viewer_input.control_fps_delta,

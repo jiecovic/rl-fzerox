@@ -21,16 +21,10 @@ from rl_fzerox.ui.watch.runtime.course_navigation import (
     adjacent_watch_course_id as _adjacent_watch_course_id,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
-    advance_watch_reset_course as _advance_watch_reset_course,
-)
-from rl_fzerox.ui.watch.runtime.course_navigation import (
     current_watch_course_id as _current_watch_course_id,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     sync_locked_course_info as _sync_locked_course_info,
-)
-from rl_fzerox.ui.watch.runtime.course_navigation import (
-    toggle_locked_reset_course as _toggle_locked_reset_course,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     watch_sequential_course_ids as _watch_sequential_course_ids,
@@ -88,7 +82,6 @@ if TYPE_CHECKING:
 
 __all__ = (
     "_adjacent_watch_course_id",
-    "_advance_watch_reset_course",
     "_refresh_paused_cnn_activations",
     "_watch_sequential_course_ids",
     "run_simulation_worker",
@@ -166,7 +159,6 @@ def _run_simulation_loop(
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         persistent_locked_reset_course_id: str | None = None
-        one_shot_reset_course_id: str | None = None
         sequential_course_ids = _watch_sequential_course_ids(config.env.track_sampling.entries)
         watch_zeroed_state_features = configured_watch_zeroed_features(config)
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
@@ -176,15 +168,9 @@ def _run_simulation_loop(
         )
 
         while config.watch.episodes is None or episode < config.watch.episodes:
-            effective_reset_course_id = (
-                one_shot_reset_course_id
-                if one_shot_reset_course_id is not None
-                else persistent_locked_reset_course_id
-            )
-            env.set_locked_reset_course(effective_reset_course_id)
+            env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
-            one_shot_reset_course_id = None
             if x_cup_info is not None:
                 raw_info.update(x_cup_info)
             observation, info = apply_watch_state_feature_zeroing(
@@ -321,13 +307,10 @@ def _run_simulation_loop(
                             failed_track_attempts=failed_track_attempts,
                         ),
                     )
-                if commands.toggle_track_course_lock_id is not None:
-                    persistent_locked_reset_course_id = _toggle_locked_reset_course(
-                        env,
-                        locked_reset_course_id=persistent_locked_reset_course_id,
-                        requested_course_id=commands.toggle_track_course_lock_id,
-                    )
-                    one_shot_reset_course_id = None
+                if commands.jump_course_id is not None:
+                    persistent_locked_reset_course_id = None
+                    env.set_locked_reset_course(None)
+                    env.set_next_sequential_reset_course(commands.jump_course_id)
                     _sync_locked_course_info(
                         info=info,
                         reset_info=reset_info,
@@ -337,12 +320,24 @@ def _run_simulation_loop(
                 if commands.toggle_current_course_lock:
                     current_course_id = _current_watch_course_id(info)
                     if current_course_id is not None:
-                        persistent_locked_reset_course_id = _toggle_locked_reset_course(
-                            env,
-                            locked_reset_course_id=persistent_locked_reset_course_id,
-                            requested_course_id=current_course_id,
-                        )
-                        one_shot_reset_course_id = None
+                        if persistent_locked_reset_course_id == current_course_id:
+                            persistent_locked_reset_course_id = None
+                            env.set_locked_reset_course(None)
+                            next_course_id = _adjacent_watch_course_id(
+                                current_course_id=current_course_id,
+                                ordered_course_ids=sequential_course_ids,
+                                offset=1,
+                            )
+                            env.set_next_sequential_reset_course(next_course_id)
+                        else:
+                            persistent_locked_reset_course_id = current_course_id
+                            env.set_locked_reset_course(current_course_id)
+                            next_course_id = _adjacent_watch_course_id(
+                                current_course_id=current_course_id,
+                                ordered_course_ids=sequential_course_ids,
+                                offset=1,
+                            )
+                            env.set_next_sequential_reset_course(next_course_id)
                         _sync_locked_course_info(
                             info=info,
                             reset_info=reset_info,
@@ -350,27 +345,37 @@ def _run_simulation_loop(
                         )
                         lock_state_changed = True
                 if commands.reset_mode == "current":
-                    one_shot_reset_course_id = _current_watch_course_id(info)
+                    current_course_id = _current_watch_course_id(info)
+                    if current_course_id is not None and persistent_locked_reset_course_id is None:
+                        env.set_next_sequential_reset_course(current_course_id)
                     break
-                if commands.reset_mode == "previous":
-                    persistent_locked_reset_course_id, one_shot_reset_course_id = (
-                        _advance_watch_reset_course(
-                            locked_reset_course_id=persistent_locked_reset_course_id,
-                            current_course_id=_current_watch_course_id(info),
-                            ordered_course_ids=sequential_course_ids,
-                            offset=-1,
-                        )
+                if commands.reset_mode in {"previous", "next"}:
+                    base_course_id = persistent_locked_reset_course_id or _current_watch_course_id(
+                        info
                     )
-                    break
-                if commands.reset_mode == "next":
-                    persistent_locked_reset_course_id, one_shot_reset_course_id = (
-                        _advance_watch_reset_course(
-                            locked_reset_course_id=persistent_locked_reset_course_id,
-                            current_course_id=_current_watch_course_id(info),
-                            ordered_course_ids=sequential_course_ids,
-                            offset=1,
-                        )
+                    offset = -1 if commands.reset_mode == "previous" else 1
+                    target_course_id = _adjacent_watch_course_id(
+                        current_course_id=base_course_id,
+                        ordered_course_ids=sequential_course_ids,
+                        offset=offset,
                     )
+                    if target_course_id is not None:
+                        if persistent_locked_reset_course_id is None:
+                            env.set_next_sequential_reset_course(target_course_id)
+                        else:
+                            persistent_locked_reset_course_id = target_course_id
+                            env.set_locked_reset_course(target_course_id)
+                            next_course_id = _adjacent_watch_course_id(
+                                current_course_id=target_course_id,
+                                ordered_course_ids=sequential_course_ids,
+                                offset=1,
+                            )
+                            env.set_next_sequential_reset_course(next_course_id)
+                            _sync_locked_course_info(
+                                info=info,
+                                reset_info=reset_info,
+                                locked_reset_course_id=persistent_locked_reset_course_id,
+                            )
                     break
                 if lock_state_changed:
                     publish_worker_message(

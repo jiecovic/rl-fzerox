@@ -15,7 +15,6 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.worker import (
     _adjacent_watch_course_id,
-    _advance_watch_reset_course,
     _watch_sequential_course_ids,
     run_simulation_worker,
 )
@@ -125,24 +124,6 @@ def test_adjacent_watch_course_id_wraps_to_previous_course() -> None:
     )
 
 
-def test_advance_watch_reset_course_uses_one_shot_without_locked_anchor() -> None:
-    assert _advance_watch_reset_course(
-        locked_reset_course_id=None,
-        current_course_id="mute_city",
-        ordered_course_ids=("mute_city", "silence", "devils_forest"),
-        offset=1,
-    ) == (None, "silence")
-
-
-def test_advance_watch_reset_course_moves_locked_anchor() -> None:
-    assert _advance_watch_reset_course(
-        locked_reset_course_id="mute_city",
-        current_course_id="mute_city",
-        ordered_course_ids=("mute_city", "silence", "devils_forest"),
-        offset=1,
-    ) == ("silence", None)
-
-
 def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
     command_queue = _CommandQueue(
         [
@@ -217,11 +198,11 @@ def test_drain_worker_commands_toggles_manual_control_state() -> None:
     assert commands.manual_control_enabled is True
 
 
-def test_drain_worker_commands_coalesces_course_lock_toggle() -> None:
+def test_drain_worker_commands_coalesces_course_jump_selection() -> None:
     command_queue = _CommandQueue(
         [
-            ViewerCommand(toggle_track_course_lock_id="mute_city"),
-            ViewerCommand(toggle_track_course_lock_id="silence"),
+            ViewerCommand(jump_course_id="mute_city"),
+            ViewerCommand(jump_course_id="silence"),
         ]
     )
 
@@ -231,7 +212,7 @@ def test_drain_worker_commands_coalesces_course_lock_toggle() -> None:
         control_state=ControllerState(),
     )
 
-    assert commands.toggle_track_course_lock_id == "silence"
+    assert commands.jump_course_id == "silence"
 
 
 def test_drain_worker_commands_coalesces_current_course_lock_toggle() -> None:

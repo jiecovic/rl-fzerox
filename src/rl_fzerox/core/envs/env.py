@@ -114,6 +114,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         self._engine.set_sequential_track_sampling(enabled)
 
+    def set_next_sequential_reset_course(self, course_id: str | None) -> None:
+        """Align the next sequential watch reset to a specific configured course."""
+
+        self._engine.set_next_sequential_reset_course(course_id)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""

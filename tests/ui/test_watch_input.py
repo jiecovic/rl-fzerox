@@ -57,6 +57,7 @@ class _FakePygame:
     K_5 = 33
     K_6 = 34
     K_7 = 45
+    K_8 = 46
 
     def __init__(
         self,
@@ -223,6 +224,7 @@ def test_poll_viewer_input_selects_panel_tabs_with_number_keys() -> None:
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_5,))).panel_tab_index == 4
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_6,))).panel_tab_index == 5
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_7,))).panel_tab_index == 6
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_8,))).panel_tab_index == 7
 
 
 def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:
@@ -262,7 +264,7 @@ def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
         record_course_hitboxes=(RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),),
     )
 
-    assert viewer_input.toggle_record_course_lock_id == "mute_city"
+    assert viewer_input.jump_course_id == "mute_city"
 
 
 def test_poll_viewer_input_selects_state_feature_toggle_with_mouse_click() -> None:

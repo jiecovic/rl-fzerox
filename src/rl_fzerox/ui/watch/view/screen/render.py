@@ -15,6 +15,7 @@ from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.screen.frame import FrameRenderData, _draw_frame
 from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
@@ -35,6 +36,7 @@ def draw_watch_frame(
     render_rate: RateMeter,
     target_render_fps: float | None,
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
     panel_tab_index: int = 0,
     cnn_layer_tab_index: int = 0,
     record_tab_index: int = 0,
@@ -74,6 +76,7 @@ def draw_watch_frame(
             policy_auxiliary_state_predictions=snapshot.policy_auxiliary_state_predictions,
             policy_auxiliary_state_targets=snapshot.policy_auxiliary_state_targets,
             auxiliary_episode_metrics=auxiliary_episode_metrics,
+            live_episode_series=live_episode_series,
             episode=snapshot.episode,
             info=draw_info,
             reset_info=snapshot.reset_info,

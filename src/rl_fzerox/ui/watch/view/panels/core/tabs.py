@@ -31,6 +31,10 @@ class PanelTabRegistry:
         return self.index("cnn")
 
     @property
+    def live_index(self) -> int:
+        return self.index("live")
+
+    @property
     def records_index(self) -> int:
         return self.index("records")
 
@@ -58,6 +62,7 @@ class PanelTabRegistry:
 PANEL_TABS = PanelTabRegistry(
     tabs=(
         PanelTab(key="run", label="Run"),
+        PanelTab(key="live", label="Live"),
         PanelTab(key="details", label="Details"),
         PanelTab(key="state", label="State"),
         PanelTab(key="aux", label="Aux"),

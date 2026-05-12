@@ -1,6 +1,7 @@
 # tests/core/envs/test_reset.py
 import pickle
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -467,11 +468,12 @@ def test_sequential_track_sampling_rotates_courses_not_raw_pool_entries(
     assert first_info["track_course_id"] == "mute_city"
     assert second_info["track_course_id"] == "silence"
     assert third_info["track_course_id"] == "mute_city"
-    assert first_info["track_sampling_mode"] == "sequential"
 
 
-def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: Path) -> None:
-    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
+def test_sequential_track_sampling_can_jump_to_requested_course_for_watch(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
     env = FZeroXEnv(
         backend=SyntheticBackend(),
         config=EnvConfig(
@@ -479,6 +481,55 @@ def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: P
             track_sampling=TrackSamplingConfig(
                 enabled=True,
                 sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand"],
+                        weight=1.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_sequential_track_sampling(True)
+    first_info = env.reset(seed=123)[1]
+    env.set_next_sequential_reset_course("sand_ocean")
+    second_info = env.reset(seed=124)[1]
+    third_info = env.reset(seed=125)[1]
+
+    assert first_info["track_course_id"] == "mute_city"
+    assert second_info["track_course_id"] == "sand_ocean"
+    assert third_info["track_course_id"] == "mute_city"
+    assert first_info["track_sampling_mode"] == "sequential"
+
+
+@pytest.mark.parametrize("sampling_mode", ("step_balanced", "adaptive_step_balanced"))
+def test_dynamic_track_sampling_accepts_runtime_weight_updates(
+    tmp_path: Path,
+    sampling_mode: Literal["step_balanced", "adaptive_step_balanced"],
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode=sampling_mode,
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",
@@ -499,7 +550,7 @@ def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: P
     sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
     assert sampled_ids == ["silence", "silence", "silence", "silence"]
-    assert env.reset(seed=123)[1]["track_sampling_mode"] == "step_balanced"
+    assert env.reset(seed=123)[1]["track_sampling_mode"] == sampling_mode
 
 
 def test_step_balanced_track_sampling_does_not_front_load_config_order(

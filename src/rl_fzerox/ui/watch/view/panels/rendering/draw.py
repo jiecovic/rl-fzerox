@@ -10,6 +10,7 @@ from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column
@@ -19,6 +20,7 @@ from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
 )
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
 from rl_fzerox.ui.watch.view.panels.visuals.cnn import _draw_cnn_tab
+from rl_fzerox.ui.watch.view.panels.visuals.live import _draw_live_tab
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -85,6 +87,7 @@ class SidePanelData:
     policy_auxiliary_state_predictions: dict[str, object] | None
     policy_auxiliary_state_targets: dict[str, object] | None
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
+    live_episode_series: EpisodeLiveSeriesSnapshot | None
     telemetry: FZeroXTelemetry | None
     train_config: TrainConfig | None
     policy_config: PolicyConfig | None
@@ -200,6 +203,18 @@ def _draw_side_panel(
             width=panel_width,
             activations=data.cnn_activations,
             selected_layer_page_index=data.cnn_layer_tab_index,
+        )
+    elif selected_tab_index == PANEL_TABS.live_index:
+        _draw_live_tab(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            height=panel_rect.bottom - y - LAYOUT.panel_padding,
+            info=data.info,
+            live_series=data.live_episode_series,
         )
     elif selected_tab_index == PANEL_TABS.records_index:
         record_sections = columns.records
