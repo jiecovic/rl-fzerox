@@ -13,6 +13,7 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGr
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
+    adaptive_difficulty_bonus,
 )
 
 
@@ -201,10 +202,13 @@ def _target_step_bonus(
     state: TrackSamplingRuntimeState,
     entry: TrackSamplingRuntimeEntry,
 ) -> float:
-    if state.sampling_mode != "adaptive_step_balanced":
-        return 1.0
-    completion = entry.ema_completion_fraction
-    if completion is None:
-        return 1.0
-    completion_gap = max(state.adaptive_target_completion - completion, 0.0)
-    return 1.0 + state.adaptive_completion_weight * completion_gap
+    return adaptive_difficulty_bonus(
+        sampling_mode=state.sampling_mode,
+        max_weight_scale=state.max_weight_scale,
+        completion_weight=state.adaptive_completion_weight,
+        target_completion=state.adaptive_target_completion,
+        update_episodes=state.update_episodes,
+        completion_fraction=entry.ema_completion_fraction,
+        finished_episode_count=entry.finished_episode_count,
+        success_sample_count=entry.success_sample_count,
+    )

@@ -149,6 +149,74 @@ def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion()
     assert weights["mute"] > weights["silence"]
 
 
+def test_adaptive_step_balance_controller_uses_finish_rate_when_completion_is_similar() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"sector_alpha": 1.0, "white_land": 1.0},
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.35,
+        adaptive_target_completion=0.9,
+    )
+
+    weights = controller.record_episodes(
+        (
+            {
+                "track_id": "sector_alpha",
+                "episode_step": 200,
+                "episode_completion_fraction": 0.95,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "white_land",
+                "episode_step": 200,
+                "episode_completion_fraction": 0.85,
+                "termination_reason": "stalled",
+            },
+        )
+    )
+
+    assert weights is not None
+    assert weights["white_land"] > weights["sector_alpha"]
+
+
+def test_adaptive_step_balance_controller_can_create_large_target_spread() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"easy": 1.0, "hard": 1.0},
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.35,
+        adaptive_target_completion=0.9,
+    )
+
+    controller.record_episodes(
+        (
+            {
+                "track_id": "easy",
+                "episode_step": 200,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "hard",
+                "episode_step": 200,
+                "episode_completion_fraction": 0.0,
+                "termination_reason": "stalled",
+            },
+        )
+    )
+
+    runtime = controller.runtime_state()
+    weights_by_track = {entry.track_id: entry.current_weight for entry in runtime.entries}
+
+    assert weights_by_track["hard"] > 1.5 * weights_by_track["easy"]
+
+
 def test_step_balance_controller_builds_from_env_config() -> None:
     controller = StepBalancedTrackSamplingController.from_configs(
         env_config=EnvConfig(

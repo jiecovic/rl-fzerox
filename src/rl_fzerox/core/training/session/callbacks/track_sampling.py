@@ -371,11 +371,16 @@ class StepBalancedTrackSamplingController:
         self.update_count = max(0, int(restored_state.update_count))
 
     def _adaptive_completion_bonus(self, stats: _TrackStepStats) -> float:
-        completion_fraction = stats.ema_completion_fraction
-        if completion_fraction is None:
-            return 1.0
-        completion_gap = max(self._adaptive_target_completion - completion_fraction, 0.0)
-        return 1.0 + self._adaptive_completion_weight * completion_gap
+        return adaptive_difficulty_bonus(
+            sampling_mode=self._sampling_mode,
+            max_weight_scale=self._max_weight_scale,
+            completion_weight=self._adaptive_completion_weight,
+            target_completion=self._adaptive_target_completion,
+            update_episodes=self._update_episodes,
+            completion_fraction=stats.ema_completion_fraction,
+            finished_episode_count=stats.finished_episode_count,
+            success_sample_count=stats.success_sample_count,
+        )
 
 
 def _distribute_course_weight(
@@ -394,6 +399,73 @@ def _distribute_course_weight(
         return {}
     equal_weight = course_weight / len(entry_ids)
     return {entry_id: equal_weight for entry_id in entry_ids}
+
+
+def adaptive_difficulty_bonus(
+    *,
+    sampling_mode: str,
+    max_weight_scale: float,
+    completion_weight: float,
+    target_completion: float,
+    update_episodes: int,
+    completion_fraction: float | None,
+    finished_episode_count: int,
+    success_sample_count: int,
+) -> float:
+    if sampling_mode != "adaptive_step_balanced":
+        return 1.0
+    if max_weight_scale <= 1.0 or completion_weight <= 0.0 or target_completion <= 0.0:
+        return 1.0
+    completion_gap = _normalized_completion_gap(
+        observed_completion=completion_fraction,
+        target_completion=target_completion,
+    )
+    finish_gap = _normalized_completion_gap(
+        observed_completion=_observed_finish_rate(
+            finished_episode_count=finished_episode_count,
+            success_sample_count=success_sample_count,
+        ),
+        target_completion=target_completion,
+    )
+    difficulty_signal = max(
+        completion_gap,
+        _finish_rate_confidence(
+            success_sample_count=success_sample_count,
+            update_episodes=update_episodes,
+        )
+        * finish_gap,
+    )
+    bonus = 1.0 + (max_weight_scale - 1.0) * completion_weight * difficulty_signal
+    return min(bonus, max_weight_scale)
+
+
+def _normalized_completion_gap(
+    *,
+    observed_completion: float | None,
+    target_completion: float,
+) -> float:
+    if observed_completion is None or target_completion <= 0.0:
+        return 0.0
+    return max(target_completion - observed_completion, 0.0) / target_completion
+
+
+def _observed_finish_rate(
+    *,
+    finished_episode_count: int,
+    success_sample_count: int,
+) -> float | None:
+    if success_sample_count <= 0:
+        return None
+    return max(0.0, min(1.0, finished_episode_count / success_sample_count))
+
+
+def _finish_rate_confidence(
+    *,
+    success_sample_count: int,
+    update_episodes: int,
+) -> float:
+    confidence_episodes = max(1, int(update_episodes)) * 4
+    return max(0.0, min(1.0, success_sample_count / confidence_episodes))
 
 
 def _aggregate_runtime_entries(
