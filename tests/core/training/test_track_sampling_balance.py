@@ -126,6 +126,29 @@ def test_step_balance_controller_tracks_finished_episode_counts() -> None:
     }
 
 
+def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"mute": 1.0, "silence": 1.0},
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.5,
+        adaptive_target_completion=0.9,
+    )
+
+    weights = controller.record_episodes(
+        (
+            {"track_id": "mute", "episode_step": 200, "episode_completion_fraction": 0.2},
+            {"track_id": "silence", "episode_step": 200, "episode_completion_fraction": 0.8},
+        )
+    )
+
+    assert weights is not None
+    assert weights["mute"] > weights["silence"]
+
+
 def test_step_balance_controller_builds_from_env_config() -> None:
     controller = StepBalancedTrackSamplingController.from_configs(
         env_config=EnvConfig(
@@ -277,6 +300,7 @@ def test_step_balance_controller_state_round_trip_and_restore(tmp_path: Path) ->
     restored_state = load_track_sampling_runtime_state(state_path)
 
     assert restored_state is not None
+    assert restored_state.sampling_mode == "step_balanced"
     restored = StepBalancedTrackSamplingController(
         track_base_weights={"mute": 1.0, "silence": 1.0},
         action_repeat=2,

@@ -13,7 +13,12 @@ from rl_fzerox.core.domain.observation_image import (
 )
 
 WatchFpsSetting: TypeAlias = PositiveFloat | Literal["auto", "unlimited"]
-TrackSamplingMode: TypeAlias = Literal["random", "balanced", "step_balanced"]
+TrackSamplingMode: TypeAlias = Literal[
+    "random",
+    "balanced",
+    "step_balanced",
+    "adaptive_step_balanced",
+]
 ObservationPresetName: TypeAlias = DomainObservationPresetName
 ObservationResizeFilter: TypeAlias = DomainObservationResizeFilter
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]

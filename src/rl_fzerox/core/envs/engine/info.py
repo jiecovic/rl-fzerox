@@ -134,8 +134,20 @@ def telemetry_info(telemetry: FZeroXTelemetry) -> dict[str, object]:
         "laps_completed": race_laps_completed,
         "race_laps_completed": race_laps_completed,
         "raw_laps_completed": telemetry.player.laps_completed,
+        "episode_completion_fraction": _episode_completion_fraction(telemetry),
         "energy": telemetry.player.energy,
     }
+
+
+def _episode_completion_fraction(telemetry: FZeroXTelemetry) -> float:
+    course_length = float(telemetry.course_length)
+    total_lap_count = int(telemetry.total_lap_count)
+    if course_length <= 0.0 or total_lap_count <= 0:
+        return 0.0
+    total_race_distance = course_length * total_lap_count
+    if total_race_distance <= 0.0:
+        return 0.0
+    return max(0.0, min(1.0, float(telemetry.player.race_distance) / total_race_distance))
 
 
 def telemetry_can_boost(telemetry: FZeroXTelemetry | None) -> bool:

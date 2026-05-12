@@ -900,6 +900,7 @@ def test_monitor_info_keys_include_position_context() -> None:
 
 def test_monitor_info_keys_include_finished_timing_and_damage_metrics() -> None:
     assert "race_time_ms" in MONITOR_INFO_KEYS
+    assert "episode_completion_fraction" in MONITOR_INFO_KEYS
     assert "damage_taken_frames" in MONITOR_INFO_KEYS
     assert "boost_pad_entries" in MONITOR_INFO_KEYS
     assert "boost_pad_entries_per_lap" in MONITOR_INFO_KEYS
