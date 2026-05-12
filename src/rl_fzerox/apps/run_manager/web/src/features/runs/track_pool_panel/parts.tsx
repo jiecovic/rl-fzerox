@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/track_pool_panel/parts.tsx
 import {
+  completionSummary,
   formatOptionalPercent,
   formatPercent,
   shortCupLabel,
@@ -137,6 +138,7 @@ export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
 }
 
 function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
+  const completion = completionSummary(entry);
   return (
     <div className="run-track-distribution-column">
       <div className="run-track-distribution-column-bars">
@@ -165,7 +167,10 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
       <div className="run-track-distribution-column-label">
         <strong>{entry.label}</strong>
         <span>
-          {successSummary(entry)} · {(entry.completedEnvSteps ?? 0).toLocaleString()} steps
+          {successSummary(entry)}
+          {completion === null ? "" : ` · ${completion}`}
+          {" · "}
+          {(entry.completedEnvSteps ?? 0).toLocaleString()} steps
         </span>
       </div>
     </div>
