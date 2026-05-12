@@ -7,6 +7,12 @@
   gap: 10px;
 }
 
+.track-sampling-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
 .track-choice-note,
 .track-pool-metric span,
 .track-pool-fragments span,

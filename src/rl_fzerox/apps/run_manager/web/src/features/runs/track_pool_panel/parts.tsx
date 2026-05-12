@@ -11,10 +11,15 @@ import type { TrackPoolCourseView, TrackPoolCupView } from "@/features/runs/trac
 interface DistributionBarProps {
   kind: "sample" | "success" | "episodes" | "steps";
   label: string;
+  targetValue?: number | null;
   value: number;
 }
 
-export function DistributionBar({ kind, label, value }: DistributionBarProps) {
+export function DistributionBar({ kind, label, targetValue, value }: DistributionBarProps) {
+  const clampedTarget =
+    targetValue === undefined || targetValue === null
+      ? null
+      : Math.max(0, Math.min(targetValue, 1));
   return (
     <button
       aria-label={label}
@@ -27,13 +32,19 @@ export function DistributionBar({ kind, label, value }: DistributionBarProps) {
           className={`run-track-distribution-bar-fill run-track-distribution-bar-fill-${kind}`}
           style={{ height: `${Math.max(0, Math.min(value, 1)) * 100}%` }}
         />
+        {clampedTarget === null ? null : (
+          <div
+            className={`run-track-distribution-bar-target run-track-distribution-bar-target-${kind}`}
+            style={{ bottom: `${clampedTarget * 100}%` }}
+          />
+        )}
       </div>
     </button>
   );
 }
 
 interface LegendItemProps {
-  kind: "sample" | "success" | "episodes" | "steps";
+  kind: "sample" | "success" | "episodes" | "steps" | "target";
   label: string;
 }
 
@@ -104,6 +115,7 @@ export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
         <LegendItem kind="success" label="Finish" />
         <LegendItem kind="episodes" label="Episodes" />
         <LegendItem kind="steps" label="Env steps" />
+        <LegendItem kind="target" label="Step target" />
       </div>
       <div className="run-track-distribution-chart">
         <div className="run-track-distribution-axis">
@@ -145,7 +157,8 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
         />
         <DistributionBar
           kind="steps"
-          label={`${(entry.completedEnvSteps ?? 0).toLocaleString()} env steps · ${formatPercent(entry.stepShare ?? 0)}`}
+          label={`${(entry.completedEnvSteps ?? 0).toLocaleString()} env steps · ${formatPercent(entry.stepShare ?? 0)} · target ${formatPercent(entry.targetStepShare ?? 0)}`}
+          targetValue={entry.targetStepShare}
           value={entry.stepShare ?? 0}
         />
       </div>

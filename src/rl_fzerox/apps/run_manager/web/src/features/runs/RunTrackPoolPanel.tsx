@@ -5,6 +5,7 @@ import {
   expectsTrackSamplingState,
   showTrackSamplingState,
   trackPoolEmptyMessage,
+  trackSamplingModeLabel,
   trackSamplingUpdatedLabel,
 } from "@/features/runs/track_pool_panel/model";
 import { CupTabs, TrackPoolBody } from "@/features/runs/track_pool_panel/parts";
@@ -51,8 +52,8 @@ export function RunTrackPoolPanel({
           <strong>Track pool</strong>
           <div className="run-track-distribution-note">
             {visibleState === null
-              ? "step-balanced"
-              : `step-balanced · updated ${trackSamplingUpdatedLabel(run)}`}
+              ? trackSamplingModeLabel(run.config.tracks.sampling_mode)
+              : `${trackSamplingModeLabel(run.config.tracks.sampling_mode)} · updated ${trackSamplingUpdatedLabel(run)}`}
           </div>
         </div>
         <div className="run-track-distribution-meta">

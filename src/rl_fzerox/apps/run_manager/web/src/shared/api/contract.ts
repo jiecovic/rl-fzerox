@@ -8,7 +8,7 @@ const observationResolutionModeSchema = z.enum(["preset", "custom"]);
 const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
 const gpDifficultySchema = z.enum(["novice", "standard", "expert", "master"]);
-const trackSamplingModeSchema = z.enum(["equal", "step_balanced"]);
+const trackSamplingModeSchema = z.enum(["equal", "step_balanced", "adaptive_step_balanced"]);
 const vehicleSelectionModeSchema = z.enum(["fixed", "pool"]);
 const engineSettingModeSchema = z.enum(["fixed", "random_range"]);
 const actionAxisModeSchema = z.enum(["continuous", "discrete"]);
@@ -89,6 +89,11 @@ const tracksConfigSchema = z.object({
   race_mode: raceModeSchema,
   gp_difficulty: gpDifficultySchema.nullable().optional(),
   sampling_mode: trackSamplingModeSchema,
+  step_balance_update_episodes: z.number().int().positive(),
+  step_balance_ema_alpha: z.number().gt(0).max(1),
+  step_balance_max_weight_scale: z.number().min(1),
+  adaptive_step_balance_completion_weight: z.number().nonnegative(),
+  adaptive_step_balance_target_completion: z.number().min(0).max(1),
   selected_course_ids: z.array(z.string()),
 });
 
@@ -404,15 +409,22 @@ export const trackSamplingRuntimeEntrySchema = z.object({
   success_sample_count: z.number().int().nonnegative(),
   episode_share: z.number().min(0).max(1),
   success_rate: z.number().min(0).max(1).nullable(),
+  target_step_share: z.number().min(0).max(1),
   completed_frames: z.number().int().nonnegative(),
   completed_env_steps: z.number().int().nonnegative(),
   step_share: z.number().min(0).max(1),
+  ema_episode_frames: z.number().nonnegative().nullable(),
+  ema_completion_fraction: z.number().min(0).max(1).nullable(),
 });
 
 export const trackSamplingRuntimeStateSchema = z.object({
   sampling_mode: z.string(),
   action_repeat: z.number().int().positive(),
   update_episodes: z.number().int().positive(),
+  ema_alpha: z.number().gt(0).max(1),
+  max_weight_scale: z.number().min(1),
+  adaptive_completion_weight: z.number().nonnegative(),
+  adaptive_target_completion: z.number().min(0).max(1),
   update_count: z.number().int().nonnegative(),
   episodes_since_update: z.number().int().nonnegative(),
   entries: z.array(trackSamplingRuntimeEntrySchema),

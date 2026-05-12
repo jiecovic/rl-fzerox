@@ -130,6 +130,12 @@
   background: color-mix(in srgb, var(--accent) 42%, var(--run-accent) 58%);
 }
 
+.run-track-distribution-legend-swatch-target {
+  width: 12px;
+  height: 0;
+  border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
+}
+
 .run-track-distribution-chart {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
@@ -196,6 +202,16 @@
 .run-track-distribution-bar-fill {
   position: absolute;
   inset: auto 0 0 0;
+}
+
+.run-track-distribution-bar-target {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  border-top: 2px solid color-mix(in srgb, #f5c542 82%, white);
+  pointer-events: none;
+  transform: translateY(50%);
+  z-index: 1;
 }
 
 .run-track-distribution-bar-fill-sample {

@@ -10,7 +10,10 @@ from rl_fzerox.core.manager import (
     ManagedRunTemplate,
 )
 from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGroup
-from rl_fzerox.core.training.session.callbacks.track_sampling import TrackSamplingRuntimeState
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingRuntimeEntry,
+    TrackSamplingRuntimeState,
+)
 
 
 def template_payload(template: ManagedRunTemplate) -> dict[str, object]:
@@ -134,12 +137,17 @@ def run_metric_payload(sample: ManagedRunMetricSample) -> dict[str, object]:
 
 def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, object]:
     total_weight = sum(entry.current_weight for entry in state.entries)
+    target_step_shares = _target_step_shares(state)
     total_episodes = sum(entry.episode_count for entry in state.entries)
     total_frames = sum(entry.completed_frames for entry in state.entries)
     return {
         "sampling_mode": state.sampling_mode,
         "action_repeat": state.action_repeat,
         "update_episodes": state.update_episodes,
+        "ema_alpha": state.ema_alpha,
+        "max_weight_scale": state.max_weight_scale,
+        "adaptive_completion_weight": state.adaptive_completion_weight,
+        "adaptive_target_completion": state.adaptive_target_completion,
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -162,12 +170,41 @@ def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, 
                     if entry.success_sample_count <= 0
                     else entry.finished_episode_count / entry.success_sample_count
                 ),
+                "target_step_share": target_step_shares.get(entry.course_key, 0.0),
                 "completed_frames": entry.completed_frames,
                 "completed_env_steps": (
                     0 if state.action_repeat <= 0 else entry.completed_frames // state.action_repeat
                 ),
                 "step_share": (0.0 if total_frames <= 0 else entry.completed_frames / total_frames),
+                "ema_episode_frames": entry.ema_episode_frames,
+                "ema_completion_fraction": entry.ema_completion_fraction,
             }
             for entry in state.entries
         ],
     }
+
+
+def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
+    raw_targets = {
+        entry.course_key: max(0.0, float(entry.base_weight)) * _target_step_bonus(state, entry)
+        for entry in state.entries
+    }
+    total_target = sum(raw_targets.values())
+    if total_target <= 0.0:
+        return {entry.course_key: 0.0 for entry in state.entries}
+    return {
+        course_key: raw_target / total_target for course_key, raw_target in raw_targets.items()
+    }
+
+
+def _target_step_bonus(
+    state: TrackSamplingRuntimeState,
+    entry: TrackSamplingRuntimeEntry,
+) -> float:
+    if state.sampling_mode != "adaptive_step_balanced":
+        return 1.0
+    completion = entry.ema_completion_fraction
+    if completion is None:
+        return 1.0
+    completion_gap = max(state.adaptive_target_completion - completion, 0.0)
+    return 1.0 + state.adaptive_completion_weight * completion_gap

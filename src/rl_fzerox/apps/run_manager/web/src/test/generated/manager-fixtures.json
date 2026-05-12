@@ -962,6 +962,10 @@
         "value": "step_balanced"
       },
       {
+        "label": "adaptive step balanced",
+        "value": "adaptive_step_balanced"
+      },
+      {
         "label": "equal",
         "value": "equal"
       }
@@ -1399,6 +1403,8 @@
     },
     "seed": 123,
     "tracks": {
+      "adaptive_step_balance_completion_weight": 0.35,
+      "adaptive_step_balance_target_completion": 0.9,
       "pool_mode": "built_in",
       "race_mode": "time_attack",
       "sampling_mode": "step_balanced",
@@ -1427,7 +1433,10 @@
         "sand_ocean_2",
         "port_town_2",
         "big_hand"
-      ]
+      ],
+      "step_balance_ema_alpha": 0.1,
+      "step_balance_max_weight_scale": 5.0,
+      "step_balance_update_episodes": 5
     },
     "train": {
       "batch_size": 1024,
