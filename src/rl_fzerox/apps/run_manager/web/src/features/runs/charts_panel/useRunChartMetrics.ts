@@ -30,8 +30,16 @@ export function useRunChartMetrics(
     }
 
     let ignore = false;
+    let inFlight = false;
+    let activeController: AbortController | null = null;
 
     async function loadMetrics() {
+      if (inFlight) {
+        return;
+      }
+      inFlight = true;
+      const controller = new AbortController();
+      activeController = controller;
       try {
         setMetricsByRun((current) => ({
           ...current,
@@ -39,7 +47,11 @@ export function useRunChartMetrics(
         }));
         const samples = await Promise.all(
           selectedRunIds.map(
-            async (runId) => [runId, await fetchFreshRunMetrics(runId, rangeMode)] as const,
+            async (runId) =>
+              [
+                runId,
+                await fetchFreshRunMetrics(runId, rangeMode, { signal: controller.signal }),
+              ] as const,
           ),
         );
         if (!ignore) {
@@ -47,9 +59,17 @@ export function useRunChartMetrics(
           setLoadError(null);
         }
       } catch (caught) {
+        if (isAbortError(caught)) {
+          return;
+        }
         if (!ignore) {
           setLoadError(caught instanceof Error ? caught.message : "failed to load run metrics");
         }
+      } finally {
+        if (activeController === controller) {
+          activeController = null;
+        }
+        inFlight = false;
       }
     }
 
@@ -59,9 +79,14 @@ export function useRunChartMetrics(
     }, 5_000);
     return () => {
       ignore = true;
+      activeController?.abort();
       window.clearInterval(intervalId);
     };
   }, [rangeMode, selectedRunIds]);
 
   return { loadError, metricsByRun };
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
 }

@@ -80,10 +80,18 @@ export function useRunTrackSamplingState(
 
   useEffect(() => {
     let ignore = false;
+    let inFlight = false;
+    let activeController: AbortController | null = null;
 
     async function loadTrackSamplingState() {
+      if (inFlight) {
+        return;
+      }
+      inFlight = true;
+      const controller = new AbortController();
+      activeController = controller;
       try {
-        const state = await fetchRunTrackSamplingState(runId);
+        const state = await fetchRunTrackSamplingState(runId, { signal: controller.signal });
         if (!ignore) {
           setTrackSamplingState(state);
         }
@@ -91,6 +99,11 @@ export function useRunTrackSamplingState(
         if (!ignore) {
           setTrackSamplingState(null);
         }
+      } finally {
+        if (activeController === controller) {
+          activeController = null;
+        }
+        inFlight = false;
       }
     }
 
@@ -98,6 +111,7 @@ export function useRunTrackSamplingState(
     if (status !== "running") {
       return () => {
         ignore = true;
+        activeController?.abort();
       };
     }
     const intervalId = window.setInterval(() => {
@@ -105,6 +119,7 @@ export function useRunTrackSamplingState(
     }, 2_000);
     return () => {
       ignore = true;
+      activeController?.abort();
       window.clearInterval(intervalId);
     };
   }, [runId, status]);

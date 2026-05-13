@@ -11,6 +11,8 @@ export function openDraftSession(current: DraftEditorSession[], draft: ManagedDr
   return [
     ...current,
     {
+      currentConfig: draft.config,
+      currentDraftName: draft.name,
       draftId: draft.id,
       forkSource: draftForkSource(draft),
       initialDraftName: draft.name,
@@ -39,6 +41,8 @@ export function createDraftSession(
   return [
     ...current,
     {
+      currentConfig: initialConfig,
+      currentDraftName: initialDraftName,
       draftId: null,
       forkSource,
       initialDraftName,
@@ -62,6 +66,8 @@ export function patchDraftSessions(
     }
     const updated = { ...session, ...patch };
     changed =
+      updated.currentDraftName !== session.currentDraftName ||
+      updated.currentConfig !== session.currentConfig ||
       updated.title !== session.title ||
       updated.initialDraftName !== session.initialDraftName ||
       updated.initialConfig !== session.initialConfig ||

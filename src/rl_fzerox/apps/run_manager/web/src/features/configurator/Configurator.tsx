@@ -40,6 +40,9 @@ interface ConfiguratorProps {
   initialConfig?: ManagedRunConfig | null;
   loadedDraft: ManagedDraft | null;
   metadata: ConfigMetadata;
+  resumeConfig?: ManagedRunConfig | null;
+  resumeDraftName?: string | null;
+  onConfigChange?: (config: ManagedRunConfig) => void;
   onDraftNameChange?: (name: string) => void;
   onLaunchRun: (
     name: string,
@@ -62,6 +65,9 @@ export function Configurator({
   initialConfig = null,
   loadedDraft,
   metadata,
+  resumeConfig = null,
+  resumeDraftName = null,
+  onConfigChange,
   onDraftNameChange,
   onLaunchRun,
   onSaveDraft,
@@ -69,8 +75,8 @@ export function Configurator({
 }: ConfiguratorProps) {
   const baselineConfig = loadedDraft?.config ?? initialConfig ?? baseConfig;
   const baselineDraftName = configuratorDraftName(baseConfig, initialDraftName, loadedDraft);
-  const [draftName, setDraftName] = useState(baselineDraftName);
-  const [config, setConfig] = useState(baselineConfig);
+  const [draftName, setDraftName] = useState(resumeDraftName ?? baselineDraftName);
+  const [config, setConfig] = useState(resumeConfig ?? baselineConfig);
   const [section, setSection] = useState<ConfigSection>("tracks");
   const [policyPreview, setPolicyPreview] = useState<PolicyArchitecturePreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -106,12 +112,17 @@ export function Configurator({
         : loadedDraft === null && createNameConflict
           ? "This draft name is already used by another draft or open editor."
           : null;
+  const baselineConfigJson = useMemo(() => stableJson(baselineConfig), [baselineConfig]);
+  const configJson = useMemo(() => stableJson(config), [config]);
   const isDirty = useMemo(() => {
     if (normalizedDraftName !== normalizedBaselineDraftName) {
       return true;
     }
-    return stableJson(config) !== stableJson(baselineConfig);
-  }, [baselineConfig, config, normalizedBaselineDraftName, normalizedDraftName]);
+    return configJson !== baselineConfigJson;
+  }, [baselineConfigJson, configJson, normalizedBaselineDraftName, normalizedDraftName]);
+  const notifyConfigChange = useEffectEvent((nextConfig: ManagedRunConfig) => {
+    onConfigChange?.(nextConfig);
+  });
   const notifyDraftNameChange = useEffectEvent((name: string) => {
     onDraftNameChange?.(name);
   });
@@ -172,6 +183,10 @@ export function Configurator({
   useEffect(() => {
     notifyDraftNameChange(draftName);
   }, [draftName]);
+
+  useEffect(() => {
+    notifyConfigChange(config);
+  }, [config]);
 
   function committedConfigSnapshot() {
     const activeElement = document.activeElement;

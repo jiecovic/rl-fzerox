@@ -1,9 +1,11 @@
 # src/rl_fzerox/apps/run_manager/tensorboard_metrics.py
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import TYPE_CHECKING
 
 from rl_fzerox.core.manager.models import ManagedRun, ManagedRunMetricSample
@@ -27,7 +29,9 @@ class _TensorboardMetricCacheEntry:
     samples: tuple[ManagedRunMetricSample, ...]
 
 
-_RUN_METRIC_CACHE: dict[Path, _TensorboardMetricCacheEntry] = {}
+MAX_RUN_METRIC_CACHE_ENTRIES = 32
+_RUN_METRIC_CACHE: OrderedDict[Path, _TensorboardMetricCacheEntry] = OrderedDict()
+_RUN_METRIC_CACHE_LOCK = Lock()
 
 
 def load_run_metric_samples_from_tensorboard(
@@ -37,6 +41,15 @@ def load_run_metric_samples_from_tensorboard(
 ) -> tuple[ManagedRunMetricSample, ...]:
     """Load sampled scalar history for one run from its TensorBoard event files."""
 
+    with _RUN_METRIC_CACHE_LOCK:
+        return _load_run_metric_samples_from_tensorboard(run, limit=limit)
+
+
+def _load_run_metric_samples_from_tensorboard(
+    run: ManagedRun,
+    *,
+    limit: int | None,
+) -> tuple[ManagedRunMetricSample, ...]:
     event_dir = run.run_dir / RUN_LAYOUT.tensorboard_dirname
     if not event_dir.is_dir():
         return ()
@@ -53,6 +66,7 @@ def load_run_metric_samples_from_tensorboard(
     cache_key = event_dir.resolve()
     cached = _RUN_METRIC_CACHE.get(cache_key)
     if cached is not None and cached.signature == signature:
+        _RUN_METRIC_CACHE.move_to_end(cache_key)
         return _slice_samples(cached.samples, limit)
 
     accumulator = (
@@ -131,12 +145,25 @@ def load_run_metric_samples_from_tensorboard(
         )
         for sample in ordered
     )
-    _RUN_METRIC_CACHE[cache_key] = _TensorboardMetricCacheEntry(
-        accumulator=accumulator,
-        signature=signature,
-        samples=samples,
+    _store_metric_cache_entry(
+        cache_key,
+        _TensorboardMetricCacheEntry(
+            accumulator=accumulator,
+            signature=signature,
+            samples=samples,
+        ),
     )
     return _slice_samples(samples, limit)
+
+
+def _store_metric_cache_entry(
+    cache_key: Path,
+    entry: _TensorboardMetricCacheEntry,
+) -> None:
+    _RUN_METRIC_CACHE[cache_key] = entry
+    _RUN_METRIC_CACHE.move_to_end(cache_key)
+    while len(_RUN_METRIC_CACHE) > MAX_RUN_METRIC_CACHE_ENTRIES:
+        _RUN_METRIC_CACHE.popitem(last=False)
 
 
 def _slice_samples(
