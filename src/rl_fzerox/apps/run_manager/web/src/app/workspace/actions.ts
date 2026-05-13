@@ -102,6 +102,8 @@ export function useWorkspaceActions({
     );
     setDrafts((current) => upsertDraft(current, draft));
     sessions.patchDraftEditor(sessionId, {
+      currentConfig: draft.config,
+      currentDraftName: draft.name,
       draftId: draft.id,
       forkSource: draftForkSource(draft),
       initialDraftName: draft.name,
@@ -129,6 +131,8 @@ export function useWorkspaceActions({
     );
     setDrafts((current) => upsertDraft(current, draft));
     sessions.patchDraftEditor(sessionId, {
+      currentConfig: draft.config,
+      currentDraftName: draft.name,
       draftId: draft.id,
       forkSource: draftForkSource(draft),
       initialDraftName: draft.name,

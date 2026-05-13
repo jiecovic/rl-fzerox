@@ -9,6 +9,8 @@ export interface ForkSource {
 }
 
 export interface DraftEditorSession {
+  currentConfig: ManagedRunConfig | null;
+  currentDraftName: string;
   draftId: string | null;
   forkSource: ForkSource | null;
   initialDraftName: string;

@@ -12,6 +12,8 @@ import type {
   ManagedRunDetail,
 } from "@/shared/api/contract";
 
+const MAX_CACHED_RUN_DETAILS = 16;
+
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
   const [runs, setRuns] = useState<ManagedRun[]>([]);
@@ -21,17 +23,22 @@ export function useManagerData() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const runDetailsRef = useRef(runDetailsById);
+  const runDetailAccessOrderRef = useRef<string[]>([]);
   const pollInFlightRef = useRef(false);
   const runDetailRequestsRef = useRef(new Map<string, Promise<ManagedRunDetail>>());
   runDetailsRef.current = runDetailsById;
 
   const upsertRunDetail = useCallback((run: ManagedRunDetail) => {
-    setRunDetailsById((current) => ({ ...current, [run.id]: run }));
+    rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
+    setRunDetailsById((current) =>
+      trimRunDetailCache({ ...current, [run.id]: run }, null, runDetailAccessOrderRef.current),
+    );
   }, []);
 
   const loadRunDetail = useCallback(async (runId: string) => {
     const cached = runDetailsRef.current[runId];
     if (cached !== undefined) {
+      rememberRunDetailAccess(runDetailAccessOrderRef.current, runId);
       return cached;
     }
     const inflight = runDetailRequestsRef.current.get(runId);
@@ -40,7 +47,10 @@ export function useManagerData() {
     }
     const request = fetchRun(runId)
       .then((run) => {
-        setRunDetailsById((current) => ({ ...current, [run.id]: run }));
+        rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
+        setRunDetailsById((current) =>
+          trimRunDetailCache({ ...current, [run.id]: run }, null, runDetailAccessOrderRef.current),
+        );
         return run;
       })
       .finally(() => {
@@ -56,12 +66,21 @@ export function useManagerData() {
     try {
       const managerData = await loadManagerData();
       const runDetails = managerData.runs.filter(hasRunDetail);
+      for (const run of runDetails) {
+        rememberRunDetailAccess(runDetailAccessOrderRef.current, run.id);
+      }
       setDrafts(managerData.drafts);
       setRuns(managerData.runs.map((run) => (hasRunDetail(run) ? runSummaryFromDetail(run) : run)));
-      setRunDetailsById((current) => ({
-        ...current,
-        ...Object.fromEntries(runDetails.map((run) => [run.id, run])),
-      }));
+      setRunDetailsById((current) =>
+        trimRunDetailCache(
+          {
+            ...current,
+            ...Object.fromEntries(runDetails.map((run) => [run.id, run])),
+          },
+          null,
+          runDetailAccessOrderRef.current,
+        ),
+      );
       setMetadata(managerData.metadata);
       setDefaultConfig((current) => current ?? managerData.templates[0]?.config ?? null);
     } catch (caught) {
@@ -88,10 +107,12 @@ export function useManagerData() {
         startTransition(() => {
           setRuns((current) => (sameRunPayload(current, sortedRuns) ? current : sortedRuns));
           setRunDetailsById((current) => {
-            const entries = Object.entries(current).filter(([runId]) => visibleRunIds.has(runId));
-            return entries.length === Object.keys(current).length
-              ? current
-              : Object.fromEntries(entries);
+            const next = trimRunDetailCache(
+              current,
+              visibleRunIds,
+              runDetailAccessOrderRef.current,
+            );
+            return next === current || sameRunDetailsById(current, next) ? current : next;
           });
         });
       } catch {
@@ -102,9 +123,23 @@ export function useManagerData() {
     }
 
     const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
       void reloadRuns();
     }, 2_000);
-    return () => window.clearInterval(intervalId);
+
+    function reloadWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void reloadRuns();
+      }
+    }
+
+    document.addEventListener("visibilitychange", reloadWhenVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", reloadWhenVisible);
+      window.clearInterval(intervalId);
+    };
   }, []);
 
   return {
@@ -199,4 +234,49 @@ function sameRecentEvents(left: ManagedRun, right: ManagedRun) {
       event.message === other.message
     );
   });
+}
+
+function rememberRunDetailAccess(order: string[], runId: string) {
+  const existingIndex = order.indexOf(runId);
+  if (existingIndex !== -1) {
+    order.splice(existingIndex, 1);
+  }
+  order.push(runId);
+}
+
+function trimRunDetailCache(
+  current: Record<string, ManagedRunDetail>,
+  visibleRunIds: Set<string> | null,
+  accessOrder: string[],
+) {
+  let entries = Object.entries(current);
+  if (visibleRunIds !== null) {
+    entries = entries.filter(([runId]) => visibleRunIds.has(runId));
+  }
+  const entryIds = new Set(entries.map(([runId]) => runId));
+  for (const [runId] of entries) {
+    if (!accessOrder.includes(runId)) {
+      accessOrder.push(runId);
+    }
+  }
+  const prunedOrder = accessOrder.filter((runId) => entryIds.has(runId));
+  accessOrder.splice(0, accessOrder.length, ...prunedOrder);
+  if (entries.length <= MAX_CACHED_RUN_DETAILS) {
+    return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries);
+  }
+  const keepIds = new Set(prunedOrder.slice(-MAX_CACHED_RUN_DETAILS));
+  accessOrder.splice(0, accessOrder.length, ...prunedOrder.filter((runId) => keepIds.has(runId)));
+  return Object.fromEntries(entries.filter(([runId]) => keepIds.has(runId)));
+}
+
+function sameRunDetailsById(
+  left: Record<string, ManagedRunDetail>,
+  right: Record<string, ManagedRunDetail>,
+) {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  return leftKeys.every((key) => left[key] === right[key]);
 }

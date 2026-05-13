@@ -44,6 +44,7 @@ export function WorkspaceBody({
 }: WorkspaceBodyProps) {
   const [runDetailError, setRunDetailError] = useState<string | null>(null);
   const activeRunTab = sessions.activeRunTab;
+  const activeDraftEditor = sessions.activeDraftEditor;
   const activeRunSummary =
     activeRunTab === null
       ? null
@@ -128,31 +129,42 @@ export function WorkspaceBody({
           />
         )
       ) : null}
-      {!isLoading && sessions.activeDraftEditor !== null ? (
+      {!isLoading && activeDraftEditor !== null ? (
         defaultConfig !== null && metadata !== null ? (
-          sessions.draftEditors.map((session) => (
-            <div hidden={sessions.activeTabId !== session.sessionId} key={session.sessionId}>
-              <Configurator
-                active={sessions.activeTabId === session.sessionId}
-                baseConfig={defaultConfig}
-                existingNames={sessions.reservedNamesForSession(session.sessionId)}
-                forkSourceArtifact={session.forkSource?.artifact ?? null}
-                forkSourceRunLabel={sessions.forkSourceRunLabel(session.forkSource)}
-                initialConfig={session.initialConfig}
-                initialDraftName={session.initialDraftName}
-                loadedDraft={session.loadedDraft}
-                metadata={metadata}
-                onDraftNameChange={(name) => sessions.setDraftEditorTitle(session.sessionId, name)}
-                onLaunchRun={(name, config, draftId) =>
-                  actions.launchTrainingRun(session.sessionId, name, config, draftId)
-                }
-                onSaveDraft={(name, config) => actions.saveDraft(session.sessionId, name, config)}
-                onUpdateDraft={(id, name, config) =>
-                  actions.updateExistingDraft(session.sessionId, id, name, config)
-                }
-              />
-            </div>
-          ))
+          <Configurator
+            key={activeDraftEditor.sessionId}
+            active
+            baseConfig={defaultConfig}
+            existingNames={sessions.reservedNamesForSession(activeDraftEditor.sessionId)}
+            forkSourceArtifact={activeDraftEditor.forkSource?.artifact ?? null}
+            forkSourceRunLabel={sessions.forkSourceRunLabel(activeDraftEditor.forkSource)}
+            initialConfig={activeDraftEditor.initialConfig}
+            initialDraftName={activeDraftEditor.initialDraftName}
+            loadedDraft={activeDraftEditor.loadedDraft}
+            metadata={metadata}
+            resumeConfig={activeDraftEditor.currentConfig}
+            resumeDraftName={activeDraftEditor.currentDraftName}
+            onConfigChange={(config) =>
+              sessions.patchDraftEditor(activeDraftEditor.sessionId, {
+                currentConfig: config,
+              })
+            }
+            onDraftNameChange={(name) => {
+              sessions.setDraftEditorTitle(activeDraftEditor.sessionId, name);
+              sessions.patchDraftEditor(activeDraftEditor.sessionId, {
+                currentDraftName: name,
+              });
+            }}
+            onLaunchRun={(name, config, draftId) =>
+              actions.launchTrainingRun(activeDraftEditor.sessionId, name, config, draftId)
+            }
+            onSaveDraft={(name, config) =>
+              actions.saveDraft(activeDraftEditor.sessionId, name, config)
+            }
+            onUpdateDraft={(id, name, config) =>
+              actions.updateExistingDraft(activeDraftEditor.sessionId, id, name, config)
+            }
+          />
         ) : (
           <Notice tone="error">Run manager metadata is missing.</Notice>
         )

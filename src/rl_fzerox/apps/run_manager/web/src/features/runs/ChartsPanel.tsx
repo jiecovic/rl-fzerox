@@ -70,7 +70,9 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     const available = new Set(visibleRuns.map((run) => run.id));
     setSelectedRuns((current) => {
       const filtered = current.filter((runId) => available.has(runId));
-      return filtered.length === 0 ? defaultSelectedRunIds(visibleRuns, focusedRunId) : filtered;
+      const next =
+        filtered.length === 0 ? defaultSelectedRunIds(visibleRuns, focusedRunId) : filtered;
+      return sameRunIdList(current, next) ? current : next;
     });
   }, [focusedRunId, setSelectedRuns, visibleRuns]);
 
@@ -330,6 +332,10 @@ function chartGroupOptions(runs: readonly ManagedRun[]) {
       }
       return left.label.localeCompare(right.label);
     });
+}
+
+function sameRunIdList(left: readonly string[], right: readonly string[]) {
+  return left.length === right.length && left.every((runId, index) => runId === right[index]);
 }
 
 function defaultChartGroupFilter(runs: readonly ManagedRun[], focusedRunId: string | null) {

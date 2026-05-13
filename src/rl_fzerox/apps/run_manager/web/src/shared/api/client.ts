@@ -33,6 +33,10 @@ import {
 export type RunMetricRangeMode = "recent" | "full";
 export const API_SCHEMA_MISMATCH_MESSAGE = "Run-manager backend is outdated. Restart run-manager.";
 
+interface RequestOptions {
+  signal?: AbortSignal;
+}
+
 export class ApiSchemaMismatchError extends Error {
   constructor() {
     super(API_SCHEMA_MISMATCH_MESSAGE);
@@ -41,6 +45,8 @@ export class ApiSchemaMismatchError extends Error {
 }
 
 const RECENT_RUN_METRIC_LIMIT = 240;
+const MAX_RECENT_RUN_METRIC_CACHE_ENTRIES = 48;
+const MAX_FULL_RUN_METRIC_CACHE_ENTRIES = 12;
 const runMetricsCache = new Map<string, ManagedRunMetricSample[]>();
 const inflightRunMetrics = new Map<string, Promise<ManagedRunMetricSample[]>>();
 
@@ -70,16 +76,18 @@ export async function fetchRun(runId: string): Promise<ManagedRunDetail> {
 export async function fetchRunMetrics(
   runId: string,
   rangeMode: RunMetricRangeMode = "recent",
+  options: RequestOptions = {},
 ): Promise<ManagedRunMetricSample[]> {
-  return fetchFreshRunMetrics(runId, rangeMode);
+  return fetchFreshRunMetrics(runId, rangeMode, options);
 }
 
 export async function fetchRunTrackSamplingState(
   runId: string,
+  options: RequestOptions = {},
 ): Promise<TrackSamplingRuntimeState | null> {
   const payload = parseApiPayload(
     runTrackSamplingResponseSchema,
-    await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling`),
+    await getJson(`/api/runs/${encodeURIComponent(runId)}/track-sampling`, options),
   );
   return payload.state;
 }
@@ -95,12 +103,13 @@ export function getCachedRunMetrics(
   runId: string,
   rangeMode: RunMetricRangeMode = "recent",
 ): ManagedRunMetricSample[] | null {
-  const cached = runMetricsCache.get(runMetricsCacheKey(runId, rangeMode));
+  const cacheKey = runMetricsCacheKey(runId, rangeMode);
+  const cached = getRunMetricCacheEntry(cacheKey);
   if (cached !== undefined) {
     return cached;
   }
   if (rangeMode === "recent") {
-    const full = runMetricsCache.get(runMetricsCacheKey(runId, "full"));
+    const full = getRunMetricCacheEntry(runMetricsCacheKey(runId, "full"));
     return full === undefined ? null : full.slice(-RECENT_RUN_METRIC_LIMIT);
   }
   return null;
@@ -109,8 +118,9 @@ export function getCachedRunMetrics(
 export async function fetchFreshRunMetrics(
   runId: string,
   rangeMode: RunMetricRangeMode = "recent",
+  options: RequestOptions = {},
 ): Promise<ManagedRunMetricSample[]> {
-  return refreshRunMetrics(runId, rangeMode);
+  return refreshRunMetrics(runId, rangeMode, options);
 }
 
 export async function fetchConfigMetadata(): Promise<ConfigMetadata> {
@@ -301,19 +311,22 @@ export async function rebuildTensorboardViews(): Promise<TensorboardViewGroup[]>
   return payload.tensorboard_views;
 }
 
-async function getJson(url: string): Promise<unknown> {
-  const response = await fetch(url);
+async function getJson(url: string, options: RequestOptions = {}): Promise<unknown> {
+  const response = await fetch(url, { signal: options.signal });
   return parseJson(response);
 }
 
 async function refreshRunMetrics(
   runId: string,
   rangeMode: RunMetricRangeMode,
+  options: RequestOptions,
 ): Promise<ManagedRunMetricSample[]> {
   const cacheKey = runMetricsCacheKey(runId, rangeMode);
-  const inflight = inflightRunMetrics.get(cacheKey);
-  if (inflight !== undefined) {
-    return inflight;
+  if (options.signal === undefined) {
+    const inflight = inflightRunMetrics.get(cacheKey);
+    if (inflight !== undefined) {
+      return inflight;
+    }
   }
   const request = (async () => {
     const query = new URLSearchParams({ mode: rangeMode });
@@ -322,27 +335,55 @@ async function refreshRunMetrics(
     }
     const payload = parseApiPayload(
       runMetricsResponseSchema,
-      await getJson(`/api/runs/${encodeURIComponent(runId)}/metrics?${query.toString()}`),
+      await getJson(`/api/runs/${encodeURIComponent(runId)}/metrics?${query.toString()}`, options),
     );
-    runMetricsCache.set(cacheKey, payload.samples);
+    setRunMetricCacheEntry(cacheKey, payload.samples);
     if (rangeMode === "full") {
-      runMetricsCache.set(
+      setRunMetricCacheEntry(
         runMetricsCacheKey(runId, "recent"),
         payload.samples.slice(-RECENT_RUN_METRIC_LIMIT),
       );
     }
     return payload.samples;
   })();
-  inflightRunMetrics.set(cacheKey, request);
+  if (options.signal === undefined) {
+    inflightRunMetrics.set(cacheKey, request);
+  }
   try {
     return await request;
   } finally {
-    inflightRunMetrics.delete(cacheKey);
+    if (options.signal === undefined) {
+      inflightRunMetrics.delete(cacheKey);
+    }
   }
 }
 
 function runMetricsCacheKey(runId: string, rangeMode: RunMetricRangeMode) {
   return `${runId}:${rangeMode}`;
+}
+
+function getRunMetricCacheEntry(cacheKey: string): ManagedRunMetricSample[] | undefined {
+  const cached = runMetricsCache.get(cacheKey);
+  if (cached === undefined) {
+    return undefined;
+  }
+  runMetricsCache.delete(cacheKey);
+  runMetricsCache.set(cacheKey, cached);
+  return cached;
+}
+
+function setRunMetricCacheEntry(cacheKey: string, samples: ManagedRunMetricSample[]) {
+  runMetricsCache.delete(cacheKey);
+  runMetricsCache.set(cacheKey, samples);
+  trimRunMetricCache("recent", MAX_RECENT_RUN_METRIC_CACHE_ENTRIES);
+  trimRunMetricCache("full", MAX_FULL_RUN_METRIC_CACHE_ENTRIES);
+}
+
+function trimRunMetricCache(rangeMode: RunMetricRangeMode, maxEntries: number) {
+  const keys = [...runMetricsCache.keys()].filter((key) => key.endsWith(`:${rangeMode}`));
+  for (const key of keys.slice(0, Math.max(0, keys.length - maxEntries))) {
+    runMetricsCache.delete(key);
+  }
 }
 
 async function postRunAction(url: string): Promise<ManagedRunDetail> {

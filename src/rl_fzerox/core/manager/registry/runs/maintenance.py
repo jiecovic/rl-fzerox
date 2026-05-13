@@ -6,11 +6,7 @@ from typing import TYPE_CHECKING
 
 import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops
 from rl_fzerox.core.manager.registry.common import pid_exists, utc_now
-from rl_fzerox.core.manager.registry.rows import (
-    run_from_row,
-    run_select_sql,
-    run_worker_lease_from_row,
-)
+from rl_fzerox.core.manager.registry.rows import run_worker_lease_from_row
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -24,7 +20,11 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
     now = datetime.now(UTC)
     with store._connect() as connection:
         rows = connection.execute(
-            run_select_sql(where_clause="WHERE runs.status = 'running'")
+            """
+            SELECT id
+            FROM runs
+            WHERE status = 'running'
+            """
         ).fetchall()
         worker_rows = connection.execute(
             """
@@ -36,8 +36,8 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             str(row["run_id"]): run_worker_lease_from_row(row) for row in worker_rows
         }
         for row in rows:
-            run = run_from_row(row)
-            worker = worker_by_run_id.get(run.id)
+            run_id = str(row["id"])
+            worker = worker_by_run_id.get(run_id)
             if worker is None:
                 continue
             heartbeat_at = datetime.fromisoformat(worker.heartbeat_at)
@@ -45,15 +45,15 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
                 continue
             if pid_exists(worker.pid):
                 continue
-            connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run.id,))
-            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run.id,))
+            connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
+            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
             connection.execute(
                 """
                 UPDATE runs
                 SET status = ?, stopped_at = ?
                 WHERE id = ?
                 """,
-                ("failed", utc_now(), run.id),
+                ("failed", utc_now(), run_id),
             )
             connection.execute(
                 """
@@ -61,7 +61,7 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
                 VALUES (?, ?, ?, ?)
                 """,
                 (
-                    run.id,
+                    run_id,
                     utc_now(),
                     "failed",
                     "manager worker disappeared before reporting a clean final state",

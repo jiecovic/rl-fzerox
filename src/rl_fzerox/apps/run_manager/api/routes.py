@@ -1,7 +1,10 @@
 # src/rl_fzerox/apps/run_manager/api/routes.py
 from __future__ import annotations
 
-from typing import Annotated, Literal
+import asyncio
+from collections.abc import Callable
+from functools import partial
+from typing import Annotated, Literal, ParamSpec, TypeVar
 
 from fastapi import FastAPI, HTTPException, Path, Query
 from fastapi.encoders import jsonable_encoder
@@ -43,6 +46,9 @@ from rl_fzerox.core.training.session.callbacks.track_sampling import (
     load_track_sampling_runtime_state,
 )
 
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
 
 def create_manager_api_app(
     store: ManagerStore,
@@ -83,8 +89,9 @@ def create_manager_api_app(
 
     @app.get("/api/runs")
     async def runs() -> dict[str, list[dict[str, object]]]:
-        visible_runs = store.list_visible_run_summaries()
-        recent_events = store.list_recent_run_events(
+        visible_runs = await _run_sync(store.list_visible_run_summaries)
+        recent_events = await _run_sync(
+            store.list_recent_run_events,
             tuple(run.id for run in visible_runs),
             limit_per_run=6,
         )
@@ -99,7 +106,7 @@ def create_manager_api_app(
     async def run_detail(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, dict[str, object]]:
-        return _run_response(store, _require_run(store, run_id))
+        return await _run_sync(_run_response_for_id, store, run_id)
 
     @app.put("/api/runs/{run_id}")
     async def update_run(
@@ -124,22 +131,18 @@ def create_manager_api_app(
         mode: Literal["recent", "full"] = Query(default="recent"),
         limit: int = Query(default=240, ge=1, le=2_000),
     ) -> dict[str, list[dict[str, object]]]:
-        run = _require_run(store, run_id)
-        samples = load_run_metric_samples_from_tensorboard(
-            run,
+        return await _run_sync(
+            _run_metrics_payload,
+            store,
+            run_id,
             limit=None if mode == "full" else limit,
         )
-        return {"samples": [run_metric_payload(item) for item in samples]}
 
     @app.get("/api/runs/{run_id}/track-sampling")
     async def run_track_sampling(
         run_id: Annotated[str, Path(min_length=1)],
     ) -> dict[str, object]:
-        run = _require_run(store, run_id)
-        state = load_track_sampling_runtime_state(
-            run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename,
-        )
-        return {"state": None if state is None else track_sampling_state_payload(state)}
+        return await _run_sync(_run_track_sampling_payload, store, run_id)
 
     @app.post("/api/runs/{run_id}/track-sampling/reset")
     async def reset_run_track_sampling(
@@ -382,6 +385,29 @@ def _run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, o
     return {"run": run_payload(run, recent_events=recent_events.get(run.id, ()))}
 
 
+def _run_response_for_id(store: ManagerStore, run_id: str) -> dict[str, dict[str, object]]:
+    return _run_response(store, _require_run(store, run_id))
+
+
+def _run_metrics_payload(
+    store: ManagerStore,
+    run_id: str,
+    *,
+    limit: int | None,
+) -> dict[str, list[dict[str, object]]]:
+    run = _require_run(store, run_id)
+    samples = load_run_metric_samples_from_tensorboard(run, limit=limit)
+    return {"samples": [run_metric_payload(item) for item in samples]}
+
+
+def _run_track_sampling_payload(store: ManagerStore, run_id: str) -> dict[str, object]:
+    run = _require_run(store, run_id)
+    state = load_track_sampling_runtime_state(
+        run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename,
+    )
+    return {"state": None if state is None else track_sampling_state_payload(state)}
+
+
 def _require_run(store: ManagerStore, run_id: str) -> ManagedRun:
     run = store.get_run(run_id)
     if run is None:
@@ -412,3 +438,7 @@ def _reset_track_sampling_state(store: ManagerStore, run: ManagedRun) -> None:
         kind="track_sampling_reset",
         message="track-pool stats reset from manager",
     )
+
+
+async def _run_sync(function: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T:
+    return await asyncio.to_thread(partial(function, *args, **kwargs))
