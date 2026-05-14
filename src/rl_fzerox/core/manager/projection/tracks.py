@@ -27,7 +27,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
 def _runtime_track_sampling_mode(config: ManagedRunConfig) -> str:
     sampling_mode = config.tracks.sampling_mode
     if sampling_mode == "equal":
-        return "random"
+        return "balanced"
     return sampling_mode
 
 

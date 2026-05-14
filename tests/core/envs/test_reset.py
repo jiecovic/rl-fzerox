@@ -544,16 +544,55 @@ def test_dynamic_track_sampling_accepts_runtime_weight_updates(
         ),
     )
 
-    assert env.reset(seed=123)[1]["track_id"] == "silence"
+    assert env.reset(seed=123)[1]["track_id"] == "mute"
 
     env.set_track_sampling_weights({"mute": 1.0, "silence": 3.0})
     sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
-    assert sampled_ids == ["silence", "silence", "silence", "silence"]
+    assert sampled_ids == ["mute", "silence", "silence", "silence"]
     assert env.reset(seed=123)[1]["track_sampling_mode"] == sampling_mode
 
 
-def test_step_balanced_track_sampling_does_not_front_load_config_order(
+def test_step_balanced_track_sampling_preserves_cursor_after_weight_update(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand"],
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert [env.reset(seed=123)[1]["track_id"] for _ in range(2)] == ["mute", "silence"]
+
+    env.set_track_sampling_weights({"mute": 1.0, "silence": 2.0, "sand": 1.0})
+
+    assert env.reset(seed=123)[1]["track_id"] == "sand"
+
+
+def test_step_balanced_track_sampling_cycles_courses_not_raw_entries(
     tmp_path: Path,
 ) -> None:
     baseline_paths = _write_track_baselines(
@@ -606,12 +645,12 @@ def test_step_balanced_track_sampling_does_not_front_load_config_order(
     sampled_courses = [env.reset(seed=123)[1]["track_course_id"] for _ in range(6)]
 
     assert sampled_courses == [
-        "sand_ocean",
-        "silence",
-        "sand_ocean",
-        "silence",
-        "silence",
         "mute_city",
+        "silence",
+        "sand_ocean",
+        "mute_city",
+        "silence",
+        "sand_ocean",
     ]
 
 

@@ -46,6 +46,21 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
     assert len(train_config.env.track_sampling.entries) == len(config.tracks.selected_course_ids)
 
 
+def test_manager_training_bridge_projects_equal_sampling_to_balanced_cycle(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.sampling_mode = "equal"
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-equal-track-sampling",
+        run_dir=tmp_path / "runs" / "bridge-equal-track-sampling_0001",
+    )
+
+    assert train_config.env.track_sampling.sampling_mode == "balanced"
+
+
 def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     tmp_path: Path,
 ) -> None:
