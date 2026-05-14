@@ -56,11 +56,13 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     () => runs.filter((run) => chartGroupValues(run.lineage_groups).includes(groupFilter)),
     [groupFilter, runs],
   );
-  const { loadError, metricsByRun } = useRunChartMetrics(selectedRunIds, rangeMode);
 
   const setSelectedRuns = useCallback((nextValue: string[] | ((current: string[]) => string[])) => {
     setSelectedRunIds((current) => {
       const next = typeof nextValue === "function" ? nextValue(current) : nextValue;
+      if (sameRunIdList(current, next)) {
+        return current;
+      }
       writeStoredSelectedRunIds(next);
       return next;
     });
@@ -135,6 +137,15 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
         .map((runId) => runsById.get(runId))
         .filter((run): run is ManagedRun => run !== undefined),
     [runsById, selectedRunIds],
+  );
+  const refreshingRunIds = useMemo(
+    () => selectedRuns.filter((run) => run.status === "running").map((run) => run.id),
+    [selectedRuns],
+  );
+  const { loadError, metricsByRun } = useRunChartMetrics(
+    selectedRunIds,
+    rangeMode,
+    refreshingRunIds,
   );
   const colorByRunId = useMemo(
     () => buildChartColorByRunId(visibleRuns, selectedRuns),

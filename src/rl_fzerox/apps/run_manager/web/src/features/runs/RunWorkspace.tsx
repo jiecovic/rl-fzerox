@@ -42,10 +42,8 @@ export function RunWorkspace({
   const [configSection, setConfigSection] = useState<ConfigSection>("training");
   const previewEnabled = configSection === "observation" || configSection === "policy";
   const { policyPreview, previewError } = useRunPolicyPreview(run.config, previewEnabled);
-  const { setTrackSamplingState, trackSamplingState } = useRunTrackSamplingState(
-    run.id,
-    run.status,
-  );
+  const { setTrackSamplingState, trackSamplingError, trackSamplingState } =
+    useRunTrackSamplingState(run.id, run.status);
   const actions = useRunWorkspaceActions({
     clearTrackSamplingState: setTrackSamplingState,
     onCreateDraftFromRun,
@@ -59,6 +57,10 @@ export function RunWorkspace({
     run,
     runName,
   });
+  const hasFeedback =
+    actions.controlError !== null ||
+    trackSamplingError !== null ||
+    (previewEnabled && previewError !== null);
 
   useEffect(() => {
     setRunName(run.name);
@@ -77,11 +79,12 @@ export function RunWorkspace({
         trackSamplingState={trackSamplingState}
       />
 
-      {actions.controlError !== null || (previewEnabled && previewError !== null) ? (
+      {hasFeedback ? (
         <div className="configurator-feedback-stack">
           {actions.controlError !== null ? (
             <Notice tone="error">{actions.controlError}</Notice>
           ) : null}
+          {trackSamplingError !== null ? <Notice tone="error">{trackSamplingError}</Notice> : null}
           {previewEnabled && previewError !== null ? (
             <Notice tone="error">{previewError}</Notice>
           ) : null}

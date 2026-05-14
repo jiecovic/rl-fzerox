@@ -193,9 +193,7 @@ def _target_step_shares(state: TrackSamplingRuntimeState) -> dict[str, float]:
     total_target = sum(raw_targets.values())
     if total_target <= 0.0:
         return {entry.course_key: 0.0 for entry in state.entries}
-    return {
-        course_key: raw_target / total_target for course_key, raw_target in raw_targets.items()
-    }
+    return {course_key: raw_target / total_target for course_key, raw_target in raw_targets.items()}
 
 
 def _target_step_bonus(

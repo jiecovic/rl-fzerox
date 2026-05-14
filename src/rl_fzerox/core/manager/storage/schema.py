@@ -8,7 +8,7 @@ import sqlite3
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -125,6 +125,12 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
 
         CREATE UNIQUE INDEX IF NOT EXISTS run_drafts_name_unique_idx
         ON run_drafts(name COLLATE NOCASE);
+
+        CREATE INDEX IF NOT EXISTS run_events_run_id_created_idx
+        ON run_events(run_id, created_at DESC, id DESC);
+
+        CREATE INDEX IF NOT EXISTS runs_status_created_idx
+        ON runs(status, created_at DESC, id DESC);
         """
     )
     connection.execute("DROP INDEX IF EXISTS run_metric_samples_run_id_created_at_idx")

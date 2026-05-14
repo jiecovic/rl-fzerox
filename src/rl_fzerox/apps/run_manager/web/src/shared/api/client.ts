@@ -39,6 +39,7 @@ interface RequestOptions {
 }
 
 interface RunLiveSubscriptionOptions {
+  onConnectionChange?: (connected: boolean) => void;
   onError?: (error: Error) => void;
   onRuns: (runs: ManagedRun[]) => void;
 }
@@ -73,6 +74,7 @@ export async function fetchRuns(): Promise<ManagedRun[]> {
 }
 
 export function subscribeRunLiveUpdates({
+  onConnectionChange,
   onError,
   onRuns,
 }: RunLiveSubscriptionOptions): () => void {
@@ -85,6 +87,9 @@ export function subscribeRunLiveUpdates({
       return;
     }
     socket = new WebSocket(apiWebSocketUrl("/api/runs/live"));
+    socket.addEventListener("open", () => {
+      onConnectionChange?.(true);
+    });
     socket.addEventListener("message", (event) => {
       try {
         const parsed = parseApiPayload(runsLiveMessageSchema, JSON.parse(String(event.data)));
@@ -93,14 +98,12 @@ export function subscribeRunLiveUpdates({
         onError?.(caught instanceof Error ? caught : new Error("invalid run update payload"));
       }
     });
-    socket.addEventListener("error", () => {
-      onError?.(new Error("run live-update connection failed"));
-    });
     socket.addEventListener("close", () => {
       socket = null;
       if (closed) {
         return;
       }
+      onConnectionChange?.(false);
       reconnectTimer = window.setTimeout(connect, RUN_LIVE_RECONNECT_DELAY_MS);
     });
   }
@@ -180,16 +183,21 @@ export async function fetchConfigMetadata(): Promise<ConfigMetadata> {
 
 export async function fetchPolicyPreview(
   config: ManagedRunConfig,
+  options: RequestOptions = {},
 ): Promise<PolicyArchitecturePreview> {
-  const response = await postPolicyPreview(config);
+  const response = await postPolicyPreview(config, options);
   return parseApiPayload(policyArchitecturePreviewSchema, await parseJson(response));
 }
 
-async function postPolicyPreview(config: ManagedRunConfig): Promise<Response> {
+async function postPolicyPreview(
+  config: ManagedRunConfig,
+  options: RequestOptions,
+): Promise<Response> {
   return fetch("/api/policy-preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
+    signal: options.signal,
   });
 }
 
@@ -460,9 +468,32 @@ function parseApiPayload<T>(schema: ZodType<T>, payload: unknown): T {
 }
 
 async function parseJson(response: Response): Promise<unknown> {
-  const payload = (await response.json()) as { error?: unknown };
+  const payload = await readJsonResponse(response);
   if (!response.ok) {
-    throw new Error(typeof payload.error === "string" ? payload.error : response.statusText);
+    const errorMessage =
+      isApiErrorPayload(payload) && typeof payload.error === "string"
+        ? payload.error
+        : response.statusText || `request failed with status ${response.status}`;
+    throw new Error(errorMessage);
   }
   return payload;
+}
+
+async function readJsonResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (text.length === 0) {
+    return null;
+  }
+  try {
+    return JSON.parse(text) as unknown;
+  } catch (caught) {
+    if (!response.ok) {
+      return null;
+    }
+    throw caught;
+  }
+}
+
+function isApiErrorPayload(payload: unknown): payload is { error?: unknown } {
+  return typeof payload === "object" && payload !== null && "error" in payload;
 }
