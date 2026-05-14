@@ -29,6 +29,7 @@ const openRunDirectoryMock = vi.fn();
 const renameRunMock = vi.fn();
 const resumeRunMock = vi.fn();
 const stopRunMock = vi.fn();
+const subscribeRunLiveUpdatesMock = vi.fn();
 const watchRunMock = vi.fn();
 
 vi.mock("@/app/managerData", () => ({
@@ -57,6 +58,7 @@ vi.mock("@/shared/api/client", async () => {
     renameRun: (runId: string, name: string) => renameRunMock(runId, name),
     resumeRun: (runId: string) => resumeRunMock(runId),
     stopRun: (runId: string) => stopRunMock(runId),
+    subscribeRunLiveUpdates: (options: unknown) => subscribeRunLiveUpdatesMock(options),
     watchRun: (runId: string, artifact: "latest" | "best") => watchRunMock(runId, artifact),
     updateDraftWithSource: (
       id: string,
@@ -108,6 +110,7 @@ describe("App", () => {
     renameRunMock.mockResolvedValue(runFixture({ name: "renamed run" }));
     resumeRunMock.mockResolvedValue(runFixture({ status: "running", pending_command: null }));
     stopRunMock.mockResolvedValue(runFixture({ pending_command: "stop" }));
+    subscribeRunLiveUpdatesMock.mockReturnValue(() => undefined);
     watchRunMock.mockResolvedValue("started");
   });
 
