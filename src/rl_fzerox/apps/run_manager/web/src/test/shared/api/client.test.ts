@@ -22,6 +22,18 @@ describe("shared api client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("surfaces non-json failed responses by status text", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("Bad Gateway", {
+        status: 502,
+        statusText: "Bad Gateway",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchPolicyPreview(managedRunConfigFixture)).rejects.toThrow("Bad Gateway");
+  });
+
   it("parses successful policy preview responses", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(policyPreviewFixture), {

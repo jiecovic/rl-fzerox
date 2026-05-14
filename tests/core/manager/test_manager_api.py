@@ -10,6 +10,7 @@ from typing import Literal
 import httpx
 import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api.routes as manager_api_routes
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
@@ -210,11 +211,7 @@ async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Pat
 
     client = _ApiClient(create_manager_api_app(store, run_launcher=FakeLauncher()))
     config = default_managed_run_config().model_copy(
-        update={
-            "train": default_managed_run_config().train.model_copy(
-                update={"clip_range": 0.17}
-            )
-        }
+        update={"train": default_managed_run_config().train.model_copy(update={"clip_range": 0.17})}
     )
 
     response = await client.post(
@@ -719,6 +716,7 @@ async def test_manager_api_rejects_missing_draft_delete(tmp_path: Path) -> None:
     assert response.status_code == 404
     assert response.json()["error"] == "draft not found"
 
+
 async def test_manager_api_hides_unstarted_run_records(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.create_run(
@@ -767,6 +765,25 @@ async def test_manager_api_lists_run_summaries_and_fetches_run_details(tmp_path:
     detail = detail_response.json()["run"]
     assert detail["config"]["seed"] == 1234
     assert detail["config_hash"] == run.config_hash
+
+
+def test_manager_api_live_runs_sends_initial_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Visible Live Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    store.update_run_status(run_id=run.id, status="stopped", message="run stopped")
+
+    app = create_manager_api_app(store, run_launcher=_LauncherStub())
+
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/runs/live") as websocket:
+            payload = websocket.receive_json()
+
+    assert payload["type"] == "runs_snapshot"
+    assert payload["runs"][0]["id"] == run.id
 
 
 async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:

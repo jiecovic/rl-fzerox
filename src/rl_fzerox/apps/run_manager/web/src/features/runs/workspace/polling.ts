@@ -8,12 +8,14 @@ import type {
   PolicyArchitecturePreview,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
+import { useDocumentVisible } from "@/shared/browser/useDocumentVisible";
 
 export function useRunClock(status: ManagedRun["status"]): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const documentVisible = useDocumentVisible();
 
   useEffect(() => {
-    if (status !== "running") {
+    if (status !== "running" || !documentVisible) {
       return undefined;
     }
     const intervalId = window.setInterval(() => {
@@ -22,7 +24,7 @@ export function useRunClock(status: ManagedRun["status"]): number {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [status]);
+  }, [documentVisible, status]);
 
   return nowMs;
 }
@@ -44,8 +46,9 @@ export function useRunPolicyPreview(
     }
 
     let ignore = false;
+    const controller = new AbortController();
     setPreviewError(null);
-    void fetchPolicyPreview(config)
+    void fetchPolicyPreview(config, { signal: controller.signal })
       .then((preview) => {
         if (!ignore) {
           setPolicyPreview(preview);
@@ -61,6 +64,7 @@ export function useRunPolicyPreview(
       });
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [config, enabled]);
 
@@ -72,13 +76,20 @@ export function useRunTrackSamplingState(
   status: ManagedRun["status"],
 ): {
   setTrackSamplingState: (state: TrackSamplingRuntimeState | null) => void;
+  trackSamplingError: string | null;
   trackSamplingState: TrackSamplingRuntimeState | null;
 } {
   const [trackSamplingState, setTrackSamplingState] = useState<TrackSamplingRuntimeState | null>(
     null,
   );
+  const [trackSamplingError, setTrackSamplingError] = useState<string | null>(null);
+  const documentVisible = useDocumentVisible();
 
   useEffect(() => {
+    if (!documentVisible) {
+      return undefined;
+    }
+
     let ignore = false;
     let inFlight = false;
     let activeController: AbortController | null = null;
@@ -94,10 +105,13 @@ export function useRunTrackSamplingState(
         const state = await fetchRunTrackSamplingState(runId, { signal: controller.signal });
         if (!ignore) {
           setTrackSamplingState(state);
+          setTrackSamplingError(null);
         }
-      } catch {
+      } catch (caught) {
         if (!ignore) {
-          setTrackSamplingState(null);
+          setTrackSamplingError(
+            caught instanceof Error ? caught.message : "failed to load track-pool stats",
+          );
         }
       } finally {
         if (activeController === controller) {
@@ -122,7 +136,7 @@ export function useRunTrackSamplingState(
       activeController?.abort();
       window.clearInterval(intervalId);
     };
-  }, [runId, status]);
+  }, [documentVisible, runId, status]);
 
-  return { setTrackSamplingState, trackSamplingState };
+  return { setTrackSamplingState, trackSamplingError, trackSamplingState };
 }

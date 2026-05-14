@@ -3,7 +3,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 
 import { loadManagerData } from "@/app/managerData";
 import { compareRuns, runSummaryFromDetail } from "@/app/workspace/model";
-import { fetchRun, subscribeRunLiveUpdates } from "@/shared/api/client";
+import { fetchRun, fetchRuns, subscribeRunLiveUpdates } from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -13,6 +13,7 @@ import type {
 } from "@/shared/api/contract";
 
 const MAX_CACHED_RUN_DETAILS = 16;
+const RUN_LIVE_FALLBACK_POLL_MS = 5_000;
 
 export function useManagerData() {
   const [drafts, setDrafts] = useState<ManagedDraft[]>([]);
@@ -95,6 +96,9 @@ export function useManagerData() {
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
+    let fallbackPollInterval: number | null = null;
+    let fallbackPollInFlight = false;
+    let liveConnected = false;
 
     function applyRunSnapshot(nextRuns: ManagedRun[]) {
       const sortedRuns = [...nextRuns].sort(compareRuns);
@@ -109,11 +113,52 @@ export function useManagerData() {
       });
     }
 
+    async function pollRunsFallback() {
+      if (fallbackPollInFlight || liveConnected || document.visibilityState === "hidden") {
+        return;
+      }
+      fallbackPollInFlight = true;
+      try {
+        applyRunSnapshot(await fetchRuns());
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : "failed to refresh run list");
+      } finally {
+        fallbackPollInFlight = false;
+      }
+    }
+
+    function startFallbackPolling() {
+      if (fallbackPollInterval !== null) {
+        return;
+      }
+      void pollRunsFallback();
+      fallbackPollInterval = window.setInterval(() => {
+        void pollRunsFallback();
+      }, RUN_LIVE_FALLBACK_POLL_MS);
+    }
+
+    function stopFallbackPolling() {
+      if (fallbackPollInterval === null) {
+        return;
+      }
+      window.clearInterval(fallbackPollInterval);
+      fallbackPollInterval = null;
+    }
+
     function connect() {
       if (unsubscribe !== null || document.visibilityState === "hidden") {
         return;
       }
       unsubscribe = subscribeRunLiveUpdates({
+        onConnectionChange: (connected) => {
+          liveConnected = connected;
+          if (connected) {
+            stopFallbackPolling();
+            setError(null);
+            return;
+          }
+          startFallbackPolling();
+        },
         onError: (caught) => {
           setError(caught.message);
         },
@@ -124,6 +169,8 @@ export function useManagerData() {
     function disconnect() {
       unsubscribe?.();
       unsubscribe = null;
+      liveConnected = false;
+      stopFallbackPolling();
     }
 
     function syncVisibility() {

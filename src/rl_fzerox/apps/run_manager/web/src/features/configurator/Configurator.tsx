@@ -160,8 +160,9 @@ export function Configurator({
       return undefined;
     }
     let ignore = false;
+    const controller = new AbortController();
     setPreviewError(null);
-    void fetchPolicyPreview(previewConfig)
+    void fetchPolicyPreview(previewConfig, { signal: controller.signal })
       .then((preview) => {
         if (!ignore) {
           setPolicyPreview(preview);
@@ -177,6 +178,7 @@ export function Configurator({
       });
     return () => {
       ignore = true;
+      controller.abort();
     };
   }, [active, previewConfig]);
 
