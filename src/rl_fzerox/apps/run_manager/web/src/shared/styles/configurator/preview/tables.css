@@ -83,7 +83,7 @@
 
 .conv-derived-table thead th:nth-child(1),
 .conv-derived-table tbody th {
-  width: 78px;
+  width: 104px;
 }
 
 .conv-derived-table th:nth-child(2),
@@ -168,6 +168,50 @@
   font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   font-size: 13px;
   font-variant-numeric: tabular-nums;
+}
+
+.custom-cnn-layer-cell {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.custom-cnn-layer-row {
+  cursor: grab;
+}
+
+.custom-cnn-layer-row.is-dragging {
+  opacity: 0.5;
+}
+
+.custom-cnn-layer-row.is-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.custom-cnn-layer-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-cnn-drag-mark {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: -0.08em;
+}
+
+.custom-cnn-layer-cell select {
+  width: 92px;
+  height: 30px;
+  min-width: 0;
+}
+
+.custom-cnn-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .custom-conv-table-input {

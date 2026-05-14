@@ -11,6 +11,8 @@ from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
+from rl_fzerox.core.domain.cnn import CnnLayerKind
+
 ConvProfile = Literal[
     "nature",
     "custom",
@@ -19,8 +21,9 @@ ConvProfile = Literal[
 
 @dataclass(frozen=True, slots=True)
 class ConvLayerSpec:
-    """One CNN convolution layer in a supported policy image profile."""
+    """One top-level CNN image layer in a supported policy image profile."""
 
+    kind: CnnLayerKind
     out_channels: int
     kernel_size: tuple[int, int]
     stride: tuple[int, int]
@@ -28,7 +31,51 @@ class ConvLayerSpec:
 
 
 ConvSpec = tuple[ConvLayerSpec, ...]
-CustomConvLayerConfig = Mapping[str, int]
+CustomConvLayerConfig = Mapping[str, object]
+
+
+class ResidualConvBlock(nn.Module):
+    """Basic residual image block with optional projection on the skip path."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        layer_spec: ConvLayerSpec,
+    ) -> None:
+        super().__init__()
+        self.conv1 = nn.Conv2d(
+            in_channels,
+            layer_spec.out_channels,
+            kernel_size=layer_spec.kernel_size,
+            stride=layer_spec.stride,
+            padding=layer_spec.padding,
+        )
+        self.activation = nn.ReLU()
+        self.conv2 = nn.Conv2d(
+            layer_spec.out_channels,
+            layer_spec.out_channels,
+            kernel_size=layer_spec.kernel_size,
+            stride=(1, 1),
+            padding=layer_spec.padding,
+        )
+        self.projection = (
+            nn.Conv2d(
+                in_channels,
+                layer_spec.out_channels,
+                kernel_size=(1, 1),
+                stride=layer_spec.stride,
+                padding=(0, 0),
+            )
+            if in_channels != layer_spec.out_channels or layer_spec.stride != (1, 1)
+            else nn.Identity()
+        )
+        self.output_activation = nn.ReLU()
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        residual = self.projection(inputs)
+        output = self.activation(self.conv1(inputs))
+        output = self.conv2(output)
+        return self.output_activation(output + residual)
 
 
 def _conv_layer(
@@ -39,6 +86,7 @@ def _conv_layer(
     padding: int = 0,
 ) -> ConvLayerSpec:
     return ConvLayerSpec(
+        kind="conv",
         out_channels=out_channels,
         kernel_size=(kernel_size, kernel_size),
         stride=(stride, stride),
@@ -111,16 +159,21 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         layers: list[nn.Module] = []
         in_channels = input_channels
         for layer_spec in conv_spec:
-            layers.append(
-                nn.Conv2d(
-                    in_channels,
-                    layer_spec.out_channels,
-                    kernel_size=layer_spec.kernel_size,
-                    stride=layer_spec.stride,
-                    padding=layer_spec.padding,
+            if layer_spec.kind == "conv":
+                layers.append(
+                    nn.Conv2d(
+                        in_channels,
+                        layer_spec.out_channels,
+                        kernel_size=layer_spec.kernel_size,
+                        stride=layer_spec.stride,
+                        padding=layer_spec.padding,
+                    )
                 )
-            )
-            layers.append(nn.ReLU())
+                layers.append(nn.ReLU())
+            elif layer_spec.kind == "residual":
+                layers.append(ResidualConvBlock(in_channels, layer_spec))
+            else:
+                raise ValueError(f"Unsupported CNN layer kind: {layer_spec.kind!r}")
             in_channels = layer_spec.out_channels
         return layers
 
@@ -138,12 +191,15 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
 
         activations: list[tuple[str, torch.Tensor]] = []
         output = self._channels_first_observations(observations)
-        conv_index = 0
+        layer_index = 0
         for layer in self._cnn:
+            if isinstance(layer, nn.Flatten):
+                break
             output = layer(output)
-            if isinstance(layer, nn.ReLU):
-                conv_index += 1
-                activations.append((f"conv{conv_index}", output.detach()))
+            if isinstance(layer, nn.ReLU | ResidualConvBlock):
+                layer_index += 1
+                layer_spec = self._conv_spec[layer_index - 1]
+                activations.append((cnn_layer_name(layer_index, layer_spec.kind), output.detach()))
         return tuple(activations)
 
     def _channels_first_observations(self, observations: torch.Tensor) -> torch.Tensor:
@@ -364,21 +420,15 @@ def ensure_conv_spec_fits_geometry(
     current_height = height
     current_width = width
     for index, layer in enumerate(conv_spec, start=1):
-        next_height = _conv_output_size(
-            current_height,
-            layer.kernel_size[0],
-            layer.stride[0],
-            padding=layer.padding[0],
-        )
-        next_width = _conv_output_size(
-            current_width,
-            layer.kernel_size[1],
-            layer.stride[1],
-            padding=layer.padding[1],
+        next_height, next_width = cnn_layer_output_shape(
+            height=current_height,
+            width=current_width,
+            layer_spec=layer,
         )
         if next_height < 1 or next_width < 1:
             raise ValueError(
-                f"CNN profile {profile_name!r} collapses {height}x{width} at conv{index}: "
+                f"CNN profile {profile_name!r} collapses {height}x{width} at "
+                f"{cnn_layer_name(index, layer.kind)}: "
                 f"{current_height}x{current_width} with k={layer.kernel_size[0]} "
                 f"s={layer.stride[0]} p={layer.padding[0]}"
             )
@@ -392,15 +442,7 @@ def _custom_conv_spec(
     if not custom_conv_layers:
         raise ValueError("custom CNN profile requires at least one convolution layer")
 
-    return tuple(
-        _conv_layer(
-            int(layer["out_channels"]),
-            kernel_size=int(layer["kernel_size"]),
-            stride=int(layer["stride"]),
-            padding=int(layer.get("padding", 0)),
-        )
-        for layer in custom_conv_layers
-    )
+    return tuple(_custom_cnn_layer(layer) for layer in custom_conv_layers)
 
 
 def _image_flatten_dim(
@@ -420,19 +462,96 @@ def _image_flatten_dim(
     output_channels = geometry.channels
     for layer_spec in geometry.conv_spec:
         output_channels = layer_spec.out_channels
-        height = _conv_output_size(
-            height,
-            layer_spec.kernel_size[0],
-            layer_spec.stride[0],
-            padding=layer_spec.padding[0],
-        )
-        width = _conv_output_size(
-            width,
-            layer_spec.kernel_size[1],
-            layer_spec.stride[1],
-            padding=layer_spec.padding[1],
+        height, width = cnn_layer_output_shape(
+            height=height,
+            width=width,
+            layer_spec=layer_spec,
         )
     return output_channels * height * width
+
+
+def _custom_cnn_layer(layer: CustomConvLayerConfig) -> ConvLayerSpec:
+    kind = _custom_cnn_layer_kind(layer.get("kind"))
+    kernel_size = _custom_cnn_layer_int(layer, "kernel_size")
+    stride = _custom_cnn_layer_int(layer, "stride")
+    padding = _custom_cnn_layer_int(layer, "padding", default=0)
+    return ConvLayerSpec(
+        kind=kind,
+        out_channels=_custom_cnn_layer_int(layer, "out_channels"),
+        kernel_size=(kernel_size, kernel_size),
+        stride=(stride, stride),
+        padding=(padding, padding),
+    )
+
+
+def _custom_cnn_layer_int(
+    layer: CustomConvLayerConfig,
+    key: str,
+    *,
+    default: int | None = None,
+) -> int:
+    if key in layer:
+        value = layer[key]
+    elif default is not None:
+        value = default
+    else:
+        raise KeyError(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise TypeError(f"custom CNN layer field {key!r} must be an integer")
+    return value
+
+
+def _custom_cnn_layer_kind(value: object) -> CnnLayerKind:
+    if value is None or value == "conv":
+        return "conv"
+    if value == "residual":
+        return "residual"
+    raise ValueError(f"Unsupported custom CNN layer kind: {value!r}")
+
+
+def cnn_layer_name(index: int, kind: CnnLayerKind) -> str:
+    return f"res{index}" if kind == "residual" else f"conv{index}"
+
+
+def cnn_layer_output_shape(
+    *,
+    height: int,
+    width: int,
+    layer_spec: ConvLayerSpec,
+) -> tuple[int, int]:
+    first_height = _conv_output_size(
+        height,
+        layer_spec.kernel_size[0],
+        layer_spec.stride[0],
+        padding=layer_spec.padding[0],
+    )
+    first_width = _conv_output_size(
+        width,
+        layer_spec.kernel_size[1],
+        layer_spec.stride[1],
+        padding=layer_spec.padding[1],
+    )
+    if layer_spec.kind == "conv" or first_height < 1 or first_width < 1:
+        return first_height, first_width
+
+    second_height = _conv_output_size(
+        first_height,
+        layer_spec.kernel_size[0],
+        1,
+        padding=layer_spec.padding[0],
+    )
+    second_width = _conv_output_size(
+        first_width,
+        layer_spec.kernel_size[1],
+        1,
+        padding=layer_spec.padding[1],
+    )
+    if (second_height, second_width) != (first_height, first_width):
+        raise ValueError(
+            "residual CNN blocks require the second convolution to preserve spatial size; "
+            "use an odd kernel_size with padding=kernel_size//2"
+        )
+    return second_height, second_width
 
 
 def _conv_output_size(input_size: int, kernel_size: int, stride: int, padding: int = 0) -> int:

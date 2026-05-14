@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
+from rl_fzerox.core.domain.cnn import CnnLayerKind, validate_residual_cnn_padding
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_supports_grounded_only,
@@ -28,10 +29,20 @@ class ExtractorConfig(BaseModel):
     class CustomConvLayer(BaseModel):
         model_config = ConfigDict(extra="forbid")
 
+        kind: CnnLayerKind = "conv"
         out_channels: PositiveInt
         kernel_size: PositiveInt
         stride: PositiveInt
         padding: int = Field(default=0, ge=0)
+
+        @model_validator(mode="after")
+        def _validate_residual_shape(self) -> ExtractorConfig.CustomConvLayer:
+            validate_residual_cnn_padding(
+                kind=self.kind,
+                kernel_size=int(self.kernel_size),
+                padding=int(self.padding),
+            )
+            return self
 
     conv_profile: Literal[
         "nature",
@@ -123,8 +134,6 @@ class PolicyConfig(BaseModel):
     extractor: ExtractorConfig = Field(default_factory=ExtractorConfig)
     recurrent: PolicyRecurrentConfig = Field(default_factory=PolicyRecurrentConfig)
     action_bias: PolicyActionBiasConfig = Field(default_factory=PolicyActionBiasConfig)
-    auxiliary_state: PolicyAuxiliaryStateConfig = Field(
-        default_factory=PolicyAuxiliaryStateConfig
-    )
+    auxiliary_state: PolicyAuxiliaryStateConfig = Field(default_factory=PolicyAuxiliaryStateConfig)
     activation: Literal["tanh", "relu", "gelu"] = "tanh"
     net_arch: NetArchConfig = Field(default_factory=NetArchConfig)

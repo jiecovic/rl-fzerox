@@ -12,6 +12,7 @@ from pydantic import (
     model_validator,
 )
 
+from rl_fzerox.core.domain.cnn import CnnLayerKind, validate_residual_cnn_padding
 from rl_fzerox.core.manager.run_spec.common import (
     ActivationName,
     ConvProfile,
@@ -47,10 +48,20 @@ class ManagedPolicyConfig(BaseModel):
     class CustomConvLayer(BaseModel):
         model_config = ConfigDict(extra="forbid")
 
+        kind: CnnLayerKind = "conv"
         out_channels: PositiveInt
         kernel_size: PositiveInt
         stride: PositiveInt
         padding: NonNegativeInt = 0
+
+        @model_validator(mode="after")
+        def _validate_residual_shape(self) -> ManagedPolicyConfig.CustomConvLayer:
+            validate_residual_cnn_padding(
+                kind=self.kind,
+                kernel_size=int(self.kernel_size),
+                padding=int(self.padding),
+            )
+            return self
 
     conv_profile: ConvProfile = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = Field(

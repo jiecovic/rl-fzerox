@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from rl_fzerox.core.manager.architecture.models import ConvLayerPreview
 from rl_fzerox.core.manager.run_spec import ConvProfile, ManagedRunConfig
-from rl_fzerox.core.policy.extractors import conv_output_size, resolve_conv_spec
+from rl_fzerox.core.policy.extractors import (
+    ConvLayerSpec,
+    cnn_layer_name,
+    cnn_layer_output_shape,
+    resolve_conv_spec,
+)
 
 
 def conv_layer_previews(
@@ -12,7 +17,7 @@ def conv_layer_previews(
     width: int,
     channels: int,
     conv_profile: ConvProfile,
-    custom_conv_layers: tuple[dict[str, int], ...] | None = None,
+    custom_conv_layers: tuple[dict[str, object], ...] | None = None,
 ) -> tuple[tuple[ConvLayerPreview, ...], int]:
     layers: list[ConvLayerPreview] = []
     in_channels = channels
@@ -31,8 +36,11 @@ def conv_layer_previews(
         padding = int(layer.padding[0])
         input_height = output_height
         input_width = output_width
-        output_height = conv_output_size(input_height, kernel_size, stride, padding)
-        output_width = conv_output_size(input_width, kernel_size, stride, padding)
+        output_height, output_width = cnn_layer_output_shape(
+            height=input_height,
+            width=input_width,
+            layer_spec=layer,
+        )
         dropped_height = dropped_trailing_pixels(
             input_size=input_height + (2 * padding),
             kernel_size=kernel_size,
@@ -45,14 +53,11 @@ def conv_layer_previews(
             stride=stride,
             output_size=output_width,
         )
-        params = conv_params(
-            in_channels=in_channels,
-            out_channels=layer.out_channels,
-            kernel_size=kernel_size,
-        )
+        params = cnn_layer_params(in_channels=in_channels, layer=layer)
         layers.append(
             ConvLayerPreview(
-                name=f"conv{index}",
+                name=cnn_layer_name(index, layer.kind),
+                kind=layer.kind,
                 in_channels=in_channels,
                 out_channels=layer.out_channels,
                 kernel_size=kernel_size,
@@ -92,6 +97,30 @@ def linear_params(in_features: int, out_features: int) -> int:
 
 def conv_params(*, in_channels: int, out_channels: int, kernel_size: int) -> int:
     return (in_channels * out_channels * kernel_size * kernel_size) + out_channels
+
+
+def cnn_layer_params(*, in_channels: int, layer: ConvLayerSpec) -> int:
+    kernel_size = int(layer.kernel_size[0])
+    params = conv_params(
+        in_channels=in_channels,
+        out_channels=layer.out_channels,
+        kernel_size=kernel_size,
+    )
+    if layer.kind != "residual":
+        return params
+
+    params += conv_params(
+        in_channels=layer.out_channels,
+        out_channels=layer.out_channels,
+        kernel_size=kernel_size,
+    )
+    if in_channels != layer.out_channels or layer.stride != (1, 1):
+        params += conv_params(
+            in_channels=in_channels,
+            out_channels=layer.out_channels,
+            kernel_size=1,
+        )
+    return params
 
 
 def dropped_trailing_pixels(

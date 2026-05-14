@@ -938,19 +938,40 @@ async def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
     config = default_managed_run_config().model_dump(mode="json")
     config["policy"]["conv_profile"] = "custom"
     config["policy"]["custom_conv_layers"] = [
-        {"out_channels": 16, "kernel_size": 3, "stride": 2, "padding": 1},
-        {"out_channels": 32, "kernel_size": 4, "stride": 2, "padding": 0},
-        {"out_channels": 48, "kernel_size": 3, "stride": 1, "padding": 1},
+        {"kind": "conv", "out_channels": 16, "kernel_size": 3, "stride": 2, "padding": 1},
+        {
+            "kind": "residual",
+            "out_channels": 16,
+            "kernel_size": 3,
+            "stride": 1,
+            "padding": 1,
+        },
+        {"kind": "conv", "out_channels": 32, "kernel_size": 4, "stride": 2, "padding": 0},
+        {"kind": "conv", "out_channels": 48, "kernel_size": 3, "stride": 1, "padding": 1},
     ]
 
     response = await client.post("/api/policy-preview", json=config)
 
     assert response.status_code == 200
     payload = response.json()
-    assert [layer["out_channels"] for layer in payload["conv_layers"]] == [16, 32, 48]
-    assert [layer["padding"] for layer in payload["conv_layers"]] == [1, 0, 1]
+    assert [layer["name"] for layer in payload["conv_layers"]] == [
+        "conv1",
+        "res2",
+        "conv3",
+        "conv4",
+    ]
+    assert [layer["kind"] for layer in payload["conv_layers"]] == [
+        "conv",
+        "residual",
+        "conv",
+        "conv",
+    ]
+    assert [layer["out_channels"] for layer in payload["conv_layers"]] == [16, 16, 32, 48]
+    assert [layer["padding"] for layer in payload["conv_layers"]] == [1, 1, 0, 1]
     assert payload["conv_layers"][0]["output_height"] == 30
     assert payload["conv_layers"][0]["output_width"] == 38
+    assert payload["conv_layers"][1]["output_height"] == 30
+    assert payload["conv_layers"][1]["output_width"] == 38
 
 
 async def test_manager_api_preview_keeps_masked_branch_logits_but_marks_status(

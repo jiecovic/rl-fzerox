@@ -179,7 +179,9 @@ def test_observation_extractor_custom_profile_uses_configured_layers() -> None:
     assert extractor._flatten_dim == 2_592
     assert tuple(features.shape) == (2, 2_592)
     assert [
-        module.out_channels for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)
+        module.out_channels
+        for module in extractor._cnn.modules()
+        if isinstance(module, torch.nn.Conv2d)
     ] == [16, 32, 48]
 
 
@@ -199,10 +201,59 @@ def test_observation_extractor_custom_profile_supports_padding() -> None:
 
     assert extractor._flatten_dim == 6_840
     assert tuple(features.shape) == (2, 6_840)
-    assert [module.padding for module in extractor._cnn if isinstance(module, torch.nn.Conv2d)] == [
-        (1, 1),
-        (1, 1),
+    assert [
+        module.padding for module in extractor._cnn.modules() if isinstance(module, torch.nn.Conv2d)
+    ] == [(1, 1), (1, 1)]
+
+
+def test_observation_extractor_custom_profile_supports_residual_blocks() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="custom",
+        custom_conv_layers=(
+            {"kind": "conv", "out_channels": 16, "kernel_size": 6, "stride": 3, "padding": 0},
+            {
+                "kind": "residual",
+                "out_channels": 16,
+                "kernel_size": 3,
+                "stride": 1,
+                "padding": 1,
+            },
+            {"kind": "conv", "out_channels": 32, "kernel_size": 4, "stride": 2, "padding": 0},
+        ),
+    )
+
+    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    features = extractor(observations)
+    activations = extractor.convolution_activations(observations[:1])
+
+    assert extractor._flatten_dim == 2_816
+    assert tuple(features.shape) == (2, 2_816)
+    assert [type(module).__name__ for module in extractor._cnn] == [
+        "Conv2d",
+        "ReLU",
+        "ResidualConvBlock",
+        "Conv2d",
+        "ReLU",
+        "Flatten",
     ]
+    assert [name for name, _ in activations] == ["conv1", "res2", "conv3"]
+
+
+def test_observation_extractor_conv_only_state_dict_keys_stay_legacy() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(84, 84, 9), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="nature",
+    )
+
+    state_keys = set(extractor.state_dict())
+
+    assert "_cnn.0.weight" in state_keys
+    assert "_cnn.2.weight" in state_keys
+    assert "_cnn.4.weight" in state_keys
+    assert "_cnn.0.conv.weight" not in state_keys
 
 
 def test_observation_extractor_rejects_custom_profile_that_collapses_geometry() -> None:
