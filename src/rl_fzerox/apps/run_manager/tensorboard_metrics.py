@@ -1,6 +1,7 @@
 # src/rl_fzerox/apps/run_manager/tensorboard_metrics.py
 from __future__ import annotations
 
+import random
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -30,6 +31,8 @@ class _TensorboardMetricCacheEntry:
 
 
 MAX_RUN_METRIC_CACHE_ENTRIES = 32
+TENSORBOARD_SCALAR_RETENTION_SAMPLES = 10_000
+TENSORBOARD_SCALAR_PLOT_SAMPLES = 1_000
 _RUN_METRIC_CACHE: OrderedDict[Path, _TensorboardMetricCacheEntry] = OrderedDict()
 _RUN_METRIC_CACHE_LOCK = Lock()
 
@@ -72,7 +75,10 @@ def _load_run_metric_samples_from_tensorboard(
     accumulator = (
         cached.accumulator
         if cached is not None
-        else EventAccumulator(str(event_dir), size_guidance={"scalars": 0})
+        else EventAccumulator(
+            str(event_dir),
+            size_guidance={"scalars": TENSORBOARD_SCALAR_RETENTION_SAMPLES},
+        )
     )
     try:
         accumulator.Reload()
@@ -171,8 +177,24 @@ def _slice_samples(
     limit: int | None,
 ) -> tuple[ManagedRunMetricSample, ...]:
     if limit is None:
-        return samples
+        return _downsample_samples(samples, TENSORBOARD_SCALAR_PLOT_SAMPLES)
     return samples[-max(1, limit) :]
+
+
+def _downsample_samples(
+    samples: tuple[ManagedRunMetricSample, ...],
+    max_samples: int,
+) -> tuple[ManagedRunMetricSample, ...]:
+    """Match TensorBoard scalar downsampling: deterministic subsequence plus latest point."""
+
+    if max_samples >= len(samples):
+        return samples
+    if max_samples <= 0:
+        return ()
+    indices = random.Random(0).sample(range(len(samples) - 1), max_samples - 1)
+    indices.sort()
+    indices.append(len(samples) - 1)
+    return tuple(samples[index] for index in indices)
 
 
 def _event_file_signature(event_dir: Path) -> tuple[tuple[str, int, int], ...]:

@@ -8,6 +8,7 @@ import pytest
 from torch.utils.tensorboard import SummaryWriter
 
 from rl_fzerox.apps.run_manager.tensorboard_metrics import (
+    TENSORBOARD_SCALAR_PLOT_SAMPLES,
     load_run_metric_samples_from_tensorboard,
 )
 from rl_fzerox.core.manager import default_managed_run_config
@@ -97,6 +98,40 @@ def test_tensorboard_metric_loader_supports_full_history_mode(tmp_path: Path) ->
 
     assert [sample.num_timesteps for sample in recent] == [256, 512]
     assert [sample.num_timesteps for sample in full] == [128, 256, 512]
+
+
+def test_tensorboard_metric_loader_downsamples_full_history_like_tensorboard(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "run"
+    tensorboard_dir = run_dir / "tensorboard"
+    tensorboard_dir.mkdir(parents=True)
+
+    writer = SummaryWriter(log_dir=str(tensorboard_dir))
+    for step in range(TENSORBOARD_SCALAR_PLOT_SAMPLES + 5):
+        _write_scalar_event(writer, step=step, values={"rollout/ep_rew_mean": float(step)})
+    writer.flush()
+    writer.close()
+
+    run = ManagedRun(
+        id="run-001",
+        name="ppo_test_1",
+        status="running",
+        config=default_managed_run_config(),
+        config_hash="hash",
+        run_dir=run_dir,
+        created_at="2026-05-04T00:00:00+00:00",
+        lineage_id="run-001",
+        lineage_step_offset=0,
+    )
+
+    samples = load_run_metric_samples_from_tensorboard(run, limit=None)
+
+    assert len(samples) == TENSORBOARD_SCALAR_PLOT_SAMPLES
+    assert samples[-1].num_timesteps == TENSORBOARD_SCALAR_PLOT_SAMPLES + 4
+    assert [sample.num_timesteps for sample in samples] == sorted(
+        sample.num_timesteps for sample in samples
+    )
 
 
 def test_tensorboard_metric_loader_does_not_double_offset_lineage_steps(tmp_path: Path) -> None:

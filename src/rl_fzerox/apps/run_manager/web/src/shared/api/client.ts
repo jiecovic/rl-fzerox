@@ -397,12 +397,6 @@ async function refreshRunMetrics(
       await getJson(`/api/runs/${encodeURIComponent(runId)}/metrics?${query.toString()}`, options),
     );
     setRunMetricCacheEntry(cacheKey, payload.samples);
-    if (rangeMode === "full") {
-      setRunMetricCacheEntry(
-        runMetricsCacheKey(runId, "recent"),
-        payload.samples.slice(-RECENT_RUN_METRIC_LIMIT),
-      );
-    }
     return payload.samples;
   })();
   if (options.signal === undefined) {
