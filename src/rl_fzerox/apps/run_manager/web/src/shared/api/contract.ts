@@ -34,6 +34,7 @@ const actionHistoryControlSchema = z.enum([
   "pitch",
 ]);
 const convProfileSchema = z.enum(["nature", "custom"]);
+const customCnnLayerKindSchema = z.enum(["conv", "residual"]);
 const auxiliaryStateTargetNameSchema = z.enum([
   "vehicle_state.speed_norm",
   "vehicle_state.energy_frac",
@@ -53,12 +54,23 @@ const auxiliaryStateTargetNameSchema = z.enum([
   "course_context.builtin_course_id",
 ]);
 
-const customConvLayerSchema = z.object({
-  out_channels: z.number().int().positive(),
-  kernel_size: z.number().int().positive(),
-  stride: z.number().int().positive(),
-  padding: z.number().int().nonnegative(),
-});
+const customConvLayerSchema = z
+  .object({
+    kind: customCnnLayerKindSchema.default("conv"),
+    out_channels: z.number().int().positive(),
+    kernel_size: z.number().int().positive(),
+    stride: z.number().int().positive(),
+    padding: z.number().int().nonnegative(),
+  })
+  .refine(
+    (layer) =>
+      layer.kind === "conv" ||
+      (layer.kernel_size % 2 === 1 && layer.padding === Math.floor(layer.kernel_size / 2)),
+    {
+      message: "residual CNN blocks require odd kernel_size and padding=kernel_size//2",
+      path: ["padding"],
+    },
+  );
 
 const trainConfigSchema = z.object({
   num_envs: z.number().int().positive(),
@@ -617,6 +629,7 @@ const stateFeaturePreviewSchema = z.object({
 
 const convLayerPreviewSchema = z.object({
   name: z.string(),
+  kind: customCnnLayerKindSchema,
   in_channels: z.number().int().nonnegative(),
   out_channels: z.number().int().positive(),
   kernel_size: z.number().int().positive(),

@@ -82,6 +82,7 @@ describe("Configurator", () => {
       expect.objectContaining({
         train: expect.objectContaining({ clip_range: 0.18 }),
       }),
+      expect.objectContaining({ signal: expect.any(Object) }),
     );
   });
 
@@ -943,8 +944,8 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Policy" }));
     expect(screen.getByRole("combobox", { name: "CNN profile" })).toBeDisabled();
-    expect(screen.getByLabelText("custom conv 1 output channels")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Add custom conv layer" })).toBeDisabled();
+    expect(screen.getByLabelText("custom CNN layer 1 output channels")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Add custom CNN conv layer" })).toBeDisabled();
     expect(screen.getByRole("combobox", { name: "Activation" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Action" }));

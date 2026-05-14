@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from rl_fzerox.core.domain.cnn import CnnLayerKind
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentName
 from rl_fzerox.core.domain.observation_image import ObservationPresetName
 
@@ -146,6 +147,7 @@ class ConvLayerPreview(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
+    kind: CnnLayerKind
     in_channels: int
     out_channels: int
     kernel_size: int

@@ -1331,18 +1331,21 @@
       "custom_conv_layers": [
         {
           "kernel_size": 8,
+          "kind": "conv",
           "out_channels": 32,
           "padding": 0,
           "stride": 4
         },
         {
           "kernel_size": 4,
+          "kind": "conv",
           "out_channels": 64,
           "padding": 0,
           "stride": 2
         },
         {
           "kernel_size": 3,
+          "kind": "conv",
           "out_channels": 128,
           "padding": 0,
           "stride": 1
@@ -1636,6 +1639,7 @@
         "input_height": 60,
         "input_width": 76,
         "kernel_size": 8,
+        "kind": "conv",
         "name": "conv1",
         "out_channels": 32,
         "output_height": 14,
@@ -1651,6 +1655,7 @@
         "input_height": 14,
         "input_width": 18,
         "kernel_size": 4,
+        "kind": "conv",
         "name": "conv2",
         "out_channels": 64,
         "output_height": 6,
@@ -1666,6 +1671,7 @@
         "input_height": 6,
         "input_width": 8,
         "kernel_size": 3,
+        "kind": "conv",
         "name": "conv3",
         "out_channels": 64,
         "output_height": 4,
