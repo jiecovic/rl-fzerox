@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Callable
 from functools import partial
 from typing import Annotated, Literal, ParamSpec, TypeVar
 
-from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi import FastAPI, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -89,18 +90,27 @@ def create_manager_api_app(
 
     @app.get("/api/runs")
     async def runs() -> dict[str, list[dict[str, object]]]:
-        visible_runs = await _run_sync(store.list_visible_run_summaries)
-        recent_events = await _run_sync(
-            store.list_recent_run_events,
-            tuple(run.id for run in visible_runs),
-            limit_per_run=6,
-        )
-        return {
-            "runs": [
-                run_summary_payload(item, recent_events=recent_events.get(item.id, ()))
-                for item in visible_runs
-            ]
-        }
+        return await _run_sync(_runs_payload, store)
+
+    @app.websocket("/api/runs/live")
+    async def live_runs(websocket: WebSocket) -> None:
+        await websocket.accept()
+        last_payload_key: str | None = None
+        try:
+            while True:
+                payload = await _run_sync(_runs_payload, store)
+                payload_key = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                if payload_key != last_payload_key:
+                    last_payload_key = payload_key
+                    await websocket.send_json(
+                        {
+                            "type": "runs_snapshot",
+                            **payload,
+                        }
+                    )
+                await asyncio.sleep(2.0)
+        except WebSocketDisconnect:
+            return
 
     @app.get("/api/runs/{run_id}")
     async def run_detail(
@@ -383,6 +393,20 @@ def create_manager_api_app(
 def _run_response(store: ManagerStore, run: ManagedRun) -> dict[str, dict[str, object]]:
     recent_events = store.list_recent_run_events((run.id,), limit_per_run=6)
     return {"run": run_payload(run, recent_events=recent_events.get(run.id, ()))}
+
+
+def _runs_payload(store: ManagerStore) -> dict[str, list[dict[str, object]]]:
+    visible_runs = store.list_visible_run_summaries()
+    recent_events = store.list_recent_run_events(
+        tuple(run.id for run in visible_runs),
+        limit_per_run=6,
+    )
+    return {
+        "runs": [
+            run_summary_payload(item, recent_events=recent_events.get(item.id, ()))
+            for item in visible_runs
+        ]
+    }
 
 
 def _run_response_for_id(store: ManagerStore, run_id: str) -> dict[str, dict[str, object]]:

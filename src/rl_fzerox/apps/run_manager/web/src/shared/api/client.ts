@@ -21,6 +21,7 @@ import {
   resetTrackSamplingResponseSchema,
   runMetricsResponseSchema,
   runResponseSchema,
+  runsLiveMessageSchema,
   runsResponseSchema,
   runTrackSamplingResponseSchema,
   type TensorboardViewGroup,
@@ -37,6 +38,11 @@ interface RequestOptions {
   signal?: AbortSignal;
 }
 
+interface RunLiveSubscriptionOptions {
+  onError?: (error: Error) => void;
+  onRuns: (runs: ManagedRun[]) => void;
+}
+
 export class ApiSchemaMismatchError extends Error {
   constructor() {
     super(API_SCHEMA_MISMATCH_MESSAGE);
@@ -47,6 +53,7 @@ export class ApiSchemaMismatchError extends Error {
 const RECENT_RUN_METRIC_LIMIT = 240;
 const MAX_RECENT_RUN_METRIC_CACHE_ENTRIES = 48;
 const MAX_FULL_RUN_METRIC_CACHE_ENTRIES = 12;
+const RUN_LIVE_RECONNECT_DELAY_MS = 1_500;
 const runMetricsCache = new Map<string, ManagedRunMetricSample[]>();
 const inflightRunMetrics = new Map<string, Promise<ManagedRunMetricSample[]>>();
 
@@ -63,6 +70,50 @@ export async function fetchDrafts(): Promise<ManagedDraft[]> {
 export async function fetchRuns(): Promise<ManagedRun[]> {
   const payload = parseApiPayload(runsResponseSchema, await getJson("/api/runs"));
   return payload.runs;
+}
+
+export function subscribeRunLiveUpdates({
+  onError,
+  onRuns,
+}: RunLiveSubscriptionOptions): () => void {
+  let closed = false;
+  let reconnectTimer: number | null = null;
+  let socket: WebSocket | null = null;
+
+  function connect() {
+    if (closed) {
+      return;
+    }
+    socket = new WebSocket(apiWebSocketUrl("/api/runs/live"));
+    socket.addEventListener("message", (event) => {
+      try {
+        const parsed = parseApiPayload(runsLiveMessageSchema, JSON.parse(String(event.data)));
+        onRuns(parsed.runs);
+      } catch (caught) {
+        onError?.(caught instanceof Error ? caught : new Error("invalid run update payload"));
+      }
+    });
+    socket.addEventListener("error", () => {
+      onError?.(new Error("run live-update connection failed"));
+    });
+    socket.addEventListener("close", () => {
+      socket = null;
+      if (closed) {
+        return;
+      }
+      reconnectTimer = window.setTimeout(connect, RUN_LIVE_RECONNECT_DELAY_MS);
+    });
+  }
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer !== null) {
+      window.clearTimeout(reconnectTimer);
+    }
+    socket?.close();
+  };
 }
 
 export async function fetchRun(runId: string): Promise<ManagedRunDetail> {
@@ -360,6 +411,11 @@ async function refreshRunMetrics(
 
 function runMetricsCacheKey(runId: string, rangeMode: RunMetricRangeMode) {
   return `${runId}:${rangeMode}`;
+}
+
+function apiWebSocketUrl(path: string) {
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${protocol}//${window.location.host}${path}`;
 }
 
 function getRunMetricCacheEntry(cacheKey: string): ManagedRunMetricSample[] | undefined {

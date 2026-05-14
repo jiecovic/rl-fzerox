@@ -3,7 +3,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 
 import { loadManagerData } from "@/app/managerData";
 import { compareRuns, runSummaryFromDetail } from "@/app/workspace/model";
-import { fetchRun, fetchRuns } from "@/shared/api/client";
+import { fetchRun, subscribeRunLiveUpdates } from "@/shared/api/client";
 import type {
   ConfigMetadata,
   ManagedDraft,
@@ -24,7 +24,6 @@ export function useManagerData() {
   const [isLoading, setIsLoading] = useState(true);
   const runDetailsRef = useRef(runDetailsById);
   const runDetailAccessOrderRef = useRef<string[]>([]);
-  const pollInFlightRef = useRef(false);
   const runDetailRequestsRef = useRef(new Map<string, Promise<ManagedRunDetail>>());
   runDetailsRef.current = runDetailsById;
 
@@ -95,50 +94,51 @@ export function useManagerData() {
   }, [reloadManagerData]);
 
   useEffect(() => {
-    async function reloadRuns() {
-      if (pollInFlightRef.current) {
-        return;
-      }
-      pollInFlightRef.current = true;
-      try {
-        const nextRuns = await fetchRuns();
-        const sortedRuns = [...nextRuns].sort(compareRuns);
-        const visibleRunIds = new Set(sortedRuns.map((run) => run.id));
-        startTransition(() => {
-          setRuns((current) => (sameRunPayload(current, sortedRuns) ? current : sortedRuns));
-          setRunDetailsById((current) => {
-            const next = trimRunDetailCache(
-              current,
-              visibleRunIds,
-              runDetailAccessOrderRef.current,
-            );
-            return next === current || sameRunDetailsById(current, next) ? current : next;
-          });
+    let unsubscribe: (() => void) | null = null;
+
+    function applyRunSnapshot(nextRuns: ManagedRun[]) {
+      const sortedRuns = [...nextRuns].sort(compareRuns);
+      const visibleRunIds = new Set(sortedRuns.map((run) => run.id));
+      startTransition(() => {
+        setError(null);
+        setRuns((current) => (sameRunPayload(current, sortedRuns) ? current : sortedRuns));
+        setRunDetailsById((current) => {
+          const next = trimRunDetailCache(current, visibleRunIds, runDetailAccessOrderRef.current);
+          return next === current || sameRunDetailsById(current, next) ? current : next;
         });
-      } catch {
-        // Keep the current snapshot when transient polling fails.
-      } finally {
-        pollInFlightRef.current = false;
-      }
+      });
     }
 
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === "hidden") {
+    function connect() {
+      if (unsubscribe !== null || document.visibilityState === "hidden") {
         return;
       }
-      void reloadRuns();
-    }, 2_000);
-
-    function reloadWhenVisible() {
-      if (document.visibilityState === "visible") {
-        void reloadRuns();
-      }
+      unsubscribe = subscribeRunLiveUpdates({
+        onError: (caught) => {
+          setError(caught.message);
+        },
+        onRuns: applyRunSnapshot,
+      });
     }
 
-    document.addEventListener("visibilitychange", reloadWhenVisible);
+    function disconnect() {
+      unsubscribe?.();
+      unsubscribe = null;
+    }
+
+    function syncVisibility() {
+      if (document.visibilityState === "hidden") {
+        disconnect();
+        return;
+      }
+      connect();
+    }
+
+    connect();
+    document.addEventListener("visibilitychange", syncVisibility);
     return () => {
-      document.removeEventListener("visibilitychange", reloadWhenVisible);
-      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", syncVisibility);
+      disconnect();
     };
   }, []);
 

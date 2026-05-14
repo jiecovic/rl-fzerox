@@ -442,6 +442,10 @@ export const runsResponseSchema = z.object({
   runs: z.array(managedRunSummarySchema),
 });
 
+export const runsLiveMessageSchema = runsResponseSchema.extend({
+  type: z.literal("runs_snapshot"),
+});
+
 export const runResponseSchema = z.object({
   run: managedRunSchema,
 });
