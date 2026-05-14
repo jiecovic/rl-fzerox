@@ -444,7 +444,7 @@ def _zero_progress_bonus(progress_reward: float) -> float:
 def _outside_track_recovery_offset(telemetry: FZeroXTelemetry | None) -> float | None:
     if telemetry is None:
         return None
-    return abs(float(telemetry.player.lateral_distance))
+    return abs(float(telemetry.player.signed_lateral_offset))
 
 
 def _previous_outside_track_recovery_offset(telemetry: FZeroXTelemetry | None) -> float | None:

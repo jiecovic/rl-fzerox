@@ -384,7 +384,7 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
     assert outside_again.breakdown == {}
 
 
-def test_reward_main_uses_lateral_distance_for_outside_track_recovery() -> None:
+def test_reward_main_uses_signed_lateral_offset_for_outside_track_recovery() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
@@ -415,7 +415,7 @@ def test_reward_main_uses_lateral_distance_for_outside_track_recovery() -> None:
             lateral_distance=150.0,
         ),
     )
-    recovering_by_center_distance = tracker.step_summary(
+    worsening_by_signed_offset = tracker.step_summary(
         _summary(max_race_distance=0.0, airborne_frames=5),
         _status(step_count=2),
         _telemetry(
@@ -427,9 +427,9 @@ def test_reward_main_uses_lateral_distance_for_outside_track_recovery() -> None:
         ),
     )
 
-    assert recovering_by_center_distance.reward == pytest.approx(0.3)
-    assert recovering_by_center_distance.breakdown == {
-        "outside_track_recovery": pytest.approx(0.3)
+    assert worsening_by_signed_offset.reward == pytest.approx(-0.3)
+    assert worsening_by_signed_offset.breakdown == {
+        "outside_track_recovery": pytest.approx(-0.3)
     }
 
 
@@ -543,12 +543,12 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
         ),
     )
 
-    assert recovering_after_grace.reward == pytest.approx(0.3)
+    assert recovering_after_grace.reward == pytest.approx(0.1)
     assert recovering_after_grace.breakdown == {
-        "outside_track_recovery": pytest.approx(0.3)
+        "outside_track_recovery": pytest.approx(0.1)
     }
-    assert landing_inside.reward == pytest.approx(0.1)
-    assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.1)}
+    assert landing_inside.reward == pytest.approx(0.3)
+    assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.3)}
 
 
 def test_reward_main_scales_time_pressure_when_speed_is_low() -> None:
