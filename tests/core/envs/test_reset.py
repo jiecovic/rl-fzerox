@@ -45,12 +45,12 @@ def test_reset_returns_stacked_observation():
     obs, info = env.reset(seed=123)
     obs = image_obs(obs)
 
-    assert obs.shape == (60, 76, 12)
+    assert obs.shape == (84, 84, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
-    assert info["observation_shape"] == (60, 76, 12)
-    assert info["observation_frame_shape"] == (60, 76, 3)
+    assert info["observation_shape"] == (84, 84, 12)
+    assert info["observation_frame_shape"] == (84, 84, 3)
     assert info["observation_stack"] == 4
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
@@ -87,15 +87,13 @@ def test_reset_can_return_image_state_observation() -> None:
 
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
-    assert obs["image"].shape == (60, 76, 12)
+    assert obs["image"].shape == (84, 84, 12)
     assert obs["image"].dtype == np.uint8
     assert obs["state"].shape == (8,)
     assert obs["state"].dtype == np.float32
-    assert obs["state"].tolist() == pytest.approx(
-        [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0]
-    )
+    assert obs["state"].tolist() == pytest.approx([0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
     assert info["observation_mode"] == "image_state"
-    assert info["observation_shape"] == (60, 76, 12)
+    assert info["observation_shape"] == (84, 84, 12)
     assert info["observation_state_shape"] == (8,)
     assert info["observation_state_features"] == (
         "vehicle_state.speed_norm",
@@ -544,16 +542,19 @@ def test_dynamic_track_sampling_accepts_runtime_weight_updates(
         ),
     )
 
-    assert env.reset(seed=123)[1]["track_id"] == "mute"
+    first_info = env.reset(seed=123)[1]
 
-    env.set_track_sampling_weights({"mute": 1.0, "silence": 3.0})
+    assert first_info["track_id"] in {"mute", "silence"}
+    assert first_info["track_sampling_mode"] == sampling_mode
+
+    env.set_track_sampling_weights({"mute": 0.0, "silence": 1.0})
     sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
-    assert sampled_ids == ["mute", "silence", "silence", "silence"]
+    assert sampled_ids == ["silence", "silence", "silence", "silence"]
     assert env.reset(seed=123)[1]["track_sampling_mode"] == sampling_mode
 
 
-def test_step_balanced_track_sampling_preserves_cursor_after_weight_update(
+def test_step_balanced_track_sampling_excludes_zero_weighted_courses(
     tmp_path: Path,
 ) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
@@ -585,14 +586,13 @@ def test_step_balanced_track_sampling_preserves_cursor_after_weight_update(
         ),
     )
 
-    assert [env.reset(seed=123)[1]["track_id"] for _ in range(2)] == ["mute", "silence"]
+    env.set_track_sampling_weights({"mute": 0.0, "silence": 0.0, "sand": 1.0})
+    sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
-    env.set_track_sampling_weights({"mute": 1.0, "silence": 2.0, "sand": 1.0})
-
-    assert env.reset(seed=123)[1]["track_id"] == "sand"
+    assert sampled_ids == ["sand", "sand", "sand", "sand"]
 
 
-def test_step_balanced_track_sampling_cycles_courses_not_raw_entries(
+def test_step_balanced_track_sampling_zeroes_duplicate_course_entries(
     tmp_path: Path,
 ) -> None:
     baseline_paths = _write_track_baselines(
@@ -642,16 +642,19 @@ def test_step_balanced_track_sampling_cycles_courses_not_raw_entries(
         ),
     )
 
-    sampled_courses = [env.reset(seed=123)[1]["track_course_id"] for _ in range(6)]
+    env.set_track_sampling_weights(
+        {
+            "mute_a": 0.0,
+            "mute_b": 0.0,
+            "silence_a": 0.0,
+            "silence_b": 1.0,
+            "sand_a": 0.0,
+            "sand_b": 0.0,
+        }
+    )
+    sampled_courses = [env.reset(seed=123)[1]["track_course_id"] for _ in range(4)]
 
-    assert sampled_courses == [
-        "mute_city",
-        "silence",
-        "sand_ocean",
-        "mute_city",
-        "silence",
-        "sand_ocean",
-    ]
+    assert sampled_courses == ["silence", "silence", "silence", "silence"]
 
 
 def test_curriculum_stage_can_override_track_sampling(tmp_path: Path) -> None:

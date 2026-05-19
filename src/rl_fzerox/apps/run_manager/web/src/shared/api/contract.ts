@@ -3,8 +3,7 @@ import { z } from "zod";
 
 const runStatusSchema = z.enum(["created", "running", "paused", "stopped", "finished", "failed"]);
 const runCommandSchema = z.enum(["pause", "stop"]);
-const observationPresetSchema = z.enum(["crop_60x76", "crop_68x108", "crop_84x84"]);
-const observationResolutionModeSchema = z.enum(["preset", "custom"]);
+const observationPresetSchema = z.enum(["crop_72x96", "crop_84x84"]);
 const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
 const gpDifficultySchema = z.enum(["novice", "standard", "expert", "master"]);
@@ -33,8 +32,11 @@ const actionHistoryControlSchema = z.enum([
   "lean",
   "pitch",
 ]);
-const convProfileSchema = z.enum(["nature", "custom"]);
-const customCnnLayerKindSchema = z.enum(["conv", "residual"]);
+const convProfileSchema = z.enum(["nature", "impala_small", "impala_large", "custom"]);
+const customCnnLayerKindSchema = z.preprocess(
+  (value) => (value === "residual" ? "residual_post" : value),
+  z.enum(["conv", "residual_pre", "residual_post", "maxpool", "avgpool"]),
+);
 const auxiliaryStateTargetNameSchema = z.enum([
   "vehicle_state.speed_norm",
   "vehicle_state.energy_frac",
@@ -61,16 +63,21 @@ const customConvLayerSchema = z
     kernel_size: z.number().int().positive(),
     stride: z.number().int().positive(),
     padding: z.number().int().nonnegative(),
+    post_activation: z.boolean().default(true),
   })
   .refine(
     (layer) =>
-      layer.kind === "conv" ||
+      !isResidualCnnLayerKind(layer.kind) ||
       (layer.kernel_size % 2 === 1 && layer.padding === Math.floor(layer.kernel_size / 2)),
     {
       message: "residual CNN blocks require odd kernel_size and padding=kernel_size//2",
       path: ["padding"],
     },
   );
+
+function isResidualCnnLayerKind(kind: z.infer<typeof customCnnLayerKindSchema>) {
+  return kind === "residual_pre" || kind === "residual_post";
+}
 
 const trainConfigSchema = z.object({
   num_envs: z.number().int().positive(),
@@ -202,43 +209,37 @@ const stateFeatureDropoutConfigSchema = z.object({
 });
 
 const observationCustomResolutionSchema = z.object({
+  mode: z.literal("custom"),
   height: z.number().int().min(32).max(208),
   width: z.number().int().min(32).max(592),
 });
 
-const observationConfigSchema = z
-  .object({
-    resolution_mode: observationResolutionModeSchema,
+const observationResolutionSchema = z.discriminatedUnion("mode", [
+  z.object({
+    mode: z.literal("preset"),
     preset: observationPresetSchema,
-    custom_resolution: observationCustomResolutionSchema.nullable(),
-    frame_stack: z.number().int().positive().max(8),
-    stack_mode: z.enum(["rgb", "gray", "luma_chroma"]),
-    minimap_layer: z.boolean(),
-    resize_filter: z.enum(["nearest", "bilinear"]),
-    minimap_resize_filter: z.enum(["nearest", "bilinear"]),
-    state_components: z.array(stateComponentConfigSchema),
-    state_feature_dropouts: z.array(stateFeatureDropoutConfigSchema),
-  })
-  .superRefine((observation, context) => {
-    if (observation.resolution_mode === "preset" && observation.custom_resolution !== null) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "custom_resolution must be null when resolution_mode is preset",
-        path: ["custom_resolution"],
-      });
-    }
-    if (observation.resolution_mode === "custom" && observation.custom_resolution === null) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "custom_resolution is required when resolution_mode is custom",
-        path: ["custom_resolution"],
-      });
-    }
-  });
+  }),
+  observationCustomResolutionSchema,
+  z.object({
+    mode: z.literal("source_crop"),
+  }),
+]);
+
+const observationConfigSchema = z.object({
+  resolution: observationResolutionSchema,
+  frame_stack: z.number().int().positive().max(8),
+  stack_mode: z.enum(["rgb", "gray", "luma_chroma"]),
+  minimap_layer: z.boolean(),
+  resize_filter: z.enum(["nearest", "bilinear"]),
+  minimap_resize_filter: z.enum(["nearest", "bilinear"]),
+  state_components: z.array(stateComponentConfigSchema),
+  state_feature_dropouts: z.array(stateFeatureDropoutConfigSchema),
+});
 
 const policyConfigSchema = z.object({
   conv_profile: convProfileSchema,
   custom_conv_layers: z.array(customConvLayerSchema),
+  custom_cnn_final_relu: z.boolean(),
   features_dim: z.union([z.literal("auto"), z.number().int().positive()]),
   state_net_arch: z.array(z.number().int().positive()),
   fusion_features_dim: z.number().int().positive().nullable(),
@@ -276,9 +277,11 @@ const rewardConfigSchema = z
     suspend_progress_while_outside_track_bounds: z.boolean(),
     outside_bounds_reentry_progress_distance_cap: z.number().nonnegative().nullable(),
     outside_track_recovery_reward: z.number().nonnegative(),
+    outside_track_recovery_reward_cap: z.number().nonnegative(),
     outside_track_recovery_airborne_grace_frames: z.number().int().nonnegative(),
     lap_completion_bonus: z.number().nonnegative(),
     lap_position_scale: z.number().nonnegative(),
+    ko_star_reward: z.number().nonnegative(),
     energy_loss_epsilon: z.number().nonnegative(),
     energy_refill_progress_multiplier: z.number().min(1),
     dirt_progress_multiplier: z.number().nonnegative(),
@@ -635,6 +638,7 @@ const convLayerPreviewSchema = z.object({
   kernel_size: z.number().int().positive(),
   stride: z.number().int().positive(),
   padding: z.number().int().nonnegative(),
+  post_activation: z.boolean(),
   input_height: z.number().int().positive(),
   input_width: z.number().int().positive(),
   output_height: z.number().int().positive(),

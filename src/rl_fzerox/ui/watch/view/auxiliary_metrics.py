@@ -33,6 +33,7 @@ class _CategoricalPrediction(TypedDict):
     probabilities: list[float]
     confidence: float
 
+
 _EPSILON = 1e-6
 
 
@@ -94,9 +95,7 @@ class _AuxiliaryRunningMetric:
 class AuxiliaryEpisodeMetricsTracker:
     loss_terms: tuple[AuxiliaryStateLossTerm, ...]
     episode: int | None = None
-    metrics: dict[AuxiliaryStateTargetName, _AuxiliaryRunningMetric] = field(
-        default_factory=dict
-    )
+    metrics: dict[AuxiliaryStateTargetName, _AuxiliaryRunningMetric] = field(default_factory=dict)
 
     @classmethod
     def from_policy_config(
@@ -235,10 +234,7 @@ def _error_percent(
 def _binary_cross_entropy(predicted_probability: float, target: float) -> float:
     probability = min(max(predicted_probability, _EPSILON), 1.0 - _EPSILON)
     target_value = 1.0 if target >= 0.5 else 0.0
-    return -(
-        target_value * log(probability)
-        + (1.0 - target_value) * log(1.0 - probability)
-    )
+    return -(target_value * log(probability) + (1.0 - target_value) * log(1.0 - probability))
 
 
 def _categorical_prediction(

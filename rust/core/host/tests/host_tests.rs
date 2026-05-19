@@ -288,6 +288,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
             speed_kph: 0.0,
             energy: 100.0,
             max_energy: 178.0,
+            ko_star_count: 0,
             boost_timer: 0,
             recoil_tilt_magnitude: 0.0,
             damage_rumble_counter: 0,

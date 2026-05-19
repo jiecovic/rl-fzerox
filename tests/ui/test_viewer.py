@@ -686,7 +686,7 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         action_repeat=1,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(60, 76, 12),
+        observation_shape=(84, 84, 12),
         observation_state=np.array([0.5, 0.25, 0.0, 0.0], dtype=np.float32),
         observation_state_feature_names=feature_names,
         telemetry=_sample_telemetry(),
@@ -876,7 +876,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
     assert return_line.value == "-12.3457"
 
 
-def test_session_section_shows_best_finish_position() -> None:
+def test_session_section_omits_global_best_finish_position() -> None:
     columns = _build_panel_columns(
         episode=2,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -897,38 +897,8 @@ def test_session_section_shows_best_finish_position() -> None:
     )
 
     session_section = next(section for section in columns.left if section.title == "Run")
-    best_position_line = next(
-        line for line in session_section.lines if line.label == "Best position"
-    )
 
-    assert best_position_line.value == "8"
-
-
-def test_session_section_shows_na_before_successful_finish() -> None:
-    columns = _build_panel_columns(
-        episode=2,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_curriculum_stage=None,
-        policy_action=np.array([2, 1, 0], dtype=np.int64),
-        policy_reload_age_seconds=5.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
-    )
-
-    session_section = next(section for section in columns.left if section.title == "Run")
-    best_position_line = next(
-        line for line in session_section.lines if line.label == "Best position"
-    )
-
-    assert best_position_line.value == "n/a"
+    assert all(line.label != "Best position" for line in session_section.lines)
 
 
 def test_format_reload_age_is_human_readable() -> None:

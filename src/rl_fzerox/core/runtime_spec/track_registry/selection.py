@@ -153,7 +153,5 @@ def _baseline_gp_difficulty(
         raise ValueError("track_sampling.baseline.gp_difficulty must be a non-empty string")
     if not is_race_difficulty_name(value):
         allowed = ", ".join(race_difficulty_names())
-        raise ValueError(
-            f"track_sampling.baseline.gp_difficulty must be one of {allowed}"
-        )
+        raise ValueError(f"track_sampling.baseline.gp_difficulty must be one of {allowed}")
     return value

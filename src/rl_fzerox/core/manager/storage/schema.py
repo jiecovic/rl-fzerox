@@ -143,10 +143,12 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
         """,
         (SCHEMA_VERSION, applied_at),
     )
-    _insert_default_template(connection, created_at=applied_at)
+    refresh_default_template(connection, updated_at=applied_at)
 
 
-def _insert_default_template(connection: sqlite3.Connection, *, created_at: str) -> None:
+def refresh_default_template(connection: sqlite3.Connection, *, updated_at: str) -> None:
+    """Upsert the built-in template using the current code defaults."""
+
     config = default_managed_run_config()
     connection.execute(
         """
@@ -170,7 +172,7 @@ def _insert_default_template(connection: sqlite3.Connection, *, created_at: str)
             "All cups recurrent PPO",
             config_json(config),
             config_hash(config),
-            created_at,
-            created_at,
+            updated_at,
+            updated_at,
         ),
     )

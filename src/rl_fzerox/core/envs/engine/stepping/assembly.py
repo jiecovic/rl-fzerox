@@ -8,6 +8,7 @@ from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema import EnvConfig
 from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
@@ -60,6 +61,7 @@ class EngineStepAssembler:
     observation_builder: EngineObservationBuilder
     mask_controller: ActionMaskController
     control_state: ControlStateTracker
+    renderer: RendererName
 
     def run(self, request: EnvStepRequest) -> EnvStepAssembly:
         requested_control_state = request.requested_control_state or request.control_state
@@ -230,7 +232,7 @@ class EngineStepAssembler:
                 progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
                 terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
                 lean_timer_assist=lean_timer_assist,
-                **self.config.observation.native_resolution_kwargs(),
+                **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
             )
         return self.backend.step_repeat_raw(
             control_state,
@@ -247,7 +249,7 @@ class EngineStepAssembler:
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
-            **self.config.observation.native_resolution_kwargs(),
+            **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 
 

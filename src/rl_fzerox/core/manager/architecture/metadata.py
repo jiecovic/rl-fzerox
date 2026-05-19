@@ -9,11 +9,7 @@ from rl_fzerox.core.domain.observation_components import (
     state_feature_default_enabled,
 )
 from rl_fzerox.core.domain.observation_image import (
-    MAX_CUSTOM_OBSERVATION_HEIGHT,
-    MAX_CUSTOM_OBSERVATION_WIDTH,
-    MIN_CUSTOM_OBSERVATION_DIMENSION,
-    OBSERVATION_PRESET_GEOMETRIES,
-    OBSERVATION_SOURCE_GEOMETRIES,
+    OBSERVATION_IMAGE_GEOMETRY,
 )
 from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.envs.observations.state.components import state_component_definition
@@ -49,16 +45,16 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         observation_presets=tuple(
             ObservationPresetInfo(
                 value=geometry.name,
-                label=geometry.name.replace("crop_", "").replace("x", " x "),
+                label=_observation_preset_label(geometry.name),
                 height=geometry.height,
                 width=geometry.width,
             )
-            for geometry in OBSERVATION_PRESET_GEOMETRIES
+            for geometry in OBSERVATION_IMAGE_GEOMETRY.presets
         ),
         observation_resolution_bounds=ObservationResolutionBounds(
-            min_dimension=MIN_CUSTOM_OBSERVATION_DIMENSION,
-            max_height=MAX_CUSTOM_OBSERVATION_HEIGHT,
-            max_width=MAX_CUSTOM_OBSERVATION_WIDTH,
+            min_dimension=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
+            max_height=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_height,
+            max_width=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_width,
         ),
         observation_source_geometries=tuple(
             ObservationSourceGeometryInfo(
@@ -66,7 +62,7 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
                 height=geometry.height,
                 width=geometry.width,
             )
-            for geometry in OBSERVATION_SOURCE_GEOMETRIES
+            for geometry in OBSERVATION_IMAGE_GEOMETRY.source_geometries
         ),
         track_pool_modes=(
             SelectOption(value="built_in", label="Built-in cups"),
@@ -116,12 +112,7 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             )
             for component in default_state_components()
         ),
-        conv_profiles=_options(
-            (
-                "nature",
-                "custom",
-            )
-        ),
+        conv_profiles=_conv_profile_options(),
         activation_functions=_options(("relu", "gelu", "tanh")),
         net_arch_presets=(
             SelectOption(value="256,128", label="[256, 128]"),
@@ -129,6 +120,23 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             SelectOption(value="256", label="[256]"),
             SelectOption(value="128", label="[128]"),
         ),
+    )
+
+
+def _observation_preset_label(preset_name: str) -> str:
+    if preset_name == "crop_84x84":
+        return "84 x 84 DQN/Atari"
+    if preset_name == "crop_72x96":
+        return "72 x 96 IMPALA"
+    return preset_name.replace("crop_", "").replace("x", " x ")
+
+
+def _conv_profile_options() -> tuple[SelectOption, ...]:
+    return (
+        SelectOption(value="nature", label="Nature CNN"),
+        SelectOption(value="impala_small", label="IMPALA small"),
+        SelectOption(value="impala_large", label="IMPALA large"),
+        SelectOption(value="custom", label="Custom"),
     )
 
 

@@ -96,11 +96,13 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
             reward.outside_bounds_reentry_progress_distance_cap
         ),
         "outside_track_recovery_reward": reward.outside_track_recovery_reward,
+        "outside_track_recovery_reward_cap": reward.outside_track_recovery_reward_cap,
         "outside_track_recovery_airborne_grace_frames": (
             reward.outside_track_recovery_airborne_grace_frames
         ),
         "lap_completion_bonus": reward.lap_completion_bonus,
         "lap_position_scale": reward.lap_position_scale,
+        "ko_star_reward": reward.ko_star_reward,
         "energy_loss_epsilon": reward.energy_loss_epsilon,
         "energy_refill_progress_multiplier": reward.energy_refill_progress_multiplier,
         "dirt_progress_multiplier": reward.dirt_progress_multiplier,

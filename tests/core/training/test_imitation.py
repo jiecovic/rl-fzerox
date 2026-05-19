@@ -18,8 +18,7 @@ from rl_fzerox.core.training.imitation import (
 def test_observation_image_recipe_preserves_preset_runtime_settings() -> None:
     recipe = observation_image_recipe(
         ObservationConfig(
-            resolution_mode="preset",
-            preset="crop_84x84",
+            resolution={"mode": "preset", "preset": "crop_84x84"},
             frame_stack=3,
             stack_mode="gray",
             minimap_layer=True,
@@ -45,8 +44,7 @@ def test_observation_view_spec_from_env_config_carries_state_metadata() -> None:
                 "action": {"independent_lean_buttons": True},
                 "observation": {
                     "mode": "image_state",
-                    "resolution_mode": "custom",
-                    "custom_resolution": {"height": 72, "width": 96},
+                    "resolution": {"mode": "custom", "height": 72, "width": 96},
                     "frame_stack": 2,
                     "stack_mode": "rgb",
                     "state_components": [

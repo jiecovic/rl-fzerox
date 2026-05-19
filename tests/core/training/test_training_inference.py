@@ -603,6 +603,8 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
+
+
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
     tmp_path: Path,
 ) -> None:

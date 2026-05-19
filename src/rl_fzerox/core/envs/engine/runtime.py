@@ -17,6 +17,7 @@ from rl_fzerox.core.envs.rewards import build_reward_tracker
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     auxiliary_state_target_vector_or_zeros,
 )
+from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, KNOWN_RENDERERS, RendererName
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -65,12 +66,14 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
+        self._renderer: RendererName = _backend_renderer(backend)
         self._curriculum_config = curriculum_config
         self._action_config = config.action.runtime()
         self._action_adapter = build_action_adapter(self._action_config)
         self._observation_builder = EngineObservationBuilder.from_engine_config(
             backend=backend,
             config=config,
+            renderer=self._renderer,
         )
         self._reward_tracker = build_reward_tracker(
             config=reward_config,
@@ -113,6 +116,7 @@ class FZeroXEnvEngine:
             observation_builder=self._observation_builder,
             mask_controller=self._mask_controller,
             control_state=self._control_state,
+            renderer=self._renderer,
         )
         self._episode = EngineEpisodeState()
 
@@ -353,7 +357,9 @@ class FZeroXEnvEngine:
         )
 
     def render(self) -> RgbFrame:
-        return self.backend.render_display(**self.config.observation.native_resolution_kwargs())
+        return self.backend.render_display(
+            **self.config.observation.native_resolution_kwargs(renderer=self._renderer)
+        )
 
     def close(self) -> None:
         self.backend.close()
@@ -421,3 +427,13 @@ class FZeroXEnvEngine:
             last_telemetry=self._episode.last_telemetry,
         )
         return self._control_state.apply_lean_semantics(gated_control_state)
+
+
+_RENDERERS_BY_NAME: dict[str, RendererName] = {name: name for name in KNOWN_RENDERERS}
+
+
+def _backend_renderer(backend: EmulatorBackend) -> RendererName:
+    """Return the backend renderer name used for renderer-sized observations."""
+
+    renderer = getattr(backend, "renderer", DEFAULT_RENDERER)
+    return _RENDERERS_BY_NAME.get(str(renderer), DEFAULT_RENDERER)

@@ -30,6 +30,8 @@ ObservationPreset = ObservationPresetName
 ObservationResizeFilter = DomainObservationResizeFilter
 ConvProfile = Literal[
     "nature",
+    "impala_small",
+    "impala_large",
     "custom",
 ]
 FeatureDim: TypeAlias = PositiveInt | Literal["auto"]

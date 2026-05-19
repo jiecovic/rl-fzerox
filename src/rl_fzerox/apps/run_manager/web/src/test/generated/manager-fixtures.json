@@ -260,11 +260,19 @@
     ],
     "conv_profiles": [
       {
-        "label": "nature",
+        "label": "Nature CNN",
         "value": "nature"
       },
       {
-        "label": "custom",
+        "label": "IMPALA small",
+        "value": "impala_small"
+      },
+      {
+        "label": "IMPALA large",
+        "value": "impala_large"
+      },
+      {
+        "label": "Custom",
         "value": "custom"
       }
     ],
@@ -361,20 +369,14 @@
     ],
     "observation_presets": [
       {
-        "height": 60,
-        "label": "60 x 76",
-        "value": "crop_60x76",
-        "width": 76
-      },
-      {
-        "height": 68,
-        "label": "68 x 108",
-        "value": "crop_68x108",
-        "width": 108
+        "height": 72,
+        "label": "72 x 96 IMPALA",
+        "value": "crop_72x96",
+        "width": 96
       },
       {
         "height": 84,
-        "label": "84 x 84",
+        "label": "84 x 84 DQN/Atari",
         "value": "crop_84x84",
         "width": 84
       }
@@ -1253,13 +1255,14 @@
       "renderer": "gliden64"
     },
     "observation": {
-      "custom_resolution": null,
       "frame_stack": 2,
       "minimap_layer": false,
       "minimap_resize_filter": "nearest",
-      "preset": "crop_60x76",
       "resize_filter": "bilinear",
-      "resolution_mode": "preset",
+      "resolution": {
+        "mode": "preset",
+        "preset": "crop_84x84"
+      },
       "stack_mode": "rgb",
       "state_components": [
         {
@@ -1328,12 +1331,14 @@
       "auxiliary_state_head_arch": [128],
       "auxiliary_state_losses": [],
       "conv_profile": "nature",
+      "custom_cnn_final_relu": false,
       "custom_conv_layers": [
         {
           "kernel_size": 8,
           "kind": "conv",
           "out_channels": 32,
           "padding": 0,
+          "post_activation": true,
           "stride": 4
         },
         {
@@ -1341,6 +1346,7 @@
           "kind": "conv",
           "out_channels": 64,
           "padding": 0,
+          "post_activation": true,
           "stride": 2
         },
         {
@@ -1348,6 +1354,7 @@
           "kind": "conv",
           "out_channels": 128,
           "padding": 0,
+          "post_activation": true,
           "stride": 1
         }
       ],
@@ -1384,6 +1391,7 @@
       "grounded_pitch_penalty": 0.0,
       "ice_entry_penalty": 0.0,
       "ice_progress_multiplier": 1.0,
+      "ko_star_reward": 0.0,
       "lap_completion_bonus": 5.0,
       "lap_position_scale": 1.0,
       "lean_request_penalty": -0.003,
@@ -1391,6 +1399,7 @@
       "outside_bounds_reentry_progress_distance_cap": 10000.0,
       "outside_track_recovery_airborne_grace_frames": 30,
       "outside_track_recovery_reward": 0.0,
+      "outside_track_recovery_reward_cap": 0.1,
       "progress_bucket_distance": 25.0,
       "progress_bucket_reward": 0.05,
       "progress_reward_interval_frames": 1,
@@ -1525,21 +1534,21 @@
         "label": "Image branch",
         "nodes": [
           {
-            "detail": "60 x 76 x 6",
+            "detail": "84 x 84 x 6",
             "id": "image",
             "label": "Image",
             "params": null,
             "tone": "normal"
           },
           {
-            "detail": "nature \u2192 1536, relu",
+            "detail": "nature \u2192 3136",
             "id": "cnn",
             "label": "CNN",
             "params": 82080,
             "tone": "normal"
           },
           {
-            "detail": "identity 1536",
+            "detail": "identity 3136",
             "id": "image_projection",
             "label": "Image projection",
             "params": 0,
@@ -1572,17 +1581,17 @@
         "label": "Fusion and heads",
         "nodes": [
           {
-            "detail": "1600",
+            "detail": "3200",
             "id": "concat",
             "label": "Concat",
             "params": null,
             "tone": "normal"
           },
           {
-            "detail": "1600 \u2192 768, relu",
+            "detail": "3200 \u2192 768, relu",
             "id": "fusion",
             "label": "Fusion MLP",
-            "params": 1229568,
+            "params": 2458368,
             "tone": "normal"
           },
           {
@@ -1636,60 +1645,63 @@
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 6,
-        "input_height": 60,
-        "input_width": 76,
+        "input_height": 84,
+        "input_width": 84,
         "kernel_size": 8,
         "kind": "conv",
         "name": "conv1",
         "out_channels": 32,
-        "output_height": 14,
-        "output_width": 18,
+        "output_height": 20,
+        "output_width": 20,
         "padding": 0,
         "params": 12320,
+        "post_activation": true,
         "stride": 4
       },
       {
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 32,
-        "input_height": 14,
-        "input_width": 18,
+        "input_height": 20,
+        "input_width": 20,
         "kernel_size": 4,
         "kind": "conv",
         "name": "conv2",
         "out_channels": 64,
-        "output_height": 6,
-        "output_width": 8,
+        "output_height": 9,
+        "output_width": 9,
         "padding": 0,
         "params": 32832,
+        "post_activation": true,
         "stride": 2
       },
       {
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 64,
-        "input_height": 6,
-        "input_width": 8,
+        "input_height": 9,
+        "input_width": 9,
         "kernel_size": 3,
         "kind": "conv",
         "name": "conv3",
         "out_channels": 64,
-        "output_height": 4,
-        "output_width": 6,
+        "output_height": 7,
+        "output_width": 7,
         "padding": 0,
         "params": 36928,
+        "post_activation": true,
         "stride": 1
       }
     ],
     "discrete_action_logits": 14,
     "extractor_output_dim": 768,
-    "flatten_dim": 1536,
-    "fusion_input_dim": 1600,
-    "image_features_dim": 1536,
+    "flatten_dim": 3136,
+    "fusion_input_dim": 3200,
+    "image_features_dim": 3136,
     "image_shape": {
       "channels": 6,
-      "height": 60,
-      "width": 76
+      "height": 84,
+      "width": 84
     },
     "parameter_groups": [
       {
@@ -1706,7 +1718,7 @@
       },
       {
         "name": "Fusion",
-        "params": 1229568
+        "params": 2458368
       },
       {
         "name": "LayerNorm",
@@ -1980,6 +1992,6 @@
       }
     ],
     "state_features_dim": 64,
-    "total_params": 3617136
+    "total_params": 4845936
   }
 }

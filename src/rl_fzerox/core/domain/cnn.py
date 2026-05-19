@@ -1,9 +1,54 @@
 # src/rl_fzerox/core/domain/cnn.py
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
-CnnLayerKind: TypeAlias = Literal["conv", "residual"]
+CnnLayerKind: TypeAlias = Literal[
+    "conv",
+    "residual_pre",
+    "residual_post",
+    "maxpool",
+    "avgpool",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class _CnnLayerKindSpec:
+    value: CnnLayerKind
+    aliases: tuple[str, ...] = ()
+    residual: bool = False
+    pooling: bool = False
+
+
+_cnn_layer_kind_specs = (
+    _CnnLayerKindSpec("conv"),
+    _CnnLayerKindSpec("residual_pre", residual=True),
+    _CnnLayerKindSpec("residual_post", aliases=("residual",), residual=True),
+    _CnnLayerKindSpec("maxpool", pooling=True),
+    _CnnLayerKindSpec("avgpool", pooling=True),
+)
+
+
+def normalize_cnn_layer_kind(value: object) -> CnnLayerKind:
+    """Return the canonical layer kind stored by new configs."""
+
+    return _cnn_layer_kind_spec(value).value
+
+
+def is_residual_cnn_layer(kind: CnnLayerKind) -> bool:
+    return _cnn_layer_kind_spec(kind).residual
+
+
+def is_pooling_cnn_layer(kind: CnnLayerKind) -> bool:
+    return _cnn_layer_kind_spec(kind).pooling
+
+
+def _cnn_layer_kind_spec(value: object) -> _CnnLayerKindSpec:
+    for spec in _cnn_layer_kind_specs:
+        if value == spec.value or value in spec.aliases:
+            return spec
+    raise ValueError(f"Unsupported CNN layer kind: {value!r}")
 
 
 def residual_padding_for_kernel(kernel_size: int) -> int:
@@ -16,8 +61,16 @@ def residual_padding_for_kernel(kernel_size: int) -> int:
     return kernel_size // 2
 
 
+def validate_cnn_layer_geometry(*, kind: CnnLayerKind, kernel_size: int, padding: int) -> None:
+    """Validate layer-kind-specific shape constraints before PyTorch builds modules."""
+
+    validate_residual_cnn_padding(kind=kind, kernel_size=kernel_size, padding=padding)
+    if is_pooling_cnn_layer(kind) and padding > kernel_size // 2:
+        raise ValueError("pooling CNN layers require padding<=kernel_size//2")
+
+
 def validate_residual_cnn_padding(*, kind: CnnLayerKind, kernel_size: int, padding: int) -> None:
-    if kind != "residual":
+    if not is_residual_cnn_layer(kind):
         return
     expected_padding = residual_padding_for_kernel(kernel_size)
     if padding != expected_padding:

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
+from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
@@ -51,6 +52,7 @@ def spawn_manager_worker(
                 stderr=subprocess.STDOUT,
                 start_new_session=True,
             )
+            reap_child_when_done(process)
             registered = store.register_run_worker(
                 run_id=run_id,
                 launch_token=launch_token,

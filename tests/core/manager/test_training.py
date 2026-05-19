@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from rl_fzerox.core.domain.observation_image import ObservationCustomResolution
+from rl_fzerox.core.domain.observation_image import (
+    CustomResolutionChoice,
+    SourceCropResolutionChoice,
+)
 from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.manager import default_managed_run_config
 from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
@@ -109,6 +112,7 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.reward.outside_track_recovery_reward = 0.0025
+    config.reward.outside_track_recovery_reward_cap = 0.075
     config.reward.outside_track_recovery_airborne_grace_frames = 45
     config.reward.airborne_landing_grace_frames = 60
 
@@ -119,6 +123,7 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     )
 
     assert train_config.reward.outside_track_recovery_reward == pytest.approx(0.0025)
+    assert train_config.reward.outside_track_recovery_reward_cap == pytest.approx(0.075)
     assert train_config.reward.outside_track_recovery_airborne_grace_frames == 45
     assert train_config.reward.airborne_landing_grace_frames == 60
 
@@ -225,10 +230,7 @@ def test_manager_training_bridge_can_disable_fusion_mlp(tmp_path: Path) -> None:
     preview = policy_architecture_preview(config)
     fusion_group = next(group for group in preview.parameter_groups if group.name == "Fusion")
     fusion_node = next(
-        node
-        for lane in preview.architecture_lanes
-        for node in lane.nodes
-        if node.id == "fusion"
+        node for lane in preview.architecture_lanes for node in lane.nodes if node.id == "fusion"
     )
 
     assert train_config.policy.extractor.fusion_features_dim is None
@@ -241,14 +243,10 @@ def test_manager_training_bridge_can_disable_fusion_mlp(tmp_path: Path) -> None:
 def test_policy_architecture_preview_labels_extractor_activations() -> None:
     config = default_managed_run_config()
     preview = policy_architecture_preview(config)
-    node_by_id = {
-        node.id: node
-        for lane in preview.architecture_lanes
-        for node in lane.nodes
-    }
+    node_by_id = {node.id: node for lane in preview.architecture_lanes for node in lane.nodes}
 
-    assert node_by_id["cnn"].detail.endswith(", relu")
-    assert node_by_id["image_projection"].detail == "identity 1536"
+    assert node_by_id["cnn"].detail == "nature → 3136"
+    assert node_by_id["image_projection"].detail == "identity 3136"
     assert node_by_id["state_mlp"].detail.endswith(", relu")
     assert node_by_id["fusion"].detail.endswith(", relu")
     assert node_by_id["policy_head"].detail.endswith(", relu")
@@ -303,8 +301,7 @@ def test_manager_training_bridge_projects_custom_observation_resolution(
     tmp_path: Path,
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
-    config.observation.resolution_mode = "custom"
-    config.observation.custom_resolution = ObservationCustomResolution(height=72, width=96)
+    config.observation.resolution = CustomResolutionChoice(height=72, width=96)
 
     train_config = build_managed_train_app_config(
         config,
@@ -312,16 +309,32 @@ def test_manager_training_bridge_projects_custom_observation_resolution(
         run_dir=tmp_path / "runs" / "bridge-custom-resolution_0001",
     )
 
-    assert train_config.env.observation.resolution_mode == "custom"
-    assert train_config.env.observation.custom_resolution is not None
-    assert train_config.env.observation.custom_resolution.height == 72
-    assert train_config.env.observation.custom_resolution.width == 96
+    assert train_config.env.observation.resolution == CustomResolutionChoice(height=72, width=96)
+
+
+def test_manager_training_bridge_projects_source_crop_observation_resolution(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.environment.renderer = "angrylion"
+    config.observation.resolution = SourceCropResolutionChoice()
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-source-crop-resolution",
+        run_dir=tmp_path / "runs" / "bridge-source-crop-resolution_0001",
+    )
+
+    assert train_config.env.observation.resolution == SourceCropResolutionChoice()
+    assert train_config.env.observation.image_geometry(renderer=train_config.emulator.renderer) == (
+        208,
+        592,
+    )
 
 
 def test_manager_training_bridge_supports_nature_conv_profile_for_custom_resolution() -> None:
     config = default_managed_run_config().model_copy(deep=True)
-    config.observation.resolution_mode = "custom"
-    config.observation.custom_resolution = ObservationCustomResolution(height=72, width=96)
+    config.observation.resolution = CustomResolutionChoice(height=72, width=96)
 
     train_config = build_managed_train_app_config(
         config,

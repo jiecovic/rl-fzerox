@@ -9,6 +9,7 @@ from gymnasium import spaces
 pytest.importorskip("stable_baselines3")
 
 from rl_fzerox.core.policy import FZeroXImageStateExtractor, FZeroXObservationCnnExtractor
+from rl_fzerox.core.policy.extractors import PreActivationResidualConvBlock
 
 
 def test_observation_extractor_accepts_channels_last_observations() -> None:
@@ -147,6 +148,60 @@ def test_observation_extractor_nature_profile_supports_square_dqn_geometry() -> 
     assert tuple(features.shape) == (2, 3_136)
 
 
+def test_observation_extractor_impala_small_profile_uses_shallow_paper_stack() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(72, 96, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="impala_small",
+    )
+
+    observations = torch.zeros((2, 72, 96, 6), dtype=torch.float32)
+    features = extractor(observations)
+    activations = extractor.convolution_activations(observations[:1])
+
+    assert extractor._flatten_dim == 2_240
+    assert tuple(features.shape) == (2, 2_240)
+    assert [(name, tuple(values.shape)) for name, values in activations] == [
+        ("conv1", (1, 16, 17, 23)),
+        ("conv2", (1, 32, 7, 10)),
+    ]
+
+
+def test_observation_extractor_impala_large_profile_uses_residual_conv_sequences() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(72, 96, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="impala_large",
+    )
+
+    observations = torch.zeros((2, 72, 96, 6), dtype=torch.float32)
+    features = extractor(observations)
+    activations = extractor.convolution_activations(observations[:1])
+
+    assert extractor._flatten_dim == 3_456
+    assert tuple(features.shape) == (2, 3_456)
+    assert [(name, tuple(values.shape)) for name, values in activations] == [
+        ("conv1", (1, 16, 72, 96)),
+        ("pool2", (1, 16, 36, 48)),
+        ("res-pre3", (1, 16, 36, 48)),
+        ("res-pre4", (1, 16, 36, 48)),
+        ("conv5", (1, 32, 36, 48)),
+        ("pool6", (1, 32, 18, 24)),
+        ("res-pre7", (1, 32, 18, 24)),
+        ("res-pre8", (1, 32, 18, 24)),
+        ("conv9", (1, 32, 18, 24)),
+        ("pool10", (1, 32, 9, 12)),
+        ("res-pre11", (1, 32, 9, 12)),
+        ("res-pre12", (1, 32, 9, 12)),
+    ]
+    cnn_modules = tuple(extractor._cnn.children())
+    assert isinstance(cnn_modules[0], torch.nn.Conv2d)
+    assert isinstance(cnn_modules[1], torch.nn.MaxPool2d)
+    assert isinstance(cnn_modules[2], PreActivationResidualConvBlock)
+    assert isinstance(cnn_modules[-2], torch.nn.ReLU)
+    assert isinstance(cnn_modules[-1], torch.nn.Flatten)
+
+
 def test_observation_extractor_nature_profile_supports_compact_aspect_geometry() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(76, 100, 9), dtype=np.uint8),
@@ -214,7 +269,7 @@ def test_observation_extractor_custom_profile_supports_residual_blocks() -> None
         custom_conv_layers=(
             {"kind": "conv", "out_channels": 16, "kernel_size": 6, "stride": 3, "padding": 0},
             {
-                "kind": "residual",
+                "kind": "residual_post",
                 "out_channels": 16,
                 "kernel_size": 3,
                 "stride": 1,
@@ -233,12 +288,53 @@ def test_observation_extractor_custom_profile_supports_residual_blocks() -> None
     assert [type(module).__name__ for module in extractor._cnn] == [
         "Conv2d",
         "ReLU",
-        "ResidualConvBlock",
+        "PostActivationResidualConvBlock",
         "Conv2d",
         "ReLU",
         "Flatten",
     ]
     assert [name for name, _ in activations] == ["conv1", "res2", "conv3"]
+
+
+@pytest.mark.parametrize(
+    ("pool_kind", "pool_module", "pool_name"),
+    (("maxpool", "MaxPool2d", "pool2"), ("avgpool", "AvgPool2d", "avgpool2")),
+)
+def test_observation_extractor_custom_profile_supports_pooling_layers(
+    pool_kind: str,
+    pool_module: str,
+    pool_name: str,
+) -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(60, 76, 6), dtype=np.uint8),
+        features_dim="auto",
+        conv_profile="custom",
+        custom_conv_layers=(
+            {"kind": "conv", "out_channels": 16, "kernel_size": 6, "stride": 3, "padding": 0},
+            {"kind": pool_kind, "kernel_size": 2, "stride": 2, "padding": 0},
+            {"kind": "conv", "out_channels": 32, "kernel_size": 3, "stride": 1, "padding": 0},
+        ),
+    )
+
+    observations = torch.zeros((2, 60, 76, 6), dtype=torch.float32)
+    features = extractor(observations)
+    activations = extractor.convolution_activations(observations[:1])
+
+    assert extractor._flatten_dim == 2_240
+    assert tuple(features.shape) == (2, 2_240)
+    assert [type(module).__name__ for module in extractor._cnn] == [
+        "Conv2d",
+        "ReLU",
+        pool_module,
+        "Conv2d",
+        "ReLU",
+        "Flatten",
+    ]
+    assert [(name, tuple(values.shape)) for name, values in activations] == [
+        ("conv1", (1, 16, 19, 24)),
+        (pool_name, (1, 16, 9, 12)),
+        ("conv3", (1, 32, 7, 10)),
+    ]
 
 
 def test_observation_extractor_conv_only_state_dict_keys_stay_legacy() -> None:

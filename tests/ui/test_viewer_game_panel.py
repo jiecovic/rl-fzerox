@@ -565,6 +565,45 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     assert latest_line.value == "1:41.234 (+2.5s)"
 
 
+def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_id": "silence",
+            "track_mode": "gp_race",
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        best_finish_ranks={"silence": 1},
+        best_finish_times={"silence": 98765},
+        track_pool_records=(
+            {
+                "track_id": "silence",
+                "track_display_name": "Silence GP Race - Blue Falcon Balanced",
+                "track_mode": "gp_race",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    pb_line = next(line for line in records_section.lines if line.label == "PB")
+
+    assert pb_line.value == "1:38.765 · P1"
+
+
 def test_records_section_groups_track_pool_by_cup() -> None:
     columns = _build_panel_columns(
         episode=0,

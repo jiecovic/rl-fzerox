@@ -10,22 +10,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Final, Literal, TypeAlias
+from typing import Annotated, Final, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
 ObservationPresetName: TypeAlias = Literal[
-    "crop_60x76",
-    "crop_68x108",
+    "crop_72x96",
     "crop_84x84",
 ]
-ObservationResolutionMode: TypeAlias = Literal["preset", "custom"]
+ObservationResolutionMode: TypeAlias = Literal["preset", "custom", "source_crop"]
 ObservationResizeFilter: TypeAlias = Literal["nearest", "bilinear"]
 ObservationRendererName: TypeAlias = Literal["angrylion", "gliden64"]
-
-MIN_CUSTOM_OBSERVATION_DIMENSION: Final[int] = 32
-MAX_CUSTOM_OBSERVATION_HEIGHT: Final[int] = 208
-MAX_CUSTOM_OBSERVATION_WIDTH: Final[int] = 592
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +33,15 @@ class ObservationPresetGeometry:
 
 
 @dataclass(frozen=True, slots=True)
+class CustomResolutionBounds:
+    """Accepted custom observation-resolution bounds."""
+
+    min_dimension: int
+    max_height: int
+    max_width: int
+
+
+@dataclass(frozen=True, slots=True)
 class ObservationSourceGeometry:
     """Native cropped framebuffer size before the resize step."""
 
@@ -46,39 +50,76 @@ class ObservationSourceGeometry:
     width: int
 
 
-class ObservationCustomResolution(BaseModel):
-    """Bounded custom image geometry accepted by the managed config surface."""
+@dataclass(frozen=True, slots=True)
+class ObservationImageGeometry:
+    """Supported image-observation geometry choices."""
+
+    custom_bounds: CustomResolutionBounds
+    presets: tuple[ObservationPresetGeometry, ...]
+    default_preset: ObservationPresetName
+    source_geometries: tuple[ObservationSourceGeometry, ...]
+
+
+OBSERVATION_IMAGE_GEOMETRY: Final[ObservationImageGeometry] = ObservationImageGeometry(
+    custom_bounds=CustomResolutionBounds(
+        min_dimension=32,
+        max_height=208,
+        max_width=592,
+    ),
+    presets=(
+        ObservationPresetGeometry("crop_72x96", 72, 96),
+        ObservationPresetGeometry("crop_84x84", 84, 84),
+    ),
+    default_preset="crop_84x84",
+    source_geometries=(
+        ObservationSourceGeometry("angrylion", 208, 592),
+        ObservationSourceGeometry("gliden64", 208, 296),
+    ),
+)
+OBSERVATION_PRESET_GEOMETRY_BY_NAME: Final[MappingProxyType[str, ObservationPresetGeometry]] = (
+    MappingProxyType({geometry.name: geometry for geometry in OBSERVATION_IMAGE_GEOMETRY.presets})
+)
+
+
+class PresetResolutionChoice(BaseModel):
+    """Preset-backed observation resolution."""
 
     model_config = ConfigDict(extra="forbid")
 
+    mode: Literal["preset"] = "preset"
+    preset: ObservationPresetName = OBSERVATION_IMAGE_GEOMETRY.default_preset
+
+
+class CustomResolutionChoice(BaseModel):
+    """Custom fixed observation resolution."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["custom"] = "custom"
     height: int = Field(
-        ge=MIN_CUSTOM_OBSERVATION_DIMENSION,
-        le=MAX_CUSTOM_OBSERVATION_HEIGHT,
+        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
+        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_height,
     )
     width: int = Field(
-        ge=MIN_CUSTOM_OBSERVATION_DIMENSION,
-        le=MAX_CUSTOM_OBSERVATION_WIDTH,
+        ge=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.min_dimension,
+        le=OBSERVATION_IMAGE_GEOMETRY.custom_bounds.max_width,
     )
 
 
-OBSERVATION_PRESET_GEOMETRIES: Final[tuple[ObservationPresetGeometry, ...]] = (
-    ObservationPresetGeometry("crop_60x76", 60, 76),
-    ObservationPresetGeometry("crop_68x108", 68, 108),
-    ObservationPresetGeometry("crop_84x84", 84, 84),
-)
-OBSERVATION_PRESET_GEOMETRY_BY_NAME: Final[MappingProxyType[str, ObservationPresetGeometry]] = (
-    MappingProxyType({geometry.name: geometry for geometry in OBSERVATION_PRESET_GEOMETRIES})
-)
-OBSERVATION_SOURCE_GEOMETRIES: Final[tuple[ObservationSourceGeometry, ...]] = (
-    ObservationSourceGeometry("angrylion", 208, 592),
-    ObservationSourceGeometry("gliden64", 208, 296),
-)
+class SourceCropResolutionChoice(BaseModel):
+    """Use the renderer-native crop size without target downsampling."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["source_crop"] = "source_crop"
 
 
-def custom_resolution_label(height: int, width: int) -> str:
-    """Return a stable human/debug label for one custom image geometry."""
-
-    return f"custom_{height}x{width}"
+ObservationResolutionConfig: TypeAlias = Annotated[
+    PresetResolutionChoice
+    | CustomResolutionChoice
+    | SourceCropResolutionChoice,
+    Field(discriminator="mode"),
+]
 
 
 def preset_geometry(preset: ObservationPresetName) -> tuple[int, int]:
@@ -90,16 +131,26 @@ def preset_geometry(preset: ObservationPresetName) -> tuple[int, int]:
     return geometry.height, geometry.width
 
 
+def source_crop_geometry(renderer: ObservationRendererName) -> tuple[int, int]:
+    """Return the native cropped `(height, width)` before target downsampling."""
+
+    for geometry in OBSERVATION_IMAGE_GEOMETRY.source_geometries:
+        if geometry.renderer == renderer:
+            return geometry.height, geometry.width
+    raise ValueError(f"Unsupported observation renderer: {renderer!r}")
+
+
 def resolve_observation_geometry(
     *,
-    resolution_mode: ObservationResolutionMode,
-    preset: ObservationPresetName,
-    custom_resolution: ObservationCustomResolution | None,
+    resolution: ObservationResolutionConfig,
+    renderer: ObservationRendererName | None = None,
 ) -> tuple[int, int]:
     """Return the active `(height, width)` pair for one observation config."""
 
-    if resolution_mode == "preset":
-        return preset_geometry(preset)
-    if custom_resolution is None:
-        raise ValueError("custom_resolution must be set when resolution_mode='custom'")
-    return int(custom_resolution.height), int(custom_resolution.width)
+    if isinstance(resolution, PresetResolutionChoice):
+        return preset_geometry(resolution.preset)
+    if isinstance(resolution, CustomResolutionChoice):
+        return int(resolution.height), int(resolution.width)
+    if renderer is None:
+        raise ValueError("renderer must be set for source-crop observation resolution")
+    return source_crop_geometry(renderer)

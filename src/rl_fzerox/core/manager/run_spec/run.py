@@ -62,7 +62,7 @@ class ManagedRunConfig(BaseModel):
             resolve_conv_spec,
         )
 
-        height, width = self.observation.image_geometry()
+        height, width = self.observation.image_geometry(renderer=self.environment.renderer)
         conv_spec = resolve_conv_spec(
             (height, width),
             conv_profile=self.policy.conv_profile,
@@ -88,8 +88,7 @@ class ManagedRunConfig(BaseModel):
         if unknown_features:
             joined = ", ".join(sorted(unknown_features))
             raise ValueError(
-                "observation.state_feature_dropouts must reference active state features: "
-                f"{joined}"
+                f"observation.state_feature_dropouts must reference active state features: {joined}"
             )
         return self
 

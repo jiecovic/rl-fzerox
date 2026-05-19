@@ -153,6 +153,7 @@ class ConvLayerPreview(BaseModel):
     kernel_size: int
     stride: int
     padding: int
+    post_activation: bool
     input_height: int
     input_width: int
     output_height: int

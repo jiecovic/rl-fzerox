@@ -87,6 +87,13 @@ def format_optional_compact_time(time_ms: int | None) -> str:
     return format_compact_race_time_ms(time_ms)
 
 
+def format_personal_best(time_ms: int | None, rank: int | None) -> str:
+    time_text = format_optional_compact_time(time_ms)
+    if rank is None:
+        return time_text
+    return f"{time_text} · P{rank}"
+
+
 def format_latest_compact_time(
     latest_time_ms: int | None,
     best_time_ms: int | None,

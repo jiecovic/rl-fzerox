@@ -7,7 +7,7 @@ from rl_fzerox.ui.watch.view.screen.types import PanelLine
 
 from .formatting import (
     format_latest_compact_time,
-    format_optional_compact_time,
+    format_personal_best,
     format_record_range,
     format_track_record_heading,
     latest_time_color,
@@ -28,6 +28,7 @@ def record_group_lines(
     records: tuple[RecordInfo, ...],
     *,
     current_info: RecordInfo,
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
@@ -41,6 +42,7 @@ def record_group_lines(
             track_record_pool_lines(
                 record,
                 current_info=current_info,
+                best_finish_ranks=best_finish_ranks,
                 best_finish_times=best_finish_times,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -54,12 +56,14 @@ def track_record_pool_lines(
     record: RecordInfo,
     *,
     current_info: RecordInfo,
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
 ) -> tuple[PanelLine, ...]:
     is_current_track = is_current_track_record(record, current_info)
+    watch_best_rank = watch_track_value(record, best_finish_ranks)
     watch_best = watch_track_value(record, best_finish_times)
     watch_latest = watch_track_value(record, latest_finish_times)
     watch_latest_delta = watch_track_value(record, latest_finish_deltas_ms)
@@ -91,7 +95,10 @@ def track_record_pool_lines(
         ),
         panel_line(
             "PB",
-            format_optional_compact_time(watch_best),
+            format_personal_best(
+                watch_best,
+                watch_best_rank if _shows_finish_rank(record, current_info) else None,
+            ),
             status_color if watch_best is not None else PALETTE.text_muted,
         ),
         panel_line(
@@ -117,3 +124,7 @@ def track_record_pool_lines(
             else PALETTE.text_muted,
         ),
     )
+
+
+def _shows_finish_rank(record: RecordInfo, current_info: RecordInfo) -> bool:
+    return record.get("track_mode") == "gp_race" or current_info.get("track_mode") == "gp_race"

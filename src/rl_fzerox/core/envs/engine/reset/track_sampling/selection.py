@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
 from fractions import Fraction
 from functools import reduce
 from math import gcd
@@ -19,13 +18,6 @@ from rl_fzerox.core.runtime_spec.vehicle_catalog import EngineSetting, resolve_e
 _T = TypeVar("_T")
 
 
-@dataclass(frozen=True, slots=True)
-class _WeightedCourseBucket:
-    key: str
-    weight: float
-    entry_cycle: tuple[TrackSamplingEntryConfig, ...]
-
-
 class TrackResetSelector:
     """Select reset baselines using either iid random or per-env balanced cycling."""
 
@@ -33,8 +25,6 @@ class TrackResetSelector:
         self._env_index = max(0, int(env_index))
         self._fingerprint: tuple[object, ...] | None = None
         self._cycle: tuple[TrackSamplingEntryConfig, ...] = ()
-        self._weighted_course_cycle: tuple[_WeightedCourseBucket, ...] = ()
-        self._entry_cursors_by_course: dict[str, int] = {}
         self._sequential_course_buckets: tuple[tuple[TrackSamplingEntryConfig, ...], ...] = ()
         self._cursor = 0
 
@@ -48,10 +38,10 @@ class TrackResetSelector:
                 seed=seed,
             )
         if config.sampling_mode in {"step_balanced", "adaptive_step_balanced"}:
-            return self._select_weighted_course_balanced(
+            return select_reset_track_by_course_weight(
                 config,
-                sampling_mode=config.sampling_mode,
                 seed=seed,
+                sampling_mode=config.sampling_mode,
             )
         raise ValueError(f"Unsupported track sampling mode: {config.sampling_mode!r}")
 
@@ -120,29 +110,6 @@ class TrackResetSelector:
             seed=seed,
         )
 
-    def _select_weighted_course_balanced(
-        self,
-        config: TrackSamplingConfig,
-        *,
-        sampling_mode: str,
-        seed: int | None,
-    ) -> SelectedTrack | None:
-        if not config.enabled:
-            return None
-        if not config.entries:
-            raise ValueError("track sampling is enabled but has no entries")
-        self._sync_weighted_course_cycle(config)
-        position = self._cursor % len(self._weighted_course_cycle)
-        bucket = self._weighted_course_cycle[position]
-        entry = self._next_bucket_entry(bucket)
-        self._cursor += 1
-        return _selected_track_from_entry(
-            entry,
-            sampling_mode=sampling_mode,
-            cycle_position=position,
-            seed=seed,
-        )
-
     def _sync_balanced_cycle(self, config: TrackSamplingConfig) -> None:
         fingerprint = _track_sampling_fingerprint(config)
         if fingerprint == self._fingerprint:
@@ -151,26 +118,6 @@ class TrackResetSelector:
         self._cycle = _balanced_cycle(config.entries)
         self._cursor = self._env_index % len(self._cycle)
 
-    def _sync_weighted_course_cycle(self, config: TrackSamplingConfig) -> None:
-        fingerprint = ("weighted_course", *_track_sampling_fingerprint(config))
-        if fingerprint == self._fingerprint:
-            return
-        previous_cycle = self._weighted_course_cycle
-        previous_cursor = self._cursor
-        previous_entry_cursors = self._entry_cursors_by_course
-        self._fingerprint = fingerprint
-        self._weighted_course_cycle = _weighted_course_cycle(config.entries)
-        self._entry_cursors_by_course = {
-            bucket.key: previous_entry_cursors.get(
-                bucket.key,
-                self._env_index % len(bucket.entry_cycle),
-            )
-            for bucket in self._weighted_course_cycle
-        }
-        self._cursor = (
-            previous_cursor if previous_cycle else self._env_index
-        ) % len(self._weighted_course_cycle)
-
     def _sync_sequential_cycle(self, config: TrackSamplingConfig) -> None:
         fingerprint = ("sequential", *_sequential_track_sampling_fingerprint(config))
         if fingerprint == self._fingerprint:
@@ -178,13 +125,6 @@ class TrackResetSelector:
         self._fingerprint = fingerprint
         self._sequential_course_buckets = _sequential_course_buckets(config.entries)
         self._cursor = 0
-
-    def _next_bucket_entry(self, bucket: _WeightedCourseBucket) -> TrackSamplingEntryConfig:
-        cursor = self._entry_cursors_by_course.get(bucket.key, 0)
-        entry = bucket.entry_cycle[cursor % len(bucket.entry_cycle)]
-        self._entry_cursors_by_course[bucket.key] = cursor + 1
-        return entry
-
 
 def select_reset_track_by_course_id(
     config: TrackSamplingConfig,
@@ -210,6 +150,7 @@ def select_reset_track(
     config: TrackSamplingConfig,
     *,
     seed: int | None,
+    sampling_mode: str = "random",
 ) -> SelectedTrack | None:
     """Select one configured reset baseline with deterministic seeding when available."""
 
@@ -219,10 +160,43 @@ def select_reset_track(
         raise ValueError("track sampling is enabled but has no entries")
 
     total_weight = sum(float(entry.weight) for entry in config.entries)
+    if total_weight <= 0.0:
+        raise ValueError("track sampling requires at least one positive entry weight")
     sample = (Random(seed).random() if seed is not None else random()) * total_weight
     return _selected_track_from_entry(
         _weighted_entry(config.entries, sample=sample),
-        sampling_mode="random",
+        sampling_mode=sampling_mode,
+        seed=seed,
+    )
+
+
+def select_reset_track_by_course_weight(
+    config: TrackSamplingConfig,
+    *,
+    seed: int | None,
+    sampling_mode: str,
+) -> SelectedTrack | None:
+    """Select one course by summed weight, then one baseline within that course."""
+
+    if not config.enabled:
+        return None
+    if not config.entries:
+        raise ValueError("track sampling is enabled but has no entries")
+
+    course_buckets = _group_entries_by_course(config.entries)
+    course_weights = tuple(_entries_weight(entries) for _, entries in course_buckets)
+    total_course_weight = sum(course_weights)
+    if total_course_weight <= 0.0:
+        raise ValueError("track sampling requires at least one positive course weight")
+
+    rng = Random(seed) if seed is not None else Random()
+    course_index = _weighted_index(course_weights, sample=rng.random() * total_course_weight)
+    _, course_entries = course_buckets[course_index]
+    entry_weight = course_weights[course_index]
+    entry = _weighted_entry(course_entries, sample=rng.random() * entry_weight)
+    return _selected_track_from_entry(
+        entry,
+        sampling_mode=sampling_mode,
         seed=seed,
     )
 
@@ -232,12 +206,16 @@ def _weighted_entry(
     *,
     sample: float,
 ) -> TrackSamplingEntryConfig:
+    return entries[_weighted_index(tuple(float(entry.weight) for entry in entries), sample=sample)]
+
+
+def _weighted_index(weights: tuple[float, ...], *, sample: float) -> int:
     cursor = 0.0
-    for entry in entries:
-        cursor += float(entry.weight)
+    for index, weight in enumerate(weights):
+        cursor += max(0.0, float(weight))
         if sample < cursor:
-            return entry
-    return entries[-1]
+            return index
+    return len(weights) - 1
 
 
 def _pick_track_entry(
@@ -340,14 +318,6 @@ def _balanced_cycle(
     return _balanced_cycle_from_counts(entries, counts)
 
 
-def _weighted_course_cycle(
-    entries: tuple[TrackSamplingEntryConfig, ...],
-) -> tuple[_WeightedCourseBucket, ...]:
-    buckets = _weighted_course_buckets(entries)
-    counts = _balanced_repetition_counts(bucket.weight for bucket in buckets)
-    return _balanced_cycle_from_counts(buckets, counts)
-
-
 def _balanced_cycle_from_counts(items: tuple[_T, ...], counts: tuple[int, ...]) -> tuple[_T, ...]:
     total = sum(counts)
     current = [0] * len(items)
@@ -362,31 +332,30 @@ def _balanced_cycle_from_counts(items: tuple[_T, ...], counts: tuple[int, ...]) 
 
 
 def _balanced_repetition_counts(weights: Iterable[float]) -> tuple[int, ...]:
-    fractions = [Fraction(str(float(weight))).limit_denominator(100) for weight in weights]
+    raw_weights = tuple(max(0.0, float(weight)) for weight in weights)
+    if not raw_weights:
+        return ()
+    if all(weight <= 0.0 for weight in raw_weights):
+        return tuple(1 for _ in raw_weights)
+
+    fractions = [
+        Fraction(0) if weight <= 0.0 else Fraction(str(weight)).limit_denominator(100)
+        for weight in raw_weights
+    ]
     denominator = 1
     for weight in fractions:
         denominator = denominator * weight.denominator // gcd(denominator, weight.denominator)
-    counts = [max(1, int(weight * denominator)) for weight in fractions]
-    common_divisor = reduce(gcd, counts)
-    counts = [count // common_divisor for count in counts]
+    counts = [int(weight * denominator) for weight in fractions]
+    positive_counts = [count for count in counts if count > 0]
+    if not positive_counts:
+        return tuple(1 for _ in raw_weights)
+    common_divisor = reduce(gcd, positive_counts)
+    counts = [count // common_divisor if count > 0 else 0 for count in counts]
     total = sum(counts)
     if total > TRACK_SAMPLING_LIMITS.max_balanced_cycle_slots:
         scale = TRACK_SAMPLING_LIMITS.max_balanced_cycle_slots / total
-        counts = [max(1, round(count * scale)) for count in counts]
+        counts = [max(1, round(count * scale)) if count > 0 else 0 for count in counts]
     return tuple(counts)
-
-
-def _weighted_course_buckets(
-    entries: tuple[TrackSamplingEntryConfig, ...],
-) -> tuple[_WeightedCourseBucket, ...]:
-    return tuple(
-        _WeightedCourseBucket(
-            key=course_key,
-            weight=sum(float(entry.weight) for entry in course_entries),
-            entry_cycle=_balanced_cycle(course_entries),
-        )
-        for course_key, course_entries in _group_entries_by_course(entries)
-    )
 
 
 def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
@@ -463,3 +432,7 @@ def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
     if entry.course_index is not None:
         return f"course_index:{int(entry.course_index)}"
     return f"entry:{entry.id}"
+
+
+def _entries_weight(entries: tuple[TrackSamplingEntryConfig, ...]) -> float:
+    return sum(max(0.0, float(entry.weight)) for entry in entries)

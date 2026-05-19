@@ -15,6 +15,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
         speed_kph=123.5,
         energy=92.25,
         max_energy=100.0,
+        ko_star_count=2,
         boost_timer=0,
         recoil_tilt_magnitude=0.5,
         reverse_timer=12,
@@ -35,6 +36,7 @@ def test_native_player_telemetry_exposes_state_helpers() -> None:
     assert player.active is True
     assert player.finished is False
     assert player.recoil_tilt_magnitude == 0.5
+    assert player.ko_star_count == 2
     assert player.course_effect_raw == 0
     assert player.course_effect_name == "none"
     assert player.on_energy_refill is False
@@ -106,6 +108,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
             speed_kph=123.5,
             energy=92.25,
             max_energy=100.0,
+            ko_star_count=4,
             boost_timer=0,
             recoil_tilt_magnitude=0.5,
             reverse_timer=12,
@@ -145,6 +148,7 @@ def test_native_telemetry_to_dict_includes_nested_player_state() -> None:
     player_payload = payload["player"]
     assert isinstance(player_payload, dict)
     assert player_payload["recoil_tilt_magnitude"] == 0.5
+    assert player_payload["ko_star_count"] == 4
     assert player_payload["machine_body_stat"] == 4
     assert player_payload["machine_boost_stat"] == 3
     assert player_payload["machine_grip_stat"] == 2

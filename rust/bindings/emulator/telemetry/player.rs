@@ -35,10 +35,17 @@ impl PyPlayerTelemetry {
         lap,
         laps_completed,
         position,
+        ko_star_count = 0,
         damage_rumble_counter = 0,
         segment_index = None,
         segment_t = 0.0,
         segment_length_proportion = 0.0,
+        world_pos_x = 0.0,
+        world_pos_y = 0.0,
+        world_pos_z = 0.0,
+        segment_center_x = 0.0,
+        segment_center_y = 0.0,
+        segment_center_z = 0.0,
         local_lateral_velocity = 0.0,
         signed_lateral_offset = 0.0,
         lateral_distance = 0.0,
@@ -46,6 +53,8 @@ impl PyPlayerTelemetry {
         current_radius_left = 0.0,
         current_radius_right = 0.0,
         height_above_ground = 0.0,
+        future_local_nearest_segment_index = None,
+        future_local_nearest_segment_distance = 0.0,
         velocity_magnitude = 0.0,
         acceleration_magnitude = 0.0,
         acceleration_force = 0.0,
@@ -75,10 +84,17 @@ impl PyPlayerTelemetry {
         lap: i16,
         laps_completed: i16,
         position: i32,
+        ko_star_count: i16,
         damage_rumble_counter: i32,
         segment_index: Option<i32>,
         segment_t: f32,
         segment_length_proportion: f32,
+        world_pos_x: f32,
+        world_pos_y: f32,
+        world_pos_z: f32,
+        segment_center_x: f32,
+        segment_center_y: f32,
+        segment_center_z: f32,
         local_lateral_velocity: f32,
         signed_lateral_offset: f32,
         lateral_distance: f32,
@@ -86,6 +102,8 @@ impl PyPlayerTelemetry {
         current_radius_left: f32,
         current_radius_right: f32,
         height_above_ground: f32,
+        future_local_nearest_segment_index: Option<i32>,
+        future_local_nearest_segment_distance: f32,
         velocity_magnitude: f32,
         acceleration_magnitude: f32,
         acceleration_force: f32,
@@ -103,6 +121,7 @@ impl PyPlayerTelemetry {
                 speed_kph,
                 energy,
                 max_energy,
+                ko_star_count,
                 boost_timer,
                 recoil_tilt_magnitude,
                 damage_rumble_counter,
@@ -117,6 +136,12 @@ impl PyPlayerTelemetry {
                     segment_index,
                     segment_t,
                     segment_length_proportion,
+                    world_pos_x,
+                    world_pos_y,
+                    world_pos_z,
+                    segment_center_x,
+                    segment_center_y,
+                    segment_center_z,
                     local_lateral_velocity,
                     signed_lateral_offset,
                     lateral_distance,
@@ -124,6 +149,8 @@ impl PyPlayerTelemetry {
                     current_radius_left,
                     current_radius_right,
                     height_above_ground,
+                    future_local_nearest_segment_index,
+                    future_local_nearest_segment_distance,
                     velocity_magnitude,
                     acceleration_magnitude,
                     acceleration_force,
@@ -164,6 +191,11 @@ impl PyPlayerTelemetry {
     #[getter]
     fn max_energy(&self) -> f32 {
         self.inner.max_energy
+    }
+
+    #[getter]
+    fn ko_star_count(&self) -> i16 {
+        self.inner.ko_star_count
     }
 
     #[getter]
@@ -232,6 +264,36 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn world_pos_x(&self) -> f32 {
+        self.inner.geometry.world_pos_x
+    }
+
+    #[getter]
+    fn world_pos_y(&self) -> f32 {
+        self.inner.geometry.world_pos_y
+    }
+
+    #[getter]
+    fn world_pos_z(&self) -> f32 {
+        self.inner.geometry.world_pos_z
+    }
+
+    #[getter]
+    fn segment_center_x(&self) -> f32 {
+        self.inner.geometry.segment_center_x
+    }
+
+    #[getter]
+    fn segment_center_y(&self) -> f32 {
+        self.inner.geometry.segment_center_y
+    }
+
+    #[getter]
+    fn segment_center_z(&self) -> f32 {
+        self.inner.geometry.segment_center_z
+    }
+
+    #[getter]
     fn local_lateral_velocity(&self) -> f32 {
         self.inner.geometry.local_lateral_velocity
     }
@@ -264,6 +326,16 @@ impl PyPlayerTelemetry {
     #[getter]
     fn height_above_ground(&self) -> f32 {
         self.inner.geometry.height_above_ground
+    }
+
+    #[getter]
+    fn future_local_nearest_segment_index(&self) -> Option<i32> {
+        self.inner.geometry.future_local_nearest_segment_index
+    }
+
+    #[getter]
+    fn future_local_nearest_segment_distance(&self) -> f32 {
+        self.inner.geometry.future_local_nearest_segment_distance
     }
 
     #[getter]
@@ -398,6 +470,7 @@ impl PyPlayerTelemetry {
         dict.set_item("speed_kph", self.speed_kph())?;
         dict.set_item("energy", self.energy())?;
         dict.set_item("max_energy", self.max_energy())?;
+        dict.set_item("ko_star_count", self.ko_star_count())?;
         dict.set_item("boost_timer", self.boost_timer())?;
         dict.set_item("recoil_tilt_magnitude", self.recoil_tilt_magnitude())?;
         dict.set_item("damage_rumble_counter", self.damage_rumble_counter())?;
@@ -414,6 +487,12 @@ impl PyPlayerTelemetry {
             "segment_length_proportion",
             self.segment_length_proportion(),
         )?;
+        dict.set_item("world_pos_x", self.world_pos_x())?;
+        dict.set_item("world_pos_y", self.world_pos_y())?;
+        dict.set_item("world_pos_z", self.world_pos_z())?;
+        dict.set_item("segment_center_x", self.segment_center_x())?;
+        dict.set_item("segment_center_y", self.segment_center_y())?;
+        dict.set_item("segment_center_z", self.segment_center_z())?;
         dict.set_item("local_lateral_velocity", self.local_lateral_velocity())?;
         dict.set_item("signed_lateral_offset", self.signed_lateral_offset())?;
         dict.set_item("lateral_distance", self.lateral_distance())?;
@@ -424,6 +503,14 @@ impl PyPlayerTelemetry {
         dict.set_item("current_radius_left", self.current_radius_left())?;
         dict.set_item("current_radius_right", self.current_radius_right())?;
         dict.set_item("height_above_ground", self.height_above_ground())?;
+        dict.set_item(
+            "future_local_nearest_segment_index",
+            self.future_local_nearest_segment_index(),
+        )?;
+        dict.set_item(
+            "future_local_nearest_segment_distance",
+            self.future_local_nearest_segment_distance(),
+        )?;
         dict.set_item("velocity_magnitude", self.velocity_magnitude())?;
         dict.set_item("acceleration_magnitude", self.acceleration_magnitude())?;
         dict.set_item("acceleration_force", self.acceleration_force())?;

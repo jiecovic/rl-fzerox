@@ -87,6 +87,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         policy_reload_error=None,
         cnn_activations=None,
         best_finish_position=None,
+        best_finish_ranks={"mute": 1},
         best_finish_times={"mute": 98_000},
         latest_finish_times={"mute": 101_000},
         latest_finish_deltas_ms={"mute": 3_000},
@@ -113,6 +114,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         "final",
     ]
     assert [snapshot.episode_reward for snapshot in snapshots] == [12.0, 12.0, 15.0]
+    assert [snapshot.best_finish_ranks for snapshot in snapshots] == [
+        {"mute": 1},
+        {"mute": 1},
+        {"mute": 1},
+    ]
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, policy_action)

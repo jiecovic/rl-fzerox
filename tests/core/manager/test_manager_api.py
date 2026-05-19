@@ -841,9 +841,15 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert "crop_60x76" in {preset["value"] for preset in payload["observation_presets"]}
-    assert "crop_68x108" in {preset["value"] for preset in payload["observation_presets"]}
+    preset_values = {preset["value"] for preset in payload["observation_presets"]}
+    assert preset_values == {"crop_72x96", "crop_84x84"}
+    preset_labels = {preset["value"]: preset["label"] for preset in payload["observation_presets"]}
+    assert preset_labels["crop_72x96"] == "72 x 96 IMPALA"
+    assert preset_labels["crop_84x84"] == "84 x 84 DQN/Atari"
+    assert "gliden64" in {source["renderer"] for source in payload["observation_source_geometries"]}
     assert "nature" in {profile["value"] for profile in payload["conv_profiles"]}
+    assert "impala_small" in {profile["value"] for profile in payload["conv_profiles"]}
+    assert "impala_large" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "x_cup" in {mode["value"] for mode in payload["track_pool_modes"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
@@ -891,7 +897,7 @@ async def test_manager_api_previews_policy_architecture(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["image_shape"] == {"height": 60, "width": 76, "channels": 6}
+    assert payload["image_shape"] == {"height": 84, "width": 84, "channels": 6}
     assert payload["total_params"] > 0
     assert payload["continuous_action_dims"] == 1
     assert payload["discrete_action_logits"] == 14
@@ -940,12 +946,14 @@ async def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
     config["policy"]["custom_conv_layers"] = [
         {"kind": "conv", "out_channels": 16, "kernel_size": 3, "stride": 2, "padding": 1},
         {
-            "kind": "residual",
+            "kind": "residual_post",
             "out_channels": 16,
             "kernel_size": 3,
             "stride": 1,
             "padding": 1,
         },
+        {"kind": "maxpool", "out_channels": 16, "kernel_size": 2, "stride": 2, "padding": 0},
+        {"kind": "avgpool", "out_channels": 16, "kernel_size": 3, "stride": 1, "padding": 1},
         {"kind": "conv", "out_channels": 32, "kernel_size": 4, "stride": 2, "padding": 0},
         {"kind": "conv", "out_channels": 48, "kernel_size": 3, "stride": 1, "padding": 1},
     ]
@@ -957,21 +965,98 @@ async def test_manager_api_previews_custom_cnn_profile(tmp_path: Path) -> None:
     assert [layer["name"] for layer in payload["conv_layers"]] == [
         "conv1",
         "res2",
-        "conv3",
-        "conv4",
+        "pool3",
+        "avgpool4",
+        "conv5",
+        "conv6",
     ]
     assert [layer["kind"] for layer in payload["conv_layers"]] == [
         "conv",
-        "residual",
+        "residual_post",
+        "maxpool",
+        "avgpool",
         "conv",
         "conv",
     ]
-    assert [layer["out_channels"] for layer in payload["conv_layers"]] == [16, 16, 32, 48]
-    assert [layer["padding"] for layer in payload["conv_layers"]] == [1, 1, 0, 1]
-    assert payload["conv_layers"][0]["output_height"] == 30
-    assert payload["conv_layers"][0]["output_width"] == 38
-    assert payload["conv_layers"][1]["output_height"] == 30
-    assert payload["conv_layers"][1]["output_width"] == 38
+    assert [layer["out_channels"] for layer in payload["conv_layers"]] == [16, 16, 16, 16, 32, 48]
+    assert [layer["padding"] for layer in payload["conv_layers"]] == [1, 1, 0, 1, 0, 1]
+    assert payload["conv_layers"][0]["output_height"] == 42
+    assert payload["conv_layers"][0]["output_width"] == 42
+    assert payload["conv_layers"][1]["output_height"] == 42
+    assert payload["conv_layers"][1]["output_width"] == 42
+    assert payload["conv_layers"][2]["output_height"] == 21
+    assert payload["conv_layers"][2]["output_width"] == 21
+    assert payload["conv_layers"][3]["output_height"] == 21
+    assert payload["conv_layers"][3]["output_width"] == 21
+
+
+async def test_manager_api_previews_impala_small_cnn_profile(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    config = default_managed_run_config().model_dump(mode="json")
+    config["observation"]["resolution"] = {"mode": "preset", "preset": "crop_72x96"}
+    config["policy"]["conv_profile"] = "impala_small"
+
+    response = await client.post("/api/policy-preview", json=config)
+
+    assert response.status_code == 200
+    payload = response.json()
+    layer_shapes = [
+        (layer["out_channels"], layer["output_height"], layer["output_width"])
+        for layer in payload["conv_layers"]
+    ]
+    assert layer_shapes == [(16, 17, 23), (32, 7, 10)]
+    assert payload["image_features_dim"] == 2_240
+
+
+async def test_manager_api_previews_impala_large_cnn_profile(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    config = default_managed_run_config().model_dump(mode="json")
+    config["observation"]["resolution"] = {"mode": "preset", "preset": "crop_72x96"}
+    config["policy"]["conv_profile"] = "impala_large"
+
+    response = await client.post("/api/policy-preview", json=config)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["image_shape"] == {"height": 72, "width": 96, "channels": 6}
+    assert [layer["kind"] for layer in payload["conv_layers"]] == [
+        "conv",
+        "maxpool",
+        "residual_pre",
+        "residual_pre",
+        "conv",
+        "maxpool",
+        "residual_pre",
+        "residual_pre",
+        "conv",
+        "maxpool",
+        "residual_pre",
+        "residual_pre",
+    ]
+    assert [layer["post_activation"] for layer in payload["conv_layers"][:2]] == [False, True]
+    layer_shapes = [
+        (layer["out_channels"], layer["output_height"], layer["output_width"])
+        for layer in payload["conv_layers"]
+    ]
+    pixel_drops = [
+        (layer["dropped_height"], layer["dropped_width"]) for layer in payload["conv_layers"]
+    ]
+    assert layer_shapes == [
+        (16, 72, 96),
+        (16, 36, 48),
+        (16, 36, 48),
+        (16, 36, 48),
+        (32, 36, 48),
+        (32, 18, 24),
+        (32, 18, 24),
+        (32, 18, 24),
+        (32, 18, 24),
+        (32, 9, 12),
+        (32, 9, 12),
+        (32, 9, 12),
+    ]
+    assert pixel_drops == [(0, 0)] * 12
+    assert payload["image_features_dim"] == 3_456
 
 
 async def test_manager_api_preview_keeps_masked_branch_logits_but_marks_status(

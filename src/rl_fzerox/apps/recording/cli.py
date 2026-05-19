@@ -5,7 +5,7 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
-from rl_fzerox.apps.recording.progress import format_race_time_ms
+from rl_fzerox.apps.recording.progress import format_race_time_ms, format_recording_target
 from rl_fzerox.apps.recording.runner import record_policy_episode
 from rl_fzerox.apps.watch import resolve_watch_app_config
 from rl_fzerox.apps.watch_cli.args import require_policy_run_locator
@@ -54,16 +54,32 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Final MP4 path to create when a matching episode is found.",
     )
     parser.add_argument(
+        "--max-episodes",
         "--episodes",
+        dest="max_episodes",
         type=_positive_int,
         default=50,
-        help="Maximum number of attempts before giving up.",
+        help="Maximum episode attempts before giving up.",
     )
     parser.add_argument(
         "--target-rank",
         type=_positive_int,
-        default=1,
-        help="Keep the first finished episode with rank <= this value.",
+        default=None,
+        help="Optional extra filter: keep only finished episodes with rank <= this value.",
+    )
+    parser.add_argument(
+        "--target-laps",
+        type=_positive_int,
+        default=3,
+        help="Keep the first episode that completes at least this many race laps.",
+    )
+    parser.add_argument(
+        "--course-id",
+        default=None,
+        help=(
+            "Lock every recording attempt to one configured course id, e.g. "
+            "space_plant. Display names such as 'Space Plant' are also accepted."
+        ),
     )
     parser.add_argument(
         "--fps",
@@ -103,6 +119,21 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--reload-mode",
+        choices=("off", "episode", "hot"),
+        default="off",
+        help=(
+            "Policy reload mode: off never reloads after startup; episode checks "
+            "before each new attempt; hot checks during episodes."
+        ),
+    )
+    parser.add_argument(
+        "--reload-interval",
+        type=_non_negative_float,
+        default=10.0,
+        help="Minimum seconds between hot reload checks. Use 0 to check every policy action.",
+    )
+    parser.add_argument(
         "overrides",
         nargs=argparse.REMAINDER,
         help="Watch overrides. Use `-- key=value` to separate them from CLI flags.",
@@ -132,23 +163,33 @@ def main(argv: Sequence[str] | None = None) -> None:
         result = record_policy_episode(
             config,
             output_path=output_path,
-            attempts=args.episodes,
+            attempts=args.max_episodes,
+            target_laps=args.target_laps,
             target_rank=args.target_rank,
+            course_id=args.course_id,
             fps=args.fps,
             progress_interval_seconds=args.progress_interval,
             overwrite=args.overwrite,
             keep_failed=args.keep_failed,
             record_mode=args.record_mode,
+            reload_mode=args.reload_mode,
+            reload_interval_seconds=args.reload_interval,
         )
     except (FileExistsError, FileNotFoundError, RuntimeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
 
+    target_label = format_recording_target(
+        target_laps=args.target_laps,
+        target_rank=args.target_rank,
+    )
     print(
         "saved "
         f"{result.path} "
-        f"(attempt={result.attempt}, rank={result.finish_rank}, "
+        f"(attempt={result.attempt}, laps={result.race_laps_completed}, "
+        f"rank={result.finish_rank}, "
         f"time={format_race_time_ms(result.race_time_ms)}, "
-        f"return={result.episode_return:.3f}, steps={result.episode_steps})"
+        f"return={result.episode_return:.3f}, steps={result.episode_steps}, "
+        f"target={target_label})"
     )
 
 

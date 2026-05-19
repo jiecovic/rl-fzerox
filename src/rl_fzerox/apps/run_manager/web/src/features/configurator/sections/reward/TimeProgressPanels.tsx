@@ -177,12 +177,20 @@ export function TimeProgressPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Positive shaping weight for outside-track recovery. Once the current outside-track excursion is armed, this adds weight × (previous center distance - current center distance), so moving back toward the centerline helps and drifting farther away hurts. Set to 0 to disable."
-            label="Outside-track recovery shaping"
+            help="Positive shaping weight for outside-track recovery. Once armed, this adds weight × the decrease in future-local 3D segment distance in raw game units. The final reward is clamped by the recovery cap. Set weight to 0 to disable."
+            label="Outside-track recovery weight"
             resetValue={defaultConfig.reward.outside_track_recovery_reward}
             step="0.0001"
             value={config.reward.outside_track_recovery_reward}
             onChange={(value) => updateReward({ outside_track_recovery_reward: value })}
+          />
+          <NumberField
+            help="Maximum absolute reward this recovery shaping term can add per env step after applying the recovery weight. Default 0.1 means this term is clamped to [-0.1, +0.1]."
+            label="Recovery reward cap"
+            resetValue={defaultConfig.reward.outside_track_recovery_reward_cap}
+            step="0.01"
+            value={config.reward.outside_track_recovery_reward_cap}
+            onChange={(value) => updateReward({ outside_track_recovery_reward_cap: value })}
           />
           <IntegerField
             help="Keep outside-track recovery shaping off until the current outside-track excursion has accumulated at least this many airborne internal frames. Short off-track jumps stay ungated if they land earlier. Set to 0 to arm shaping from the first airborne frame."

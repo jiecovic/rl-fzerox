@@ -31,9 +31,11 @@ class ManagedRewardConfig(BaseModel):
     suspend_progress_while_outside_track_bounds: bool = True
     outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = 10_000.0
     outside_track_recovery_reward: NonNegativeFloat = 0.0
+    outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
     lap_completion_bonus: NonNegativeFloat = 5.0
     lap_position_scale: NonNegativeFloat = 1.0
+    ko_star_reward: NonNegativeFloat = 0.0
     energy_loss_epsilon: NonNegativeFloat = 0.01
     energy_refill_progress_multiplier: float = Field(default=3.0, ge=1.0)
     dirt_progress_multiplier: float = Field(default=1.0, ge=0.0)

@@ -9,6 +9,7 @@ from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.training.inference import PolicyRunner
 
 RecordMode = Literal["stream-all", "probe-then-record"]
+PolicyReloadMode = Literal["off", "episode", "hot"]
 
 
 @dataclass(frozen=True)
@@ -19,6 +20,7 @@ class RecordAttemptResult:
     path: Path
     matched: bool
     finish_rank: int | None
+    race_laps_completed: int
     episode_return: float
     episode_steps: int
     race_time_ms: int
@@ -34,6 +36,7 @@ class AttemptRunResult:
     path: Path
     matched: bool
     finish_rank: int | None
+    race_laps_completed: int
     episode_return: float
     episode_steps: int
     race_time_ms: int

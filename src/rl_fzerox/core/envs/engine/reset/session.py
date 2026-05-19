@@ -68,7 +68,7 @@ class EngineResetCoordinator:
             if isinstance(track_id, str)
             and isinstance(weight, int | float)
             and math.isfinite(float(weight))
-            and float(weight) > 0.0
+            and float(weight) >= 0.0
         }
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
 

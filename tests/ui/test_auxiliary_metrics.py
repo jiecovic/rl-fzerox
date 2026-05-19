@@ -86,14 +86,10 @@ def test_auxiliary_episode_metrics_tracker_respects_grounded_only() -> None:
 
     assert snapshot is not None
     edge_ratio = next(
-        metric
-        for metric in snapshot.metrics
-        if metric.name == "track_position.edge_ratio"
+        metric for metric in snapshot.metrics if metric.name == "track_position.edge_ratio"
     )
     course_id = next(
-        metric
-        for metric in snapshot.metrics
-        if metric.name == "course_context.builtin_course_id"
+        metric for metric in snapshot.metrics if metric.name == "course_context.builtin_course_id"
     )
 
     assert edge_ratio.sample_count == 1

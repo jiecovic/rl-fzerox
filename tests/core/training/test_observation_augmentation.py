@@ -24,9 +24,7 @@ from rl_fzerox.core.training.session.observation_augmentation import (
 def test_state_feature_dropout_wrapper_zeros_selected_state_features() -> None:
     env = EpisodeStateFeatureDropoutWrapper(
         _DictStateEnv(),
-        dropout_groups=(
-            _StateFeatureDropoutGroup(feature_indices=(1, 2), dropout_prob=1.0),
-        ),
+        dropout_groups=(_StateFeatureDropoutGroup(feature_indices=(1, 2), dropout_prob=1.0),),
     )
 
     observation, _info = env.reset(seed=123)
@@ -41,9 +39,7 @@ def test_state_feature_dropout_wrapper_zeros_selected_state_features() -> None:
 def test_state_feature_dropout_wrapper_preserves_auxiliary_targets() -> None:
     env = EpisodeStateFeatureDropoutWrapper(
         _DictImageStateAuxEnv(),
-        dropout_groups=(
-            _StateFeatureDropoutGroup(feature_indices=(1, 2), dropout_prob=1.0),
-        ),
+        dropout_groups=(_StateFeatureDropoutGroup(feature_indices=(1, 2), dropout_prob=1.0),),
     )
 
     observation, _info = env.reset(seed=123)

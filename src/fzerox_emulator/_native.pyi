@@ -54,10 +54,17 @@ class PlayerTelemetry:
         lap: int,
         laps_completed: int,
         position: int,
+        ko_star_count: int = 0,
         damage_rumble_counter: int = 0,
         segment_index: int | None = None,
         segment_t: float = 0.0,
         segment_length_proportion: float = 0.0,
+        world_pos_x: float = 0.0,
+        world_pos_y: float = 0.0,
+        world_pos_z: float = 0.0,
+        segment_center_x: float = 0.0,
+        segment_center_y: float = 0.0,
+        segment_center_z: float = 0.0,
         local_lateral_velocity: float = 0.0,
         signed_lateral_offset: float = 0.0,
         lateral_distance: float = 0.0,
@@ -65,6 +72,8 @@ class PlayerTelemetry:
         current_radius_left: float = 0.0,
         current_radius_right: float = 0.0,
         height_above_ground: float = 0.0,
+        future_local_nearest_segment_index: int | None = None,
+        future_local_nearest_segment_distance: float = 0.0,
         velocity_magnitude: float = 0.0,
         acceleration_magnitude: float = 0.0,
         acceleration_force: float = 0.0,
@@ -86,6 +95,8 @@ class PlayerTelemetry:
     def energy(self) -> float: ...
     @property
     def max_energy(self) -> float: ...
+    @property
+    def ko_star_count(self) -> int: ...
     @property
     def boost_timer(self) -> int: ...
     @property
@@ -113,6 +124,18 @@ class PlayerTelemetry:
     @property
     def segment_length_proportion(self) -> float: ...
     @property
+    def world_pos_x(self) -> float: ...
+    @property
+    def world_pos_y(self) -> float: ...
+    @property
+    def world_pos_z(self) -> float: ...
+    @property
+    def segment_center_x(self) -> float: ...
+    @property
+    def segment_center_y(self) -> float: ...
+    @property
+    def segment_center_z(self) -> float: ...
+    @property
     def local_lateral_velocity(self) -> float: ...
     @property
     def signed_lateral_offset(self) -> float: ...
@@ -126,6 +149,10 @@ class PlayerTelemetry:
     def current_radius_right(self) -> float: ...
     @property
     def height_above_ground(self) -> float: ...
+    @property
+    def future_local_nearest_segment_index(self) -> int | None: ...
+    @property
+    def future_local_nearest_segment_distance(self) -> float: ...
     @property
     def velocity_magnitude(self) -> float: ...
     @property

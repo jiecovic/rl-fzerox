@@ -9,10 +9,15 @@ from pydantic import (
     Field,
     NonNegativeInt,
     PositiveInt,
+    field_validator,
     model_validator,
 )
 
-from rl_fzerox.core.domain.cnn import CnnLayerKind, validate_residual_cnn_padding
+from rl_fzerox.core.domain.cnn import (
+    CnnLayerKind,
+    normalize_cnn_layer_kind,
+    validate_cnn_layer_geometry,
+)
 from rl_fzerox.core.manager.run_spec.common import (
     ActivationName,
     ConvProfile,
@@ -53,10 +58,16 @@ class ManagedPolicyConfig(BaseModel):
         kernel_size: PositiveInt
         stride: PositiveInt
         padding: NonNegativeInt = 0
+        post_activation: bool = True
+
+        @field_validator("kind", mode="before")
+        @classmethod
+        def _normalize_kind(cls, value: object) -> CnnLayerKind:
+            return normalize_cnn_layer_kind(value)
 
         @model_validator(mode="after")
-        def _validate_residual_shape(self) -> ManagedPolicyConfig.CustomConvLayer:
-            validate_residual_cnn_padding(
+        def _validate_layer_geometry(self) -> ManagedPolicyConfig.CustomConvLayer:
+            validate_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
                 padding=int(self.padding),
@@ -67,6 +78,7 @@ class ManagedPolicyConfig(BaseModel):
     custom_conv_layers: tuple[CustomConvLayer, ...] = Field(
         default_factory=lambda: default_custom_conv_layers()
     )
+    custom_cnn_final_relu: bool = False
     features_dim: FeatureDim = "auto"
     state_net_arch: tuple[PositiveInt, ...] = (64,)
     fusion_features_dim: PositiveInt | None = 768

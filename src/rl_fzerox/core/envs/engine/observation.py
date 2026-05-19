@@ -19,6 +19,7 @@ from rl_fzerox.core.envs.observations import (
     build_observation,
     build_observation_space,
 )
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema import EnvConfig
 
 
@@ -28,6 +29,7 @@ class EngineObservationBuilder:
 
     backend: EmulatorBackend
     config: EnvConfig
+    renderer: RendererName
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
     independent_lean_buttons: bool
@@ -41,8 +43,11 @@ class EngineObservationBuilder:
         *,
         backend: EmulatorBackend,
         config: EnvConfig,
+        renderer: RendererName,
     ) -> EngineObservationBuilder:
-        spec = backend.observation_spec(**config.observation.native_resolution_kwargs())
+        spec = backend.observation_spec(
+            **config.observation.native_resolution_kwargs(renderer=renderer)
+        )
         state_components = config.observation.state_components_data()
         independent_lean_buttons = config.action.independent_lean_buttons
         action_history_len, action_history_controls = action_history_settings_for_observation(
@@ -60,6 +65,7 @@ class EngineObservationBuilder:
         return cls(
             backend=backend,
             config=config,
+            renderer=renderer,
             spec=spec,
             state_components=state_components,
             independent_lean_buttons=independent_lean_buttons,
@@ -75,7 +81,7 @@ class EngineObservationBuilder:
             minimap_layer=self.config.observation.minimap_layer,
             resize_filter=self.config.observation.resize_filter,
             minimap_resize_filter=self.config.observation.minimap_resize_filter,
-            **self.config.observation.native_resolution_kwargs(),
+            **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 
     def build_observation(

@@ -37,13 +37,31 @@ export function PolicySection({
     patchConfigSection(setConfig, "policy", patch);
   };
   const updateConvProfile = (value: ManagedRunConfig["policy"]["conv_profile"]) => {
-    patchConfigSection(setConfig, "policy", (currentConfig) => ({
-      conv_profile: value,
-      custom_conv_layers:
-        value === "custom" && currentConfig.policy.custom_conv_layers.length === 0
-          ? defaultConfig.policy.custom_conv_layers
-          : currentConfig.policy.custom_conv_layers,
-    }));
+    setConfig((currentConfig) => {
+      const nextConfig: ManagedRunConfig = {
+        ...currentConfig,
+        policy: {
+          ...currentConfig.policy,
+          conv_profile: value,
+          custom_conv_layers:
+            value === "custom" && currentConfig.policy.custom_conv_layers.length === 0
+              ? defaultConfig.policy.custom_conv_layers
+              : currentConfig.policy.custom_conv_layers,
+          custom_cnn_final_relu:
+            value === "custom" ? currentConfig.policy.custom_cnn_final_relu : false,
+        },
+      };
+      if (value !== "impala_small" && value !== "impala_large") {
+        return nextConfig;
+      }
+      return {
+        ...nextConfig,
+        observation: {
+          ...currentConfig.observation,
+          resolution: { mode: "preset", preset: "crop_72x96" },
+        },
+      };
+    });
   };
   const jumpToCnnConfigurator = () => {
     document.getElementById("policy-cnn-configurator")?.scrollIntoView({
@@ -77,6 +95,7 @@ export function PolicySection({
                   updatePolicy({
                     conv_profile: defaultConfig.policy.conv_profile,
                     custom_conv_layers: defaultConfig.policy.custom_conv_layers,
+                    custom_cnn_final_relu: defaultConfig.policy.custom_cnn_final_relu,
                     features_dim: defaultConfig.policy.features_dim,
                     state_net_arch: defaultConfig.policy.state_net_arch,
                     fusion_features_dim: defaultConfig.policy.fusion_features_dim,
@@ -86,7 +105,7 @@ export function PolicySection({
         >
           <fieldset className="fork-lock-fieldset training-field-grid" disabled={checkpointLocked}>
             <SelectField
-              help="Convolution stack used for the image branch. Choose custom to edit the conv layers directly."
+              help="Backend CNN profile used for the image branch. Preset layers are read-only until you copy them with Edit as custom in the preview."
               label="CNN profile"
               options={convProfileOptions}
               resetValue={defaultConfig.policy.conv_profile}
@@ -99,7 +118,7 @@ export function PolicySection({
               onClick={jumpToCnnConfigurator}
             >
               <CnnConfigIcon />
-              {config.policy.conv_profile === "custom" ? "Edit CNN" : "Go to CNN"}
+              {config.policy.conv_profile === "custom" ? "Edit CNN" : "View CNN"}
             </button>
             <FeatureDimField
               help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
@@ -108,6 +127,18 @@ export function PolicySection({
               value={config.policy.features_dim}
               onChange={(value) => updatePolicy({ features_dim: value })}
             />
+            <fieldset
+              className="dependent-fieldset"
+              disabled={checkpointLocked || config.policy.conv_profile !== "custom"}
+            >
+              <BooleanField
+                help="Apply one ReLU after the last custom CNN layer before flattening. This is needed to preserve the IMPALA large trunk after copying it into custom layers."
+                label="Final CNN ReLU"
+                resetValue={defaultConfig.policy.custom_cnn_final_relu}
+                value={config.policy.custom_cnn_final_relu}
+                onChange={(value) => updatePolicy({ custom_cnn_final_relu: value })}
+              />
+            </fieldset>
             <LayerListField
               help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
               label="State MLP"
@@ -262,7 +293,31 @@ export function PolicySection({
           convProfile={config.policy.conv_profile}
           customConvLayers={config.policy.custom_conv_layers}
           preview={preview}
-          setCustomConvLayers={(value) => updatePolicy({ custom_conv_layers: value })}
+          convertPresetToCustom={(value) => {
+            setConfig((currentConfig) => ({
+              ...currentConfig,
+              policy: {
+                ...currentConfig.policy,
+                conv_profile: "custom",
+                custom_conv_layers: value,
+                custom_cnn_final_relu: currentConfig.policy.conv_profile === "impala_large",
+              },
+            }));
+          }}
+          setCustomConvLayers={(value) => {
+            setConfig((currentConfig) => ({
+              ...currentConfig,
+              policy: {
+                ...currentConfig.policy,
+                conv_profile: "custom",
+                custom_conv_layers: value,
+                custom_cnn_final_relu:
+                  currentConfig.policy.conv_profile === "impala_large"
+                    ? true
+                    : currentConfig.policy.custom_cnn_final_relu,
+              },
+            }));
+          }}
         />
       </ConfigPanel>
     </div>

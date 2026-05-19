@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Configurator } from "@/features/configurator/Configurator";
-import type { ManagedRunConfig } from "@/shared/api/contract";
+import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 import {
   configMetadataFixture,
   draftFixture,
@@ -41,6 +41,69 @@ function reorderConfigKeys(config: ManagedRunConfig): ManagedRunConfig {
     preset_name: config.preset_name,
     seed: config.seed,
     version: config.version,
+  };
+}
+
+function impalaLargePreviewFixture(): PolicyArchitecturePreview {
+  const convLayers: PolicyArchitecturePreview["conv_layers"] = [
+    {
+      name: "conv1",
+      kind: "conv",
+      in_channels: 6,
+      out_channels: 16,
+      kernel_size: 3,
+      stride: 1,
+      padding: 1,
+      post_activation: false,
+      input_height: 72,
+      input_width: 96,
+      output_height: 72,
+      output_width: 96,
+      dropped_height: 0,
+      dropped_width: 0,
+      params: 880,
+    },
+    {
+      name: "pool2",
+      kind: "maxpool",
+      in_channels: 16,
+      out_channels: 16,
+      kernel_size: 3,
+      stride: 2,
+      padding: 1,
+      post_activation: true,
+      input_height: 72,
+      input_width: 96,
+      output_height: 36,
+      output_width: 48,
+      dropped_height: 0,
+      dropped_width: 0,
+      params: 0,
+    },
+    {
+      name: "res-pre3",
+      kind: "residual_pre",
+      in_channels: 16,
+      out_channels: 16,
+      kernel_size: 3,
+      stride: 1,
+      padding: 1,
+      post_activation: true,
+      input_height: 36,
+      input_width: 48,
+      output_height: 36,
+      output_width: 48,
+      dropped_height: 0,
+      dropped_width: 0,
+      params: 4640,
+    },
+  ];
+  return {
+    ...policyPreviewFixture,
+    conv_layers: convLayers,
+    flatten_dim: 27_648,
+    image_features_dim: 27_648,
+    image_shape: { height: 72, width: 96, channels: 6 },
   };
 }
 
@@ -675,8 +738,125 @@ describe("Configurator", () => {
         "custom resolution draft",
         expect.objectContaining({
           observation: expect.objectContaining({
-            resolution_mode: "custom",
-            custom_resolution: { height: 72, width: 96 },
+            resolution: { mode: "custom", height: 72, width: 96 },
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("persists original crop as a resolution source instead of a preset", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="source crop draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.selectOptions(screen.getByLabelText("Resolution source"), "source_crop");
+    expect(screen.getAllByText("208 x 296").length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "source crop draft",
+        expect.objectContaining({
+          observation: expect.objectContaining({
+            resolution: { mode: "source_crop" },
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("sets the IMPALA image geometry when selecting the large IMPALA CNN profile", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="impala large draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Policy" }));
+    await user.selectOptions(screen.getByLabelText("CNN profile"), "impala_large");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "impala large draft",
+        expect.objectContaining({
+          observation: expect.objectContaining({
+            resolution: { mode: "preset", preset: "crop_72x96" },
+          }),
+          policy: expect.objectContaining({
+            conv_profile: "impala_large",
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("copies preset CNN rows into a custom profile when edited", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+    fetchPolicyPreviewMock.mockResolvedValue(impalaLargePreviewFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="edited preset cnn"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Policy" }));
+    await user.selectOptions(screen.getByLabelText("CNN profile"), "impala_large");
+    expect(await screen.findByLabelText("custom CNN layer 1 activation")).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Edit as custom" }));
+    const firstActivation = await screen.findByLabelText("custom CNN layer 1 activation");
+    await user.selectOptions(firstActivation, "relu");
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "edited preset cnn",
+        expect.objectContaining({
+          policy: expect.objectContaining({
+            conv_profile: "custom",
+            custom_cnn_final_relu: true,
+            custom_conv_layers: expect.arrayContaining([
+              expect.objectContaining({
+                kind: "conv",
+                post_activation: true,
+              }),
+              expect.objectContaining({
+                kind: "residual_pre",
+              }),
+            ]),
           }),
         }),
       ),

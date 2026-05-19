@@ -59,7 +59,7 @@ class Emulator:
         self._baseline_state_path = (
             baseline_state_path.resolve() if baseline_state_path is not None else None
         )
-        self._renderer = renderer
+        self._renderer: RendererName = renderer
         if not self._core_path.is_file():
             raise FileNotFoundError(f"Libretro core not found: {self._core_path}")
         if not self._rom_path.is_file():
@@ -87,6 +87,10 @@ class Emulator:
     @property
     def display_aspect_ratio(self) -> float:
         return float(self._native.display_aspect_ratio)
+
+    @property
+    def renderer(self) -> RendererName:
+        return self._renderer
 
     @property
     def frame_shape(self) -> tuple[int, int, int]:

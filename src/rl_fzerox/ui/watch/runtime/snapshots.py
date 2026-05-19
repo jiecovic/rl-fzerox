@@ -91,6 +91,7 @@ def _publish_step_snapshots(
     policy_reload_error: str | None,
     cnn_activations: CnnActivationSnapshot | None,
     best_finish_position: int | None,
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
@@ -191,6 +192,7 @@ def _publish_step_snapshots(
                 policy_reload_error=policy_reload_error,
                 cnn_activations=cnn_activations,
                 best_finish_position=best_finish_position,
+                best_finish_ranks=best_finish_ranks,
                 best_finish_times=best_finish_times,
                 latest_finish_times=latest_finish_times,
                 latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -228,6 +230,7 @@ def _build_snapshot(
     policy_reload_error: str | None,
     cnn_activations: CnnActivationSnapshot | None,
     best_finish_position: int | None,
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
@@ -280,6 +283,7 @@ def _build_snapshot(
         policy_reload_error=policy_reload_error,
         cnn_activations=cnn_activations,
         best_finish_position=best_finish_position,
+        best_finish_ranks=dict(best_finish_ranks),
         best_finish_times=dict(best_finish_times),
         latest_finish_times=dict(latest_finish_times),
         latest_finish_deltas_ms=dict(latest_finish_deltas_ms),
@@ -385,11 +389,7 @@ def _policy_auxiliary_state_targets(
     if telemetry is None:
         return {}
     all_targets = auxiliary_state_target_values(telemetry)
-    return {
-        str(name): value
-        for name, value in all_targets.items()
-        if name in target_names
-    }
+    return {str(name): value for name, value in all_targets.items() if name in target_names}
 
 
 def _next_boost_lamp_level(

@@ -18,6 +18,23 @@
   font-size: 15px;
 }
 
+.conv-table-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.conv-table-heading h3 {
+  margin: 0;
+}
+
+.conv-table-heading .secondary-button {
+  height: 32px;
+  padding: 0 12px;
+}
+
 .architecture-layout-pending {
   display: grid;
   min-height: 260px;

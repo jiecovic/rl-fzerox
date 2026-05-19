@@ -6,10 +6,10 @@ import type { PolicyArchitecturePreview } from "@/shared/api/contract";
 import { policyPreviewFixture } from "@/test/fixtures";
 
 describe("policy architecture graph model", () => {
-  it("splits activation details onto their own line", () => {
+  it("splits MLP activation details onto their own line", () => {
     const graph = buildArchitectureGraph(policyPreviewFixture);
 
-    expect(graph.visuals.get("cnn")?.detailLines.at(-1)).toBe("relu");
+    expect(graph.visuals.get("cnn")?.detailLines.at(-1)).toBe("nature → 3136");
     expect(graph.visuals.get("state_mlp")?.detailLines.at(-1)).toBe("relu");
     expect(graph.visuals.get("fusion")?.detailLines.at(-1)).toBe("relu");
   });

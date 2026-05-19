@@ -180,6 +180,10 @@
   cursor: grab;
 }
 
+.custom-cnn-layer-row.is-disabled {
+  cursor: default;
+}
+
 .custom-cnn-layer-row.is-dragging {
   opacity: 0.5;
 }
@@ -218,6 +222,10 @@
   width: 72px;
   min-width: 0;
   height: 32px;
+}
+
+.custom-conv-static-value {
+  color: var(--text);
 }
 
 .custom-conv-add-row-button {

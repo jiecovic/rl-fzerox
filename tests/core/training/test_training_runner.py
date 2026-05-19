@@ -894,6 +894,7 @@ def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
 
 def test_monitor_info_keys_include_position_context() -> None:
     assert "position" in MONITOR_INFO_KEYS
+    assert "ko_star_count" in MONITOR_INFO_KEYS
     assert "total_racers" in MONITOR_INFO_KEYS
     assert "course_index" in MONITOR_INFO_KEYS
 

@@ -48,6 +48,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "suspend_progress_while_outside_track_bounds": False,
         "outside_bounds_reentry_progress_distance_cap": 300.0,
         "outside_track_recovery_reward": 0.125,
+        "outside_track_recovery_reward_cap": 0.75,
         "outside_track_recovery_airborne_grace_frames": 11,
         "time_penalty_per_frame": -0.002,
         "reverse_time_penalty_scale": 1.25,
@@ -56,6 +57,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "slow_speed_time_penalty_power": 2.0,
         "lap_completion_bonus": 9.0,
         "lap_position_scale": 0.33,
+        "ko_star_reward": 4.0,
         "damage_taken_frame_penalty": -0.02,
         "damage_taken_streak_ramp_penalty": -0.001,
         "damage_taken_streak_cap_frames": 120,
@@ -88,6 +90,56 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         field.name: getattr(tracker._weights, field.name) for field in fields(RewardMainWeights)
     }
     assert actual == overrides
+
+
+def test_reward_main_rewards_new_gp_ko_stars_once() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            ko_star_reward=2.5,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(ko_star_count=1))
+
+    gained_two = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(ko_star_count=3),
+    )
+    repeated_count = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(ko_star_count=3),
+    )
+
+    assert gained_two.reward == 5.0
+    assert gained_two.breakdown == {"ko_star": 5.0}
+    assert repeated_count.reward == 0.0
+
+
+def test_reward_main_ignores_ko_star_reward_outside_gp_race() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            ko_star_reward=2.5,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(game_mode_name="practice", ko_star_count=0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(game_mode_name="practice", ko_star_count=1),
+    )
+
+    assert step.reward == 0.0
+    assert step.breakdown == {}
 
 
 def test_reward_main_rewards_each_frontier_bucket_once() -> None:
@@ -308,7 +360,8 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            outside_track_recovery_reward=0.01,
+            outside_track_recovery_reward=0.0001,
+            outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
@@ -326,6 +379,8 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
             signed_lateral_offset=150.0,
             lateral_distance=150.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         ),
     )
     recovering = tracker.step_summary(
@@ -337,6 +392,8 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
             signed_lateral_offset=120.0,
             lateral_distance=120.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=120.0,
         ),
     )
     worsening = tracker.step_summary(
@@ -348,6 +405,8 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
             signed_lateral_offset=140.0,
             lateral_distance=140.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=140.0,
         ),
     )
     back_inside = tracker.step_summary(
@@ -369,26 +428,29 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
             signed_lateral_offset=120.0,
             lateral_distance=120.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=120.0,
         ),
     )
 
     assert first_outside.reward == 0.0
     assert first_outside.breakdown == {}
-    assert recovering.reward == pytest.approx(0.3)
-    assert recovering.breakdown == {"outside_track_recovery": pytest.approx(0.3)}
-    assert worsening.reward == pytest.approx(-0.2)
-    assert worsening.breakdown == {"outside_track_recovery": pytest.approx(-0.2)}
-    assert back_inside.reward == pytest.approx(0.6)
-    assert back_inside.breakdown == {"outside_track_recovery": pytest.approx(0.6)}
+    assert recovering.reward == pytest.approx(0.003)
+    assert recovering.breakdown == {"outside_track_recovery": pytest.approx(0.003)}
+    assert worsening.reward == pytest.approx(-0.002)
+    assert worsening.breakdown == {"outside_track_recovery": pytest.approx(-0.002)}
+    assert back_inside.reward == pytest.approx(0.014)
+    assert back_inside.breakdown == {"outside_track_recovery": pytest.approx(0.014)}
     assert outside_again.reward == 0.0
     assert outside_again.breakdown == {}
 
 
-def test_reward_main_uses_signed_lateral_offset_for_outside_track_recovery() -> None:
+def test_reward_main_uses_future_segment_distance_for_outside_track_recovery() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            outside_track_recovery_reward=0.01,
+            outside_track_recovery_reward=0.0001,
+            outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
@@ -401,6 +463,8 @@ def test_reward_main_uses_signed_lateral_offset_for_outside_track_recovery() -> 
             current_radius_left=100.0,
             signed_lateral_offset=150.0,
             lateral_distance=150.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         )
     )
 
@@ -413,6 +477,8 @@ def test_reward_main_uses_signed_lateral_offset_for_outside_track_recovery() -> 
             state_labels=("active", "airborne"),
             signed_lateral_offset=150.0,
             lateral_distance=150.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         ),
     )
     worsening_by_signed_offset = tracker.step_summary(
@@ -424,20 +490,133 @@ def test_reward_main_uses_signed_lateral_offset_for_outside_track_recovery() -> 
             state_labels=("active", "airborne"),
             signed_lateral_offset=180.0,
             lateral_distance=120.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=180.0,
         ),
     )
 
-    assert worsening_by_signed_offset.reward == pytest.approx(-0.3)
-    assert worsening_by_signed_offset.breakdown == {
-        "outside_track_recovery": pytest.approx(-0.3)
-    }
+    assert worsening_by_signed_offset.reward == pytest.approx(-0.003)
+    assert worsening_by_signed_offset.breakdown == {"outside_track_recovery": pytest.approx(-0.003)}
+
+
+def test_reward_main_does_not_scale_recovery_by_active_side_radius() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            outside_track_recovery_reward=0.01,
+            outside_track_recovery_reward_cap=10.0,
+            outside_track_recovery_airborne_grace_frames=0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, current_radius_left=200.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=-150.0,
+            current_radius_left=200.0,
+            current_radius_right=50.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
+        ),
+    )
+    recovered_on_right_side = tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=2),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=-75.0,
+            current_radius_left=200.0,
+            current_radius_right=50.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=75.0,
+        ),
+    )
+
+    assert recovered_on_right_side.reward == pytest.approx(0.75)
+    assert recovered_on_right_side.breakdown == {"outside_track_recovery": pytest.approx(0.75)}
+
+
+def test_reward_main_caps_outside_track_recovery_reward_after_weight() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            outside_track_recovery_reward=1.0,
+            outside_track_recovery_reward_cap=0.1,
+            outside_track_recovery_airborne_grace_frames=0,
+            time_penalty_per_frame=0.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=150.0,
+            current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
+        ),
+    )
+    large_recovery = tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=2),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=10.0,
+            current_radius_left=100.0,
+        ),
+    )
+    tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=3),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=150.0,
+            current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
+        ),
+    )
+    large_worsening = tracker.step_summary(
+        _summary(max_race_distance=0.0, airborne_frames=5),
+        _status(step_count=4),
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            signed_lateral_offset=260.0,
+            current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=260.0,
+        ),
+    )
+
+    assert large_recovery.reward == pytest.approx(0.1)
+    assert large_recovery.breakdown == {"outside_track_recovery": pytest.approx(0.1)}
+    assert large_worsening.reward == pytest.approx(-0.1)
+    assert large_worsening.breakdown == {"outside_track_recovery": pytest.approx(-0.1)}
 
 
 def test_reward_main_keeps_short_airborne_outside_excursions_ungated() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            outside_track_recovery_reward=0.01,
+            outside_track_recovery_reward=0.0001,
+            outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=30,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
@@ -455,6 +634,8 @@ def test_reward_main_keeps_short_airborne_outside_excursions_ungated() -> None:
             signed_lateral_offset=150.0,
             lateral_distance=150.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         ),
     )
     recovering_too_early = tracker.step_summary(
@@ -466,6 +647,8 @@ def test_reward_main_keeps_short_airborne_outside_excursions_ungated() -> None:
             signed_lateral_offset=120.0,
             lateral_distance=120.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=120.0,
         ),
     )
     landed_still_outside = tracker.step_summary(
@@ -490,7 +673,8 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
-            outside_track_recovery_reward=0.01,
+            outside_track_recovery_reward=0.0001,
+            outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=30,
             time_penalty_per_frame=0.0,
             damage_taken_frame_penalty=0.0,
@@ -508,6 +692,8 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
             signed_lateral_offset=150.0,
             lateral_distance=150.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         ),
     )
     tracker.step_summary(
@@ -519,6 +705,8 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
             signed_lateral_offset=120.0,
             lateral_distance=120.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=120.0,
         ),
     )
     recovering_after_grace = tracker.step_summary(
@@ -530,6 +718,8 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
             signed_lateral_offset=110.0,
             lateral_distance=90.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=110.0,
         ),
     )
     landing_inside = tracker.step_summary(
@@ -543,12 +733,10 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
         ),
     )
 
-    assert recovering_after_grace.reward == pytest.approx(0.1)
-    assert recovering_after_grace.breakdown == {
-        "outside_track_recovery": pytest.approx(0.1)
-    }
-    assert landing_inside.reward == pytest.approx(0.3)
-    assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.3)}
+    assert recovering_after_grace.reward == pytest.approx(0.001)
+    assert recovering_after_grace.breakdown == {"outside_track_recovery": pytest.approx(0.001)}
+    assert landing_inside.reward == pytest.approx(0.011)
+    assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.011)}
 
 
 def test_reward_main_scales_time_pressure_when_speed_is_low() -> None:
@@ -822,10 +1010,12 @@ def test_reward_main_course_reward_override_null_fields_inherit_base_after_dump(
 
 def _telemetry(
     *,
-    race_distance: float,
+    race_distance: float = 0.0,
+    game_mode_name: str = "gp_race",
     state_labels: tuple[str, ...] = ("active",),
     position: int = 30,
     energy: float = 178.0,
+    ko_star_count: int = 0,
     boost_timer: int = 0,
     race_time_ms: int = 0,
     speed_kph: float = 100.0,
@@ -839,17 +1029,21 @@ def _telemetry(
     lateral_distance: float = 0.0,
     current_radius_left: float = 0.0,
     current_radius_right: float = 0.0,
+    future_local_nearest_segment_index: int | None = None,
+    future_local_nearest_segment_distance: float = 0.0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
     state_flags |= course_effect_raw
     if on_energy_refill:
         state_flags |= _COURSE_EFFECT_PIT
     return make_telemetry(
+        game_mode_name=game_mode_name,
         race_distance=race_distance,
         state_labels=state_labels,
         state_flags=state_flags,
         speed_kph=speed_kph,
         energy=energy,
+        ko_star_count=ko_star_count,
         boost_timer=boost_timer,
         race_time_ms=race_time_ms,
         position=position,
@@ -861,6 +1055,8 @@ def _telemetry(
         lateral_distance=lateral_distance,
         current_radius_left=current_radius_left,
         current_radius_right=current_radius_right,
+        future_local_nearest_segment_index=future_local_nearest_segment_index,
+        future_local_nearest_segment_distance=future_local_nearest_segment_distance,
     )
 
 

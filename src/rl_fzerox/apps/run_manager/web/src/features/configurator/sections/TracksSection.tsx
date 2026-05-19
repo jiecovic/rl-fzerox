@@ -321,16 +321,16 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                   value={config.tracks.step_balance_ema_alpha}
                   onChange={(value) => updateTracks({ step_balance_ema_alpha: value })}
                 />
-                <NumberField
-                  help="Clamp the overall course-weight multiplier around 1x."
-                  label="Max scale"
-                  resetValue={defaultConfig.tracks.step_balance_max_weight_scale}
-                  step="0.1"
-                  value={config.tracks.step_balance_max_weight_scale}
-                  onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
-                />
                 {usesAdaptiveStepBalancing ? (
                   <>
+                    <NumberField
+                      help="Caps the adaptive frame-budget boost for low-completion courses. Reset frequency is still converted from target frame share using recent episode length."
+                      label="Max target scale"
+                      resetValue={defaultConfig.tracks.step_balance_max_weight_scale}
+                      step="0.1"
+                      value={config.tracks.step_balance_max_weight_scale}
+                      onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
+                    />
                     <NumberField
                       help="How strongly low completion raises a course's step-budget share."
                       label="Completion weight"
