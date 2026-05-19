@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_serializer, model_validator
 
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
@@ -13,12 +13,12 @@ from rl_fzerox.core.domain.observation_components import (
     TrackPositionProgressSourceName,
 )
 from rl_fzerox.core.domain.observation_image import (
-    ObservationCustomResolution,
-    ObservationResolutionMode,
+    ObservationRendererName,
+    ObservationResolutionConfig,
+    PresetResolutionChoice,
     resolve_observation_geometry,
 )
 from rl_fzerox.core.manager.run_spec.common import (
-    ObservationPreset,
     ObservationResizeFilter,
     StackMode,
 )
@@ -129,9 +129,7 @@ class ManagedObservationConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    resolution_mode: ObservationResolutionMode = "preset"
-    preset: ObservationPreset = "crop_60x76"
-    custom_resolution: ObservationCustomResolution | None = None
+    resolution: ObservationResolutionConfig = Field(default_factory=PresetResolutionChoice)
     frame_stack: PositiveInt = Field(default=2, le=8)
     stack_mode: StackMode = "rgb"
     minimap_layer: bool = False
@@ -146,14 +144,6 @@ class ManagedObservationConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_observation_components(self) -> ManagedObservationConfig:
-        if self.resolution_mode == "preset" and self.custom_resolution is not None:
-            raise ValueError(
-                "observation.custom_resolution must be null for resolution_mode='preset'"
-            )
-        if self.resolution_mode == "custom" and self.custom_resolution is None:
-            raise ValueError(
-                "observation.custom_resolution must be set for resolution_mode='custom'"
-            )
         names = [component.name for component in self.state_components]
         if len(set(names)) != len(names):
             raise ValueError("observation.state_components must not contain duplicates")
@@ -162,13 +152,30 @@ class ManagedObservationConfig(BaseModel):
             raise ValueError("observation.state_feature_dropouts must not contain duplicates")
         return self
 
-    def image_geometry(self) -> tuple[int, int]:
+    @model_serializer(mode="plain")
+    def _serialize(self) -> dict[str, object]:
+        data: dict[str, object] = {
+            "resolution": self.resolution.model_dump(mode="json"),
+            "frame_stack": self.frame_stack,
+            "stack_mode": self.stack_mode,
+            "minimap_layer": self.minimap_layer,
+            "resize_filter": self.resize_filter,
+            "minimap_resize_filter": self.minimap_resize_filter,
+            "state_components": [
+                component.model_dump(mode="json") for component in self.state_components
+            ],
+            "state_feature_dropouts": [
+                dropout.model_dump(mode="json") for dropout in self.state_feature_dropouts
+            ],
+        }
+        return data
+
+    def image_geometry(self, *, renderer: ObservationRendererName | None = None) -> tuple[int, int]:
         """Return the active `(height, width)` for preview and projection code."""
 
         return resolve_observation_geometry(
-            resolution_mode=self.resolution_mode,
-            preset=self.preset,
-            custom_resolution=self.custom_resolution,
+            resolution=self.resolution,
+            renderer=renderer,
         )
 
 

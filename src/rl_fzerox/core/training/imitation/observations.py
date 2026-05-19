@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from fzerox_emulator import ObservationImageRecipe
 from rl_fzerox.core.domain.observation_components import StateComponentsSettings
+from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
+from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, ObservationConfig
 
 
@@ -25,19 +27,26 @@ class ObservationViewSpec:
         cls,
         config: ObservationConfig,
         *,
+        renderer: RendererName = DEFAULT_RENDERER,
         independent_lean_buttons: bool = False,
     ) -> ObservationViewSpec:
         return cls(
-            image_recipe=observation_image_recipe(config),
+            image_recipe=observation_image_recipe(config, renderer=renderer),
             mode=config.mode,
             state_components=config.state_components_data(),
             independent_lean_buttons=independent_lean_buttons,
         )
 
     @classmethod
-    def from_env_config(cls, config: EnvConfig) -> ObservationViewSpec:
+    def from_env_config(
+        cls,
+        config: EnvConfig,
+        *,
+        renderer: RendererName = DEFAULT_RENDERER,
+    ) -> ObservationViewSpec:
         return cls.from_observation_config(
             config.observation,
+            renderer=renderer,
             independent_lean_buttons=config.action.independent_lean_buttons,
         )
 
@@ -53,24 +62,26 @@ class ObservationRenderPlan:
         return self.view_recipe_indices[view_index]
 
 
-def observation_image_recipe(config: ObservationConfig) -> ObservationImageRecipe:
+def observation_image_recipe(
+    config: ObservationConfig,
+    *,
+    renderer: RendererName = DEFAULT_RENDERER,
+) -> ObservationImageRecipe:
     """Project one runtime observation config into a native image recipe."""
 
-    if config.resolution_mode == "preset":
+    if isinstance(config.resolution, PresetResolutionChoice):
         return ObservationImageRecipe(
-            preset=config.preset,
+            preset=config.resolution.preset,
             frame_stack=int(config.frame_stack),
             stack_mode=config.stack_mode,
             minimap_layer=config.minimap_layer,
             resize_filter=config.resize_filter,
             minimap_resize_filter=config.minimap_resize_filter,
         )
-    geometry = config.custom_resolution
-    if geometry is None:
-        raise ValueError("custom_resolution must be set for resolution_mode='custom'")
+    height, width = config.image_geometry(renderer=renderer)
     return ObservationImageRecipe(
-        height=int(geometry.height),
-        width=int(geometry.width),
+        height=height,
+        width=width,
         frame_stack=int(config.frame_stack),
         stack_mode=config.stack_mode,
         minimap_layer=config.minimap_layer,

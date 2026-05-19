@@ -18,6 +18,10 @@ import type {
 } from "@/shared/api/contract";
 import { StateComponentPanels } from "./observation/StateComponentPanels";
 
+type ObservationResolution = ManagedRunConfig["observation"]["resolution"];
+type ObservationResolutionMode = ObservationResolution["mode"];
+type ObservationPreset = Extract<ObservationResolution, { mode: "preset" }>["preset"];
+
 interface ObservationSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
@@ -47,14 +51,26 @@ export function ObservationSection({
   const resizeFilterOptions = metadata.resize_filters.map(
     (option) => option.value,
   ) as ManagedRunConfig["observation"]["resize_filter"][];
-  const resolutionModeOptions: ManagedRunConfig["observation"]["resolution_mode"][] = [
-    "preset",
-    "custom",
-  ];
+  const observationPresetOptions = metadata.observation_presets.map(
+    (preset) => preset.value,
+  ) as ObservationPreset[];
+  const observationPresetLabels = Object.fromEntries(
+    metadata.observation_presets.map((preset) => [preset.value, preset.label]),
+  ) as Partial<Record<ObservationPreset, string>>;
+  const defaultPreset: ObservationPreset = observationPresetOptions[0] ?? "crop_84x84";
+  const resolutionModeOptions: ObservationResolutionMode[] = ["preset", "custom", "source_crop"];
+  const resolutionModeLabels: Partial<Record<ObservationResolutionMode, string>> = {
+    preset: "Preset",
+    custom: "Custom",
+    source_crop: "Original crop",
+  };
+  const resolution = config.observation.resolution;
+  const defaultResolution = defaultConfig.observation.resolution;
+  const currentPreset = resolution.mode === "preset" ? resolution.preset : defaultPreset;
   const selectedPreset = metadata.observation_presets.find(
-    (preset) => preset.value === config.observation.preset,
+    (preset) => preset.value === currentPreset,
   );
-  const customResolution = config.observation.custom_resolution;
+  const customResolution = resolution.mode === "custom" ? resolution : null;
   const sourceGeometry = metadata.observation_source_geometries.find(
     (geometry) => geometry.renderer === config.environment.renderer,
   );
@@ -71,11 +87,13 @@ export function ObservationSection({
         }
       : null;
   const configuredGeometry =
-    config.observation.resolution_mode === "custom" && customResolution !== null
+    resolution.mode === "custom" && customResolution !== null
       ? { height: customResolution.height, width: customResolution.width, channels: null }
-      : selectedPreset !== undefined
-        ? { height: selectedPreset.height, width: selectedPreset.width, channels: null }
-        : null;
+      : resolution.mode === "source_crop" && sourceGeometry !== undefined
+        ? { height: sourceGeometry.height, width: sourceGeometry.width, channels: null }
+        : selectedPreset !== undefined
+          ? { height: selectedPreset.height, width: selectedPreset.width, channels: null }
+          : null;
   const activeGeometry = previewGeometry ?? configuredGeometry;
   const imageMetricValue =
     activeGeometry === null
@@ -92,17 +110,22 @@ export function ObservationSection({
   const sourceCropValue =
     sourceGeometry === undefined ? "pending" : `${sourceGeometry.height} x ${sourceGeometry.width}`;
 
-  function updateResolutionMode(mode: ManagedRunConfig["observation"]["resolution_mode"]) {
+  function updateResolutionMode(mode: ObservationResolutionMode) {
     if (mode === "preset") {
       updateObservation({
-        resolution_mode: "preset",
-        custom_resolution: null,
+        resolution: { mode: "preset", preset: currentPreset },
+      });
+      return;
+    }
+    if (mode === "source_crop") {
+      updateObservation({
+        resolution: { mode: "source_crop" },
       });
       return;
     }
     updateObservation({
-      resolution_mode: "custom",
-      custom_resolution: customResolution ?? {
+      resolution: customResolution ?? {
+        mode: "custom",
         height: fallbackCustomHeight,
         width: fallbackCustomWidth,
       },
@@ -119,23 +142,29 @@ export function ObservationSection({
               disabled={checkpointLocked}
             >
               <SelectField
-                help="Choose a stable native preset or provide a bounded custom resize target."
+                help="Choose a named resize target, provide a bounded custom size, or keep the cropped source size."
                 label="Resolution source"
                 options={resolutionModeOptions}
-                resetValue={defaultConfig.observation.resolution_mode}
-                value={config.observation.resolution_mode}
+                optionLabels={resolutionModeLabels}
+                resetValue={defaultResolution.mode}
+                value={resolution.mode}
                 onChange={updateResolutionMode}
               />
-              {config.observation.resolution_mode === "preset" ? (
+              {resolution.mode === "preset" ? (
                 <SelectField
                   help="Rendered crop preset used for the policy image input."
                   label="Input resolution"
-                  options={metadata.observation_presets.map((preset) => preset.value)}
-                  resetValue={defaultConfig.observation.preset}
-                  value={config.observation.preset}
-                  onChange={(value) => updateObservation({ preset: value })}
+                  options={observationPresetOptions}
+                  optionLabels={observationPresetLabels}
+                  resetValue={
+                    defaultResolution.mode === "preset" ? defaultResolution.preset : defaultPreset
+                  }
+                  value={resolution.preset}
+                  onChange={(value) =>
+                    updateObservation({ resolution: { mode: "preset", preset: value } })
+                  }
                 />
-              ) : (
+              ) : resolution.mode === "custom" ? (
                 <div className="custom-resolution-grid">
                   <IntegerField
                     help={`Custom target height after crop. Allowed range: ${metadata.observation_resolution_bounds.min_dimension}-${metadata.observation_resolution_bounds.max_height}px.`}
@@ -146,7 +175,8 @@ export function ObservationSection({
                     value={customResolution?.height ?? fallbackCustomHeight}
                     onChange={(value) =>
                       updateObservation({
-                        custom_resolution: {
+                        resolution: {
+                          mode: "custom",
                           height: value,
                           width: customResolution?.width ?? fallbackCustomWidth,
                         },
@@ -162,13 +192,23 @@ export function ObservationSection({
                     value={customResolution?.width ?? fallbackCustomWidth}
                     onChange={(value) =>
                       updateObservation({
-                        custom_resolution: {
+                        resolution: {
+                          mode: "custom",
                           height: customResolution?.height ?? fallbackCustomHeight,
                           width: value,
                         },
                       })
                     }
                   />
+                </div>
+              ) : (
+                <div className="field-shell">
+                  <span className="field-label">Input resolution</span>
+                  <span className="derived-value-note">
+                    {sourceGeometry === undefined
+                      ? "pending"
+                      : `${sourceGeometry.height} x ${sourceGeometry.width}`}
+                  </span>
                 </div>
               )}
               <SelectField

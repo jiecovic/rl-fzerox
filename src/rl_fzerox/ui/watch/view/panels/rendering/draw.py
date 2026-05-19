@@ -60,6 +60,7 @@ class SidePanelData:
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
+    best_finish_ranks: dict[str, int]
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
@@ -134,6 +135,7 @@ def _draw_side_panel(
         policy_reload_age_seconds=data.policy_reload_age_seconds,
         policy_reload_error=data.policy_reload_error,
         best_finish_position=data.best_finish_position,
+        best_finish_ranks=data.best_finish_ranks,
         best_finish_times=data.best_finish_times,
         latest_finish_times=data.latest_finish_times,
         latest_finish_deltas_ms=data.latest_finish_deltas_ms,

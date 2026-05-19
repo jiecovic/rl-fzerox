@@ -122,7 +122,7 @@ def main(argv: list[str] | None = None) -> None:
             run_id=run.id,
             status="paused" if signal.command == "pause" else "stopped",
             stopped_at=_now(),
-            message=f"training {signal.command}d by manager",
+            message=f"training {_past_tense_command(signal.command)} by manager",
         )
         return
     except Exception as exc:
@@ -275,6 +275,10 @@ def _mark_worker_boot_failure(
 
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _past_tense_command(command: str) -> str:
+    return "stopped" if command == "stop" else f"{command}d"
 
 
 def _configure_logging() -> None:

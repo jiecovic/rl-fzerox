@@ -61,7 +61,7 @@ def test_step_advances_backend_by_action_repeat():
     obs, reward, terminated, truncated, info = env.step(np.array([3, 1], dtype=np.int64))
     obs = _image_obs(obs)
 
-    assert obs.shape == (60, 76, 12)
+    assert obs.shape == (84, 84, 12)
     assert isinstance(reward, float)
     assert not terminated
     assert not truncated
@@ -91,7 +91,7 @@ def test_watch_step_captures_each_repeated_display_frame():
     assert backend.capture_video_flags == [True, True, True]
     assert len(watch_step.display_frames) == 3
     assert watch_step.display_frames[0].shape == (444, 592, 3)
-    assert _image_obs(watch_step.observation).shape == (60, 76, 12)
+    assert _image_obs(watch_step.observation).shape == (84, 84, 12)
     assert watch_step.info["repeat_index"] == 2
 
 
@@ -274,7 +274,7 @@ def test_step_updates_image_state_observation_from_step_telemetry() -> None:
 
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
-    assert obs["image"].shape == (60, 76, 12)
+    assert obs["image"].shape == (84, 84, 12)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
     values = {
@@ -573,9 +573,9 @@ def test_env_reset_passes_preset_to_render_observation() -> None:
     obs, info = env.reset(seed=13)
     obs = _image_obs(obs)
 
-    assert obs.shape == (60, 76, 12)
-    assert info["observation_frame_shape"] == (60, 76, 3)
-    assert backend.render_observation_calls == [("crop_60x76", None, None, 4, "rgb", False)]
+    assert obs.shape == (84, 84, 12)
+    assert info["observation_frame_shape"] == (84, 84, 3)
+    assert backend.render_observation_calls == [("crop_84x84", None, None, 4, "rgb", False)]
 
 
 def test_env_reset_passes_custom_resolution_to_render_observation() -> None:
@@ -615,9 +615,7 @@ def test_env_reset_passes_custom_resolution_to_render_observation() -> None:
             "action_repeat": 1,
             "observation": {
                 "mode": "image",
-                "resolution_mode": "custom",
-                "preset": "crop_60x76",
-                "custom_resolution": {"height": 72, "width": 96},
+                "resolution": {"mode": "custom", "height": 72, "width": 96},
                 "frame_stack": 4,
                 "stack_mode": "rgb",
                 "minimap_layer": False,
@@ -642,7 +640,7 @@ def test_env_reset_uses_rgb_stack_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                preset="crop_84x84",
+                resolution={"mode": "preset", "preset": "crop_84x84"},
                 frame_stack=4,
                 stack_mode="rgb",
             ),
@@ -664,7 +662,7 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                preset="crop_84x84",
+                resolution={"mode": "preset", "preset": "crop_84x84"},
                 frame_stack=4,
                 stack_mode="rgb",
                 minimap_layer=True,
@@ -1018,7 +1016,7 @@ def test_terminal_step_returns_an_observation_at_step_boundary() -> None:
     obs, _, terminated, truncated, info = env.step(np.array([2, 0], dtype=np.int64))
     obs = _image_obs(obs)
 
-    assert obs.shape == (60, 76, 12)
+    assert obs.shape == (84, 84, 12)
     assert terminated
     assert not truncated
     assert info["repeat_index"] == 0

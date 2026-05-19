@@ -86,13 +86,14 @@ function displayEnvironmentSummary(config: ManagedRunConfig) {
 }
 
 function displayObservationResolution(config: ManagedRunConfig) {
-  if (
-    config.observation.resolution_mode === "custom" &&
-    config.observation.custom_resolution !== null
-  ) {
-    return `${config.observation.custom_resolution.height} x ${config.observation.custom_resolution.width}`;
+  const { resolution } = config.observation;
+  if (resolution.mode === "custom") {
+    return `${resolution.height} x ${resolution.width}`;
   }
-  return config.observation.preset;
+  if (resolution.mode === "source_crop") {
+    return "original crop";
+  }
+  return resolution.preset;
 }
 
 function displayAuxiliarySummary(config: ManagedRunConfig) {

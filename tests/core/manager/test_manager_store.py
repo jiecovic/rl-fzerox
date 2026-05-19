@@ -301,7 +301,7 @@ def test_manager_store_rejects_legacy_observation_fields(tmp_path: Path) -> None
     stale_config["observation"] = {
         "frame_stack": 2,
         "minimap_layer": False,
-        "preset": "crop_60x76",
+        "preset": "crop_84x84",
         "progress_source": "segment_progress",
         "stack_mode": "rgb",
         "zero_edge_ratio": True,
@@ -771,6 +771,57 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
     assert worker_row is None
 
 
+def test_manager_store_reconciles_dead_worker_even_with_fresh_heartbeat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        name="Fresh Dead Lease Run",
+        config=default_managed_run_config(),
+        managed_runs_root=tmp_path / "runs",
+    )
+    started_at = "2026-05-03T12:00:00+00:00"
+    launched = store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at=started_at,
+        stopped_at=None,
+        message="worker launched",
+    )
+
+    assert launched is not None
+    assert store.register_run_worker(
+        run_id=run.id,
+        launch_token="token-1",
+        pid=12345,
+        launched_at=started_at,
+    )
+    requested = store.request_run_command(run_id=run.id, command="stop")
+    assert requested is not None
+    assert requested.pending_command == "stop"
+    fresh_heartbeat = (datetime.now(UTC) + timedelta(minutes=5)).isoformat(timespec="seconds")
+    with sqlite3.connect(store.db_path) as connection:
+        connection.execute(
+            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
+            (fresh_heartbeat, run.id),
+        )
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
+
+    store.reconcile_orphaned_runs()
+    failed = store.get_run(run.id)
+
+    assert failed is not None
+    assert failed.status == "failed"
+    assert failed.pending_command is None
+    with sqlite3.connect(store.db_path) as connection:
+        worker_row = connection.execute(
+            "SELECT 1 FROM run_workers WHERE run_id = ?",
+            (run.id,),
+        ).fetchone()
+    assert worker_row is None
+
+
 def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -812,7 +863,10 @@ def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
     assert refreshed.status == "running"
 
 
-def test_manager_store_exposes_worker_heartbeat_on_runs(tmp_path: Path) -> None:
+def test_manager_store_exposes_worker_heartbeat_on_runs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         name="Heartbeat Run",
@@ -841,6 +895,7 @@ def test_manager_store_exposes_worker_heartbeat_on_runs(tmp_path: Path) -> None:
         launch_token="token-1",
         heartbeat_at=heartbeat_at,
     )
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: True)
 
     refreshed = store.get_run(run.id)
 

@@ -128,6 +128,8 @@ def test_resolve_effective_training_algorithm_returns_configured_algorithm(
     assert resolve_effective_training_algorithm(train_config=config.train) == (
         "maskable_hybrid_action_ppo"
     )
+
+
 def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_action(
     tmp_path: Path,
 ) -> None:
@@ -141,6 +143,8 @@ def test_validate_training_algorithm_config_rejects_hybrid_ppo_without_hybrid_ac
 
     with pytest.raises(RuntimeError, match="configured_hybrid"):
         validate_training_algorithm_config(config)
+
+
 def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
     from sb3x import MaskableHybridActionPPO
     from stable_baselines3.common.vec_env import DummyVecEnv
@@ -179,6 +183,48 @@ def test_build_ppo_model_can_construct_maskable_hybrid_action_ppo() -> None:
         env.close()
 
     assert isinstance(model, MaskableHybridActionPPO)
+
+
+def test_build_ppo_model_rejects_unavailable_explicit_cuda(monkeypatch: pytest.MonkeyPatch) -> None:
+    from stable_baselines3.common.vec_env import DummyVecEnv
+
+    monkeypatch.setattr(
+        "rl_fzerox.core.training.session.model.builders.th.cuda.is_available",
+        lambda: False,
+    )
+    env = DummyVecEnv(
+        vec_env_fns(
+            lambda: FZeroXEnv(
+                backend=SyntheticBackend(),
+                config=EnvConfig(
+                    action=configured_hybrid_action(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    ),
+                    observation=ObservationConfig(
+                        mode="image_state",
+                        state_components=_VEHICLE_STATE_COMPONENT,
+                    ),
+                ),
+            )
+        )
+    )
+
+    try:
+        with pytest.raises(RuntimeError, match="PyTorch cannot access CUDA"):
+            build_ppo_model(
+                train_env=env,
+                train_config=TrainConfig(
+                    algorithm="maskable_hybrid_action_ppo",
+                    n_steps=4,
+                    batch_size=4,
+                    device="cuda",
+                ),
+                policy_config=PolicyConfig(),
+                tensorboard_log=None,
+            )
+    finally:
+        env.close()
 
 
 def test_build_ppo_model_can_construct_maskable_hybrid_recurrent_ppo() -> None:
@@ -394,6 +440,7 @@ def test_maskable_hybrid_recurrent_ppo_learns_with_auxiliary_state_loss() -> Non
 def test_auxiliary_state_losses_are_logged_to_tensorboard(tmp_path: Path) -> None:
     from stable_baselines3.common import logger as sb3_logger
     from stable_baselines3.common.vec_env import DummyVecEnv
+
     event_accumulator = pytest.importorskip(
         "tensorboard.backend.event_processing.event_accumulator"
     )

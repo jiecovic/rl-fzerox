@@ -99,12 +99,14 @@ export function LayerListField({
 
 export function CustomConvTableRows({
   disabled = false,
+  disabledReason = "CNN layers are locked.",
   flattenDim,
   previewLayers,
   value,
   onChange,
 }: {
   disabled?: boolean;
+  disabledReason?: string;
   flattenDim: number;
   previewLayers: PolicyArchitecturePreview["conv_layers"];
   value: ManagedRunConfig["policy"]["custom_conv_layers"];
@@ -126,7 +128,7 @@ export function CustomConvTableRows({
           return layer;
         }
         const nextLayer = { ...layer, [key]: nextValue };
-        if (nextLayer.kind === "residual" && key === "kernel_size") {
+        if (isResidualLayerKind(nextLayer.kind) && key === "kernel_size") {
           if (nextValue % 2 === 0) {
             return layer;
           }
@@ -143,11 +145,22 @@ export function CustomConvTableRows({
         if (layerIndex !== index) {
           return layer;
         }
-        if (kind === "residual") {
-          return normalizedResidualLayer(layer);
+        if (isResidualLayerKind(kind)) {
+          return normalizedResidualLayer(layer, kind);
+        }
+        if (isPoolingLayerKind(kind)) {
+          return normalizedPoolLayer(layer, kind);
         }
         return { ...layer, kind };
       }),
+    );
+  }
+
+  function setLayerPostActivation(index: number, enabled: boolean) {
+    onChange(
+      value.map((layer, layerIndex) =>
+        layerIndex === index ? { ...layer, post_activation: enabled } : layer,
+      ),
     );
   }
 
@@ -156,13 +169,27 @@ export function CustomConvTableRows({
     const template: CustomConvLayer = {
       kind,
       out_channels: previous?.out_channels ?? 64,
-      kernel_size: kind === "residual" ? 3 : (previous?.kernel_size ?? 3),
-      stride: kind === "residual" ? 1 : (previous?.stride ?? 1),
-      padding: kind === "residual" ? 1 : (previous?.padding ?? 0),
+      kernel_size: isResidualLayerKind(kind)
+        ? 3
+        : isPoolingLayerKind(kind)
+          ? 2
+          : (previous?.kernel_size ?? 2),
+      stride: isResidualLayerKind(kind)
+        ? 1
+        : isPoolingLayerKind(kind)
+          ? 2
+          : (previous?.stride ?? 1),
+      padding: isResidualLayerKind(kind)
+        ? 1
+        : isPoolingLayerKind(kind)
+          ? 0
+          : (previous?.padding ?? 0),
+      post_activation: true,
     };
-    const nextLayer: CustomConvLayer =
-      kind === "residual"
-        ? normalizedResidualLayer(template)
+    const nextLayer: CustomConvLayer = isResidualLayerKind(kind)
+      ? normalizedResidualLayer(template, kind)
+      : isPoolingLayerKind(kind)
+        ? normalizedPoolLayer(template, kind)
         : {
             ...template,
             kind: "conv",
@@ -177,6 +204,7 @@ export function CustomConvTableRows({
       kernel_size: 3,
       stride: 1,
       padding: 0,
+      post_activation: true,
     };
     onChange([...value, { ...template, kind: "conv" }]);
   }
@@ -233,7 +261,7 @@ export function CustomConvTableRows({
         const preview = previewLayers[index] ?? null;
         return (
           <tr
-            className={customCnnRowClass(index, draggedLayerIndex, dragOverLayerIndex)}
+            className={customCnnRowClass(index, draggedLayerIndex, dragOverLayerIndex, disabled)}
             draggable={!disabled}
             key={rowIdsRef.current[index]}
             onDragEnd={() => {
@@ -262,25 +290,34 @@ export function CustomConvTableRows({
                   }
                 >
                   <option value="conv">Conv</option>
-                  <option value="residual">Res block</option>
+                  <option value="residual_post">Res post</option>
+                  <option value="residual_pre">Res pre</option>
+                  <option value="maxpool">Max pool</option>
+                  <option value="avgpool">Avg pool</option>
                 </select>
               </div>
             </th>
             <td>
               <div className="custom-conv-channel-cell">
                 <span>{preview === null ? "…" : `${preview.in_channels} →`}</span>
-                <input
-                  aria-label={`custom CNN layer ${index + 1} output channels`}
-                  className="custom-conv-table-input"
-                  disabled={disabled}
-                  min={1}
-                  step={1}
-                  type="number"
-                  value={layer.out_channels}
-                  onChange={(event) =>
-                    setLayerValue(index, "out_channels", Number(event.target.value))
-                  }
-                />
+                {isPoolingLayerKind(layer.kind) ? (
+                  <span className="custom-conv-static-value">
+                    {preview === null ? "same" : preview.out_channels}
+                  </span>
+                ) : (
+                  <input
+                    aria-label={`custom CNN layer ${index + 1} output channels`}
+                    className="custom-conv-table-input"
+                    disabled={disabled}
+                    min={1}
+                    step={1}
+                    type="number"
+                    value={layer.out_channels}
+                    onChange={(event) =>
+                      setLayerValue(index, "out_channels", Number(event.target.value))
+                    }
+                  />
+                )}
               </div>
             </td>
             <td>
@@ -317,9 +354,26 @@ export function CustomConvTableRows({
                 step={1}
                 type="number"
                 value={layer.padding}
-                disabled={disabled || layer.kind === "residual"}
+                disabled={disabled || isResidualLayerKind(layer.kind)}
                 onChange={(event) => setLayerValue(index, "padding", Number(event.target.value))}
               />
+            </td>
+            <td>
+              {layer.kind === "conv" ? (
+                <select
+                  aria-label={`custom CNN layer ${index + 1} activation`}
+                  disabled={disabled}
+                  value={layer.post_activation ? "relu" : "none"}
+                  onChange={(event) =>
+                    setLayerPostActivation(index, event.currentTarget.value === "relu")
+                  }
+                >
+                  <option value="relu">ReLU</option>
+                  <option value="none">None</option>
+                </select>
+              ) : (
+                <span className="custom-conv-static-value">{layerActivationLabel(layer)}</span>
+              )}
             </td>
             <td>{formatConvSpatial(preview, "input")}</td>
             <td>{formatConvSpatial(preview, "output")}</td>
@@ -332,7 +386,7 @@ export function CustomConvTableRows({
                 className="field-reset-button tooltip-anchor"
                 data-tooltip={
                   disabled
-                    ? "Forked checkpoints keep the original CNN extractor."
+                    ? disabledReason
                     : value.length <= 1
                       ? "Keep at least one layer"
                       : "Remove layer"
@@ -349,7 +403,7 @@ export function CustomConvTableRows({
       })}
       <tr className="custom-conv-add-row">
         <th>{`L${value.length + 1}`}</th>
-        <td colSpan={9}>
+        <td colSpan={10}>
           <div className="custom-cnn-add-actions">
             <button
               className="secondary-button custom-conv-add-row-button"
@@ -363,9 +417,33 @@ export function CustomConvTableRows({
               className="secondary-button custom-conv-add-row-button"
               disabled={disabled}
               type="button"
-              onClick={() => addLayer("residual")}
+              onClick={() => addLayer("residual_post")}
             >
-              Add res block
+              Add res post
+            </button>
+            <button
+              className="secondary-button custom-conv-add-row-button"
+              disabled={disabled}
+              type="button"
+              onClick={() => addLayer("residual_pre")}
+            >
+              Add res pre
+            </button>
+            <button
+              className="secondary-button custom-conv-add-row-button"
+              disabled={disabled}
+              type="button"
+              onClick={() => addLayer("maxpool")}
+            >
+              Add max pool
+            </button>
+            <button
+              className="secondary-button custom-conv-add-row-button"
+              disabled={disabled}
+              type="button"
+              onClick={() => addLayer("avgpool")}
+            >
+              Add avg pool
             </button>
           </div>
         </td>
@@ -373,9 +451,7 @@ export function CustomConvTableRows({
           <button
             aria-label="Add custom CNN conv layer"
             className="field-reset-button layer-add-button tooltip-anchor"
-            data-tooltip={
-              disabled ? "Forked checkpoints keep the original CNN extractor." : "Add layer"
-            }
+            data-tooltip={disabled ? disabledReason : "Add layer"}
             disabled={disabled}
             type="button"
             onClick={duplicateLastConvLayer}
@@ -386,10 +462,20 @@ export function CustomConvTableRows({
       </tr>
       <tr className="custom-conv-flatten-row">
         <th>flatten</th>
-        <td colSpan={10}>{formatFlattenSummary(previewLayers, flattenDim)}</td>
+        <td colSpan={11}>{formatFlattenSummary(previewLayers, flattenDim)}</td>
       </tr>
     </>
   );
+}
+
+function layerActivationLabel(layer: CustomConvLayer) {
+  if (layer.kind === "residual_pre") {
+    return "pre";
+  }
+  if (layer.kind === "residual_post") {
+    return "post";
+  }
+  return "none";
 }
 
 function layerListResetHandler<T>(value: T[], resetValue: T[], onChange: (value: T[]) => void) {
@@ -409,14 +495,30 @@ function deepEqual(left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function normalizedResidualLayer(layer: CustomConvLayer): CustomConvLayer {
+function normalizedResidualLayer(
+  layer: CustomConvLayer,
+  kind: Extract<CustomCnnLayerKind, "residual_pre" | "residual_post">,
+): CustomConvLayer {
   const kernelSize =
     layer.kernel_size % 2 === 1 ? layer.kernel_size : Math.max(1, layer.kernel_size - 1);
   return {
     ...layer,
-    kind: "residual",
+    kind,
     kernel_size: kernelSize,
     padding: residualPadding(kernelSize),
+  };
+}
+
+function normalizedPoolLayer(
+  layer: CustomConvLayer,
+  kind: Extract<CustomCnnLayerKind, "maxpool" | "avgpool">,
+): CustomConvLayer {
+  return {
+    ...layer,
+    kind,
+    kernel_size: Math.max(1, layer.kernel_size),
+    stride: Math.max(1, layer.stride),
+    padding: Math.max(0, layer.padding),
   };
 }
 
@@ -425,19 +527,58 @@ function residualPadding(kernelSize: number) {
 }
 
 function layerLabel(index: number, kind: CustomCnnLayerKind) {
-  return kind === "residual" ? `res${index}` : `conv${index}`;
+  if (kind === "residual_pre") {
+    return `res-pre${index}`;
+  }
+  if (kind === "residual_post") {
+    return `res${index}`;
+  }
+  if (kind === "maxpool") {
+    return `pool${index}`;
+  }
+  if (kind === "avgpool") {
+    return `avgpool${index}`;
+  }
+  return `conv${index}`;
 }
 
 function customCnnLayerKind(value: string): CustomCnnLayerKind {
-  return value === "residual" ? "residual" : "conv";
+  if (value === "residual") {
+    return "residual_post";
+  }
+  if (
+    value === "residual_pre" ||
+    value === "residual_post" ||
+    value === "maxpool" ||
+    value === "avgpool"
+  ) {
+    return value;
+  }
+  return "conv";
+}
+
+function isResidualLayerKind(
+  kind: CustomCnnLayerKind,
+): kind is Extract<CustomCnnLayerKind, "residual_pre" | "residual_post"> {
+  return kind === "residual_pre" || kind === "residual_post";
+}
+
+function isPoolingLayerKind(
+  kind: CustomCnnLayerKind,
+): kind is Extract<CustomCnnLayerKind, "maxpool" | "avgpool"> {
+  return kind === "maxpool" || kind === "avgpool";
 }
 
 function customCnnRowClass(
   index: number,
   draggedLayerIndex: number | null,
   dragOverLayerIndex: number | null,
+  disabled: boolean,
 ) {
   const classes = ["custom-cnn-layer-row"];
+  if (disabled) {
+    classes.push("is-disabled");
+  }
   if (draggedLayerIndex === index) {
     classes.push("is-dragging");
   }

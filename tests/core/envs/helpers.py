@@ -84,7 +84,7 @@ class ScriptedStepBackend(SyntheticBackend):
         )
         if result.observation.shape[2] != expected_channels:
             raise AssertionError("Scripted observation stack does not match frame_stack")
-        if preset != "crop_60x76":
+        if preset != "crop_84x84":
             raise AssertionError(f"Unexpected preset {preset!r}")
         return result
 
@@ -227,7 +227,7 @@ def backend_step_result(
     status: StepStatus | None = None,
 ) -> BackendStepResult:
     value = np.uint8(summary.final_frame_index % 255)
-    height, width = preset_geometry("crop_60x76")
+    height, width = preset_geometry("crop_84x84")
     observation = np.full((height, width, 12), value, dtype=np.uint8)
     return BackendStepResult(
         observation=observation,

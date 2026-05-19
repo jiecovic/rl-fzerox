@@ -1,11 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyPreviewPanel.tsx
 import { PolicyArchitectureDiagram } from "@/features/configurator/sections/PolicyArchitectureDiagram";
-import {
-  formatConvSpatial,
-  formatFitMode,
-  formatParamCount,
-  formatPixelDrop,
-} from "@/features/configurator/sections/policy/convPreviewFormatting";
+import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import { CustomConvTableRows } from "@/features/configurator/sections/policy/LayerEditors";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 
@@ -14,17 +9,27 @@ export function PolicyPreviewPanel({
   convProfile,
   customConvLayers,
   preview,
+  convertPresetToCustom,
   setCustomConvLayers,
 }: {
   checkpointLocked?: boolean;
   convProfile: ManagedRunConfig["policy"]["conv_profile"];
   customConvLayers: ManagedRunConfig["policy"]["custom_conv_layers"];
   preview: PolicyArchitecturePreview | null;
+  convertPresetToCustom: (value: ManagedRunConfig["policy"]["custom_conv_layers"]) => void;
   setCustomConvLayers: (value: ManagedRunConfig["policy"]["custom_conv_layers"]) => void;
 }) {
   if (preview === null) {
     return <div className="preview-placeholder">Computing architecture preview...</div>;
   }
+  const isCustomProfile = convProfile === "custom";
+  const canConvertPreset = !checkpointLocked && !isCustomProfile;
+  const editorDisabledReason = checkpointLocked
+    ? "Forked checkpoints keep the original CNN extractor."
+    : "Preset CNNs are read-only. Use Edit as custom first.";
+  const editableConvLayers = isCustomProfile
+    ? customConvLayers
+    : customConvLayersFromPreview(preview.conv_layers);
 
   return (
     <div className="policy-preview-grid">
@@ -42,14 +47,19 @@ export function PolicyPreviewPanel({
       </section>
 
       <section className="conv-table-panel" id="policy-cnn-configurator">
-        <h3>CNN layers</h3>
-        <table
-          className={
-            convProfile === "custom"
-              ? "derived-table conv-derived-table conv-derived-table-custom"
-              : "derived-table conv-derived-table"
-          }
-        >
+        <div className="conv-table-heading">
+          <h3>CNN layers</h3>
+          {canConvertPreset ? (
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => convertPresetToCustom(editableConvLayers)}
+            >
+              Edit as custom
+            </button>
+          ) : null}
+        </div>
+        <table className="derived-table conv-derived-table conv-derived-table-custom">
           <thead>
             <tr>
               <th>Layer</th>
@@ -57,43 +67,24 @@ export function PolicyPreviewPanel({
               <th>Kernel</th>
               <th>Stride</th>
               <th>Pad</th>
+              <th>Activation</th>
               <th>Input</th>
               <th>Output</th>
               <th>Fit</th>
               <th>Pixel drop</th>
               <th>Params</th>
-              {convProfile === "custom" ? <th>Actions</th> : null}
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {convProfile === "custom" ? (
-              <CustomConvTableRows
-                disabled={checkpointLocked}
-                flattenDim={preview.flatten_dim}
-                previewLayers={preview.conv_layers}
-                value={customConvLayers}
-                onChange={setCustomConvLayers}
-              />
-            ) : (
-              preview.conv_layers.map((layer) => (
-                <tr key={layer.name}>
-                  <th>{layer.name}</th>
-                  <td>
-                    {layer.in_channels}
-                    {" → "}
-                    {layer.out_channels}
-                  </td>
-                  <td>{layer.kernel_size}</td>
-                  <td>{layer.stride}</td>
-                  <td>{layer.padding}</td>
-                  <td>{formatConvSpatial(layer, "input")}</td>
-                  <td>{formatConvSpatial(layer, "output")}</td>
-                  <td>{formatFitMode(layer)}</td>
-                  <td>{formatPixelDrop(layer)}</td>
-                  <td>{formatParamCount(layer.params)}</td>
-                </tr>
-              ))
-            )}
+            <CustomConvTableRows
+              disabled={checkpointLocked || !isCustomProfile}
+              disabledReason={editorDisabledReason}
+              flattenDim={preview.flatten_dim}
+              previewLayers={preview.conv_layers}
+              value={editableConvLayers}
+              onChange={setCustomConvLayers}
+            />
           </tbody>
         </table>
       </section>
@@ -149,6 +140,19 @@ export function PolicyPreviewPanel({
       </section>
     </div>
   );
+}
+
+function customConvLayersFromPreview(
+  layers: PolicyArchitecturePreview["conv_layers"],
+): ManagedRunConfig["policy"]["custom_conv_layers"] {
+  return layers.map((layer) => ({
+    kind: layer.kind,
+    out_channels: layer.out_channels,
+    kernel_size: layer.kernel_size,
+    stride: layer.stride,
+    padding: layer.padding,
+    post_activation: layer.post_activation,
+  }));
 }
 
 function branchStatus(branch: PolicyArchitecturePreview["action_branches"][number]) {

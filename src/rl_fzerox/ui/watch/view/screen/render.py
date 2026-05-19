@@ -100,6 +100,7 @@ def draw_watch_frame(
             policy_reload_error=snapshot.policy_reload_error,
             cnn_activations=snapshot.cnn_activations,
             best_finish_position=snapshot.best_finish_position,
+            best_finish_ranks=snapshot.best_finish_ranks,
             best_finish_times=snapshot.best_finish_times,
             latest_finish_times=snapshot.latest_finish_times,
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,

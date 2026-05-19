@@ -74,6 +74,7 @@ class PolicyRunner:
         self._policy_mtime_ns = _policy_mtime_ns(loaded_policy.policy_path)
         self._policy_metadata_mtime_ns = _policy_metadata_mtime_ns(loaded_policy.policy_path)
         self._last_reload_monotonic = time.monotonic()
+        self._next_refresh_check_monotonic = 0.0
         self._reload_error: str | None = None
         self._last_reload_error: str | None = None
         self._predict_state: PolicyState = None
@@ -131,6 +132,15 @@ class PolicyRunner:
         """Reload artifact metadata if the watched policy checkpoint changed on disk."""
 
         self._maybe_reload()
+
+    def refresh_if_due(self, *, interval_seconds: float) -> None:
+        """Refresh at most once per interval unless the interval is zero."""
+
+        now = time.monotonic()
+        if now < self._next_refresh_check_monotonic:
+            return
+        self._next_refresh_check_monotonic = now + max(0.0, float(interval_seconds))
+        self.refresh()
 
     def reset(self) -> None:
         """Reset any recurrent inference state for a fresh episode."""

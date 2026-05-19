@@ -3,9 +3,13 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
-from rl_fzerox.core.domain.cnn import CnnLayerKind, validate_residual_cnn_padding
+from rl_fzerox.core.domain.cnn import (
+    CnnLayerKind,
+    normalize_cnn_layer_kind,
+    validate_cnn_layer_geometry,
+)
 from rl_fzerox.core.policy.auxiliary_state.targets import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_supports_grounded_only,
@@ -34,10 +38,16 @@ class ExtractorConfig(BaseModel):
         kernel_size: PositiveInt
         stride: PositiveInt
         padding: int = Field(default=0, ge=0)
+        post_activation: bool = True
+
+        @field_validator("kind", mode="before")
+        @classmethod
+        def _normalize_kind(cls, value: object) -> CnnLayerKind:
+            return normalize_cnn_layer_kind(value)
 
         @model_validator(mode="after")
-        def _validate_residual_shape(self) -> ExtractorConfig.CustomConvLayer:
-            validate_residual_cnn_padding(
+        def _validate_layer_geometry(self) -> ExtractorConfig.CustomConvLayer:
+            validate_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
                 padding=int(self.padding),
@@ -46,9 +56,12 @@ class ExtractorConfig(BaseModel):
 
     conv_profile: Literal[
         "nature",
+        "impala_small",
+        "impala_large",
         "custom",
     ] = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = ()
+    custom_cnn_final_relu: bool = False
     features_dim: PositiveInt | Literal["auto"] = 512
     state_features_dim: PositiveInt = 64
     state_net_arch: tuple[PositiveInt, ...] | None = None

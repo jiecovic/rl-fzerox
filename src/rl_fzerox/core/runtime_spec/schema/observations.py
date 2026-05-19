@@ -4,7 +4,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Literal, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
@@ -14,12 +22,12 @@ from rl_fzerox.core.domain.observation_components import (
     TrackPositionProgressSourceName,
 )
 from rl_fzerox.core.domain.observation_image import (
-    ObservationCustomResolution,
-    ObservationResolutionMode,
+    ObservationResolutionConfig,
+    PresetResolutionChoice,
     resolve_observation_geometry,
 )
+from rl_fzerox.core.runtime_spec.renderers import RendererName
 from rl_fzerox.core.runtime_spec.schema.common import (
-    ObservationPresetName,
     ObservationResizeFilter,
 )
 
@@ -147,15 +155,30 @@ class ObservationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mode: Literal["image", "image_state"] = "image"
-    resolution_mode: ObservationResolutionMode = "preset"
-    preset: ObservationPresetName = "crop_60x76"
-    custom_resolution: ObservationCustomResolution | None = None
+    resolution: ObservationResolutionConfig = Field(default_factory=PresetResolutionChoice)
     frame_stack: PositiveInt = 4
     stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb"
     minimap_layer: bool = False
     resize_filter: ObservationResizeFilter = "nearest"
     minimap_resize_filter: ObservationResizeFilter = "nearest"
     state_components: tuple[ObservationStateComponentConfig, ...] | None = None
+
+    @model_serializer(mode="plain")
+    def _serialize(self) -> dict[str, object]:
+        data: dict[str, object] = {
+            "mode": self.mode,
+            "resolution": self.resolution.model_dump(mode="json"),
+            "frame_stack": self.frame_stack,
+            "stack_mode": self.stack_mode,
+            "minimap_layer": self.minimap_layer,
+            "resize_filter": self.resize_filter,
+            "minimap_resize_filter": self.minimap_resize_filter,
+        }
+        if self.state_components is not None:
+            data["state_components"] = [
+                component.model_dump(mode="json") for component in self.state_components
+            ]
+        return data
 
     @field_validator("state_components")
     @classmethod
@@ -172,14 +195,6 @@ class ObservationConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_state_components_for_mode(self) -> ObservationConfig:
-        if self.resolution_mode == "preset" and self.custom_resolution is not None:
-            raise ValueError(
-                "observation.custom_resolution must be null for resolution_mode='preset'"
-            )
-        if self.resolution_mode == "custom" and self.custom_resolution is None:
-            raise ValueError(
-                "observation.custom_resolution must be set for resolution_mode='custom'"
-            )
         if self.mode == "image_state" and not self.state_components:
             raise ValueError("observation.state_components must not be empty for mode=image_state")
         return self
@@ -191,21 +206,24 @@ class ObservationConfig(BaseModel):
             return None
         return tuple(component.data() for component in self.state_components)
 
-    def image_geometry(self) -> tuple[int, int]:
+    def image_geometry(self, *, renderer: RendererName | None = None) -> tuple[int, int]:
         """Return the active `(height, width)` for one resolved runtime config."""
 
         return resolve_observation_geometry(
-            resolution_mode=self.resolution_mode,
-            preset=self.preset,
-            custom_resolution=self.custom_resolution,
+            resolution=self.resolution,
+            renderer=renderer,
         )
 
-    def native_resolution_kwargs(self) -> NativeObservationResolutionKwargs:
+    def native_resolution_kwargs(
+        self,
+        *,
+        renderer: RendererName | None = None,
+    ) -> NativeObservationResolutionKwargs:
         """Return the backend kwargs for the active preset-or-custom resolution."""
 
-        if self.resolution_mode == "preset":
-            return {"preset": self.preset}
-        height, width = self.image_geometry()
+        if isinstance(self.resolution, PresetResolutionChoice):
+            return {"preset": self.resolution.preset}
+        height, width = self.image_geometry(renderer=renderer)
         return {"height": height, "width": width}
 
 

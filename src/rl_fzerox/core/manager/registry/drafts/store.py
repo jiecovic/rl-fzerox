@@ -284,6 +284,7 @@ def list_templates(store: ManagerStore) -> tuple[ManagedRunTemplate, ...]:
 
 
 def default_template(store: ManagerStore) -> ManagedRunTemplate:
+    store.refresh_system_templates()
     templates = list_templates(store)
     if not templates:
         raise RuntimeError("Manager DB did not initialize a default run template")

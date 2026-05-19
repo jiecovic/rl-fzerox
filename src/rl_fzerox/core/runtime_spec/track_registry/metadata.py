@@ -37,9 +37,7 @@ def entry_from_course_variant(
     course_id = optional_str(course.get("id")) or safe_id(course_ref)
     mode_id = safe_id(variant.mode)
     difficulty_suffix = (
-        ""
-        if variant.gp_difficulty is None
-        else f"_{safe_id(variant.gp_difficulty)}"
+        "" if variant.gp_difficulty is None else f"_{safe_id(variant.gp_difficulty)}"
     )
 
     entry: dict[str, object] = {

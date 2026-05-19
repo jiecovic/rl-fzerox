@@ -22,6 +22,7 @@ describe("CustomConvTableRows", () => {
         kernel_size: 6,
         stride: 3,
         padding: 0,
+        post_activation: true,
       },
     ];
     const onChange = vi.fn();
@@ -39,16 +40,101 @@ describe("CustomConvTableRows", () => {
       </table>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Add res block" }));
+    await user.click(screen.getByRole("button", { name: "Add res post" }));
 
     expect(onChange).toHaveBeenCalledWith([
       layers[0],
       {
-        kind: "residual",
+        kind: "residual_post",
         out_channels: 16,
         kernel_size: 3,
         stride: 1,
         padding: 1,
+        post_activation: true,
+      },
+    ]);
+  });
+
+  it("adds max-pool layers with pooling defaults", async () => {
+    const user = userEvent.setup();
+    const layers: CustomConvLayer[] = [
+      {
+        kind: "conv",
+        out_channels: 16,
+        kernel_size: 6,
+        stride: 3,
+        padding: 0,
+        post_activation: true,
+      },
+    ];
+    const onChange = vi.fn();
+
+    render(
+      <table>
+        <tbody>
+          <CustomConvTableRows
+            flattenDim={0}
+            previewLayers={[]}
+            value={layers}
+            onChange={onChange}
+          />
+        </tbody>
+      </table>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add max pool" }));
+
+    expect(onChange).toHaveBeenCalledWith([
+      layers[0],
+      {
+        kind: "maxpool",
+        out_channels: 16,
+        kernel_size: 2,
+        stride: 2,
+        padding: 0,
+        post_activation: true,
+      },
+    ]);
+  });
+
+  it("adds avg-pool layers with pooling defaults", async () => {
+    const user = userEvent.setup();
+    const layers: CustomConvLayer[] = [
+      {
+        kind: "conv",
+        out_channels: 16,
+        kernel_size: 6,
+        stride: 3,
+        padding: 0,
+        post_activation: true,
+      },
+    ];
+    const onChange = vi.fn();
+
+    render(
+      <table>
+        <tbody>
+          <CustomConvTableRows
+            flattenDim={0}
+            previewLayers={[]}
+            value={layers}
+            onChange={onChange}
+          />
+        </tbody>
+      </table>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Add avg pool" }));
+
+    expect(onChange).toHaveBeenCalledWith([
+      layers[0],
+      {
+        kind: "avgpool",
+        out_channels: 16,
+        kernel_size: 2,
+        stride: 2,
+        padding: 0,
+        post_activation: true,
       },
     ]);
   });
@@ -61,13 +147,15 @@ describe("CustomConvTableRows", () => {
         kernel_size: 6,
         stride: 3,
         padding: 0,
+        post_activation: true,
       },
       {
-        kind: "residual",
+        kind: "residual_post",
         out_channels: 16,
         kernel_size: 3,
         stride: 1,
         padding: 1,
+        post_activation: true,
       },
     ];
     const onChange = vi.fn();

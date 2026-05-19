@@ -5,6 +5,8 @@ from fzerox_emulator import FZeroXTelemetry
 
 TrackFinishTimes = dict[str, int]
 TrackBestFinishTimes = TrackFinishTimes
+TrackFinishRanks = dict[str, int]
+TrackBestFinishRanks = TrackFinishRanks
 TrackLatestFinishDeltas = dict[str, int]
 FailedTrackAttempts = frozenset[str]
 
@@ -38,6 +40,25 @@ def _update_best_finish_times(
         return best_finish_times
     updated = dict(best_finish_times)
     updated[track_key] = finish_time_ms
+    return updated
+
+
+def _update_best_finish_ranks(
+    best_finish_ranks: TrackBestFinishRanks,
+    info: dict[str, object],
+    telemetry: FZeroXTelemetry | None,
+) -> TrackBestFinishRanks:
+    """Return updated per-track best finish positions for successful episodes."""
+
+    finish_position = _successful_finish_position(info, telemetry)
+    track_key = _track_key(info)
+    if finish_position is None or track_key is None:
+        return best_finish_ranks
+    current_best = best_finish_ranks.get(track_key)
+    if current_best is not None and current_best <= finish_position:
+        return best_finish_ranks
+    updated = dict(best_finish_ranks)
+    updated[track_key] = finish_position
     return updated
 
 

@@ -91,10 +91,7 @@ def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
     field_name = auxiliary_state_targets_field()
     aux_targets = obs.get(field_name)
     if not isinstance(aux_targets, torch.Tensor):
-        raise TypeError(
-            "Auxiliary-state policies require tensor observation key "
-            f"{field_name!r}"
-        )
+        raise TypeError(f"Auxiliary-state policies require tensor observation key {field_name!r}")
     return torch.flatten(aux_targets.float(), start_dim=1)
 
 

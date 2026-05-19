@@ -43,6 +43,14 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ lap_position_scale: value })}
           />
           <NumberField
+            help="Reward for each newly gained KO star in GP race. This is ignored outside GP race."
+            label="KO star reward"
+            resetValue={defaultConfig.reward.ko_star_reward}
+            step="0.1"
+            value={config.reward.ko_star_reward}
+            onChange={(value) => updateReward({ ko_star_reward: value })}
+          />
+          <NumberField
             help="Progress reward multiplier while on dirt."
             label="Dirt progress multiplier"
             resetValue={defaultConfig.reward.dirt_progress_multiplier}

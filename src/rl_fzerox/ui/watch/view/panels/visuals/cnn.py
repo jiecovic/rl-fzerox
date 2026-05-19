@@ -443,9 +443,7 @@ def _weak_channel_summary(layer: CnnActivationLayer) -> str:
         return "weakest channels: n/a"
 
     weakest = sorted(stats, key=lambda stat: stat.max_abs)[: _STATS_LAYOUT.weakest_channel_count]
-    channels = " ".join(
-        f"{stat.index}:{_format_compact_float(stat.max_abs)}" for stat in weakest
-    )
+    channels = " ".join(f"{stat.index}:{_format_compact_float(stat.max_abs)}" for stat in weakest)
     return f"weakest max|x| ch: {channels}"
 
 
@@ -483,8 +481,7 @@ def _stats_grid_columns(*, width: int, channel_count: int) -> int:
     max_columns = min(channel_count, _STATS_LAYOUT.max_columns)
     widest_columns = max(
         1,
-        (width + _STATS_LAYOUT.cell_gap)
-        // (_STATS_LAYOUT.min_cell_size + _STATS_LAYOUT.cell_gap),
+        (width + _STATS_LAYOUT.cell_gap) // (_STATS_LAYOUT.min_cell_size + _STATS_LAYOUT.cell_gap),
     )
     return max(1, min(max_columns, widest_columns))
 

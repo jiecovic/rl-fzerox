@@ -145,7 +145,9 @@ def _history_feature_bounds_for_controls(
     features: list[StateFeature] = []
     for control in controls:
         if control == "lean":
-            features.extend(_lean_history_feature_bounds(independent_lean_buttons=independent_lean_buttons))
+            features.extend(
+                _lean_history_feature_bounds(independent_lean_buttons=independent_lean_buttons)
+            )
             continue
         features.append(ACTION_HISTORY_FEATURE_BOUNDS[control])
     return tuple(features)

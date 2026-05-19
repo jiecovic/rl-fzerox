@@ -62,6 +62,7 @@ def _build_panel_columns(
     boost_lamp_level: float = 0.0,
     action_mask_branches: ActionMaskBranches | None = None,
     best_finish_position: int | None = None,
+    best_finish_ranks: dict[str, int] | None = None,
     best_finish_times: dict[str, int] | None = None,
     latest_finish_times: dict[str, int] | None = None,
     latest_finish_deltas_ms: dict[str, int] | None = None,
@@ -138,13 +139,6 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
-                    _panel_line(
-                        "Best position",
-                        _format_best_position(best_finish_position),
-                        PALETTE.text_primary
-                        if best_finish_position is not None
-                        else PALETTE.text_muted,
-                    ),
                     _panel_line(
                         "Episode frame",
                         _format_episode_frames(info, max_episode_steps=max_episode_steps),
@@ -272,6 +266,7 @@ def _build_panel_columns(
             *track_record_sections(
                 current_info=info,
                 track_pool_records=track_pool_records,
+                best_finish_ranks=best_finish_ranks or {},
                 best_finish_times=best_finish_times or {},
                 latest_finish_times=latest_finish_times or {},
                 latest_finish_deltas_ms=latest_finish_deltas_ms or {},
@@ -297,6 +292,7 @@ def _watch_zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     if isinstance(raw_features, tuple | list):
         return frozenset(str(feature) for feature in raw_features)
     return frozenset()
+
 
 def _format_reward_value(value: float) -> str:
     return f"{value:.4f}"
@@ -340,7 +336,3 @@ def _format_curriculum_stage(*, checkpoint_stage: str | None, info: dict[str, ob
     if checkpoint_stage is not None and checkpoint_stage:
         return checkpoint_stage
     return _format_env_curriculum_stage(info)
-
-
-def _format_best_position(value: int | None) -> str:
-    return "n/a" if value is None else str(value)

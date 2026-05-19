@@ -5,32 +5,26 @@ import time
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TYPE_CHECKING
 
-from fzerox_emulator import ControllerState, Emulator
-from rl_fzerox.core.envs import FZeroXEnv
+from fzerox_emulator import ControllerState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
-from rl_fzerox.core.seed import seed_process
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationSampler,
 )
+from rl_fzerox.ui.watch.runtime.course_commands import apply_course_navigation_commands
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     adjacent_watch_course_id as _adjacent_watch_course_id,
-)
-from rl_fzerox.ui.watch.runtime.course_navigation import (
-    current_watch_course_id as _current_watch_course_id,
-)
-from rl_fzerox.ui.watch.runtime.course_navigation import (
-    sync_locked_course_info as _sync_locked_course_info,
 )
 from rl_fzerox.ui.watch.runtime.course_navigation import (
     watch_sequential_course_ids as _watch_sequential_course_ids,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
+    _update_best_finish_ranks,
     _update_best_finish_times,
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
@@ -44,16 +38,15 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 )
 from rl_fzerox.ui.watch.runtime.observation import (
     apply_watch_state_feature_zeroing,
-    configured_watch_zeroed_features,
     toggle_watch_state_feature,
 )
 from rl_fzerox.ui.watch.runtime.policy import (
-    _load_policy_runner,
     _persist_reload_error,
     _policy_reload_error,
     _reset_policy_runner,
     _sync_policy_curriculum_stage,
 )
+from rl_fzerox.ui.watch.runtime.session import open_watch_runtime_session
 from rl_fzerox.ui.watch.runtime.snapshots import (
     _build_snapshot,
     _next_boost_lamp_level,
@@ -63,7 +56,6 @@ from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
 from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _adjust_control_fps,
-    _resolve_control_fps,
     _target_seconds,
 )
 from rl_fzerox.ui.watch.runtime.visualization import (
@@ -75,7 +67,6 @@ from rl_fzerox.ui.watch.runtime.visualization import (
 from rl_fzerox.ui.watch.runtime.visualization import (
     refresh_paused_cnn_activations as _refresh_paused_cnn_activations,
 )
-from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
 
 if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
@@ -110,40 +101,20 @@ def _run_simulation_loop(
     command_queue: ProcessQueue,
     snapshot_queue: ProcessQueue,
 ) -> None:
-    seed_process(config.seed)
-    x_cup_info = materialize_x_cup_watch_baseline(config) if config.watch.x_cup.enabled else None
-    emulator = Emulator(
-        core_path=config.emulator.core_path,
-        rom_path=config.emulator.rom_path,
-        runtime_dir=config.emulator.runtime_dir,
-        baseline_state_path=config.emulator.baseline_state_path,
-        renderer=config.emulator.renderer,
-    )
-    env = FZeroXEnv(
-        backend=emulator,
-        config=config.env,
-        reward_config=config.reward,
-        curriculum_config=config.curriculum,
-    )
-    env.set_sequential_track_sampling(True)
+    session = open_watch_runtime_session(config)
+    emulator = session.emulator
+    env = session.env
+    policy_runner = session.policy_runner
+    x_cup_info = session.x_cup_info
     try:
-        policy_runner = _load_policy_runner(
-            config.watch.policy_run_dir,
-            artifact=config.watch.policy_artifact,
-            device=config.watch.device,
-            algorithm=config.watch.policy_algorithm,
-        )
-        _sync_policy_curriculum_stage(policy_runner, env)
-        native_control_fps = env.backend.native_fps / config.env.action_repeat
-        target_control_fps = _resolve_control_fps(
-            config.watch.control_fps,
-            native_control_fps=native_control_fps,
-        )
-        target_control_seconds = _target_seconds(target_control_fps)
+        native_control_fps = session.native_control_fps
+        target_control_fps = session.target_control_fps
+        target_control_seconds = session.target_control_seconds
         control_rate = RateMeter(window=60)
         last_logged_reload_error: str | None = None
         episode = 0
         best_finish_position: int | None = None
+        best_finish_ranks: dict[str, int] = {}
         best_finish_times: dict[str, int] = {}
         latest_finish_times: dict[str, int] = {}
         latest_finish_deltas_ms: dict[str, int] = {}
@@ -159,12 +130,10 @@ def _run_simulation_loop(
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         persistent_locked_reset_course_id: str | None = None
-        sequential_course_ids = _watch_sequential_course_ids(config.env.track_sampling.entries)
-        watch_zeroed_state_features = configured_watch_zeroed_features(config)
+        sequential_course_ids = session.sequential_course_ids
+        watch_zeroed_state_features = session.watch_zeroed_state_features
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
-            ()
-            if config.policy is None
-            else tuple(loss.name for loss in config.policy.auxiliary_state.losses)
+            session.auxiliary_target_names
         )
 
         while config.watch.episodes is None or episode < config.watch.episodes:
@@ -232,6 +201,7 @@ def _run_simulation_loop(
                     policy_reload_error=policy_reload_error,
                     cnn_activations=None,
                     best_finish_position=best_finish_position,
+                    best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -260,7 +230,6 @@ def _run_simulation_loop(
                     bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
                 )
                 cnn_normalization = commands.cnn_normalization
-                lock_state_changed = False
                 if commands.quit_requested:
                     return
                 if commands.toggle_zeroed_state_feature_name is not None:
@@ -301,83 +270,25 @@ def _run_simulation_loop(
                             policy_reload_error=policy_reload_error,
                             cnn_activations=cnn_activations,
                             best_finish_position=best_finish_position,
+                            best_finish_ranks=best_finish_ranks,
                             best_finish_times=best_finish_times,
                             latest_finish_times=latest_finish_times,
                             latest_finish_deltas_ms=latest_finish_deltas_ms,
                             failed_track_attempts=failed_track_attempts,
                         ),
                     )
-                if commands.jump_course_id is not None:
-                    persistent_locked_reset_course_id = None
-                    env.set_locked_reset_course(None)
-                    env.set_next_sequential_reset_course(commands.jump_course_id)
-                    _sync_locked_course_info(
-                        info=info,
-                        reset_info=reset_info,
-                        locked_reset_course_id=persistent_locked_reset_course_id,
-                    )
+                course_command = apply_course_navigation_commands(
+                    commands,
+                    env=env,
+                    info=info,
+                    reset_info=reset_info,
+                    locked_reset_course_id=persistent_locked_reset_course_id,
+                    sequential_course_ids=sequential_course_ids,
+                )
+                persistent_locked_reset_course_id = course_command.locked_reset_course_id
+                if course_command.reset_requested:
                     break
-                if commands.toggle_current_course_lock:
-                    current_course_id = _current_watch_course_id(info)
-                    if current_course_id is not None:
-                        if persistent_locked_reset_course_id == current_course_id:
-                            persistent_locked_reset_course_id = None
-                            env.set_locked_reset_course(None)
-                            next_course_id = _adjacent_watch_course_id(
-                                current_course_id=current_course_id,
-                                ordered_course_ids=sequential_course_ids,
-                                offset=1,
-                            )
-                            env.set_next_sequential_reset_course(next_course_id)
-                        else:
-                            persistent_locked_reset_course_id = current_course_id
-                            env.set_locked_reset_course(current_course_id)
-                            next_course_id = _adjacent_watch_course_id(
-                                current_course_id=current_course_id,
-                                ordered_course_ids=sequential_course_ids,
-                                offset=1,
-                            )
-                            env.set_next_sequential_reset_course(next_course_id)
-                        _sync_locked_course_info(
-                            info=info,
-                            reset_info=reset_info,
-                            locked_reset_course_id=persistent_locked_reset_course_id,
-                        )
-                        lock_state_changed = True
-                if commands.reset_mode == "current":
-                    current_course_id = _current_watch_course_id(info)
-                    if current_course_id is not None and persistent_locked_reset_course_id is None:
-                        env.set_next_sequential_reset_course(current_course_id)
-                    break
-                if commands.reset_mode in {"previous", "next"}:
-                    base_course_id = persistent_locked_reset_course_id or _current_watch_course_id(
-                        info
-                    )
-                    offset = -1 if commands.reset_mode == "previous" else 1
-                    target_course_id = _adjacent_watch_course_id(
-                        current_course_id=base_course_id,
-                        ordered_course_ids=sequential_course_ids,
-                        offset=offset,
-                    )
-                    if target_course_id is not None:
-                        if persistent_locked_reset_course_id is None:
-                            env.set_next_sequential_reset_course(target_course_id)
-                        else:
-                            persistent_locked_reset_course_id = target_course_id
-                            env.set_locked_reset_course(target_course_id)
-                            next_course_id = _adjacent_watch_course_id(
-                                current_course_id=target_course_id,
-                                ordered_course_ids=sequential_course_ids,
-                                offset=1,
-                            )
-                            env.set_next_sequential_reset_course(next_course_id)
-                            _sync_locked_course_info(
-                                info=info,
-                                reset_info=reset_info,
-                                locked_reset_course_id=persistent_locked_reset_course_id,
-                            )
-                    break
-                if lock_state_changed:
+                if course_command.lock_state_changed:
                     publish_worker_message(
                         snapshot_queue,
                         _build_snapshot(
@@ -406,6 +317,7 @@ def _run_simulation_loop(
                             policy_reload_error=policy_reload_error,
                             cnn_activations=cnn_activations,
                             best_finish_position=best_finish_position,
+                            best_finish_ranks=best_finish_ranks,
                             best_finish_times=best_finish_times,
                             latest_finish_times=latest_finish_times,
                             latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -502,6 +414,7 @@ def _run_simulation_loop(
                                 policy_reload_error=policy_reload_error,
                                 cnn_activations=cnn_activations,
                                 best_finish_position=best_finish_position,
+                                best_finish_ranks=best_finish_ranks,
                                 best_finish_times=best_finish_times,
                                 latest_finish_times=latest_finish_times,
                                 latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -613,6 +526,11 @@ def _run_simulation_loop(
                     info,
                     None,
                 )
+                best_finish_ranks = _update_best_finish_ranks(
+                    best_finish_ranks,
+                    info,
+                    live_telemetry,
+                )
                 latest_finish_deltas_ms = _update_latest_finish_deltas_ms(
                     latest_finish_deltas_ms,
                     best_finish_times,
@@ -671,6 +589,7 @@ def _run_simulation_loop(
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
                     best_finish_position=best_finish_position,
+                    best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -687,4 +606,4 @@ def _run_simulation_loop(
                     next_step_time = max(next_step_time + target_control_seconds, now)
             episode += 1
     finally:
-        env.close()
+        session.close()

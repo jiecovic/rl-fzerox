@@ -27,6 +27,7 @@ from rl_fzerox.core.runtime_spec.schema import (
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
+    _update_best_finish_ranks,
     _update_best_finish_times,
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
@@ -118,9 +119,7 @@ def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: 
         state_components=tuple(component.data() for component in state_components),
     )
     course_feature_names = tuple(
-        feature_name
-        for feature_name in feature_names
-        if feature_name.startswith("course_context.")
+        feature_name for feature_name in feature_names if feature_name.startswith("course_context.")
     )
     config = WatchAppConfig(
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
@@ -232,6 +231,38 @@ def test_best_finish_times_track_successful_finishes_per_track() -> None:
     assert best_times == {"mute": 95_000, "silence": 105_000}
 
 
+def test_best_finish_ranks_track_successful_finishes_per_track() -> None:
+    best_ranks = _update_best_finish_ranks(
+        {},
+        {"termination_reason": "crashed", "position": 1, "track_id": "mute"},
+        _sample_telemetry(position=1),
+    )
+    assert best_ranks == {}
+
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=8),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=12),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "silence"},
+        _sample_telemetry(position=5),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=3),
+    )
+
+    assert best_ranks == {"mute": 3, "silence": 5}
+
+
 def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
     latest_times = _update_latest_finish_times(
         {},
@@ -320,6 +351,7 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
     failed_section = track_record_sections(
         current_info={},
         track_pool_records=records,
+        best_finish_ranks={},
         best_finish_times={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
@@ -328,6 +360,7 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
     success_section = track_record_sections(
         current_info={},
         track_pool_records=records,
+        best_finish_ranks={},
         best_finish_times={"mute": 95_000},
         latest_finish_times={"mute": 95_000},
         latest_finish_deltas_ms={},

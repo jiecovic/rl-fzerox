@@ -16,6 +16,7 @@ class _CurriculumStagePolicyRunner(Protocol):
     def supports_action_masks(self) -> bool: ...
 
     def refresh(self) -> None: ...
+    def refresh_if_due(self, *, interval_seconds: float) -> None: ...
     def reset(self) -> None: ...
 
 
@@ -90,7 +91,7 @@ def _sync_policy_curriculum_stage(
 ) -> None:
     if policy_runner is None:
         return
-    policy_runner.refresh()
+    policy_runner.refresh_if_due(interval_seconds=10.0)
     env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
 
 

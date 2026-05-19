@@ -29,7 +29,10 @@ from rl_fzerox.core.manager.registry import lineages as lineage_registry
 from rl_fzerox.core.manager.registry import runs as run_registry
 from rl_fzerox.core.manager.registry.common import new_run_id
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
-from rl_fzerox.core.manager.storage.schema import initialize_manager_schema
+from rl_fzerox.core.manager.storage.schema import (
+    initialize_manager_schema,
+    refresh_default_template,
+)
 
 
 def default_manager_db_path() -> Path:
@@ -60,7 +63,7 @@ class ManagerStore:
     def initialize(self) -> None:
         """Create the manager database schema if needed."""
 
-        self._initialize_schema()
+        self._ensure_schema_initialized()
         self._drain_pending_filesystem_operations()
 
     def _ensure_schema_initialized(self) -> None:
@@ -82,6 +85,13 @@ class ManagerStore:
                 migrated_at=self.utc_now(),
             )
         self._schema_initialized = True
+
+    def refresh_system_templates(self) -> None:
+        """Refresh built-in templates without re-running full schema bootstrap."""
+
+        self._ensure_schema_initialized()
+        with self._connect() as connection:
+            refresh_default_template(connection, updated_at=self.utc_now())
 
     def manager_runs_root(self, *, output_root: Path | None = None) -> Path:
         return manager_runs_root(output_root=output_root)

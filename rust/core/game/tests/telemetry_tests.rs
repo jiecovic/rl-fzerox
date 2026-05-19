@@ -21,6 +21,8 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&4_i16.to_le_bytes());
     memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
         .copy_from_slice(&0.7_f32.to_le_bytes());
+    memory[GLOBALS.racers_ko_count..GLOBALS.racers_ko_count + 2]
+        .copy_from_slice(&4_i16.to_le_bytes());
     memory[player_base + RACER.character] = 4_u8;
     let machine_base = MACHINE_TABLE.machines + (4 * MACHINE_TABLE.machine_size);
     write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.body_stat, 4);
@@ -82,12 +84,26 @@ fn read_snapshot_decodes_player_one_race_values() {
     memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_length_proportion
         ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_length_proportion + 4]
         .copy_from_slice(&0.75_f32.to_le_bytes());
+    write_vec3(
+        &mut memory,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_pos,
+        10.0,
+        20.0,
+        30.0,
+    );
     memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement
         ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 4]
         .copy_from_slice(&3.0_f32.to_le_bytes());
     memory[segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 4
         ..segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement + 8]
         .copy_from_slice(&4.0_f32.to_le_bytes());
+    write_vec3(
+        &mut memory,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.pos,
+        11.0,
+        22.0,
+        33.0,
+    );
     memory[player_base + RACER.local_velocity..player_base + RACER.local_velocity + 4]
         .copy_from_slice(&(-9.5_f32).to_le_bytes());
     memory[player_base + RACER.segment_basis + 0x18..player_base + RACER.segment_basis + 0x1C]
@@ -136,6 +152,7 @@ fn read_snapshot_decodes_player_one_race_values() {
     );
     assert!((telemetry.player.energy - 92.25).abs() < f32::EPSILON);
     assert!((telemetry.player.max_energy - 100.0).abs() < f32::EPSILON);
+    assert_eq!(telemetry.player.ko_star_count, 4);
     assert_eq!(telemetry.player.boost_timer, 77);
     assert!((telemetry.player.recoil_tilt_magnitude - 0.5).abs() < f32::EPSILON);
     assert_eq!(telemetry.player.damage_rumble_counter, 1);
@@ -149,6 +166,12 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.geometry.segment_index, Some(12));
     assert!((telemetry.player.geometry.segment_t - 0.25).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.segment_length_proportion - 0.75).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.world_pos_x - 11.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.world_pos_y - 22.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.world_pos_z - 33.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.segment_center_x - 10.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.segment_center_y - 20.0).abs() < f32::EPSILON);
+    assert!((telemetry.player.geometry.segment_center_z - 30.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.local_lateral_velocity + 9.5).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.signed_lateral_offset - 3.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.lateral_distance - 5.0).abs() < f32::EPSILON);
@@ -156,6 +179,19 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert!((telemetry.player.geometry.current_radius_left - 100.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.current_radius_right - 120.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.height_above_ground - 7.0).abs() < f32::EPSILON);
+    assert_eq!(
+        telemetry.player.geometry.future_local_nearest_segment_index,
+        None
+    );
+    assert!(
+        (telemetry
+            .player
+            .geometry
+            .future_local_nearest_segment_distance
+            - 0.0)
+            .abs()
+            < f32::EPSILON
+    );
     assert!((telemetry.player.geometry.velocity_magnitude - 10.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.acceleration_magnitude - 3.0).abs() < f32::EPSILON);
     assert!((telemetry.player.geometry.acceleration_force - 9.0).abs() < f32::EPSILON);
@@ -166,6 +202,87 @@ fn read_snapshot_decodes_player_one_race_values() {
     assert_eq!(telemetry.player.machine_context.grip_stat, 2);
     assert_eq!(telemetry.player.machine_context.weight, 1260);
     assert!((telemetry.player.machine_context.engine_setting - 0.7).abs() < f32::EPSILON);
+}
+
+#[test]
+fn read_snapshot_reports_future_local_nearest_segment_when_outside_bounds() {
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+    let player_base = GLOBALS.racers;
+    let segment_info_base = player_base + RACER.segment_position_info;
+    let segment_base_offset = 0x002C_2000_usize;
+    let current_segment_index = 1_usize;
+    let current_segment_offset = segment_base_offset + (current_segment_index * 0x40);
+    let current_segment_address = TELEMETRY_CONFIG.kseg0_base + current_segment_offset;
+
+    write_u32(
+        &mut memory,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.course_segment,
+        current_segment_address as u32,
+    );
+    write_vec3(
+        &mut memory,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.pos,
+        25.0,
+        12.0,
+        0.0,
+    );
+    write_vec3(
+        &mut memory,
+        segment_info_base + RACER_SEGMENT_POSITION_INFO.segment_displacement,
+        20.0,
+        0.0,
+        0.0,
+    );
+    write_f32(&mut memory, player_base + RACER.segment_basis + 0x18, 1.0);
+    write_f32(&mut memory, player_base + RACER.current_radius_left, 10.0);
+    write_f32(&mut memory, player_base + RACER.current_radius_right, 10.0);
+
+    for segment_index in 0_usize..10 {
+        let offset = segment_base_offset + (segment_index * 0x40);
+        write_vec3(
+            &mut memory,
+            offset + COURSE_SEGMENT.pos,
+            (segment_index as f32) * 10.0,
+            0.0,
+            0.0,
+        );
+        write_f32(&mut memory, offset + COURSE_SEGMENT.tension, 0.0);
+        write_i32(
+            &mut memory,
+            offset + COURSE_SEGMENT.segment_index,
+            segment_index as i32,
+        );
+        write_u32(
+            &mut memory,
+            offset + COURSE_SEGMENT.next,
+            (TELEMETRY_CONFIG.kseg0_base + segment_base_offset + ((segment_index + 1) * 0x40))
+                as u32,
+        );
+        let prev_segment_index = segment_index.saturating_sub(1);
+        write_u32(
+            &mut memory,
+            offset + COURSE_SEGMENT.prev,
+            (TELEMETRY_CONFIG.kseg0_base + segment_base_offset + (prev_segment_index * 0x40))
+                as u32,
+        );
+    }
+
+    let telemetry = read_snapshot(&memory).expect("telemetry should decode");
+
+    assert_eq!(telemetry.player.geometry.signed_lateral_offset, 20.0);
+    assert_eq!(
+        telemetry.player.geometry.future_local_nearest_segment_index,
+        Some(2)
+    );
+    assert!(
+        (telemetry
+            .player
+            .geometry
+            .future_local_nearest_segment_distance
+            - 12.0)
+            .abs()
+            < 0.001
+    );
 }
 
 #[test]
@@ -229,4 +346,22 @@ fn write_machine_i16(memory: &mut [u8], logical_offset: usize, value: i16) {
     let bytes = value.to_be_bytes();
     write_machine_u8(memory, logical_offset, bytes[0]);
     write_machine_u8(memory, logical_offset + 1, bytes[1]);
+}
+
+fn write_u32(memory: &mut [u8], offset: usize, value: u32) {
+    memory[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_i32(memory: &mut [u8], offset: usize, value: i32) {
+    memory[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_f32(memory: &mut [u8], offset: usize, value: f32) {
+    memory[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+}
+
+fn write_vec3(memory: &mut [u8], offset: usize, x: f32, y: f32, z: f32) {
+    write_f32(memory, offset, x);
+    write_f32(memory, offset + 4, y);
+    write_f32(memory, offset + 8, z);
 }

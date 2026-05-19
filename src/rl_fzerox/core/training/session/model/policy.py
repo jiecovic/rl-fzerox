@@ -60,6 +60,7 @@ def build_policy_kwargs(
                 layer.model_dump(mode="python")
                 for layer in policy_config.extractor.custom_conv_layers
             ),
+            "custom_cnn_final_relu": policy_config.extractor.custom_cnn_final_relu,
             "features_dim": policy_config.extractor.features_dim,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "state_net_arch": policy_config.extractor.resolved_state_net_arch(),
@@ -74,6 +75,7 @@ def build_policy_kwargs(
                 layer.model_dump(mode="python")
                 for layer in policy_config.extractor.custom_conv_layers
             ),
+            "custom_cnn_final_relu": policy_config.extractor.custom_cnn_final_relu,
             "features_dim": policy_config.extractor.features_dim,
             "layer_norm": policy_config.extractor.layer_norm,
         }

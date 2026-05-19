@@ -14,6 +14,7 @@ def track_record_sections(
     *,
     current_info: RecordInfo,
     track_pool_records: tuple[RecordInfo, ...],
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
@@ -22,6 +23,7 @@ def track_record_sections(
     records = _unique_course_records(track_pool_records or current_track_record_pool(current_info))
     if (
         not records
+        and not best_finish_ranks
         and not best_finish_times
         and not latest_finish_times
         and not failed_track_attempts
@@ -35,6 +37,7 @@ def track_record_sections(
                 lines=record_group_lines(
                     group.records,
                     current_info=current_info,
+                    best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -47,6 +50,7 @@ def track_record_sections(
     lines = record_group_lines(
         records,
         current_info=current_info,
+        best_finish_ranks=best_finish_ranks,
         best_finish_times=best_finish_times,
         latest_finish_times=latest_finish_times,
         latest_finish_deltas_ms=latest_finish_deltas_ms,

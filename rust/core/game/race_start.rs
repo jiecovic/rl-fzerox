@@ -306,7 +306,11 @@ fn write_menu_setup(
         write_i32(system_ram, GLOBALS.current_ghost_type, current_ghost_type)?;
     }
     if mode == RaceStartMode::GpRace && setup.gp_difficulty_raw_value != PRESERVE_GP_DIFFICULTY {
-        write_i32(system_ram, GLOBALS.difficulty, setup.gp_difficulty_raw_value)?;
+        write_i32(
+            system_ram,
+            GLOBALS.difficulty,
+            setup.gp_difficulty_raw_value,
+        )?;
     }
     write_i32(system_ram, GLOBALS.course_index, setup.course_index)?;
     write_i16(system_ram, GLOBALS.player_characters, setup.character_index)?;

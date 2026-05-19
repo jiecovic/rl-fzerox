@@ -112,9 +112,7 @@ class AuxiliaryStateHeadBank(nn.Module):
         if not losses:
             return None
 
-        requested_names: tuple[AuxiliaryStateTargetName, ...] = tuple(
-            loss.name for loss in losses
-        )
+        requested_names: tuple[AuxiliaryStateTargetName, ...] = tuple(loss.name for loss in losses)
         trunk_latent = self.trunk(latent)
         scalar_predictions = (
             self.scalar_head(trunk_latent) if _needs_scalar_head(requested_names) else None
@@ -125,9 +123,7 @@ class AuxiliaryStateHeadBank(nn.Module):
         course_logits = (
             self.course_head(trunk_latent) if _needs_course_head(requested_names) else None
         )
-        airborne_index = resolve_auxiliary_state_target(
-            "vehicle_state.airborne"
-        ).vector_start
+        airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
         airborne = aux_targets[:, airborne_index]
         total_loss = latent.new_zeros(())
         metrics: dict[str, float] = {}
@@ -230,9 +226,7 @@ class AuxiliaryStateHeadBank(nn.Module):
                 continue
             if binary_logits is None:
                 raise RuntimeError("Binary auxiliary prediction head is unavailable")
-            probability = torch.sigmoid(
-                binary_logits[sample_index, _BINARY_HEAD_INDEX[name]]
-            )
+            probability = torch.sigmoid(binary_logits[sample_index, _BINARY_HEAD_INDEX[name]])
             values[name] = float(probability.detach().cpu().item())
 
         if "course_context.builtin_course_id" in requested_names:

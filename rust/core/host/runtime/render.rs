@@ -40,13 +40,14 @@ impl Host {
         minimap_resize_filter: VideoResizeFilter,
     ) -> Result<&[u8], CoreError> {
         let spec = self.observation_spec(layout)?;
-        let aspect_ratio = layout.observation_aspect_ratio(self.display_aspect_ratio);
         let crop = layout.crop(self.observation_crop_profile);
         let minimap_layer_request =
             self.minimap_layer_request(minimap_layer, &spec, minimap_resize_filter);
         self.callbacks
             .stacked_observation_frame(StackedObservationRequest {
-                aspect_ratio,
+                // Policy observations should be a direct resize of the cropped
+                // framebuffer. Display aspect correction is only for preview.
+                aspect_ratio: 0.0,
                 target_width: spec.frame_width,
                 target_height: spec.frame_height,
                 rgb: spec.channels == 3,

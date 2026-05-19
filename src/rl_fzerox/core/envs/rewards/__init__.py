@@ -44,6 +44,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
             config.outside_bounds_reentry_progress_distance_cap
         ),
         outside_track_recovery_reward=config.outside_track_recovery_reward,
+        outside_track_recovery_reward_cap=config.outside_track_recovery_reward_cap,
         outside_track_recovery_airborne_grace_frames=(
             config.outside_track_recovery_airborne_grace_frames
         ),
@@ -54,6 +55,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         slow_speed_time_penalty_power=config.slow_speed_time_penalty_power,
         lap_completion_bonus=config.lap_completion_bonus,
         lap_position_scale=config.lap_position_scale,
+        ko_star_reward=config.ko_star_reward,
         damage_taken_frame_penalty=config.damage_taken_frame_penalty,
         damage_taken_streak_ramp_penalty=config.damage_taken_streak_ramp_penalty,
         damage_taken_streak_cap_frames=config.damage_taken_streak_cap_frames,
@@ -65,9 +67,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         ice_progress_multiplier=config.ice_progress_multiplier,
         dirt_entry_penalty=config.dirt_entry_penalty,
         ice_entry_penalty=config.ice_entry_penalty,
-        energy_refill_collision_cooldown_frames=(
-            config.energy_refill_collision_cooldown_frames
-        ),
+        energy_refill_collision_cooldown_frames=(config.energy_refill_collision_cooldown_frames),
         air_brake_request_penalty=config.air_brake_request_penalty,
         lean_request_penalty=config.lean_request_penalty,
         grounded_pitch_penalty=config.grounded_pitch_penalty,
@@ -124,6 +124,11 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 if override.outside_track_recovery_reward is not None
                 else base.outside_track_recovery_reward
             ),
+            outside_track_recovery_reward_cap=(
+                override.outside_track_recovery_reward_cap
+                if override.outside_track_recovery_reward_cap is not None
+                else base.outside_track_recovery_reward_cap
+            ),
             outside_track_recovery_airborne_grace_frames=(
                 override.outside_track_recovery_airborne_grace_frames
                 if override.outside_track_recovery_airborne_grace_frames is not None
@@ -163,6 +168,11 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 override.lap_position_scale
                 if override.lap_position_scale is not None
                 else base.lap_position_scale
+            ),
+            ko_star_reward=(
+                override.ko_star_reward
+                if override.ko_star_reward is not None
+                else base.ko_star_reward
             ),
             damage_taken_frame_penalty=(
                 override.damage_taken_frame_penalty

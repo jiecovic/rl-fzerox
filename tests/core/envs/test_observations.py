@@ -62,12 +62,13 @@ def test_crop_84x84_uses_square_shape() -> None:
     assert observation.shape == (84, 84, 12)
 
 
-def test_crop_60x76_uses_compact_nature_shape() -> None:
+def test_custom_60x76_uses_requested_compact_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
     observation = backend.render_observation(
-        preset="crop_60x76",
+        height=60,
+        width=76,
         frame_stack=4,
         stack_mode="rgb",
     )
@@ -75,12 +76,13 @@ def test_crop_60x76_uses_compact_nature_shape() -> None:
     assert observation.shape == (60, 76, 12)
 
 
-def test_crop_68x108_uses_wide_nature_shape() -> None:
+def test_custom_68x108_uses_requested_wide_shape() -> None:
     backend = SyntheticBackend()
     backend.reset()
 
     observation = backend.render_observation(
-        preset="crop_68x108",
+        height=68,
+        width=108,
         frame_stack=4,
         stack_mode="rgb",
     )
@@ -107,18 +109,20 @@ def test_rgb_observation_stack_keeps_all_frames_rgb() -> None:
     backend.reset()
 
     observation = backend.render_observation(
-        preset="crop_60x76",
+        height=60,
+        width=76,
         frame_stack=4,
         stack_mode="rgb",
     )
-    spec = backend.observation_spec("crop_60x76")
+    spec = backend.observation_spec(height=60, width=76)
     image_space = build_image_observation_space(
         spec,
         frame_stack=4,
         stack_mode="rgb",
     )
     current_frame = backend.render_observation(
-        preset="crop_60x76",
+        height=60,
+        width=76,
         frame_stack=1,
         stack_mode="rgb",
     )
@@ -521,7 +525,7 @@ def test_state_components_can_disable_control_history() -> None:
 def test_state_components_define_observation_space_shape_and_bounds() -> None:
     components = _clean_state_components()
     backend = SyntheticBackend()
-    spec = backend.observation_spec("crop_60x76")
+    spec = backend.observation_spec(height=60, width=76)
 
     observation_space = build_observation_space(
         spec,

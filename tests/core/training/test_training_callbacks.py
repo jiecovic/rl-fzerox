@@ -39,6 +39,8 @@ def test_resolve_checkpoint_policy_prefers_rollout_interval_for_ppo() -> None:
     assert policy.step_interval is None
     assert policy.save_recent is True
     assert policy.recent_limit == 3
+
+
 def test_rollout_checkpoint_callback_saves_and_trims_recent_snapshots(tmp_path: Path) -> None:
     run_paths = build_run_paths(output_root=tmp_path / "runs", run_name="ppo_cnn")
     ensure_run_dirs(run_paths)

@@ -52,8 +52,7 @@ pub enum ObservationPreset {
     Crop116x164,
     Crop98x130,
     Crop66x82,
-    Crop60x76,
-    Crop68x108,
+    Crop72x96,
     Crop68x68,
     Crop84x84,
     Crop76x100,
@@ -99,8 +98,7 @@ impl ObservationPreset {
             "crop_116x164" => Ok(Self::Crop116x164),
             "crop_98x130" => Ok(Self::Crop98x130),
             "crop_66x82" => Ok(Self::Crop66x82),
-            "crop_60x76" => Ok(Self::Crop60x76),
-            "crop_68x108" => Ok(Self::Crop68x108),
+            "crop_72x96" => Ok(Self::Crop72x96),
             "crop_68x68" => Ok(Self::Crop68x68),
             "crop_84x84" => Ok(Self::Crop84x84),
             "crop_76x100" => Ok(Self::Crop76x100),
@@ -124,8 +122,7 @@ impl ObservationPreset {
             Self::Crop116x164 => "crop_116x164",
             Self::Crop98x130 => "crop_98x130",
             Self::Crop66x82 => "crop_66x82",
-            Self::Crop60x76 => "crop_60x76",
-            Self::Crop68x108 => "crop_68x108",
+            Self::Crop72x96 => "crop_72x96",
             Self::Crop68x68 => "crop_68x68",
             Self::Crop84x84 => "crop_84x84",
             Self::Crop76x100 => "crop_76x100",
@@ -155,8 +152,7 @@ impl ObservationPreset {
             Self::Crop116x164 => (164, 116, 3),
             Self::Crop98x130 => (130, 98, 3),
             Self::Crop66x82 => (82, 66, 3),
-            Self::Crop60x76 => (76, 60, 3),
-            Self::Crop68x108 => (108, 68, 3),
+            Self::Crop72x96 => (96, 72, 3),
             Self::Crop68x68 => (68, 68, 3),
             Self::Crop84x84 => (84, 84, 3),
             Self::Crop76x100 => (100, 76, 3),
@@ -170,22 +166,6 @@ impl ObservationPreset {
             display_width,
             display_height,
         })
-    }
-
-    pub fn observation_aspect_ratio(self, display_aspect_ratio: f64) -> f64 {
-        match self {
-            Self::Crop84x116
-            | Self::Crop92x124
-            | Self::Crop116x164
-            | Self::Crop98x130
-            | Self::Crop66x82
-            | Self::Crop60x76
-            | Self::Crop68x108
-            | Self::Crop68x68
-            | Self::Crop84x84
-            | Self::Crop76x100
-            | Self::Crop64x64 => display_aspect_ratio,
-        }
     }
 }
 
@@ -230,13 +210,6 @@ impl ObservationLayout {
                     display_height,
                 })
             }
-        }
-    }
-
-    pub fn observation_aspect_ratio(self, display_aspect_ratio: f64) -> f64 {
-        match self {
-            Self::Preset(preset) => preset.observation_aspect_ratio(display_aspect_ratio),
-            Self::Custom { .. } => display_aspect_ratio,
         }
     }
 }

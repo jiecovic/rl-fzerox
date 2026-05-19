@@ -60,23 +60,13 @@ fn crop_66x82_resolves_to_small_racing_geometry() {
 }
 
 #[test]
-fn crop_60x76_resolves_to_compact_aspect_geometry() {
-    let spec = ObservationPreset::Crop60x76
+fn crop_72x96_resolves_to_impala_geometry() {
+    let spec = ObservationPreset::Crop72x96
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_60x76 should resolve");
+        .expect("crop_72x96 should resolve");
 
-    assert_eq!(spec.layout_name, "crop_60x76");
-    assert_eq!((spec.frame_width, spec.frame_height), (76, 60));
-}
-
-#[test]
-fn crop_68x108_resolves_to_wide_nature_geometry() {
-    let spec = ObservationPreset::Crop68x108
-        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_68x108 should resolve");
-
-    assert_eq!(spec.layout_name, "crop_68x108");
-    assert_eq!((spec.frame_width, spec.frame_height), (108, 68));
+    assert_eq!(spec.layout_name, "crop_72x96");
+    assert_eq!((spec.frame_width, spec.frame_height), (96, 72));
 }
 
 #[test]

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
+from rl_fzerox.apps.run_manager.launching.processes import reap_child_when_done
 from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
 from rl_fzerox.core.manager import ManagerStore
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
@@ -28,12 +29,15 @@ def launch_watch_artifact(
         raise ValueError(f"unsupported watch artifact: {artifact}")
     resolve_model_artifact_path(run.run_dir, artifact=artifact)
     pid_path = manager_watch_pid_path(run.id, artifact=artifact)
-    if active_watch_pid(
-        pid_path=pid_path,
-        run_id=run.id,
-        run_dir=run.run_dir,
-        artifact=artifact,
-    ) is not None:
+    if (
+        active_watch_pid(
+            pid_path=pid_path,
+            run_id=run.id,
+            run_dir=run.run_dir,
+            artifact=artifact,
+        )
+        is not None
+    ):
         return "already_running"
     resolve_watch_app_config(
         policy_run_dir=None,
@@ -74,6 +78,7 @@ def launch_watch_artifact(
         artifact=artifact,
     )
     raise_if_watch_exited_early(process=process, log_path=log_path, pid_path=pid_path)
+    reap_child_when_done(process)
     return "started"
 
 

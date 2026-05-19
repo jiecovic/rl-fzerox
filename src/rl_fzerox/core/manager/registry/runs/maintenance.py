@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/manager/registry/runs/maintenance.py
 from __future__ import annotations
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -40,33 +41,38 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             worker = worker_by_run_id.get(run_id)
             if worker is None:
                 continue
+            if not pid_exists(worker.pid):
+                _mark_orphaned_run_failed(connection, run_id=run_id)
+                continue
             heartbeat_at = datetime.fromisoformat(worker.heartbeat_at)
             if now - heartbeat_at <= RUN_WORKER_HEARTBEAT_TIMEOUT:
                 continue
-            if pid_exists(worker.pid):
-                continue
-            connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
-            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
-            connection.execute(
-                """
-                UPDATE runs
-                SET status = ?, stopped_at = ?
-                WHERE id = ?
-                """,
-                ("failed", utc_now(), run_id),
-            )
-            connection.execute(
-                """
-                INSERT INTO run_events(run_id, created_at, kind, message)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    run_id,
-                    utc_now(),
-                    "failed",
-                    "manager worker disappeared before reporting a clean final state",
-                ),
-            )
+
+
+def _mark_orphaned_run_failed(connection: sqlite3.Connection, *, run_id: str) -> None:
+    failed_at = utc_now()
+    connection.execute("DELETE FROM run_commands WHERE run_id = ?", (run_id,))
+    connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
+    connection.execute(
+        """
+        UPDATE runs
+        SET status = ?, stopped_at = ?
+        WHERE id = ?
+        """,
+        ("failed", failed_at, run_id),
+    )
+    connection.execute(
+        """
+        INSERT INTO run_events(run_id, created_at, kind, message)
+        VALUES (?, ?, ?, ?)
+        """,
+        (
+            run_id,
+            failed_at,
+            "failed",
+            "manager worker disappeared before reporting a clean final state",
+        ),
+    )
 
 
 def drain_pending_filesystem_operations(store: ManagerStore) -> None:

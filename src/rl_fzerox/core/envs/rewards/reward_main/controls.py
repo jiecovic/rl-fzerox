@@ -9,19 +9,21 @@ from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
 def outside_track_recovery_reward(
     *,
     weights: RewardMainWeights,
-    previous_outside_offset: float | None,
-    current_outside_offset: float | None,
+    previous_distance: float | None,
+    current_distance: float | None,
     enabled: bool,
 ) -> float:
     recovery_weight = weights.outside_track_recovery_reward
     if (
         recovery_weight <= 0.0
         or not enabled
-        or previous_outside_offset is None
-        or current_outside_offset is None
+        or previous_distance is None
+        or current_distance is None
     ):
         return 0.0
-    return recovery_weight * (previous_outside_offset - current_outside_offset)
+    reward = recovery_weight * (previous_distance - current_distance)
+    cap = max(0.0, float(weights.outside_track_recovery_reward_cap))
+    return max(-cap, min(cap, reward))
 
 
 def lean_request_penalty(

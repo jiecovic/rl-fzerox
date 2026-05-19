@@ -63,7 +63,7 @@ def architecture_lanes(
                 ArchitectureNodePreview(
                     id="cnn",
                     label="CNN",
-                    detail=f"{config.policy.conv_profile} → {flatten_dim}, {EXTRACTOR_ACTIVATION}",
+                    detail=f"{config.policy.conv_profile} → {flatten_dim}",
                     params=node_params.get("cnn"),
                 ),
                 ArchitectureNodePreview(

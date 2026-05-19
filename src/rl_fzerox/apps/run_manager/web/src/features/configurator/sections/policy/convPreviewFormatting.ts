@@ -20,6 +20,22 @@ export function formatFitMode(layer: ConvLayerPreview | null) {
   return layer.dropped_height === 0 && layer.dropped_width === 0 ? "exact" : "floored";
 }
 
+export function formatLayerActivation(layer: ConvLayerPreview | null) {
+  if (layer === null) {
+    return "…";
+  }
+  if (layer.kind === "conv") {
+    return layer.post_activation ? "ReLU" : "none";
+  }
+  if (layer.kind === "residual_pre") {
+    return "pre";
+  }
+  if (layer.kind === "residual_post") {
+    return "post";
+  }
+  return "none";
+}
+
 export function formatPixelDrop(layer: ConvLayerPreview | null) {
   if (layer === null) {
     return "…";

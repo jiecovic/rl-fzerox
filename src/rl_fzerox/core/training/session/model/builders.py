@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/session/model/builders.py
 from __future__ import annotations
 
+import torch as th
 from stable_baselines3.common.vec_env import VecEnv
 
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
@@ -72,6 +73,7 @@ def _build_ppo_family_model(
 ):
     """Construct a PPO-family model for the current run."""
 
+    _validate_requested_device(train_config.device)
     validate_recurrent_configuration_alignment(
         effective_algorithm=effective_algorithm,
         policy_config=policy_config,
@@ -141,3 +143,13 @@ def _build_ppo_family_model(
 
 def _ppo_ent_coef(train_config: TrainConfig) -> float:
     return float(train_config.ent_coef)
+
+
+def _validate_requested_device(device: str) -> None:
+    requested = device.lower()
+    if requested == "cuda" or requested.startswith("cuda:"):
+        if not th.cuda.is_available():
+            raise RuntimeError(
+                "train.device is set to cuda, but PyTorch cannot access CUDA. "
+                "Fix GPU/driver/WSL CUDA access or set train.device=cpu explicitly."
+            )

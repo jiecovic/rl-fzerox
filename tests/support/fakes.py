@@ -202,12 +202,7 @@ class SyntheticBackend:
         _ = (resize_filter, minimap_resize_filter)
         spec = self.observation_spec(preset, height=height, width=width)
         cropped = _crop_visible_game_area(self._last_frame)
-        aspect_corrected = _resize_frame(
-            cropped,
-            width=spec.display_width,
-            height=spec.display_height,
-        )
-        frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
+        frame = _resize_frame(cropped, width=spec.width, height=spec.height)
         stack_key = (
             spec.preset,
             frame_stack,
@@ -666,8 +661,7 @@ class SyntheticBackend:
 
 def _canonical_observation_preset(preset: str) -> ObservationPresetName | None:
     aliases: dict[str, ObservationPresetName] = {
-        "crop_60x76": "crop_60x76",
-        "crop_68x108": "crop_68x108",
+        "crop_72x96": "crop_72x96",
         "crop_84x84": "crop_84x84",
     }
     return aliases.get(preset)

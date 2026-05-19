@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.format import _int_info
+from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -27,6 +28,9 @@ class _LiveChartStyle:
     line_width: int = 2
     return_color: tuple[int, int, int] = (111, 211, 255)
     progress_color: tuple[int, int, int] = PALETTE.text_accent
+    lateral_offset_color: tuple[int, int, int] = (255, 132, 132)
+    outside_edge_excess_ratio_color: tuple[int, int, int] = (175, 220, 135)
+    future_segment_distance_color: tuple[int, int, int] = (190, 165, 255)
     grid_color: tuple[int, int, int] = PALETTE.panel_border
     zero_line_color: tuple[int, int, int] = PALETTE.text_muted
     block_fill: tuple[int, int, int] = (16, 20, 26)
@@ -47,7 +51,6 @@ def _draw_live_tab(
     info: dict[str, object],
     live_series: EpisodeLiveSeriesSnapshot | None,
 ) -> None:
-    del height
     env_step = _int_info(info, "episode_step")
     title_surface = fonts.section.render("Live episode", True, PALETTE.text_primary)
     subtitle_surface = fonts.small.render(
@@ -60,14 +63,24 @@ def _draw_live_tab(
     screen.blit(subtitle_surface, (x, subtitle_y))
     chart_y = subtitle_y + subtitle_surface.get_height() + LAYOUT.section_gap
 
-    block_height = _chart_block_height(fonts)
+    header_height = chart_y - y
+    plot_height = _plot_height_for_rows(
+        fonts,
+        available_height=max(0, height - header_height),
+        row_count=3,
+    )
+    block_height = _chart_block_height(fonts, plot_height=plot_height)
+    block_width = (width - LIVE_CHART_STYLE.block_gap) // 2
+    right_x = x + block_width + LIVE_CHART_STYLE.block_gap
+    second_row_y = chart_y + block_height + LIVE_CHART_STYLE.block_gap
+    third_row_y = second_row_y + block_height + LIVE_CHART_STYLE.block_gap
     _draw_chart_block(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
         x=x,
         y=chart_y,
-        width=width,
+        width=block_width,
         height=block_height,
         title="Speed",
         summary=_speed_summary(live_series),
@@ -76,14 +89,15 @@ def _draw_live_tab(
         color=LIVE_CHART_STYLE.progress_color,
         fixed_range=None,
         zero_line=False,
+        plot_height=plot_height,
     )
     _draw_chart_block(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        x=x,
-        y=chart_y + block_height + LIVE_CHART_STYLE.block_gap,
-        width=width,
+        x=right_x,
+        y=chart_y,
+        width=block_width,
         height=block_height,
         title="Episode return",
         summary=_return_summary(live_series),
@@ -92,10 +106,79 @@ def _draw_live_tab(
         color=LIVE_CHART_STYLE.return_color,
         fixed_range=None,
         zero_line=True,
+        plot_height=plot_height,
+    )
+    _draw_chart_block(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=x,
+        y=second_row_y,
+        width=block_width,
+        height=block_height,
+        title="Lateral offset",
+        summary=_lateral_offset_summary(live_series),
+        x_values=() if live_series is None else live_series.env_steps,
+        y_values=() if live_series is None else live_series.lateral_offset,
+        color=LIVE_CHART_STYLE.lateral_offset_color,
+        fixed_range=None,
+        zero_line=True,
+        plot_height=plot_height,
+    )
+    _draw_chart_block(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=right_x,
+        y=second_row_y,
+        width=block_width,
+        height=block_height,
+        title="Outside edge excess ratio",
+        summary=_outside_edge_excess_ratio_summary(live_series),
+        x_values=() if live_series is None else live_series.env_steps,
+        y_values=() if live_series is None else live_series.outside_edge_excess_ratio,
+        color=LIVE_CHART_STYLE.outside_edge_excess_ratio_color,
+        fixed_range=None,
+        zero_line=False,
+        plot_height=plot_height,
+    )
+    _draw_chart_block(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=x,
+        y=third_row_y,
+        width=width,
+        height=block_height,
+        title="Future segment distance",
+        summary=_future_segment_distance_summary(live_series),
+        x_values=() if live_series is None else live_series.env_steps,
+        y_values=() if live_series is None else live_series.future_local_nearest_segment_distance,
+        color=LIVE_CHART_STYLE.future_segment_distance_color,
+        fixed_range=None,
+        zero_line=False,
+        plot_height=plot_height,
     )
 
 
-def _chart_block_height(fonts: ViewerFonts) -> int:
+def _plot_height_for_rows(
+    fonts: ViewerFonts,
+    *,
+    available_height: int,
+    row_count: int,
+) -> int:
+    non_plot_height = _chart_block_non_plot_height(fonts)
+    gap_height = max(0, row_count - 1) * LIVE_CHART_STYLE.block_gap
+    usable_height = max(0, available_height - gap_height)
+    fit_height = (usable_height // max(1, row_count)) - non_plot_height
+    return max(82, min(LIVE_CHART_STYLE.plot_height, fit_height))
+
+
+def _chart_block_height(fonts: ViewerFonts, *, plot_height: int) -> int:
+    return _chart_block_non_plot_height(fonts) + plot_height
+
+
+def _chart_block_non_plot_height(fonts: ViewerFonts) -> int:
     title_height = fonts.small.render("Episode return", True, PALETTE.text_primary).get_height()
     summary_height = fonts.small.render(
         "waiting for episode steps",
@@ -108,7 +191,6 @@ def _chart_block_height(fonts: ViewerFonts) -> int:
         + LIVE_CHART_STYLE.title_gap
         + summary_height
         + LIVE_CHART_STYLE.plot_gap
-        + LIVE_CHART_STYLE.plot_height
     )
 
 
@@ -128,6 +210,7 @@ def _draw_chart_block(
     color: tuple[int, int, int],
     fixed_range: tuple[float, float] | None,
     zero_line: bool,
+    plot_height: int,
 ) -> None:
     rect = pygame.Rect(x, y, width, height)
     pygame.draw.rect(
@@ -147,8 +230,16 @@ def _draw_chart_block(
     inner_x = x + LIVE_CHART_STYLE.block_padding
     inner_y = y + LIVE_CHART_STYLE.block_padding
     inner_width = width - (2 * LIVE_CHART_STYLE.block_padding)
-    title_surface = fonts.small.render(title, True, PALETTE.text_primary)
-    summary_surface = fonts.small.render(summary, True, PALETTE.text_muted)
+    title_surface = fonts.small.render(
+        _fit_text(fonts.small, title, inner_width),
+        True,
+        PALETTE.text_primary,
+    )
+    summary_surface = fonts.small.render(
+        _fit_text(fonts.small, summary, inner_width),
+        True,
+        PALETTE.text_muted,
+    )
     screen.blit(title_surface, (inner_x, inner_y))
     summary_y = inner_y + title_surface.get_height() + LIVE_CHART_STYLE.title_gap
     screen.blit(summary_surface, (inner_x, summary_y))
@@ -158,7 +249,7 @@ def _draw_chart_block(
         inner_x,
         plot_y,
         max(LIVE_CHART_STYLE.plot_min_width, inner_width),
-        LIVE_CHART_STYLE.plot_height,
+        plot_height,
     )
     _draw_plot_background(pygame=pygame, screen=screen, rect=plot_rect)
     if not x_values or not y_values:
@@ -221,10 +312,7 @@ def _draw_plot_series(
     points = [
         (
             rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
-            rect.y
-            + rect.height
-            - 1
-            - int(round((value - y_min) / span * max(1, rect.height - 1))),
+            rect.y + rect.height - 1 - int(round((value - y_min) / span * max(1, rect.height - 1))),
         )
         for step, value in zip(x_values, y_values, strict=False)
     ]
@@ -237,8 +325,8 @@ def _draw_plot_series(
         width=1,
     )
     if zero_line and y_min <= 0.0 <= y_max:
-        zero_y = rect.y + rect.height - 1 - int(
-            round((0.0 - y_min) / span * max(1, rect.height - 1))
+        zero_y = (
+            rect.y + rect.height - 1 - int(round((0.0 - y_min) / span * max(1, rect.height - 1)))
         )
         pygame.draw.line(
             screen,
@@ -255,19 +343,45 @@ def _draw_plot_series(
 
 def _speed_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.speed_kph:
-        return "speed - · progress - · return -"
+        return "now - · progress -"
     current_speed = live_series.speed_kph[-1]
     current_progress = live_series.current_progress * 100.0
-    current_return = live_series.current_return
-    return (
-        f"speed {current_speed:.1f} km/h · progress {current_progress:.1f}% · "
-        f"return {current_return:+.4f}"
-    )
+    return f"now {current_speed:.1f} km/h · progress {current_progress:.1f}%"
 
 
 def _return_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.returns:
-        return "return - · progress max -"
+        return "now - · max progress -"
     current_return = live_series.current_return
     max_progress = live_series.max_progress * 100.0
-    return f"return {current_return:+.4f} · progress max {max_progress:.1f}%"
+    return f"now {current_return:+.4f} · max progress {max_progress:.1f}%"
+
+
+def _lateral_offset_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
+    if live_series is None or not live_series.lateral_offset:
+        return "now - · max |x| -"
+    current_offset = live_series.lateral_offset[-1]
+    max_absolute_offset = max(abs(value) for value in live_series.lateral_offset)
+    return f"now {current_offset:+.1f} · max |x| {max_absolute_offset:.1f}"
+
+
+def _outside_edge_excess_ratio_summary(
+    live_series: EpisodeLiveSeriesSnapshot | None,
+) -> str:
+    if live_series is None or not live_series.outside_edge_excess_ratio:
+        return "now - · max -"
+    current_excess = live_series.outside_edge_excess_ratio[-1]
+    max_excess = max(live_series.outside_edge_excess_ratio)
+    return f"now {current_excess:.3f} · max {max_excess:.3f}"
+
+
+def _future_segment_distance_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
+    if (
+        live_series is None
+        or not live_series.future_local_nearest_segment_distance
+    ):
+        return "seg - · distance -"
+    current_distance = live_series.future_local_nearest_segment_distance[-1]
+    segment_index = live_series.current_future_local_nearest_segment_index
+    segment_label = "-" if segment_index is None else str(segment_index)
+    return f"seg {segment_label} · distance {current_distance:.1f}"

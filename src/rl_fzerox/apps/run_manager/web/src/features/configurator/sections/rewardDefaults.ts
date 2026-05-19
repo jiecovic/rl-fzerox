@@ -31,6 +31,7 @@ export function boundsDefaults(reward: RewardConfig): RewardPatch {
     airborne_landing_grace_frames: reward.airborne_landing_grace_frames,
     outside_track_recovery_airborne_grace_frames:
       reward.outside_track_recovery_airborne_grace_frames,
+    outside_track_recovery_reward_cap: reward.outside_track_recovery_reward_cap,
     outside_track_recovery_reward: reward.outside_track_recovery_reward,
   };
 }
@@ -41,6 +42,7 @@ export function trackEventDefaults(reward: RewardConfig): RewardPatch {
     dirt_progress_multiplier: reward.dirt_progress_multiplier,
     ice_entry_penalty: reward.ice_entry_penalty,
     ice_progress_multiplier: reward.ice_progress_multiplier,
+    ko_star_reward: reward.ko_star_reward,
     lap_completion_bonus: reward.lap_completion_bonus,
     lap_position_scale: reward.lap_position_scale,
   };

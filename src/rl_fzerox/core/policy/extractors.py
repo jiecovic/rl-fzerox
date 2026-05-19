@@ -11,10 +11,18 @@ from stable_baselines3.common.preprocessing import is_image_space_channels_first
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
-from rl_fzerox.core.domain.cnn import CnnLayerKind
+from rl_fzerox.core.domain.cnn import (
+    CnnLayerKind,
+    is_pooling_cnn_layer,
+    is_residual_cnn_layer,
+    normalize_cnn_layer_kind,
+    validate_cnn_layer_geometry,
+)
 
 ConvProfile = Literal[
     "nature",
+    "impala_small",
+    "impala_large",
     "custom",
 ]
 
@@ -28,14 +36,15 @@ class ConvLayerSpec:
     kernel_size: tuple[int, int]
     stride: tuple[int, int]
     padding: tuple[int, int]
+    post_activation: bool = True
 
 
 ConvSpec = tuple[ConvLayerSpec, ...]
 CustomConvLayerConfig = Mapping[str, object]
 
 
-class ResidualConvBlock(nn.Module):
-    """Basic residual image block with optional projection on the skip path."""
+class PostActivationResidualConvBlock(nn.Module):
+    """Residual block matching the custom-CNN block behavior used so far."""
 
     def __init__(
         self,
@@ -78,15 +87,95 @@ class ResidualConvBlock(nn.Module):
         return self.output_activation(output + residual)
 
 
+class PreActivationResidualConvBlock(nn.Module):
+    """IMPALA-style residual block with an identity-preserving skip path."""
+
+    def __init__(
+        self,
+        in_channels: int,
+        layer_spec: ConvLayerSpec,
+    ) -> None:
+        super().__init__()
+        self.activation1 = nn.ReLU()
+        self.conv1 = nn.Conv2d(
+            in_channels,
+            layer_spec.out_channels,
+            kernel_size=layer_spec.kernel_size,
+            stride=layer_spec.stride,
+            padding=layer_spec.padding,
+        )
+        self.activation2 = nn.ReLU()
+        self.conv2 = nn.Conv2d(
+            layer_spec.out_channels,
+            layer_spec.out_channels,
+            kernel_size=layer_spec.kernel_size,
+            stride=(1, 1),
+            padding=layer_spec.padding,
+        )
+        self.projection = (
+            nn.Conv2d(
+                in_channels,
+                layer_spec.out_channels,
+                kernel_size=(1, 1),
+                stride=layer_spec.stride,
+                padding=(0, 0),
+            )
+            if in_channels != layer_spec.out_channels or layer_spec.stride != (1, 1)
+            else nn.Identity()
+        )
+
+    def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+        residual = self.projection(inputs)
+        output = self.conv1(self.activation1(inputs))
+        output = self.conv2(self.activation2(output))
+        return output + residual
+
+
 def _conv_layer(
     out_channels: int,
     *,
     kernel_size: int,
     stride: int,
     padding: int = 0,
+    post_activation: bool = True,
 ) -> ConvLayerSpec:
     return ConvLayerSpec(
         kind="conv",
+        out_channels=out_channels,
+        kernel_size=(kernel_size, kernel_size),
+        stride=(stride, stride),
+        padding=(padding, padding),
+        post_activation=post_activation,
+    )
+
+
+def _pool_layer(
+    *,
+    kind: Literal["maxpool", "avgpool"],
+    out_channels: int,
+    kernel_size: int,
+    stride: int,
+    padding: int,
+) -> ConvLayerSpec:
+    return ConvLayerSpec(
+        kind=kind,
+        out_channels=out_channels,
+        kernel_size=(kernel_size, kernel_size),
+        stride=(stride, stride),
+        padding=(padding, padding),
+    )
+
+
+def _residual_layer(
+    out_channels: int,
+    *,
+    kind: CnnLayerKind = "residual_post",
+    kernel_size: int = 3,
+    stride: int = 1,
+    padding: int = 1,
+) -> ConvLayerSpec:
+    return ConvLayerSpec(
+        kind=kind,
         out_channels=out_channels,
         kernel_size=(kernel_size, kernel_size),
         stride=(stride, stride),
@@ -99,6 +188,30 @@ NATURE_CNN_CONV_SPEC: ConvSpec = (
     _conv_layer(64, kernel_size=4, stride=2),
     _conv_layer(64, kernel_size=3, stride=1),
 )
+IMPALA_SMALL_CNN_CONV_SPEC: ConvSpec = (
+    _conv_layer(16, kernel_size=8, stride=4),
+    _conv_layer(32, kernel_size=4, stride=2),
+)
+
+
+def _impala_conv_sequence(out_channels: int) -> ConvSpec:
+    return (
+        _conv_layer(out_channels, kernel_size=3, stride=1, padding=1, post_activation=False),
+        _pool_layer(
+            kind="maxpool",
+            out_channels=out_channels,
+            kernel_size=3,
+            stride=2,
+            padding=1,
+        ),
+        _residual_layer(out_channels, kind="residual_pre"),
+        _residual_layer(out_channels, kind="residual_pre"),
+    )
+
+
+IMPALA_LARGE_CNN_CONV_SPEC: ConvSpec = (
+    _impala_conv_sequence(16) + _impala_conv_sequence(32) + _impala_conv_sequence(32)
+)
 
 
 class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
@@ -110,6 +223,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         features_dim: int | Literal["auto"] = 512,
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
+        custom_cnn_final_relu: bool = False,
         layer_norm: bool = False,
     ) -> None:
         image_geometry = _resolve_supported_image_geometry(
@@ -123,13 +237,14 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         self._channels = image_geometry.channels
         self._conv_spec = image_geometry.conv_spec
 
-        cnn = nn.Sequential(
-            *self._build_conv_layers(
-                input_channels=self._channels,
-                conv_spec=self._conv_spec,
-            ),
-            nn.Flatten(),
+        cnn_layers, capture_indices = self._build_conv_layers(
+            input_channels=self._channels,
+            conv_spec=self._conv_spec,
         )
+        self._cnn_capture_indices = capture_indices
+        if conv_profile == "impala_large" or (conv_profile == "custom" and custom_cnn_final_relu):
+            cnn_layers.append(nn.ReLU())
+        cnn = nn.Sequential(*cnn_layers, nn.Flatten())
 
         with torch.no_grad():
             sample = torch.zeros(1, self._channels, self._height, self._width)
@@ -155,27 +270,35 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         *,
         input_channels: int,
         conv_spec: ConvSpec,
-    ) -> list[nn.Module]:
+    ) -> tuple[list[nn.Module], tuple[int, ...]]:
         layers: list[nn.Module] = []
+        capture_indices: list[int] = []
         in_channels = input_channels
         for layer_spec in conv_spec:
             if layer_spec.kind == "conv":
-                layers.append(
-                    nn.Conv2d(
-                        in_channels,
-                        layer_spec.out_channels,
-                        kernel_size=layer_spec.kernel_size,
-                        stride=layer_spec.stride,
-                        padding=layer_spec.padding,
-                    )
+                conv = nn.Conv2d(
+                    in_channels,
+                    layer_spec.out_channels,
+                    kernel_size=layer_spec.kernel_size,
+                    stride=layer_spec.stride,
+                    padding=layer_spec.padding,
                 )
-                layers.append(nn.ReLU())
-            elif layer_spec.kind == "residual":
-                layers.append(ResidualConvBlock(in_channels, layer_spec))
+                layers.append(conv)
+                if layer_spec.post_activation:
+                    layers.append(nn.ReLU())
+            elif layer_spec.kind == "residual_pre":
+                layers.append(PreActivationResidualConvBlock(in_channels, layer_spec))
+            elif layer_spec.kind == "residual_post":
+                layers.append(PostActivationResidualConvBlock(in_channels, layer_spec))
+            elif layer_spec.kind == "maxpool":
+                layers.append(_torch_pooling_layer(nn.MaxPool2d, layer_spec))
+            elif layer_spec.kind == "avgpool":
+                layers.append(_torch_pooling_layer(nn.AvgPool2d, layer_spec))
             else:
                 raise ValueError(f"Unsupported CNN layer kind: {layer_spec.kind!r}")
-            in_channels = layer_spec.out_channels
-        return layers
+            capture_indices.append(len(layers) - 1)
+            in_channels = cnn_layer_output_channels(in_channels, layer_spec)
+        return layers, tuple(capture_indices)
 
     def forward(self, observations: torch.Tensor) -> torch.Tensor:
         """Convert either NHWC or NCHW observations into shared PPO features."""
@@ -187,19 +310,23 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         self,
         observations: torch.Tensor,
     ) -> tuple[tuple[str, torch.Tensor], ...]:
-        """Return post-ReLU activation maps for each convolutional layer."""
+        """Return top-level image-layer outputs for CNN visualization."""
 
         activations: list[tuple[str, torch.Tensor]] = []
         output = self._channels_first_observations(observations)
-        layer_index = 0
-        for layer in self._cnn:
+        capture_positions = {
+            module_index: layer_index
+            for layer_index, module_index in enumerate(self._cnn_capture_indices)
+        }
+        for module_index, layer in enumerate(self._cnn):
             if isinstance(layer, nn.Flatten):
                 break
             output = layer(output)
-            if isinstance(layer, nn.ReLU | ResidualConvBlock):
-                layer_index += 1
-                layer_spec = self._conv_spec[layer_index - 1]
-                activations.append((cnn_layer_name(layer_index, layer_spec.kind), output.detach()))
+            layer_index = capture_positions.get(module_index)
+            if layer_index is None:
+                continue
+            layer_spec = self._conv_spec[layer_index]
+            activations.append((cnn_layer_name(layer_index + 1, layer_spec.kind), output.detach()))
         return tuple(activations)
 
     def _channels_first_observations(self, observations: torch.Tensor) -> torch.Tensor:
@@ -231,6 +358,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         fusion_features_dim: int | None = None,
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
+        custom_cnn_final_relu: bool = False,
         layer_norm: bool = False,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
@@ -281,6 +409,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             features_dim=features_dim,
             conv_profile=conv_profile,
             custom_conv_layers=custom_conv_layers,
+            custom_cnn_final_relu=custom_cnn_final_relu,
             layer_norm=False,
         )
         self._state_mlp = _state_branch_mlp(
@@ -331,6 +460,17 @@ def _state_branch_mlp(*, input_dim: int, widths: tuple[int, ...]) -> nn.Module:
         layers.append(nn.ReLU())
         previous_dim = int(width)
     return nn.Sequential(*layers)
+
+
+def _torch_pooling_layer(
+    pool_type: type[nn.MaxPool2d] | type[nn.AvgPool2d],
+    layer_spec: ConvLayerSpec,
+) -> nn.Module:
+    return pool_type(
+        kernel_size=layer_spec.kernel_size,
+        stride=layer_spec.stride,
+        padding=layer_spec.padding,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,6 +530,10 @@ def _resolve_conv_spec(
 ) -> ConvSpec:
     if conv_profile == "nature":
         return NATURE_CNN_CONV_SPEC
+    if conv_profile == "impala_small":
+        return IMPALA_SMALL_CNN_CONV_SPEC
+    if conv_profile == "impala_large":
+        return IMPALA_LARGE_CNN_CONV_SPEC
     if conv_profile == "custom":
         return _custom_conv_spec(custom_conv_layers)
     raise ValueError(f"Unsupported CNN conv profile: {conv_profile!r}")
@@ -461,7 +605,7 @@ def _image_flatten_dim(
     width = geometry.width
     output_channels = geometry.channels
     for layer_spec in geometry.conv_spec:
-        output_channels = layer_spec.out_channels
+        output_channels = cnn_layer_output_channels(output_channels, layer_spec)
         height, width = cnn_layer_output_shape(
             height=height,
             width=width,
@@ -475,12 +619,18 @@ def _custom_cnn_layer(layer: CustomConvLayerConfig) -> ConvLayerSpec:
     kernel_size = _custom_cnn_layer_int(layer, "kernel_size")
     stride = _custom_cnn_layer_int(layer, "stride")
     padding = _custom_cnn_layer_int(layer, "padding", default=0)
+    validate_cnn_layer_geometry(kind=kind, kernel_size=kernel_size, padding=padding)
     return ConvLayerSpec(
         kind=kind,
-        out_channels=_custom_cnn_layer_int(layer, "out_channels"),
+        out_channels=_custom_cnn_layer_int(
+            layer,
+            "out_channels",
+            default=1 if is_pooling_cnn_layer(kind) else None,
+        ),
         kernel_size=(kernel_size, kernel_size),
         stride=(stride, stride),
         padding=(padding, padding),
+        post_activation=_custom_cnn_layer_bool(layer, "post_activation", default=True),
     )
 
 
@@ -501,16 +651,40 @@ def _custom_cnn_layer_int(
     return value
 
 
+def _custom_cnn_layer_bool(
+    layer: CustomConvLayerConfig,
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    if key not in layer:
+        return default
+    value = layer[key]
+    if not isinstance(value, bool):
+        raise TypeError(f"custom CNN layer field {key!r} must be a boolean")
+    return value
+
+
 def _custom_cnn_layer_kind(value: object) -> CnnLayerKind:
-    if value is None or value == "conv":
+    if value is None:
         return "conv"
-    if value == "residual":
-        return "residual"
-    raise ValueError(f"Unsupported custom CNN layer kind: {value!r}")
+    return normalize_cnn_layer_kind(value)
 
 
 def cnn_layer_name(index: int, kind: CnnLayerKind) -> str:
-    return f"res{index}" if kind == "residual" else f"conv{index}"
+    if kind == "residual_pre":
+        return f"res-pre{index}"
+    if kind == "residual_post":
+        return f"res{index}"
+    if kind == "maxpool":
+        return f"pool{index}"
+    if kind == "avgpool":
+        return f"avgpool{index}"
+    return f"conv{index}"
+
+
+def cnn_layer_output_channels(input_channels: int, layer_spec: ConvLayerSpec) -> int:
+    return input_channels if is_pooling_cnn_layer(layer_spec.kind) else layer_spec.out_channels
 
 
 def cnn_layer_output_shape(
@@ -531,7 +705,7 @@ def cnn_layer_output_shape(
         layer_spec.stride[1],
         padding=layer_spec.padding[1],
     )
-    if layer_spec.kind == "conv" or first_height < 1 or first_width < 1:
+    if not is_residual_cnn_layer(layer_spec.kind) or first_height < 1 or first_width < 1:
         return first_height, first_width
 
     second_height = _conv_output_size(

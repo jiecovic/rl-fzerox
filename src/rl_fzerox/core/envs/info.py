@@ -20,6 +20,7 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("race_distance", None),
     _MonitorInfoField("speed_kph", None),
     _MonitorInfoField("position", None),
+    _MonitorInfoField("ko_star_count", None),
     _MonitorInfoField("total_racers", None),
     _MonitorInfoField("course_index", None),
     _MonitorInfoField("lap", None),
