@@ -270,11 +270,18 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
             time_penalty_per_frame=0.0,
             airborne_landing_reward=5.0,
             airborne_landing_grace_frames=0,
+            airborne_landing_min_peak_height=50.0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+    tracker.reset(
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=140.0,
+        )
+    )
 
     first_landing = tracker.step_summary(
         _summary(max_race_distance=350.0),
@@ -284,7 +291,11 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
     takeoff_without_progress = tracker.step_summary(
         _summary(max_race_distance=350.0),
         _status(step_count=2),
-        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
     repeated_landing = tracker.step_summary(
         _summary(max_race_distance=350.0),
@@ -294,7 +305,11 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
     takeoff_with_progress = tracker.step_summary(
         _summary(max_race_distance=450.0),
         _status(step_count=4),
-        _telemetry(race_distance=450.0, state_labels=("active", "airborne")),
+        _telemetry(
+            race_distance=450.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
     next_bucket_landing = tracker.step_summary(
         _summary(max_race_distance=450.0),
@@ -322,6 +337,7 @@ def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
             time_penalty_per_frame=0.0,
             airborne_landing_reward=5.0,
             airborne_landing_grace_frames=50,
+            airborne_landing_min_peak_height=50.0,
             damage_taken_frame_penalty=0.0,
             damage_taken_streak_ramp_penalty=0.0,
         )
@@ -331,7 +347,11 @@ def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
     tracker.step_summary(
         _summary(max_race_distance=350.0, airborne_frames=20),
         _status(step_count=1),
-        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
     short_jump_landing = tracker.step_summary(
         _summary(max_race_distance=350.0, airborne_frames=20),
@@ -343,7 +363,11 @@ def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
     tracker.step_summary(
         _summary(max_race_distance=350.0, airborne_frames=25),
         _status(step_count=1),
-        _telemetry(race_distance=350.0, state_labels=("active", "airborne")),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
     long_jump_landing = tracker.step_summary(
         _summary(max_race_distance=350.0, airborne_frames=25),
@@ -355,6 +379,40 @@ def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
     assert short_jump_landing.breakdown == {}
     assert long_jump_landing.reward == 5.0
     assert long_jump_landing.breakdown == {"landing": 5.0}
+
+
+def test_reward_main_requires_peak_height_for_landing_reward() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=0,
+            airborne_landing_min_peak_height=50.0,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=10),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=20.0,
+        ),
+    )
+    shallow_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=10),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    assert shallow_landing.reward == 0.0
+    assert shallow_landing.breakdown == {}
 
 
 def _telemetry(
@@ -370,6 +428,7 @@ def _telemetry(
     lap: int | None = None,
     reverse_timer: int = 0,
     on_energy_refill: bool = False,
+    height_above_ground: float = 0.0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
     if on_energy_refill:
@@ -386,6 +445,7 @@ def _telemetry(
         laps_completed=laps_completed,
         lap=max(laps_completed + 1, 1) if lap is None else lap,
         reverse_timer=reverse_timer,
+        height_above_ground=height_above_ground,
     )
 
 

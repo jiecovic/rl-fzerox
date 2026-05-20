@@ -84,6 +84,7 @@ class RewardCourseOverrideConfig(BaseModel):
     damage_taken_streak_cap_frames: NonNegativeInt | None = None
     airborne_landing_reward: float | None = None
     airborne_landing_grace_frames: NonNegativeInt | None = None
+    airborne_landing_min_peak_height: NonNegativeFloat | None = None
     manual_boost_reward: NonNegativeFloat | None = None
     boost_pad_reward: NonNegativeFloat | None = None
     boost_pad_reward_progress_window: PositiveFloat | None = None
@@ -139,6 +140,7 @@ class RewardConfig(BaseModel):
     damage_taken_streak_cap_frames: NonNegativeInt = 0
     airborne_landing_reward: float = 0.0
     airborne_landing_grace_frames: NonNegativeInt = 50
+    airborne_landing_min_peak_height: NonNegativeFloat = 50.0
     manual_boost_reward: NonNegativeFloat = 0.0
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0

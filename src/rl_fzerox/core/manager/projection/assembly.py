@@ -121,6 +121,7 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "damage_taken_streak_cap_frames": reward.damage_taken_streak_cap_frames,
         "airborne_landing_reward": reward.airborne_landing_reward,
         "airborne_landing_grace_frames": reward.airborne_landing_grace_frames,
+        "airborne_landing_min_peak_height": reward.airborne_landing_min_peak_height,
         "collision_recoil_penalty": reward.collision_recoil_penalty,
         "failure_penalty": reward.failure_penalty,
         "truncation_penalty": reward.truncation_penalty,

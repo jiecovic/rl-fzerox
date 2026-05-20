@@ -42,6 +42,7 @@ class RewardMainWeights:
     grounded_pitch_penalty: float = 0.0
     airborne_landing_reward: float = 1.0
     airborne_landing_grace_frames: int = 50
+    airborne_landing_min_peak_height: float = 50.0
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0

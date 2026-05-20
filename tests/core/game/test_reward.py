@@ -75,6 +75,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "grounded_pitch_penalty": -0.004,
         "airborne_landing_reward": 5.0,
         "airborne_landing_grace_frames": 33,
+        "airborne_landing_min_peak_height": 120.0,
         "collision_recoil_penalty": -0.25,
         "failure_penalty": -30.0,
         "truncation_penalty": -15.0,
@@ -433,16 +434,19 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
         ),
     )
 
-    assert first_outside.reward == 0.0
-    assert first_outside.breakdown == {}
+    assert first_outside.reward == pytest.approx(-0.015)
+    assert first_outside.breakdown == {"outside_track_recovery": pytest.approx(-0.015)}
     assert recovering.reward == pytest.approx(0.003)
     assert recovering.breakdown == {"outside_track_recovery": pytest.approx(0.003)}
     assert worsening.reward == pytest.approx(-0.002)
     assert worsening.breakdown == {"outside_track_recovery": pytest.approx(-0.002)}
     assert back_inside.reward == pytest.approx(0.014)
     assert back_inside.breakdown == {"outside_track_recovery": pytest.approx(0.014)}
-    assert outside_again.reward == 0.0
-    assert outside_again.breakdown == {}
+    assert first_outside.reward + recovering.reward + worsening.reward + back_inside.reward == (
+        pytest.approx(0.0)
+    )
+    assert outside_again.reward == pytest.approx(-0.012)
+    assert outside_again.breakdown == {"outside_track_recovery": pytest.approx(-0.012)}
 
 
 def test_reward_main_uses_future_segment_distance_for_outside_track_recovery() -> None:
@@ -733,8 +737,8 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
         ),
     )
 
-    assert recovering_after_grace.reward == pytest.approx(0.001)
-    assert recovering_after_grace.breakdown == {"outside_track_recovery": pytest.approx(0.001)}
+    assert recovering_after_grace.reward == pytest.approx(-0.011)
+    assert recovering_after_grace.breakdown == {"outside_track_recovery": pytest.approx(-0.011)}
     assert landing_inside.reward == pytest.approx(0.011)
     assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.011)}
 
