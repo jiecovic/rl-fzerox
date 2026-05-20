@@ -170,6 +170,54 @@ def test_reward_main_penalizes_lean_request() -> None:
     assert step.breakdown == {"lean": -0.003}
 
 
+def test_reward_main_penalizes_lean_activation_once() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            lean_request_penalty=-0.001,
+            lean_activation_penalty=-0.01,
+            damage_taken_frame_penalty=0.0,
+            damage_taken_streak_ramp_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
+    )
+    held = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=6),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
+    )
+    released = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=9),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=False),
+    )
+    reactivated = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=12),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
+    )
+
+    assert first.reward == pytest.approx(-0.013)
+    assert first.breakdown == {"lean": -0.003, "lean_activation": -0.01}
+    assert held.reward == pytest.approx(-0.003)
+    assert held.breakdown == {"lean": -0.003}
+    assert released.reward == 0.0
+    assert released.breakdown == {}
+    assert reactivated.reward == pytest.approx(-0.013)
+    assert reactivated.breakdown == {"lean": -0.003, "lean_activation": -0.01}
+
+
 def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:
     tracker = build_reward_tracker(
         RewardConfig(

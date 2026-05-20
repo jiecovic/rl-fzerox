@@ -153,12 +153,20 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ air_brake_request_penalty: value })}
           />
           <NumberField
-            help="Per-step penalty for requesting lean."
-            label="Lean request penalty"
+            help="Per-frame penalty while lean is held."
+            label="Lean hold penalty"
             resetValue={defaultConfig.reward.lean_request_penalty}
             step="0.001"
             value={config.reward.lean_request_penalty}
             onChange={(value) => updateReward({ lean_request_penalty: value })}
+          />
+          <NumberField
+            help="One-time penalty when lean changes from idle to active. This discourages lean chatter without making long holds expensive."
+            label="Lean activation penalty"
+            resetValue={defaultConfig.reward.lean_activation_penalty}
+            step="0.001"
+            value={config.reward.lean_activation_penalty}
+            onChange={(value) => updateReward({ lean_activation_penalty: value })}
           />
           <NumberField
             help="Small penalty for grounded pitch requests above the penalty threshold. This does not clamp controller pitch."

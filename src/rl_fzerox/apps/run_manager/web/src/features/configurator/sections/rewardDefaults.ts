@@ -62,6 +62,7 @@ export function actionDefaults(reward: RewardConfig): RewardPatch {
     boost_pad_reward: reward.boost_pad_reward,
     boost_pad_reward_progress_window: reward.boost_pad_reward_progress_window,
     grounded_pitch_penalty: reward.grounded_pitch_penalty,
+    lean_activation_penalty: reward.lean_activation_penalty,
     lean_request_penalty: reward.lean_request_penalty,
     manual_boost_reward: reward.manual_boost_reward,
   };

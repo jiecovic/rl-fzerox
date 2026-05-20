@@ -16,6 +16,7 @@ from rl_fzerox.core.envs.rewards.reward_main.bounds import (
 from rl_fzerox.core.envs.rewards.reward_main.controls import (
     air_brake_request_penalty,
     grounded_pitch_penalty,
+    lean_activation_penalty,
     lean_request_penalty,
     manual_boost_reward,
     outside_track_recovery_reward,
@@ -69,6 +70,7 @@ class RewardMainTracker:
         self._previous_outside_recovery_distance: float | None = None
         self._deferred_outside_bounds_progress = False
         self._previous_ko_star_count: int | None = None
+        self._previous_lean_requested = False
         self._course_id: str | None = None
 
     def reset(
@@ -104,6 +106,7 @@ class RewardMainTracker:
         )
         self._deferred_outside_bounds_progress = telemetry_outside_track_bounds(telemetry)
         self._previous_ko_star_count = _ko_star_count(telemetry)
+        self._previous_lean_requested = False
 
     def summary_config(self) -> RewardSummaryConfig:
         """Return native summary thresholds required by this reward."""
@@ -135,6 +138,7 @@ class RewardMainTracker:
             self._previous_outside_recovery_distance = None
             self._deferred_outside_bounds_progress = False
             self._previous_ko_star_count = None
+            self._previous_lean_requested = False
             return RewardStep(reward=0.0)
 
         self._progress.ensure_origin(telemetry)
@@ -276,6 +280,15 @@ class RewardMainTracker:
             reward += lean_penalty
             breakdown["lean"] = lean_penalty
 
+        lean_activation = lean_activation_penalty(
+            action_context,
+            previous_lean_requested=self._previous_lean_requested,
+            weights=self._weights,
+        )
+        if lean_activation:
+            reward += lean_activation
+            breakdown["lean_activation"] = lean_activation
+
         grounded_pitch = grounded_pitch_penalty(
             summary,
             telemetry,
@@ -351,6 +364,9 @@ class RewardMainTracker:
         )
         self._deferred_outside_bounds_progress = defer_outside_bounds_progress
         self._previous_ko_star_count = _ko_star_count(telemetry)
+        self._previous_lean_requested = (
+            False if action_context is None else action_context.lean_requested
+        )
         return RewardStep(reward=reward, breakdown=breakdown, raw_reward=raw_reward)
 
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:

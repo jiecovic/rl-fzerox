@@ -294,6 +294,7 @@ const rewardConfigSchema = z
     boost_pad_reward: z.number().nonnegative(),
     boost_pad_reward_progress_window: z.number().positive(),
     lean_request_penalty: z.number().max(0),
+    lean_activation_penalty: z.number().max(0),
     grounded_pitch_penalty: z.number().max(0),
     damage_taken_frame_penalty: z.number().max(0),
     damage_taken_streak_ramp_penalty: z.number().max(0),
