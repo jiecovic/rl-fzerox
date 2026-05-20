@@ -10,12 +10,13 @@ import {
 import type { RunLineageRun } from "@/features/runs/panel/types";
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
 import { formatDate } from "@/shared/ui/format";
-import { BranchSourceIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
+import { BranchSourceIcon, ExportIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
 
 interface RunRowProps {
   busyActionRunId: string | null;
   entry: RunLineageRun;
   isDeleting: boolean;
+  onExportRun: () => Promise<void>;
   onOpenRun: () => void;
   onRequestDelete: () => void;
   onResumeRun: () => Promise<void>;
@@ -27,6 +28,7 @@ export function RunRow({
   busyActionRunId,
   entry,
   isDeleting,
+  onExportRun,
   onOpenRun,
   onRequestDelete,
   onResumeRun,
@@ -41,6 +43,7 @@ export function RunRow({
     (run.status === "paused" || run.status === "stopped" || run.status === "failed") &&
     !busy &&
     !isDeleting;
+  const canExport = run.status !== "running" && pendingCommand === null && !busy && !isDeleting;
   const canDelete =
     entry.childCount === 0 &&
     entry.dependentDraftCount === 0 &&
@@ -154,6 +157,16 @@ export function RunRow({
           onClick={() => void onRunAction(run.id, onResumeRun)}
         >
           <ResumeIcon />
+        </button>
+        <button
+          aria-label={`Export run ${run.name}`}
+          className="icon-button compact-icon-button run-list-action-button"
+          title={canExport ? "Export run" : "Stop the run before exporting"}
+          type="button"
+          disabled={!canExport}
+          onClick={() => void onRunAction(run.id, onExportRun)}
+        >
+          <ExportIcon />
         </button>
         <button
           aria-label={`Delete run ${run.name}`}

@@ -14,6 +14,8 @@ import {
   deleteDraft,
   deleteLineage,
   deleteRun,
+  exportRunBundle,
+  importRunBundle,
   launchRun,
   openRunDirectory,
   renameRun,
@@ -52,6 +54,8 @@ export interface WorkspaceActions {
     draftId: string | null,
   ) => Promise<ManagedRunDetail>;
   openManagedRunDirectory: (runId: string) => Promise<void>;
+  exportManagedRun: (run: ManagedRun) => Promise<void>;
+  importManagedRunBundle: (file: File) => Promise<void>;
   removeDraft: (id: string) => Promise<void>;
   removeLineage: (lineageId: string) => Promise<void>;
   removeRun: (run: ManagedRun) => Promise<void>;
@@ -251,6 +255,18 @@ export function useWorkspaceActions({
     await openRunDirectory(runId);
   }
 
+  async function exportManagedRun(run: ManagedRun) {
+    await exportRunBundle(run);
+  }
+
+  async function importManagedRunBundle(file: File) {
+    const run = await importRunBundle(file);
+    setRuns((current) => upsertRun(current, runSummaryFromDetail(run)));
+    upsertRunDetail(run);
+    sessions.openRun(run);
+    await reloadManagerData();
+  }
+
   async function watchManagedRun(
     runId: string,
     artifact: "latest" | "best",
@@ -281,6 +297,8 @@ export function useWorkspaceActions({
     forkManagedRun,
     launchTrainingRun,
     openManagedRunDirectory,
+    exportManagedRun,
+    importManagedRunBundle,
     removeDraft,
     removeLineage,
     removeRun,

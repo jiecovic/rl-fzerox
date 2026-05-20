@@ -197,6 +197,34 @@ export function ResumeIcon({ size = 14 }: IconProps) {
   );
 }
 
+export function ExportIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M10 3.5v8M6.75 8.25 10 11.5l3.25-3.25M4.5 14.5v2h11v-2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+export function ImportIcon({ size = 14 }: IconProps) {
+  return (
+    <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 20 20" width={size}>
+      <path
+        d="M10 16.5v-8M6.75 11.75 10 8.5l3.25 3.25M4.5 5.5v-2h11v2"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 export function BranchSourceIcon({ size = 16 }: IconProps) {
   return (
     <svg aria-hidden="true" fill="none" height={size} viewBox="0 0 16 16" width={size}>

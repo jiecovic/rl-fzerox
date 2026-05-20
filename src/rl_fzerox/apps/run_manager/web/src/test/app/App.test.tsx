@@ -19,11 +19,13 @@ const createDraftWithSourceMock = vi.fn();
 const updateDraftWithSourceMock = vi.fn();
 const deleteDraftMock = vi.fn();
 const deleteRunMock = vi.fn();
+const exportRunBundleMock = vi.fn();
 const fetchRunMock = vi.fn();
 const fetchRunsMock = vi.fn();
 const fetchRunMetricsMock = vi.fn();
 const fetchRunTrackSamplingStateMock = vi.fn();
 const fetchPolicyPreviewMock = vi.fn();
+const importRunBundleMock = vi.fn();
 const launchRunMock = vi.fn();
 const openRunDirectoryMock = vi.fn();
 const renameRunMock = vi.fn();
@@ -48,11 +50,13 @@ vi.mock("@/shared/api/client", async () => {
     ) => createDraftWithSourceMock(name, config, sourceRunId, sourceArtifact),
     deleteDraft: (id: string) => deleteDraftMock(id),
     deleteRun: (id: string) => deleteRunMock(id),
+    exportRunBundle: (run: ReturnType<typeof runFixture>) => exportRunBundleMock(run),
     fetchRun: (runId: string) => fetchRunMock(runId),
     fetchRuns: () => fetchRunsMock(),
     fetchRunMetrics: (runId: string) => fetchRunMetricsMock(runId),
     fetchRunTrackSamplingState: (runId: string) => fetchRunTrackSamplingStateMock(runId),
     fetchPolicyPreview: (config: typeof managedRunConfigFixture) => fetchPolicyPreviewMock(config),
+    importRunBundle: (file: File) => importRunBundleMock(file),
     launchRun: (...args: unknown[]) => launchRunMock(...args),
     openRunDirectory: (runId: string) => openRunDirectoryMock(runId),
     renameRun: (runId: string, name: string) => renameRunMock(runId, name),
@@ -100,11 +104,13 @@ describe("App", () => {
     );
     deleteDraftMock.mockResolvedValue(undefined);
     deleteRunMock.mockResolvedValue(undefined);
+    exportRunBundleMock.mockResolvedValue(undefined);
     fetchRunMock.mockResolvedValue(runFixture());
     fetchRunsMock.mockResolvedValue([]);
     fetchRunMetricsMock.mockResolvedValue([runMetricSampleFixture()]);
     fetchRunTrackSamplingStateMock.mockResolvedValue(null);
     fetchPolicyPreviewMock.mockResolvedValue(policyPreviewFixture);
+    importRunBundleMock.mockResolvedValue(runFixture({ id: "imported-run", name: "imported" }));
     launchRunMock.mockResolvedValue(runFixture());
     openRunDirectoryMock.mockResolvedValue(undefined);
     renameRunMock.mockResolvedValue(runFixture({ name: "renamed run" }));
