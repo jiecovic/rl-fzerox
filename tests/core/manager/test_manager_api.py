@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import rl_fzerox.apps.run_manager.api.routes as manager_api_routes
+import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.core.manager import (
     ManagedRun,
@@ -786,7 +787,10 @@ def test_manager_api_live_runs_sends_initial_snapshot(tmp_path: Path) -> None:
     assert payload["runs"][0]["id"] == run.id
 
 
-async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_path: Path) -> None:
+async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
         name="Running Run",
@@ -824,6 +828,7 @@ async def test_manager_api_exposes_worker_heartbeat_separately_from_runtime(tmp_
         progress_fraction=0.5,
         updated_at=runtime_updated_at,
     )
+    monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: True)
     client = _ApiClient(create_manager_api_app(store))
 
     response = await client.get("/api/runs")
