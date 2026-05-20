@@ -22,6 +22,7 @@ describe("RunsPanel", () => {
     const drafts = [draftFixture()];
     const onDeleteLineage = vi.fn().mockResolvedValue(undefined);
     const onDeleteRun = vi.fn().mockResolvedValue(undefined);
+    const onExportRun = vi.fn().mockResolvedValue(undefined);
     const onOpenRun = vi.fn();
     const onResumeRun = vi.fn().mockResolvedValue(undefined);
     const onStopRun = vi.fn().mockResolvedValue(undefined);
@@ -32,6 +33,8 @@ describe("RunsPanel", () => {
         runs={[run, failedRun]}
         onDeleteLineage={onDeleteLineage}
         onDeleteRun={onDeleteRun}
+        onExportRun={onExportRun}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
         onOpenRun={onOpenRun}
         onResumeRun={onResumeRun}
         onStopRun={onStopRun}
@@ -55,6 +58,13 @@ describe("RunsPanel", () => {
       }),
     );
     expect(onStopRun).toHaveBeenCalledWith(run);
+
+    await user.click(
+      within(failedRow as HTMLElement).getByRole("button", {
+        name: `Export run ${failedRun.name}`,
+      }),
+    );
+    expect(onExportRun).toHaveBeenCalledWith(failedRun);
 
     await user.click(
       within(failedRow as HTMLElement).getByRole("button", {
@@ -92,6 +102,8 @@ describe("RunsPanel", () => {
         runs={[run, leafRun]}
         onDeleteLineage={onDeleteLineage}
         onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onExportRun={vi.fn().mockResolvedValue(undefined)}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
         onOpenRun={vi.fn()}
         onResumeRun={vi.fn().mockResolvedValue(undefined)}
         onStopRun={vi.fn().mockResolvedValue(undefined)}
@@ -136,6 +148,8 @@ describe("RunsPanel", () => {
         runs={[oldRun, newRun]}
         onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
         onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onExportRun={vi.fn().mockResolvedValue(undefined)}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
         onOpenRun={vi.fn()}
         onResumeRun={vi.fn().mockResolvedValue(undefined)}
         onStopRun={vi.fn().mockResolvedValue(undefined)}
@@ -166,6 +180,8 @@ describe("RunsPanel", () => {
         runs={[{ ...oldRun }, { ...newRun, lineage_groups: [...newRun.lineage_groups] }]}
         onDeleteLineage={vi.fn().mockResolvedValue(undefined)}
         onDeleteRun={vi.fn().mockResolvedValue(undefined)}
+        onExportRun={vi.fn().mockResolvedValue(undefined)}
+        onImportRunBundle={vi.fn().mockResolvedValue(undefined)}
         onOpenRun={vi.fn()}
         onResumeRun={vi.fn().mockResolvedValue(undefined)}
         onStopRun={vi.fn().mockResolvedValue(undefined)}

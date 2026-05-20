@@ -92,6 +92,8 @@ export function WorkspaceBody({
           runs={runs}
           onDeleteLineage={actions.removeLineage}
           onDeleteRun={actions.removeRun}
+          onExportRun={actions.exportManagedRun}
+          onImportRunBundle={actions.importManagedRunBundle}
           onOpenRun={sessions.openRun}
           onResumeRun={(run) => actions.resumeManagedRun(run.id)}
           onStopRun={(run) => actions.stopManagedRun(run.id)}

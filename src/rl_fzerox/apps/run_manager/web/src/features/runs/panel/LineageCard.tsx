@@ -11,6 +11,7 @@ interface LineageCardProps {
   isDeleting: boolean;
   lineage: RunLineageGroup;
   onDeleteLineage: () => void;
+  onExportRun: (run: ManagedRun) => Promise<void>;
   onOpenRun: (run: ManagedRun) => void;
   onRequestRunDelete: (run: ManagedRun) => void;
   onResumeRun: (run: ManagedRun) => Promise<void>;
@@ -26,6 +27,7 @@ export function LineageCard({
   isDeleting,
   lineage,
   onDeleteLineage,
+  onExportRun,
   onOpenRun,
   onRequestRunDelete,
   onResumeRun,
@@ -151,6 +153,7 @@ export function LineageCard({
                 entry={entry}
                 isDeleting={isDeleting}
                 key={entry.run.id}
+                onExportRun={() => onExportRun(entry.run)}
                 onOpenRun={() => onOpenRun(entry.run)}
                 onRequestDelete={() => onRequestRunDelete(entry.run)}
                 onResumeRun={() => onResumeRun(entry.run)}

@@ -93,6 +93,12 @@
   min-width: 0;
 }
 
+.run-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .run-lineage-actions {
   display: inline-flex;
   align-items: center;
@@ -161,7 +167,7 @@
 }
 
 .run-list-head {
-  grid-template-columns: minmax(0, 1fr) 102px;
+  grid-template-columns: minmax(0, 1fr) 136px;
   gap: 8px;
   padding: 0 10px 4px;
   color: var(--muted);
@@ -173,7 +179,7 @@
 
 .run-list-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 102px;
+  grid-template-columns: minmax(0, 1fr) 136px;
   gap: 8px;
   align-items: center;
   border: 1px solid var(--border);
@@ -203,7 +209,7 @@
 }
 
 .run-list-head-actions {
-  width: 102px;
+  width: 136px;
   justify-self: end;
   text-align: right;
 }
@@ -459,7 +465,7 @@
 
 .run-list-actions {
   display: flex;
-  width: 102px;
+  width: 136px;
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;

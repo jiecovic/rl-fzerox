@@ -44,7 +44,6 @@ fzerox-smoke = "rl_fzerox.apps.smoke:main"
 fzerox-train = "rl_fzerox.apps.train:main"
 fzerox-watch = "rl_fzerox.apps.watch:main"
 fzerox-record-policy = "rl_fzerox.apps.record_policy:main"
-fzerox-run-transfer = "rl_fzerox.apps.run_manager.transfer:main"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
