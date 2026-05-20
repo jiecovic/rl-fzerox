@@ -1395,6 +1395,7 @@
       "ko_star_reward": 0.0,
       "lap_completion_bonus": 5.0,
       "lap_position_scale": 1.0,
+      "lean_activation_penalty": 0.0,
       "lean_request_penalty": -0.003,
       "manual_boost_reward": 0.01,
       "outside_bounds_reentry_progress_distance_cap": 10000.0,

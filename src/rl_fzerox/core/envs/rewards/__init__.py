@@ -70,6 +70,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         energy_refill_collision_cooldown_frames=(config.energy_refill_collision_cooldown_frames),
         air_brake_request_penalty=config.air_brake_request_penalty,
         lean_request_penalty=config.lean_request_penalty,
+        lean_activation_penalty=config.lean_activation_penalty,
         grounded_pitch_penalty=config.grounded_pitch_penalty,
         airborne_landing_reward=config.airborne_landing_reward,
         airborne_landing_grace_frames=config.airborne_landing_grace_frames,
@@ -244,6 +245,11 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 override.lean_request_penalty
                 if override.lean_request_penalty is not None
                 else base.lean_request_penalty
+            ),
+            lean_activation_penalty=(
+                override.lean_activation_penalty
+                if override.lean_activation_penalty is not None
+                else base.lean_activation_penalty
             ),
             grounded_pitch_penalty=(
                 override.grounded_pitch_penalty
