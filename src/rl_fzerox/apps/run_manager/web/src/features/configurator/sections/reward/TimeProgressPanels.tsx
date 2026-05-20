@@ -218,6 +218,14 @@ export function TimeProgressPanels({
             value={config.reward.airborne_landing_grace_frames}
             onChange={(value) => updateReward({ airborne_landing_grace_frames: value })}
           />
+          <NumberField
+            help="Minimum peak height above ground reached during the airborne segment before landing reward can pay. This filters shallow border flicker while preserving real jumps. Set to 0 for the old behavior."
+            label="Landing min peak height"
+            resetValue={defaultConfig.reward.airborne_landing_min_peak_height}
+            step="10"
+            value={config.reward.airborne_landing_min_peak_height}
+            onChange={(value) => updateReward({ airborne_landing_min_peak_height: value })}
+          />
         </div>
       </ConfigDisclosure>
     </>

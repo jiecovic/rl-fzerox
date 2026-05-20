@@ -62,6 +62,7 @@ class RewardMainTracker:
         self._damage = DamagePenaltyState()
         self._previous_airborne = False
         self._landing_airborne_frames = 0
+        self._landing_airborne_peak_height = 0.0
         self._outside_track_recovery_airborne_frames = 0
         self._outside_track_recovery_armed = False
         self._use_visible_reentry_progress_until_grounded = False
@@ -91,6 +92,10 @@ class RewardMainTracker:
         self._damage.reset()
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
         self._landing_airborne_frames = 0
+        self._landing_airborne_peak_height = _landing_airborne_peak_height(
+            previous_peak_height=0.0,
+            telemetry=telemetry,
+        )
         self._outside_track_recovery_airborne_frames = 0
         self._outside_track_recovery_armed = False
         self._use_visible_reentry_progress_until_grounded = False
@@ -123,6 +128,7 @@ class RewardMainTracker:
             self._damage.reset()
             self._previous_airborne = False
             self._landing_airborne_frames = 0
+            self._landing_airborne_peak_height = 0.0
             self._outside_track_recovery_airborne_frames = 0
             self._outside_track_recovery_armed = False
             self._use_visible_reentry_progress_until_grounded = False
@@ -138,6 +144,10 @@ class RewardMainTracker:
             previous_airborne=self._previous_airborne,
             current_airborne=telemetry.player.airborne,
             summary=summary,
+        )
+        landing_airborne_peak_height = _landing_airborne_peak_height(
+            previous_peak_height=self._landing_airborne_peak_height,
+            telemetry=telemetry,
         )
         recovery_excursion_active = (
             self._previous_outside_recovery_distance is not None or outside_track_bounds
@@ -195,9 +205,16 @@ class RewardMainTracker:
         if frontier_reward.energy_refill_bonus:
             reward += frontier_reward.energy_refill_bonus
             breakdown["energy_refill_progress"] = frontier_reward.energy_refill_bonus
+        previous_recovery_distance_for_reward = _outside_track_recovery_baseline(
+            previous_distance=self._previous_outside_recovery_distance,
+            current_distance=current_outside_recovery_distance,
+            outside_track_bounds=outside_track_bounds,
+            previous_armed=self._outside_track_recovery_armed,
+            current_armed=recovery_armed,
+        )
         recovery_reward = outside_track_recovery_reward(
             weights=self._weights,
-            previous_distance=self._previous_outside_recovery_distance,
+            previous_distance=previous_recovery_distance_for_reward,
             current_distance=current_outside_recovery_distance,
             enabled=recovery_armed,
         )
@@ -277,6 +294,7 @@ class RewardMainTracker:
         landing = self._landings.reward(
             previous_airborne=self._previous_airborne,
             airborne_frames=landing_airborne_frames,
+            airborne_peak_height=landing_airborne_peak_height,
             telemetry=telemetry,
             frontier_bucket_index=self._progress.frontier_bucket_index,
             weights=self._weights,
@@ -318,6 +336,9 @@ class RewardMainTracker:
         self._energy.finish_step(telemetry)
         self._previous_airborne = telemetry.player.airborne
         self._landing_airborne_frames = landing_airborne_frames if telemetry.player.airborne else 0
+        self._landing_airborne_peak_height = (
+            landing_airborne_peak_height if telemetry.player.airborne else 0.0
+        )
         self._outside_track_recovery_airborne_frames = (
             recovery_airborne_frames if outside_track_bounds else 0
         )
@@ -490,6 +511,23 @@ def _previous_outside_track_recovery_distance(
     return _outside_track_recovery_distance(telemetry)
 
 
+def _outside_track_recovery_baseline(
+    *,
+    previous_distance: float | None,
+    current_distance: float | None,
+    outside_track_bounds: bool,
+    previous_armed: bool,
+    current_armed: bool,
+) -> float | None:
+    if current_distance is None:
+        return previous_distance
+    if outside_track_bounds and current_armed and not previous_armed:
+        return 0.0
+    if outside_track_bounds and previous_distance is None:
+        return 0.0
+    return previous_distance
+
+
 def _outside_track_recovery_airborne_frames(
     *,
     previous_frames: int,
@@ -515,6 +553,17 @@ def _landing_airborne_frames(
     if not previous_airborne and not current_airborne and current_frames <= 0:
         return 0
     return max(previous_frames, 0) + current_frames
+
+
+def _landing_airborne_peak_height(
+    *,
+    previous_peak_height: float,
+    telemetry: FZeroXTelemetry | None,
+) -> float:
+    if telemetry is None or not telemetry.player.airborne:
+        return max(float(previous_peak_height), 0.0)
+    current_height = max(float(telemetry.player.height_above_ground), 0.0)
+    return max(float(previous_peak_height), current_height)
 
 
 def _outside_track_recovery_armed(

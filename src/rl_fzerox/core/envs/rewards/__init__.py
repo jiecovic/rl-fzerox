@@ -73,6 +73,7 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         grounded_pitch_penalty=config.grounded_pitch_penalty,
         airborne_landing_reward=config.airborne_landing_reward,
         airborne_landing_grace_frames=config.airborne_landing_grace_frames,
+        airborne_landing_min_peak_height=config.airborne_landing_min_peak_height,
         collision_recoil_penalty=config.collision_recoil_penalty,
         failure_penalty=config.failure_penalty,
         truncation_penalty=config.truncation_penalty,
@@ -258,6 +259,11 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 override.airborne_landing_grace_frames
                 if override.airborne_landing_grace_frames is not None
                 else base.airborne_landing_grace_frames
+            ),
+            airborne_landing_min_peak_height=(
+                override.airborne_landing_min_peak_height
+                if override.airborne_landing_min_peak_height is not None
+                else base.airborne_landing_min_peak_height
             ),
             collision_recoil_penalty=(
                 override.collision_recoil_penalty

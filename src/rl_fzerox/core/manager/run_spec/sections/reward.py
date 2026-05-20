@@ -54,6 +54,7 @@ class ManagedRewardConfig(BaseModel):
     damage_taken_streak_cap_frames: NonNegativeInt = 120
     airborne_landing_reward: float = 1.0
     airborne_landing_grace_frames: NonNegativeInt = 50
+    airborne_landing_min_peak_height: NonNegativeFloat = 50.0
     collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0

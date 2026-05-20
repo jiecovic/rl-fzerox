@@ -300,6 +300,7 @@ const rewardConfigSchema = z
     damage_taken_streak_cap_frames: z.number().int().nonnegative(),
     airborne_landing_reward: z.number(),
     airborne_landing_grace_frames: z.number().int().nonnegative(),
+    airborne_landing_min_peak_height: z.number().nonnegative(),
     collision_recoil_penalty: z.number(),
     failure_penalty: z.number(),
     truncation_penalty: z.number(),

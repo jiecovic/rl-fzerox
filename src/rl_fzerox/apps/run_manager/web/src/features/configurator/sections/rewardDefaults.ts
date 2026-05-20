@@ -29,6 +29,7 @@ export function boundsDefaults(reward: RewardConfig): RewardPatch {
   return {
     airborne_landing_reward: reward.airborne_landing_reward,
     airborne_landing_grace_frames: reward.airborne_landing_grace_frames,
+    airborne_landing_min_peak_height: reward.airborne_landing_min_peak_height,
     outside_track_recovery_airborne_grace_frames:
       reward.outside_track_recovery_airborne_grace_frames,
     outside_track_recovery_reward_cap: reward.outside_track_recovery_reward_cap,

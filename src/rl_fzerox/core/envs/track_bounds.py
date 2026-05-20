@@ -51,6 +51,7 @@ def track_edge_state(
     player: PlayerTelemetry,
     *,
     near_edge_ratio_threshold: float = 0.8,
+    outside_edge_ratio_threshold: float = 1.05,
 ) -> TrackEdgeState:
     offset = float(player.signed_lateral_offset)
     if offset >= 0.0:
@@ -60,12 +61,15 @@ def track_edge_state(
         side = "right"
         ratio = _safe_ratio(offset, float(player.current_radius_right))
 
-    near_side = _near_edge_side(ratio, near_edge_ratio_threshold=near_edge_ratio_threshold)
+    near_side = _near_edge_side(
+        ratio,
+        near_edge_ratio_threshold=near_edge_ratio_threshold,
+    )
     return TrackEdgeState(
         side=side,
         ratio=ratio,
         near_side=near_side,
-        outside_bounds=ratio is not None and abs(ratio) > 1.0,
+        outside_bounds=ratio is not None and abs(ratio) > outside_edge_ratio_threshold,
     )
 
 
