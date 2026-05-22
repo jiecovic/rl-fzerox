@@ -38,6 +38,76 @@ export function nextAvailableDraftName(baseName: string, takenNames: Iterable<st
   return `${baseName} ${suffix}`;
 }
 
+export function nextForkDraftName(
+  sourceRun: ManagedRun,
+  runs: readonly ManagedRun[],
+  takenNames: Iterable<string>,
+) {
+  return nextCounterName(forkDraftBaseName(sourceRun, runs), takenNames);
+}
+
+function forkDraftBaseName(sourceRun: ManagedRun, runs: readonly ManagedRun[]) {
+  const lineageRuns = runs.filter((run) => run.lineage_id === sourceRun.lineage_id);
+  const baseRun = [...lineageRuns].sort(compareLineageBaseRuns).at(0) ?? sourceRun;
+  return stripForkSuffixes(baseRun.name);
+}
+
+function compareLineageBaseRuns(left: ManagedRun, right: ManagedRun) {
+  const leftRootRank = lineageBaseRank(left);
+  const rightRootRank = lineageBaseRank(right);
+  if (leftRootRank !== rightRootRank) {
+    return leftRootRank - rightRootRank;
+  }
+  if (left.lineage_step_offset !== right.lineage_step_offset) {
+    return left.lineage_step_offset - right.lineage_step_offset;
+  }
+  if (left.created_at !== right.created_at) {
+    return left.created_at.localeCompare(right.created_at);
+  }
+  return left.id.localeCompare(right.id);
+}
+
+function lineageBaseRank(run: ManagedRun) {
+  return run.parent_run_id === null && run.source_run_id === null ? 0 : 1;
+}
+
+function stripForkSuffixes(name: string) {
+  let current = normalizeDraftTabTitle(name);
+  while (true) {
+    const withoutCounter = current.replace(/\s+\d+$/, "").trim();
+    const withoutFork = withoutCounter.replace(/\s+(?:best\s+)?fork$/i, "").trim();
+    const next = withoutFork.length > 0 ? withoutFork : current;
+    if (next === current) {
+      return current;
+    }
+    current = next;
+  }
+}
+
+function nextCounterName(baseName: string, takenNames: Iterable<string>) {
+  const trimmedBaseName = normalizeDraftTabTitle(baseName);
+  const normalizedBaseName = trimmedBaseName.toLowerCase();
+  let highestCounter = 0;
+
+  for (const name of takenNames) {
+    const normalizedName = name.trim().toLowerCase();
+    if (normalizedName === normalizedBaseName) {
+      highestCounter = Math.max(highestCounter, 1);
+      continue;
+    }
+    const prefix = `${normalizedBaseName} `;
+    if (!normalizedName.startsWith(prefix)) {
+      continue;
+    }
+    const suffix = normalizedName.slice(prefix.length);
+    if (/^\d+$/.test(suffix)) {
+      highestCounter = Math.max(highestCounter, Number(suffix));
+    }
+  }
+
+  return highestCounter === 0 ? trimmedBaseName : `${trimmedBaseName} ${highestCounter + 1}`;
+}
+
 export function upsertDraft(current: ManagedDraft[], nextDraft: ManagedDraft) {
   const withoutPrevious = current.filter((draft) => draft.id !== nextDraft.id);
   return [nextDraft, ...withoutPrevious].sort(compareDrafts);
