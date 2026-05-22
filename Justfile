@@ -58,7 +58,7 @@ run-manager-build:
 
 # Launch the local React run manager with the Python SQLite API.
 run-manager:
-    @PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
+    @EGL_PLATFORM="${EGL_PLATFORM:-x11}" PYTHONPATH=src "{{python_bin}}" -m rl_fzerox.apps.run_manager
 
 # Aggregate repo-wide quality tasks.
 fmt: rust-fmt py-fmt
