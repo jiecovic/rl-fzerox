@@ -68,8 +68,9 @@ class _LauncherStub:
         *,
         run_id: str,
         artifact: str,
+        device: Literal["cpu", "cuda"],
     ) -> Literal["started", "already_running"]:
-        del run_id, artifact
+        del run_id, artifact, device
         raise AssertionError("watch should not be called")
 
 
@@ -180,6 +181,59 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
     payload = response.json()
     assert payload["run"]["name"] == "Launch Me"
     assert payload["run"]["status"] == "running"
+
+
+async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Path) -> None:
+    class FakeLauncher(_LauncherStub):
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, str, Literal["cpu", "cuda"]]] = []
+
+        def watch_artifact(
+            self,
+            *,
+            run_id: str,
+            artifact: str,
+            device: Literal["cpu", "cuda"],
+        ) -> Literal["started", "already_running"]:
+            self.calls.append((run_id, artifact, device))
+            return "started"
+
+    launcher = FakeLauncher()
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _ApiClient(create_manager_api_app(store, run_launcher=launcher))
+
+    response = await client.post("/api/runs/run-1/watch?artifact=best", json={"device": "cpu"})
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "started"}
+    assert launcher.calls == [("run-1", "best", "cpu")]
+
+
+async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> None:
+    class FakeLauncher(_LauncherStub):
+        def __init__(self) -> None:
+            self.device: Literal["cpu", "cuda"] | None = None
+
+        def watch_artifact(
+            self,
+            *,
+            run_id: str,
+            artifact: str,
+            device: Literal["cpu", "cuda"],
+        ) -> Literal["started", "already_running"]:
+            del run_id, artifact
+            self.device = device
+            return "already_running"
+
+    launcher = FakeLauncher()
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    client = _ApiClient(create_manager_api_app(store, run_launcher=launcher))
+
+    response = await client.post("/api/runs/run-1/watch")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "already_running"}
+    assert launcher.device == "cuda"
 
 
 async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Path) -> None:

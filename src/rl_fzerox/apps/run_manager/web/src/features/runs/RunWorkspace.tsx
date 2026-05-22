@@ -6,7 +6,12 @@ import { RunIdentityPanel } from "@/features/runs/workspace/IdentityPanel";
 import { useRunPolicyPreview, useRunTrackSamplingState } from "@/features/runs/workspace/polling";
 import { RunReadonlyConfig } from "@/features/runs/workspace/ReadonlyConfig";
 import { RunRuntimeSummary, runWorkspaceSubtitle } from "@/features/runs/workspace/RuntimeSummary";
-import type { ConfigMetadata, ManagedRun, ManagedRunDetail } from "@/shared/api/contract";
+import type {
+  ConfigMetadata,
+  ManagedRun,
+  ManagedRunDetail,
+  WatchDevice,
+} from "@/shared/api/contract";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface RunWorkspaceProps {
@@ -20,7 +25,11 @@ interface RunWorkspaceProps {
   onResetTrackPool: (runId: string) => Promise<void>;
   onShowCharts: (runId: string) => void;
   onStop: (runId: string) => Promise<void>;
-  onWatch: (runId: string, artifact: "latest" | "best") => Promise<"started" | "already_running">;
+  onWatch: (
+    runId: string,
+    artifact: "latest" | "best",
+    device: WatchDevice,
+  ) => Promise<"started" | "already_running">;
   run: ManagedRunDetail;
 }
 
