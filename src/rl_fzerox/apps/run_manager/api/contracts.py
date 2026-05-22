@@ -38,6 +38,14 @@ class UpdateRunRequest(BaseModel):
     name: str
 
 
+class WatchRunRequest(BaseModel):
+    """Request body for launching one run in the watch app."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    device: Literal["cpu", "cuda"] = "cuda"
+
+
 class UpdateLineageGroupsRequest(BaseModel):
     """Request body for assigning one lineage to UI/TensorBoard groups."""
 
@@ -99,4 +107,5 @@ class RunLauncher(Protocol):
         *,
         run_id: str,
         artifact: str,
+        device: Literal["cpu", "cuda"],
     ) -> Literal["started", "already_running"]: ...

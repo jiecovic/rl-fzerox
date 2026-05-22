@@ -31,6 +31,7 @@ import type {
   ManagedRun,
   ManagedRunConfig,
   ManagedRunDetail,
+  WatchDevice,
 } from "@/shared/api/contract";
 
 interface UseWorkspaceActionsOptions {
@@ -78,6 +79,7 @@ export interface WorkspaceActions {
   watchManagedRun: (
     runId: string,
     artifact: "latest" | "best",
+    device: WatchDevice,
   ) => Promise<"started" | "already_running">;
 }
 
@@ -270,8 +272,9 @@ export function useWorkspaceActions({
   async function watchManagedRun(
     runId: string,
     artifact: "latest" | "best",
+    device: WatchDevice,
   ): Promise<"started" | "already_running"> {
-    return await watchRun(runId, artifact);
+    return await watchRun(runId, artifact, device);
   }
 
   async function resetManagedRunTrackPool(runId: string) {

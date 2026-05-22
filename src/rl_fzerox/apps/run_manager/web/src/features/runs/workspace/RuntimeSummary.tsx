@@ -205,6 +205,21 @@ export function RunRuntimeSummary({
               <option value="best">best</option>
             </select>
           </label>
+          <label className="run-watch-select-shell">
+            <span className="run-watch-select-label">Policy device</span>
+            <select
+              aria-label="Policy device"
+              className="run-watch-select"
+              value={actions.selectedWatchDevice}
+              disabled={actions.watchingArtifact !== null}
+              onChange={(event) =>
+                actions.setSelectedWatchDevice(event.target.value === "cpu" ? "cpu" : "cuda")
+              }
+            >
+              <option value="cuda">cuda</option>
+              <option value="cpu">cpu</option>
+            </select>
+          </label>
           <button
             aria-label={
               actions.watchingArtifact === actions.selectedArtifact

@@ -63,7 +63,8 @@ vi.mock("@/shared/api/client", async () => {
     resumeRun: (runId: string) => resumeRunMock(runId),
     stopRun: (runId: string) => stopRunMock(runId),
     subscribeRunLiveUpdates: (options: unknown) => subscribeRunLiveUpdatesMock(options),
-    watchRun: (runId: string, artifact: "latest" | "best") => watchRunMock(runId, artifact),
+    watchRun: (runId: string, artifact: "latest" | "best", device: "cpu" | "cuda") =>
+      watchRunMock(runId, artifact, device),
     updateDraftWithSource: (
       id: string,
       name: string,

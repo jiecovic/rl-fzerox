@@ -15,6 +15,7 @@ const actionDriveModeSchema = z.enum(["pwm", "on_off"]);
 const leanOutputModeSchema = z.enum(["three_way", "independent_buttons"]);
 const leanModeSchema = z.enum(["minimum_hold", "release_cooldown", "timer_assist", "raw"]);
 const rendererSchema = z.enum(["angrylion", "gliden64"]);
+export const watchDeviceSchema = z.enum(["cpu", "cuda"]);
 const stateComponentNameSchema = z.enum([
   "vehicle_state",
   "machine_context",
@@ -701,6 +702,7 @@ export type ManagedTemplate = z.infer<typeof managedTemplateSchema>;
 export type ManagedDraft = z.infer<typeof managedDraftSchema>;
 export type ManagedRun = z.infer<typeof managedRunSummarySchema>;
 export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
+export type WatchDevice = z.infer<typeof watchDeviceSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
 export type TrackSamplingRuntimeEntry = z.infer<typeof trackSamplingRuntimeEntrySchema>;
 export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeStateSchema>;

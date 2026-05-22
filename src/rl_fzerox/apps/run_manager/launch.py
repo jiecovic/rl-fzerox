@@ -265,10 +265,21 @@ class ManagerRunLauncher:
 
         return self._request_command(run_id=run_id, command="stop")
 
-    def watch_artifact(self, *, run_id: str, artifact: str) -> launching.WatchLaunchStatus:
+    def watch_artifact(
+        self,
+        *,
+        run_id: str,
+        artifact: str,
+        device: Literal["cpu", "cuda"],
+    ) -> launching.WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
-        return launching.launch_watch_artifact(store=self._store, run_id=run_id, artifact=artifact)
+        return launching.launch_watch_artifact(
+            store=self._store,
+            run_id=run_id,
+            artifact=artifact,
+            device=device,
+        )
 
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:
         run = self._store.get_run(run_id)

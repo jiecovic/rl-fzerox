@@ -347,7 +347,7 @@ def test_watch_artifact_skips_duplicate_window(
         ),
     )
 
-    launcher.watch_artifact(run_id=run.id, artifact="latest")
+    launcher.watch_artifact(run_id=run.id, artifact="latest", device="cuda")
 
 
 def test_watch_artifact_passes_pid_file_to_watch_process(
@@ -369,6 +369,8 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         pid = 4321
 
         def wait(self, timeout: float | None = None) -> int:
+            if timeout is None:
+                return 0
             raise subprocess.TimeoutExpired(cmd="watch", timeout=timeout or 0.0)
 
     def _fake_popen(command: list[str], **_kwargs: object) -> _FakeProcess:
@@ -393,7 +395,7 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         _fake_popen,
     )
 
-    status = launcher.watch_artifact(run_id=run.id, artifact="latest")
+    status = launcher.watch_artifact(run_id=run.id, artifact="latest", device="cuda")
 
     assert status == "started"
     assert captured["command"] == [
@@ -408,5 +410,7 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         "latest",
         "--watch-pid-file",
         str(pid_path),
+        "--",
+        "watch.device=cuda",
     ]
     assert pid_path.is_file()

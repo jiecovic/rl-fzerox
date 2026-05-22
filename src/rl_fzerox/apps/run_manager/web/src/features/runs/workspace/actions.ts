@@ -1,6 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/actions.ts
 import { useEffect, useState } from "react";
-import type { ManagedRunDetail, TrackSamplingRuntimeState } from "@/shared/api/contract";
+import type {
+  ManagedRunDetail,
+  TrackSamplingRuntimeState,
+  WatchDevice,
+} from "@/shared/api/contract";
 
 export type CheckpointArtifact = "latest" | "best";
 export type WatchToastTone = "info" | "error";
@@ -19,7 +23,11 @@ export interface RunWorkspaceActionsProps {
   onResume: (runId: string) => Promise<void>;
   onResetTrackPool: (runId: string) => Promise<void>;
   onStop: (runId: string) => Promise<void>;
-  onWatch: (runId: string, artifact: CheckpointArtifact) => Promise<"started" | "already_running">;
+  onWatch: (
+    runId: string,
+    artifact: CheckpointArtifact,
+    device: WatchDevice,
+  ) => Promise<"started" | "already_running">;
   run: ManagedRunDetail;
   runName: string;
 }
@@ -46,6 +54,8 @@ export interface RunWorkspaceActionState {
   resumeRun: () => Promise<void>;
   selectedArtifact: CheckpointArtifact;
   setSelectedArtifact: (artifact: CheckpointArtifact) => void;
+  selectedWatchDevice: WatchDevice;
+  setSelectedWatchDevice: (device: WatchDevice) => void;
   stopRun: () => Promise<void>;
   watchToast: WatchToastState | null;
   watchRunArtifact: (artifact: CheckpointArtifact) => Promise<void>;
@@ -75,6 +85,7 @@ export function useRunWorkspaceActions({
   const [isResuming, setIsResuming] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
   const [selectedArtifact, setSelectedArtifact] = useState<CheckpointArtifact>("latest");
+  const [selectedWatchDevice, setSelectedWatchDevice] = useState<WatchDevice>("cuda");
   const [watchingArtifact, setWatchingArtifact] = useState<CheckpointArtifact | null>(null);
   const [isResettingTrackPool, setIsResettingTrackPool] = useState(false);
 
@@ -185,7 +196,7 @@ export function useRunWorkspaceActions({
     setControlError(null);
     setWatchToast(null);
     try {
-      const status = await onWatch(run.id, artifact);
+      const status = await onWatch(run.id, artifact, selectedWatchDevice);
       if (status === "already_running") {
         setWatchToast({
           message: `${artifact} watch is already running`,
@@ -262,6 +273,8 @@ export function useRunWorkspaceActions({
     resumeRun,
     selectedArtifact,
     setSelectedArtifact,
+    selectedWatchDevice,
+    setSelectedWatchDevice,
     stopRun,
     watchToast,
     watchRunArtifact,

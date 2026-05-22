@@ -21,6 +21,7 @@ def launch_watch_artifact(
     store: ManagerStore,
     run_id: str,
     artifact: str,
+    device: Literal["cpu", "cuda"],
 ) -> WatchLaunchStatus:
     run = store.get_run(run_id)
     if run is None:
@@ -44,7 +45,7 @@ def launch_watch_artifact(
         policy_artifact="best" if artifact == "best" else "latest",
         manager_db_path=store.db_path,
         managed_run_id=run.id,
-        overrides=(),
+        overrides=(f"watch.device={device}",),
     )
     log_path = manager_watch_log_path(run.id, artifact=artifact)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,6 +61,8 @@ def launch_watch_artifact(
         artifact,
         "--watch-pid-file",
         str(pid_path),
+        "--",
+        f"watch.device={device}",
     ]
     with log_path.open("ab") as log_handle:
         process = subprocess.Popen(

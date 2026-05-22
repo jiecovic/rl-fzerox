@@ -22,6 +22,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     UpdateDraftRequest,
     UpdateLineageGroupsRequest,
     UpdateRunRequest,
+    WatchRunRequest,
 )
 from rl_fzerox.apps.run_manager.api.live import RunLiveBroadcaster
 from rl_fzerox.apps.run_manager.api.payloads import (
@@ -218,9 +219,11 @@ def create_manager_api_app(
     @app.post("/api/runs/{run_id}/watch")
     async def watch_run(
         run_id: Annotated[str, Path(min_length=1)],
+        request: WatchRunRequest | None = None,
         artifact: str = Query(default="latest"),
     ) -> dict[str, str]:
-        return await _run_sync(_watch_run_payload, launcher, run_id, artifact)
+        device: Literal["cpu", "cuda"] = "cuda" if request is None else request.device
+        return await _run_sync(_watch_run_payload, launcher, run_id, artifact, device)
 
     @app.get("/api/config-metadata")
     async def config_metadata() -> dict[str, object]:
@@ -520,9 +523,10 @@ def _watch_run_payload(
     launcher: RunLauncher,
     run_id: str,
     artifact: str,
+    device: Literal["cpu", "cuda"],
 ) -> dict[str, str]:
     try:
-        status = launcher.watch_artifact(run_id=run_id, artifact=artifact)
+        status = launcher.watch_artifact(run_id=run_id, artifact=artifact, device=device)
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RuntimeError as error:
