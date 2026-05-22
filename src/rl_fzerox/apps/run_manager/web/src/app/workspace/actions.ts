@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from "react";
 import {
   draftForkSource,
   nextAvailableDraftName,
+  nextForkDraftName,
   runSummaryFromDetail,
   upsertDraft,
   upsertRun,
@@ -199,15 +200,10 @@ export function useWorkspaceActions({
   async function forkManagedRun(runId: string, artifact: "latest" | "best") {
     const sourceRun = runs.find((candidate) => candidate.id === runId) ?? null;
     const sourceDetail = await loadRunDetail(runId);
-    const baseName =
+    const initialDraftName =
       sourceRun === null
-        ? artifact === "best"
-          ? "fork best"
-          : "fork"
-        : artifact === "best"
-          ? `${sourceRun.name} best fork`
-          : `${sourceRun.name} fork`;
-    const initialDraftName = nextAvailableDraftName(baseName, allKnownNames());
+        ? nextAvailableDraftName("fork", allKnownNames())
+        : nextForkDraftName(sourceRun, runs, allKnownNames());
     sessions.createForkDraft({
       artifact,
       initialConfig: sourceDetail.config,

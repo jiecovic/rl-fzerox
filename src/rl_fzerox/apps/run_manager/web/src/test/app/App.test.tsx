@@ -185,7 +185,7 @@ describe("App", () => {
     expect(launchRunMock).not.toHaveBeenCalled();
     expect(createDraftWithSourceMock).not.toHaveBeenCalled();
     expect(await screen.findByText(/Forked from/i)).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Run name" })).toHaveValue("ppo_test_1 fork");
+    expect(screen.getByRole("textbox", { name: "Run name" })).toHaveValue("ppo_test_1 2");
     await user.click(within(workspaceTabs).getByRole("button", { name: "Drafts" }));
     expect(
       screen.getByText("No drafts yet. Create one to open the configurator."),
@@ -215,7 +215,7 @@ describe("App", () => {
     await user.click(await screen.findByRole("button", { name: "Save draft" }));
 
     expect(createDraftWithSourceMock).toHaveBeenCalledWith(
-      "ppo_test_1 fork",
+      "ppo_test_1 2",
       managedRunConfigFixture,
       "run-001",
       "latest",
@@ -224,9 +224,9 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Train" }));
 
     expect(launchRunMock).toHaveBeenCalledWith(
-      "ppo_test_1 fork",
+      "ppo_test_1 2",
       managedRunConfigFixture,
-      "ppo_test_1 fork",
+      "ppo_test_1 2",
       "run-001",
       "latest",
     );
@@ -260,7 +260,7 @@ describe("App", () => {
     await user.click(screen.getByRole("button", { name: "Train" }));
 
     expect(launchRunMock).toHaveBeenCalledWith(
-      "ppo_test_1 fork",
+      "ppo_test_1 2",
       expect.objectContaining({
         train: expect.objectContaining({
           clip_range: 0.17,
