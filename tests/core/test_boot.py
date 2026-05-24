@@ -8,7 +8,9 @@ from rl_fzerox.core.boot import boot_into_first_race
 from tests.support.fakes import SyntheticBackend
 
 
-def test_boot_into_first_race_raises_when_title_mode_never_appears(monkeypatch) -> None:
+def test_boot_into_first_race_raises_when_title_mode_never_appears(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     backend = SyntheticBackend()
 
     monkeypatch.setattr(
@@ -22,7 +24,9 @@ def test_boot_into_first_race_raises_when_title_mode_never_appears(monkeypatch) 
     assert backend.last_controller_state == ControllerState()
 
 
-def test_boot_into_first_race_raises_when_gp_race_mode_never_appears(monkeypatch) -> None:
+def test_boot_into_first_race_raises_when_gp_race_mode_never_appears(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     backend = SyntheticBackend()
 
     monkeypatch.setattr(

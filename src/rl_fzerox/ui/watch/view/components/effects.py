@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
 from rl_fzerox.ui.watch.view.screen.theme import Color
 
+if TYPE_CHECKING:
+    from pygame import Rect, Surface
+
 AlphaColor = tuple[int, int, int, int]
+PygameModule = Any
 
 
 @dataclass(frozen=True)
@@ -43,8 +48,8 @@ def offset_points(
 
 def draw_alpha_polygon(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: Surface,
     points: tuple[tuple[int, int], ...],
     color: tuple[int, int, int, int],
 ) -> None:
@@ -60,8 +65,8 @@ def draw_alpha_polygon(
 
 def draw_alpha_circle(
     *,
-    pygame,
-    screen,
+    pygame: PygameModule,
+    screen: Surface,
     center: tuple[int, int],
     radius: int,
     color: tuple[int, int, int, int],
@@ -72,13 +77,19 @@ def draw_alpha_circle(
     screen.blit(surface, (center[0] - radius, center[1] - radius))
 
 
-def draw_alpha_rect(*, pygame, screen, rect, color: tuple[int, int, int, int]) -> None:
+def draw_alpha_rect(
+    *,
+    pygame: PygameModule,
+    screen: Surface,
+    rect: Rect,
+    color: tuple[int, int, int, int],
+) -> None:
     surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
     surface.fill(color)
     screen.blit(surface, rect.topleft)
 
 
-def draw_glass_track_overlay(*, pygame, screen, track) -> None:
+def draw_glass_track_overlay(*, pygame: PygameModule, screen: Surface, track: Rect) -> None:
     style = GLASS_EFFECT_STYLE
     draw_alpha_rect(
         pygame=pygame,
@@ -124,7 +135,7 @@ def draw_glass_track_overlay(*, pygame, screen, track) -> None:
     )
 
 
-def draw_glass_column_overlay(*, pygame, screen, track) -> None:
+def draw_glass_column_overlay(*, pygame: PygameModule, screen: Surface, track: Rect) -> None:
     style = GLASS_EFFECT_STYLE
     draw_alpha_rect(
         pygame=pygame,

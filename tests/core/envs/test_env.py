@@ -9,6 +9,7 @@ from fzerox_emulator import (
     ControllerState,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.observations import ObservationStackMode
@@ -638,7 +639,7 @@ def test_env_reset_uses_rgb_stack_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                resolution={"mode": "preset", "preset": "crop_84x84"},
+                resolution=PresetResolutionChoice(preset="crop_84x84"),
                 frame_stack=4,
                 stack_mode="rgb",
             ),
@@ -660,7 +661,7 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
         backend=SyntheticBackend(),
         config=EnvConfig(
             observation=ObservationConfig(
-                resolution={"mode": "preset", "preset": "crop_84x84"},
+                resolution=PresetResolutionChoice(preset="crop_84x84"),
                 frame_stack=4,
                 stack_mode="rgb",
                 minimap_layer=True,
