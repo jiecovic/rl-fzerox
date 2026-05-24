@@ -20,7 +20,7 @@ use egl::{
     EglContext, EglDisplay, EglFns, EglSurface, bind_opengl_api, choose_config, context_type,
     create_context, create_display, create_surface, egl_fns, make_current,
 };
-use gl::{GL_VALUES, GlFns, GlSizei, flip_rgb_rows};
+use gl::{GL_VALUES, GlFns, GlSizei, flip_rgb_rows_into};
 
 pub struct HardwareRenderContext {
     egl: &'static EglFns,
@@ -92,11 +92,33 @@ impl HardwareRenderContext {
     }
 
     pub fn capture_frame(&mut self, width: usize, height: usize) -> Option<VideoFrame> {
+        let mut frame = VideoFrame {
+            width,
+            height,
+            rgb: Vec::new(),
+        };
+        self.capture_frame_into(&mut frame, width, height)
+            .then_some(frame)
+    }
+
+    pub fn capture_frame_into(
+        &mut self,
+        frame: &mut VideoFrame,
+        width: usize,
+        height: usize,
+    ) -> bool {
         if width == 0 || height == 0 {
-            return None;
+            return false;
         }
-        make_current(self.egl, self.display, self.surface, self.context).ok()?;
-        let byte_len = width.checked_mul(height)?.checked_mul(3)?;
+        if make_current(self.egl, self.display, self.surface, self.context).is_err() {
+            return false;
+        }
+        let Some(byte_len) = width
+            .checked_mul(height)
+            .and_then(|pixels| pixels.checked_mul(3))
+        else {
+            return false;
+        };
         self.scratch.resize(byte_len, 0);
         unsafe {
             (self.gl.finish)();
@@ -111,11 +133,10 @@ impl HardwareRenderContext {
                 self.scratch.as_mut_ptr().cast::<c_void>(),
             );
         }
-        Some(VideoFrame {
-            width,
-            height,
-            rgb: flip_rgb_rows(&self.scratch, width, height),
-        })
+        frame.width = width;
+        frame.height = height;
+        flip_rgb_rows_into(&self.scratch, width, height, &mut frame.rgb);
+        true
     }
 }
 

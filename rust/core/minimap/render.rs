@@ -39,7 +39,7 @@ pub(super) fn render_layer_into(
     transform: MinimapTransform,
     target: MinimapRenderTarget<'_>,
     mut sample: impl FnMut(usize, usize) -> Option<[u8; 3]>,
-) -> Result<usize, CoreError> {
+) -> Result<(), CoreError> {
     let MinimapRenderTarget {
         output,
         marker_layer,
@@ -53,13 +53,12 @@ pub(super) fn render_layer_into(
         .width
         .checked_mul(roi.height)
         .ok_or(CoreError::NoFrameAvailable)?;
-    if mask.len() != roi.width * roi.height {
+    if mask.len() != roi_len {
         return Err(CoreError::NoFrameAvailable);
     }
 
     scratch.roi_layer.clear();
     scratch.roi_layer.resize(roi_len, 0);
-    let mut marker_count = 0_usize;
     let mut marker_layer = marker_layer;
     if let Some(marker_layer) = marker_layer.as_deref_mut() {
         marker_layer.clear();
@@ -73,7 +72,7 @@ pub(super) fn render_layer_into(
             .zip(marker_layer.chunks_exact_mut(roi.width))
             .enumerate()
         {
-            marker_count += render_roi_row(
+            render_roi_row(
                 roi,
                 roi_y,
                 mask_row,
@@ -146,7 +145,7 @@ pub(super) fn render_layer_into(
         marker_layer.extend_from_slice(&scratch.resized_marker_layer);
     }
     debug_assert_eq!(output.len(), output_len);
-    Ok(marker_count)
+    Ok(())
 }
 
 fn rotate_luma_90_clockwise_into(
@@ -176,8 +175,7 @@ fn render_roi_row(
     output_row: &mut [u8],
     marker_row: Option<&mut [u8]>,
     sample: &mut impl FnMut(usize, usize) -> Option<[u8; 3]>,
-) -> Result<usize, CoreError> {
-    let mut marker_count = 0_usize;
+) -> Result<(), CoreError> {
     match marker_row {
         Some(marker_row) => {
             for (roi_x, ((mask_value, output_value), marker_value)) in mask_row
@@ -194,7 +192,6 @@ fn render_roi_row(
                 }
                 if is_player_marker_color(red, green, blue) {
                     *marker_value = 1;
-                    marker_count += 1;
                 }
                 *output_value = TRACK_LUMA;
             }
@@ -208,7 +205,7 @@ fn render_roi_row(
             }
         }
     }
-    Ok(marker_count)
+    Ok(())
 }
 
 pub(super) fn write_zero_layer(

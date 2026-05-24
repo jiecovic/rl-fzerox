@@ -43,11 +43,16 @@ impl GlFns {
     }
 }
 
-pub(super) fn flip_rgb_rows(rgb_bottom_left: &[u8], width: usize, height: usize) -> Vec<u8> {
+pub(super) fn flip_rgb_rows_into(
+    rgb_bottom_left: &[u8],
+    width: usize,
+    height: usize,
+    rgb: &mut Vec<u8>,
+) {
     let row_len = width * 3;
-    let mut rgb = vec![0_u8; rgb_bottom_left.len()];
+    rgb.resize(rgb_bottom_left.len(), 0);
     if row_len == 0 || height == 0 {
-        return rgb;
+        return;
     }
     for (src_row, dst_row) in rgb_bottom_left
         .chunks_exact(row_len)
@@ -57,7 +62,6 @@ pub(super) fn flip_rgb_rows(rgb_bottom_left: &[u8], width: usize, height: usize)
     {
         dst_row.copy_from_slice(src_row);
     }
-    rgb
 }
 
 fn gl_symbol<T>(name: &str) -> Result<T, String>

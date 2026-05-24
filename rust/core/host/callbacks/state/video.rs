@@ -24,12 +24,20 @@ impl CallbackState {
         }
 
         if HardwareRenderContext::can_capture(data) {
-            if let Some(hardware_render) = self.hardware_render.as_mut()
-                && let Some(frame) = hardware_render.capture_frame(width, height)
-            {
-                self.raw_frame = None;
-                self.frame = Some(frame);
-                self.frame_serial += 1;
+            if let Some(hardware_render) = self.hardware_render.as_mut() {
+                let updated = if let Some(frame) = self.frame.as_mut() {
+                    hardware_render.capture_frame_into(frame, width, height)
+                } else if let Some(frame) = hardware_render.capture_frame(width, height) {
+                    self.frame = Some(frame);
+                    true
+                } else {
+                    false
+                };
+
+                if updated {
+                    self.raw_frame = None;
+                    self.frame_serial += 1;
+                }
             }
             return;
         }

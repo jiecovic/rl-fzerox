@@ -9,7 +9,8 @@ use crate::core::error::CoreError;
 
 impl Host {
     pub fn system_ram_size(&mut self) -> Result<usize, CoreError> {
-        self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)
+        self.ensure_open()?;
+        Ok(self.system_ram_size)
     }
 
     pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
@@ -29,9 +30,14 @@ impl Host {
         Ok(size)
     }
 
+    pub(super) fn cache_system_ram_size(&mut self) -> Result<(), CoreError> {
+        self.system_ram_size = self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        Ok(())
+    }
+
     pub(super) fn system_ram_slice(&mut self) -> Result<&[u8], CoreError> {
         self.ensure_open()?;
-        let available = self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        let available = self.available_memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
         let data =
             self.call_core(|core| unsafe { core.memory_data(libretro_sys::MEMORY_SYSTEM_RAM) });
         if data.is_null() {
@@ -45,7 +51,7 @@ impl Host {
 
     pub(super) fn system_ram_slice_mut(&mut self) -> Result<&mut [u8], CoreError> {
         self.ensure_open()?;
-        let available = self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
+        let available = self.available_memory_size(libretro_sys::MEMORY_SYSTEM_RAM)?;
         let data =
             self.call_core(|core| unsafe { core.memory_data(libretro_sys::MEMORY_SYSTEM_RAM) });
         if data.is_null() {
@@ -66,7 +72,7 @@ impl Host {
         // The public Python API expects an owned byte buffer here, so this
         // helper intentionally copies out the requested subrange.
         self.ensure_open()?;
-        let available = self.memory_size(memory_id)?;
+        let available = self.available_memory_size(memory_id)?;
         let end = offset
             .checked_add(length)
             .ok_or(CoreError::MemoryOutOfRange {
@@ -100,7 +106,7 @@ impl Host {
         bytes: &[u8],
     ) -> Result<(), CoreError> {
         self.ensure_open()?;
-        let available = self.memory_size(memory_id)?;
+        let available = self.available_memory_size(memory_id)?;
         let length = bytes.len();
         let end = offset
             .checked_add(length)
@@ -127,5 +133,12 @@ impl Host {
         let target = unsafe { slice::from_raw_parts_mut(data.cast::<u8>().add(offset), length) };
         target.copy_from_slice(bytes);
         Ok(())
+    }
+
+    fn available_memory_size(&mut self, memory_id: u32) -> Result<usize, CoreError> {
+        if memory_id == libretro_sys::MEMORY_SYSTEM_RAM && self.system_ram_size != 0 {
+            return Ok(self.system_ram_size);
+        }
+        self.memory_size(memory_id)
     }
 }

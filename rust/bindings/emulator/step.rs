@@ -208,12 +208,7 @@ pub(super) fn step_summary_to_py(
     py: Python<'_>,
     summary: &StepSummary,
 ) -> PyResult<Py<PyStepSummary>> {
-    Py::new(
-        py,
-        PyStepSummary {
-            inner: summary.clone(),
-        },
-    )
+    Py::new(py, PyStepSummary { inner: *summary })
 }
 
 #[pyclass(
@@ -320,12 +315,7 @@ impl PyStepStatus {
 }
 
 pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult<Py<PyStepStatus>> {
-    Py::new(
-        py,
-        PyStepStatus {
-            inner: status.clone(),
-        },
-    )
+    Py::new(py, PyStepStatus { inner: *status })
 }
 
 fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {

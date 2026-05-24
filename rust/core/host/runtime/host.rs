@@ -38,6 +38,7 @@ pub struct Host {
     pub(super) native_fps: f64,
     pub(super) frame_shape: (usize, usize, usize),
     pub(super) frame_index: usize,
+    pub(super) system_ram_size: usize,
     pub(super) step_counters: StepCounters,
     pub(super) closed: bool,
 }
@@ -85,12 +86,14 @@ impl Host {
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
             frame_index: 0,
+            system_ram_size: 0,
             step_counters: StepCounters::default(),
             closed: false,
         };
         host.configure_callbacks();
         host.initialize();
         host.load_game()?;
+        host.cache_system_ram_size()?;
         match baseline_state_path {
             Some(path) if path.is_file() => host.load_baseline_from_file(path)?,
             None => host.capture_startup_baseline()?,

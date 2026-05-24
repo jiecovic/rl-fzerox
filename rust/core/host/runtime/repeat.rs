@@ -81,9 +81,7 @@ impl Host {
         self.callbacks.set_controller_state(config.controller_state);
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
-            let display_frame_len = self.display_frame(observation_config.layout)?.len();
-            let mut display_frames =
-                DisplayFrameBatch::with_capacity(display_frame_len, config.action_repeat);
+            let mut display_frames = DisplayFrameBatch::default();
 
             for _ in 0..config.action_repeat {
                 self.callbacks.set_capture_video(true);
@@ -97,7 +95,9 @@ impl Host {
 
                 let telemetry = self.telemetry_sample()?;
                 accumulator.observe(&telemetry, self.frame_index);
-                display_frames.push_frame(self.display_frame(observation_config.layout)?);
+                let display_frame = self.display_frame(observation_config.layout)?;
+                display_frames.reserve_frame_capacity(display_frame.len(), config.action_repeat);
+                display_frames.push_frame(display_frame);
             }
 
             Ok((accumulator.finish(), display_frames))
