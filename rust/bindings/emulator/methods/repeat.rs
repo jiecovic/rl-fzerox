@@ -2,47 +2,36 @@
 //! Repeated-step method bodies used by training and watch playback.
 
 use pyo3::prelude::*;
-use pyo3::types::PyTuple;
+use pyo3::types::{PyDict, PyList, PyTuple};
 
-use crate::bindings::emulator::frame::{frame_to_pyarray, frames_to_pylist};
+use crate::bindings::emulator::frame::{frame_batch_to_pyarray, frame_to_pyarray};
 use crate::bindings::emulator::step::{step_status_to_py, step_summary_to_py};
 use crate::bindings::emulator::telemetry::telemetry_to_py;
-use crate::bindings::emulator::{PyEmulator, parse_resize_filter};
+use crate::bindings::emulator::{
+    ObservationImageRequest, PyEmulator, parse_observation_layout, parse_resize_filter,
+};
 use crate::bindings::error::map_core_error;
-use crate::core::host::RepeatedStepConfig;
+use crate::bindings::payload::{optional_item, required_dict, required_item};
+use crate::core::host::{ObservationRenderConfig, RepeatedStepConfig};
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationStackMode};
+use crate::core::observation::ObservationStackMode;
 
-pub(in crate::bindings::emulator) struct RepeatStepArgs<'a> {
-    pub action_repeat: usize,
-    pub preset: &'a str,
-    pub frame_stack: usize,
-    pub stuck_min_speed_kph: f32,
-    pub energy_loss_epsilon: f32,
-    pub max_episode_steps: usize,
-    pub progress_frontier_stall_limit_frames: Option<usize>,
-    pub progress_frontier_epsilon: f32,
-    pub terminate_on_energy_depleted: bool,
-    pub lean_timer_assist: bool,
-    pub stack_mode: &'a str,
-    pub minimap_layer: bool,
-    pub resize_filter: &'a str,
-    pub minimap_resize_filter: &'a str,
-    pub joypad_mask: u16,
-    pub left_stick_x: f32,
-    pub left_stick_y: f32,
-    pub right_stick_x: f32,
-    pub right_stick_y: f32,
-}
+const REPEAT_PAYLOAD: &str = "repeat request";
+const REPEAT_STEP_PAYLOAD: &str = "repeat step request";
 
 pub(in crate::bindings::emulator) fn step_repeat_raw<'py>(
     emulator: &mut PyEmulator,
     py: Python<'py>,
-    args: RepeatStepArgs<'_>,
+    request: &Bound<'_, PyDict>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let prepared = prepare_repeated_step(emulator, &args)?;
+    let request = RepeatObservationBindingRequest::from_py_dict(request)?;
+    let prepared = prepare_observation_render(emulator, &request.observation)?;
     let result = py
-        .detach(|| emulator.host.step_repeat_raw(prepared.config))
+        .detach(|| {
+            emulator
+                .host
+                .step_repeat_raw(request.step_config, prepared.config)
+        })
         .map_err(map_core_error)?;
     let observation = frame_to_pyarray(
         py,
@@ -68,11 +57,16 @@ pub(in crate::bindings::emulator) fn step_repeat_raw<'py>(
 pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
     emulator: &mut PyEmulator,
     py: Python<'py>,
-    args: RepeatStepArgs<'_>,
+    request: &Bound<'_, PyDict>,
 ) -> PyResult<Bound<'py, PyTuple>> {
-    let prepared = prepare_repeated_step(emulator, &args)?;
+    let request = RepeatObservationBindingRequest::from_py_dict(request)?;
+    let prepared = prepare_observation_render(emulator, &request.observation)?;
     let result = py
-        .detach(|| emulator.host.step_repeat_watch_raw(prepared.config))
+        .detach(|| {
+            emulator
+                .host
+                .step_repeat_watch_raw(request.step_config, prepared.config)
+        })
         .map_err(map_core_error)?;
     let observation = frame_to_pyarray(
         py,
@@ -81,9 +75,9 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
         prepared.frame_width,
         prepared.stacked_channels,
     )?;
-    let display_frames = frames_to_pylist(
+    let display_frames = frame_batch_to_pyarray(
         py,
-        &result.display_frames,
+        result.display_frames,
         prepared.display_height,
         prepared.display_width,
         3,
@@ -103,8 +97,68 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
     )
 }
 
-struct PreparedRepeatStep {
-    config: RepeatedStepConfig,
+pub(in crate::bindings::emulator) fn step_repeat_multi_observation_raw<'py>(
+    emulator: &mut PyEmulator,
+    py: Python<'py>,
+    request: &Bound<'_, PyDict>,
+) -> PyResult<Bound<'py, PyTuple>> {
+    let request = RepeatMultiObservationBindingRequest::from_py_dict(request)?;
+    let mut prepared_observations = Vec::with_capacity(request.observations.len());
+    for observation in &request.observations {
+        prepared_observations.push(prepare_observation_render(emulator, observation)?);
+    }
+    let observation_configs = prepared_observations
+        .iter()
+        .map(|prepared| prepared.config)
+        .collect::<Vec<_>>();
+    let result = py
+        .detach(|| {
+            emulator
+                .host
+                .step_repeat_multi_observation_raw(request.step_config, &observation_configs)
+        })
+        .map_err(map_core_error)?;
+    let observation_list = PyList::empty(py);
+    for (frame, prepared) in result
+        .observations
+        .frames
+        .iter()
+        .zip(prepared_observations.iter())
+    {
+        observation_list.append(frame_to_pyarray(
+            py,
+            frame.as_slice(),
+            prepared.frame_height,
+            prepared.frame_width,
+            prepared.stacked_channels,
+        )?)?;
+    }
+    let summary = step_summary_to_py(py, &result.summary)?;
+    let status = step_status_to_py(py, &result.status)?;
+    let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
+    PyTuple::new(
+        py,
+        [
+            observation_list.into_any(),
+            summary.into_bound(py).into_any(),
+            status.into_bound(py).into_any(),
+            telemetry.into_bound(py).into_any(),
+        ],
+    )
+}
+
+struct RepeatObservationBindingRequest {
+    step_config: RepeatedStepConfig,
+    observation: ObservationImageRequest,
+}
+
+struct RepeatMultiObservationBindingRequest {
+    step_config: RepeatedStepConfig,
+    observations: Vec<ObservationImageRequest>,
+}
+
+struct PreparedObservationRender {
+    config: ObservationRenderConfig,
     frame_height: usize,
     frame_width: usize,
     display_height: usize,
@@ -112,48 +166,101 @@ struct PreparedRepeatStep {
     stacked_channels: usize,
 }
 
-fn prepare_repeated_step(
+impl RepeatObservationBindingRequest {
+    fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let step_request = required_dict(request, REPEAT_PAYLOAD, "step")?;
+        let observation_request = required_dict(request, REPEAT_PAYLOAD, "observation")?;
+        let step_config = repeated_step_config(&step_request)?;
+        let observation = observation_request_from_dict(&observation_request)?;
+        Ok(Self {
+            step_config,
+            observation,
+        })
+    }
+}
+
+impl RepeatMultiObservationBindingRequest {
+    fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let step_request = required_dict(request, REPEAT_PAYLOAD, "step")?;
+        let step_config = repeated_step_config(&step_request)?;
+        let observations_raw = required_item(request, REPEAT_PAYLOAD, "observations")?;
+        let observations_list = observations_raw.cast::<PyList>()?;
+        if observations_list.is_empty() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "observations must contain at least one observation recipe",
+            ));
+        }
+        let mut observations = Vec::with_capacity(observations_list.len());
+        for observation in observations_list.iter() {
+            observations.push(observation_request_from_dict(
+                observation.cast::<PyDict>()?,
+            )?);
+        }
+        Ok(Self {
+            step_config,
+            observations,
+        })
+    }
+}
+
+fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepConfig> {
+    let controller_state = ControllerState::from_normalized(
+        optional_item(request, "joypad_mask", 0)?,
+        optional_item(request, "left_stick_x", 0.0)?,
+        optional_item(request, "left_stick_y", 0.0)?,
+        optional_item(request, "right_stick_x", 0.0)?,
+        optional_item(request, "right_stick_y", 0.0)?,
+    );
+    Ok(RepeatedStepConfig {
+        controller_state,
+        action_repeat: required_item(request, REPEAT_STEP_PAYLOAD, "action_repeat")?.extract()?,
+        stuck_min_speed_kph: required_item(request, REPEAT_STEP_PAYLOAD, "stuck_min_speed_kph")?
+            .extract()?,
+        energy_loss_epsilon: required_item(request, REPEAT_STEP_PAYLOAD, "energy_loss_epsilon")?
+            .extract()?,
+        max_episode_steps: required_item(request, REPEAT_STEP_PAYLOAD, "max_episode_steps")?
+            .extract()?,
+        progress_frontier_stall_limit_frames: optional_item(
+            request,
+            "progress_frontier_stall_limit_frames",
+            None,
+        )?,
+        progress_frontier_epsilon: optional_item(request, "progress_frontier_epsilon", 100.0)?,
+        terminate_on_energy_depleted: optional_item(request, "terminate_on_energy_depleted", true)?,
+        lean_timer_assist: optional_item(request, "lean_timer_assist", false)?,
+    })
+}
+
+fn observation_request_from_dict(request: &Bound<'_, PyDict>) -> PyResult<ObservationImageRequest> {
+    ObservationImageRequest::from_py_dict(request)
+}
+
+fn prepare_observation_render(
     emulator: &mut PyEmulator,
-    args: &RepeatStepArgs<'_>,
-) -> PyResult<PreparedRepeatStep> {
-    let preset = ObservationPreset::parse(args.preset).map_err(map_core_error)?;
-    let stack_mode = ObservationStackMode::parse(args.stack_mode).map_err(map_core_error)?;
-    let resize_filter = parse_resize_filter(args.resize_filter)?;
-    let minimap_resize_filter = parse_resize_filter(args.minimap_resize_filter)?;
+    request: &ObservationImageRequest,
+) -> PyResult<PreparedObservationRender> {
+    let layout = parse_observation_layout(&request.preset, request.height, request.width)?;
+    let stack_mode = ObservationStackMode::parse(&request.stack_mode).map_err(map_core_error)?;
+    let resize_filter = parse_resize_filter(&request.resize_filter)?;
+    let minimap_resize_filter = parse_resize_filter(&request.minimap_resize_filter)?;
     let spec = emulator
         .host
-        .observation_spec(preset)
+        .observation_spec(layout)
         .map_err(map_core_error)?;
-    let controller_state = ControllerState::from_normalized(
-        args.joypad_mask,
-        args.left_stick_x,
-        args.left_stick_y,
-        args.right_stick_x,
-        args.right_stick_y,
-    );
-    Ok(PreparedRepeatStep {
-        config: RepeatedStepConfig {
-            controller_state,
-            action_repeat: args.action_repeat,
-            preset,
-            frame_stack: args.frame_stack,
+    Ok(PreparedObservationRender {
+        config: ObservationRenderConfig {
+            layout,
+            frame_stack: request.frame_stack,
             stack_mode,
-            minimap_layer: args.minimap_layer,
+            minimap_layer: request.minimap_layer,
             resize_filter,
             minimap_resize_filter,
-            stuck_min_speed_kph: args.stuck_min_speed_kph,
-            energy_loss_epsilon: args.energy_loss_epsilon,
-            max_episode_steps: args.max_episode_steps,
-            progress_frontier_stall_limit_frames: args.progress_frontier_stall_limit_frames,
-            progress_frontier_epsilon: args.progress_frontier_epsilon,
-            terminate_on_energy_depleted: args.terminate_on_energy_depleted,
-            lean_timer_assist: args.lean_timer_assist,
         },
         frame_height: spec.frame_height,
         frame_width: spec.frame_width,
         display_height: spec.display_height,
         display_width: spec.display_width,
-        stacked_channels: stack_mode.stacked_channels(spec.channels, args.frame_stack)
-            + usize::from(args.minimap_layer),
+        stacked_channels: stack_mode.stacked_channels(spec.channels, request.frame_stack)
+            + usize::from(request.minimap_layer),
     })
 }

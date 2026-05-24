@@ -1,6 +1,6 @@
-// rust/core/observation/tests.rs
-
+// rust/core/tests/observation_tests.rs
 use super::{ObservationCropProfile, ObservationPreset, ObservationStackMode};
+use crate::core::observation::ObservationLayout;
 use crate::core::video::VideoCrop;
 
 #[test]
@@ -40,12 +40,12 @@ fn gliden64_crop_resolves_to_half_size_watch_display() {
 }
 
 #[test]
-fn crop_98x130_resolves_to_compact_deep_geometry() {
+fn crop_98x130_resolves_to_wide_legacy_geometry() {
     let spec = ObservationPreset::Crop98x130
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_98x130 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_98x130");
+    assert_eq!(spec.layout_name, "crop_98x130");
     assert_eq!((spec.frame_width, spec.frame_height), (130, 98));
 }
 
@@ -55,18 +55,18 @@ fn crop_66x82_resolves_to_small_racing_geometry() {
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_66x82 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_66x82");
+    assert_eq!(spec.layout_name, "crop_66x82");
     assert_eq!((spec.frame_width, spec.frame_height), (82, 66));
 }
 
 #[test]
-fn crop_60x76_resolves_to_compact_aspect_geometry() {
-    let spec = ObservationPreset::Crop60x76
+fn crop_72x96_resolves_to_impala_geometry() {
+    let spec = ObservationPreset::Crop72x96
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
-        .expect("crop_60x76 should resolve");
+        .expect("crop_72x96 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_60x76");
-    assert_eq!((spec.frame_width, spec.frame_height), (76, 60));
+    assert_eq!(spec.layout_name, "crop_72x96");
+    assert_eq!((spec.frame_width, spec.frame_height), (96, 72));
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn crop_68x68_resolves_to_square_nature_geometry() {
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_68x68 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_68x68");
+    assert_eq!(spec.layout_name, "crop_68x68");
     assert_eq!((spec.frame_width, spec.frame_height), (68, 68));
 }
 
@@ -85,7 +85,7 @@ fn crop_84x84_resolves_to_square_nature_geometry() {
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_84x84 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_84x84");
+    assert_eq!(spec.layout_name, "crop_84x84");
     assert_eq!((spec.frame_width, spec.frame_height), (84, 84));
 }
 
@@ -95,7 +95,7 @@ fn crop_76x100_resolves_to_nature_geometry() {
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_76x100 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_76x100");
+    assert_eq!(spec.layout_name, "crop_76x100");
     assert_eq!((spec.frame_width, spec.frame_height), (100, 76));
 }
 
@@ -105,8 +105,19 @@ fn crop_64x64_resolves_to_square_geometry() {
         .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
         .expect("crop_64x64 should resolve");
 
-    assert_eq!(spec.preset_name, "crop_64x64");
+    assert_eq!(spec.layout_name, "crop_64x64");
     assert_eq!((spec.frame_width, spec.frame_height), (64, 64));
+}
+
+#[test]
+fn custom_layout_uses_requested_target_geometry() {
+    let spec = ObservationLayout::custom(72, 96)
+        .resolve(640, 240, 4.0 / 3.0, ObservationCropProfile::Angrylion)
+        .expect("custom layout should resolve");
+
+    assert_eq!(spec.layout_name, "custom_72x96");
+    assert_eq!((spec.frame_width, spec.frame_height), (96, 72));
+    assert_eq!((spec.display_width, spec.display_height), (592, 444));
 }
 
 #[test]

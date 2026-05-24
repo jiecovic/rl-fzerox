@@ -30,6 +30,10 @@ def course_effect_raw(telemetry: FZeroXTelemetry | None) -> int:
     return int(telemetry.player.course_effect_raw)
 
 
+def on_refill_surface(telemetry: FZeroXTelemetry | None) -> bool:
+    return course_effect_raw(telemetry) == CourseEffect.PIT
+
+
 def ground_effect_flags(telemetry: FZeroXTelemetry | None) -> tuple[float, float, float, float]:
     raw_effect = course_effect_raw(telemetry)
     return (

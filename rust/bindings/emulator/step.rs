@@ -5,8 +5,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
+use crate::bindings::payload::{optional_item, required_item};
 use crate::core::host::{StepStatus, StepSummary};
 use crate::core::telemetry::CourseEffect;
+
+const STEP_SUMMARY_PAYLOAD: &str = "step summary";
 
 #[pyclass(
     name = "StepSummary",
@@ -22,54 +25,37 @@ pub struct PyStepSummary {
 #[pymethods]
 impl PyStepSummary {
     #[new]
-    #[pyo3(signature = (
-        frames_run,
-        max_race_distance,
-        reverse_active_frames=0,
-        low_speed_frames=0,
-        energy_loss_total=0.0,
-        energy_gain_total=0.0,
-        damage_taken_frames=0,
-        consecutive_low_speed_frames=0,
-        entered_state_flags=0,
-        entered_course_effects=0,
-        final_frame_index=0,
-        airborne_frames=0,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 constructor mirrors the flat Python step-summary object"
-    )]
-    fn new(
-        frames_run: usize,
-        max_race_distance: f32,
-        reverse_active_frames: usize,
-        low_speed_frames: usize,
-        energy_loss_total: f32,
-        energy_gain_total: f32,
-        damage_taken_frames: usize,
-        consecutive_low_speed_frames: usize,
-        entered_state_flags: u32,
-        entered_course_effects: u32,
-        final_frame_index: usize,
-        airborne_frames: usize,
-    ) -> Self {
-        Self {
+    #[pyo3(signature = (data))]
+    fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let damage_taken_frames = optional_item(data, "damage_taken_frames", 0)?;
+        let collision_recoil_active_frames =
+            optional_item(data, "collision_recoil_active_frames", 0)?;
+        let impact_frames: Option<usize> = optional_item(data, "impact_frames", None)?;
+        let resolved_impact_frames =
+            impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
+        Ok(Self {
             inner: StepSummary {
-                frames_run,
-                max_race_distance,
-                reverse_active_frames,
-                low_speed_frames,
-                energy_loss_total,
-                energy_gain_total,
+                frames_run: required_item(data, STEP_SUMMARY_PAYLOAD, "frames_run")?.extract()?,
+                max_race_distance: required_item(data, STEP_SUMMARY_PAYLOAD, "max_race_distance")?
+                    .extract()?,
+                reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
+                collision_recoil_active_frames,
+                low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
+                energy_loss_total: optional_item(data, "energy_loss_total", 0.0)?,
+                energy_gain_total: optional_item(data, "energy_gain_total", 0.0)?,
                 damage_taken_frames,
-                airborne_frames,
-                consecutive_low_speed_frames,
-                entered_state_flags,
-                entered_course_effects,
-                final_frame_index,
+                impact_frames: resolved_impact_frames,
+                airborne_frames: optional_item(data, "airborne_frames", 0)?,
+                consecutive_low_speed_frames: optional_item(
+                    data,
+                    "consecutive_low_speed_frames",
+                    0,
+                )?,
+                entered_state_flags: optional_item(data, "entered_state_flags", 0)?,
+                entered_course_effects: optional_item(data, "entered_course_effects", 0)?,
+                final_frame_index: optional_item(data, "final_frame_index", 0)?,
             },
-        }
+        })
     }
 
     #[getter]
@@ -85,6 +71,11 @@ impl PyStepSummary {
     #[getter]
     fn reverse_active_frames(&self) -> usize {
         self.inner.reverse_active_frames
+    }
+
+    #[getter]
+    fn collision_recoil_active_frames(&self) -> usize {
+        self.inner.collision_recoil_active_frames
     }
 
     #[getter]
@@ -105,6 +96,11 @@ impl PyStepSummary {
     #[getter]
     fn damage_taken_frames(&self) -> usize {
         self.inner.damage_taken_frames
+    }
+
+    #[getter]
+    fn impact_frames(&self) -> usize {
+        self.inner.impact_frames
     }
 
     #[getter]
@@ -132,15 +128,6 @@ impl PyStepSummary {
         PyTuple::new(py, state_flag_labels(self.inner.entered_state_flags))
     }
 
-    #[getter]
-    fn entered_collision_recoil(&self) -> bool {
-        has_state_flag(
-            self.inner.entered_state_flags,
-            RACER_STATE_FLAGS.collision_recoil,
-        )
-    }
-
-    #[getter]
     fn entered_spinning_out(&self) -> bool {
         has_state_flag(
             self.inner.entered_state_flags,
@@ -195,10 +182,15 @@ impl PyStepSummary {
         dict.set_item("frames_run", self.frames_run())?;
         dict.set_item("max_race_distance", self.max_race_distance())?;
         dict.set_item("reverse_active_frames", self.reverse_active_frames())?;
+        dict.set_item(
+            "collision_recoil_active_frames",
+            self.collision_recoil_active_frames(),
+        )?;
         dict.set_item("low_speed_frames", self.low_speed_frames())?;
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
+        dict.set_item("impact_frames", self.impact_frames())?;
         dict.set_item("airborne_frames", self.airborne_frames())?;
         dict.set_item(
             "consecutive_low_speed_frames",
@@ -216,12 +208,7 @@ pub(super) fn step_summary_to_py(
     py: Python<'_>,
     summary: &StepSummary,
 ) -> PyResult<Py<PyStepSummary>> {
-    Py::new(
-        py,
-        PyStepSummary {
-            inner: summary.clone(),
-        },
-    )
+    Py::new(py, PyStepSummary { inner: *summary })
 }
 
 #[pyclass(
@@ -328,12 +315,7 @@ impl PyStepStatus {
 }
 
 pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult<Py<PyStepStatus>> {
-    Py::new(
-        py,
-        PyStepStatus {
-            inner: status.clone(),
-        },
-    )
+    Py::new(py, PyStepStatus { inner: *status })
 }
 
 fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {

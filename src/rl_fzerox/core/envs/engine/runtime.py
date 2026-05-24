@@ -4,12 +4,7 @@ from __future__ import annotations
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState, EmulatorBackend
-from fzerox_emulator.arrays import ActionMask, RgbFrame
-from rl_fzerox.core.config.schema import (
-    CurriculumConfig,
-    EnvConfig,
-    RewardConfig,
-)
+from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import (
     ActionValue,
     DiscreteActionDimension,
@@ -19,6 +14,15 @@ from rl_fzerox.core.envs.actions import (
 from rl_fzerox.core.envs.actions.continuous_controls import action_drive_axis
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.envs.rewards import build_reward_tracker
+from rl_fzerox.core.policy.auxiliary_state.targets import (
+    auxiliary_state_target_vector_or_zeros,
+)
+from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, KNOWN_RENDERERS, RendererName
+from rl_fzerox.core.runtime_spec.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    RewardConfig,
+)
 
 from .controls import (
     ActionMaskBranches,
@@ -62,12 +66,14 @@ class FZeroXEnvEngine:
     ) -> None:
         self.backend = backend
         self.config = config
+        self._renderer: RendererName = _backend_renderer(backend)
         self._curriculum_config = curriculum_config
         self._action_config = config.action.runtime()
         self._action_adapter = build_action_adapter(self._action_config)
         self._observation_builder = EngineObservationBuilder.from_engine_config(
             backend=backend,
             config=config,
+            renderer=self._renderer,
         )
         self._reward_tracker = build_reward_tracker(
             config=reward_config,
@@ -82,6 +88,8 @@ class FZeroXEnvEngine:
             curriculum_config=curriculum_config,
             boost_unmask_max_speed_kph=self._action_config.boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=self._action_config.lean_unmask_min_speed_kph,
+            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
+            pitch_neutral_index=self._action_config.pitch_buckets // 2,
         )
         self._reset_coordinator = EngineResetCoordinator(
             backend=backend,
@@ -97,6 +105,7 @@ class FZeroXEnvEngine:
             boost_request_lockout_frames=self._action_config.boost_request_lockout_frames,
             action_history_len=self._observation_builder.action_history_len,
             action_history_controls=self._observation_builder.action_history_controls,
+            independent_lean_buttons=self._action_config.independent_lean_buttons,
         )
         self._step_assembler = EngineStepAssembler(
             backend=self.backend,
@@ -107,6 +116,7 @@ class FZeroXEnvEngine:
             observation_builder=self._observation_builder,
             mask_controller=self._mask_controller,
             control_state=self._control_state,
+            renderer=self._renderer,
         )
         self._episode = EngineEpisodeState()
 
@@ -172,6 +182,11 @@ class FZeroXEnvEngine:
 
         self._reset_coordinator.set_sequential_track_sampling(enabled)
 
+    def set_next_sequential_reset_course(self, course_id: str | None) -> None:
+        """Align the next sequential watch reset to a specific configured course."""
+
+        self._reset_coordinator.set_next_sequential_course(course_id)
+
     @property
     def curriculum_stage_index(self) -> int | None:
         """Return the active curriculum stage index, if any."""
@@ -183,6 +198,11 @@ class FZeroXEnvEngine:
         """Return the active curriculum stage name, if any."""
 
         return self._mask_controller.stage_name
+
+    def auxiliary_state_targets(self) -> StateVector:
+        """Return the current hidden auxiliary-state target vector."""
+
+        return auxiliary_state_target_vector_or_zeros(self._episode.last_telemetry)
 
     def reset(self, seed: int | None = None) -> tuple[ObservationValue, dict[str, object]]:
         """Reset one episode and return the first policy observation."""
@@ -251,7 +271,11 @@ class FZeroXEnvEngine:
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._step_control_state(
             self._action_adapter.decode(action),
-            action_drive_axis=action_drive_axis(action, self._action_space),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._action_space,
+                drive_axis_index=self._action_config.continuous_drive_axis_index(),
+            ),
         )
 
     def step_watch(self, action: ActionValue) -> WatchEnvStep:
@@ -259,7 +283,11 @@ class FZeroXEnvEngine:
 
         return self._step_control_state_watch(
             self._action_adapter.decode(action),
-            action_drive_axis=action_drive_axis(action, self._action_space),
+            action_drive_axis=action_drive_axis(
+                action,
+                self._action_space,
+                drive_axis_index=self._action_config.continuous_drive_axis_index(),
+            ),
         )
 
     def action_to_control_state(self, action: ActionValue) -> ControllerState:
@@ -329,7 +357,9 @@ class FZeroXEnvEngine:
         )
 
     def render(self) -> RgbFrame:
-        return self.backend.render_display(preset=self.config.observation.preset)
+        return self.backend.render_display(
+            **self.config.observation.native_resolution_kwargs(renderer=self._renderer)
+        )
 
     def close(self) -> None:
         self.backend.close()
@@ -392,7 +422,18 @@ class FZeroXEnvEngine:
         gated_control_state = apply_dynamic_control_gates(
             control_state,
             mask_controller=self._mask_controller,
+            mask_air_brake_on_ground=self._action_config.mask_air_brake_on_ground,
             continuous_air_brake_mode=self._action_config.continuous_air_brake_mode,
             last_telemetry=self._episode.last_telemetry,
         )
         return self._control_state.apply_lean_semantics(gated_control_state)
+
+
+_RENDERERS_BY_NAME: dict[str, RendererName] = {name: name for name in KNOWN_RENDERERS}
+
+
+def _backend_renderer(backend: EmulatorBackend) -> RendererName:
+    """Return the backend renderer name used for renderer-sized observations."""
+
+    renderer = getattr(backend, "renderer", DEFAULT_RENDERER)
+    return _RENDERERS_BY_NAME.get(str(renderer), DEFAULT_RENDERER)

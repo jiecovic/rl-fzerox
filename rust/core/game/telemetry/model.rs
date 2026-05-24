@@ -3,6 +3,7 @@
 
 #[derive(Clone, Copy, Debug)]
 struct RacerStateFlags {
+    collision_recoil: u32,
     retired: u32,
     falling_off_track: u32,
     finished: u32,
@@ -20,6 +21,7 @@ struct CourseEffectBits {
 }
 
 const RACER_STATE_FLAGS: RacerStateFlags = RacerStateFlags {
+    collision_recoil: 1 << 13,
     retired: 1 << 18,
     falling_off_track: 1 << 19,
     finished: 1 << 25,
@@ -95,6 +97,10 @@ pub(crate) struct StepTelemetrySample {
 }
 
 impl StepTelemetrySample {
+    pub(crate) fn collision_recoil(&self) -> bool {
+        (self.state_flags & RACER_STATE_FLAGS.collision_recoil) != 0
+    }
+
     pub(crate) fn damage_taken(&self) -> bool {
         (self.state_flags & RACER_STATE_FLAGS.received_damage) != 0
             || self.damage_rumble_counter > 0
@@ -124,11 +130,17 @@ pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'sta
     None
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct RacerGeometryTelemetry {
     pub segment_index: Option<i32>,
     pub segment_t: f32,
     pub segment_length_proportion: f32,
+    pub world_pos_x: f32,
+    pub world_pos_y: f32,
+    pub world_pos_z: f32,
+    pub segment_center_x: f32,
+    pub segment_center_y: f32,
+    pub segment_center_z: f32,
     pub local_lateral_velocity: f32,
     pub signed_lateral_offset: f32,
     pub lateral_distance: f32,
@@ -136,6 +148,8 @@ pub struct RacerGeometryTelemetry {
     pub current_radius_left: f32,
     pub current_radius_right: f32,
     pub height_above_ground: f32,
+    pub future_local_nearest_segment_index: Option<i32>,
+    pub future_local_nearest_segment_distance: f32,
     pub velocity_magnitude: f32,
     pub acceleration_magnitude: f32,
     pub acceleration_force: f32,
@@ -149,6 +163,12 @@ impl Default for RacerGeometryTelemetry {
             segment_index: None,
             segment_t: 0.0,
             segment_length_proportion: 0.0,
+            world_pos_x: 0.0,
+            world_pos_y: 0.0,
+            world_pos_z: 0.0,
+            segment_center_x: 0.0,
+            segment_center_y: 0.0,
+            segment_center_z: 0.0,
             local_lateral_velocity: 0.0,
             signed_lateral_offset: 0.0,
             lateral_distance: 0.0,
@@ -156,6 +176,8 @@ impl Default for RacerGeometryTelemetry {
             current_radius_left: 0.0,
             current_radius_right: 0.0,
             height_above_ground: 0.0,
+            future_local_nearest_segment_index: None,
+            future_local_nearest_segment_distance: 0.0,
             velocity_magnitude: 0.0,
             acceleration_magnitude: 0.0,
             acceleration_force: 0.0,
@@ -165,7 +187,7 @@ impl Default for RacerGeometryTelemetry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct MachineContextTelemetry {
     pub body_stat: i8,
     pub boost_stat: i8,
@@ -186,12 +208,13 @@ impl Default for MachineContextTelemetry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct PlayerTelemetry {
     pub state_flags: u32,
     pub speed_kph: f32,
     pub energy: f32,
     pub max_energy: f32,
+    pub ko_star_count: i16,
     pub boost_timer: i32,
     pub recoil_tilt_magnitude: f32,
     pub damage_rumble_counter: i32,
@@ -229,7 +252,7 @@ impl PlayerTelemetry {
 }
 
 /// Telemetry snapshot for the current frame, focused on player-one race state.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TelemetrySnapshot {
     pub total_lap_count: i32,
     pub difficulty_raw: i32,

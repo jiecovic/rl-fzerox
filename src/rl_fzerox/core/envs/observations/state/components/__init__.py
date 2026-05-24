@@ -9,7 +9,12 @@ from rl_fzerox.core.envs.observations.state.components.core import (
     component_int,
     component_state_values,
     component_str,
+    raw_state_component_features,
+    selected_state_component_feature_indexes,
+    selected_state_component_features,
+    selected_state_component_values,
     state_component_definition,
+    state_component_features,
     state_vector_spec_from_components,
 )
 from rl_fzerox.core.envs.observations.state.components.machine import (
@@ -31,6 +36,11 @@ __all__ = [
     "component_int",
     "component_state_values",
     "component_str",
+    "raw_state_component_features",
+    "selected_state_component_feature_indexes",
+    "selected_state_component_features",
+    "selected_state_component_values",
     "state_component_definition",
+    "state_component_features",
     "state_vector_spec_from_components",
 ]

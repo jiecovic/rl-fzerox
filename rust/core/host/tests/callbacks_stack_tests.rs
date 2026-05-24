@@ -1,4 +1,4 @@
-// rust/core/host/callbacks/stack/tests.rs
+// rust/core/host/tests/callbacks_stack_tests.rs
 
 use super::StackedObservationBuffer;
 use crate::core::observation::ObservationStackMode;

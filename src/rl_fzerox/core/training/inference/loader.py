@@ -40,6 +40,7 @@ def _load_saved_policy(
     *,
     run_dir: Path | None = None,
     device: str = "cpu",
+    algorithm: str | None = None,
 ) -> _HasPredict:
     """Load one saved policy-only SB3 artifact."""
 
@@ -48,7 +49,7 @@ def _load_saved_policy(
 
     _ensure_policy_dependencies_loaded()
 
-    algorithm = _load_saved_policy_algorithm(run_dir)
+    algorithm = _load_saved_policy_algorithm(run_dir, explicit_algorithm=algorithm)
     if algorithm in TRAINING_ALGORITHMS.full_model_policy:
         if run_dir is None:
             raise RuntimeError(f"{algorithm} policy loading requires the source run directory")
@@ -82,6 +83,7 @@ def _ensure_policy_dependencies_loaded() -> None:
     """Import custom policy modules before SB3 deserializes saved artifacts."""
 
     import_module("rl_fzerox.core.policy.extractors")
+    import_module("rl_fzerox.core.policy.auxiliary_state.policies")
 
 
 def _policy_predict_fn(policy: object) -> Callable[..., tuple[ActionValue, PolicyState]]:
@@ -137,10 +139,6 @@ def _policy_classes_for_algorithm(*, algorithm: str):
         from sb3_contrib.ppo_mask import CnnPolicy, MultiInputPolicy
 
         return CnnPolicy, MultiInputPolicy
-    if algorithm == TRAINING_ALGORITHMS.sac:
-        from stable_baselines3.sac import CnnPolicy, MultiInputPolicy
-
-        return CnnPolicy, MultiInputPolicy
 
     raise ValueError(f"Unsupported saved policy algorithm: {algorithm!r}")
 
@@ -159,14 +157,6 @@ def _full_model_class_for_algorithm(algorithm: str):
             from sb3x import MaskableHybridRecurrentPPO
 
             return MaskableHybridRecurrentPPO
-        if algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_sac:
-            from sb3x import MaskableHybridActionSAC
-
-            return MaskableHybridActionSAC
-        if algorithm == TRAINING_ALGORITHMS.hybrid_action_sac:
-            from sb3x import HybridActionSAC
-
-            return HybridActionSAC
     except ImportError as exc:
         raise RuntimeError(
             f"Loading {algorithm} checkpoints requires sb3x in the active environment."
@@ -174,7 +164,12 @@ def _full_model_class_for_algorithm(algorithm: str):
     raise ValueError(f"Unsupported full-model policy algorithm: {algorithm!r}")
 
 
-def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
+def _load_saved_policy_algorithm(
+    run_dir: Path | None,
+    explicit_algorithm: str | None = None,
+) -> str:
+    if explicit_algorithm is not None:
+        return explicit_algorithm
     if run_dir is None:
         raise RuntimeError("Saved policy loading requires the source run directory")
 
@@ -182,18 +177,17 @@ def _load_saved_policy_algorithm(run_dir: Path | None) -> str:
     if not config_path.is_file():
         raise RuntimeError(f"Saved policy run is missing {RUN_LAYOUT.config_filename}")
 
-    from rl_fzerox.core.config import load_train_app_config
+    from rl_fzerox.core.training.runs import load_train_run_config
 
-    config = load_train_app_config(config_path)
-    return config.train.algorithm
+    return load_train_run_config(run_dir).train.algorithm
 
 
 def _artifact_kind_from_policy_path(policy_path: Path) -> str:
-    filename = policy_path.name
-    if filename.startswith("latest_"):
-        return "latest"
-    if filename.startswith("best_"):
-        return "best"
-    if filename.startswith("final_"):
-        return "final"
-    raise ValueError(f"Unsupported policy artifact filename: {filename}")
+    if policy_path.name != "policy.zip":
+        raise ValueError(f"Unsupported policy artifact filename: {policy_path.name}")
+    if policy_path.parent.parent.name != RUN_LAYOUT.checkpoints_dirname:
+        raise ValueError(f"Unsupported policy artifact path: {policy_path}")
+    artifact_kind = policy_path.parent.name
+    if artifact_kind in {"latest", "best", "final"}:
+        return artifact_kind
+    raise ValueError(f"Unsupported policy artifact path: {policy_path}")

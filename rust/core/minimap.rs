@@ -83,7 +83,7 @@ impl MinimapLayerRenderer {
         sample: impl FnMut(usize, usize) -> Option<[u8; 3]>,
     ) -> Result<(), CoreError> {
         self.marker_hold.ensure_key(request);
-        let marker_count = render_layer_into(
+        render_layer_into(
             request,
             roi,
             mask,
@@ -95,7 +95,7 @@ impl MinimapLayerRenderer {
             },
             sample,
         )?;
-        self.marker_hold.update(marker_count, &self.marker_scratch);
+        self.marker_hold.update(&self.marker_scratch);
         self.marker_hold.overlay(output);
         Ok(())
     }

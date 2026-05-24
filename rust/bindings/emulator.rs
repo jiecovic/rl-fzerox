@@ -3,12 +3,14 @@
 
 use std::path::Path;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyTuple};
 
 use crate::bindings::error::map_core_error;
 use crate::core::error::CoreError;
 use crate::core::host::Host;
+use crate::core::observation::{ObservationLayout, ObservationPreset};
 use crate::core::video::VideoResizeFilter;
 
 mod frame;
@@ -27,6 +29,8 @@ struct FrameObservationOptions {
     minimap_layer: bool,
     resize_filter: String,
     minimap_resize_filter: String,
+    height: Option<usize>,
+    width: Option<usize>,
 }
 
 impl Default for FrameObservationOptions {
@@ -36,6 +40,8 @@ impl Default for FrameObservationOptions {
             minimap_layer: false,
             resize_filter: "nearest".to_owned(),
             minimap_resize_filter: "nearest".to_owned(),
+            height: None,
+            width: None,
         }
     }
 }
@@ -59,8 +65,98 @@ impl FrameObservationOptions {
         if let Some(value) = options.get_item("minimap_resize_filter")? {
             parsed.minimap_resize_filter = value.extract()?;
         }
+        if let Some(value) = options.get_item("height")? {
+            parsed.height = Some(value.extract()?);
+        }
+        if let Some(value) = options.get_item("width")? {
+            parsed.width = Some(value.extract()?);
+        }
         Ok(parsed)
     }
+}
+
+#[derive(Debug)]
+pub(in crate::bindings::emulator) struct ObservationImageRequest {
+    preset: String,
+    frame_stack: usize,
+    stack_mode: String,
+    minimap_layer: bool,
+    resize_filter: String,
+    minimap_resize_filter: String,
+    height: Option<usize>,
+    width: Option<usize>,
+}
+
+impl Default for ObservationImageRequest {
+    fn default() -> Self {
+        Self {
+            preset: String::new(),
+            frame_stack: 1,
+            stack_mode: "rgb".to_owned(),
+            minimap_layer: false,
+            resize_filter: "nearest".to_owned(),
+            minimap_resize_filter: "nearest".to_owned(),
+            height: None,
+            width: None,
+        }
+    }
+}
+
+impl ObservationImageRequest {
+    pub(in crate::bindings::emulator) fn from_py_dict(
+        options: &Bound<'_, PyDict>,
+    ) -> PyResult<Self> {
+        let mut parsed = Self::default();
+        if let Some(value) = options.get_item("preset")? {
+            parsed.preset = value.extract()?;
+        }
+        if let Some(value) = options.get_item("frame_stack")? {
+            parsed.frame_stack = value.extract()?;
+        }
+        if let Some(value) = options.get_item("stack_mode")? {
+            parsed.stack_mode = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_layer")? {
+            parsed.minimap_layer = value.extract()?;
+        }
+        if let Some(value) = options.get_item("resize_filter")? {
+            parsed.resize_filter = value.extract()?;
+        }
+        if let Some(value) = options.get_item("minimap_resize_filter")? {
+            parsed.minimap_resize_filter = value.extract()?;
+        }
+        if let Some(value) = options.get_item("height")? {
+            parsed.height = Some(value.extract()?);
+        }
+        if let Some(value) = options.get_item("width")? {
+            parsed.width = Some(value.extract()?);
+        }
+        Ok(parsed)
+    }
+}
+
+fn parse_observation_layout(
+    preset: &str,
+    height: Option<usize>,
+    width: Option<usize>,
+) -> PyResult<ObservationLayout> {
+    if preset.is_empty() {
+        let resolved_height = height.ok_or_else(|| {
+            PyValueError::new_err("custom observation height must be set when preset is empty")
+        })?;
+        let resolved_width = width.ok_or_else(|| {
+            PyValueError::new_err("custom observation width must be set when preset is empty")
+        })?;
+        return Ok(ObservationLayout::custom(resolved_height, resolved_width));
+    }
+    if height.is_some() || width.is_some() {
+        return Err(PyValueError::new_err(
+            "custom observation height/width cannot be combined with a preset name",
+        ));
+    }
+    ObservationPreset::parse(preset)
+        .map(ObservationLayout::Preset)
+        .map_err(map_core_error)
 }
 
 /// Python-facing wrapper around one native `Host` instance.
@@ -140,154 +236,31 @@ impl PyEmulator {
         methods::control::step_frames(self, py, count, capture_video)
     }
 
-    #[pyo3(signature = (
-        action_repeat,
-        preset,
-        frame_stack,
-        stuck_min_speed_kph,
-        energy_loss_epsilon,
-        max_episode_steps,
-        progress_frontier_stall_limit_frames=None,
-        progress_frontier_epsilon=100.0,
-        terminate_on_energy_depleted=true,
-        lean_timer_assist=false,
-        stack_mode="rgb",
-        minimap_layer=false,
-        resize_filter="nearest",
-        minimap_resize_filter="nearest",
-        joypad_mask=0,
-        left_stick_x=0.0,
-        left_stick_y=0.0,
-        right_stick_x=0.0,
-        right_stick_y=0.0,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 method signature is the stable Python training API"
-    )]
+    #[pyo3(signature = (request))]
     fn step_repeat_raw<'py>(
         &mut self,
         py: Python<'py>,
-        action_repeat: usize,
-        preset: &str,
-        frame_stack: usize,
-        stuck_min_speed_kph: f32,
-        energy_loss_epsilon: f32,
-        max_episode_steps: usize,
-        progress_frontier_stall_limit_frames: Option<usize>,
-        progress_frontier_epsilon: f32,
-        terminate_on_energy_depleted: bool,
-        lean_timer_assist: bool,
-        stack_mode: &str,
-        minimap_layer: bool,
-        resize_filter: &str,
-        minimap_resize_filter: &str,
-        joypad_mask: u16,
-        left_stick_x: f32,
-        left_stick_y: f32,
-        right_stick_x: f32,
-        right_stick_y: f32,
+        request: &Bound<'_, PyDict>,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        methods::repeat::step_repeat_raw(
-            self,
-            py,
-            methods::repeat::RepeatStepArgs {
-                action_repeat,
-                preset,
-                frame_stack,
-                stuck_min_speed_kph,
-                energy_loss_epsilon,
-                max_episode_steps,
-                progress_frontier_stall_limit_frames,
-                progress_frontier_epsilon,
-                terminate_on_energy_depleted,
-                lean_timer_assist,
-                stack_mode,
-                minimap_layer,
-                resize_filter,
-                minimap_resize_filter,
-                joypad_mask,
-                left_stick_x,
-                left_stick_y,
-                right_stick_x,
-                right_stick_y,
-            },
-        )
+        methods::repeat::step_repeat_raw(self, py, request)
     }
 
-    #[pyo3(signature = (
-        action_repeat,
-        preset,
-        frame_stack,
-        stuck_min_speed_kph,
-        energy_loss_epsilon,
-        max_episode_steps,
-        progress_frontier_stall_limit_frames=None,
-        progress_frontier_epsilon=100.0,
-        terminate_on_energy_depleted=true,
-        lean_timer_assist=false,
-        stack_mode="rgb",
-        minimap_layer=false,
-        resize_filter="nearest",
-        minimap_resize_filter="nearest",
-        joypad_mask=0,
-        left_stick_x=0.0,
-        left_stick_y=0.0,
-        right_stick_x=0.0,
-        right_stick_y=0.0,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 method signature is the stable Python watch API"
-    )]
+    #[pyo3(signature = (request))]
+    fn step_repeat_multi_observation_raw<'py>(
+        &mut self,
+        py: Python<'py>,
+        request: &Bound<'_, PyDict>,
+    ) -> PyResult<Bound<'py, PyTuple>> {
+        methods::repeat::step_repeat_multi_observation_raw(self, py, request)
+    }
+
+    #[pyo3(signature = (request))]
     fn step_repeat_watch_raw<'py>(
         &mut self,
         py: Python<'py>,
-        action_repeat: usize,
-        preset: &str,
-        frame_stack: usize,
-        stuck_min_speed_kph: f32,
-        energy_loss_epsilon: f32,
-        max_episode_steps: usize,
-        progress_frontier_stall_limit_frames: Option<usize>,
-        progress_frontier_epsilon: f32,
-        terminate_on_energy_depleted: bool,
-        lean_timer_assist: bool,
-        stack_mode: &str,
-        minimap_layer: bool,
-        resize_filter: &str,
-        minimap_resize_filter: &str,
-        joypad_mask: u16,
-        left_stick_x: f32,
-        left_stick_y: f32,
-        right_stick_x: f32,
-        right_stick_y: f32,
+        request: &Bound<'_, PyDict>,
     ) -> PyResult<Bound<'py, PyTuple>> {
-        methods::repeat::step_repeat_watch_raw(
-            self,
-            py,
-            methods::repeat::RepeatStepArgs {
-                action_repeat,
-                preset,
-                frame_stack,
-                stuck_min_speed_kph,
-                energy_loss_epsilon,
-                max_episode_steps,
-                progress_frontier_stall_limit_frames,
-                progress_frontier_epsilon,
-                terminate_on_energy_depleted,
-                lean_timer_assist,
-                stack_mode,
-                minimap_layer,
-                resize_filter,
-                minimap_resize_filter,
-                joypad_mask,
-                left_stick_x,
-                left_stick_y,
-                right_stick_x,
-                right_stick_y,
-            },
-        )
+        methods::repeat::step_repeat_watch_raw(self, py, request)
     }
 
     #[pyo3(signature = (
@@ -334,16 +307,19 @@ impl PyEmulator {
         methods::control::capture_current_as_baseline(self, py, path)
     }
 
-    fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+    fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         methods::frame::frame_rgb(self, py)
     }
 
+    #[pyo3(signature = (preset, *, height=None, width=None))]
     fn observation_spec<'py>(
         &mut self,
         py: Python<'py>,
         preset: &str,
+        height: Option<usize>,
+        width: Option<usize>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        methods::frame::observation_spec(self, py, preset)
+        methods::frame::observation_spec(self, py, preset, height, width)
     }
 
     #[pyo3(signature = (preset, frame_stack, options=None))]
@@ -357,98 +333,65 @@ impl PyEmulator {
         methods::frame::frame_observation(self, py, preset, frame_stack, options)
     }
 
-    #[pyo3(signature = (preset))]
-    fn frame_display<'py>(&mut self, py: Python<'py>, preset: &str) -> PyResult<Bound<'py, PyAny>> {
-        methods::frame::frame_display(self, py, preset)
+    #[pyo3(signature = (preset, *, height=None, width=None))]
+    fn frame_display<'py>(
+        &mut self,
+        py: Python<'py>,
+        preset: &str,
+        height: Option<usize>,
+        width: Option<usize>,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        methods::frame::frame_display(self, py, preset, height, width)
     }
 
     fn telemetry(&mut self, py: Python<'_>) -> PyResult<Py<PyTelemetry>> {
         methods::control::telemetry(self, py)
     }
 
-    #[pyo3(signature = (
-        course_index,
-        character_index,
-        engine_setting_raw_value,
-        machine_skin_index=0,
-        total_lap_count=3,
-    ))]
-    fn patch_time_attack_race_start_setup(
+    #[pyo3(signature = (request))]
+    fn patch_race_start_setup(
         &mut self,
         py: Python<'_>,
-        course_index: i32,
-        character_index: i16,
-        engine_setting_raw_value: i32,
-        machine_skin_index: i16,
-        total_lap_count: i32,
+        request: &Bound<'_, PyDict>,
     ) -> PyResult<()> {
-        methods::control::patch_time_attack_race_start_setup(
-            self,
-            py,
-            course_index,
-            character_index,
-            engine_setting_raw_value,
-            machine_skin_index,
-            total_lap_count,
-        )
+        methods::control::patch_race_start_setup(self, py, request)
     }
 
-    #[pyo3(signature = (
-        course_index,
-        character_index,
-        engine_setting_raw_value,
-        machine_skin_index=0,
-        total_lap_count=3,
-    ))]
-    fn patch_time_attack_machine_settings(
+    #[pyo3(signature = (request))]
+    fn patch_machine_settings(
         &mut self,
         py: Python<'_>,
-        course_index: i32,
-        character_index: i16,
-        engine_setting_raw_value: i32,
-        machine_skin_index: i16,
-        total_lap_count: i32,
+        request: &Bound<'_, PyDict>,
     ) -> PyResult<()> {
-        methods::control::patch_time_attack_machine_settings(
-            self,
-            py,
-            course_index,
-            character_index,
-            engine_setting_raw_value,
-            machine_skin_index,
-            total_lap_count,
-        )
+        methods::control::patch_machine_settings(self, py, request)
     }
 
-    fn force_time_attack_reinit(&mut self, py: Python<'_>) -> PyResult<()> {
-        methods::control::force_time_attack_reinit(self, py)
-    }
-
-    #[pyo3(signature = (
-        course_index,
-        character_index,
-        engine_setting_raw_value,
-        machine_skin_index=0,
-        total_lap_count=3,
-    ))]
-    fn validate_time_attack_race_start_setup(
+    #[pyo3(signature = (mode, engine_setting_raw_value))]
+    fn patch_engine_settings(
         &mut self,
         py: Python<'_>,
-        course_index: i32,
-        character_index: i16,
+        mode: &str,
         engine_setting_raw_value: i32,
-        machine_skin_index: i16,
-        total_lap_count: i32,
     ) -> PyResult<()> {
-        methods::control::validate_time_attack_race_start_setup(
-            self,
-            py,
-            course_index,
-            character_index,
-            engine_setting_raw_value,
-            machine_skin_index,
-            total_lap_count,
-        )
+        methods::control::patch_engine_settings(self, py, mode, engine_setting_raw_value)
+    }
+
+    #[pyo3(signature = (mode))]
+    fn force_race_reinit(&mut self, py: Python<'_>, mode: &str) -> PyResult<()> {
+        methods::control::force_race_reinit(self, py, mode)
+    }
+
+    #[pyo3(signature = (request))]
+    fn validate_race_start_setup(
+        &mut self,
+        py: Python<'_>,
+        request: &Bound<'_, PyDict>,
+    ) -> PyResult<()> {
+        methods::control::validate_race_start_setup(self, py, request)
+    }
+
+    fn patch_time_attack_menu_mode(&mut self, py: Python<'_>) -> PyResult<()> {
+        methods::control::patch_time_attack_menu_mode(self, py)
     }
 
     fn vehicle_setup_info<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {

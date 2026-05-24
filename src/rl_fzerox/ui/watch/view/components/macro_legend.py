@@ -54,11 +54,15 @@ VIEWER_HOTKEY_HINTS: tuple[MacroLegendHint, ...] = (
     MacroLegendHint("Esc", "close"),
     MacroLegendHint("P", "pause"),
     MacroLegendHint("N", "step"),
-    MacroLegendHint("R", "reset"),
+    MacroLegendHint("R", "same course"),
+    MacroLegendHint("E", "prev course"),
+    MacroLegendHint("T", "next course"),
+    MacroLegendHint("F", "toggle anchor"),
     MacroLegendHint("K", "save"),
     MacroLegendHint("M", "manual"),
     MacroLegendHint("D", "policy"),
-    MacroLegendHint("Tab / 1-6", "tabs"),
+    MacroLegendHint("Tab / 1-8", "tabs"),
+    MacroLegendHint("C", "cnn mode"),
     MacroLegendHint("+/-", "speed"),
     MacroLegendHint("0", "reset speed"),
 )
@@ -102,8 +106,12 @@ def _macro_legend_height(*, fonts: ViewerFonts, width: int) -> int:
         return 0
 
     title_height = fonts.small.render(_MACRO_LEGEND_TITLE, True, style.panel_title).get_height()
-    return (2 * style.padding_y) + title_height + style.title_gap + sum(visible_group_heights) + (
-        (len(visible_group_heights) - 1) * style.group_gap
+    return (
+        (2 * style.padding_y)
+        + title_height
+        + style.title_gap
+        + sum(visible_group_heights)
+        + ((len(visible_group_heights) - 1) * style.group_gap)
     )
 
 

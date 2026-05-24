@@ -5,10 +5,12 @@ from dataclasses import dataclass
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column
@@ -18,6 +20,7 @@ from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
 )
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
 from rl_fzerox.ui.watch.view.panels.visuals.cnn import _draw_cnn_tab
+from rl_fzerox.ui.watch.view.panels.visuals.live import _draw_live_tab
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -50,6 +53,7 @@ class SidePanelData:
     policy_label: str | None
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
+    policy_experience_frames: int | None
     policy_deterministic: bool | None
     manual_control_enabled: bool
     policy_action: ActionValue | None
@@ -57,14 +61,20 @@ class SidePanelData:
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
+    best_finish_ranks: dict[str, int]
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
     failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    cnn_layer_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
+    continuous_air_brake_axis_index: int | None
+    continuous_air_brake_deadzone: float
+    continuous_air_brake_full_threshold: float
+    continuous_air_brake_min_duty: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
     action_repeat: int
@@ -74,7 +84,12 @@ class SidePanelData:
     game_display_size: tuple[int, int]
     observation_shape: tuple[int, ...]
     observation_state: StateVector | None
+    observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
+    policy_auxiliary_state_predictions: dict[str, object] | None
+    policy_auxiliary_state_targets: dict[str, object] | None
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
+    live_episode_series: EpisodeLiveSeriesSnapshot | None
     telemetry: FZeroXTelemetry | None
     train_config: TrainConfig | None
     policy_config: PolicyConfig | None
@@ -115,18 +130,24 @@ def _draw_side_panel(
         policy_label=data.policy_label,
         policy_curriculum_stage=data.policy_curriculum_stage,
         policy_num_timesteps=data.policy_num_timesteps,
+        policy_experience_frames=data.policy_experience_frames,
         policy_deterministic=data.policy_deterministic,
         manual_control_enabled=data.manual_control_enabled,
         policy_action=data.policy_action,
         policy_reload_age_seconds=data.policy_reload_age_seconds,
         policy_reload_error=data.policy_reload_error,
         best_finish_position=data.best_finish_position,
+        best_finish_ranks=data.best_finish_ranks,
         best_finish_times=data.best_finish_times,
         latest_finish_times=data.latest_finish_times,
         latest_finish_deltas_ms=data.latest_finish_deltas_ms,
         failed_track_attempts=data.failed_track_attempts,
         track_pool_records=data.track_pool_records,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
+        continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
         action_repeat=data.action_repeat,
@@ -136,7 +157,11 @@ def _draw_side_panel(
         game_display_size=data.game_display_size,
         observation_shape=data.observation_shape,
         observation_state=data.observation_state,
+        observation_state_reference=data.observation_state_reference,
         observation_state_feature_names=data.observation_state_feature_names,
+        policy_auxiliary_state_predictions=data.policy_auxiliary_state_predictions,
+        policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
+        auxiliary_episode_metrics=data.auxiliary_episode_metrics,
         telemetry=data.telemetry,
         train_config=data.train_config,
         policy_config=data.policy_config,
@@ -169,9 +194,11 @@ def _draw_side_panel(
     y += LAYOUT.title_section_gap
 
     record_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
+    cnn_layer_tab_rects: tuple[tuple[int, int, int, int] | None, ...] = ()
     record_course_hitboxes: tuple[RecordCourseHitbox, ...] = ()
+    state_feature_hitboxes = ()
     if selected_tab_index == PANEL_TABS.cnn_index:
-        _draw_cnn_tab(
+        _, cnn_layer_tab_rects = _draw_cnn_tab(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -179,6 +206,19 @@ def _draw_side_panel(
             y=y,
             width=panel_width,
             activations=data.cnn_activations,
+            selected_layer_page_index=data.cnn_layer_tab_index,
+        )
+    elif selected_tab_index == PANEL_TABS.live_index:
+        _draw_live_tab(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            x=x,
+            y=y,
+            width=panel_width,
+            height=panel_rect.bottom - y - LAYOUT.panel_padding,
+            info=data.info,
+            live_series=data.live_episode_series,
         )
     elif selected_tab_index == PANEL_TABS.records_index:
         record_sections = columns.records
@@ -195,7 +235,7 @@ def _draw_side_panel(
             )
             y += LAYOUT.title_section_gap
             record_sections = _record_tab_sections(record_sections, data.record_tab_index)
-        _, record_course_hitboxes = _draw_column(
+        _, record_hitboxes = _draw_column(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -204,8 +244,9 @@ def _draw_side_panel(
             width=panel_width,
             sections=record_sections,
         )
+        record_course_hitboxes = record_hitboxes.record_courses
     else:
-        _draw_column(
+        _, panel_hitboxes = _draw_column(
             pygame=pygame,
             screen=screen,
             fonts=fonts,
@@ -214,10 +255,13 @@ def _draw_side_panel(
             width=panel_width,
             sections=_panel_tab_sections(columns, selected_tab_index),
         )
+        state_feature_hitboxes = panel_hitboxes.state_features
     return ViewerHitboxes(
         panel_tabs=tab_rects,
+        cnn_layer_tabs=cnn_layer_tab_rects,
         record_tabs=record_tab_rects,
         record_courses=record_course_hitboxes,
+        state_features=state_feature_hitboxes,
     )
 
 
@@ -237,6 +281,8 @@ def _panel_tab_sections(columns: PanelColumns, selected_index: int) -> list[Pane
         return columns.middle
     if tab_key == "state":
         return columns.stats
+    if tab_key == "aux":
+        return columns.aux
     if tab_key == "records":
         return columns.records
     if tab_key == "train":

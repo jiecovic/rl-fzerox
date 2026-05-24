@@ -5,7 +5,10 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
+use crate::bindings::payload::{optional_item, required_item};
 use crate::core::telemetry::{MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry};
+
+const PLAYER_TELEMETRY_PAYLOAD: &str = "player telemetry";
 
 #[pyclass(
     name = "PlayerTelemetry",
@@ -21,124 +24,88 @@ pub struct PyPlayerTelemetry {
 #[pymethods]
 impl PyPlayerTelemetry {
     #[new]
-    #[pyo3(signature = (
-        state_flags,
-        speed_kph,
-        energy,
-        max_energy,
-        boost_timer,
-        recoil_tilt_magnitude,
-        reverse_timer,
-        race_distance,
-        lap_distance,
-        race_time_ms,
-        lap,
-        laps_completed,
-        position,
-        damage_rumble_counter = 0,
-        segment_index = None,
-        segment_t = 0.0,
-        segment_length_proportion = 0.0,
-        local_lateral_velocity = 0.0,
-        signed_lateral_offset = 0.0,
-        lateral_distance = 0.0,
-        lateral_displacement_magnitude = 0.0,
-        current_radius_left = 0.0,
-        current_radius_right = 0.0,
-        height_above_ground = 0.0,
-        velocity_magnitude = 0.0,
-        acceleration_magnitude = 0.0,
-        acceleration_force = 0.0,
-        drift_attack_force = 0.0,
-        collision_mass = 0.0,
-        machine_body_stat = 0,
-        machine_boost_stat = 0,
-        machine_grip_stat = 0,
-        machine_weight = 0,
-        engine_setting = 0.0,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 constructor mirrors the flat Python telemetry object"
-    )]
-    fn new(
-        state_flags: u32,
-        speed_kph: f32,
-        energy: f32,
-        max_energy: f32,
-        boost_timer: i32,
-        recoil_tilt_magnitude: f32,
-        reverse_timer: i32,
-        race_distance: f32,
-        lap_distance: f32,
-        race_time_ms: i32,
-        lap: i16,
-        laps_completed: i16,
-        position: i32,
-        damage_rumble_counter: i32,
-        segment_index: Option<i32>,
-        segment_t: f32,
-        segment_length_proportion: f32,
-        local_lateral_velocity: f32,
-        signed_lateral_offset: f32,
-        lateral_distance: f32,
-        lateral_displacement_magnitude: f32,
-        current_radius_left: f32,
-        current_radius_right: f32,
-        height_above_ground: f32,
-        velocity_magnitude: f32,
-        acceleration_magnitude: f32,
-        acceleration_force: f32,
-        drift_attack_force: f32,
-        collision_mass: f32,
-        machine_body_stat: i8,
-        machine_boost_stat: i8,
-        machine_grip_stat: i8,
-        machine_weight: i16,
-        engine_setting: f32,
-    ) -> Self {
-        Self {
+    #[pyo3(signature = (data))]
+    fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
+        Ok(Self {
             inner: PlayerTelemetry {
-                state_flags,
-                speed_kph,
-                energy,
-                max_energy,
-                boost_timer,
-                recoil_tilt_magnitude,
-                damage_rumble_counter,
-                reverse_timer,
-                race_distance,
-                lap_distance,
-                race_time_ms,
-                lap,
-                laps_completed,
-                position,
+                state_flags: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "state_flags")?
+                    .extract()?,
+                speed_kph: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "speed_kph")?.extract()?,
+                energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "energy")?.extract()?,
+                max_energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "max_energy")?
+                    .extract()?,
+                ko_star_count: optional_item(data, "ko_star_count", 0)?,
+                boost_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "boost_timer")?
+                    .extract()?,
+                recoil_tilt_magnitude: required_item(
+                    data,
+                    PLAYER_TELEMETRY_PAYLOAD,
+                    "recoil_tilt_magnitude",
+                )?
+                .extract()?,
+                damage_rumble_counter: optional_item(data, "damage_rumble_counter", 0)?,
+                reverse_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "reverse_timer")?
+                    .extract()?,
+                race_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_distance")?
+                    .extract()?,
+                lap_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap_distance")?
+                    .extract()?,
+                race_time_ms: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_time_ms")?
+                    .extract()?,
+                lap: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap")?.extract()?,
+                laps_completed: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "laps_completed")?
+                    .extract()?,
+                position: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "position")?.extract()?,
                 geometry: RacerGeometryTelemetry {
-                    segment_index,
-                    segment_t,
-                    segment_length_proportion,
-                    local_lateral_velocity,
-                    signed_lateral_offset,
-                    lateral_distance,
-                    lateral_displacement_magnitude,
-                    current_radius_left,
-                    current_radius_right,
-                    height_above_ground,
-                    velocity_magnitude,
-                    acceleration_magnitude,
-                    acceleration_force,
-                    drift_attack_force,
-                    collision_mass,
+                    segment_index: optional_item(data, "segment_index", None)?,
+                    segment_t: optional_item(data, "segment_t", 0.0)?,
+                    segment_length_proportion: optional_item(
+                        data,
+                        "segment_length_proportion",
+                        0.0,
+                    )?,
+                    world_pos_x: optional_item(data, "world_pos_x", 0.0)?,
+                    world_pos_y: optional_item(data, "world_pos_y", 0.0)?,
+                    world_pos_z: optional_item(data, "world_pos_z", 0.0)?,
+                    segment_center_x: optional_item(data, "segment_center_x", 0.0)?,
+                    segment_center_y: optional_item(data, "segment_center_y", 0.0)?,
+                    segment_center_z: optional_item(data, "segment_center_z", 0.0)?,
+                    local_lateral_velocity: optional_item(data, "local_lateral_velocity", 0.0)?,
+                    signed_lateral_offset: optional_item(data, "signed_lateral_offset", 0.0)?,
+                    lateral_distance: optional_item(data, "lateral_distance", 0.0)?,
+                    lateral_displacement_magnitude: optional_item(
+                        data,
+                        "lateral_displacement_magnitude",
+                        0.0,
+                    )?,
+                    current_radius_left: optional_item(data, "current_radius_left", 0.0)?,
+                    current_radius_right: optional_item(data, "current_radius_right", 0.0)?,
+                    height_above_ground: optional_item(data, "height_above_ground", 0.0)?,
+                    future_local_nearest_segment_index: optional_item(
+                        data,
+                        "future_local_nearest_segment_index",
+                        None,
+                    )?,
+                    future_local_nearest_segment_distance: optional_item(
+                        data,
+                        "future_local_nearest_segment_distance",
+                        0.0,
+                    )?,
+                    velocity_magnitude: optional_item(data, "velocity_magnitude", 0.0)?,
+                    acceleration_magnitude: optional_item(data, "acceleration_magnitude", 0.0)?,
+                    acceleration_force: optional_item(data, "acceleration_force", 0.0)?,
+                    drift_attack_force: optional_item(data, "drift_attack_force", 0.0)?,
+                    collision_mass: optional_item(data, "collision_mass", 0.0)?,
                 },
                 machine_context: MachineContextTelemetry {
-                    body_stat: machine_body_stat,
-                    boost_stat: machine_boost_stat,
-                    grip_stat: machine_grip_stat,
-                    weight: machine_weight,
-                    engine_setting,
+                    body_stat: optional_item(data, "machine_body_stat", 0)?,
+                    boost_stat: optional_item(data, "machine_boost_stat", 0)?,
+                    grip_stat: optional_item(data, "machine_grip_stat", 0)?,
+                    weight: optional_item(data, "machine_weight", 0)?,
+                    engine_setting: optional_item(data, "engine_setting", 0.0)?,
                 },
             },
-        }
+        })
     }
 
     #[getter]
@@ -164,6 +131,11 @@ impl PyPlayerTelemetry {
     #[getter]
     fn max_energy(&self) -> f32 {
         self.inner.max_energy
+    }
+
+    #[getter]
+    fn ko_star_count(&self) -> i16 {
+        self.inner.ko_star_count
     }
 
     #[getter]
@@ -232,6 +204,36 @@ impl PyPlayerTelemetry {
     }
 
     #[getter]
+    fn world_pos_x(&self) -> f32 {
+        self.inner.geometry.world_pos_x
+    }
+
+    #[getter]
+    fn world_pos_y(&self) -> f32 {
+        self.inner.geometry.world_pos_y
+    }
+
+    #[getter]
+    fn world_pos_z(&self) -> f32 {
+        self.inner.geometry.world_pos_z
+    }
+
+    #[getter]
+    fn segment_center_x(&self) -> f32 {
+        self.inner.geometry.segment_center_x
+    }
+
+    #[getter]
+    fn segment_center_y(&self) -> f32 {
+        self.inner.geometry.segment_center_y
+    }
+
+    #[getter]
+    fn segment_center_z(&self) -> f32 {
+        self.inner.geometry.segment_center_z
+    }
+
+    #[getter]
     fn local_lateral_velocity(&self) -> f32 {
         self.inner.geometry.local_lateral_velocity
     }
@@ -264,6 +266,16 @@ impl PyPlayerTelemetry {
     #[getter]
     fn height_above_ground(&self) -> f32 {
         self.inner.geometry.height_above_ground
+    }
+
+    #[getter]
+    fn future_local_nearest_segment_index(&self) -> Option<i32> {
+        self.inner.geometry.future_local_nearest_segment_index
+    }
+
+    #[getter]
+    fn future_local_nearest_segment_distance(&self) -> f32 {
+        self.inner.geometry.future_local_nearest_segment_distance
     }
 
     #[getter]
@@ -398,6 +410,7 @@ impl PyPlayerTelemetry {
         dict.set_item("speed_kph", self.speed_kph())?;
         dict.set_item("energy", self.energy())?;
         dict.set_item("max_energy", self.max_energy())?;
+        dict.set_item("ko_star_count", self.ko_star_count())?;
         dict.set_item("boost_timer", self.boost_timer())?;
         dict.set_item("recoil_tilt_magnitude", self.recoil_tilt_magnitude())?;
         dict.set_item("damage_rumble_counter", self.damage_rumble_counter())?;
@@ -414,6 +427,12 @@ impl PyPlayerTelemetry {
             "segment_length_proportion",
             self.segment_length_proportion(),
         )?;
+        dict.set_item("world_pos_x", self.world_pos_x())?;
+        dict.set_item("world_pos_y", self.world_pos_y())?;
+        dict.set_item("world_pos_z", self.world_pos_z())?;
+        dict.set_item("segment_center_x", self.segment_center_x())?;
+        dict.set_item("segment_center_y", self.segment_center_y())?;
+        dict.set_item("segment_center_z", self.segment_center_z())?;
         dict.set_item("local_lateral_velocity", self.local_lateral_velocity())?;
         dict.set_item("signed_lateral_offset", self.signed_lateral_offset())?;
         dict.set_item("lateral_distance", self.lateral_distance())?;
@@ -424,6 +443,14 @@ impl PyPlayerTelemetry {
         dict.set_item("current_radius_left", self.current_radius_left())?;
         dict.set_item("current_radius_right", self.current_radius_right())?;
         dict.set_item("height_above_ground", self.height_above_ground())?;
+        dict.set_item(
+            "future_local_nearest_segment_index",
+            self.future_local_nearest_segment_index(),
+        )?;
+        dict.set_item(
+            "future_local_nearest_segment_distance",
+            self.future_local_nearest_segment_distance(),
+        )?;
         dict.set_item("velocity_magnitude", self.velocity_magnitude())?;
         dict.set_item("acceleration_magnitude", self.acceleration_magnitude())?;
         dict.set_item("acceleration_force", self.acceleration_force())?;
@@ -443,8 +470,6 @@ impl PyPlayerTelemetry {
 
 impl PyPlayerTelemetry {
     pub(super) fn from_native(player: &PlayerTelemetry) -> Self {
-        Self {
-            inner: player.clone(),
-        }
+        Self { inner: *player }
     }
 }

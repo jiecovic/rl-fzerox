@@ -1,23 +1,41 @@
 # tests/ui/test_viewer_runtime.py
 from pathlib import Path
 
-from rl_fzerox.core.config.schema import (
+import numpy as np
+
+from fzerox_emulator.arrays import Float32Array, UInt8Array
+from rl_fzerox.core.envs.observations import (
+    ImageStateObservation,
+    observation_state,
+    state_feature_names,
+)
+from rl_fzerox.core.runtime_spec.schema import (
+    ActionConfig,
     CurriculumConfig,
     CurriculumStageConfig,
     EmulatorConfig,
     EnvConfig,
+    ObservationConfig,
+    ObservationStateComponentConfig,
+    StateFeatureDropoutGroupConfig,
     TrackRecordEntryConfig,
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    TrainConfig,
     WatchAppConfig,
 )
 from rl_fzerox.ui.watch.runtime.episode import (
     _update_best_finish_position,
+    _update_best_finish_ranks,
     _update_best_finish_times,
     _update_failed_track_attempts,
     _update_latest_finish_deltas_ms,
     _update_latest_finish_times,
+)
+from rl_fzerox.ui.watch.runtime.observation import (
+    apply_watch_state_feature_zeroing,
+    configured_watch_zeroed_features,
 )
 from rl_fzerox.ui.watch.runtime.policy import _persist_reload_error
 from rl_fzerox.ui.watch.runtime.timing import (
@@ -28,6 +46,111 @@ from rl_fzerox.ui.watch.runtime.timing import (
 from rl_fzerox.ui.watch.view.panels.content.records import track_record_sections
 from rl_fzerox.ui.watch.view.screen.render import _add_config_track_info, _track_pool_records
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+def test_watch_state_feature_zeroing_masks_selected_features_without_mutating_source() -> None:
+    observation: ImageStateObservation = {
+        "image": _sample_image(),
+        "state": _sample_state([0.0, 2.0, 3.0]),
+    }
+    info = {
+        "observation_state_features": (
+            "vehicle_state.speed_kph_norm",
+            "machine_context.energy_norm",
+            "course_context.course_builtin_0",
+        ),
+        "observation_zeroed_state_features": ("vehicle_state.speed_kph_norm",),
+    }
+
+    masked_observation, masked_info = apply_watch_state_feature_zeroing(
+        observation,
+        info,
+        watch_zeroed_features=frozenset({"machine_context.energy_norm"}),
+    )
+
+    assert observation["state"][1] == 2.0
+    masked_state = observation_state(masked_observation)
+    assert masked_state is not None
+    assert masked_state[1] == 0.0
+    assert masked_state[2] == 3.0
+    assert masked_info["watch_zeroed_state_features"] == ("machine_context.energy_norm",)
+    assert masked_info["observation_zeroed_state_features"] == (
+        "machine_context.energy_norm",
+        "vehicle_state.speed_kph_norm",
+    )
+
+
+def test_watch_state_feature_zeroing_supports_component_level_course_toggle() -> None:
+    observation: ImageStateObservation = {
+        "image": _sample_image(),
+        "state": _sample_state([1.0, 0.0, 2.0]),
+    }
+    info = {
+        "observation_state_features": (
+            "course_context.course_builtin_0",
+            "course_context.course_builtin_1",
+            "vehicle_state.speed_kph_norm",
+        ),
+        "observation_zeroed_state_features": (),
+    }
+
+    masked_observation, masked_info = apply_watch_state_feature_zeroing(
+        observation,
+        info,
+        watch_zeroed_features=frozenset({"course_context"}),
+    )
+
+    masked_state = observation_state(masked_observation)
+    assert masked_state is not None
+    assert list(masked_state) == [0.0, 0.0, 2.0]
+    assert masked_info["watch_zeroed_state_features"] == ("course_context",)
+
+
+def test_configured_watch_zeroed_features_inherits_dropout_one_groups(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    state_components = (
+        ObservationStateComponentConfig(name="track_position", progress_source="segment_progress"),
+        ObservationStateComponentConfig(name="course_context", encoding="one_hot_builtin"),
+    )
+    feature_names = state_feature_names(
+        state_components=tuple(component.data() for component in state_components),
+    )
+    course_feature_names = tuple(
+        feature_name for feature_name in feature_names if feature_name.startswith("course_context.")
+    )
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            action=ActionConfig(
+                layout_continuous_axes=("steer",),
+                layout_discrete_axes=("gas", "boost", "lean"),
+            ),
+            observation=ObservationConfig(mode="image_state", state_components=state_components),
+        ),
+        train=TrainConfig(
+            state_feature_dropout_groups=(
+                StateFeatureDropoutGroupConfig(
+                    feature_names=("track_position.edge_ratio",),
+                    dropout_prob=1.0,
+                ),
+                StateFeatureDropoutGroupConfig(
+                    feature_names=course_feature_names,
+                    dropout_prob=1.0,
+                ),
+                StateFeatureDropoutGroupConfig(
+                    feature_names=("track_position.lap_progress",),
+                    dropout_prob=0.6,
+                ),
+            )
+        ),
+    )
+
+    assert configured_watch_zeroed_features(config) == frozenset(
+        {"track_position.edge_ratio", "course_context"}
+    )
 
 
 def test_watch_fps_helpers_resolve_split_control_and_render_rates() -> None:
@@ -106,6 +229,38 @@ def test_best_finish_times_track_successful_finishes_per_track() -> None:
     )
 
     assert best_times == {"mute": 95_000, "silence": 105_000}
+
+
+def test_best_finish_ranks_track_successful_finishes_per_track() -> None:
+    best_ranks = _update_best_finish_ranks(
+        {},
+        {"termination_reason": "crashed", "position": 1, "track_id": "mute"},
+        _sample_telemetry(position=1),
+    )
+    assert best_ranks == {}
+
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=8),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=12),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "silence"},
+        _sample_telemetry(position=5),
+    )
+    best_ranks = _update_best_finish_ranks(
+        best_ranks,
+        {"termination_reason": "finished", "track_id": "mute"},
+        _sample_telemetry(position=3),
+    )
+
+    assert best_ranks == {"mute": 3, "silence": 5}
 
 
 def test_latest_finish_times_track_most_recent_successful_finish_per_track() -> None:
@@ -196,6 +351,7 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
     failed_section = track_record_sections(
         current_info={},
         track_pool_records=records,
+        best_finish_ranks={},
         best_finish_times={},
         latest_finish_times={},
         latest_finish_deltas_ms={},
@@ -204,6 +360,7 @@ def test_record_panel_marks_failed_watch_attempts_until_success() -> None:
     success_section = track_record_sections(
         current_info={},
         track_pool_records=records,
+        best_finish_ranks={},
         best_finish_times={"mute": 95_000},
         latest_finish_times={"mute": 95_000},
         latest_finish_deltas_ms={},
@@ -330,3 +487,11 @@ def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:
     assert (tmp_path / "watch" / "reload_error.log").read_text(encoding="utf-8") == (
         "PyTorchStreamReader failed reading file data/0\n"
     )
+
+
+def _sample_image() -> UInt8Array:
+    return np.zeros((2, 2, 3), dtype=np.uint8)
+
+
+def _sample_state(values: list[float]) -> Float32Array:
+    return np.asarray(values, dtype=np.float32)

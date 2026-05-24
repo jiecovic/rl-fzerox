@@ -8,7 +8,7 @@
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{
     input::ControllerState,
-    observation::{ObservationPreset, ObservationStackMode},
+    observation::{ObservationLayout, ObservationStackMode},
     video::VideoResizeFilter,
 };
 
@@ -16,7 +16,7 @@ use crate::core::{
 ///
 /// This is the native summary Python reward trackers and limit trackers will
 /// consume once the repeated step loop moves behind the Rust boundary.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepSummary {
     /// Number of internal frames actually executed for this env step.
     pub frames_run: usize,
@@ -24,6 +24,8 @@ pub struct StepSummary {
     pub max_race_distance: f32,
     /// Number of internal frames spent with the game reverse timer active.
     pub reverse_active_frames: usize,
+    /// Number of internal frames spent in collision recoil.
+    pub collision_recoil_active_frames: usize,
     /// Number of internal frames spent below the configured stuck-speed threshold.
     pub low_speed_frames: usize,
     /// Total energy lost during the repeated step.
@@ -32,6 +34,8 @@ pub struct StepSummary {
     pub energy_gain_total: f32,
     /// Number of internal frames where the game damage pulse was active.
     pub damage_taken_frames: usize,
+    /// Number of internal frames where damage or collision recoil was active.
+    pub impact_frames: usize,
     /// Number of internal frames where the player machine was airborne.
     pub airborne_frames: usize,
     /// Low-speed streak length at the end of the repeated step.
@@ -60,7 +64,7 @@ pub struct StepCounters {
 }
 
 /// Native stop/counter state after one repeated env step completes.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepStatus {
     /// Updated carried counters after the repeated env step.
     pub counters: StepCounters,
@@ -196,6 +200,23 @@ fn carried_progress_frontier(
     }
 }
 
+/// Native observation render request for one post-step image view.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ObservationRenderConfig {
+    /// Observation image layout used for the rendered tensor.
+    pub layout: ObservationLayout,
+    /// Number of observation frames stacked in the returned tensor.
+    pub frame_stack: usize,
+    /// Channel encoding used for stacked observation frames.
+    pub stack_mode: ObservationStackMode,
+    /// Append a masked one-channel minimap crop after the stacked image channels.
+    pub minimap_layer: bool,
+    /// Resize filter for camera observation frames.
+    pub resize_filter: VideoResizeFilter,
+    /// Resize filter for the optional minimap layer.
+    pub minimap_resize_filter: VideoResizeFilter,
+}
+
 /// Native env-step payload returned after executing a repeated step.
 #[derive(Clone, Debug)]
 pub struct NativeStepResult<'a> {
@@ -209,10 +230,47 @@ pub struct NativeStepResult<'a> {
     pub final_telemetry: TelemetrySnapshot,
 }
 
+/// Owned observation-frame storage for one repeated step.
+///
+/// Multi-view repeated steps render several observations from the same
+/// post-step emulator state. Those renders reuse callback-owned scratch
+/// buffers internally, so the batch stores owned frame copies before returning
+/// to Python.
+#[derive(Clone, Debug, Default)]
+pub struct ObservationFrameBatch {
+    pub frames: Vec<Vec<u8>>,
+}
+
+impl ObservationFrameBatch {
+    pub fn with_capacity(frame_count: usize) -> Self {
+        Self {
+            frames: Vec::with_capacity(frame_count),
+        }
+    }
+
+    pub fn push_frame(&mut self, frame: &[u8]) {
+        self.frames.push(frame.to_vec());
+    }
+}
+
+/// Native env-step payload returned after executing a repeated step with
+/// multiple rendered observations.
+#[derive(Clone, Debug)]
+pub struct NativeMultiObservationStepResult {
+    /// Final stacked observation tensors for this outer env step.
+    pub observations: ObservationFrameBatch,
+    /// Aggregated step features spanning the internal repeated frames.
+    pub summary: StepSummary,
+    /// Native counter/stop state after the repeated env step completed.
+    pub status: StepStatus,
+    /// Final telemetry snapshot after the repeated step completed.
+    pub final_telemetry: TelemetrySnapshot,
+}
+
 /// Flat watch-frame storage for one repeated step.
 ///
-/// Watch mode still returns individual frames to Python, but internally this
-/// avoids one allocation per repeated display frame.
+/// Watch mode returns one batched Python array, and this flat native storage
+/// keeps the Rust side to a single display-frame allocation per repeated step.
 #[derive(Clone, Debug, Default)]
 pub struct DisplayFrameBatch {
     pub frame_len: usize,
@@ -220,14 +278,24 @@ pub struct DisplayFrameBatch {
 }
 
 impl DisplayFrameBatch {
-    pub fn with_capacity(frame_len: usize, frame_count: usize) -> Self {
-        Self {
-            frame_len,
-            bytes: Vec::with_capacity(frame_len * frame_count),
+    pub fn frame_count(&self) -> usize {
+        if self.frame_len == 0 {
+            return 0;
+        }
+        self.bytes.len() / self.frame_len
+    }
+
+    pub fn reserve_frame_capacity(&mut self, frame_len: usize, frame_count: usize) {
+        if self.frame_len == 0 {
+            self.frame_len = frame_len;
+            self.bytes.reserve(frame_len * frame_count);
         }
     }
 
     pub fn push_frame(&mut self, frame: &[u8]) {
+        if self.frame_len == 0 {
+            self.frame_len = frame.len();
+        }
         debug_assert_eq!(frame.len(), self.frame_len);
         self.bytes.extend_from_slice(frame);
     }
@@ -260,18 +328,6 @@ pub struct RepeatedStepConfig {
     pub controller_state: ControllerState,
     /// Number of internal emulator frames to execute.
     pub action_repeat: usize,
-    /// Observation preset used for the final stacked observation.
-    pub preset: ObservationPreset,
-    /// Number of observation frames stacked in the returned tensor.
-    pub frame_stack: usize,
-    /// Channel encoding used for stacked observation frames.
-    pub stack_mode: ObservationStackMode,
-    /// Append a masked one-channel minimap crop after the stacked image channels.
-    pub minimap_layer: bool,
-    /// Resize filter for camera observation frames.
-    pub resize_filter: VideoResizeFilter,
-    /// Resize filter for the optional minimap layer.
-    pub minimap_resize_filter: VideoResizeFilter,
     /// Speed threshold used for low-speed counters and reward summaries.
     pub stuck_min_speed_kph: f32,
     /// Epsilon used for reward-side energy-loss aggregation.

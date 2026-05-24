@@ -1,0 +1,39 @@
+{
+  "name": "rl-fzerox-run-manager",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "sync-fixtures": "PYTHON_BIN=${PYTHON:-$(if [ -x ../../../../../.venv/bin/python ]; then printf ../../../../../.venv/bin/python; else printf python; fi)}; PYTHONPATH=../../../.. \"$PYTHON_BIN\" -m rl_fzerox.core.manager.fixtures.web && biome format --write src/test/generated/manager-fixtures.json",
+    "build": "npm run sync-fixtures && tsc -b && vite build",
+    "format": "biome format --write src index.html vite.config.ts package.json tsconfig.json",
+    "lint": "biome lint src index.html vite.config.ts",
+    "biome-check": "biome check src index.html vite.config.ts package.json tsconfig.json",
+    "check": "npm run sync-fixtures && tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json",
+    "test": "npm run sync-fixtures && vitest run"
+  },
+  "dependencies": {
+    "elkjs": "^0.11.1",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "uplot": "^1.6.32",
+    "zod": "^4.4.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.13",
+    "@tailwindcss/vite": "^4.2.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^27.0.1",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vitest": "^4.0.7"
+  }
+}

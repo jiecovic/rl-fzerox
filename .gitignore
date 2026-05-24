@@ -51,6 +51,17 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Frontend dependencies and generated artifacts.
+node_modules/
+**/node_modules/
+**/dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+vite.config.*.timestamp-*
+
 # Translations
 *.mo
 *.pot
@@ -229,3 +240,15 @@ conf/local/**/*.yml
 !conf/local/*.example.yaml
 !conf/local/*.example.yml
 tmp/
+
+# Local UI/debug artifacts.
+.playwright-mcp/
+playwright-report/
+test-results/
+run-manager-*.png
+runmgr-*.png
+runmgr-*.md
+tracks-tab-*.png
+run-list*.png
+runs-list*.png
+runs-tab*.png

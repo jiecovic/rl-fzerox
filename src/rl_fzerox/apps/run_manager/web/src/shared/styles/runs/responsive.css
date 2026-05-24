@@ -1,0 +1,105 @@
+@media (max-width: 760px) {
+  .run-list-head {
+    display: none;
+  }
+
+  .run-list-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .run-list-main {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .run-list-progress-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .run-list-actions {
+    justify-content: flex-start;
+  }
+
+  .run-runtime-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .run-runtime-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .run-track-distribution-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .run-track-distribution-summary {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .run-track-distribution-chart {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .run-track-distribution-axis {
+    display: none;
+  }
+
+  .run-track-distribution-columns {
+    grid-template-columns: repeat(var(--track-column-count), minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .run-runtime-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 1100px) {
+  .run-record-row {
+    grid-template-columns: 1fr;
+  }
+
+  .run-record-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .run-record-actions {
+    justify-content: flex-start;
+  }
+
+  .run-chart-lineage-run-grid,
+  .run-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .run-chart-content {
+    grid-template-columns: 1fr;
+  }
+
+  .run-chart-global-legend {
+    position: static;
+    width: 100%;
+    margin: 0 0 12px;
+  }
+
+  .run-chart-lineage-legend-list {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .run-runtime-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .run-runtime-actions {
+    justify-content: flex-start;
+  }
+}

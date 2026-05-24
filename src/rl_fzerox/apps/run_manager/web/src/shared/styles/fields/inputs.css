@@ -1,0 +1,106 @@
+input,
+select {
+  box-sizing: border-box;
+  height: 40px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+input[type="number"] {
+  text-align: center;
+  text-indent: -8px;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  margin-left: 8px;
+}
+
+input:not([type="range"]):focus,
+select:focus {
+  background: var(--field-active);
+  border-color: var(--border-strong);
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px var(--focus-ring),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+  caret-color: var(--text);
+}
+
+input[aria-invalid="true"]:not([type="range"]) {
+  border-color: var(--danger);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 46%, transparent);
+}
+
+input:disabled {
+  opacity: 0.42;
+}
+
+.compact-value-field input:not([type="range"]) {
+  width: min(100%, 14ch);
+  min-width: 9ch;
+  justify-self: start;
+}
+
+input::selection,
+textarea::selection {
+  background: var(--selection-background);
+  color: var(--selection-text);
+}
+
+.range-field,
+.optional-number-field,
+.boolean-field,
+.range-pair-field {
+  min-width: 0;
+}
+
+.range-row,
+.optional-number-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 12px;
+  align-items: start;
+}
+
+.range-row > input:not([type="range"]) {
+  height: 34px;
+  background: var(--surface);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.range-readonly {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.optional-number-row {
+  grid-template-columns: 52px minmax(0, 1fr) 76px;
+  align-items: center;
+}
+
+.reward-accordion-stack .optional-number-row {
+  grid-template-columns: 52px minmax(0, 1fr) 96px;
+}
+
+.feature-dim-field {
+  display: grid;
+  gap: 10px;
+}
+
+.feature-dim-input {
+  width: min(100%, 14ch);
+  min-width: 9ch;
+  justify-self: start;
+}

@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/content/hparams.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.view.panels.core.lines import panel_line as _panel_line
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelSection
@@ -53,36 +53,6 @@ def training_hparam_sections(
 
 
 def _algorithm_section(train_config: TrainConfig) -> PanelSection:
-    if "sac" in str(train_config.algorithm):
-        return PanelSection(
-            title="SAC HParams",
-            lines=[
-                _panel_line("Buffer", _format_int(train_config.buffer_size), PALETTE.text_primary),
-                _panel_line(
-                    "Learn starts",
-                    _format_int(train_config.learning_starts),
-                    PALETTE.text_primary,
-                ),
-                _panel_line("Train freq", str(train_config.train_freq), PALETTE.text_primary),
-                _panel_line(
-                    "Grad steps",
-                    str(train_config.gradient_steps),
-                    PALETTE.text_primary,
-                ),
-                _panel_line("Tau", _format_float(train_config.tau), PALETTE.text_primary),
-                _panel_line(
-                    "Target entropy",
-                    str(train_config.target_entropy),
-                    PALETTE.text_primary,
-                ),
-                _panel_line(
-                    "Replay opt",
-                    "on" if train_config.optimize_memory_usage else "off",
-                    PALETTE.text_primary,
-                ),
-            ],
-        )
-
     return PanelSection(
         title="PPO HParams",
         lines=[

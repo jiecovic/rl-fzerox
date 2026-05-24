@@ -3,14 +3,28 @@
 use super::step_accumulator::StepAccumulator;
 use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::StepTelemetrySample;
-use crate::core::video::VideoResizeFilter;
 
-const AIRBORNE_FLAG: u32 = 1 << 26;
-const ACTIVE_FLAG: u32 = 1 << 30;
-const COURSE_EFFECT_DASH: u32 = 3;
-const COURSE_EFFECT_DIRT: u32 = 2;
+#[derive(Clone, Copy)]
+struct TestStateFlags {
+    airborne: u32,
+    active: u32,
+    collision_recoil: u32,
+}
+
+#[derive(Clone, Copy)]
+struct TestCourseEffects {
+    dash: u32,
+    dirt: u32,
+}
+
+const STATE_FLAGS: TestStateFlags = TestStateFlags {
+    airborne: 1 << 26,
+    active: 1 << 30,
+    collision_recoil: 1 << 13,
+};
+
+const COURSE_EFFECTS: TestCourseEffects = TestCourseEffects { dash: 3, dirt: 2 };
 
 #[test]
 fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
@@ -25,10 +39,12 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
     assert_eq!(summary.frames_run, 2);
     assert_eq!(summary.max_race_distance, 140.0);
     assert_eq!(summary.reverse_active_frames, 1);
+    assert_eq!(summary.collision_recoil_active_frames, 0);
     assert_eq!(summary.low_speed_frames, 1);
     assert_eq!(summary.energy_loss_total, 12.0);
     assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
     assert_eq!(summary.entered_state_flags, 0b110);
     assert_eq!(summary.final_frame_index, 42);
@@ -97,6 +113,7 @@ fn step_accumulator_counts_received_damage_state_as_damage_taken() {
     let summary = accumulator.finish();
 
     assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
 }
 
 #[test]
@@ -104,8 +121,14 @@ fn step_accumulator_counts_airborne_frames() {
     let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
-    accumulator.observe(&telemetry(101.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 21);
-    accumulator.observe(&telemetry(102.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 22);
+    accumulator.observe(
+        &telemetry(101.0, 100.0, 120.0, STATE_FLAGS.airborne, 0, 0),
+        21,
+    );
+    accumulator.observe(
+        &telemetry(102.0, 100.0, 120.0, STATE_FLAGS.airborne, 0, 0),
+        22,
+    );
     accumulator.observe(&telemetry(103.0, 100.0, 120.0, 0, 0, 0), 23);
 
     let summary = accumulator.finish();
@@ -115,32 +138,116 @@ fn step_accumulator_counts_airborne_frames() {
 }
 
 #[test]
-fn step_accumulator_tracks_entered_course_effects() {
-    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+fn step_accumulator_counts_collision_recoil_active_frames() {
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
     accumulator.observe(
-        &telemetry(101.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        &telemetry(
+            101.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
+            0,
+            0,
+        ),
         21,
     );
     accumulator.observe(
-        &telemetry(102.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        &telemetry(
+            102.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
+            0,
+            0,
+        ),
         22,
     );
     accumulator.observe(
-        &telemetry(103.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DIRT, 0, 0),
+        &telemetry(103.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0),
+        23,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.frames_run, 3);
+    assert_eq!(summary.collision_recoil_active_frames, 2);
+    assert_eq!(summary.impact_frames, 2);
+}
+
+#[test]
+fn step_accumulator_counts_damage_and_recoil_overlap_as_one_impact_frame() {
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry(
+            101.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
+            0,
+            1,
+        ),
+        21,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.collision_recoil_active_frames, 1);
+    assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
+}
+
+#[test]
+fn step_accumulator_tracks_entered_course_effects() {
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry(
+            101.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dash,
+            0,
+            0,
+        ),
+        21,
+    );
+    accumulator.observe(
+        &telemetry(
+            102.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dash,
+            0,
+            0,
+        ),
+        22,
+    );
+    accumulator.observe(
+        &telemetry(
+            103.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dirt,
+            0,
+            0,
+        ),
         23,
     );
 
     let summary = accumulator.finish();
 
     assert_eq!(
-        summary.entered_course_effects & (1 << COURSE_EFFECT_DASH),
-        1 << COURSE_EFFECT_DASH
+        summary.entered_course_effects & (1 << COURSE_EFFECTS.dash),
+        1 << COURSE_EFFECTS.dash
     );
     assert_eq!(
-        summary.entered_course_effects & (1 << COURSE_EFFECT_DIRT),
-        1 << COURSE_EFFECT_DIRT
+        summary.entered_course_effects & (1 << COURSE_EFFECTS.dirt),
+        1 << COURSE_EFFECTS.dirt
     );
 }
 
@@ -167,12 +274,6 @@ fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> Repea
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
-        preset: ObservationPreset::Crop84x116,
-        frame_stack: 4,
-        stack_mode: ObservationStackMode::Rgb,
-        minimap_layer: false,
-        resize_filter: VideoResizeFilter::Nearest,
-        minimap_resize_filter: VideoResizeFilter::Nearest,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,

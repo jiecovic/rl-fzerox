@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/track_baselines.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.schema import (
     TrackConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
@@ -39,6 +39,8 @@ def track_config_from_sampling_entry(
             "source_vehicle": entry.source_vehicle,
             "engine_setting": entry.engine_setting,
             "engine_setting_raw_value": entry.engine_setting_raw_value,
+            "engine_setting_min_raw_value": entry.engine_setting_min_raw_value,
+            "engine_setting_max_raw_value": entry.engine_setting_max_raw_value,
             "source_course_index": entry.source_course_index,
             "source_engine_setting": entry.source_engine_setting,
             "source_engine_setting_raw_value": entry.source_engine_setting_raw_value,

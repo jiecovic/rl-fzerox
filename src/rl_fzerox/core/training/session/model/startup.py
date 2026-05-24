@@ -8,8 +8,7 @@ from typing import TYPE_CHECKING
 import torch as th
 from gymnasium import spaces
 
-from rl_fzerox.core.config.schema import TrainAppConfig, TrainConfig
-from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, TrainConfig
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.model.algorithms import resolve_effective_training_algorithm
 
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
     from stable_baselines3.common.vec_env import VecEnv
 
 
-def build_tensorboard_logger(run_paths: RunPaths):
+def build_tensorboard_logger(run_paths: RunPaths, *, step_offset: int = 0):
     """Create the SB3 TensorBoard logger for one training run."""
 
     try:
@@ -28,7 +27,21 @@ def build_tensorboard_logger(run_paths: RunPaths):
             "Install with `python -m pip install -e .[train]`."
         ) from exc
 
-    return sb3_logger.configure(str(run_paths.tensorboard_dir), ["tensorboard"])
+    logger = sb3_logger.configure(str(run_paths.tensorboard_dir), ["tensorboard"])
+    if step_offset <= 0:
+        return logger
+
+    class TensorboardStepOffsetLogger(sb3_logger.Logger):
+        """Apply one fixed global-step offset before SB3 writes TensorBoard events."""
+
+        def __init__(self, *, step_offset: int) -> None:
+            super().__init__(folder=logger.dir, output_formats=logger.output_formats)
+            self._step_offset = step_offset
+
+        def dump(self, step: int = 0) -> None:
+            super().dump(step + self._step_offset)
+
+    return TensorboardStepOffsetLogger(step_offset=step_offset)
 
 
 def print_training_startup(
@@ -165,16 +178,6 @@ def _training_summary_parts(
     ]
     if train_config.resume_run_dir is not None:
         parts.append(f"resume={train_config.resume_mode}:{train_config.resume_artifact}")
-    if effective_algorithm in TRAINING_ALGORITHMS.sac_family:
-        parts.extend(
-            [
-                f"buffer_size={train_config.buffer_size}",
-                f"learning_starts={train_config.learning_starts}",
-                f"train_freq={train_config.train_freq}",
-                f"gradient_steps={train_config.gradient_steps}",
-            ]
-        )
-        return parts
     parts.append(f"n_steps={train_config.n_steps}")
     return parts
 
@@ -297,20 +300,24 @@ def _model_parameter_summary(model: object) -> _ModelParameterSummary:
 
 def _iter_model_parameters(model: object) -> tuple[th.nn.Parameter, ...]:
     policy = _model_policy(model)
-    if isinstance(policy, th.nn.Module):
-        return tuple(policy.parameters())
-    if isinstance(model, th.nn.Module):
-        return tuple(model.parameters())
-    parameters = getattr(model, "parameters", None)
+    policy_parameters = _parameter_iterable(policy)
+    if policy_parameters is not None:
+        return policy_parameters
+    model_parameters = _parameter_iterable(model)
+    if model_parameters is not None:
+        return model_parameters
+    return ()
+
+
+def _parameter_iterable(candidate: object) -> tuple[th.nn.Parameter, ...] | None:
+    parameters = getattr(candidate, "parameters", None)
     if not callable(parameters):
-        return ()
+        return None
     raw_parameters = parameters()
     if not isinstance(raw_parameters, Iterable):
-        return ()
+        return None
     return tuple(
-        parameter
-        for parameter in raw_parameters
-        if isinstance(parameter, th.nn.Parameter)
+        parameter for parameter in raw_parameters if isinstance(parameter, th.nn.Parameter)
     )
 
 

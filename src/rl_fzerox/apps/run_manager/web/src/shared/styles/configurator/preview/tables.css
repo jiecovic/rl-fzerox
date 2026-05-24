@@ -1,0 +1,244 @@
+.derived-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.derived-table th,
+.derived-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.derived-table tr:last-child th,
+.derived-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.derived-table thead th {
+  width: auto;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.derived-table tbody th {
+  width: 30%;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.derived-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.derived-table td:nth-child(2) {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.derived-table td:last-child {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+
+.derived-value-stack {
+  display: inline-grid;
+  gap: 2px;
+  justify-items: end;
+}
+
+.derived-value-note {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.conv-derived-table {
+  table-layout: auto;
+}
+
+.conv-derived-table thead th,
+.conv-derived-table tbody th,
+.conv-derived-table td {
+  white-space: nowrap;
+}
+
+.conv-derived-table td:nth-child(10) {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+
+.conv-derived-table thead th:nth-child(1),
+.conv-derived-table tbody th {
+  width: 104px;
+}
+
+.conv-derived-table th:nth-child(2),
+.conv-derived-table td:nth-child(2) {
+  width: 138px;
+}
+
+.conv-derived-table th:nth-child(3),
+.conv-derived-table td:nth-child(3) {
+  width: 64px;
+}
+
+.conv-derived-table th:nth-child(4),
+.conv-derived-table td:nth-child(4) {
+  width: 64px;
+}
+
+.conv-derived-table th:nth-child(5),
+.conv-derived-table td:nth-child(5) {
+  width: 58px;
+}
+
+.conv-derived-table th:nth-child(6),
+.conv-derived-table td:nth-child(6),
+.conv-derived-table th:nth-child(7),
+.conv-derived-table td:nth-child(7) {
+  width: 92px;
+}
+
+.conv-derived-table th:nth-child(8),
+.conv-derived-table td:nth-child(8) {
+  width: 72px;
+}
+
+.conv-derived-table th:nth-child(9),
+.conv-derived-table td:nth-child(9) {
+  width: 132px;
+}
+
+.conv-derived-table th:nth-child(10),
+.conv-derived-table td:nth-child(10) {
+  width: 78px;
+}
+
+.conv-derived-table-custom thead th:nth-child(2) {
+  width: 158px;
+}
+
+.conv-derived-table-custom thead th:nth-child(3),
+.conv-derived-table-custom thead th:nth-child(4) {
+  width: 68px;
+}
+
+.conv-derived-table-custom thead th:nth-child(5),
+.conv-derived-table-custom thead th:nth-child(6),
+.conv-derived-table-custom thead th:nth-child(7) {
+  width: 92px;
+}
+
+.conv-derived-table-custom thead th:nth-child(8) {
+  width: 72px;
+}
+
+.conv-derived-table-custom thead th:nth-child(9) {
+  width: 132px;
+}
+
+.conv-derived-table-custom thead th:nth-child(10) {
+  width: 78px;
+}
+
+.conv-derived-table-custom thead th:nth-child(11) {
+  width: 64px;
+}
+
+.custom-conv-channel-cell {
+  display: inline-grid;
+  grid-template-columns: auto 70px;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.custom-cnn-layer-cell {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+
+.custom-cnn-layer-row {
+  cursor: grab;
+}
+
+.custom-cnn-layer-row.is-disabled {
+  cursor: default;
+}
+
+.custom-cnn-layer-row.is-dragging {
+  opacity: 0.5;
+}
+
+.custom-cnn-layer-row.is-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.custom-cnn-layer-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.custom-cnn-drag-mark {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  letter-spacing: -0.08em;
+}
+
+.custom-cnn-layer-cell select {
+  width: 92px;
+  height: 30px;
+  min-width: 0;
+}
+
+.custom-cnn-add-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.custom-conv-table-input {
+  width: 72px;
+  min-width: 0;
+  height: 32px;
+}
+
+.custom-conv-static-value {
+  color: var(--text);
+}
+
+.custom-conv-add-row-button {
+  min-width: 128px;
+}
+
+.custom-conv-flatten-row td {
+  color: var(--text);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.conv-actions-cell {
+  text-align: right;
+}

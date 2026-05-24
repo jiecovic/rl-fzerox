@@ -2,19 +2,19 @@
 from __future__ import annotations
 
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.paths import config_root_dir, resolve_config_data_paths
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.runtime_spec.paths import project_root_dir, resolve_config_data_paths
+from rl_fzerox.core.runtime_spec.schema import (
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.config.track_registry import expand_track_registry_metadata
-from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
+from rl_fzerox.core.runtime_spec.track_registry import expand_track_registry_metadata
 from rl_fzerox.core.training.runs.paths import (
     RUN_LAYOUT,
     RunPaths,
@@ -37,12 +37,15 @@ def materialize_watch_session_config(
         if watch_config.env.track_sampling.enabled
         else watch_config.emulator.baseline_state_path
     )
+    if watch_config.watch.x_cup.enabled and baseline_source_path is None:
+        baseline_source_path = Path("watch-x-cup.state")
     paths = build_watch_session_paths(
         run_dir=run_dir,
         runtime_dir=watch_config.emulator.runtime_dir,
         baseline_state_path=baseline_source_path,
         session_name=session_name,
     )
+    shutil.rmtree(paths.session_dir, ignore_errors=True)
     ensure_watch_session_dirs(paths)
     _copy_state_file(
         source=baseline_source_path,
@@ -65,13 +68,17 @@ def materialize_train_run_config(
     *,
     run_paths: RunPaths,
     baseline_cache_root: Path | None = None,
+    startup_reporter: Callable[[str, str], None] | None = None,
 ) -> TrainAppConfig:
     """Rewrite one train config to use run-local runtime and baseline files."""
+
+    from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
 
     materialized_config = materialize_run_baselines(
         config,
         run_paths=run_paths,
         cache_root=baseline_cache_root,
+        startup_reporter=startup_reporter,
     )
     return materialized_config.model_copy(
         update={
@@ -98,7 +105,7 @@ def load_train_run_config(run_dir: Path) -> TrainAppConfig:
     loaded = _load_train_config_mapping(config_path)
     expand_track_registry_metadata(
         loaded,
-        config_root=config_root_dir().resolve(),
+        config_root=project_root_dir().resolve(),
     )
     _resolve_train_config_paths(loaded, config_dir=config_path.parent)
     return TrainAppConfig.model_validate(loaded)
@@ -149,54 +156,9 @@ def _load_train_config_mapping(config_path: Path) -> dict[str, object]:
 
 
 def _train_config_snapshot_data(config: TrainAppConfig) -> dict[str, object]:
-    data = {
+    return {
         str(key): value for key, value in config.model_dump(mode="json", exclude_none=True).items()
     }
-    _prefer_action_branch_snapshot(data)
-    _prefer_observation_component_snapshot(data)
-    return data
-
-
-def _prefer_action_branch_snapshot(config_data: dict[str, object]) -> None:
-    env_data = config_data.get("env")
-    if not isinstance(env_data, dict):
-        return
-
-    action_data = env_data.get("action")
-    if not isinstance(action_data, dict):
-        return
-
-    branches_data = action_data.get("branches")
-    if branches_data is None:
-        return
-
-    # Runtime bridge: branch configs compile to adapter-era fields internally.
-    # Do not persist those generated fields in fresh run manifests; keeping the
-    # branch declaration as the only saved source makes this bridge removable.
-    action_data.clear()
-    action_data["branches"] = branches_data
-
-
-def _prefer_observation_component_snapshot(config_data: dict[str, object]) -> None:
-    env_data = config_data.get("env")
-    if not isinstance(env_data, dict):
-        return
-
-    observation_data = env_data.get("observation")
-    if not isinstance(observation_data, dict):
-        return
-
-    if observation_data.get("state_components") is None:
-        return
-
-    for key in (
-        "state_profile",
-        "course_context",
-        "ground_effect_context",
-        "action_history_len",
-        "action_history_controls",
-    ):
-        observation_data.pop(key, None)
 
 
 def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: Path) -> None:
@@ -212,6 +174,7 @@ def _resolve_train_config_paths(config_data: dict[str, object], *, config_dir: P
             ),
             "train": (
                 "output_root",
+                "explicit_run_dir",
                 "continue_run_dir",
                 "resume_run_dir",
             ),

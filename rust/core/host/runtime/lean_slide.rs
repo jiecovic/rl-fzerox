@@ -15,9 +15,6 @@ use crate::core::error::CoreError;
 use crate::core::input::ControllerState;
 use crate::core::telemetry::{player_r_button_timer_offset, player_z_button_timer_offset};
 
-const Z_BUTTON_TIMER_OFFSET: usize = player_z_button_timer_offset();
-const R_BUTTON_TIMER_OFFSET: usize = player_r_button_timer_offset();
-
 #[derive(Clone, Copy, Debug)]
 struct SlideAssistRam {
     lean_button_ids: [u32; 2],
@@ -27,7 +24,10 @@ struct SlideAssistRam {
 
 const SLIDE_ASSIST_RAM: SlideAssistRam = SlideAssistRam {
     lean_button_ids: [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R],
-    timer_offsets: [Z_BUTTON_TIMER_OFFSET, R_BUTTON_TIMER_OFFSET],
+    timer_offsets: [
+        player_z_button_timer_offset(),
+        player_r_button_timer_offset(),
+    ],
     attack_timer_guard_frames: 15,
 };
 

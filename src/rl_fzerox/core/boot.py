@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from fzerox_emulator import (
-    JOYPAD_START,
+    JOYPAD_BUTTONS,
     ControllerState,
     EmulatorBackend,
     FZeroXTelemetry,
@@ -34,7 +34,7 @@ class BootConfig:
 
     title_mode_name: str = "title"
     race_mode_name: str = "gp_race"
-    start_control: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_START))
+    start_control: ControllerState = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start))
     neutral_control: ControllerState = ControllerState()
     title_wait_frames: int = 240
     start_hold_frames: int = 2
@@ -47,6 +47,36 @@ class BootConfig:
 
 
 BOOT_CONFIG = BootConfig()
+
+
+@dataclass(frozen=True, slots=True)
+class UnlockEverythingInput:
+    label: str
+    control_state: ControllerState
+
+
+UNLOCK_EVERYTHING_SEQUENCE: tuple[UnlockEverythingInput, ...] = (
+    UnlockEverythingInput(
+        "left_shoulder",
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left_shoulder)),
+    ),
+    UnlockEverythingInput(
+        "left_trigger",
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left_trigger)),
+    ),
+    UnlockEverythingInput(
+        "right_shoulder",
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right_shoulder)),
+    ),
+    UnlockEverythingInput("right_stick_up", ControllerState(right_stick_y=-1.0)),
+    UnlockEverythingInput("right_stick_down", ControllerState(right_stick_y=1.0)),
+    UnlockEverythingInput("right_stick_left", ControllerState(right_stick_x=-1.0)),
+    UnlockEverythingInput("right_stick_right", ControllerState(right_stick_x=1.0)),
+    UnlockEverythingInput(
+        "start",
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start)),
+    ),
+)
 
 
 class BootState(StrEnum):

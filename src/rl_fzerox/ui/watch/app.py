@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/app.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import (
     SpeedKeyRepeat,
     ViewerInput,
@@ -22,6 +22,8 @@ from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _resolve_render_fps,
 )
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsTracker
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.screen.frame import (
     _create_fonts,
@@ -60,10 +62,15 @@ def run_viewer(config: WatchAppConfig) -> None:
         fonts = _create_fonts(pygame)
         paused = False
         panel_tab_index = 0
+        cnn_layer_tab_index = 0
         record_tab_index = 0
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         hitboxes = ViewerHitboxes()
         speed_repeat = SpeedKeyRepeat()
+        auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
+        live_series = EpisodeLiveSeriesTracker()
+        auxiliary_metrics.observe_snapshot(snapshot)
+        live_series.observe_snapshot(snapshot, action_repeat=config.env.action_repeat)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -73,11 +80,15 @@ def run_viewer(config: WatchAppConfig) -> None:
                 pygame,
                 deterministic_toggle_rect=hitboxes.deterministic_toggle,
                 panel_tab_rects=hitboxes.panel_tabs,
+                cnn_layer_tab_rects=hitboxes.cnn_layer_tabs,
                 record_tab_rects=hitboxes.record_tabs,
                 record_course_hitboxes=hitboxes.record_courses,
+                state_feature_hitboxes=hitboxes.state_features,
                 speed_repeat=speed_repeat,
             )
             panel_tab_index = _next_panel_tab_index(panel_tab_index, viewer_input)
+            if viewer_input.cnn_layer_tab_index is not None:
+                cnn_layer_tab_index = viewer_input.cnn_layer_tab_index
             if viewer_input.record_tab_index is not None:
                 record_tab_index = viewer_input.record_tab_index
             if viewer_input.toggle_cnn_normalization:
@@ -87,6 +98,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 viewer_input,
                 paused=paused,
                 cnn_visualization_enabled=panel_tab_index == PANEL_TABS.cnn_index,
+                auxiliary_visualization_enabled=panel_tab_index
+                in {PANEL_TABS.state_index, PANEL_TABS.aux_index},
                 cnn_normalization=cnn_normalization,
             )
             if viewer_input.quit_requested:
@@ -98,6 +111,8 @@ def run_viewer(config: WatchAppConfig) -> None:
             )
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
+                auxiliary_metrics.observe_snapshot(snapshot)
+                live_series.observe_snapshot(snapshot, action_repeat=config.env.action_repeat)
             elif worker_closed and not worker.process.is_alive():
                 return
             elif not worker.process.is_alive():
@@ -108,6 +123,8 @@ def run_viewer(config: WatchAppConfig) -> None:
                 screen,
                 game_display_size,
                 snapshot.observation_image.shape,
+                fonts=fonts,
+                info=snapshot.info,
                 panel_tab_index=panel_tab_index,
             )
             render_rate.tick()
@@ -120,7 +137,10 @@ def run_viewer(config: WatchAppConfig) -> None:
                 paused=paused,
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
+                auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
+                live_episode_series=live_series.snapshot(),
                 panel_tab_index=panel_tab_index,
+                cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,
             )
             _sync_mouse_cursor(pygame, hitboxes)
@@ -148,8 +168,10 @@ def _sync_mouse_cursor(pygame: PygameModule, hitboxes: ViewerHitboxes) -> None:
         mouse_pos,
         deterministic_toggle_rect=hitboxes.deterministic_toggle,
         panel_tab_rects=hitboxes.panel_tabs,
+        cnn_layer_tab_rects=hitboxes.cnn_layer_tabs,
         record_tab_rects=hitboxes.record_tabs,
         record_course_hitboxes=hitboxes.record_courses,
+        state_feature_hitboxes=hitboxes.state_features,
     )
     cursor = _system_cursor(
         pygame,

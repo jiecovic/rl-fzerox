@@ -4,17 +4,12 @@
 use std::ffi::CString;
 use std::path::{Path, PathBuf};
 
-use libretro_sys::MEMORY_SYSTEM_RAM;
-
 use crate::core::api::LoadedCore;
 use crate::core::callbacks::{CallbackGuard, CallbackState};
 use crate::core::error::CoreError;
-use crate::core::game::race_start::{RaceStartSetup, VehicleSetupInfo};
-use crate::core::input::ControllerState;
 use crate::core::observation::ObservationCropProfile;
 use crate::core::rom::validate_supported_rom;
 use crate::core::stdio::with_silenced_stdio;
-use crate::core::telemetry::{StepTelemetrySample, TelemetrySnapshot};
 use crate::core::video::VideoFrame;
 
 use super::step::StepCounters;
@@ -43,6 +38,7 @@ pub struct Host {
     pub(super) native_fps: f64,
     pub(super) frame_shape: (usize, usize, usize),
     pub(super) frame_index: usize,
+    pub(super) system_ram_size: usize,
     pub(super) step_counters: StepCounters,
     pub(super) closed: bool,
 }
@@ -90,12 +86,14 @@ impl Host {
             native_fps: 0.0,
             frame_shape: (0, 0, 3),
             frame_index: 0,
+            system_ram_size: 0,
             step_counters: StepCounters::default(),
             closed: false,
         };
         host.configure_callbacks();
         host.initialize();
         host.load_game()?;
+        host.cache_system_ram_size()?;
         match baseline_state_path {
             Some(path) if path.is_file() => host.load_baseline_from_file(path)?,
             None => host.capture_startup_baseline()?,
@@ -125,130 +123,11 @@ impl Host {
         self.frame_index
     }
 
-    pub fn system_ram_size(&mut self) -> Result<usize, CoreError> {
-        self.memory_size(MEMORY_SYSTEM_RAM)
-    }
-
     pub fn baseline_kind(&self) -> &'static str {
         match self.baseline_kind {
             BaselineKind::Startup => "startup",
             BaselineKind::Custom => "custom",
         }
-    }
-
-    pub fn load_baseline(&mut self, path: &Path) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.load_baseline_from_file(path)
-    }
-
-    pub fn load_baseline_bytes(&mut self, state: &[u8]) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.load_baseline_from_state_bytes(state)
-    }
-
-    pub fn reset(&mut self) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.restore_baseline()?;
-        self.callbacks
-            .set_controller_state(ControllerState::default());
-        self.frame_index = 0;
-        self.step_counters = StepCounters::default();
-        self.refresh_shape_from_frame();
-        Ok(())
-    }
-
-    pub fn step_frames(&mut self, count: usize, capture_video: bool) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.callbacks.set_capture_video(capture_video);
-        let run_frames = || {
-            for _ in 0..count {
-                self.call_core(|core| unsafe {
-                    core.run();
-                });
-            }
-        };
-        with_silenced_stdio(run_frames);
-        self.callbacks.set_capture_video(true);
-        self.frame_index += count;
-        self.refresh_shape_from_frame();
-        if capture_video && !self.callbacks.has_frame() {
-            return Err(CoreError::NoFrameAvailable);
-        }
-        Ok(())
-    }
-
-    pub fn set_controller_state(
-        &mut self,
-        controller_state: ControllerState,
-    ) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.callbacks.set_controller_state(controller_state);
-        Ok(())
-    }
-
-    pub fn save_state(&mut self, path: &Path) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.save_state_to_path(path)
-    }
-
-    pub fn capture_current_as_baseline(
-        &mut self,
-        save_path: Option<&Path>,
-    ) -> Result<(), CoreError> {
-        self.ensure_open()?;
-        self.capture_current_as_baseline_to_path(save_path)
-    }
-
-    pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
-        self.read_memory(MEMORY_SYSTEM_RAM, offset, length)
-    }
-
-    pub fn write_system_ram(&mut self, offset: usize, bytes: &[u8]) -> Result<(), CoreError> {
-        self.write_memory(MEMORY_SYSTEM_RAM, offset, bytes)
-    }
-
-    pub fn telemetry(&mut self) -> Result<TelemetrySnapshot, CoreError> {
-        let system_ram = self.system_ram_slice()?;
-        crate::core::telemetry::read_snapshot(system_ram)
-    }
-
-    pub fn patch_time_attack_race_start_setup(
-        &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_time_attack_race_setup(system_ram, setup)
-    }
-
-    pub fn patch_time_attack_machine_settings(
-        &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_time_attack_machine_settings(system_ram, setup)
-    }
-
-    pub fn force_time_attack_reinit(&mut self) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::force_time_attack_reinit(system_ram)
-    }
-
-    pub fn validate_time_attack_race_start_setup(
-        &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice()?;
-        crate::core::game::race_start::validate_time_attack_race_setup(system_ram, setup)
-    }
-
-    pub fn vehicle_setup_info(&mut self) -> Result<VehicleSetupInfo, CoreError> {
-        let system_ram = self.system_ram_slice()?;
-        crate::core::game::race_start::vehicle_setup_info(system_ram)
-    }
-
-    pub(super) fn telemetry_sample(&mut self) -> Result<StepTelemetrySample, CoreError> {
-        let system_ram = self.system_ram_slice()?;
-        crate::core::telemetry::read_step_sample(system_ram)
     }
 
     pub fn close(&mut self) {

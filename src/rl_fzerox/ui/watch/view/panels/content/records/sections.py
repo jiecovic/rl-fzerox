@@ -5,7 +5,7 @@ from rl_fzerox.ui.watch.view.screen.types import PanelSection
 
 from .formatting import format_cup_label
 from .grouping import record_groups, should_split_cup_sections
-from .identity import current_track_record_pool
+from .identity import current_track_record_pool, track_best_key
 from .lines import record_group_lines
 from .model import RecordInfo
 
@@ -14,14 +14,16 @@ def track_record_sections(
     *,
     current_info: RecordInfo,
     track_pool_records: tuple[RecordInfo, ...],
+    best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str] = frozenset(),
 ) -> tuple[PanelSection, ...]:
-    records = track_pool_records or current_track_record_pool(current_info)
+    records = _unique_course_records(track_pool_records or current_track_record_pool(current_info))
     if (
         not records
+        and not best_finish_ranks
         and not best_finish_times
         and not latest_finish_times
         and not failed_track_attempts
@@ -35,6 +37,7 @@ def track_record_sections(
                 lines=record_group_lines(
                     group.records,
                     current_info=current_info,
+                    best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -47,6 +50,7 @@ def track_record_sections(
     lines = record_group_lines(
         records,
         current_info=current_info,
+        best_finish_ranks=best_finish_ranks,
         best_finish_times=best_finish_times,
         latest_finish_times=latest_finish_times,
         latest_finish_deltas_ms=latest_finish_deltas_ms,
@@ -55,3 +59,18 @@ def track_record_sections(
     if not lines:
         return ()
     return (PanelSection(title="Records", lines=lines),)
+
+
+def _unique_course_records(records: tuple[RecordInfo, ...]) -> tuple[RecordInfo, ...]:
+    unique: list[RecordInfo] = []
+    seen: set[str] = set()
+    for record in records:
+        record_key = track_best_key(record)
+        if record_key is None:
+            unique.append(record)
+            continue
+        if record_key in seen:
+            continue
+        seen.add(record_key)
+        unique.append(record)
+    return tuple(unique)

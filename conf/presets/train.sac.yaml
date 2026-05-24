@@ -1,9 +1,0 @@
-defaults:
-  - /train_sac_base
-  - /presets/local_runtime@_global_
-  - _self_
-
-train:
-  resume_run_dir: null
-  resume_artifact: latest
-  save_freq: 10_000

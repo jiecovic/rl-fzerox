@@ -1,11 +1,12 @@
+# src/rl_fzerox/core/envs/engine/controls/mask_config.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TypeAlias
 
 from fzerox_emulator.arrays import ActionMask
-from rl_fzerox.core.config.schema import CurriculumConfig
 from rl_fzerox.core.envs.actions import ActionAdapter
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig
 
 ActionMaskOverrides: TypeAlias = dict[str, tuple[int, ...]]
 ActionMaskBranches: TypeAlias = dict[str, tuple[bool, ...]]

@@ -1,0 +1,108 @@
+# src/rl_fzerox/apps/dev/telemetry.py
+from __future__ import annotations
+
+import argparse
+import json
+from collections.abc import Sequence
+from pathlib import Path
+
+from fzerox_emulator import Emulator
+from rl_fzerox.apps.watch_cli.args import require_policy_run_locator
+from rl_fzerox.apps.watch_cli.resolve import resolve_watch_app_config
+from rl_fzerox.core.boot import boot_into_first_race
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse CLI arguments for the live telemetry probe."""
+
+    parser = argparse.ArgumentParser(
+        description="Read live F-Zero X telemetry from emulated system RAM.",
+        allow_abbrev=False,
+    )
+    parser.add_argument(
+        "--run-dir",
+        dest="policy_run_dir",
+        type=Path,
+        default=None,
+        help="Training run directory to inspect.",
+    )
+    parser.add_argument(
+        "--manager-db-path",
+        dest="manager_db_path",
+        type=Path,
+        default=None,
+        help="Optional manager SQLite path for manager-owned watch sessions.",
+    )
+    parser.add_argument(
+        "--managed-run-id",
+        dest="managed_run_id",
+        default=None,
+        help="Optional run-manager run id to resolve the watch session from SQLite.",
+    )
+    parser.add_argument(
+        "--frames",
+        type=int,
+        default=0,
+        help="Additional frames to advance after reset/bootstrap.",
+    )
+    args = parser.parse_args(argv)
+    require_policy_run_locator(
+        policy_run_dir=args.policy_run_dir,
+        managed_run_id=args.managed_run_id,
+    )
+    return args
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Open the emulator from config and print a telemetry JSON snapshot."""
+
+    args = parse_args(argv)
+    if args.frames < 0:
+        raise SystemExit("--frames must be >= 0")
+
+    config = resolve_watch_app_config(
+        policy_run_dir=args.policy_run_dir,
+        policy_artifact="latest",
+        manager_db_path=args.manager_db_path,
+        managed_run_id=args.managed_run_id,
+        overrides=[],
+    )
+    emulator = Emulator(
+        core_path=config.emulator.core_path,
+        rom_path=config.emulator.rom_path,
+        runtime_dir=config.emulator.runtime_dir,
+        baseline_state_path=config.emulator.baseline_state_path,
+        renderer=config.emulator.renderer,
+    )
+
+    try:
+        reset_state = emulator.reset()
+        boot_info: dict[str, object] = {}
+        if config.env.reset_to_race and emulator.baseline_kind != "custom":
+            _, boot_info = boot_into_first_race(emulator)
+        if args.frames:
+            emulator.step_frames(args.frames)
+
+        telemetry = emulator.try_read_telemetry()
+        if telemetry is None:
+            raise RuntimeError("Configured emulator backend does not expose telemetry")
+        print(
+            json.dumps(
+                {
+                    "frame_index": emulator.frame_index,
+                    "baseline_kind": emulator.baseline_kind,
+                    "reset_mode": boot_info.get("reset_mode", "baseline"),
+                    "boot_state": boot_info.get("boot_state", "-"),
+                    "reset_frame_shape": list(reset_state.frame.shape),
+                    "telemetry": telemetry.to_dict(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    finally:
+        emulator.close()
+
+
+if __name__ == "__main__":
+    main()

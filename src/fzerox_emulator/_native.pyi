@@ -1,68 +1,25 @@
 # src/fzerox_emulator/_native.pyi
-from typing import Literal, TypedDict
+"""Typing surface for the compiled `fzerox_emulator._native` PyO3 extension."""
+
+from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
 
-class ObservationSpecDict(TypedDict):
-    preset: str
-    width: int
-    height: int
-    channels: int
-    display_width: int
-    display_height: int
-
-class FrameObservationOptionsDict(TypedDict):
-    stack_mode: Literal["rgb", "gray", "luma_chroma"]
-    minimap_layer: bool
-    resize_filter: Literal["nearest", "bilinear"]
-    minimap_resize_filter: Literal["nearest", "bilinear"]
-
-class VehicleSetupInfoDict(TypedDict):
-    vehicle_character_index_ram: int
-    engine_setting_ram: float
-    engine_setting_percent_ram: float
-    character_engine_setting_ram: float
-    racer_engine_curve_ram: float
+from fzerox_emulator.boundary import (
+    FrameObservationOptionsDict,
+    FZeroXTelemetryDict,
+    ObservationSpecDict,
+    PlayerTelemetryDict,
+    RaceStartRequestDict,
+    RepeatMultiObservationStepRequestDict,
+    RepeatObservationStepRequestDict,
+    StepSummaryDict,
+    VehicleSetupInfoDict,
+)
 
 class PlayerTelemetry:
-    def __init__(
-        self,
-        state_flags: int,
-        speed_kph: float,
-        energy: float,
-        max_energy: float,
-        boost_timer: int,
-        recoil_tilt_magnitude: float,
-        reverse_timer: int,
-        race_distance: float,
-        lap_distance: float,
-        race_time_ms: int,
-        lap: int,
-        laps_completed: int,
-        position: int,
-        damage_rumble_counter: int = 0,
-        segment_index: int | None = None,
-        segment_t: float = 0.0,
-        segment_length_proportion: float = 0.0,
-        local_lateral_velocity: float = 0.0,
-        signed_lateral_offset: float = 0.0,
-        lateral_distance: float = 0.0,
-        lateral_displacement_magnitude: float = 0.0,
-        current_radius_left: float = 0.0,
-        current_radius_right: float = 0.0,
-        height_above_ground: float = 0.0,
-        velocity_magnitude: float = 0.0,
-        acceleration_magnitude: float = 0.0,
-        acceleration_force: float = 0.0,
-        drift_attack_force: float = 0.0,
-        collision_mass: float = 0.0,
-        machine_body_stat: int = 0,
-        machine_boost_stat: int = 0,
-        machine_grip_stat: int = 0,
-        machine_weight: int = 0,
-        engine_setting: float = 0.0,
-    ) -> None: ...
+    def __init__(self, data: PlayerTelemetryDict) -> None: ...
     @property
     def state_flags(self) -> int: ...
     @property
@@ -73,6 +30,8 @@ class PlayerTelemetry:
     def energy(self) -> float: ...
     @property
     def max_energy(self) -> float: ...
+    @property
+    def ko_star_count(self) -> int: ...
     @property
     def boost_timer(self) -> int: ...
     @property
@@ -100,6 +59,18 @@ class PlayerTelemetry:
     @property
     def segment_length_proportion(self) -> float: ...
     @property
+    def world_pos_x(self) -> float: ...
+    @property
+    def world_pos_y(self) -> float: ...
+    @property
+    def world_pos_z(self) -> float: ...
+    @property
+    def segment_center_x(self) -> float: ...
+    @property
+    def segment_center_y(self) -> float: ...
+    @property
+    def segment_center_z(self) -> float: ...
+    @property
     def local_lateral_velocity(self) -> float: ...
     @property
     def signed_lateral_offset(self) -> float: ...
@@ -113,6 +84,10 @@ class PlayerTelemetry:
     def current_radius_right(self) -> float: ...
     @property
     def height_above_ground(self) -> float: ...
+    @property
+    def future_local_nearest_segment_index(self) -> int | None: ...
+    @property
+    def future_local_nearest_segment_distance(self) -> float: ...
     @property
     def velocity_magnitude(self) -> float: ...
     @property
@@ -166,23 +141,7 @@ class PlayerTelemetry:
     def to_dict(self) -> dict[str, object]: ...
 
 class FZeroXTelemetry:
-    def __init__(
-        self,
-        total_lap_count: int,
-        game_mode_raw: int,
-        game_mode_name: str,
-        in_race_mode: bool,
-        total_racers: int,
-        course_index: int,
-        player: PlayerTelemetry,
-        course_length: float = 0.0,
-        course_segment_count: int = 0,
-        difficulty_raw: int = 0,
-        difficulty_name: str | None = None,
-        camera_setting_raw: int = 2,
-        camera_setting_name: str | None = None,
-        race_intro_timer: int = 0,
-    ) -> None: ...
+    def __init__(self, data: FZeroXTelemetryDict) -> None: ...
     @property
     def total_lap_count(self) -> int: ...
     @property
@@ -214,27 +173,15 @@ class FZeroXTelemetry:
     def to_dict(self) -> dict[str, object]: ...
 
 class StepSummary:
-    def __init__(
-        self,
-        frames_run: int,
-        max_race_distance: float,
-        reverse_active_frames: int = 0,
-        low_speed_frames: int = 0,
-        energy_loss_total: float = 0.0,
-        energy_gain_total: float = 0.0,
-        damage_taken_frames: int = 0,
-        consecutive_low_speed_frames: int = 0,
-        entered_state_flags: int = 0,
-        entered_course_effects: int = 0,
-        final_frame_index: int = 0,
-        airborne_frames: int = 0,
-    ) -> None: ...
+    def __init__(self, data: StepSummaryDict) -> None: ...
     @property
     def frames_run(self) -> int: ...
     @property
     def max_race_distance(self) -> float: ...
     @property
     def reverse_active_frames(self) -> int: ...
+    @property
+    def collision_recoil_active_frames(self) -> int: ...
     @property
     def low_speed_frames(self) -> int: ...
     @property
@@ -243,6 +190,8 @@ class StepSummary:
     def energy_gain_total(self) -> float: ...
     @property
     def damage_taken_frames(self) -> int: ...
+    @property
+    def impact_frames(self) -> int: ...
     @property
     def airborne_frames(self) -> int: ...
     @property
@@ -253,8 +202,6 @@ class StepSummary:
     def entered_course_effects(self) -> int: ...
     @property
     def entered_state_labels(self) -> tuple[str, ...]: ...
-    @property
-    def entered_collision_recoil(self) -> bool: ...
     @property
     def entered_spinning_out(self) -> bool: ...
     @property
@@ -328,50 +275,18 @@ class Emulator:
     def step_frames(self, count: int = 1, capture_video: bool = True) -> None: ...
     def step_repeat_raw(
         self,
-        action_repeat: int,
-        preset: str,
-        frame_stack: int,
-        stuck_min_speed_kph: float,
-        energy_loss_epsilon: float,
-        max_episode_steps: int,
-        progress_frontier_stall_limit_frames: int | None,
-        progress_frontier_epsilon: float,
-        terminate_on_energy_depleted: bool = True,
-        lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        joypad_mask: int = 0,
-        left_stick_x: float = 0.0,
-        left_stick_y: float = 0.0,
-        right_stick_x: float = 0.0,
-        right_stick_y: float = 0.0,
+        request: RepeatObservationStepRequestDict,
     ) -> tuple[npt.NDArray[np.uint8], StepSummary, StepStatus, FZeroXTelemetry]: ...
+    def step_repeat_multi_observation_raw(
+        self,
+        request: RepeatMultiObservationStepRequestDict,
+    ) -> tuple[list[npt.NDArray[np.uint8]], StepSummary, StepStatus, FZeroXTelemetry]: ...
     def step_repeat_watch_raw(
         self,
-        action_repeat: int,
-        preset: str,
-        frame_stack: int,
-        stuck_min_speed_kph: float,
-        energy_loss_epsilon: float,
-        max_episode_steps: int,
-        progress_frontier_stall_limit_frames: int | None,
-        progress_frontier_epsilon: float,
-        terminate_on_energy_depleted: bool = True,
-        lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        joypad_mask: int = 0,
-        left_stick_x: float = 0.0,
-        left_stick_y: float = 0.0,
-        right_stick_x: float = 0.0,
-        right_stick_y: float = 0.0,
+        request: RepeatObservationStepRequestDict,
     ) -> tuple[
         npt.NDArray[np.uint8],
-        list[npt.NDArray[np.uint8]],
+        npt.NDArray[np.uint8],
         StepSummary,
         StepStatus,
         FZeroXTelemetry,
@@ -388,41 +303,34 @@ class Emulator:
     def load_baseline(self, path: str) -> None: ...
     def load_baseline_bytes(self, state: bytes) -> None: ...
     def capture_current_as_baseline(self, path: str | None = None) -> None: ...
-    def frame_rgb(self) -> bytes: ...
-    def observation_spec(self, preset: str) -> ObservationSpecDict: ...
+    def frame_rgb(self) -> npt.NDArray[np.uint8]: ...
+    def observation_spec(
+        self,
+        preset: str,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpecDict: ...
     def frame_observation(
         self,
         preset: str,
         frame_stack: int,
         options: FrameObservationOptionsDict | None = None,
     ) -> npt.NDArray[np.uint8]: ...
-    def frame_display(self, preset: str) -> npt.NDArray[np.uint8]: ...
+    def frame_display(
+        self,
+        preset: str,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...
-    def patch_time_attack_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
-        total_lap_count: int = 3,
-    ) -> None: ...
-    def patch_time_attack_machine_settings(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
-        total_lap_count: int = 3,
-    ) -> None: ...
-    def force_time_attack_reinit(self) -> None: ...
-    def validate_time_attack_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = 0,
-        total_lap_count: int = 3,
-    ) -> None: ...
+    def patch_race_start_setup(self, request: RaceStartRequestDict) -> None: ...
+    def patch_machine_settings(self, request: RaceStartRequestDict) -> None: ...
+    def patch_engine_settings(self, mode: str, engine_setting_raw_value: int) -> None: ...
+    def force_race_reinit(self, mode: str) -> None: ...
+    def validate_race_start_setup(self, request: RaceStartRequestDict) -> None: ...
+    def patch_time_attack_menu_mode(self) -> None: ...
     def vehicle_setup_info(self) -> VehicleSetupInfoDict: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...
     def write_system_ram(self, offset: int, data: bytes) -> None: ...
@@ -441,20 +349,10 @@ class CoreInfo:
 def probe_core(core_path: str) -> CoreInfo: ...
 def encode_state_flags(labels: list[str] | tuple[str, ...]) -> int: ...
 def joypad_mask(*buttons: int) -> int: ...
-
-JOYPAD_B: int
-JOYPAD_Y: int
-JOYPAD_SELECT: int
-JOYPAD_START: int
-JOYPAD_UP: int
-JOYPAD_DOWN: int
-JOYPAD_LEFT: int
-JOYPAD_RIGHT: int
-JOYPAD_A: int
-JOYPAD_X: int
-JOYPAD_L: int
-JOYPAD_R: int
-JOYPAD_L2: int
-JOYPAD_R2: int
-JOYPAD_L3: int
-JOYPAD_R3: int
+def display_size(width: int, height: int, aspect_ratio: float) -> tuple[int, int]: ...
+def stacked_observation_channels(
+    single_frame_channels: int,
+    frame_stack: int,
+    stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
+    minimap_layer: bool = False,
+) -> int: ...

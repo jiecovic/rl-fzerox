@@ -16,6 +16,7 @@ class _CurriculumStagePolicyRunner(Protocol):
     def supports_action_masks(self) -> bool: ...
 
     def refresh(self) -> None: ...
+    def refresh_if_due(self, *, interval_seconds: float) -> None: ...
     def reset(self) -> None: ...
 
 
@@ -28,12 +29,18 @@ def _load_policy_runner(
     *,
     artifact: str,
     device: str,
+    algorithm: str | None = None,
 ) -> PolicyRunner | None:
     if policy_run_dir is None:
         return None
     from rl_fzerox.core.training.inference import load_policy_runner
 
-    return load_policy_runner(policy_run_dir, artifact=artifact, device=device)
+    return load_policy_runner(
+        policy_run_dir,
+        artifact=artifact,
+        device=device,
+        algorithm=algorithm,
+    )
 
 
 def _policy_label(policy_runner: PolicyRunner | None) -> str | None:
@@ -66,6 +73,26 @@ def _policy_num_timesteps(policy_runner: PolicyRunner | None) -> int | None:
     return policy_runner.checkpoint_num_timesteps
 
 
+def _policy_experience_frames(
+    policy_runner: PolicyRunner | None,
+    *,
+    action_repeat: int,
+    lineage_frame_offset: int | None,
+) -> int | None:
+    if policy_runner is None:
+        return None
+    repeat = max(1, int(action_repeat))
+    if lineage_frame_offset is None:
+        lineage_num_timesteps = policy_runner.checkpoint_num_timesteps
+        if lineage_num_timesteps is None:
+            return None
+        return max(0, int(lineage_num_timesteps)) * repeat
+    local_num_timesteps = policy_runner.checkpoint_local_num_timesteps
+    if local_num_timesteps is None:
+        return None
+    return max(0, int(lineage_frame_offset)) + (max(0, int(local_num_timesteps)) * repeat)
+
+
 def _policy_deterministic(policy_runner: PolicyRunner | None, deterministic: bool) -> bool | None:
     if policy_runner is None:
         return None
@@ -84,7 +111,7 @@ def _sync_policy_curriculum_stage(
 ) -> None:
     if policy_runner is None:
         return
-    policy_runner.refresh()
+    policy_runner.refresh_if_due(interval_seconds=10.0)
     env.sync_checkpoint_curriculum_stage(policy_runner.checkpoint_curriculum_stage_index)
 
 

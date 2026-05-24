@@ -37,6 +37,7 @@ pub(crate) struct GlobalOffsets {
     pub player_characters: usize,
     pub player_machine_skins: usize,
     pub player_engine: usize,
+    pub racers_ko_count: usize,
     pub reverse_timers: usize,
     pub racers: usize,
 }
@@ -95,13 +96,19 @@ pub(crate) struct RacerSegmentPositionInfoOffsets {
     pub course_segment: usize,
     pub segment_t_value: usize,
     pub segment_length_proportion: usize,
+    pub segment_pos: usize,
     pub segment_displacement: usize,
+    pub pos: usize,
     pub distance_from_segment: usize,
 }
 
 #[derive(Clone, Copy)]
 pub(crate) struct CourseSegmentOffsets {
+    pub pos: usize,
+    pub tension: usize,
     pub segment_index: usize,
+    pub next: usize,
+    pub prev: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -132,6 +139,7 @@ pub(crate) const GLOBALS: GlobalOffsets = GlobalOffsets {
     player_characters: rdram_offset(0x800E5EE0),
     player_machine_skins: rdram_offset(0x800E5EE8),
     player_engine: rdram_offset(0x800E5EF0),
+    racers_ko_count: rdram_offset(0x800E5FD2),
     reverse_timers: rdram_offset(0x800F_80A8),
     racers: rdram_offset(0x802C4920),
 };
@@ -193,12 +201,18 @@ pub(crate) const RACER_SEGMENT_POSITION_INFO: RacerSegmentPositionInfoOffsets =
         course_segment: 0x000,
         segment_t_value: 0x004,
         segment_length_proportion: 0x008,
+        segment_pos: 0x01C,
         segment_displacement: 0x028,
+        pos: 0x034,
         distance_from_segment: 0x040,
     };
 
 pub(crate) const COURSE_SEGMENT: CourseSegmentOffsets = CourseSegmentOffsets {
+    pos: 0x000,
+    tension: 0x024,
     segment_index: 0x030,
+    next: 0x034,
+    prev: 0x038,
 };
 
 // Byte offsets within `struct CourseInfo`, derived from the decomp's

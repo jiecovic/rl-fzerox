@@ -1,345 +1,73 @@
 # src/rl_fzerox/apps/watch.py
 from __future__ import annotations
 
-import argparse
-from collections.abc import Mapping, Sequence
+import json
+import os
+import signal
+from collections.abc import Sequence
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal
 
-from omegaconf import OmegaConf
-
-from rl_fzerox.apps._cli import normalize_hydra_overrides
-from rl_fzerox.core.config import load_watch_app_config
-from rl_fzerox.core.config.schema import TrainAppConfig, WatchAppConfig, WatchConfig
-from rl_fzerox.core.training.runs import (
-    apply_train_run_to_watch_config,
-    load_train_run_config_for_watch,
-    materialize_watch_session_config,
-)
+from rl_fzerox.apps.watch_cli import parse_args, resolve_watch_app_config
 from rl_fzerox.ui.watch import run_viewer
 
 
-def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for the watch app."""
-
-    parser = argparse.ArgumentParser(
-        description="Watch the F-Zero X environment from a Hydra-composed YAML config.",
-        allow_abbrev=False,
-    )
-    parser.add_argument(
-        "-c",
-        "--config",
-        "--config-file",
-        dest="config_path",
-        type=Path,
-        default=None,
-        help="Path to a watch config YAML file.",
-    )
-    parser.add_argument(
-        "overrides",
-        nargs=argparse.REMAINDER,
-        help="Hydra overrides. Use `-- key=value` to separate them from CLI flags.",
-    )
-    parser.add_argument(
-        "--run-dir",
-        dest="policy_run_dir",
-        type=Path,
-        default=None,
-        help=(
-            "Optional training run directory. The watch app loads its latest saved policy artifact."
-        ),
-    )
-    parser.add_argument(
-        "--artifact",
-        dest="policy_artifact",
-        choices=("latest", "best", "final"),
-        default=None,
-        help="Which saved policy artifact to load from the run directory.",
-    )
-    return parser.parse_args(argv)
-
-
 def main(argv: Sequence[str] | None = None) -> None:
-    """Load the watch config and launch the viewer."""
+    """Resolve one watch session from a run and launch the viewer."""
 
     args = parse_args(argv)
+    with _watch_pid_file_session(args.watch_pid_file):
+        try:
+            config = resolve_watch_app_config(
+                policy_run_dir=args.policy_run_dir,
+                policy_artifact=args.policy_artifact,
+                manager_db_path=args.manager_db_path,
+                managed_run_id=args.managed_run_id,
+                overrides=args.overrides,
+            )
+        except (RuntimeError, ValueError) as exc:
+            raise SystemExit(str(exc)) from exc
+
+        run_viewer(config)
+
+
+@contextmanager
+def _watch_pid_file_session(pid_path: Path | None):
+    cleanup = _watch_pid_file_cleanup(pid_path)
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+    previous_sigint = signal.getsignal(signal.SIGINT)
+
+    def _exit_with_cleanup(_signum: int, _frame: object | None) -> None:
+        cleanup()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _exit_with_cleanup)
+    signal.signal(signal.SIGINT, _exit_with_cleanup)
     try:
-        config = resolve_watch_app_config(
-            config_path=args.config_path,
-            policy_run_dir=args.policy_run_dir,
-            policy_artifact=args.policy_artifact,
-            overrides=args.overrides,
-        )
-    except (RuntimeError, ValueError) as exc:
-        raise SystemExit(str(exc)) from exc
-
-    run_viewer(config)
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        signal.signal(signal.SIGINT, previous_sigint)
+        cleanup()
 
 
-def resolve_watch_app_config(
-    *,
-    config_path: Path | None,
-    policy_run_dir: Path | None,
-    policy_artifact: Literal["latest", "best", "final"] | None,
-    overrides: Sequence[str],
-) -> WatchAppConfig:
-    """Resolve watch config with the same precedence used by the watch CLI."""
+def _watch_pid_file_cleanup(pid_path: Path | None):
+    """Unlink one watch pid file only when it still belongs to this process."""
 
-    normalized_overrides = normalize_hydra_overrides(overrides)
-    cli_run_dir = policy_run_dir.expanduser().resolve() if policy_run_dir is not None else None
-    cli_override_delta: dict[str, object] = {}
-    if config_path is None:
-        if cli_run_dir is None:
-            raise ValueError("--config is required unless --run-dir is provided")
-        if normalized_overrides:
-            cli_override_delta = _watch_config_delta_from_dotlist(normalized_overrides)
-        train_config = load_train_run_config_for_watch(cli_run_dir)
-        config = _default_watch_config_from_train_run(
-            train_config,
-            run_dir=cli_run_dir,
-            artifact=policy_artifact or "latest",
-        )
-    else:
-        config = load_watch_app_config(config_path)
-        if normalized_overrides:
-            overridden_config = load_watch_app_config(
-                config_path,
-                overrides=normalized_overrides,
-            )
-            cli_override_delta = _watch_config_delta(
-                config,
-                overridden_config,
-                normalized_overrides,
-            )
+    process_pid = os.getpid()
 
-    policy_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
-    if cli_run_dir is None and cli_override_delta:
-        policy_run_dir = _apply_watch_config_delta(config, cli_override_delta).watch.policy_run_dir
-    if policy_artifact is not None and policy_run_dir is None:
-        raise ValueError("--artifact requires --run-dir or watch.policy_run_dir in the config")
-    if policy_run_dir is not None:
-        train_config = load_train_run_config_for_watch(policy_run_dir)
-        config = apply_train_run_to_watch_config(
-            config,
-            run_dir=policy_run_dir,
-            train_config=train_config,
-        )
-        if cli_override_delta:
-            config = _apply_watch_config_delta(config, cli_override_delta)
-        if policy_artifact is not None:
-            config = config.model_copy(
-                update={
-                    "watch": config.watch.model_copy(update={"policy_artifact": policy_artifact})
-                }
-            )
-    elif cli_override_delta:
-        config = _apply_watch_config_delta(config, cli_override_delta)
+    def _cleanup() -> None:
+        if pid_path is None or not pid_path.is_file():
+            return
+        try:
+            payload = json.loads(pid_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            pid_path.unlink(missing_ok=True)
+            return
+        if payload.get("pid") == process_pid:
+            pid_path.unlink(missing_ok=True)
 
-    config = materialize_watch_session_config(
-        config,
-        run_dir=config.watch.policy_run_dir,
-    )
-    return config
-
-
-def _default_watch_config_from_train_run(
-    train_config: TrainAppConfig,
-    *,
-    run_dir: Path,
-    artifact: Literal["latest", "best", "final"],
-) -> WatchAppConfig:
-    """Build one minimal watch config directly from a saved train run."""
-
-    return WatchAppConfig(
-        seed=train_config.seed,
-        emulator=train_config.emulator,
-        env=train_config.env,
-        reward=train_config.reward,
-        policy=train_config.policy,
-        curriculum=train_config.curriculum,
-        train=train_config.train,
-        watch=WatchConfig(
-            policy_run_dir=run_dir,
-            policy_artifact=artifact,
-        ),
-    )
-
-
-def _watch_config_delta(
-    base_config: WatchAppConfig,
-    overridden_config: WatchAppConfig,
-    overrides: Sequence[str],
-) -> dict[str, object]:
-    """Return only the effective CLI changes after Hydra composition."""
-
-    delta = _mapping_delta(
-        _watch_config_data(base_config),
-        _watch_config_data(overridden_config),
-    )
-    overridden_data = _watch_config_data(overridden_config)
-    for override in overrides:
-        key_path = _override_key_path(override)
-        if key_path is None:
-            continue
-        override_value = _mapping_path_value(overridden_data, key_path)
-        if override_value is None:
-            continue
-        value, path = override_value
-        _set_mapping_path_value(delta, path, value)
-    return delta
-
-
-def _watch_config_delta_from_dotlist(overrides: Sequence[str]) -> dict[str, object]:
-    """Parse direct CLI overrides without composing an external watch YAML."""
-
-    dotlist = [
-        dotlist_override
-        for override in overrides
-        if (dotlist_override := _direct_dotlist_override(override)) is not None
-    ]
-    if not dotlist:
-        return {}
-    delta = _string_key_mapping(
-        OmegaConf.to_container(OmegaConf.from_dotlist(dotlist), resolve=True)
-    )
-    if delta is None:
-        raise ValueError("Watch overrides must resolve to a string-keyed mapping")
-    return delta
-
-
-def _direct_dotlist_override(override: str) -> str | None:
-    key, separator, value = override.partition("=")
-    key = key.strip()
-    while key.startswith("+"):
-        key = key[1:]
-    if not key or key.startswith("hydra."):
-        return None
-    if key.startswith("~"):
-        raise ValueError("Deletion overrides require --config")
-    if key.startswith("/") or "@" in key:
-        raise ValueError("Config-group overrides require --config")
-    if not separator:
-        raise ValueError(f"Watch override must use key=value syntax: {override!r}")
-    return f"{key}={value}"
-
-
-def _apply_watch_config_delta(
-    config: WatchAppConfig,
-    delta: Mapping[str, object],
-) -> WatchAppConfig:
-    """Apply CLI override delta after run-manifest inheritance."""
-
-    if not delta:
-        return config
-    return WatchAppConfig.model_validate(
-        _merge_mapping(
-            _watch_config_data(config),
-            delta,
-        )
-    )
-
-
-def _mapping_delta(
-    base: Mapping[str, object],
-    overridden: Mapping[str, object],
-) -> dict[str, object]:
-    delta: dict[str, object] = {}
-    for key, overridden_value in overridden.items():
-        if key not in base:
-            delta[key] = overridden_value
-            continue
-
-        base_value = base[key]
-        base_mapping = _string_key_mapping(base_value)
-        overridden_mapping = _string_key_mapping(overridden_value)
-        if base_mapping is not None and overridden_mapping is not None:
-            nested_delta = _mapping_delta(base_mapping, overridden_mapping)
-            if nested_delta:
-                delta[key] = nested_delta
-            continue
-
-        if overridden_value != base_value:
-            delta[key] = overridden_value
-    return delta
-
-
-def _merge_mapping(
-    base: Mapping[str, object],
-    update: Mapping[str, object],
-) -> dict[str, object]:
-    merged: dict[str, object] = dict(base)
-    for key, update_value in update.items():
-        existing_mapping = _string_key_mapping(merged.get(key))
-        update_mapping = _string_key_mapping(update_value)
-        if existing_mapping is not None and update_mapping is not None:
-            merged[key] = _merge_mapping(existing_mapping, update_mapping)
-            continue
-        merged[key] = update_value
-    return merged
-
-
-def _watch_config_data(config: WatchAppConfig) -> dict[str, object]:
-    data = _string_key_mapping(config.model_dump(mode="json", exclude_none=False))
-    if data is None:
-        raise TypeError("Watch config dump must be a string-keyed mapping")
-    return data
-
-
-def _override_key_path(override: str) -> tuple[str, ...] | None:
-    key = override.split("=", maxsplit=1)[0].strip()
-    while key.startswith("+"):
-        key = key[1:]
-    if key.startswith("~"):
-        key = key[1:]
-    if not key or key.startswith("hydra."):
-        return None
-    if key.startswith("/"):
-        key = key.rsplit("/", maxsplit=1)[-1]
-    if "@" in key:
-        key = key.split("@", maxsplit=1)[0]
-
-    path = tuple(part for part in key.split(".") if part)
-    return path or None
-
-
-def _mapping_path_value(
-    mapping: Mapping[str, object],
-    path: tuple[str, ...],
-) -> tuple[object, tuple[str, ...]] | None:
-    current: object = mapping
-    for part in path:
-        current_mapping = _string_key_mapping(current)
-        if current_mapping is None or part not in current_mapping:
-            return None
-        current = current_mapping[part]
-    return current, path
-
-
-def _set_mapping_path_value(
-    mapping: dict[str, object],
-    path: tuple[str, ...],
-    value: object,
-) -> None:
-    current = mapping
-    for part in path[:-1]:
-        next_mapping = _string_key_mapping(current.get(part))
-        if next_mapping is None:
-            next_mapping = {}
-            current[part] = next_mapping
-        current = next_mapping
-    current[path[-1]] = value
-
-
-def _string_key_mapping(value: object) -> dict[str, object] | None:
-    if not isinstance(value, dict):
-        return None
-
-    mapping: dict[str, object] = {}
-    for key, item in value.items():
-        if not isinstance(key, str):
-            return None
-        mapping[key] = item
-    return mapping
+    return _cleanup
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+# src/rl_fzerox/core/envs/engine/controls/mask_queries.py
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -5,7 +6,6 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator.arrays import ActionMask
-from rl_fzerox.core.domain.hybrid_action import HYBRID_DISCRETE_ACTION_KEY
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.actions.base import DiscreteActionDimension
 
@@ -112,7 +112,7 @@ def action_mask_violations(
 def _discrete_action_values(action: ActionValue) -> tuple[int, ...] | None:
     source: object
     if isinstance(action, Mapping):
-        source = action.get(HYBRID_DISCRETE_ACTION_KEY)
+        source = action.get("discrete")
         if source is None:
             return None
     else:

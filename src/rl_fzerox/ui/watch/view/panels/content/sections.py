@@ -3,9 +3,13 @@ from __future__ import annotations
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import StateVector
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.panels.content.auxiliary import (
+    auxiliary_episode_sections,
+)
 from rl_fzerox.ui.watch.view.panels.content.game import (
     game_detail_section,
     game_overview_section,
@@ -22,6 +26,7 @@ from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_episode_frames,
     _format_game_rate,
     _format_game_speed,
+    _format_height_width,
     _format_observation_shape,
     _format_policy_action,
     _format_progress_frontier_counter,
@@ -51,18 +56,24 @@ def _build_panel_columns(
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
     policy_num_timesteps: int | None = None,
+    policy_experience_frames: int | None = None,
     gas_level: float = 0.0,
     thrust_warning_threshold: float | None = None,
     boost_active: bool = False,
     boost_lamp_level: float = 0.0,
     action_mask_branches: ActionMaskBranches | None = None,
     best_finish_position: int | None = None,
+    best_finish_ranks: dict[str, int] | None = None,
     best_finish_times: dict[str, int] | None = None,
     latest_finish_times: dict[str, int] | None = None,
     latest_finish_deltas_ms: dict[str, int] | None = None,
     failed_track_attempts: frozenset[str] = frozenset(),
     track_pool_records: tuple[dict[str, object], ...] = (),
     continuous_drive_deadzone: float = 0.2,
+    continuous_air_brake_axis_index: int | None = 2,
+    continuous_air_brake_deadzone: float = 0.05,
+    continuous_air_brake_full_threshold: float = 0.85,
+    continuous_air_brake_min_duty: float = 0.0,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
     action_repeat: int,
@@ -75,7 +86,11 @@ def _build_panel_columns(
     max_episode_steps: int = 50_000,
     progress_frontier_stall_limit_frames: int | None = 900,
     observation_state: StateVector | None = None,
+    observation_state_reference: StateVector | None = None,
     observation_state_feature_names: tuple[str, ...] = (),
+    policy_auxiliary_state_predictions: dict[str, object] | None = None,
+    policy_auxiliary_state_targets: dict[str, object] | None = None,
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
     train_config: TrainConfig | None = None,
     policy_config: PolicyConfig | None = None,
 ) -> PanelColumns:
@@ -111,12 +126,9 @@ def _build_panel_columns(
                     ),
                     _panel_line(
                         "Experience",
-                        _format_checkpoint_experience(
-                            policy_num_timesteps,
-                            action_repeat=action_repeat,
-                        ),
+                        _format_checkpoint_experience(policy_experience_frames),
                         PALETTE.text_primary
-                        if policy_num_timesteps is not None
+                        if policy_experience_frames is not None
                         else PALETTE.text_muted,
                     ),
                     _panel_line(
@@ -125,13 +137,6 @@ def _build_panel_columns(
                         PALETTE.text_primary,
                     ),
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
-                    _panel_line(
-                        "Best position",
-                        _format_best_position(best_finish_position),
-                        PALETTE.text_primary
-                        if best_finish_position is not None
-                        else PALETTE.text_muted,
-                    ),
                     _panel_line(
                         "Episode frame",
                         _format_episode_frames(info, max_episode_steps=max_episode_steps),
@@ -228,7 +233,7 @@ def _build_panel_columns(
                 lines=[
                     _panel_line(
                         "Game",
-                        f"{game_display_size[0]}x{game_display_size[1]}",
+                        _format_height_width(game_display_size[1], game_display_size[0]),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
@@ -245,15 +250,21 @@ def _build_panel_columns(
         stats=[
             *policy_state_sections(
                 observation_state=observation_state,
+                observation_state_reference=observation_state_reference,
                 feature_names=observation_state_feature_names,
-                zeroed_components=_zeroed_state_components(info),
+                policy_config=policy_config,
+                auxiliary_predictions=policy_auxiliary_state_predictions,
+                auxiliary_targets=policy_auxiliary_state_targets,
                 zeroed_features=_zeroed_state_features(info),
+                watch_zeroed_features=_watch_zeroed_state_features(info),
             ),
         ],
+        aux=auxiliary_episode_sections(auxiliary_episode_metrics),
         records=[
             *track_record_sections(
                 current_info=info,
                 track_pool_records=track_pool_records,
+                best_finish_ranks=best_finish_ranks or {},
                 best_finish_times=best_finish_times or {},
                 latest_finish_times=latest_finish_times or {},
                 latest_finish_deltas_ms=latest_finish_deltas_ms or {},
@@ -267,17 +278,15 @@ def _build_panel_columns(
     )
 
 
-def _zeroed_state_components(info: dict[str, object]) -> frozenset[str]:
-    raw_components = info.get("observation_zeroed_state_components")
-    if not isinstance(raw_components, tuple | list):
-        return frozenset()
-    return frozenset(
-        component for component in raw_components if isinstance(component, str) and component
-    )
-
-
 def _zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
     raw_features = info.get("observation_zeroed_state_features")
+    if isinstance(raw_features, tuple | list):
+        return frozenset(str(feature) for feature in raw_features)
+    return frozenset()
+
+
+def _watch_zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
+    raw_features = info.get("watch_zeroed_state_features")
     if isinstance(raw_features, tuple | list):
         return frozenset(str(feature) for feature in raw_features)
     return frozenset()
@@ -325,7 +334,3 @@ def _format_curriculum_stage(*, checkpoint_stage: str | None, info: dict[str, ob
     if checkpoint_stage is not None and checkpoint_stage:
         return checkpoint_stage
     return _format_env_curriculum_stage(info)
-
-
-def _format_best_position(value: int | None) -> str:
-    return "n/a" if value is None else str(value)

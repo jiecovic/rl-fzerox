@@ -5,10 +5,6 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from rl_fzerox.core.domain.hybrid_action import (
-    HYBRID_CONTINUOUS_ACTION_KEY,
-    HYBRID_DISCRETE_ACTION_KEY,
-)
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.ui.watch.view.panels.core.buttons import BUTTON_LABELS
 
@@ -23,8 +19,8 @@ def _format_policy_action(policy_action: ActionValue | None) -> str:
         return "manual"
 
     if isinstance(policy_action, Mapping):
-        continuous = policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
-        discrete = policy_action.get(HYBRID_DISCRETE_ACTION_KEY)
+        continuous = policy_action.get("continuous")
+        discrete = policy_action.get("discrete")
         if continuous is not None and discrete is not None:
             return f"c={_format_action_values(continuous)} d={_format_action_values(discrete)}"
 
@@ -57,16 +53,11 @@ def _format_reload_age(reload_age_seconds: float | None) -> str:
     return f"{hours}h {minutes:02d}m"
 
 
-def _format_checkpoint_experience(
-    num_timesteps: int | None,
-    *,
-    action_repeat: int,
-) -> str:
-    if num_timesteps is None:
+def _format_checkpoint_experience(total_frames: int | None) -> str:
+    if total_frames is None:
         return "-"
 
-    total_frames = max(0, int(num_timesteps)) * max(1, int(action_repeat))
-    total_seconds = total_frames // 60
+    total_seconds = max(0, int(total_frames)) // 60
     minutes, _ = divmod(total_seconds, 60)
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)
@@ -82,6 +73,10 @@ def _display_aspect_ratio(info: dict[str, object]) -> float:
     if isinstance(value, int | float):
         return float(value)
     return 0.0
+
+
+def _format_height_width(height: int, width: int) -> str:
+    return f"{height}x{width}"
 
 
 def _format_observation_summary(
@@ -103,12 +98,12 @@ def _format_observation_summary(
         color_mode = "gray"
     if _observation_minimap_layer(info):
         color_mode = f"{color_mode}+map"
-    return f"{width}x{height} {color_mode} x{stack_size} stack"
+    return f"{_format_height_width(height, width)} {color_mode} x{stack_size} stack"
 
 
 def _format_observation_shape(observation_shape: tuple[int, ...]) -> str:
     height, width, channels = observation_shape
-    return f"{width}x{height}x{channels}"
+    return f"{_format_height_width(height, width)}x{channels}"
 
 
 def _format_progress_frontier_counter(

@@ -1,20 +1,20 @@
 # src/rl_fzerox/core/envs/observations/state/components/core.py
 from __future__ import annotations
 
-from collections.abc import Callable, Collection, Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentSettings,
     StateComponentsSettings,
+    default_excluded_state_feature_names,
 )
 from rl_fzerox.core.envs.observations.state.history import (
     action_history_control_name,
     control_history_source_control,
     validate_action_history_controls,
 )
-from rl_fzerox.core.envs.observations.state.profiles import DEFAULT_STATE_VECTOR_SPEC
 from rl_fzerox.core.envs.observations.state.types import (
     ActionHistoryControl,
     StateFeature,
@@ -26,61 +26,55 @@ from rl_fzerox.core.envs.observations.state.types import (
 class StateComponentDefinition:
     """One scalar-state component with schema and value builders kept together."""
 
-    features: Callable[[ObservationStateComponentSettings], tuple[StateFeature, ...]]
-    values: Callable[
-        [
-            FZeroXTelemetry | None,
-            ObservationStateComponentSettings,
-            Mapping[str, float],
-            Mapping[str, float],
-        ],
-        list[float],
-    ]
+    features: Callable[..., tuple[StateFeature, ...]]
+    values: Callable[..., list[float]]
 
 
 def state_vector_spec_from_components(
     state_components: StateComponentsSettings,
+    *,
+    independent_lean_buttons: bool = False,
 ) -> StateVectorSpec:
     features: list[StateFeature] = []
     for component in state_components:
-        features.extend(state_component_definition(component).features(component))
+        features.extend(
+            state_component_features(
+                component,
+                independent_lean_buttons=independent_lean_buttons,
+            )
+        )
 
-    return StateVectorSpec(
-        features=tuple(features),
-        speed_normalizer_kph=DEFAULT_STATE_VECTOR_SPEC.speed_normalizer_kph,
-        lean_tap_guard_frames=DEFAULT_STATE_VECTOR_SPEC.lean_tap_guard_frames,
-        recent_boost_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_boost_window_frames,
-        recent_steer_window_frames=DEFAULT_STATE_VECTOR_SPEC.recent_steer_window_frames,
-    )
+    return StateVectorSpec(features=tuple(features))
 
 
 def component_state_values(
     telemetry: FZeroXTelemetry | None,
     *,
     state_components: StateComponentsSettings,
-    zeroed_state_components: Collection[str] = (),
-    zeroed_state_features: Collection[str] = (),
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
+    independent_lean_buttons: bool = False,
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
-        definition = state_component_definition(component)
-        component_features = definition.features(component)
-        if component.name in zeroed_state_components:
-            values.extend([0.0] * len(component_features))
-            continue
-
-        component_values = definition.values(
-            telemetry,
+        raw_features = raw_state_component_features(
             component,
-            action_history,
-            profile_fields,
+            independent_lean_buttons=independent_lean_buttons,
         )
-        values.extend(
-            0.0 if feature.name in zeroed_state_features else value
-            for feature, value in zip(component_features, component_values, strict=True)
-        )
+        definition = state_component_definition(component)
+        if component.name == "control_history":
+            raw_values = definition.values(
+                telemetry,
+                component,
+                action_history,
+                independent_lean_buttons=independent_lean_buttons,
+            )
+        else:
+            raw_values = definition.values(
+                telemetry,
+                component,
+                action_history,
+            )
+        values.extend(selected_state_component_values(component, raw_features, raw_values))
 
     return values
 
@@ -88,19 +82,100 @@ def component_state_values(
 def action_history_settings_for_observation(
     *,
     state_components: StateComponentsSettings | None,
-    fallback_len: int | None,
-    fallback_controls: tuple[ActionHistoryControl, ...],
 ) -> tuple[int | None, tuple[ActionHistoryControl, ...]]:
     """Return the control-history buffer shape needed by the selected observation."""
 
     if state_components is None:
-        return fallback_len, fallback_controls
+        return None, ()
     control_config = component_by_name(state_components, "control_history")
     if control_config is None:
         return None, ()
     length = component_int(control_config, "length", default=2)
     controls = component_controls(control_config, default=("steer", "thrust", "boost", "lean"))
     return length, tuple(control_history_source_control(control) for control in controls)
+
+
+def state_component_features(
+    component: ObservationStateComponentSettings,
+    *,
+    independent_lean_buttons: bool = False,
+) -> tuple[StateFeature, ...]:
+    return selected_state_component_features(
+        component,
+        raw_state_component_features(
+            component,
+            independent_lean_buttons=independent_lean_buttons,
+        ),
+    )
+
+
+def raw_state_component_features(
+    component: ObservationStateComponentSettings,
+    *,
+    independent_lean_buttons: bool = False,
+) -> tuple[StateFeature, ...]:
+    """Return every feature one component can emit before inclusion filtering."""
+
+    definition = state_component_definition(component)
+    if component.name != "control_history":
+        return definition.features(component)
+    return definition.features(
+        component,
+        independent_lean_buttons=independent_lean_buttons,
+    )
+
+
+def selected_state_component_features(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+) -> tuple[StateFeature, ...]:
+    """Apply the component's explicit/default feature inclusion policy."""
+
+    selected_indexes = selected_state_component_feature_indexes(component, raw_features)
+    return tuple(raw_features[index] for index in selected_indexes)
+
+
+def selected_state_component_values(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+    raw_values: list[float],
+) -> list[float]:
+    """Apply the same feature inclusion policy to runtime values."""
+
+    if len(raw_features) != len(raw_values):
+        raise ValueError(
+            f"{component.name} emitted {len(raw_values)} value(s) for "
+            f"{len(raw_features)} feature(s)"
+        )
+    selected_indexes = selected_state_component_feature_indexes(component, raw_features)
+    return [raw_values[index] for index in selected_indexes]
+
+
+def selected_state_component_feature_indexes(
+    component: ObservationStateComponentSettings,
+    raw_features: tuple[StateFeature, ...],
+) -> tuple[int, ...]:
+    raw_names = tuple(feature.name for feature in raw_features)
+    raw_name_set = set(raw_names)
+    if component.included_features is None:
+        default_excluded = set(default_excluded_state_feature_names(component.name))
+        return tuple(
+            index
+            for index, feature_name in enumerate(raw_names)
+            if feature_name not in default_excluded
+        )
+
+    included = tuple(component.included_features)
+    if len(set(included)) != len(included):
+        raise ValueError(f"{component.name}.included_features must not contain duplicates")
+    unsupported = sorted(set(included) - raw_name_set)
+    if unsupported:
+        joined = ", ".join(unsupported)
+        raise ValueError(f"{component.name} does not support included feature(s): {joined}")
+    included_set = set(included)
+    return tuple(
+        index for index, feature_name in enumerate(raw_names) if feature_name in included_set
+    )
 
 
 def state_component_definition(

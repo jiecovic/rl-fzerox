@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry
-from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
+from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.envs.track_bounds import track_edge_state
 from rl_fzerox.ui.watch.view.panels.core.format import (
@@ -73,7 +73,7 @@ def game_overview_section(
             reverse_detected=telemetry.player.reverse_timer > 0,
             low_speed_detected=telemetry.player.speed_kph < stuck_min_speed_kph,
             energy_depleted=info.get("termination_reason") == "energy_depleted",
-            energy_refill_detected=telemetry.player.on_energy_refill,
+            refill_surface_detected=on_refill_surface(telemetry),
             dirt_detected=raw_course_effect == CourseEffect.DIRT,
             ice_detected=raw_course_effect == CourseEffect.ICE,
             track_edge_detected=edge_state.near_side is not None,

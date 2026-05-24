@@ -2,14 +2,9 @@
 from __future__ import annotations
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from rl_fzerox.core.config.schema_models.common import ContinuousAirBrakeMode
-from rl_fzerox.core.envs.actions import (
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.runtime_spec.schema.common import ContinuousAirBrakeMode
 
 from ..info import telemetry_can_boost, telemetry_energy_fraction
 from .gates import with_left_stick_y, without_joypad_mask
@@ -66,6 +61,7 @@ def apply_dynamic_control_gates(
     control_state: ControllerState,
     *,
     mask_controller: ActionMaskController,
+    mask_air_brake_on_ground: bool,
     continuous_air_brake_mode: ContinuousAirBrakeMode,
     last_telemetry: FZeroXTelemetry | None,
 ) -> ControllerState:
@@ -78,31 +74,31 @@ def apply_dynamic_control_gates(
         1,
         missing_allowed=True,
     ):
-        control_state = without_joypad_mask(control_state, BOOST_MASK)
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.boost)
     if not action_branch_value_allowed(
         branches,
         "lean",
         1,
         missing_allowed=True,
     ):
-        control_state = without_joypad_mask(control_state, LEAN_LEFT_MASK)
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.lean_left)
     if not action_branch_value_allowed(
         branches,
         "lean",
         2,
         missing_allowed=True,
     ):
-        control_state = without_joypad_mask(control_state, LEAN_RIGHT_MASK)
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.lean_right)
     if not action_branch_value_allowed(
         branches,
         "air_brake",
         1,
         missing_allowed=True,
     ):
-        control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.air_brake)
 
     if continuous_air_brake_mode == "off":
-        control_state = without_joypad_mask(control_state, AIR_BRAKE_MASK)
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.air_brake)
 
     pitch_non_neutral_allowed = action_branch_non_neutral_allowed(
         branches,
@@ -115,4 +111,6 @@ def apply_dynamic_control_gates(
 
     if last_telemetry is None or last_telemetry.player.airborne:
         return control_state
-    return with_left_stick_y(without_joypad_mask(control_state, AIR_BRAKE_MASK), 0.0)
+    if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
+        control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.air_brake)
+    return with_left_stick_y(control_state, 0.0)

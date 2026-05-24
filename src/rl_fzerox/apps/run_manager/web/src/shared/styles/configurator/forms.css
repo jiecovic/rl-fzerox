@@ -1,0 +1,358 @@
+.form-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.run-identity-grid {
+  grid-template-columns: minmax(0, 1fr) 240px;
+  align-items: end;
+  margin-bottom: 28px;
+}
+
+.fork-context-card {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 12px 14px;
+}
+
+.fork-context-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.fork-context-kicker {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.fork-context-header strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fork-context-artifact {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 0 8px;
+  text-transform: lowercase;
+}
+
+.fork-context-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.form-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.config-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.training-panel-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.config-group {
+  display: grid;
+  align-content: start;
+  align-items: start;
+  gap: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.config-group.wide {
+  grid-column: 1 / -1;
+}
+
+.config-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.config-group-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.reset-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0;
+}
+
+.reset-button:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.training-field-grid,
+.config-field-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.environment-note-field .field-note {
+  margin-top: 8px;
+}
+
+.dependent-fieldset {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  gap: 12px;
+  padding: 0;
+}
+
+.fork-lock-fieldset {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  gap: 12px;
+  padding: 0;
+}
+
+.fork-lock-fieldset:disabled {
+  opacity: 0.52;
+}
+
+.dependent-fieldset:disabled {
+  opacity: 0.52;
+}
+
+.layer-list-editor {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.layer-list-row {
+  display: grid;
+  grid-template-columns: 34px 96px 24px;
+  gap: 8px;
+  align-items: center;
+}
+
+.layer-list-row input {
+  height: 34px;
+}
+
+.layer-index,
+.layer-list-empty {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.layer-list-empty {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.layer-add-row .layer-index {
+  opacity: 0.58;
+}
+
+.layer-add-placeholder {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 0 10px;
+  text-align: left;
+  width: 96px;
+}
+
+.layer-add-placeholder:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.layer-add-button {
+  width: 20px;
+  height: 20px;
+}
+
+.image-observation-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.image-observation-fieldset {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.image-observation-fieldset > .range-field {
+  grid-column: 1 / -1;
+}
+
+.custom-resolution-grid {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.image-observation-grid > .range-field,
+.image-observation-grid > .boolean-field {
+  grid-column: 1 / -1;
+}
+
+.reward-accordion-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.disclosure-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.section-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-disclosure {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.config-disclosure-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 12px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  list-style: none;
+}
+
+.config-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.config-disclosure-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.config-disclosure-title::before {
+  content: "▸";
+  flex: 0 0 16px;
+  color: var(--muted);
+}
+
+.config-disclosure[open] .config-disclosure-title::before {
+  content: "▾";
+}
+
+.config-disclosure-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.config-disclosure-copy strong {
+  display: block;
+}
+
+.config-disclosure-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.config-disclosure-body {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding: 12px;
+}
+
+.reward-accordion-stack .config-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 196px), 1fr));
+  column-gap: 12px;
+}
+
+.reward-accordion-stack .optional-number-field {
+  grid-column: span 2;
+}
+
+.reward-accordion-stack .reward-wide-field {
+  grid-column: span 2;
+}
+
+.reward-accordion-stack .range-pair-field {
+  grid-column: 1 / -1;
+}
+
+.seed-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.seed-control label {
+  min-width: 0;
+}
+
+.seed-randomize-button {
+  margin-bottom: 0;
+}

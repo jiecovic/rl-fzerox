@@ -1,7 +1,9 @@
 # tests/ui/test_viewer_game_panel.py
 from fzerox_emulator import ControllerState
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.rendering.draw import _record_tab_sections
+from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelColumns, PanelSection
 from tests.support.native_objects import encode_state_flags
@@ -86,7 +88,7 @@ def test_energy_refill_course_effect_lights_refill_flag() -> None:
     assert "refill" in active_labels
 
 
-def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
+def test_refill_surface_flag_ignores_energy_fullness() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -114,7 +116,7 @@ def test_energy_refill_course_effect_stays_off_when_energy_is_full() -> None:
     active_labels = {
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
-    assert "refill" not in active_labels
+    assert "refill" in active_labels
 
 
 def test_game_section_shows_current_and_max_progress() -> None:
@@ -255,7 +257,7 @@ def test_outside_track_bounds_lights_outside_flag() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(
-            signed_lateral_offset=-130.0,
+            signed_lateral_offset=-140.0,
             current_radius_left=100.0,
             current_radius_right=120.0,
         ),
@@ -563,6 +565,45 @@ def test_records_section_shows_watch_best_for_track_pool() -> None:
     assert latest_line.value == "1:41.234 (+2.5s)"
 
 
+def test_records_section_shows_gp_best_rank_with_watch_best_time() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+            "track_id": "silence",
+            "track_mode": "gp_race",
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        best_finish_ranks={"silence": 1},
+        best_finish_times={"silence": 98765},
+        track_pool_records=(
+            {
+                "track_id": "silence",
+                "track_display_name": "Silence GP Race - Blue Falcon Balanced",
+                "track_mode": "gp_race",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    pb_line = next(line for line in records_section.lines if line.label == "PB")
+
+    assert pb_line.value == "1:38.765 · P1"
+
+
 def test_records_section_groups_track_pool_by_cup() -> None:
     columns = _build_panel_columns(
         episode=0,
@@ -605,9 +646,47 @@ def test_records_section_groups_track_pool_by_cup() -> None:
         "Silence",
     ]
     assert [line.label for line in columns.records[1].lines if line.heading] == ["Port Town II"]
-    assert [section.title for section in _record_tab_sections(columns.records, 1)] == [
-        "Queen Cup"
-    ]
+    assert [section.title for section in _record_tab_sections(columns.records, 1)] == ["Queen Cup"]
+
+
+def test_records_section_dedupes_course_variants_to_one_course_row() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0, "track_course_id": "mute_city"},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        best_finish_times={"mute_city": 88_000},
+        track_pool_records=(
+            {
+                "track_id": "mute_city_blue_falcon",
+                "track_course_id": "mute_city",
+                "track_course_name": "Mute City",
+                "track_vehicle": "blue_falcon",
+            },
+            {
+                "track_id": "mute_city_fire_stingray",
+                "track_course_id": "mute_city",
+                "track_course_name": "Mute City",
+                "track_vehicle": "fire_stingray",
+            },
+        ),
+    )
+
+    records_section = next(section for section in columns.records if section.title == "Records")
+    headings = [line.label for line in records_section.lines if line.heading]
+
+    assert headings == ["> Mute City"]
 
 
 def test_records_section_highlights_current_track_heading() -> None:
@@ -850,3 +929,14 @@ def test_signed_boost_timer_lights_generic_boost_pill() -> None:
         token.label for row in game_section.flag_viz.rows for token in row if token.active
     }
     assert "boost" in active_labels
+
+
+def test_control_viz_snaps_discrete_gas_to_button_state() -> None:
+    viz = _control_viz(
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate),
+        gas_level=0.37,
+        continuous_drive_enabled=False,
+        force_full_throttle=False,
+    )
+
+    assert viz.gas_level == 1.0

@@ -3,24 +3,16 @@ from pathlib import Path
 
 import numpy as np
 
-from fzerox_emulator import (
-    JOYPAD_A,
-    JOYPAD_START,
-    JOYPAD_UP,
-    ControllerState,
-)
-from rl_fzerox.core.config.schema import (
+from fzerox_emulator import JOYPAD_BUTTONS, ControllerState
+from rl_fzerox.core.runtime_spec.schema import (
     PolicyConfig,
     TrainConfig,
-)
-from rl_fzerox.core.envs.observations import (
-    DEFAULT_STATE_VECTOR_SPEC,
-    state_feature_names,
 )
 from rl_fzerox.ui.watch.view.components.macro_legend import (
     MACRO_LEGEND_HINTS,
     _macro_legend_rows,
 )
+from rl_fzerox.ui.watch.view.panels.content.state_vector import policy_state_sections
 from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_policy_action,
     _format_reload_age,
@@ -48,9 +40,19 @@ from tests.ui.viewer_support import (
 def test_pressed_button_labels_are_human_readable() -> None:
     assert _pressed_button_labels(0) == "none"
     assert (
-        _pressed_button_labels((1 << JOYPAD_UP) | (1 << JOYPAD_A) | (1 << JOYPAD_START))
+        _pressed_button_labels(
+            (1 << JOYPAD_BUTTONS.up) | (1 << JOYPAD_BUTTONS.a) | (1 << JOYPAD_BUTTONS.start)
+        )
         == "Up A Start"
     )
+
+
+def test_macro_legend_includes_toggle_anchor_hotkey() -> None:
+    hints = {hint.keys: hint.action for hint in MACRO_LEGEND_HINTS}
+
+    assert hints["F"] == "toggle anchor"
+    assert hints["C"] == "cnn mode"
+    assert hints["Tab / 1-8"] == "tabs"
 
 
 def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
@@ -62,6 +64,20 @@ def test_game_course_overlay_label_prefers_cup_and_course_name() -> None:
             }
         )
         == "Joker Cup : Big Hand"
+    )
+
+
+def test_game_course_overlay_label_marks_locked_course_lightly() -> None:
+    assert (
+        _game_course_overlay_label(
+            {
+                "track_course_id": "big_hand",
+                "track_course_ref": "joker/big_hand",
+                "track_course_name": "Big Hand",
+            },
+            reset_info={"track_sampling_locked_course_id": "big_hand"},
+        )
+        == "> Joker Cup : Big Hand <"
     )
 
 
@@ -94,6 +110,32 @@ def test_game_speed_overlay_label_formats_actual_speedup() -> None:
         )
         == "12.0x"
     )
+
+
+def test_policy_state_sections_expose_watch_ablation_toggles() -> None:
+    sections = policy_state_sections(
+        observation_state=np.asarray([0.5, 1.0, 0.0], dtype=np.float32),
+        observation_state_reference=np.asarray([0.5, 1.0, 0.0], dtype=np.float32),
+        feature_names=(
+            "vehicle_state.speed_kph_norm",
+            "machine_context.energy_norm",
+            "course_context.course_builtin_0",
+        ),
+        zeroed_features=frozenset({"machine_context.energy_norm", "course_context"}),
+        watch_zeroed_features=frozenset({"vehicle_state.speed_kph_norm", "course_context"}),
+    )
+
+    lines = sections[0].lines
+    speed_line = next(line for line in lines if line.label == "speed_kph_norm")
+    energy_line = next(line for line in lines if line.label == "// energy_norm")
+    course_line = next(line for line in lines if line.label == "// course")
+
+    assert speed_line.status_icon == "toggle_off"
+    assert speed_line.click_state_feature_name == "vehicle_state.speed_kph_norm"
+    assert energy_line.status_icon == "toggle_on"
+    assert energy_line.click_state_feature_name == "machine_context.energy_norm"
+    assert course_line.status_icon == "toggle_off"
+    assert course_line.click_state_feature_name == "course_context"
 
 
 def test_side_panel_drops_cockpit_control_section() -> None:
@@ -154,7 +196,7 @@ def test_train_tab_shows_current_training_hparams() -> None:
             output_root=Path("local/runs"),
             run_name="wide_ppo",
         ),
-        policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature_wide"}}),
+        policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature"}}),
     )
 
     training_section = next(section for section in columns.train if section.title == "Training")
@@ -166,8 +208,73 @@ def test_train_tab_shows_current_training_hparams() -> None:
     assert "Run" not in training_values
     assert training_values["Target steps"] == "50,000,000"
     assert training_values["LR"] == "2e-04"
-    assert policy_values["Conv"] == "nature_wide"
+    assert policy_values["Conv"] == "nature"
     assert policy_values["Pi net"] == "[256, 256]"
+
+
+def test_state_tab_shows_auxiliary_state_predictions_next_to_targets() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+        policy_config=PolicyConfig.model_validate(
+            {
+                "auxiliary_state": {
+                    "enabled": True,
+                    "losses": [
+                        {
+                            "name": "track_position.edge_ratio",
+                            "weight": 0.5,
+                            "grounded_only": True,
+                        },
+                        {
+                            "name": "surface_state.on_refill_surface",
+                            "weight": 0.25,
+                            "grounded_only": False,
+                        },
+                        {
+                            "name": "course_context.builtin_course_id",
+                            "weight": 1.0,
+                            "grounded_only": False,
+                        },
+                    ],
+                }
+            }
+        ),
+        policy_auxiliary_state_predictions={
+            "track_position.edge_ratio": 0.125,
+            "surface_state.on_refill_surface": 0.26,
+            "course_context.builtin_course_id": {"index": 7, "confidence": 0.82},
+        },
+        policy_auxiliary_state_targets={
+            "track_position.edge_ratio": 0.25,
+            "surface_state.on_refill_surface": 0.0,
+            "course_context.builtin_course_id": {"index": 3},
+        },
+    )
+
+    state_section = next(section for section in columns.stats if section.title == "State Vector")
+    edge_ratio_line = next(
+        line for line in state_section.lines if line.label == "edge_ratio (ground)"
+    )
+    refill_line = next(line for line in state_section.lines if line.label == "on_refill_surface")
+    course_line = next(line for line in state_section.lines if line.label == "course id")
+
+    assert edge_ratio_line.value == "  0.12 |   0.25 |    6% |       "
+    assert refill_line.value == "  0.26 |   0.00 |  hit  |       "
+    assert course_line.value == " 7@82% |      3 | miss  |       "
 
 
 def test_session_section_shows_episode_step_counter() -> None:
@@ -238,6 +345,7 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
     labels = {line.label for line in session_section.lines}
     assert "Reverse frames" not in labels
     assert "Stuck frames" not in labels
+
 
 def test_format_policy_action_is_human_readable() -> None:
     assert _format_policy_action(None) == "manual"
@@ -355,15 +463,21 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
 
     assert "Keys" not in key_map
     assert "More keys" not in key_map
+    assert key_map["Game"] == "444x592"
+    assert key_map["Obs"] == "84x116x12"
     assert hint_map == {
         "Esc": (None, "close"),
         "P": (None, "pause"),
         "N": (None, "step"),
-        "R": (None, "reset"),
+        "R": (None, "same course"),
+        "E": (None, "prev course"),
+        "T": (None, "next course"),
+        "F": (None, "toggle anchor"),
         "K": (None, "save"),
         "M": (None, "manual"),
         "D": (None, "policy"),
-        "Tab / 1-6": (None, "tabs"),
+        "Tab / 1-8": (None, "tabs"),
+        "C": (None, "cnn mode"),
         "+/-": (None, "speed"),
         "0": (None, "reset speed"),
         "Arrow keys": ("stick X/Y", "steer/pitch"),
@@ -385,6 +499,16 @@ def test_macro_legend_wraps_inside_preview_column() -> None:
 
 
 def test_side_panel_can_show_policy_observation_state_vector() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "vehicle_state.lateral_velocity_norm",
+        "vehicle_state.sliding_active",
+    )
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -401,35 +525,47 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         observation_state=np.array(
-            [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.2, 0.25],
+            [0.5, 0.75, 1.0, 0.0, 1.0, 0.0, 0.25, 1.0],
             dtype=np.float32,
         ),
-        observation_state_feature_names=DEFAULT_STATE_VECTOR_SPEC.names,
+        observation_state_feature_names=feature_names,
         telemetry=_sample_telemetry(),
     )
 
     state_vector_section = next(
         section for section in columns.stats if section.title == "State Vector"
     )
-    values = _panel_group_values(state_vector_section, "State")
+    values = _panel_group_values(state_vector_section, "Vehicle")
 
     assert values == {
         "speed_norm": "0.500",
         "energy_frac": "0.750",
         "reverse_active": "1.000",
         "airborne": "0.000",
-        "can_boost": "1.000",
+        "boost_unlocked": "1.000",
         "boost_active": "0.000",
-        "left_lean_held": "0.000",
-        "right_lean_held": "1.000",
-        "left_press_age_norm": "1.000",
-        "right_press_age_norm": "0.200",
-        "recent_boost_pressure": "0.250",
+        "lateral_velocity_norm": "0.250",
+        "sliding_active": "1.000",
     }
 
 
-def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
-    feature_names = state_feature_names("race_core", action_history_len=2)
+def test_side_panel_splits_component_action_history_from_state_vector() -> None:
+    feature_names = (
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "control_history.prev_steer_1",
+        "control_history.prev_steer_2",
+        "control_history.prev_thrust_1",
+        "control_history.prev_thrust_2",
+        "control_history.prev_boost_1",
+        "control_history.prev_boost_2",
+        "control_history.prev_lean_1",
+        "control_history.prev_lean_2",
+    )
     columns = _build_panel_columns(
         episode=0,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -454,19 +590,19 @@ def test_side_panel_splits_profile_action_history_from_state_vector() -> None:
         section for section in columns.stats if section.title == "State Vector"
     )
 
-    assert _panel_group_labels(state_vector_section, "State") == [
+    assert _panel_group_labels(state_vector_section, "Vehicle") == [
         "speed_norm",
         "energy_frac",
         "reverse_active",
         "airborne",
-        "can_boost",
+        "boost_unlocked",
         "boost_active",
     ]
     assert _panel_group_labels(state_vector_section, "Control History") == [
         "prev_steer_1",
         "prev_steer_2",
-        "prev_gas_1",
-        "prev_gas_2",
+        "prev_thrust_1",
+        "prev_thrust_2",
         "prev_boost_1",
         "prev_boost_2",
         "prev_lean_1",
@@ -550,7 +686,7 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         action_repeat=1,
         stuck_min_speed_kph=50.0,
         game_display_size=(592, 444),
-        observation_shape=(60, 76, 12),
+        observation_shape=(84, 84, 12),
         observation_state=np.array([0.5, 0.25, 0.0, 0.0], dtype=np.float32),
         observation_state_feature_names=feature_names,
         telemetry=_sample_telemetry(),
@@ -566,45 +702,6 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         "// outside_track_bounds",
     ]
 
-
-def test_side_panel_marks_zeroed_state_components() -> None:
-    feature_names = (
-        "vehicle_state.speed_norm",
-        "track_position.lap_progress",
-        "track_position.edge_ratio",
-    )
-    columns = _build_panel_columns(
-        episode=0,
-        info={
-            "frame_index": 0,
-            "native_fps": 60.0,
-            "observation_zeroed_state_components": ("track_position",),
-        },
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_curriculum_stage=None,
-        policy_action=None,
-        policy_reload_age_seconds=0.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(98, 130, 9),
-        observation_state=np.array([0.5, 0.0, 0.0], dtype=np.float32),
-        observation_state_feature_names=feature_names,
-        telemetry=_sample_telemetry(),
-    )
-
-    state_vector_section = next(
-        section for section in columns.stats if section.title == "State Vector"
-    )
-
-    assert _panel_group_labels(state_vector_section, "// Track Position") == [
-        "// lap_progress",
-        "// edge_ratio",
-    ]
 
 def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     columns = _build_panel_columns(
@@ -634,7 +731,7 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     assert curriculum_line.value == "lean_enabled"
 
 
-def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
+def test_session_section_shows_checkpoint_experience_from_frames() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={
@@ -647,6 +744,7 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
         control_state=ControllerState(),
         policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=660_000,
+        policy_experience_frames=1_320_000,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -661,6 +759,36 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
     experience_line = next(line for line in session_section.lines if line.label == "Experience")
 
     assert experience_line.value == "6h 06m"
+
+
+def test_session_section_keeps_mixed_action_repeat_lineage_experience() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage="lean_enabled",
+        policy_num_timesteps=10_000,
+        policy_experience_frames=15_000,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Run")
+    experience_line = next(line for line in session_section.lines if line.label == "Experience")
+
+    assert experience_line.value == "4m"
 
 
 def test_session_section_shows_policy_deterministic_mode() -> None:
@@ -779,7 +907,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
     assert return_line.value == "-12.3457"
 
 
-def test_session_section_shows_best_finish_position() -> None:
+def test_session_section_omits_global_best_finish_position() -> None:
     columns = _build_panel_columns(
         episode=2,
         info={"frame_index": 0, "native_fps": 60.0},
@@ -800,38 +928,9 @@ def test_session_section_shows_best_finish_position() -> None:
     )
 
     session_section = next(section for section in columns.left if section.title == "Run")
-    best_position_line = next(
-        line for line in session_section.lines if line.label == "Best position"
-    )
 
-    assert best_position_line.value == "8"
+    assert all(line.label != "Best position" for line in session_section.lines)
 
-
-def test_session_section_shows_na_before_successful_finish() -> None:
-    columns = _build_panel_columns(
-        episode=2,
-        info={"frame_index": 0, "native_fps": 60.0},
-        reset_info={},
-        episode_reward=0.0,
-        paused=False,
-        control_state=ControllerState(),
-        policy_curriculum_stage=None,
-        policy_action=np.array([2, 1, 0], dtype=np.int64),
-        policy_reload_age_seconds=5.0,
-        policy_reload_error=None,
-        action_repeat=1,
-        stuck_min_speed_kph=50.0,
-        game_display_size=(592, 444),
-        observation_shape=(84, 116, 12),
-        telemetry=_sample_telemetry(),
-    )
-
-    session_section = next(section for section in columns.left if section.title == "Run")
-    best_position_line = next(
-        line for line in session_section.lines if line.label == "Best position"
-    )
-
-    assert best_position_line.value == "n/a"
 
 def test_format_reload_age_is_human_readable() -> None:
     assert _format_reload_age(None) == "manual"

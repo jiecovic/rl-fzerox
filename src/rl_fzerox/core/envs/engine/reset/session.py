@@ -6,14 +6,14 @@ from dataclasses import dataclass
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry
 from rl_fzerox.core.boot import sync_race_intro_target
-from rl_fzerox.core.config.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrackSamplingConfig
 
 from ..info import (
     backend_step_info,
     has_custom_baseline,
     read_live_telemetry,
 )
-from .camera import sync_camera_setting
+from .camera import CAMERA_SYNC_CONTROLS, sync_camera_setting
 from .race import load_track_baseline, reset_race_state
 from .seeding import EngineResetSeeds
 from .tracks import (
@@ -68,7 +68,7 @@ class EngineResetCoordinator:
             if isinstance(track_id, str)
             and isinstance(weight, int | float)
             and math.isfinite(float(weight))
-            and float(weight) > 0.0
+            and float(weight) >= 0.0
         }
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
 
@@ -82,17 +82,31 @@ class EngineResetCoordinator:
 
         self._sequential_track_sampling = bool(enabled)
 
+    def set_next_sequential_course(self, course_id: str | None) -> None:
+        """Align the next sequential watch reset to one configured course."""
+
+        if not course_id:
+            return
+        self._track_selector.set_next_sequential_course(
+            self._active_track_sampling,
+            course_id=course_id,
+        )
+
     def select_episode_track(self, seed: int | None) -> SelectedTrack | None:
         self._reset_seeds.remember_reset_seed(seed)
         if self._locked_reset_course_id is not None:
             selected_track = select_reset_track_by_course_id(
                 self._active_track_sampling,
                 course_id=self._locked_reset_course_id,
+                seed=seed,
             )
             if selected_track is not None:
                 return selected_track
         if self._sequential_track_sampling:
-            return self._track_selector.select_sequential(self._active_track_sampling)
+            return self._track_selector.select_sequential(
+                self._active_track_sampling,
+                seed=self._reset_seeds.track_sampling_seed(seed),
+            )
         return self._track_selector.select(
             self._active_track_sampling,
             seed=self._reset_seeds.track_sampling_seed(seed),
@@ -115,6 +129,7 @@ class EngineResetCoordinator:
             backend=self._backend,
             config=self._config,
             sampled_track_baseline=selected_track is not None,
+            selected_track=selected_track,
         )
         if selected_track is not None:
             info.update(selected_track.info())
@@ -123,17 +138,13 @@ class EngineResetCoordinator:
 
         uses_custom_baseline = selected_track is not None or has_custom_baseline(info)
         telemetry = self._maybe_randomize_game_rng(seed, telemetry, info)
-        telemetry = sync_camera_setting(
+        telemetry = sync_reset_presentation(
             self._backend,
-            target_name=self._config.camera_setting,
+            camera_setting=self._config.camera_setting,
+            race_intro_target_timer=self._config.race_intro_target_timer,
             telemetry=telemetry,
             info=info,
         )
-        race_intro_info, telemetry = sync_race_intro_target(
-            self._backend,
-            target_timer=self._config.race_intro_target_timer,
-        )
-        info.update(race_intro_info)
         info.update(backend_step_info(self._backend))
         return EngineResetResult(
             selected_track=selected_track,
@@ -164,7 +175,10 @@ class EngineResetCoordinator:
         self,
         config: TrackSamplingConfig,
     ) -> TrackSamplingConfig:
-        if config.sampling_mode != "step_balanced" or not self._track_sampling_weight_overrides:
+        if (
+            config.sampling_mode not in {"step_balanced", "adaptive_step_balanced"}
+            or not self._track_sampling_weight_overrides
+        ):
             return config
         entries = tuple(
             entry.model_copy(
@@ -197,3 +211,60 @@ class EngineResetCoordinator:
         info["rng_seed"] = rng_seed
         info["rng_state"] = rng_state
         return read_live_telemetry(self._backend) or telemetry
+
+
+def sync_reset_presentation(
+    backend: EmulatorBackend,
+    *,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+    telemetry: FZeroXTelemetry | None,
+    info: dict[str, object],
+) -> FZeroXTelemetry | None:
+    camera_ready_timer = _camera_ready_intro_timer(
+        camera_setting=camera_setting,
+        race_intro_target_timer=race_intro_target_timer,
+    )
+    if camera_ready_timer is not None:
+        _, telemetry = sync_race_intro_target(
+            backend,
+            target_timer=camera_ready_timer,
+        )
+    telemetry = sync_camera_setting(
+        backend,
+        target_name=_validated_camera_setting(camera_setting),
+        telemetry=telemetry,
+        info=info,
+    )
+    race_intro_info, telemetry = sync_race_intro_target(
+        backend,
+        target_timer=race_intro_target_timer,
+    )
+    info.update(race_intro_info)
+    return telemetry
+
+
+def _camera_ready_intro_timer(
+    *,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+) -> int | None:
+    if camera_setting is None:
+        return race_intro_target_timer
+    if race_intro_target_timer is None:
+        return CAMERA_SYNC_CONTROLS.ready_intro_timer
+    return max(race_intro_target_timer, CAMERA_SYNC_CONTROLS.ready_intro_timer)
+
+
+def _validated_camera_setting(camera_setting: str | None):
+    if camera_setting is None:
+        return None
+    if camera_setting == "overhead":
+        return "overhead"
+    if camera_setting == "close_behind":
+        return "close_behind"
+    if camera_setting == "regular":
+        return "regular"
+    if camera_setting == "wide":
+        return "wide"
+    raise ValueError(f"Unsupported camera setting {camera_setting!r}")

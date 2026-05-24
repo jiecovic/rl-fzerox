@@ -10,7 +10,7 @@ PygameModule: TypeAlias = Any
 PygameRect: TypeAlias = Any
 PygameSurface: TypeAlias = Any
 MouseRect: TypeAlias = tuple[int, int, int, int]
-StatusIcon: TypeAlias = Literal["none", "in_range", "outside"]
+StatusIcon: TypeAlias = Literal["none", "in_range", "outside", "toggle_on", "toggle_off"]
 
 
 class TextSurface(Protocol):
@@ -46,15 +46,25 @@ class PanelLine:
     status_icon: StatusIcon | None = None
     status_text: str = ""
     label_color: Color | None = None
+    # Optional record-row click target for course jumps in the watch HUD.
     click_course_id: str | None = None
+    click_state_feature_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class RecordCourseHitbox:
-    """Clickable record-row region for locking watch resets to one course."""
+    """Clickable record-row region for jumping the watch reset course."""
 
     rect: MouseRect
     course_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class StateFeatureHitbox:
+    """Clickable watch-panel region for toggling one state-feature ablation."""
+
+    rect: MouseRect
+    feature_name: str
 
 
 @dataclass(frozen=True)
@@ -117,6 +127,7 @@ class PanelColumns:
     left: list[PanelSection]
     middle: list[PanelSection]
     stats: list[PanelSection]
+    aux: list[PanelSection]
     records: list[PanelSection]
     train: list[PanelSection]
 
@@ -138,5 +149,7 @@ class ViewerHitboxes:
 
     deterministic_toggle: MouseRect | None = None
     panel_tabs: tuple[MouseRect | None, ...] = ()
+    cnn_layer_tabs: tuple[MouseRect | None, ...] = ()
     record_tabs: tuple[MouseRect | None, ...] = ()
     record_courses: tuple[RecordCourseHitbox, ...] = ()
+    state_features: tuple[StateFeatureHitbox, ...] = ()

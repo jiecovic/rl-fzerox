@@ -9,7 +9,7 @@ from queue import Empty, Full
 from typing import Protocol
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.config.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import ViewerInput
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
@@ -129,6 +129,7 @@ def drain_worker_commands(
     control_state: ControllerState,
     manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
+    auxiliary_visualization_enabled: bool = False,
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> tuple[WorkerCommandBatch, bool, ControllerState]:
     next_paused = paused
@@ -137,12 +138,15 @@ def drain_worker_commands(
     quit_requested = False
     step_requests = 0
     save_requests = 0
-    reset_requested = False
+    reset_mode: str | None = None
+    jump_course_id: str | None = None
     toggle_deterministic_policy = False
-    toggle_track_course_lock_id: str | None = None
+    toggle_current_course_lock = False
+    toggle_zeroed_state_feature_name: str | None = None
     control_fps_delta = 0
     reset_control_fps = False
     next_cnn_visualization_enabled = cnn_visualization_enabled
+    next_auxiliary_visualization_enabled = auxiliary_visualization_enabled
     next_cnn_normalization = cnn_normalization
     while True:
         try:
@@ -154,13 +158,16 @@ def drain_worker_commands(
                     paused=next_paused,
                     step_requests=step_requests,
                     save_requests=save_requests,
-                    reset_requested=reset_requested,
+                    reset_mode=reset_mode,
+                    jump_course_id=jump_course_id,
                     toggle_deterministic_policy=toggle_deterministic_policy,
                     manual_control_enabled=next_manual_control_enabled,
-                    toggle_track_course_lock_id=toggle_track_course_lock_id,
+                    toggle_current_course_lock=toggle_current_course_lock,
+                    toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
                     control_fps_delta=control_fps_delta,
                     reset_control_fps=reset_control_fps,
                     cnn_visualization_enabled=next_cnn_visualization_enabled,
+                    auxiliary_visualization_enabled=next_auxiliary_visualization_enabled,
                     cnn_normalization=next_cnn_normalization,
                     control_state=next_control_state,
                 ),
@@ -177,17 +184,22 @@ def drain_worker_commands(
             step_requests += 1
         if command.save_state:
             save_requests += 1
-        if command.force_reset:
-            reset_requested = True
+        if command.reset_mode is not None:
+            reset_mode = command.reset_mode
+        if command.jump_course_id is not None:
+            jump_course_id = command.jump_course_id
         if command.toggle_deterministic_policy:
             toggle_deterministic_policy = not toggle_deterministic_policy
         if command.toggle_manual_control:
             next_manual_control_enabled = not next_manual_control_enabled
-        if command.toggle_track_course_lock_id is not None:
-            toggle_track_course_lock_id = command.toggle_track_course_lock_id
+        if command.toggle_current_course_lock:
+            toggle_current_course_lock = True
+        if command.toggle_zeroed_state_feature_name is not None:
+            toggle_zeroed_state_feature_name = command.toggle_zeroed_state_feature_name
         control_fps_delta += command.control_fps_delta
         reset_control_fps = reset_control_fps or command.reset_control_fps
         next_cnn_visualization_enabled = command.cnn_visualization_enabled
+        next_auxiliary_visualization_enabled = command.auxiliary_visualization_enabled
         next_cnn_normalization = command.cnn_normalization
         if command.control_state is not None:
             next_control_state = command.control_state
@@ -199,6 +211,7 @@ def apply_viewer_input(
     *,
     paused: bool,
     cnn_visualization_enabled: bool = False,
+    auxiliary_visualization_enabled: bool = False,
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> bool:
     next_paused = not paused if viewer_input.toggle_pause else paused
@@ -209,13 +222,16 @@ def apply_viewer_input(
             toggle_pause=viewer_input.toggle_pause,
             step_once=viewer_input.step_once,
             save_state=viewer_input.save_state,
-            force_reset=viewer_input.force_reset,
+            reset_mode=viewer_input.reset_mode,
+            jump_course_id=viewer_input.jump_course_id,
             toggle_deterministic_policy=viewer_input.toggle_deterministic_policy,
             toggle_manual_control=viewer_input.toggle_manual_control,
-            toggle_track_course_lock_id=viewer_input.toggle_record_course_lock_id,
+            toggle_current_course_lock=viewer_input.toggle_current_course_lock,
+            toggle_zeroed_state_feature_name=viewer_input.toggle_zeroed_state_feature_name,
             control_fps_delta=viewer_input.control_fps_delta,
             reset_control_fps=viewer_input.reset_control_fps,
             cnn_visualization_enabled=cnn_visualization_enabled,
+            auxiliary_visualization_enabled=auxiliary_visualization_enabled,
             cnn_normalization=cnn_normalization,
             control_state=viewer_input.control_state,
         ),

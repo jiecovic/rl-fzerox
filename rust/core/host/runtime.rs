@@ -7,17 +7,23 @@
 
 mod baseline;
 mod bootstrap;
+mod control;
 mod host;
 mod lean_slide;
 mod memory;
+mod race_start;
 mod render;
 mod repeat;
 mod rng;
 mod step;
 mod step_accumulator;
+mod telemetry;
 
 pub use host::Host;
-pub use step::{DisplayFrameBatch, RepeatedStepConfig, StepCounters, StepStatus, StepSummary};
+pub use step::{
+    DisplayFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepCounters, StepStatus,
+    StepSummary,
+};
 
 #[cfg(test)]
 use bootstrap::resolve_display_aspect_ratio;

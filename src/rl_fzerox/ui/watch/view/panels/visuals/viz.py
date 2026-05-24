@@ -6,15 +6,8 @@ from collections.abc import Mapping
 import numpy as np
 
 from fzerox_emulator import ControllerState
-from fzerox_emulator.arrays import ContinuousAction
-from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
-from rl_fzerox.core.envs.actions import (
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-    ActionValue,
-)
+from fzerox_emulator.arrays import Float32Array
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import (
     ActionMaskBranches,
     action_branch_non_neutral_allowed,
@@ -49,19 +42,35 @@ def _control_viz(
     policy_action: ActionValue | None = None,
     action_mask_branches: ActionMaskBranches | None = None,
     continuous_drive_deadzone: float = 0.2,
+    continuous_drive_enabled: bool = False,
+    force_full_throttle: bool = False,
+    continuous_pitch_enabled: bool = False,
+    continuous_air_brake_axis_index: int | None = 2,
+    continuous_air_brake_deadzone: float = 0.05,
+    continuous_air_brake_full_threshold: float = 0.85,
+    continuous_air_brake_min_duty: float = 0.0,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
+    continuous_air_brake_enabled = continuous_air_brake_mode != "off"
+    continuous_air_brake_exposed = _continuous_air_brake_axis_available_from_action(
+        policy_action,
+        axis_index=continuous_air_brake_axis_index,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
+    )
     air_brake_axis = _continuous_air_brake_axis_from_action(
         policy_action,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-        continuous_air_brake_enabled=continuous_air_brake_mode != "off",
+        axis_index=continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=continuous_air_brake_min_duty,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
     )
     if (
         air_brake_axis is None
         and continuous_air_brake_mode != "off"
-        and joypad_mask & AIR_BRAKE_MASK
+        and joypad_mask & RACE_CONTROL_MASKS.air_brake
     ):
         air_brake_axis = 1.0
     selected_branches = _selected_policy_branches(
@@ -71,11 +80,15 @@ def _control_viz(
     boost_pressed = _branch_pressed(
         selected_branches,
         "boost",
-        fallback=bool(joypad_mask & BOOST_MASK),
+        fallback=bool(joypad_mask & RACE_CONTROL_MASKS.boost),
     )
     lean_direction = _lean_direction(
         selected_branches,
-        fallback=-1 if joypad_mask & LEAN_LEFT_MASK else 1 if joypad_mask & LEAN_RIGHT_MASK else 0,
+        fallback=-1
+        if joypad_mask & RACE_CONTROL_MASKS.lean_left
+        else 1
+        if joypad_mask & RACE_CONTROL_MASKS.lean_right
+        else 0,
     )
     normalized_boost_lamp_level = max(
         0.0,
@@ -88,10 +101,16 @@ def _control_viz(
             ),
         ),
     )
+    displayed_gas_level = _displayed_gas_level(
+        joypad_mask=joypad_mask,
+        gas_level=gas_level,
+        continuous_drive_enabled=continuous_drive_enabled,
+        force_full_throttle=force_full_throttle,
+    )
     return ControlViz(
         steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
         pitch_y=max(-1.0, min(1.0, control_state.left_stick_y)),
-        gas_level=max(0.0, min(1.0, gas_level)),
+        gas_level=displayed_gas_level,
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         thrust_deadzone_threshold=_normalize_optional_level(thrust_deadzone_threshold),
         thrust_full_threshold=_normalize_optional_level(thrust_full_threshold),
@@ -105,17 +124,25 @@ def _control_viz(
         boost_lamp_level=normalized_boost_lamp_level,
         lean_direction=lean_direction,
         deterministic_policy=policy_deterministic,
-        thrust_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "gas",
-            1,
-            missing_allowed=True,
+        thrust_masked=(
+            False
+            if force_full_throttle or continuous_drive_enabled
+            else not action_branch_value_allowed(
+                action_mask_branches,
+                "gas",
+                1,
+                missing_allowed=False,
+            )
         ),
-        air_brake_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "air_brake",
-            1,
-            missing_allowed=False,
+        air_brake_masked=(
+            False
+            if continuous_air_brake_exposed
+            else not action_branch_value_allowed(
+                action_mask_branches,
+                "air_brake",
+                1,
+                missing_allowed=False,
+            )
         ),
         boost_masked=not action_branch_value_allowed(
             action_mask_branches,
@@ -135,13 +162,31 @@ def _control_viz(
             2,
             missing_allowed=False,
         ),
-        pitch_masked=not action_branch_non_neutral_allowed(
-            action_mask_branches,
-            "pitch",
-            neutral_index=2,
-            missing_allowed=False,
+        pitch_masked=(
+            False
+            if continuous_pitch_enabled
+            else not action_branch_non_neutral_allowed(
+                action_mask_branches,
+                "pitch",
+                neutral_index=2,
+                missing_allowed=False,
+            )
         ),
     )
+
+
+def _displayed_gas_level(
+    *,
+    joypad_mask: int,
+    gas_level: float,
+    continuous_drive_enabled: bool,
+    force_full_throttle: bool,
+) -> float:
+    if force_full_throttle:
+        return 1.0
+    if continuous_drive_enabled:
+        return max(0.0, min(1.0, gas_level))
+    return 1.0 if joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
 
 
 def _selected_policy_branches(
@@ -179,51 +224,94 @@ def _lean_direction(selected_branches: dict[str, int], *, fallback: int) -> int:
 def _continuous_air_brake_axis_from_action(
     policy_action: ActionValue | None,
     *,
-    continuous_drive_deadzone: float,
+    axis_index: int | None,
+    continuous_air_brake_deadzone: float,
+    continuous_air_brake_full_threshold: float,
+    continuous_air_brake_min_duty: float,
     continuous_air_brake_enabled: bool,
 ) -> float | None:
     """Return HUD air-brake value when the policy action exposes that axis."""
 
-    if policy_action is None:
+    values = _continuous_action_values(
+        policy_action,
+        axis_index=axis_index,
+        continuous_air_brake_enabled=continuous_air_brake_enabled,
+    )
+    if values is None or axis_index is None:
+        return None
+    return _continuous_air_brake_axis(
+        float(values[axis_index]),
+        continuous_air_brake_deadzone=continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=continuous_air_brake_min_duty,
+    )
+
+
+def _continuous_air_brake_axis_available_from_action(
+    policy_action: ActionValue | None,
+    *,
+    axis_index: int | None,
+    continuous_air_brake_enabled: bool,
+) -> bool:
+    return (
+        _continuous_action_values(
+            policy_action,
+            axis_index=axis_index,
+            continuous_air_brake_enabled=continuous_air_brake_enabled,
+        )
+        is not None
+    )
+
+
+def _continuous_action_values(
+    policy_action: ActionValue | None,
+    *,
+    axis_index: int | None,
+    continuous_air_brake_enabled: bool,
+) -> Float32Array | None:
+    if policy_action is None or axis_index is None or not continuous_air_brake_enabled:
         return None
     source = (
-        policy_action.get(HYBRID_CONTINUOUS_ACTION_KEY)
-        if isinstance(policy_action, Mapping)
-        else policy_action
+        policy_action.get("continuous") if isinstance(policy_action, Mapping) else policy_action
     )
     action = np.asarray(source)
     if not np.issubdtype(action.dtype, np.floating):
         return None
     values = action.reshape(-1)
-    if values.size < 3 or not continuous_air_brake_enabled:
-        return None
-    return _continuous_air_brake_axis(
-        values,
-        continuous_drive_deadzone=continuous_drive_deadzone,
-    )
+    return values if values.size > axis_index else None
 
 
 def _continuous_air_brake_axis(
-    values: ContinuousAction,
+    air_brake: float,
     *,
-    continuous_drive_deadzone: float,
+    continuous_air_brake_deadzone: float,
+    continuous_air_brake_full_threshold: float,
+    continuous_air_brake_min_duty: float,
 ) -> float | None:
-    if values.size < 3:
-        return None
-    air_brake = float(values[2])
     if not np.isfinite(air_brake):
         return None
     air_brake = max(-1.0, min(1.0, air_brake))
     return _continuous_positive_button_level(
         air_brake,
-        deadzone=continuous_drive_deadzone,
+        deadzone=continuous_air_brake_deadzone,
+        full_threshold=continuous_air_brake_full_threshold,
+        min_duty=continuous_air_brake_min_duty,
     )
 
 
-def _continuous_positive_button_level(value: float, *, deadzone: float) -> float:
+def _continuous_positive_button_level(
+    value: float,
+    *,
+    deadzone: float,
+    full_threshold: float,
+    min_duty: float,
+) -> float:
     if value <= deadzone:
         return 0.0
-    return (value - deadzone) / (1.0 - deadzone)
+    if value >= full_threshold:
+        return 1.0
+    scaled = (value - deadzone) / (full_threshold - deadzone)
+    return min(max(min_duty + ((1.0 - min_duty) * scaled), 0.0), 1.0)
 
 
 def _normalize_optional_level(value: float | None) -> float | None:
@@ -251,7 +339,7 @@ _FLAG_DISPLAY_LABELS = {
     "low_speed_detected": "slow",
     "can_boost": "can boost",
     "boost_active": "boost",
-    "energy_refill": "refill",
+    "refill_surface": "refill",
     "ground_dirt": "dirt",
     "ground_ice": "ice",
     "energy_loss": "energy loss",
@@ -271,7 +359,7 @@ _FLAG_DISPLAY_LABELS = {
 _FLAG_ROWS = (
     ("reverse_detected", "low_speed_detected", "track_edge", "outside_track_bounds"),
     ("can_boost", "boost_active", "airborne"),
-    ("energy_refill", "ground_dirt", "ground_ice"),
+    ("refill_surface", "ground_dirt", "ground_ice"),
     ("energy_loss", "damage_taken"),
     ("collision_recoil", "spinning_out", "crashed", "falling_off_track"),
     ("energy_depleted", "retired", "finished"),
@@ -285,7 +373,7 @@ def _flag_viz(
     reverse_detected: bool,
     low_speed_detected: bool,
     energy_depleted: bool,
-    energy_refill_detected: bool = False,
+    refill_surface_detected: bool = False,
     dirt_detected: bool = False,
     ice_detected: bool = False,
     track_edge_detected: bool = False,
@@ -302,8 +390,8 @@ def _flag_viz(
         active_flags.add("low_speed_detected")
     if energy_depleted:
         active_flags.add("energy_depleted")
-    if energy_refill_detected:
-        active_flags.add("energy_refill")
+    if refill_surface_detected:
+        active_flags.add("refill_surface")
     if dirt_detected:
         active_flags.add("ground_dirt")
     if ice_detected:

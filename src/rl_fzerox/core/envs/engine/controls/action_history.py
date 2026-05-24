@@ -5,16 +5,9 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-)
-from rl_fzerox.core.envs.engine.controls.lean import lean_index_from_mask, signed_lean
-from rl_fzerox.core.envs.observations import (
-    OBSERVATION_STATE_DEFAULTS,
-    ActionHistoryControl,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.core.envs.engine.controls.lean import signed_lean
+from rl_fzerox.core.envs.observations import ActionHistoryControl
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,7 +16,8 @@ class ActionHistorySample:
     gas: float
     air_brake: float
     boost: float
-    lean: float
+    lean_left: float
+    lean_right: float
     pitch: float
 
 
@@ -31,8 +25,9 @@ class ActionHistorySample:
 class ActionHistoryBuffer:
     """Fixed-width previous-action observation feature buffer."""
 
-    length: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len
-    controls: tuple[ActionHistoryControl, ...] = OBSERVATION_STATE_DEFAULTS.action_history_controls
+    length: int | None = None
+    controls: tuple[ActionHistoryControl, ...] = ()
+    independent_lean_buttons: bool = False
     _resolved_length: int = field(init=False, default=0)
     _samples: deque[ActionHistorySample] = field(init=False)
 
@@ -46,7 +41,7 @@ class ActionHistoryBuffer:
     def record(self, control_state: ControllerState, *, gas_level: float | None) -> None:
         joypad = control_state.joypad_mask
         normalized_gas = (
-            (1.0 if joypad & ACCELERATE_MASK else 0.0)
+            (1.0 if joypad & RACE_CONTROL_MASKS.accelerate else 0.0)
             if gas_level is None
             else clamp(float(gas_level), 0.0, 1.0)
         )
@@ -54,9 +49,10 @@ class ActionHistoryBuffer:
             ActionHistorySample(
                 steer=clamp(float(control_state.left_stick_x), -1.0, 1.0),
                 gas=normalized_gas,
-                air_brake=1.0 if joypad & AIR_BRAKE_MASK else 0.0,
-                boost=1.0 if joypad & BOOST_MASK else 0.0,
-                lean=signed_lean(lean_index_from_mask(joypad)),
+                air_brake=1.0 if joypad & RACE_CONTROL_MASKS.air_brake else 0.0,
+                boost=1.0 if joypad & RACE_CONTROL_MASKS.boost else 0.0,
+                lean_left=1.0 if joypad & RACE_CONTROL_MASKS.lean_left else 0.0,
+                lean_right=1.0 if joypad & RACE_CONTROL_MASKS.lean_right else 0.0,
                 pitch=clamp(float(control_state.left_stick_y), -1.0, 1.0),
             )
         )
@@ -71,11 +67,15 @@ class ActionHistoryBuffer:
             fields[f"prev_gas_{suffix}"] = sample.gas
             fields[f"prev_air_brake_{suffix}"] = sample.air_brake
             fields[f"prev_boost_{suffix}"] = sample.boost
-            fields[f"prev_lean_{suffix}"] = sample.lean
+            if self.independent_lean_buttons:
+                fields[f"prev_lean_left_{suffix}"] = sample.lean_left
+                fields[f"prev_lean_right_{suffix}"] = sample.lean_right
+            else:
+                fields[f"prev_lean_{suffix}"] = signed_lean(
+                    1 if sample.lean_left > 0.0 else (2 if sample.lean_right > 0.0 else 0)
+                )
             fields[f"prev_pitch_{suffix}"] = sample.pitch
-        return {
-            key: value for key, value in fields.items() if _field_control(key) in self.controls
-        }
+        return {key: value for key, value in fields.items() if _field_control(key) in self.controls}
 
 
 def clamp(value: float, lower: float, upper: float) -> float:
@@ -88,7 +88,8 @@ def _empty_sample() -> ActionHistorySample:
         gas=0.0,
         air_brake=0.0,
         boost=0.0,
-        lean=0.0,
+        lean_left=0.0,
+        lean_right=0.0,
         pitch=0.0,
     )
 
@@ -113,6 +114,10 @@ def _field_control(field_name: str) -> ActionHistoryControl:
     if control_name == "boost":
         return "boost"
     if control_name == "lean":
+        return "lean"
+    if control_name == "lean_left":
+        return "lean"
+    if control_name == "lean_right":
         return "lean"
     if control_name == "pitch":
         return "pitch"

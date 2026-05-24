@@ -8,6 +8,7 @@ from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentSettings,
     TrackPositionProgressSourceName,
 )
+from rl_fzerox.core.domain.track_position import height_above_ground_feature
 from rl_fzerox.core.envs.observations.state.types import StateFeature
 from rl_fzerox.core.envs.observations.state.utils import clamp
 from rl_fzerox.core.envs.track_bounds import track_edge_state
@@ -24,9 +25,8 @@ def track_position_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    profile_fields: Mapping[str, float],
 ) -> list[float]:
-    del action_history, profile_fields
+    del action_history
     return track_position_values(
         telemetry,
         progress_source=component.progress_source or "lap_progress",
@@ -38,6 +38,7 @@ def track_position_features() -> tuple[StateFeature, ...]:
         StateFeature("track_position.lap_progress", 1.0),
         StateFeature("track_position.edge_ratio", 1.0, low=-1.0),
         StateFeature("track_position.outside_track_bounds", 1.0),
+        StateFeature(height_above_ground_feature().name, 1.0),
     )
 
 
@@ -48,15 +49,16 @@ def track_position_values(
 ) -> list[float]:
     progress = track_position_progress(telemetry, progress_source=progress_source)
     if telemetry is None:
-        return [progress, 0.0, 0.0]
+        return [progress, 0.0, 0.0, 0.0]
     edge_state = track_edge_state(telemetry.player)
     edge_ratio = edge_state.ratio
     if edge_ratio is None:
-        return [progress, 0.0, 0.0]
+        return [progress, 0.0, 0.0, _height_above_ground_norm(telemetry)]
     return [
         progress,
         clamp(edge_ratio, -1.0, 1.0),
         1.0 if edge_state.outside_bounds else 0.0,
+        _height_above_ground_norm(telemetry),
     ]
 
 
@@ -94,3 +96,7 @@ def segment_progress_fraction(telemetry: FZeroXTelemetry | None) -> float:
     if segment_index is None or segment_count <= 1:
         return 0.0
     return clamp(float(segment_index) / float(segment_count - 1), 0.0, 1.0)
+
+
+def _height_above_ground_norm(telemetry: FZeroXTelemetry) -> float:
+    return height_above_ground_feature().normalize(float(telemetry.player.height_above_ground))

@@ -1,7 +1,9 @@
 # src/rl_fzerox/ui/watch/view/screen/render.py
 from __future__ import annotations
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import observations as observation_access
+from rl_fzerox.core.envs.telemetry import telemetry_boost_active
+from rl_fzerox.core.runtime_spec.schema import (
     ActionRuntimeConfig,
     CurriculumStageConfig,
     TrackConfig,
@@ -9,12 +11,11 @@ from rl_fzerox.core.config.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
-from rl_fzerox.core.domain.action_adapters import CONTINUOUS_DRIVE_ACTION_ADAPTERS
-from rl_fzerox.core.envs import observations as observation_access
-from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.screen.frame import FrameRenderData, _draw_frame
 from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
@@ -34,7 +35,10 @@ def draw_watch_frame(
     paused: bool,
     render_rate: RateMeter,
     target_render_fps: float | None,
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
     panel_tab_index: int = 0,
+    cnn_layer_tab_index: int = 0,
     record_tab_index: int = 0,
 ) -> ViewerHitboxes:
     """Render one worker state packet without leaking env/policy logic into drawing."""
@@ -64,10 +68,15 @@ def draw_watch_frame(
             raw_frame=snapshot.raw_frame,
             observation=snapshot.observation_image,
             observation_state=snapshot.observation_state,
+            observation_state_reference=snapshot.observation_state_reference,
             observation_state_feature_names=_observation_state_feature_names(
                 config,
                 snapshot.info,
             ),
+            policy_auxiliary_state_predictions=snapshot.policy_auxiliary_state_predictions,
+            policy_auxiliary_state_targets=snapshot.policy_auxiliary_state_targets,
+            auxiliary_episode_metrics=auxiliary_episode_metrics,
+            live_episode_series=live_episode_series,
             episode=snapshot.episode,
             info=draw_info,
             reset_info=snapshot.reset_info,
@@ -84,6 +93,7 @@ def draw_watch_frame(
             policy_label=snapshot.policy_label,
             policy_curriculum_stage=snapshot.policy_curriculum_stage,
             policy_num_timesteps=snapshot.policy_num_timesteps,
+            policy_experience_frames=snapshot.policy_experience_frames,
             policy_deterministic=snapshot.policy_deterministic,
             manual_control_enabled=snapshot.manual_control_enabled,
             policy_action=snapshot.policy_action,
@@ -91,14 +101,26 @@ def draw_watch_frame(
             policy_reload_error=snapshot.policy_reload_error,
             cnn_activations=snapshot.cnn_activations,
             best_finish_position=snapshot.best_finish_position,
+            best_finish_ranks=snapshot.best_finish_ranks,
             best_finish_times=snapshot.best_finish_times,
             latest_finish_times=snapshot.latest_finish_times,
             latest_finish_deltas_ms=snapshot.latest_finish_deltas_ms,
             failed_track_attempts=snapshot.failed_track_attempts,
             track_pool_records=track_pool_records,
             panel_tab_index=panel_tab_index,
+            cnn_layer_tab_index=cnn_layer_tab_index,
             record_tab_index=record_tab_index,
             continuous_drive_deadzone=action_config.continuous_drive_deadzone,
+            continuous_drive_enabled=action_config.uses_continuous_drive(),
+            force_full_throttle=bool(action_config.force_full_throttle),
+            continuous_pitch_enabled=(
+                action_config.name == "configured_hybrid"
+                and "pitch" in action_config.layout_continuous_axes
+            ),
+            continuous_air_brake_axis_index=action_config.continuous_air_brake_axis_index(),
+            continuous_air_brake_deadzone=action_config.continuous_air_brake_deadzone,
+            continuous_air_brake_full_threshold=action_config.continuous_air_brake_full_threshold,
+            continuous_air_brake_min_duty=action_config.continuous_air_brake_min_duty,
             continuous_air_brake_mode=action_config.continuous_air_brake_mode,
             continuous_air_brake_disabled=snapshot.continuous_air_brake_disabled,
             action_repeat=config.env.action_repeat,
@@ -113,19 +135,18 @@ def draw_watch_frame(
 
 
 def _thrust_warning_threshold(config: WatchAppConfig) -> float | None:
-    if config.reward.gas_underuse_penalty >= 0.0:
-        return None
-    return float(config.reward.gas_underuse_threshold)
+    del config
+    return None
 
 
 def _thrust_deadzone_threshold(action_config: ActionRuntimeConfig) -> float | None:
-    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+    if not action_config.uses_continuous_drive():
         return None
     return float(action_config.continuous_drive_deadzone)
 
 
 def _thrust_full_threshold(action_config: ActionRuntimeConfig) -> float | None:
-    if action_config.name not in CONTINUOUS_DRIVE_ACTION_ADAPTERS:
+    if not action_config.uses_continuous_drive():
         return None
     return float(action_config.continuous_drive_full_threshold)
 
@@ -137,9 +158,7 @@ def _add_config_track_info(
     track_pool_records: tuple[dict[str, object], ...] | None = None,
 ) -> None:
     records = (
-        _track_pool_records(config, info)
-        if track_pool_records is None
-        else track_pool_records
+        _track_pool_records(config, info) if track_pool_records is None else track_pool_records
     )
     registry_match = _track_record_matching_info(info, records)
     if registry_match:
@@ -312,13 +331,12 @@ def _observation_state_feature_names(
         return tuple(names)
     if config.env.observation.mode != "image_state":
         return ()
+    state_components = config.env.observation.state_components_data()
+    if state_components is None:
+        return ()
     return observation_access.state_feature_names(
-        config.env.observation.state_profile,
-        course_context=config.env.observation.course_context,
-        ground_effect_context=config.env.observation.ground_effect_context,
-        action_history_len=config.env.observation.action_history_len,
-        action_history_controls=config.env.observation.action_history_controls,
-        state_components=config.env.observation.state_components_data(),
+        state_components=state_components,
+        independent_lean_buttons=config.env.action.independent_lean_buttons,
     )
 
 

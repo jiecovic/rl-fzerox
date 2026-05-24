@@ -34,6 +34,7 @@ class RewardActionContext:
     gas_level: float | None = None
     steer_level: float | None = None
     pitch_level: float | None = None
+    pitch_deadzone: float = 0.0
     drive_axis: float | None = None
 
 
@@ -67,18 +68,6 @@ class RewardTracker(Protocol):
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
         """Expose lightweight reward-state info for logging and watch UI."""
         ...
-
-
-def apply_event_penalty(
-    entered: bool,
-    penalty: float,
-    label: str,
-    breakdown: dict[str, float],
-) -> float:
-    if not entered:
-        return 0.0
-    breakdown[label] = penalty
-    return penalty
 
 
 def finish_placement_bonus(*, position: int, total_racers: int, scale: float) -> float:

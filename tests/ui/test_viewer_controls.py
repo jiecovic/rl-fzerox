@@ -3,12 +3,7 @@ import numpy as np
 import pytest
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.runtime.snapshots import (
     BOOST_LAMP_CONFIG,
     _next_boost_lamp_level,
@@ -26,7 +21,9 @@ from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
 def test_control_viz_includes_visualized_control_state() -> None:
     control_viz = _control_viz(
         ControllerState(
-            joypad_mask=ACCELERATE_MASK | BOOST_MASK | LEAN_LEFT_MASK,
+            joypad_mask=RACE_CONTROL_MASKS.accelerate
+            | RACE_CONTROL_MASKS.boost
+            | RACE_CONTROL_MASKS.lean_left,
             left_stick_x=0.5,
         ),
         gas_level=1.0,
@@ -56,7 +53,7 @@ def test_control_viz_lights_boost_lamp_from_boost_active() -> None:
 def test_boost_lamp_flashes_then_fades_to_active_and_off_levels() -> None:
     lamp_level = _next_boost_lamp_level(
         previous=0.0,
-        control_state=ControllerState(joypad_mask=BOOST_MASK),
+        control_state=ControllerState(joypad_mask=RACE_CONTROL_MASKS.boost),
         boost_active=False,
         action_repeat=1,
     )
@@ -103,7 +100,7 @@ def test_speed_gauge_energy_meter_fill_height_and_low_color() -> None:
 
 def test_control_viz_visualizes_air_brake_button_without_air_brake_axis() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=AIR_BRAKE_MASK, left_stick_x=0.0),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake, left_stick_x=0.0),
         gas_level=0.0,
         policy_action=None,
     )
@@ -114,7 +111,7 @@ def test_control_viz_visualizes_air_brake_button_without_air_brake_axis() -> Non
 
 def test_control_viz_keeps_gas_unipolar_with_air_brake_button_pressed() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate | RACE_CONTROL_MASKS.air_brake),
         gas_level=1.0,
         policy_action=np.array([1, 1, 1], dtype=np.int64),
     )
@@ -129,6 +126,7 @@ def test_control_viz_visualizes_canonical_gas_level() -> None:
         gas_level=0.5,
         policy_action=np.array([0.25, -0.5], dtype=np.float32),
         continuous_drive_deadzone=0.0,
+        continuous_drive_enabled=True,
     )
 
     assert control_viz.gas_level == pytest.approx(0.5)
@@ -153,6 +151,7 @@ def test_control_viz_visualizes_thrust_warning_threshold() -> None:
         thrust_deadzone_threshold=0.05,
         thrust_full_threshold=0.85,
         policy_action=None,
+        continuous_drive_enabled=True,
     )
 
     assert control_viz.gas_level == pytest.approx(0.25)
@@ -174,13 +173,15 @@ def test_control_viz_visualizes_energy_fraction() -> None:
 
 def test_control_viz_visualizes_forced_full_accelerate_drive_mode() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.25),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate, left_stick_x=0.25),
         gas_level=1.0,
         policy_action={
             "continuous": np.array([0.25, -1.0, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
     )
 
     assert control_viz.gas_level == pytest.approx(1.0)
@@ -211,7 +212,7 @@ def test_control_viz_maps_action_mask_branches_to_cockpit_locks() -> None:
 
 def test_control_viz_uses_policy_branch_selection_for_hybrid_buttons() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=LEAN_LEFT_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.lean_left),
         gas_level=1.0,
         policy_action={
             "continuous": np.array([0.0, 1.0], dtype=np.float32),
@@ -237,6 +238,7 @@ def test_control_viz_treats_missing_optional_branches_as_unwired() -> None:
         gas_level=1.0,
         policy_action=None,
         action_mask_branches={},
+        continuous_drive_enabled=True,
     )
 
     assert not control_viz.thrust_masked
@@ -250,7 +252,7 @@ def test_control_viz_treats_missing_optional_branches_as_unwired() -> None:
 def test_control_viz_visualizes_hybrid_canonical_gas_level() -> None:
     control_viz = _control_viz(
         ControllerState(
-            joypad_mask=ACCELERATE_MASK | LEAN_LEFT_MASK,
+            joypad_mask=RACE_CONTROL_MASKS.accelerate | RACE_CONTROL_MASKS.lean_left,
             left_stick_x=0.25,
         ),
         gas_level=1.0,
@@ -268,22 +270,42 @@ def test_control_viz_visualizes_hybrid_canonical_gas_level() -> None:
 
 def test_control_viz_visualizes_hybrid_policy_air_brake_axis() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK | AIR_BRAKE_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate | RACE_CONTROL_MASKS.air_brake),
         gas_level=1.0,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
     )
 
     assert control_viz.gas_level == pytest.approx(1.0)
     assert control_viz.air_brake_axis == pytest.approx(0.5)
 
 
+def test_control_viz_visualizes_configured_air_brake_pwm_axis() -> None:
+    control_viz = _control_viz(
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake),
+        gas_level=0.0,
+        policy_action={
+            "continuous": np.array([0.25, 0.6], dtype=np.float32),
+            "discrete": np.array([0], dtype=np.int64),
+        },
+        continuous_air_brake_axis_index=1,
+        continuous_air_brake_deadzone=0.1,
+        continuous_air_brake_full_threshold=0.85,
+        continuous_air_brake_min_duty=0.2,
+    )
+
+    assert control_viz.air_brake_axis == pytest.approx(0.733333, abs=1e-6)
+    assert not control_viz.air_brake_masked
+
+
 def test_control_viz_hides_disabled_hybrid_policy_air_brake_axis() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate),
         gas_level=1.0,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
@@ -299,13 +321,15 @@ def test_control_viz_hides_disabled_hybrid_policy_air_brake_axis() -> None:
 
 def test_control_viz_grays_disabled_ground_air_brake_axis() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate),
         gas_level=1.0,
         policy_action={
             "continuous": np.array([0.0, 0.5, 0.5], dtype=np.float32),
             "discrete": np.array([0, 0], dtype=np.int64),
         },
         continuous_drive_deadzone=0.0,
+        continuous_air_brake_deadzone=0.0,
+        continuous_air_brake_full_threshold=1.0,
         continuous_air_brake_mode="disable_on_ground",
         continuous_air_brake_disabled=True,
     )
@@ -316,7 +340,7 @@ def test_control_viz_grays_disabled_ground_air_brake_axis() -> None:
 
 def test_control_viz_uses_canonical_gas_level_for_discrete_policy_action() -> None:
     control_viz = _control_viz(
-        ControllerState(joypad_mask=ACCELERATE_MASK, left_stick_x=0.0),
+        ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate, left_stick_x=0.0),
         gas_level=1.0,
         policy_action=np.array([4, 1], dtype=np.int64),
     )

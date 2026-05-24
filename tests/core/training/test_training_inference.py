@@ -4,11 +4,14 @@ from __future__ import annotations
 import json
 import os
 import time
+from inspect import signature
 from pathlib import Path
 
 import numpy as np
 import pytest
+from gymnasium import spaces
 from omegaconf import OmegaConf
+from pytest import MonkeyPatch
 
 from fzerox_emulator.arrays import (
     ActionMask,
@@ -19,12 +22,46 @@ from fzerox_emulator.arrays import (
     PolicyState,
 )
 from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.policy.auxiliary_state.policies import (
+    AuxiliaryStateMaskableHybridActionMultiInputPolicy,
+)
 from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.core.training.inference.loader import (
     _artifact_kind_from_policy_path,
     _load_saved_policy,
     _load_saved_policy_algorithm,
 )
+from rl_fzerox.core.training.runs import RUN_LAYOUT
+from rl_fzerox.core.training.session.artifacts import policy_artifact_metadata_path
+
+
+def _latest_policy_path(run_dir: Path) -> Path:
+    path = run_dir / RUN_LAYOUT.policy_artifacts.latest
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _latest_model_path(run_dir: Path) -> Path:
+    path = run_dir / RUN_LAYOUT.model_artifacts.latest
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _configured_discrete_action_config(*axes: str) -> dict[str, object]:
+    return {
+        "layout_discrete_axes": list(axes),
+    }
+
+
+def _configured_hybrid_action_config(
+    *,
+    continuous_axes: tuple[str, ...],
+    discrete_axes: tuple[str, ...] = (),
+) -> dict[str, object]:
+    return {
+        "layout_continuous_axes": list(continuous_axes),
+        "layout_discrete_axes": list(discrete_axes),
+    }
 
 
 class _FakePolicy:
@@ -128,6 +165,36 @@ class _FakeRecurrentMaskablePolicy(_FakeMaskablePolicy):
         return action, next_state
 
 
+class _FakeAuxiliaryStatePolicy(_FakeMaskablePolicy):
+    def __init__(self) -> None:
+        super().__init__([1])
+        self.observation_space = spaces.Dict(
+            {
+                "image": spaces.Box(low=0, high=255, shape=(84, 84, 3), dtype=np.uint8),
+                "state": spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+                "auxiliary_state_targets": spaces.Box(
+                    low=0.0,
+                    high=1.0,
+                    shape=(39,),
+                    dtype=np.float32,
+                ),
+            }
+        )
+        self.last_aux_observation: ObservationValue | None = None
+
+    def predict_auxiliary_state(
+        self,
+        observation: ObservationValue,
+        *,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
+        target_names: tuple[str, ...] | None = None,
+    ) -> dict[str, object]:
+        _ = (state, episode_start, target_names)
+        self.last_aux_observation = observation
+        return {"track_position.edge_ratio": 0.25}
+
+
 def _array_action(action: object) -> NumpyArray:
     assert isinstance(action, np.ndarray)
     return action
@@ -135,9 +202,9 @@ def _array_action(action: object) -> NumpyArray:
 
 def test_policy_runner_reloads_updated_policy_artifact(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     loaded_policy = LoadedPolicy(
@@ -155,12 +222,12 @@ def test_policy_runner_reloads_updated_policy_artifact(
     os.utime(policy_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.resolve_policy_artifact_path",
+        "rl_fzerox.core.training.inference.runner.resolve_policy_artifact_path",
         lambda run_dir, *, artifact: policy_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
+        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]
@@ -168,7 +235,7 @@ def test_policy_runner_reloads_updated_policy_artifact(
 
 
 def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     loaded_policy = LoadedPolicy(
@@ -184,7 +251,7 @@ def test_policy_runner_reports_reload_age_since_initial_load(tmp_path: Path) -> 
 
 
 def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakePolicy([2, 0])
 
@@ -204,7 +271,7 @@ def test_policy_runner_can_sample_non_deterministic_actions(tmp_path: Path) -> N
 
 
 def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -224,7 +291,7 @@ def test_policy_runner_preserves_continuous_action_values(tmp_path: Path) -> Non
 
 
 def test_policy_runner_preserves_hybrid_action_dict(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -246,7 +313,7 @@ def test_policy_runner_preserves_hybrid_action_dict(tmp_path: Path) -> None:
 
 
 def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakeMaskablePolicy([2, 0])
 
@@ -270,8 +337,49 @@ def test_policy_runner_passes_action_masks_to_maskable_policies(tmp_path: Path) 
     assert np.array_equal(recorded_masks, action_masks)
 
 
+def test_policy_runner_injects_zero_auxiliary_targets_for_aux_enabled_policy(
+    tmp_path: Path,
+) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    fake_policy = _FakeAuxiliaryStatePolicy()
+
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        fake_policy,
+    )
+
+    observation: ObservationValue = {
+        "image": np.zeros((84, 84, 3), dtype=np.uint8),
+        "state": np.array([0.0, 0.0], dtype=np.float32),
+    }
+
+    _array_action(runner.predict(observation, action_masks=np.array([True], dtype=bool)))
+    predictions = runner.auxiliary_state_predictions(observation)
+
+    assert predictions == {"track_position.edge_ratio": 0.25}
+    assert isinstance(fake_policy.last_aux_observation, dict)
+    aux_targets = fake_policy.last_aux_observation.get("auxiliary_state_targets")
+    assert isinstance(aux_targets, np.ndarray)
+    assert aux_targets.shape == (39,)
+    assert float(np.max(aux_targets)) == 0.0
+
+
+def test_non_recurrent_auxiliary_policy_accepts_runner_recurrent_kwargs() -> None:
+    parameters = signature(
+        AuxiliaryStateMaskableHybridActionMultiInputPolicy.predict_auxiliary_state
+    ).parameters
+
+    assert "state" in parameters
+    assert "episode_start" in parameters
+
+
 def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     fake_policy = _FakeRecurrentMaskablePolicy([2, 0])
 
@@ -311,9 +419,9 @@ def test_policy_runner_tracks_recurrent_state_across_predictions(tmp_path: Path)
 
 def test_policy_runner_exposes_reload_error_until_success(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
 
     runner = PolicyRunner(
@@ -330,12 +438,12 @@ def test_policy_runner_exposes_reload_error_until_success(
     os.utime(policy_path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1))
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference.resolve_policy_artifact_path",
+        "rl_fzerox.core.training.inference.runner.resolve_policy_artifact_path",
         lambda run_dir, *, artifact: policy_path,
     )
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": (_ for _ in ()).throw(
+        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: (_ for _ in ()).throw(
             RuntimeError("bad checkpoint")
         ),
     )
@@ -346,8 +454,8 @@ def test_policy_runner_exposes_reload_error_until_success(
     assert runner.last_reload_error == "bad checkpoint"
 
     monkeypatch.setattr(
-        "rl_fzerox.core.training.inference._load_saved_policy",
-        lambda path, *, run_dir=None, device="cpu": _FakePolicy([4, 1]),
+        "rl_fzerox.core.training.inference.runner._load_saved_policy",
+        lambda path, *, run_dir=None, device="cpu", algorithm=None: _FakePolicy([4, 1]),
     )
 
     assert _array_action(runner.predict(observation)).tolist() == [4, 1]
@@ -356,7 +464,7 @@ def test_policy_runner_exposes_reload_error_until_success(
 
 
 def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Path) -> None:
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"v1")
     runner = PolicyRunner(
         LoadedPolicy(
@@ -371,7 +479,7 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_curriculum_stage is None
     assert runner.checkpoint_num_timesteps is None
 
-    metadata_path = tmp_path / "latest_policy.metadata.json"
+    metadata_path = policy_artifact_metadata_path(policy_path)
     metadata_path.write_text(
         json.dumps(
             {
@@ -390,6 +498,35 @@ def test_policy_runner_refreshes_metadata_without_policy_zip_change(tmp_path: Pa
     assert runner.checkpoint_num_timesteps == 660_000
 
 
+def test_policy_runner_prefers_lineage_checkpoint_timesteps(tmp_path: Path) -> None:
+    policy_path = _latest_policy_path(tmp_path)
+    policy_path.write_bytes(b"v1")
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+        ),
+        _FakePolicy([2, 0]),
+    )
+
+    metadata_path = policy_artifact_metadata_path(policy_path)
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "num_timesteps": 660_000,
+                "lineage_num_timesteps": 14_820_470,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runner.refresh()
+
+    assert runner.checkpoint_num_timesteps == 14_820_470
+    assert runner.checkpoint_local_num_timesteps == 660_000
+
+
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -404,7 +541,14 @@ def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -437,7 +581,14 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -453,66 +604,6 @@ def test_load_saved_policy_algorithm_recognizes_maskable_recurrent_ppo(tmp_path:
     )
 
     assert _load_saved_policy_algorithm(tmp_path) == "maskable_recurrent_ppo"
-
-
-def test_load_saved_policy_algorithm_recognizes_sac(tmp_path: Path) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "continuous_steer_drive"}},
-                "policy": {},
-                "train": {
-                    "algorithm": "sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "sac"
-
-
-def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_sac(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-
-    assert _load_saved_policy_algorithm(tmp_path) == "maskable_hybrid_action_sac"
 
 
 def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
@@ -531,7 +622,12 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_action_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -561,7 +657,12 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -581,7 +682,7 @@ def test_load_saved_policy_algorithm_recognizes_maskable_hybrid_recurrent_ppo(
 
 def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -596,7 +697,14 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_discrete_action_config(
+                        "steer",
+                        "gas",
+                        "boost",
+                        "lean",
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -610,9 +718,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -647,7 +755,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_recurrent_runs(
 
 def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -662,7 +770,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {},
                 "train": {
                     "algorithm": "maskable_hybrid_action_ppo",
@@ -672,9 +785,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -710,75 +823,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_runs(
     }
 
 
-def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_sac_runs(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-    config_path = tmp_path / "train_config.yaml"
-    OmegaConf.save(
-        config=OmegaConf.create(
-            {
-                "seed": 7,
-                "emulator": {
-                    "core_path": str(core_path),
-                    "rom_path": str(rom_path),
-                },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
-                "policy": {},
-                "train": {
-                    "algorithm": "maskable_hybrid_action_sac",
-                    "ent_coef": "auto",
-                    "total_timesteps": 1000,
-                },
-            }
-        ),
-        f=str(config_path),
-    )
-    policy_path = tmp_path / "latest_policy.zip"
-    policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
-    model_path.write_bytes(b"model")
-
-    captured: dict[str, object] = {}
-
-    class _FakeLoadedMaskableHybridSacModel:
-        def predict(
-            self,
-            observation: ObservationValue,
-            state: PolicyState = None,
-            episode_start: BoolArray | None = None,
-            deterministic: bool = True,
-            action_masks: ActionMask | None = None,
-        ) -> tuple[dict[str, NumpyArray], PolicyState]:
-            _ = (observation, state, episode_start, deterministic, action_masks)
-            return {
-                "continuous": np.array([0.0, 0.0], dtype=np.float32),
-                "discrete": np.array([0, 0], dtype=np.int64),
-            }, None
-
-    def _fake_load(path: str, *, device: str) -> _FakeLoadedMaskableHybridSacModel:
-        captured["path"] = path
-        captured["device"] = device
-        return _FakeLoadedMaskableHybridSacModel()
-
-    monkeypatch.setattr("sb3x.MaskableHybridActionSAC.load", _fake_load)
-
-    loaded = _load_saved_policy(policy_path, run_dir=tmp_path, device="cpu")
-
-    assert isinstance(loaded, _FakeLoadedMaskableHybridSacModel)
-    assert captured == {
-        "path": str(model_path.resolve()),
-        "device": "cpu",
-    }
-
-
 def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurrent_runs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     core_path = tmp_path / "core.so"
     rom_path = tmp_path / "rom.n64"
@@ -793,7 +840,12 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
                     "core_path": str(core_path),
                     "rom_path": str(rom_path),
                 },
-                "env": {"action": {"name": "hybrid_steer_drive_boost_lean"}},
+                "env": {
+                    "action": _configured_hybrid_action_config(
+                        continuous_axes=("steer", "drive"),
+                        discrete_axes=("boost", "lean"),
+                    )
+                },
                 "policy": {
                     "recurrent": {
                         "enabled": True,
@@ -807,9 +859,9 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
         ),
         f=str(config_path),
     )
-    policy_path = tmp_path / "latest_policy.zip"
+    policy_path = _latest_policy_path(tmp_path)
     policy_path.write_bytes(b"policy")
-    model_path = tmp_path / "latest_model.zip"
+    model_path = _latest_model_path(tmp_path)
     model_path.write_bytes(b"model")
 
     captured: dict[str, object] = {}
@@ -845,7 +897,7 @@ def test_load_saved_policy_uses_full_model_artifact_for_maskable_hybrid_recurren
     }
 
 
-def test_artifact_kind_from_policy_path_uses_standard_prefixes() -> None:
-    assert _artifact_kind_from_policy_path(Path("latest_policy.zip")) == "latest"
-    assert _artifact_kind_from_policy_path(Path("best_policy.zip")) == "best"
-    assert _artifact_kind_from_policy_path(Path("final_policy.zip")) == "final"
+def test_artifact_kind_from_policy_path_uses_checkpoint_directory_names() -> None:
+    assert _artifact_kind_from_policy_path(Path("checkpoints/latest/policy.zip")) == "latest"
+    assert _artifact_kind_from_policy_path(Path("checkpoints/best/policy.zip")) == "best"
+    assert _artifact_kind_from_policy_path(Path("checkpoints/final/policy.zip")) == "final"

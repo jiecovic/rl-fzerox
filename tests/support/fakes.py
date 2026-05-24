@@ -1,16 +1,21 @@
 # tests/support/fakes.py
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TypeVar
 
 import numpy as np
+from gymnasium import Env
 
 from fzerox_emulator import (
+    BackendMultiObservationStepResult,
     BackendStepResult,
     ControllerState,
     FrameStep,
     FZeroXTelemetry,
+    ObservationImageRecipe,
     ObservationSpec,
     ObservationStackMode,
     ResetState,
@@ -19,9 +24,12 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
+_ObsT = TypeVar("_ObsT")
+_ActT = TypeVar("_ActT")
 
 
 @dataclass
@@ -56,6 +64,9 @@ class SyntheticBackend:
         self.loaded_baseline_bytes: list[tuple[Path | None, int]] = []
         self._active_baseline_path: Path | None = None
         self._system_ram = bytearray(0x0030_0000)
+        self.last_race_start_setup: dict[str, object] | None = None
+        self.last_machine_settings: dict[str, object] | None = None
+        self.last_race_reinit_mode: str | None = None
 
     @property
     def name(self) -> str:
@@ -124,43 +135,48 @@ class SyntheticBackend:
     def render(self) -> RgbFrame:
         return self._last_frame.copy()
 
-    def observation_spec(self, preset: str) -> ObservationSpec:
-        canonical_preset = _canonical_observation_preset(preset)
-        if canonical_preset is None:
-            raise ValueError(f"Unsupported synthetic observation preset {preset!r}")
+    def observation_spec(
+        self,
+        preset: str | None = None,
+        *,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> ObservationSpec:
+        resolved_preset, resolved_height, resolved_width = _normalize_observation_resolution(
+            preset=preset,
+            height=height,
+            width=width,
+        )
         cropped = _crop_visible_game_area(self._last_frame)
         display_width, display_height = display_size(cropped.shape, self.display_aspect_ratio)
-        if canonical_preset == "crop_84x116":
-            width, height = (116, 84)
-        elif canonical_preset == "crop_92x124":
-            width, height = (124, 92)
-        elif canonical_preset == "crop_116x164":
-            width, height = (164, 116)
-        elif canonical_preset == "crop_98x130":
-            width, height = (130, 98)
-        elif canonical_preset == "crop_66x82":
-            width, height = (82, 66)
-        elif canonical_preset == "crop_60x76":
-            width, height = (76, 60)
-        elif canonical_preset == "crop_68x68":
-            width, height = (68, 68)
-        elif canonical_preset == "crop_84x84":
-            width, height = (84, 84)
-        elif canonical_preset == "crop_76x100":
-            width, height = (100, 76)
+        if resolved_preset is not None:
+            canonical_preset = _canonical_observation_preset(resolved_preset)
+            if canonical_preset is None:
+                raise ValueError(f"Unsupported synthetic observation preset {resolved_preset!r}")
+            resolved_height, resolved_width = preset_geometry(canonical_preset)
         else:
-            width, height = (64, 64)
+            assert resolved_height is not None and resolved_width is not None
         return ObservationSpec(
-            preset=canonical_preset,
-            width=width,
-            height=height,
+            preset=(
+                resolved_preset
+                if resolved_preset is not None
+                else f"custom_{resolved_height}x{resolved_width}"
+            ),
+            width=resolved_width,
+            height=resolved_height,
             channels=3,
             display_width=display_width,
             display_height=display_height,
         )
 
-    def render_display(self, *, preset: str) -> RgbFrame:
-        spec = self.observation_spec(preset)
+    def render_display(
+        self,
+        *,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
+    ) -> RgbFrame:
+        spec = self.observation_spec(preset, height=height, width=width)
         cropped = _crop_visible_game_area(self._last_frame)
         aspect_corrected = _resize_frame(
             cropped,
@@ -172,7 +188,9 @@ class SyntheticBackend:
     def render_observation(
         self,
         *,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -180,14 +198,9 @@ class SyntheticBackend:
         minimap_resize_filter: object = "nearest",
     ) -> ObservationFrame:
         _ = (resize_filter, minimap_resize_filter)
-        spec = self.observation_spec(preset)
+        spec = self.observation_spec(preset, height=height, width=width)
         cropped = _crop_visible_game_area(self._last_frame)
-        aspect_corrected = _resize_frame(
-            cropped,
-            width=spec.display_width,
-            height=spec.display_height,
-        )
-        frame = _resize_frame(aspect_corrected, width=spec.width, height=spec.height)
+        frame = _resize_frame(cropped, width=spec.width, height=spec.height)
         stack_key = (
             spec.preset,
             frame_stack,
@@ -264,7 +277,9 @@ class SyntheticBackend:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -309,6 +324,8 @@ class SyntheticBackend:
             self._state.progress_frontier_stalled_frames = 0
         observation = self.render_observation(
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -326,16 +343,19 @@ class SyntheticBackend:
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
-                frames_run=action_repeat,
-                max_race_distance=self._state.progress,
-                reverse_active_frames=0,
-                low_speed_frames=0,
-                energy_loss_total=0.0,
-                energy_gain_total=0.0,
-                damage_taken_frames=0,
-                consecutive_low_speed_frames=0,
-                entered_state_flags=0,
-                final_frame_index=self._state.frame_index,
+                {
+                    "frames_run": action_repeat,
+                    "max_race_distance": self._state.progress,
+                    "reverse_active_frames": 0,
+                    "collision_recoil_active_frames": 0,
+                    "low_speed_frames": 0,
+                    "energy_loss_total": 0.0,
+                    "energy_gain_total": 0.0,
+                    "damage_taken_frames": 0,
+                    "consecutive_low_speed_frames": 0,
+                    "entered_state_flags": 0,
+                    "final_frame_index": self._state.frame_index,
+                }
             ),
             status=StepStatus(
                 step_count=self._state.step_count,
@@ -352,7 +372,9 @@ class SyntheticBackend:
         controller_state: ControllerState,
         *,
         action_repeat: int,
-        preset: str,
+        preset: str | None = None,
+        height: int | None = None,
+        width: int | None = None,
         frame_stack: int,
         stack_mode: ObservationStackMode = "rgb",
         minimap_layer: bool = False,
@@ -380,7 +402,7 @@ class SyntheticBackend:
         self._capture_video_flags.extend([True] * action_repeat)
         for _ in range(action_repeat):
             self.step_frame()
-            display_frames.append(self.render_display(preset=preset))
+            display_frames.append(self.render_display(preset=preset, height=height, width=width))
         self._state.step_count += action_repeat
         if self._state.progress_frontier_initialized:
             frontier_reached = (
@@ -398,6 +420,8 @@ class SyntheticBackend:
             self._state.progress_frontier_stalled_frames = 0
         observation = self.render_observation(
             preset=preset,
+            height=height,
+            width=width,
             frame_stack=frame_stack,
             stack_mode=stack_mode,
             minimap_layer=minimap_layer,
@@ -415,16 +439,19 @@ class SyntheticBackend:
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
-                frames_run=action_repeat,
-                max_race_distance=self._state.progress,
-                reverse_active_frames=0,
-                low_speed_frames=0,
-                energy_loss_total=0.0,
-                energy_gain_total=0.0,
-                damage_taken_frames=0,
-                consecutive_low_speed_frames=0,
-                entered_state_flags=0,
-                final_frame_index=self._state.frame_index,
+                {
+                    "frames_run": action_repeat,
+                    "max_race_distance": self._state.progress,
+                    "reverse_active_frames": 0,
+                    "collision_recoil_active_frames": 0,
+                    "low_speed_frames": 0,
+                    "energy_loss_total": 0.0,
+                    "energy_gain_total": 0.0,
+                    "damage_taken_frames": 0,
+                    "consecutive_low_speed_frames": 0,
+                    "entered_state_flags": 0,
+                    "final_frame_index": self._state.frame_index,
+                }
             ),
             status=StepStatus(
                 step_count=self._state.step_count,
@@ -434,7 +461,64 @@ class SyntheticBackend:
                 truncation_reason=truncation_reason,
             ),
             telemetry=None,
-            display_frames=tuple(display_frames),
+            display_frames=np.stack(display_frames),
+        )
+
+    def step_repeat_multi_observation_raw(
+        self,
+        controller_state: ControllerState,
+        *,
+        action_repeat: int,
+        observation_recipes: Sequence[ObservationImageRecipe],
+        stuck_min_speed_kph: float,
+        energy_loss_epsilon: float,
+        max_episode_steps: int,
+        progress_frontier_stall_limit_frames: int | None,
+        progress_frontier_epsilon: float,
+        terminate_on_energy_depleted: bool,
+        lean_timer_assist: bool = False,
+    ) -> BackendMultiObservationStepResult:
+        if len(observation_recipes) == 0:
+            raise ValueError("At least one observation recipe is required")
+
+        first_recipe = observation_recipes[0]
+        result = self.step_repeat_raw(
+            controller_state,
+            action_repeat=action_repeat,
+            preset=first_recipe.preset,
+            height=first_recipe.height,
+            width=first_recipe.width,
+            frame_stack=first_recipe.frame_stack,
+            stack_mode=first_recipe.stack_mode,
+            minimap_layer=first_recipe.minimap_layer,
+            resize_filter=first_recipe.resize_filter,
+            minimap_resize_filter=first_recipe.minimap_resize_filter,
+            stuck_min_speed_kph=stuck_min_speed_kph,
+            energy_loss_epsilon=energy_loss_epsilon,
+            max_episode_steps=max_episode_steps,
+            progress_frontier_stall_limit_frames=progress_frontier_stall_limit_frames,
+            progress_frontier_epsilon=progress_frontier_epsilon,
+            terminate_on_energy_depleted=terminate_on_energy_depleted,
+            lean_timer_assist=lean_timer_assist,
+        )
+        observations = tuple(
+            self.render_observation(
+                preset=recipe.preset,
+                height=recipe.height,
+                width=recipe.width,
+                frame_stack=recipe.frame_stack,
+                stack_mode=recipe.stack_mode,
+                minimap_layer=recipe.minimap_layer,
+                resize_filter=recipe.resize_filter,
+                minimap_resize_filter=recipe.minimap_resize_filter,
+            )
+            for recipe in observation_recipes
+        )
+        return BackendMultiObservationStepResult(
+            observations=observations,
+            summary=result.summary,
+            status=result.status,
+            telemetry=result.telemetry,
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
@@ -447,6 +531,80 @@ class SyntheticBackend:
     def load_baseline_bytes(self, state: bytes, *, source_path: Path | None = None) -> None:
         self._active_baseline_path = source_path
         self.loaded_baseline_bytes.append((source_path, len(state)))
+
+    def patch_race_start_setup(
+        self,
+        *,
+        mode: str,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+        gp_difficulty_raw_value: int = -1,
+    ) -> None:
+        self.last_race_start_setup = {
+            "mode": mode,
+            "course_index": course_index,
+            "character_index": character_index,
+            "engine_setting_raw_value": engine_setting_raw_value,
+            "total_lap_count": total_lap_count,
+            "gp_difficulty_raw_value": gp_difficulty_raw_value,
+        }
+
+    def patch_machine_settings(
+        self,
+        *,
+        mode: str,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+        gp_difficulty_raw_value: int = -1,
+    ) -> None:
+        self.last_machine_settings = {
+            "mode": mode,
+            "course_index": course_index,
+            "character_index": character_index,
+            "engine_setting_raw_value": engine_setting_raw_value,
+            "total_lap_count": total_lap_count,
+            "gp_difficulty_raw_value": gp_difficulty_raw_value,
+        }
+
+    def patch_engine_settings(
+        self,
+        *,
+        mode: str,
+        engine_setting_raw_value: int,
+    ) -> None:
+        self.last_engine_settings = {
+            "mode": mode,
+            "engine_setting_raw_value": engine_setting_raw_value,
+        }
+
+    def patch_time_attack_menu_mode(self) -> None:
+        self.last_time_attack_menu_mode = True
+
+    def force_race_reinit(self, *, mode: str) -> None:
+        self.last_race_reinit_mode = mode
+
+    def validate_race_start_setup(
+        self,
+        *,
+        mode: str,
+        course_index: int,
+        character_index: int,
+        engine_setting_raw_value: int,
+        total_lap_count: int,
+        gp_difficulty_raw_value: int = -1,
+    ) -> None:
+        self.patch_race_start_setup(
+            mode=mode,
+            course_index=course_index,
+            character_index=character_index,
+            engine_setting_raw_value=engine_setting_raw_value,
+            total_lap_count=total_lap_count,
+            gp_difficulty_raw_value=gp_difficulty_raw_value,
+        )
 
     def close(self) -> None:
         return None
@@ -468,20 +626,27 @@ class SyntheticBackend:
         return frame
 
 
-def _canonical_observation_preset(preset: str) -> str | None:
-    aliases = {
-        "crop_84x116": "crop_84x116",
-        "crop_92x124": "crop_92x124",
-        "crop_116x164": "crop_116x164",
-        "crop_98x130": "crop_98x130",
-        "crop_66x82": "crop_66x82",
-        "crop_60x76": "crop_60x76",
-        "crop_68x68": "crop_68x68",
+def _canonical_observation_preset(preset: str) -> ObservationPresetName | None:
+    aliases: dict[str, ObservationPresetName] = {
+        "crop_72x96": "crop_72x96",
         "crop_84x84": "crop_84x84",
-        "crop_76x100": "crop_76x100",
-        "crop_64x64": "crop_64x64",
     }
     return aliases.get(preset)
+
+
+def _normalize_observation_resolution(
+    *,
+    preset: str | None = None,
+    height: int | None = None,
+    width: int | None = None,
+) -> tuple[str | None, int | None, int | None]:
+    if preset is not None:
+        if height is not None or width is not None:
+            raise ValueError("preset cannot be combined with custom observation height/width")
+        return preset, None, None
+    if height is None or width is None:
+        raise ValueError("custom observation height and width must both be set")
+    return None, int(height), int(width)
 
 
 def _crop_visible_game_area(frame: RgbFrame) -> RgbFrame:
@@ -518,6 +683,14 @@ def _materialize_observation_stack(
         stacked = np.concatenate([_rgb_luma_chroma(frame) for frame in frames], axis=2)
         return _append_fake_minimap_layer(stacked, frames[-1]) if minimap_layer else stacked
     raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
+
+
+def vec_env_fns(
+    env_fn: Callable[[], Env[_ObsT, _ActT]],
+) -> list[Callable[[], Env[_ObsT, _ActT]]]:
+    """Return one typed env-factory list for DummyVecEnv tests."""
+
+    return [env_fn]
 
 
 def _append_fake_minimap_layer(

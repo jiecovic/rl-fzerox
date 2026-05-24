@@ -9,14 +9,8 @@ import numpy as np
 import pytest
 
 from fzerox_emulator.arrays import RgbFrame
-from rl_fzerox.apps.record_policy import (
-    AttemptRunResult,
-    _attempt_seed,
-    _finished_rank,
-    _move_result_to_output,
-    _run_attempt,
-    parse_args,
-)
+from rl_fzerox.apps.recording.cli import parse_args
+from rl_fzerox.apps.recording.models import AttemptRunResult
 from rl_fzerox.apps.recording.progress import (
     format_progress_line as _format_progress_line,
 )
@@ -24,7 +18,15 @@ from rl_fzerox.apps.recording.progress import (
     format_race_time_ms as _format_race_time_ms,
 )
 from rl_fzerox.apps.recording.progress import (
-    format_target_rank as _format_target_rank,
+    format_recording_target as _format_recording_target,
+)
+from rl_fzerox.apps.recording.runner import (
+    _attempt_seed,
+    _finished_rank,
+    _matches_recording_target,
+    _move_result_to_output,
+    _resolve_recording_course_id,
+    _run_attempt,
 )
 from rl_fzerox.apps.recording.video import (
     VideoSettings,
@@ -42,6 +44,7 @@ from rl_fzerox.apps.recording.video import (
 from rl_fzerox.apps.recording.video import (
     resolve_video_fps as _resolve_video_fps,
 )
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, TrackSamplingEntryConfig
 
 
 def test_finished_rank_accepts_finished_positive_rank() -> None:
@@ -122,39 +125,108 @@ def test_resolve_ffmpeg_path_uses_bundled_fallback(monkeypatch: pytest.MonkeyPat
 
 
 def test_parse_args_records_deterministically_by_default() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.deterministic is True
 
 
 def test_parse_args_can_record_stochastically() -> None:
-    args = parse_args(["--out", "race.mp4", "--no-deterministic"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--no-deterministic"])
 
     assert args.deterministic is False
 
 
 def test_parse_args_uses_live_progress_by_default() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.progress_interval == 2.0
 
 
 def test_parse_args_can_disable_live_progress() -> None:
-    args = parse_args(["--out", "race.mp4", "--progress-interval", "0"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--progress-interval", "0"])
 
     assert args.progress_interval == 0.0
 
 
 def test_parse_args_defaults_to_stream_all_record_mode() -> None:
-    args = parse_args(["--out", "race.mp4"])
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
 
     assert args.record_mode == "stream-all"
 
 
 def test_parse_args_accepts_probe_then_record_mode() -> None:
-    args = parse_args(["--out", "race.mp4", "--record-mode", "probe-then-record"])
+    args = parse_args(
+        ["--run-dir", "run-dir", "--out", "race.mp4", "--record-mode", "probe-then-record"]
+    )
 
     assert args.record_mode == "probe-then-record"
+
+
+def test_parse_args_uses_lap_target_by_default() -> None:
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4"])
+
+    assert args.target_laps == 3
+    assert args.target_rank is None
+
+
+def test_parse_args_accepts_max_episode_alias_and_reload_mode() -> None:
+    args = parse_args(
+        [
+            "--run-dir",
+            "run-dir",
+            "--out",
+            "race.mp4",
+            "--max-episodes",
+            "12",
+            "--reload-mode",
+            "episode",
+            "--reload-interval",
+            "5",
+        ]
+    )
+
+    assert args.max_episodes == 12
+    assert args.reload_mode == "episode"
+    assert args.reload_interval == 5.0
+
+
+def test_parse_args_accepts_recording_course_id() -> None:
+    args = parse_args(["--run-dir", "run-dir", "--out", "race.mp4", "--course-id", "space_plant"])
+
+    assert args.course_id == "space_plant"
+
+
+def test_resolve_recording_course_id_accepts_id_or_display_name() -> None:
+    track_sampling = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="space_plant_time_attack_blue_falcon",
+                course_id="space_plant",
+                course_name="Space Plant",
+                display_name="Space Plant Time Attack - Blue Falcon",
+            ),
+        ),
+    )
+
+    assert _resolve_recording_course_id(track_sampling, "space_plant") == "space_plant"
+    assert _resolve_recording_course_id(track_sampling, "Space Plant") == "space_plant"
+
+
+def test_resolve_recording_course_id_rejects_missing_course() -> None:
+    track_sampling = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="mute_city_time_attack_blue_falcon",
+                course_id="mute_city",
+                course_name="Mute City",
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="Available course ids: mute_city"):
+        _resolve_recording_course_id(track_sampling, "space_plant")
 
 
 def test_format_progress_line_shows_episode_state() -> None:
@@ -168,6 +240,7 @@ def test_format_progress_line_shows_episode_state() -> None:
             "race_distance": 54321.0,
         },
         attempt=3,
+        target_laps=3,
         target_rank=1,
         episode_return=42.125,
         effective_fps=123.4,
@@ -175,7 +248,8 @@ def test_format_progress_line_shows_episode_state() -> None:
 
     assert line == (
         "try 03 | step 123 | rank 4 | lap 2 | time 1:23.456 | "
-        "988 km/h | 54.3k prog | 123.4 frames/s | R 42.1 | need rank 1"
+        "988 km/h | 54.3k prog | 123.4 frames/s | R 42.1 | "
+        "need laps >= 3, rank 1"
     )
 
 
@@ -185,9 +259,31 @@ def test_format_race_time_ms_handles_missing_and_regular_times() -> None:
     assert _format_race_time_ms(4_001) == "0:04.001"
 
 
-def test_format_target_rank_special_cases_first_place() -> None:
-    assert _format_target_rank(1) == "need rank 1"
-    assert _format_target_rank(3) == "need rank <= 3"
+def test_format_recording_target_shows_laps_and_optional_rank() -> None:
+    assert _format_recording_target(target_laps=3, target_rank=None) == "need laps >= 3"
+    assert _format_recording_target(target_laps=3, target_rank=1) == "need laps >= 3, rank 1"
+    assert _format_recording_target(target_laps=3, target_rank=3) == "need laps >= 3, rank <= 3"
+
+
+def test_recording_target_matches_lap_completion_without_rank() -> None:
+    assert _matches_recording_target(
+        {"race_laps_completed": 1, "termination_reason": "crashed", "position": 30},
+        target_laps=1,
+        target_rank=None,
+    )
+
+
+def test_recording_target_applies_optional_rank_filter() -> None:
+    assert _matches_recording_target(
+        {"race_laps_completed": 3, "termination_reason": "finished", "position": 2},
+        target_laps=3,
+        target_rank=3,
+    )
+    assert not _matches_recording_target(
+        {"race_laps_completed": 3, "termination_reason": "finished", "position": 4},
+        target_laps=3,
+        target_rank=3,
+    )
 
 
 def test_attempt_seed_is_stable_per_attempt() -> None:
@@ -218,6 +314,7 @@ def test_move_result_to_output_keeps_existing_file_if_replace_fails(
                 path=attempt_path,
                 matched=True,
                 finish_rank=1,
+                race_laps_completed=3,
                 episode_return=123.0,
                 episode_steps=456,
                 race_time_ms=78_900,
@@ -255,9 +352,14 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
 
     class FakePolicyRunner:
         checkpoint_curriculum_stage_index: int | None = None
+        refresh_if_due_called = False
 
         def reset(self) -> None:
             return None
+
+        def refresh_if_due(self, *, interval_seconds: float) -> None:
+            assert interval_seconds == 10.0
+            self.refresh_if_due_called = True
 
         def predict(
             self,
@@ -265,8 +367,10 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
             *,
             deterministic: bool,
             action_masks: object,
+            refresh: bool,
         ) -> int:
             del observation, deterministic, action_masks
+            assert refresh is False
             return 7
 
     class FakeEnv:
@@ -297,6 +401,7 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
                 info={
                     "termination_reason": "finished",
                     "position": 1,
+                    "race_laps_completed": 3,
                     "episode_step": 1,
                     "race_time_ms": 1234,
                 },
@@ -322,7 +427,10 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
         attempt=1,
         seed=123,
         deterministic=True,
+        target_laps=3,
         target_rank=1,
+        reload_during_episode=True,
+        reload_interval_seconds=10.0,
         video=VideoSettings(
             path=tmp_path / "attempt.mp4",
             ffmpeg_path="ffmpeg",
@@ -333,5 +441,7 @@ def test_run_attempt_steps_policy_action_not_decoded_control(
 
     assert env.stepped_action == 7
     assert env.step_control_called is False
+    assert policy_runner.refresh_if_due_called is True
     assert result.matched is True
+    assert result.race_laps_completed == 3
     assert result.episode_return == pytest.approx(1.5)

@@ -4,8 +4,8 @@ from __future__ import annotations
 import torch as th
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.config.schema import PolicyConfig
 from rl_fzerox.core.envs.actions import DiscreteActionDimension
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig
 
 
 def apply_initial_action_biases(

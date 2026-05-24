@@ -2,15 +2,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import TypeGuard
 
 import numpy as np
 from gymnasium import spaces
 
 from fzerox_emulator import ControllerState
 from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
-from rl_fzerox.core.domain.hybrid_action import HYBRID_CONTINUOUS_ACTION_KEY
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
-from rl_fzerox.core.envs.actions.discrete.steer_drive import ACCELERATE_MASK
+from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 
 
 class ContinuousDriveDecoder:
@@ -53,14 +53,22 @@ class ContinuousDriveDecoder:
             return 0
 
         self._pwm_phase -= 1.0
-        return ACCELERATE_MASK
+        return RACE_CONTROL_MASKS.accelerate
 
 
 class ContinuousButtonPwmDecoder:
     """Decode positive continuous intent into a binary button with deterministic PWM."""
 
-    def __init__(self, *, deadzone: float) -> None:
+    def __init__(
+        self,
+        *,
+        deadzone: float,
+        full_threshold: float = 1.0,
+        min_duty: float = 0.0,
+    ) -> None:
         self._deadzone = deadzone
+        self._full_threshold = full_threshold
+        self._min_duty = min_duty
         self._pwm_phase = 0.0
 
     def reset(self) -> None:
@@ -69,7 +77,12 @@ class ContinuousButtonPwmDecoder:
         self._pwm_phase = 0.0
 
     def decode(self, value: float, *, button_mask: int) -> int:
-        duty = _positive_button_pwm_duty_cycle(value, deadzone=self._deadzone)
+        duty = _positive_button_pwm_duty_cycle(
+            value,
+            deadzone=self._deadzone,
+            full_threshold=self._full_threshold,
+            min_duty=self._min_duty,
+        )
         if duty <= 0.0:
             self._pwm_phase = 0.0
             return 0
@@ -91,14 +104,7 @@ def continuous_action_array(
 ) -> ContinuousAction:
     if isinstance(action, Mapping):
         raise ValueError("Continuous steer-drive action must be a numeric sequence")
-    if isinstance(action, np.ndarray):
-        values = action.astype(np.float32, copy=False).reshape(-1)
-    elif isinstance(action, int | float | np.integer | np.floating):
-        values = np.array([float(action)], dtype=np.float32)
-    elif isinstance(action, str | bytes):
-        raise ValueError("Continuous steer-drive action must be numeric")
-    else:
-        values = np.array([float(value) for value in action], dtype=np.float32)
+    values = _coerce_continuous_action_values(action)
 
     if values.size != expected_size:
         labels = ", ".join(field_labels)
@@ -117,14 +123,7 @@ def discrete_action_array(
     action_label: str,
     field_labels: tuple[str, ...],
 ) -> DiscreteAction:
-    if isinstance(action, np.ndarray):
-        values = action.astype(np.int64, copy=False).reshape(-1)
-    elif isinstance(action, int | float | np.integer | np.floating):
-        values = np.array([int(action)], dtype=np.int64)
-    elif isinstance(action, str | bytes):
-        raise ValueError(f"{action_label} action must be numeric")
-    else:
-        values = np.array([int(value) for value in action], dtype=np.int64)
+    values = _coerce_discrete_action_values(action, action_label=action_label)
 
     if values.size != expected_size:
         labels = ", ".join(field_labels)
@@ -142,6 +141,38 @@ def hybrid_branch(
         return action[branch_name]
     except KeyError as exc:
         raise ValueError(f"Hybrid action is missing {branch_name!r} branch") from exc
+
+
+def _coerce_continuous_action_values(action: ActionValue) -> ContinuousAction:
+    if isinstance(action, np.ndarray):
+        return np.asarray(action, dtype=np.float32).reshape(-1)
+    if _is_action_scalar(action):
+        return np.array([float(action)], dtype=np.float32)
+    if isinstance(action, str | bytes):
+        raise ValueError("Continuous steer-drive action must be numeric")
+    if not isinstance(action, tuple | list):
+        raise ValueError("Continuous steer-drive action must be numeric")
+    return np.array([float(value) for value in action], dtype=np.float32)
+
+
+def _coerce_discrete_action_values(
+    action: ActionBranchValue,
+    *,
+    action_label: str,
+) -> DiscreteAction:
+    if isinstance(action, np.ndarray):
+        return np.asarray(action, dtype=np.int64).reshape(-1)
+    if _is_action_scalar(action):
+        return np.array([int(action)], dtype=np.int64)
+    if isinstance(action, str | bytes):
+        raise ValueError(f"{action_label} action must be numeric")
+    if not isinstance(action, tuple | list):
+        raise ValueError(f"{action_label} action must be numeric")
+    return np.array([int(value) for value in action], dtype=np.int64)
+
+
+def _is_action_scalar(value: object) -> TypeGuard[int | float | np.integer | np.floating]:
+    return isinstance(value, int | float | np.integer | np.floating)
 
 
 def continuous_drive_gas_level(
@@ -178,17 +209,25 @@ def requested_gas_level(
             full_threshold=continuous_drive_full_threshold,
             min_thrust=continuous_drive_min_thrust,
         )
-    return 1.0 if control_state.joypad_mask & ACCELERATE_MASK else 0.0
+    return 1.0 if control_state.joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
 
 
-def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float | None:
+def action_drive_axis(
+    action: ActionValue,
+    action_space: spaces.Space,
+    *,
+    drive_axis_index: int | None = None,
+) -> float | None:
     """Extract the raw continuous drive axis when the action space exposes one."""
+
+    if drive_axis_index is None:
+        return None
 
     source: object
     if isinstance(action_space, spaces.Dict):
         if not isinstance(action, Mapping):
             return None
-        source = action.get(HYBRID_CONTINUOUS_ACTION_KEY)
+        source = action.get("continuous")
     elif isinstance(action_space, spaces.Box):
         source = action
     else:
@@ -199,9 +238,10 @@ def action_drive_axis(action: ActionValue, action_space: spaces.Space) -> float 
         values = np.asarray(source, dtype=np.float32).reshape(-1)
     except (TypeError, ValueError):
         return None
-    if values.size < 2 or not np.isfinite(values[1]):
+    axis_index = int(drive_axis_index)
+    if axis_index < 0 or values.size <= axis_index or not np.isfinite(values[axis_index]):
         return None
-    return float(np.clip(values[1], -1.0, 1.0))
+    return float(np.clip(values[axis_index], -1.0, 1.0))
 
 
 def _continuous_drive_thrust_curve(
@@ -226,8 +266,18 @@ def _clamp_unit(value: float) -> float:
     return min(max(float(value), 0.0), 1.0)
 
 
-def _positive_button_pwm_duty_cycle(value: float, *, deadzone: float) -> float:
+def _positive_button_pwm_duty_cycle(
+    value: float,
+    *,
+    deadzone: float,
+    full_threshold: float,
+    min_duty: float,
+) -> float:
     # One-sided buttons should be neutral at 0; positive values express duty.
     if value <= deadzone:
         return 0.0
-    return (value - deadzone) / (1.0 - deadzone)
+    minimum = _clamp_unit(min_duty)
+    if value >= full_threshold or bool(np.isclose(value, full_threshold)):
+        return 1.0
+    scaled = (value - deadzone) / (full_threshold - deadzone)
+    return minimum + ((1.0 - minimum) * scaled)

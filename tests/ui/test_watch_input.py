@@ -3,15 +3,9 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rl_fzerox.core.envs.actions import (
-    ACCELERATE_MASK,
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.input import SpeedKeyRepeat, _poll_viewer_input, mouse_over_clickable
-from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox
+from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox, StateFeatureHitbox
 
 
 class _PressedKeys:
@@ -39,6 +33,9 @@ class _FakePygame:
     K_0 = 40
     K_KP0 = 41
     K_r = 26
+    K_e = 43
+    K_t = 42
+    K_f = 44
     K_d = 27
     K_m = 35
     K_c = 39
@@ -59,6 +56,8 @@ class _FakePygame:
     K_4 = 32
     K_5 = 33
     K_6 = 34
+    K_7 = 45
+    K_8 = 46
 
     def __init__(
         self,
@@ -163,10 +162,28 @@ def test_poll_viewer_input_does_not_double_count_initial_held_speed_key() -> Non
     assert viewer_input.control_fps_delta == 1
 
 
-def test_poll_viewer_input_maps_r_to_force_reset() -> None:
+def test_poll_viewer_input_maps_r_to_current_course_reset() -> None:
     viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_r,)))
 
-    assert viewer_input.force_reset is True
+    assert viewer_input.reset_mode == "current"
+
+
+def test_poll_viewer_input_maps_e_to_previous_course_reset() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_e,)))
+
+    assert viewer_input.reset_mode == "previous"
+
+
+def test_poll_viewer_input_maps_t_to_next_course_reset() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_t,)))
+
+    assert viewer_input.reset_mode == "next"
+
+
+def test_poll_viewer_input_maps_f_to_current_course_anchor_toggle() -> None:
+    viewer_input = _poll_viewer_input(_FakePygame((_FakePygame.K_f,)))
+
+    assert viewer_input.toggle_current_course_lock is True
 
 
 def test_poll_viewer_input_maps_d_to_policy_mode_toggle() -> None:
@@ -206,6 +223,8 @@ def test_poll_viewer_input_selects_panel_tabs_with_number_keys() -> None:
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_4,))).panel_tab_index == 3
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_5,))).panel_tab_index == 4
     assert _poll_viewer_input(_FakePygame((_FakePygame.K_6,))).panel_tab_index == 5
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_7,))).panel_tab_index == 6
+    assert _poll_viewer_input(_FakePygame((_FakePygame.K_8,))).panel_tab_index == 7
 
 
 def test_poll_viewer_input_selects_panel_tab_with_mouse_click() -> None:
@@ -227,21 +246,47 @@ def test_poll_viewer_input_selects_record_tab_with_mouse_click() -> None:
     assert viewer_input.record_tab_index == 1
 
 
+def test_poll_viewer_input_selects_cnn_layer_tab_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 42)),
+        panel_tab_rects=((0, 0, 40, 20),),
+        cnn_layer_tab_rects=((0, 30, 40, 20), (50, 30, 40, 20)),
+    )
+
+    assert viewer_input.cnn_layer_tab_index == 1
+
+
 def test_poll_viewer_input_selects_record_course_with_mouse_click() -> None:
     viewer_input = _poll_viewer_input(
         _FakePygame((), mouse_click=(75, 72)),
         panel_tab_rects=((0, 0, 40, 20),),
         record_tab_rects=((0, 30, 40, 20),),
-        record_course_hitboxes=(
-            RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),
+        record_course_hitboxes=(RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city"),),
+    )
+
+    assert viewer_input.jump_course_id == "mute_city"
+
+
+def test_poll_viewer_input_selects_state_feature_toggle_with_mouse_click() -> None:
+    viewer_input = _poll_viewer_input(
+        _FakePygame((), mouse_click=(75, 102)),
+        state_feature_hitboxes=(
+            StateFeatureHitbox(
+                rect=(50, 90, 120, 20),
+                feature_name="vehicle_state.speed_kph_norm",
+            ),
         ),
     )
 
-    assert viewer_input.toggle_record_course_lock_id == "mute_city"
+    assert viewer_input.toggle_zeroed_state_feature_name == "vehicle_state.speed_kph_norm"
 
 
 def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
     record_hitbox = RecordCourseHitbox(rect=(50, 60, 120, 20), course_id="mute_city")
+    state_feature_hitbox = StateFeatureHitbox(
+        rect=(50, 90, 120, 20),
+        feature_name="vehicle_state.speed_kph_norm",
+    )
 
     assert mouse_over_clickable(
         (25, 12),
@@ -251,13 +296,19 @@ def test_mouse_over_clickable_matches_watch_hitboxes() -> None:
         (75, 42),
         record_tab_rects=((50, 30, 40, 20),),
     )
+    assert mouse_over_clickable(
+        (75, 52),
+        cnn_layer_tab_rects=((50, 40, 40, 20),),
+    )
     assert mouse_over_clickable((75, 72), record_course_hitboxes=(record_hitbox,))
+    assert mouse_over_clickable((75, 102), state_feature_hitboxes=(state_feature_hitbox,))
     assert not mouse_over_clickable(
         (500, 500),
         deterministic_toggle_rect=(0, 0, 40, 20),
         panel_tab_rects=((0, 30, 40, 20),),
         record_tab_rects=((50, 30, 40, 20),),
         record_course_hitboxes=(record_hitbox,),
+        state_feature_hitboxes=(state_feature_hitbox,),
     )
 
 
@@ -280,8 +331,8 @@ def test_poll_viewer_input_maps_manual_keys_to_n64_controls() -> None:
     state = viewer_input.control_state
     assert state.left_stick_x == -1.0
     assert state.left_stick_y == -1.0
-    assert state.joypad_mask & ACCELERATE_MASK
-    assert state.joypad_mask & AIR_BRAKE_MASK
-    assert state.joypad_mask & BOOST_MASK
-    assert state.joypad_mask & LEAN_LEFT_MASK
-    assert state.joypad_mask & LEAN_RIGHT_MASK
+    assert state.joypad_mask & RACE_CONTROL_MASKS.accelerate
+    assert state.joypad_mask & RACE_CONTROL_MASKS.air_brake
+    assert state.joypad_mask & RACE_CONTROL_MASKS.boost
+    assert state.joypad_mask & RACE_CONTROL_MASKS.lean_left
+    assert state.joypad_mask & RACE_CONTROL_MASKS.lean_right

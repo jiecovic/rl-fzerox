@@ -5,15 +5,30 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from rl_fzerox.core.config.paths import project_root_dir
+from rl_fzerox.core.runtime_spec.paths import project_root_dir
+
+
+@dataclass(frozen=True, slots=True)
+class GenericModeBaselineDefaults:
+    """Stable generic race-start seed used to derive exact target baselines."""
+
+    course_index: int = 0
+    vehicle: str = "blue_falcon"
+    engine_setting_raw_value: int = 50
 
 
 @dataclass(frozen=True, slots=True)
 class BaselineMaterializerSettings:
     """Stable materializer settings that affect cache identity and filenames."""
 
-    schema_version: int = 8
+    schema_version: int = 16
+    boot_menu_gp_race_mode: str = "boot_menu_gp_race"
     boot_menu_time_attack_mode: str = "boot_menu_time_attack"
+    generic_mode_gp_race_mode: str = "generic_mode_gp_race"
+    generic_mode_time_attack_mode: str = "generic_mode_time_attack"
+    generic_mode_baseline: GenericModeBaselineDefaults = field(
+        default_factory=GenericModeBaselineDefaults
+    )
     cache_root: Path = field(
         default_factory=lambda: project_root_dir() / "local" / "cache" / "baseline_materializer"
     )

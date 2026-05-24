@@ -7,6 +7,7 @@ from tests.support.native_objects import make_telemetry
 
 class FakeTextSurface:
     def __init__(self, text: str) -> None:
+        self.text = text
         self._width = len(text) * 7
         self._height = 18 if any(char in text for char in "Agyp") else 11
 
@@ -23,8 +24,11 @@ class FakeFont:
 
 
 class FakeScreen:
+    def __init__(self) -> None:
+        self.blits: list[tuple[str, tuple[int, int]]] = []
+
     def blit(self, surface: FakeTextSurface, position: tuple[int, int]) -> None:
-        return None
+        self.blits.append((surface.text, position))
 
 
 def fake_viewer_fonts() -> ViewerFonts:

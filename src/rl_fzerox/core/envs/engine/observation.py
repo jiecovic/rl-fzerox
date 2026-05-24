@@ -7,7 +7,6 @@ from gymnasium import spaces
 
 from fzerox_emulator import EmulatorBackend, FZeroXTelemetry, ObservationSpec
 from fzerox_emulator.arrays import ObservationFrame
-from rl_fzerox.core.config.schema import EnvConfig
 from rl_fzerox.core.domain.observation_components import (
     ActionHistoryControlName,
     StateComponentsSettings,
@@ -19,8 +18,9 @@ from rl_fzerox.core.envs.observations import (
     action_history_settings_for_observation,
     build_observation,
     build_observation_space,
-    state_feature_names,
 )
+from rl_fzerox.core.runtime_spec.renderers import RendererName
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
 
 
 @dataclass(slots=True)
@@ -29,10 +29,10 @@ class EngineObservationBuilder:
 
     backend: EmulatorBackend
     config: EnvConfig
+    renderer: RendererName
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
-    zeroed_state_components: tuple[str, ...]
-    zeroed_state_features: tuple[str, ...]
+    independent_lean_buttons: bool
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -43,19 +43,15 @@ class EngineObservationBuilder:
         *,
         backend: EmulatorBackend,
         config: EnvConfig,
+        renderer: RendererName,
     ) -> EngineObservationBuilder:
-        spec = backend.observation_spec(config.observation.preset)
+        spec = backend.observation_spec(
+            **config.observation.native_resolution_kwargs(renderer=renderer)
+        )
         state_components = config.observation.state_components_data()
+        independent_lean_buttons = config.action.independent_lean_buttons
         action_history_len, action_history_controls = action_history_settings_for_observation(
             state_components=state_components,
-            fallback_len=config.observation.action_history_len,
-            fallback_controls=config.observation.action_history_controls,
-        )
-        zeroed_state_features = _validated_zeroed_state_features(
-            config=config,
-            state_components=state_components,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
         )
         space = build_observation_space(
             spec,
@@ -63,20 +59,16 @@ class EngineObservationBuilder:
             stack_mode=config.observation.stack_mode,
             minimap_layer=config.observation.minimap_layer,
             mode=config.observation.mode,
-            state_profile=config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
             state_components=state_components,
+            independent_lean_buttons=independent_lean_buttons,
         )
         return cls(
             backend=backend,
             config=config,
+            renderer=renderer,
             spec=spec,
             state_components=state_components,
-            zeroed_state_components=tuple(config.observation.zeroed_state_components),
-            zeroed_state_features=zeroed_state_features,
+            independent_lean_buttons=independent_lean_buttons,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -84,12 +76,12 @@ class EngineObservationBuilder:
 
     def render_image(self) -> ObservationFrame:
         return self.backend.render_observation(
-            preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
             resize_filter=self.config.observation.resize_filter,
             minimap_resize_filter=self.config.observation.minimap_resize_filter,
+            **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 
     def build_observation(
@@ -105,16 +97,9 @@ class EngineObservationBuilder:
             image=image,
             telemetry=telemetry,
             mode=self.config.observation.mode,
-            state_profile=self.config.observation.state_profile,
-            course_context=self.config.observation.course_context,
-            ground_effect_context=self.config.observation.ground_effect_context,
-            action_history_len=self.action_history_len,
-            action_history_controls=self.action_history_controls,
             action_history=control_state.action_history_fields(),
             state_components=self.state_components,
-            zeroed_state_components=self.zeroed_state_components,
-            zeroed_state_features=self.zeroed_state_features,
-            **control_state.observation_fields(),
+            independent_lean_buttons=self.independent_lean_buttons,
         )
 
     def set_info(
@@ -133,45 +118,8 @@ class EngineObservationBuilder:
             observation_resize_filter=self.config.observation.resize_filter,
             observation_minimap_resize_filter=self.config.observation.minimap_resize_filter,
             observation_mode=self.config.observation.mode,
-            observation_state_profile=self.config.observation.state_profile,
-            observation_course_context=self.config.observation.course_context,
-            observation_ground_effect_context=self.config.observation.ground_effect_context,
             action_history_len=self.action_history_len,
             action_history_controls=self.action_history_controls,
             observation_state_components=self.state_components,
-            observation_zeroed_state_components=self.zeroed_state_components,
-            observation_zeroed_state_features=self.zeroed_state_features,
+            independent_lean_buttons=self.independent_lean_buttons,
         )
-
-
-def _validated_zeroed_state_features(
-    *,
-    config: EnvConfig,
-    state_components: StateComponentsSettings | None,
-    action_history_len: int | None,
-    action_history_controls: tuple[ActionHistoryControlName, ...],
-) -> tuple[str, ...]:
-    zeroed_state_features = tuple(config.observation.zeroed_state_features)
-    if not zeroed_state_features:
-        return ()
-
-    active_features = set(
-        state_feature_names(
-            config.observation.state_profile,
-            course_context=config.observation.course_context,
-            ground_effect_context=config.observation.ground_effect_context,
-            action_history_len=action_history_len,
-            action_history_controls=action_history_controls,
-            state_components=state_components,
-        )
-    )
-    unknown_features = sorted(
-        feature for feature in zeroed_state_features if feature not in active_features
-    )
-    if unknown_features:
-        joined = ", ".join(unknown_features)
-        raise ValueError(
-            "observation.zeroed_state_features must reference active state features: "
-            f"{joined}"
-        )
-    return zeroed_state_features

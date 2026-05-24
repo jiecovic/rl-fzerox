@@ -7,16 +7,26 @@ from typing import TYPE_CHECKING, Literal, Protocol
 
 import numpy as np
 
-from fzerox_emulator.arrays import Float32Array, RgbFrame
+from fzerox_emulator.arrays import Float32Array, RgbFrame, UInt8Array
 
 if TYPE_CHECKING:
     from rl_fzerox.core.envs.observations import ObservationValue
     from rl_fzerox.core.training.inference import PolicyCnnActivation
 
-_MAX_ACTIVATION_GRID_CHANNELS = 128
-CnnActivationNormalizationMode = Literal["channel", "layer_percentile"]
+CnnActivationNormalizationMode = Literal["channel", "layer_percentile", "stats"]
 DEFAULT_CNN_ACTIVATION_NORMALIZATION: CnnActivationNormalizationMode = "channel"
-_LAYER_PERCENTILE_HIGH = 99.0
+
+
+@dataclass(frozen=True, slots=True)
+class CnnActivationRenderConfig:
+    """Controls the watch-friendly rendering subset for CNN activations."""
+
+    max_grid_channels: int = 128
+    layer_percentile_high: float = 99.0
+    active_epsilon: float = 1e-6
+
+
+_RENDER_CONFIG = CnnActivationRenderConfig()
 
 
 class _CnnActivationRunner(Protocol):
@@ -27,8 +37,23 @@ class _CnnActivationRunner(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class CnnActivationChannelStats:
+    """Per-channel activation statistics used by the watch CNN stats mode."""
+
+    index: int
+    minimum: float
+    maximum: float
+    mean: float
+    mean_abs: float
+    std: float
+    max_abs: float
+    active_fraction: float
+    dead: bool
+
+
+@dataclass(frozen=True, slots=True)
 class CnnActivationLayer:
-    """One pre-rendered CNN activation grid for the watch UI."""
+    """One pre-rendered CNN activation payload for the watch UI."""
 
     name: str
     image: RgbFrame
@@ -37,6 +62,7 @@ class CnnActivationLayer:
     grid_shape: tuple[int, int]
     rendered_channel_count: int
     normalization: CnnActivationNormalizationMode
+    channel_stats: tuple[CnnActivationChannelStats, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,12 +89,14 @@ class CnnActivationSampler:
         policy_runner: _CnnActivationRunner | None,
         observation: ObservationValue,
         normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
+        force_refresh: bool = False,
     ) -> CnnActivationSnapshot | None:
         if not enabled or policy_runner is None:
             self._steps_until_refresh = 0
             return None
         if (
-            self._cached is not None
+            not force_refresh
+            and self._cached is not None
             and self._cached.normalization == normalization
             and self._steps_until_refresh > 0
         ):
@@ -111,7 +139,7 @@ def _activation_layer(
     if values.ndim != 3:
         raise ValueError(f"Expected CxHxW activation map, got {values.shape!r}")
     channel_count, height, width = values.shape
-    rendered_channel_count = min(channel_count, _MAX_ACTIVATION_GRID_CHANNELS)
+    rendered_channel_count = min(channel_count, _RENDER_CONFIG.max_grid_channels)
     return CnnActivationLayer(
         name=activation.name,
         image=_activation_grid(values, normalization=normalization),
@@ -120,13 +148,17 @@ def _activation_layer(
         grid_shape=_activation_grid_shape(rendered_channel_count),
         rendered_channel_count=int(rendered_channel_count),
         normalization=normalization,
+        channel_stats=_activation_channel_stats(
+            values,
+            rendered_channel_count=rendered_channel_count,
+        ),
     )
 
 
 def _activation_grid(
     values: Float32Array,
     *,
-    max_channels: int = _MAX_ACTIVATION_GRID_CHANNELS,
+    max_channels: int = _RENDER_CONFIG.max_grid_channels,
     normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
 ) -> RgbFrame:
     channel_count, tile_height, tile_width = values.shape
@@ -156,6 +188,8 @@ def next_cnn_activation_normalization(
 ) -> CnnActivationNormalizationMode:
     if mode == "channel":
         return "layer_percentile"
+    if mode == "layer_percentile":
+        return "stats"
     return "channel"
 
 
@@ -176,13 +210,13 @@ def _activation_scale(
     *,
     normalization: CnnActivationNormalizationMode,
 ) -> tuple[float, float] | None:
-    if normalization == "channel":
+    if normalization != "layer_percentile":
         return None
 
     finite = np.nan_to_num(values.astype(np.float32), copy=False)
     if finite.size == 0:
         return (0.0, 0.0)
-    high = float(np.percentile(finite, _LAYER_PERCENTILE_HIGH))
+    high = float(np.percentile(finite, _RENDER_CONFIG.layer_percentile_high))
     return (0.0, high)
 
 
@@ -190,7 +224,7 @@ def _normalized_channel(
     channel: Float32Array,
     *,
     scale: tuple[float, float] | None,
-) -> np.ndarray:
+) -> UInt8Array:
     finite = np.nan_to_num(channel.astype(np.float32), copy=False)
     if scale is None:
         min_value = float(finite.min(initial=0.0))
@@ -201,3 +235,40 @@ def _normalized_channel(
         return np.zeros(finite.shape, dtype=np.uint8)
     scaled = (finite - min_value) * (255.0 / (max_value - min_value))
     return np.clip(scaled, 0.0, 255.0).astype(np.uint8)
+
+
+def _activation_channel_stats(
+    values: Float32Array,
+    *,
+    rendered_channel_count: int,
+) -> tuple[CnnActivationChannelStats, ...]:
+    selected = np.nan_to_num(
+        values[:rendered_channel_count].astype(np.float32),
+        copy=False,
+    )
+    if selected.size == 0:
+        return ()
+
+    flat = selected.reshape(selected.shape[0], -1)
+    minimums = flat.min(axis=1)
+    maximums = flat.max(axis=1)
+    means = flat.mean(axis=1)
+    absolute = np.abs(flat)
+    mean_abs = absolute.mean(axis=1)
+    max_abs = absolute.max(axis=1)
+    stds = flat.std(axis=1)
+    active_fractions = (absolute > _RENDER_CONFIG.active_epsilon).mean(axis=1)
+    return tuple(
+        CnnActivationChannelStats(
+            index=index,
+            minimum=float(minimums[index]),
+            maximum=float(maximums[index]),
+            mean=float(means[index]),
+            mean_abs=float(mean_abs[index]),
+            std=float(stds[index]),
+            max_abs=float(max_abs[index]),
+            active_fraction=float(active_fractions[index]),
+            dead=bool(max_abs[index] <= _RENDER_CONFIG.active_epsilon),
+        )
+        for index in range(flat.shape[0])
+    )

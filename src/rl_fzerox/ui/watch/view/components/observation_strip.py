@@ -16,6 +16,7 @@ from rl_fzerox.ui.watch.view.panels.core.format import (
     _observation_stack_size,
 )
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
+from rl_fzerox.ui.watch.view.screen.observation_preview import _observation_preview_size
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE, Color
 from rl_fzerox.ui.watch.view.screen.types import (
     ControlViz,
@@ -36,6 +37,8 @@ class _ObservationGlassStyle:
     highlight: Color = (86, 101, 116)
     preview_border: Color = PALETTE.text_warning
     preview_border_width: int = 2
+    padding: int = 8
+    label_gap: int = 5
 
 
 _OBSERVATION_GLASS_STYLE = _ObservationGlassStyle()
@@ -46,12 +49,12 @@ def _draw_control_viz_below_game(
     pygame: PygameModule,
     screen: PygameSurface,
     fonts: ViewerFonts,
-    game_display_size: tuple[int, int],
+    left_column_size: tuple[int, int],
     control_viz: ControlViz,
 ) -> tuple[ViewerHitboxes, int]:
     x = LAYOUT.preview_padding
-    y = game_display_size[1] + LAYOUT.preview_gap
-    width = game_display_size[0] - (2 * LAYOUT.preview_padding)
+    y = left_column_size[1] + LAYOUT.preview_gap
+    width = left_column_size[0] - (2 * LAYOUT.preview_padding)
     if width <= 0 or y >= screen.get_height():
         return ViewerHitboxes(), y
 
@@ -65,6 +68,53 @@ def _draw_control_viz_below_game(
         control_viz=control_viz,
     )
     return ViewerHitboxes(deterministic_toggle=deterministic_toggle_rect), bottom
+
+
+def _native_observation_preview_width(
+    *,
+    observation_shape: tuple[int, ...],
+    info: dict[str, object],
+) -> int:
+    style = _OBSERVATION_GLASS_STYLE
+    preview_width, _ = _observation_preview_size(observation_shape, info=info)
+    return preview_width + (2 * style.padding)
+
+
+def _native_observation_preview_height(
+    *,
+    fonts: ViewerFonts,
+    observation_shape: tuple[int, ...],
+    info: dict[str, object],
+    width: int,
+) -> int:
+    if width <= 0:
+        return 0
+
+    style = _OBSERVATION_GLASS_STYLE
+    _, preview_height = _observation_preview_size(observation_shape, info=info)
+    title_height = fonts.section.render("Policy Obs", True, PALETTE.text_primary).get_height()
+    subtitle_height = fonts.small.render(
+        _format_observation_summary(observation_shape, info=info),
+        True,
+        PALETTE.text_muted,
+    ).get_height()
+    labels = _observation_tile_label_texts(observation_shape, info=info)
+    label_gap = style.label_gap if labels else 0
+    label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
+    legend_height = _macro_legend_height(fonts=fonts, width=width)
+    legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
+    return (
+        title_height
+        + LAYOUT.preview_title_gap
+        + subtitle_height
+        + LAYOUT.section_rule_gap
+        + (2 * style.padding)
+        + preview_height
+        + label_gap
+        + label_row_height
+        + legend_gap
+        + legend_height
+    )
 
 
 def _draw_observation_preview_in_rect(
@@ -96,33 +146,24 @@ def _draw_observation_preview_in_rect(
     y += subtitle_surface.get_height() + LAYOUT.section_rule_gap
 
     preview_width, preview_height = surface.get_size()
-    glass_padding = 8
+    style = _OBSERVATION_GLASS_STYLE
+    glass_padding = style.padding
     labels = _observation_tile_label_texts(observation_shape, info=info)
-    label_gap = 5 if labels else 0
+    label_gap = style.label_gap if labels else 0
     label_row_height = _observation_label_row_height(font=fonts.body, labels=labels)
     legend_height = _macro_legend_height(fonts=fonts, width=width)
     legend_gap = LAYOUT.preview_gap if legend_height > 0 else 0
     max_preview_width = width - (2 * glass_padding)
     max_preview_height = (
-        bottom
-        - y
-        - (2 * glass_padding)
-        - label_gap
-        - label_row_height
-        - legend_gap
-        - legend_height
+        bottom - y - (2 * glass_padding) - label_gap - label_row_height - legend_gap - legend_height
     )
     if max_preview_width <= 0 or max_preview_height <= 0:
         return
 
-    scale = min(1.0, max_preview_width / preview_width, max_preview_height / preview_height)
-    if scale <= 0:
+    if preview_width > max_preview_width or preview_height > max_preview_height:
         return
 
-    scaled_size = (
-        max(1, round(preview_width * scale)),
-        max(1, round(preview_height * scale)),
-    )
+    scaled_size = (preview_width, preview_height)
     glass_size = (
         scaled_size[0] + (2 * glass_padding),
         scaled_size[1] + label_gap + label_row_height + (2 * glass_padding),
@@ -135,12 +176,7 @@ def _draw_observation_preview_in_rect(
     preview_x = glass_rect.left + glass_padding
     preview_rect = pygame.Rect(preview_x, preview_y, *scaled_size)
     pygame.draw.rect(screen, PALETTE.panel_background, preview_rect)
-    preview_surface = (
-        surface
-        if surface.get_size() == scaled_size
-        else pygame.transform.scale(surface, scaled_size)
-    )
-    screen.blit(preview_surface, preview_rect.topleft)
+    screen.blit(surface, preview_rect.topleft)
     _draw_observation_tile_borders(
         pygame=pygame,
         screen=screen,

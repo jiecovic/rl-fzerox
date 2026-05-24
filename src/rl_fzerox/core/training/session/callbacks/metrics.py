@@ -47,8 +47,8 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("step_reward_clip_abs_excess", "reward_clip/abs_excess_mean"),
     ),
     step_rates=(
+        _MetricLogSpec("impact_frames", "state/impact_step_rate"),
         _MetricLogSpec("damage_taken_frames", "state/damage_taken_step_rate"),
-        _MetricLogSpec("collision_recoil_entered", "state/collision_recoil_entry_rate"),
         _MetricLogSpec("boost_pad_entered", "state/boost_pad_entry_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),

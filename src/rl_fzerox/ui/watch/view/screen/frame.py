@@ -9,22 +9,26 @@ import numpy as np
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
-from rl_fzerox.core.config.schema import PolicyConfig, TrainConfig
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
+from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
 from rl_fzerox.ui.watch.view.components.game_view import _draw_glass_game_view
 from rl_fzerox.ui.watch.view.components.observation_strip import (
     _draw_control_viz_below_game,
     _draw_observation_preview_in_rect,
+    _native_observation_preview_height,
+    _native_observation_preview_width,
 )
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import (
     _observation_preview_size,
     _preview_frame,
     _window_size,
 )
 from rl_fzerox.ui.watch.view.panels.rendering.draw import SidePanelData, _draw_side_panel
-from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz
+from rl_fzerox.ui.watch.view.panels.visuals.viz import _control_viz, _control_viz_height
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import FONT_SIZES, PALETTE
 from rl_fzerox.ui.watch.view.screen.types import (
@@ -43,7 +47,12 @@ class FrameRenderData:
     raw_frame: RgbFrame
     observation: ObservationFrame
     observation_state: StateVector | None
+    observation_state_reference: StateVector | None
     observation_state_feature_names: tuple[str, ...]
+    policy_auxiliary_state_predictions: dict[str, object] | None
+    policy_auxiliary_state_targets: dict[str, object] | None
+    auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
+    live_episode_series: EpisodeLiveSeriesSnapshot | None
     episode: int
     info: dict[str, object]
     reset_info: dict[str, object]
@@ -60,6 +69,7 @@ class FrameRenderData:
     policy_label: str | None
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
+    policy_experience_frames: int | None
     policy_deterministic: bool | None
     manual_control_enabled: bool
     policy_action: ActionValue | None
@@ -67,14 +77,23 @@ class FrameRenderData:
     policy_reload_error: str | None
     cnn_activations: CnnActivationSnapshot | None
     best_finish_position: int | None
+    best_finish_ranks: dict[str, int]
     best_finish_times: dict[str, int]
     latest_finish_times: dict[str, int]
     latest_finish_deltas_ms: dict[str, int]
     failed_track_attempts: frozenset[str]
     track_pool_records: tuple[dict[str, object], ...]
     panel_tab_index: int
+    cnn_layer_tab_index: int
     record_tab_index: int
     continuous_drive_deadzone: float
+    continuous_drive_enabled: bool
+    force_full_throttle: bool
+    continuous_pitch_enabled: bool
+    continuous_air_brake_axis_index: int | None
+    continuous_air_brake_deadzone: float
+    continuous_air_brake_full_threshold: float
+    continuous_air_brake_min_duty: float
     continuous_air_brake_mode: str
     continuous_air_brake_disabled: bool
     action_repeat: int
@@ -112,13 +131,17 @@ def _create_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
     panel_tab_index: int = 0,
 ) -> PygameSurface:
     _apply_window_position_hint()
     screen = pygame.display.set_mode(
-        _window_size(
+        _watch_window_size(
             game_display_size,
             observation_shape,
+            fonts=fonts,
+            info=info,
             panel_tab_index=panel_tab_index,
         )
     )
@@ -132,6 +155,8 @@ def _ensure_screen(
     game_display_size: tuple[int, int],
     observation_shape: tuple[int, ...],
     *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
     panel_tab_index: int = 0,
 ) -> PygameSurface:
     if screen is None:
@@ -139,11 +164,15 @@ def _ensure_screen(
             pygame,
             game_display_size,
             observation_shape,
+            fonts=fonts,
+            info=info,
             panel_tab_index=panel_tab_index,
         )
-    if screen.get_size() == _window_size(
+    if screen.get_size() == _watch_window_size(
         game_display_size,
         observation_shape,
+        fonts=fonts,
+        info=info,
         panel_tab_index=panel_tab_index,
     ):
         return screen
@@ -151,12 +180,65 @@ def _ensure_screen(
         pygame,
         game_display_size,
         observation_shape,
+        fonts=fonts,
+        info=info,
         panel_tab_index=panel_tab_index,
     )
 
 
 def _watch_game_display_size() -> tuple[int, int]:
     return LAYOUT.game_display_size
+
+
+def _watch_left_column_width(
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+    *,
+    info: dict[str, object],
+) -> int:
+    native_preview_width = _native_observation_preview_width(
+        observation_shape=observation_shape,
+        info=info,
+    )
+    return max(game_display_size[0], native_preview_width + (2 * LAYOUT.preview_padding))
+
+
+def _watch_window_size(
+    game_display_size: tuple[int, int],
+    observation_shape: tuple[int, ...],
+    *,
+    fonts: ViewerFonts,
+    info: dict[str, object],
+    panel_tab_index: int = 0,
+) -> tuple[int, int]:
+    left_column_width = _watch_left_column_width(
+        game_display_size,
+        observation_shape,
+        info=info,
+    )
+    left_content_width = left_column_width - (2 * LAYOUT.preview_padding)
+    left_column_height = (
+        game_display_size[1]
+        + LAYOUT.preview_gap
+        + _control_viz_height(fonts)
+        + LAYOUT.preview_gap
+        + _native_observation_preview_height(
+            fonts=fonts,
+            observation_shape=observation_shape,
+            info=info,
+            width=left_content_width,
+        )
+        + LAYOUT.preview_padding
+    )
+    _, baseline_height = _window_size(
+        game_display_size,
+        observation_shape,
+        panel_tab_index=panel_tab_index,
+    )
+    return (
+        left_column_width + LAYOUT.preview_gap + LAYOUT.panel_width,
+        max(baseline_height, left_column_height),
+    )
 
 
 def _draw_frame(
@@ -167,6 +249,11 @@ def _draw_frame(
     data: FrameRenderData,
 ) -> ViewerHitboxes:
     game_display_size = _watch_game_display_size()
+    left_column_width = _watch_left_column_width(
+        game_display_size,
+        data.observation.shape,
+        info=data.info,
+    )
     game_surface = _rgb_surface(pygame, data.raw_frame)
 
     preview_frame = _preview_frame(data.observation, info=data.info)
@@ -185,7 +272,7 @@ def _draw_frame(
         fonts=fonts,
         surface=game_surface,
         outer_size=game_display_size,
-        course_label=_game_course_overlay_label(data.info),
+        course_label=_game_course_overlay_label(data.info, reset_info=data.reset_info),
         speed_label=_game_speed_overlay_label(data.info, action_repeat=data.action_repeat),
     )
     control_viz = _control_viz(
@@ -203,6 +290,13 @@ def _draw_frame(
         policy_action=data.policy_action,
         action_mask_branches=data.action_mask_branches,
         continuous_drive_deadzone=data.continuous_drive_deadzone,
+        continuous_drive_enabled=data.continuous_drive_enabled,
+        force_full_throttle=data.force_full_throttle,
+        continuous_pitch_enabled=data.continuous_pitch_enabled,
+        continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+        continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+        continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+        continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
     )
@@ -210,7 +304,7 @@ def _draw_frame(
         pygame=pygame,
         screen=screen,
         fonts=fonts,
-        game_display_size=game_display_size,
+        left_column_size=(left_column_width, game_display_size[1]),
         control_viz=control_viz,
     )
     _draw_observation_preview_in_rect(
@@ -220,18 +314,20 @@ def _draw_frame(
         surface=observation_surface,
         x=LAYOUT.preview_padding,
         y=control_bottom + LAYOUT.preview_gap,
-        width=game_display_size[0] - (2 * LAYOUT.preview_padding),
+        width=left_column_width - (2 * LAYOUT.preview_padding),
         height=screen.get_height() - control_bottom - LAYOUT.preview_gap - LAYOUT.preview_padding,
         observation_shape=data.observation.shape,
         info=data.info,
     )
     panel_rect = pygame.Rect(
-        game_display_size[0] + LAYOUT.preview_gap,
+        left_column_width + LAYOUT.preview_gap,
         0,
         LAYOUT.panel_width,
-        _window_size(
+        _watch_window_size(
             game_display_size,
             data.observation.shape,
+            fonts=fonts,
+            info=data.info,
             panel_tab_index=data.panel_tab_index,
         )[1],
     )
@@ -255,6 +351,7 @@ def _draw_frame(
             policy_label=data.policy_label,
             policy_curriculum_stage=data.policy_curriculum_stage,
             policy_num_timesteps=data.policy_num_timesteps,
+            policy_experience_frames=data.policy_experience_frames,
             policy_deterministic=data.policy_deterministic,
             manual_control_enabled=data.manual_control_enabled,
             policy_action=data.policy_action,
@@ -262,14 +359,20 @@ def _draw_frame(
             policy_reload_error=data.policy_reload_error,
             cnn_activations=data.cnn_activations,
             best_finish_position=data.best_finish_position,
+            best_finish_ranks=data.best_finish_ranks,
             best_finish_times=data.best_finish_times,
             latest_finish_times=data.latest_finish_times,
             latest_finish_deltas_ms=data.latest_finish_deltas_ms,
             failed_track_attempts=data.failed_track_attempts,
             track_pool_records=data.track_pool_records,
             panel_tab_index=data.panel_tab_index,
+            cnn_layer_tab_index=data.cnn_layer_tab_index,
             record_tab_index=data.record_tab_index,
             continuous_drive_deadzone=data.continuous_drive_deadzone,
+            continuous_air_brake_axis_index=data.continuous_air_brake_axis_index,
+            continuous_air_brake_deadzone=data.continuous_air_brake_deadzone,
+            continuous_air_brake_full_threshold=data.continuous_air_brake_full_threshold,
+            continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
             continuous_air_brake_mode=data.continuous_air_brake_mode,
             continuous_air_brake_disabled=data.continuous_air_brake_disabled,
             action_repeat=data.action_repeat,
@@ -279,7 +382,12 @@ def _draw_frame(
             game_display_size=game_display_size,
             observation_shape=data.observation.shape,
             observation_state=data.observation_state,
+            observation_state_reference=data.observation_state_reference,
             observation_state_feature_names=data.observation_state_feature_names,
+            policy_auxiliary_state_predictions=data.policy_auxiliary_state_predictions,
+            policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
+            auxiliary_episode_metrics=data.auxiliary_episode_metrics,
+            live_episode_series=data.live_episode_series,
             telemetry=data.telemetry,
             train_config=data.train_config,
             policy_config=data.policy_config,
@@ -289,8 +397,10 @@ def _draw_frame(
     return ViewerHitboxes(
         deterministic_toggle=control_hitboxes.deterministic_toggle,
         panel_tabs=side_panel_hitboxes.panel_tabs,
+        cnn_layer_tabs=side_panel_hitboxes.cnn_layer_tabs,
         record_tabs=side_panel_hitboxes.record_tabs,
         record_courses=side_panel_hitboxes.record_courses,
+        state_features=side_panel_hitboxes.state_features,
     )
 
 
@@ -333,7 +443,11 @@ def _energy_fraction(telemetry: FZeroXTelemetry | None) -> float | None:
     return max(0.0, min(1.0, energy / max_energy))
 
 
-def _game_course_overlay_label(info: dict[str, object]) -> str | None:
+def _game_course_overlay_label(
+    info: dict[str, object],
+    *,
+    reset_info: dict[str, object] | None = None,
+) -> str | None:
     course_name = info.get("track_course_name")
     if not isinstance(course_name, str) or not course_name:
         course_name = _fallback_course_name(info)
@@ -341,9 +455,26 @@ def _game_course_overlay_label(info: dict[str, object]) -> str | None:
         return None
 
     cup = _course_cup_name(info)
-    if cup is None:
-        return course_name
-    return f"{cup} : {course_name}"
+    label = course_name if cup is None else f"{cup} : {course_name}"
+    if _course_anchor_active(info, reset_info=reset_info):
+        return f"> {label} <"
+    return label
+
+
+def _course_anchor_active(
+    info: dict[str, object],
+    *,
+    reset_info: dict[str, object] | None,
+) -> bool:
+    if reset_info is None:
+        return False
+    locked_course_id = reset_info.get("track_sampling_locked_course_id")
+    if not isinstance(locked_course_id, str) or not locked_course_id:
+        return False
+    course_id = info.get("track_course_id")
+    if course_id is None:
+        return True
+    return course_id == locked_course_id
 
 
 def _game_speed_overlay_label(info: dict[str, object], *, action_repeat: int) -> str | None:

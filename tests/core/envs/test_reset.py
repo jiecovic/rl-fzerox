@@ -1,25 +1,28 @@
 # tests/core/envs/test_reset.py
 import pickle
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
 from fzerox_emulator import ControllerState
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
+from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     CurriculumStageConfig,
     EnvConfig,
     ObservationConfig,
+    ObservationStateComponentConfig,
     TrackRecordEntryConfig,
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
 from tests.core.envs.helpers import (
+    CameraSyncAfterIntroBackend,
     CameraSyncBackend,
     ScriptedStepBackend,
     image_obs,
@@ -42,18 +45,18 @@ def test_reset_returns_stacked_observation():
     obs, info = env.reset(seed=123)
     obs = image_obs(obs)
 
-    assert obs.shape == (116, 164, 12)
+    assert obs.shape == (84, 84, 12)
     assert obs.dtype == np.uint8
     assert info["backend"] == "synthetic"
     assert info["seed"] == 123
-    assert info["observation_shape"] == (116, 164, 12)
-    assert info["observation_frame_shape"] == (116, 164, 3)
+    assert info["observation_shape"] == (84, 84, 12)
+    assert info["observation_frame_shape"] == (84, 84, 3)
     assert info["observation_stack"] == 4
     assert np.array_equal(obs[:, :, 0:3], obs[:, :, 3:6])
     assert np.array_equal(obs[:, :, 3:6], obs[:, :, 6:9])
     assert np.array_equal(obs[:, :, 6:9], obs[:, :, 9:12])
     assert isinstance(env.action_space, MultiDiscrete)
-    assert env.action_space.nvec.tolist() == [7, 3, 2, 3]
+    assert env.action_space.nvec.tolist() == [7, 2, 2, 3]
 
 
 def test_reset_can_return_image_state_observation() -> None:
@@ -72,7 +75,11 @@ def test_reset_can_return_image_state_observation() -> None:
         backend=backend,
         config=EnvConfig(
             action_repeat=1,
-            observation=ObservationConfig(mode="image_state", frame_stack=4),
+            observation=ObservationConfig(
+                mode="image_state",
+                frame_stack=4,
+                state_components=(ObservationStateComponentConfig(name="vehicle_state"),),
+            ),
         ),
     )
 
@@ -80,28 +87,23 @@ def test_reset_can_return_image_state_observation() -> None:
 
     assert isinstance(obs, dict)
     assert set(obs) == {"image", "state"}
-    assert obs["image"].shape == (116, 164, 12)
+    assert obs["image"].shape == (84, 84, 12)
     assert obs["image"].dtype == np.uint8
-    assert obs["state"].shape == (11,)
+    assert obs["state"].shape == (8,)
     assert obs["state"].dtype == np.float32
-    assert obs["state"].tolist() == pytest.approx(
-        [0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0, 0.0]
-    )
+    assert obs["state"].tolist() == pytest.approx([0.5, 0.5, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0])
     assert info["observation_mode"] == "image_state"
-    assert info["observation_shape"] == (116, 164, 12)
-    assert info["observation_state_shape"] == (11,)
+    assert info["observation_shape"] == (84, 84, 12)
+    assert info["observation_state_shape"] == (8,)
     assert info["observation_state_features"] == (
-        "speed_norm",
-        "energy_frac",
-        "reverse_active",
-        "airborne",
-        "can_boost",
-        "boost_active",
-        "left_lean_held",
-        "right_lean_held",
-        "left_press_age_norm",
-        "right_press_age_norm",
-        "recent_boost_pressure",
+        "vehicle_state.speed_norm",
+        "vehicle_state.energy_frac",
+        "vehicle_state.reverse_active",
+        "vehicle_state.airborne",
+        "vehicle_state.boost_unlocked",
+        "vehicle_state.boost_active",
+        "vehicle_state.lateral_velocity_norm",
+        "vehicle_state.sliding_active",
     )
 
 
@@ -280,6 +282,44 @@ def test_track_baseline_cache_reads_each_state_once(tmp_path: Path) -> None:
     ]
 
 
+def test_track_baseline_cache_evicts_oldest_states_when_byte_limit_is_hit(
+    tmp_path: Path,
+) -> None:
+    first_path = tmp_path / "first.state"
+    second_path = tmp_path / "second.state"
+    first_path.write_bytes(b"aaa")
+    second_path.write_bytes(b"bbbb")
+    backend = SyntheticBackend()
+    cache = TrackBaselineCache(max_cached_state_bytes=6)
+
+    cache.load_into_backend(backend, first_path)
+    cache.load_into_backend(backend, second_path)
+    first_path.write_bytes(b"ccccc")
+    cache.load_into_backend(backend, first_path)
+
+    assert backend.loaded_baseline_bytes == [
+        (first_path, len(b"aaa")),
+        (second_path, len(b"bbbb")),
+        (first_path, len(b"ccccc")),
+    ]
+
+
+def test_track_baseline_cache_skips_caching_oversized_states(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "oversized.state"
+    baseline_path.write_bytes(b"12345")
+    backend = SyntheticBackend()
+    cache = TrackBaselineCache(max_cached_state_bytes=4)
+
+    cache.load_into_backend(backend, baseline_path)
+    baseline_path.write_bytes(b"12")
+    cache.load_into_backend(backend, baseline_path)
+
+    assert backend.loaded_baseline_bytes == [
+        (baseline_path, len(b"12345")),
+        (baseline_path, len(b"12")),
+    ]
+
+
 def test_balanced_track_sampling_cycles_with_env_index_offset(tmp_path: Path) -> None:
     baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand", "forest"))
     config = EnvConfig(
@@ -379,8 +419,10 @@ def test_sequential_track_sampling_uses_config_order_for_watch(tmp_path: Path) -
     assert sampled_infos[2]["track_sampling_cycle_position"] == 2
 
 
-def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: Path) -> None:
-    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
+def test_sequential_track_sampling_rotates_courses_not_raw_pool_entries(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute_a", "mute_b", "silence"))
     env = FZeroXEnv(
         backend=SyntheticBackend(),
         config=EnvConfig(
@@ -388,6 +430,104 @@ def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: P
             track_sampling=TrackSamplingConfig(
                 enabled=True,
                 sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_a",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute_a"],
+                        weight=1.0,
+                        vehicle="blue_falcon",
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="mute_b",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute_b"],
+                        weight=5.0,
+                        vehicle="fire_stingray",
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                        weight=1.0,
+                        vehicle="white_cat",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_sequential_track_sampling(True)
+    first_info = env.reset(seed=123)[1]
+    env.set_track_sampling_weights({"mute_a": 9.0, "mute_b": 1.0, "silence": 3.0})
+    second_info = env.reset(seed=124)[1]
+    third_info = env.reset(seed=125)[1]
+
+    assert first_info["track_course_id"] == "mute_city"
+    assert second_info["track_course_id"] == "silence"
+    assert third_info["track_course_id"] == "mute_city"
+
+
+def test_sequential_track_sampling_can_jump_to_requested_course_for_watch(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand"],
+                        weight=1.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_sequential_track_sampling(True)
+    first_info = env.reset(seed=123)[1]
+    env.set_next_sequential_reset_course("sand_ocean")
+    second_info = env.reset(seed=124)[1]
+    third_info = env.reset(seed=125)[1]
+
+    assert first_info["track_course_id"] == "mute_city"
+    assert second_info["track_course_id"] == "sand_ocean"
+    assert third_info["track_course_id"] == "mute_city"
+    assert first_info["track_sampling_mode"] == "sequential"
+
+
+@pytest.mark.parametrize("sampling_mode", ("step_balanced", "adaptive_step_balanced"))
+def test_dynamic_track_sampling_accepts_runtime_weight_updates(
+    tmp_path: Path,
+    sampling_mode: Literal["step_balanced", "adaptive_step_balanced"],
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode=sampling_mode,
                 entries=(
                     TrackSamplingEntryConfig(
                         id="mute",
@@ -402,13 +542,119 @@ def test_step_balanced_track_sampling_accepts_runtime_weight_updates(tmp_path: P
         ),
     )
 
-    assert env.reset(seed=123)[1]["track_id"] == "mute"
+    first_info = env.reset(seed=123)[1]
 
-    env.set_track_sampling_weights({"mute": 1.0, "silence": 3.0})
+    assert first_info["track_id"] in {"mute", "silence"}
+    assert first_info["track_sampling_mode"] == sampling_mode
+
+    env.set_track_sampling_weights({"mute": 0.0, "silence": 1.0})
     sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
 
-    assert sampled_ids == ["silence", "mute", "silence", "silence"]
-    assert env.reset(seed=123)[1]["track_sampling_mode"] == "step_balanced"
+    assert sampled_ids == ["silence", "silence", "silence", "silence"]
+    assert env.reset(seed=123)[1]["track_sampling_mode"] == sampling_mode
+
+
+def test_step_balanced_track_sampling_excludes_zero_weighted_courses(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("mute", "silence", "sand"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand"],
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_track_sampling_weights({"mute": 0.0, "silence": 0.0, "sand": 1.0})
+    sampled_ids = [env.reset(seed=123)[1]["track_id"] for _ in range(4)]
+
+    assert sampled_ids == ["sand", "sand", "sand", "sand"]
+
+
+def test_step_balanced_track_sampling_zeroes_duplicate_course_entries(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(
+        tmp_path,
+        ("mute_a", "mute_b", "silence_a", "silence_b", "sand_a", "sand_b"),
+    )
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="mute_a",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute_a"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="mute_b",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["mute_b"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence_a",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence_a"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="silence_b",
+                        course_id="silence",
+                        baseline_state_path=baseline_paths["silence_b"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand_a",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand_a"],
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="sand_b",
+                        course_id="sand_ocean",
+                        baseline_state_path=baseline_paths["sand_b"],
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_track_sampling_weights(
+        {
+            "mute_a": 0.0,
+            "mute_b": 0.0,
+            "silence_a": 0.0,
+            "silence_b": 1.0,
+            "sand_a": 0.0,
+            "sand_b": 0.0,
+        }
+    )
+    sampled_courses = [env.reset(seed=123)[1]["track_course_id"] for _ in range(4)]
+
+    assert sampled_courses == ["silence", "silence", "silence", "silence"]
 
 
 def test_curriculum_stage_can_override_track_sampling(tmp_path: Path) -> None:
@@ -537,6 +783,31 @@ def test_reset_applies_configured_camera_setting_with_button_loop() -> None:
     assert info["camera_setting_taps"] == 3
     assert info["frame_index"] == 6
     assert backend.last_controller_state == ControllerState()
+
+
+def test_reset_syncs_camera_and_then_returns_to_target_intro_timer() -> None:
+    backend = CameraSyncAfterIntroBackend(
+        camera_setting_raw=2,
+        race_intro_timer=80,
+        camera_ready_intro_timer=160,
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action_repeat=1,
+            camera_setting="close_behind",
+            race_intro_target_timer=38,
+        ),
+    )
+
+    _, info = env.reset(seed=123)
+
+    assert info["race_intro_timer_sync"] == "changed"
+    assert info["race_intro_timer_target"] == 38
+    assert info["camera_setting"] == "close_behind"
+    assert info["camera_setting_raw"] == 1
+    assert info["camera_setting_sync"] == "changed"
+    assert info["race_intro_timer"] == 38
 
 
 def _write_track_baselines(tmp_path: Path, track_ids: tuple[str, ...]) -> dict[str, Path]:

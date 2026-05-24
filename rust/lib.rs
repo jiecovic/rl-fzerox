@@ -7,7 +7,7 @@ mod core;
 
 use crate::bindings::{
     PyCoreInfo, PyEmulator, PyPlayerTelemetry, PyStepStatus, PyStepSummary, PyTelemetry,
-    encode_state_flags, probe_core, register_input_api,
+    display_size, encode_state_flags, probe_core, register_input_api, stacked_observation_channels,
 };
 
 #[pymodule]
@@ -21,6 +21,8 @@ fn native_module(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> 
     module.add_class::<PyStepStatus>()?;
     module.add_function(wrap_pyfunction!(encode_state_flags, module)?)?;
     module.add_function(wrap_pyfunction!(probe_core, module)?)?;
+    module.add_function(wrap_pyfunction!(display_size, module)?)?;
+    module.add_function(wrap_pyfunction!(stacked_observation_channels, module)?)?;
     register_input_api(module)?;
     Ok(())
 }

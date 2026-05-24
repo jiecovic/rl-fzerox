@@ -5,15 +5,11 @@ from dataclasses import dataclass, field
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
-from rl_fzerox.core.envs.actions import BOOST_MASK
-from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer, clamp
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 from rl_fzerox.core.envs.engine.controls.boost import BoostTimingState
 from rl_fzerox.core.envs.engine.controls.lean import LeanControlState
-from rl_fzerox.core.envs.engine.controls.pressure import RecentControlPressure
-from rl_fzerox.core.envs.observations import (
-    OBSERVATION_STATE_DEFAULTS,
-    ActionHistoryControl,
-)
+from rl_fzerox.core.envs.observations import ActionHistoryControl
 
 
 @dataclass(slots=True)
@@ -24,15 +20,11 @@ class ControlStateTracker:
     lean_initial_lockout_frames: int = 0
     boost_decision_interval_frames: int = 1
     boost_request_lockout_frames: int = 0
-    action_history_len: int | None = OBSERVATION_STATE_DEFAULTS.action_history_len
-    action_history_controls: tuple[ActionHistoryControl, ...] = (
-        OBSERVATION_STATE_DEFAULTS.action_history_controls
-    )
-    _left_steer_held: bool = False
-    _right_steer_held: bool = False
+    action_history_len: int | None = None
+    action_history_controls: tuple[ActionHistoryControl, ...] = ()
+    independent_lean_buttons: bool = False
     _lean: LeanControlState = field(init=False)
     _boost: BoostTimingState = field(init=False)
-    _pressure: RecentControlPressure = field(init=False)
     _action_history: ActionHistoryBuffer = field(init=False)
 
     def __post_init__(self) -> None:
@@ -44,20 +36,17 @@ class ControlStateTracker:
             decision_interval_frames=self.boost_decision_interval_frames,
             request_lockout_frames=self.boost_request_lockout_frames,
         )
-        self._pressure = RecentControlPressure()
         self._action_history = ActionHistoryBuffer(
             length=self.action_history_len,
             controls=self.action_history_controls,
+            independent_lean_buttons=self.independent_lean_buttons,
         )
 
     def reset(self) -> None:
         """Clear all step-to-step control history."""
 
-        self._left_steer_held = False
-        self._right_steer_held = False
         self._lean.reset()
         self._boost.reset()
-        self._pressure.reset()
         self._action_history.reset()
 
     def apply_lean_semantics(self, control_state: ControllerState) -> ControllerState:
@@ -69,33 +58,20 @@ class ControlStateTracker:
         self,
         *,
         control_state: ControllerState,
+        requested_control_state: ControllerState | None = None,
         frames_run: int,
         gas_level: float | None = None,
     ) -> None:
         """Advance tracked control history by one env step."""
 
         frames_elapsed = max(int(frames_run), 0)
-        boost_requested = bool(control_state.joypad_mask & BOOST_MASK)
-        steer_axis = clamp(float(control_state.left_stick_x), -1.0, 1.0)
-
-        self._pressure.record_boost(requested=boost_requested, frames_run=frames_elapsed)
-        self._pressure.record_steer(axis=steer_axis, frames_run=frames_elapsed)
+        boost_requested = bool(control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
         self._boost.record(boost_requested=boost_requested, frames_elapsed=frames_elapsed)
         self._lean.record(joypad_mask=control_state.joypad_mask, frames_elapsed=frames_elapsed)
-        self._left_steer_held = steer_axis < -1.0e-6
-        self._right_steer_held = steer_axis > 1.0e-6
-        self._action_history.record(control_state, gas_level=gas_level)
-
-    def observation_fields(self) -> dict[str, float]:
-        """Return control-history features passed into observation building."""
-
-        return {
-            **self._lean.observation_fields(),
-            "recent_boost_pressure": self._pressure.boost_pressure(),
-            "steer_left_held": float(self._left_steer_held),
-            "steer_right_held": float(self._right_steer_held),
-            "recent_steer_pressure": self._pressure.steer_pressure(),
-        }
+        self._action_history.record(
+            control_state if requested_control_state is None else requested_control_state,
+            gas_level=gas_level,
+        )
 
     def action_history_fields(self) -> dict[str, float]:
         """Return fixed-width previous-action features for policy observations."""

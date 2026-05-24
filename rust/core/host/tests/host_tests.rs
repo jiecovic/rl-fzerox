@@ -5,9 +5,7 @@ use super::{
     step::{RepeatedStepConfig, StepCounters, StepStatus, StepSummary},
 };
 use crate::core::input::ControllerState;
-use crate::core::observation::{ObservationPreset, ObservationStackMode};
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
-use crate::core::video::VideoResizeFilter;
 
 #[test]
 fn resolve_display_aspect_ratio_prefers_reported_ratio() {
@@ -27,6 +25,7 @@ fn step_summary_defaults_to_empty_step_accumulators() {
 
     assert_eq!(summary.frames_run, 0);
     assert_eq!(summary.reverse_active_frames, 0);
+    assert_eq!(summary.collision_recoil_active_frames, 0);
     assert_eq!(summary.low_speed_frames, 0);
     assert_eq!(summary.consecutive_low_speed_frames, 0);
     assert_eq!(summary.energy_gain_total, 0.0);
@@ -259,12 +258,6 @@ fn repeated_step_config(
     RepeatedStepConfig {
         controller_state: ControllerState::default(),
         action_repeat: 1,
-        preset: ObservationPreset::Crop84x116,
-        frame_stack: 4,
-        stack_mode: ObservationStackMode::Rgb,
-        minimap_layer: false,
-        resize_filter: VideoResizeFilter::Nearest,
-        minimap_resize_filter: VideoResizeFilter::Nearest,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,
         max_episode_steps,
@@ -295,6 +288,7 @@ fn telemetry(in_race_mode: bool, state_flags: u32, reverse_timer: i32) -> Teleme
             speed_kph: 0.0,
             energy: 100.0,
             max_energy: 178.0,
+            ko_star_count: 0,
             boost_timer: 0,
             recoil_tilt_magnitude: 0.0,
             damage_rumble_counter: 0,

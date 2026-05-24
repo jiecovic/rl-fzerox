@@ -1,0 +1,353 @@
+.state-vector-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.state-auxiliary-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 10px 12px;
+}
+
+.state-auxiliary-toolbar-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.state-auxiliary-toolbar-copy strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.state-auxiliary-toolbar-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.state-component-summary {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.state-component-body {
+  gap: 12px;
+}
+
+.state-component-settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+  gap: 12px;
+}
+
+.state-component-disabled {
+  align-self: end;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.state-feature-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.state-feature-table th,
+.state-feature-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.state-feature-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.state-feature-table td {
+  background: var(--surface);
+  font-size: 13px;
+}
+
+.state-feature-table th:last-child,
+.state-feature-table td:last-child {
+  width: 108px;
+  text-align: right;
+}
+
+.state-feature-table th:nth-child(4),
+.state-feature-table td:nth-child(4) {
+  width: 124px;
+}
+
+.state-feature-table th:nth-child(2),
+.state-feature-table td:nth-child(2) {
+  width: 116px;
+  white-space: nowrap;
+}
+
+.state-feature-table th:nth-child(3),
+.state-feature-table td:nth-child(3) {
+  width: 92px;
+}
+
+.state-feature-table th:nth-child(5),
+.state-feature-table td:nth-child(5) {
+  width: 96px;
+  text-align: right;
+}
+
+.state-feature-table th:nth-child(6),
+.state-feature-table td:nth-child(6) {
+  width: 116px;
+  text-align: right;
+}
+
+.state-feature-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.state-feature-enabled-header {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.state-feature-column-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.state-feature-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.state-feature-name > span {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.state-feature-entry {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.state-feature-range {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.state-feature-dropout-cell {
+  background: var(--surface);
+}
+
+.state-feature-dropout-input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 6px 8px;
+}
+
+.state-feature-dropout-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.state-feature-toggle-cell {
+  background: var(--surface);
+  text-align: right;
+}
+
+.state-feature-aux-cell {
+  background: var(--surface);
+}
+
+.state-feature-aux-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.state-feature-aux-weight-input {
+  width: 68px;
+  min-width: 68px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 6px;
+  text-align: right;
+}
+
+.state-feature-aux-weight-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.state-feature-aux-weight {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.state-feature-aux-grounded {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.state-feature-aux-grounded input {
+  margin: 0;
+}
+
+.state-feature-aux-unsupported {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.state-progress-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 1 auto;
+  margin-left: 0;
+  min-inline-size: max-content;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  padding: 0;
+}
+
+.state-progress-toggle legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+}
+
+.state-progress-toggle button {
+  flex: 0 0 auto;
+  min-width: 88px;
+  height: 24px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.state-progress-toggle button:first-of-type {
+  min-width: 136px;
+}
+
+.state-progress-toggle button:last-child {
+  border-right: 0;
+}
+
+.state-progress-toggle button.active {
+  background: var(--surface);
+  box-shadow: inset 0 2px 0 var(--accent);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.state-progress-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.state-progress-toggle button:not(.active, :disabled):hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.state-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  gap: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.state-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.state-switch > span {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-muted);
+}
+
+.state-switch > span::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  background: var(--muted);
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.state-switch input:checked + span {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.state-switch input:checked + span::after {
+  background: var(--accent);
+  transform: translateX(16px);
+}
+
+.state-switch.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

@@ -7,6 +7,29 @@ use super::host::{BaselineKind, FRAME_WAIT_LIMIT, Host};
 use crate::core::error::CoreError;
 
 impl Host {
+    pub fn load_baseline(&mut self, path: &Path) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.load_baseline_from_file(path)
+    }
+
+    pub fn load_baseline_bytes(&mut self, state: &[u8]) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.load_baseline_from_state_bytes(state)
+    }
+
+    pub fn save_state(&mut self, path: &Path) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.save_state_to_path(path)
+    }
+
+    pub fn capture_current_as_baseline(
+        &mut self,
+        save_path: Option<&Path>,
+    ) -> Result<(), CoreError> {
+        self.ensure_open()?;
+        self.capture_current_as_baseline_to_path(save_path)
+    }
+
     pub(super) fn capture_startup_baseline(&mut self) -> Result<(), CoreError> {
         // Capture one canonical startup baseline up front. Every reset then
         // restores this snapshot instead of replaying startup frames again.

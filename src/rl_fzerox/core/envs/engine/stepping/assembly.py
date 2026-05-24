@@ -4,18 +4,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator import BackendStepResult, ControllerState, EmulatorBackend, FZeroXTelemetry
-from rl_fzerox.core.config.schema import EnvConfig
-from rl_fzerox.core.config.schema_models.actions import ActionRuntimeConfig
-from rl_fzerox.core.domain.lean import LEAN_MODE_TIMER_ASSIST
-from rl_fzerox.core.envs.actions import (
-    AIR_BRAKE_MASK,
-    BOOST_MASK,
-    LEAN_LEFT_MASK,
-    LEAN_RIGHT_MASK,
-)
+from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
+from rl_fzerox.core.runtime_spec.renderers import RendererName
+from rl_fzerox.core.runtime_spec.schema import EnvConfig
+from rl_fzerox.core.runtime_spec.schema.actions import ActionRuntimeConfig
 
 from ..controls import ActionMaskController, ControlStateTracker, sync_dynamic_action_masks
 from ..info import backend_step_info, set_curriculum_info, telemetry_info
@@ -66,6 +61,7 @@ class EngineStepAssembler:
     observation_builder: EngineObservationBuilder
     mask_controller: ActionMaskController
     control_state: ControlStateTracker
+    renderer: RendererName
 
     def run(self, request: EnvStepRequest) -> EnvStepAssembly:
         requested_control_state = request.requested_control_state or request.control_state
@@ -87,9 +83,12 @@ class EngineStepAssembler:
             continuous_drive_min_thrust=float(self.action_config.continuous_drive_min_thrust),
         )
 
-        boost_used = bool(applied_control_state.joypad_mask & BOOST_MASK)
-        lean_used = bool(applied_control_state.joypad_mask & (LEAN_LEFT_MASK | LEAN_RIGHT_MASK))
-        air_brake_used = bool(applied_control_state.joypad_mask & AIR_BRAKE_MASK)
+        boost_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
+        lean_used = bool(
+            applied_control_state.joypad_mask
+            & (RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right)
+        )
+        air_brake_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.air_brake)
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
@@ -105,8 +104,9 @@ class EngineStepAssembler:
                 ),
                 pitch_level=max(
                     -1.0,
-                    min(1.0, float(applied_control_state.left_stick_y)),
+                    min(1.0, float(requested_control_state.left_stick_y)),
                 ),
+                pitch_deadzone=float(self.action_config.pitch_deadzone),
                 drive_axis=request.action_drive_axis,
             ),
         )
@@ -134,10 +134,11 @@ class EngineStepAssembler:
         info["frames_run"] = int(step_result.summary.frames_run)
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
+        info["energy_gain_total"] = float(step_result.summary.energy_gain_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
+        info["impact_frames"] = int(step_result.summary.impact_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["episode_airborne_frames"] = episode_airborne_frames
-        info["collision_recoil_entered"] = bool(step_result.summary.entered_collision_recoil)
         info["boost_pad_entered"] = boost_pad_entered
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
@@ -164,6 +165,7 @@ class EngineStepAssembler:
 
         self.control_state.record_step(
             control_state=applied_control_state,
+            requested_control_state=requested_control_state,
             frames_run=step_result.summary.frames_run,
             gas_level=gas_level,
         )
@@ -213,12 +215,11 @@ class EngineStepAssembler:
         control_state: ControllerState,
         request: EnvStepRequest,
     ) -> BackendStepResult:
-        lean_timer_assist = self.action_config.lean_mode == LEAN_MODE_TIMER_ASSIST
+        lean_timer_assist = self.action_config.lean_mode == "timer_assist"
         if request.capture_display_frames:
             return self.backend.step_repeat_watch_raw(
                 control_state,
                 action_repeat=request.action_repeat,
-                preset=self.config.observation.preset,
                 frame_stack=self.config.observation.frame_stack,
                 stack_mode=self.config.observation.stack_mode,
                 minimap_layer=self.config.observation.minimap_layer,
@@ -233,11 +234,11 @@ class EngineStepAssembler:
                 progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
                 terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
                 lean_timer_assist=lean_timer_assist,
+                **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
             )
         return self.backend.step_repeat_raw(
             control_state,
             action_repeat=request.action_repeat,
-            preset=self.config.observation.preset,
             frame_stack=self.config.observation.frame_stack,
             stack_mode=self.config.observation.stack_mode,
             minimap_layer=self.config.observation.minimap_layer,
@@ -250,6 +251,7 @@ class EngineStepAssembler:
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
+            **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 
 

@@ -235,7 +235,7 @@ def _draw_control_viz(
         pygame=pygame,
         screen=screen,
         track=pitch_track,
-        value=control_viz.pitch_y,
+        value=-control_viz.pitch_y,
         marker_radius=marker_radius,
     )
     engine_level = control_viz.engine_setting_level

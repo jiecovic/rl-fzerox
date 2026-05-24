@@ -4,25 +4,21 @@ from __future__ import annotations
 import pytest
 
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
-from rl_fzerox.core.config.schema import RewardConfig
-from rl_fzerox.core.envs.rewards import (
-    RewardActionContext,
-    build_reward_tracker,
-)
+from rl_fzerox.core.envs.rewards import RewardActionContext, build_reward_tracker
+from rl_fzerox.core.runtime_spec.schema import RewardConfig
 from tests.support.native_objects import encode_state_flags, make_step_summary, make_telemetry
 
 _COURSE_EFFECT_PIT = 1
 
 
-def test_race_v3_treats_finish_as_final_lap_reward_only() -> None:
+def test_reward_main_treats_finish_as_final_lap_reward_only() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             lap_completion_bonus=5.0,
             lap_position_scale=1.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, laps_completed=2))
@@ -39,19 +35,48 @@ def test_race_v3_treats_finish_as_final_lap_reward_only() -> None:
     )
 
     assert step.reward == pytest.approx(34.0)
-    assert step.breakdown == {
-        "lap_completion": 5.0,
-        "lap_position": 29.0,
-    }
+    assert step.breakdown == {"lap_completion": 5.0, "lap_position": 29.0}
 
 
-def test_race_v3_applies_small_collision_recoil_entry_penalty() -> None:
+def test_reward_main_applies_impact_penalty_per_frame_while_recoil_active() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-            collision_recoil_penalty=-0.25,
+            impact_frame_penalty=-0.25,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    first_step = tracker.step_summary(
+        _summary(
+            max_race_distance=0.0,
+            frames_run=3,
+            collision_recoil_active_frames=3,
+        ),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, state_labels=("active", "collision_recoil")),
+    )
+    second_step = tracker.step_summary(
+        _summary(
+            max_race_distance=0.0,
+            frames_run=2,
+            collision_recoil_active_frames=1,
+        ),
+        _status(step_count=2),
+        _telemetry(race_distance=0.0),
+    )
+
+    assert first_step.reward == -0.75
+    assert first_step.breakdown == {"impact": -0.75}
+    assert second_step.reward == -0.25
+    assert second_step.breakdown == {"impact": -0.25}
+
+
+def test_reward_main_does_not_apply_impact_penalty_from_entry_flag_alone() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=-0.25,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -62,22 +87,21 @@ def test_race_v3_applies_small_collision_recoil_entry_penalty() -> None:
         _telemetry(race_distance=0.0),
     )
 
-    assert step.reward == -0.25
-    assert step.breakdown == {"collision_recoil": -0.25}
+    assert step.reward == 0.0
+    assert step.breakdown == {}
 
 
-def test_race_v3_uses_spinning_out_as_failure_not_raw_energy_depletion() -> None:
-    spinning_tracker = build_reward_tracker(
+def test_reward_main_uses_spinning_out_as_failure_not_raw_energy_depletion() -> None:
+    tracker = build_reward_tracker(
         RewardConfig(
             time_penalty_per_frame=0.0,
             failure_penalty=-20.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
-    spinning_tracker.reset(_telemetry(race_distance=0.0))
+    tracker.reset(_telemetry(race_distance=0.0))
 
-    spinning = spinning_tracker.step_summary(
+    spinning = tracker.step_summary(
         _summary(max_race_distance=0.0),
         _status(step_count=1, termination_reason="spinning_out"),
         _telemetry(
@@ -86,35 +110,22 @@ def test_race_v3_uses_spinning_out_as_failure_not_raw_energy_depletion() -> None
             state_labels=("active", "spinning_out"),
         ),
     )
-
-    energy_tracker = build_reward_tracker(
-        RewardConfig(
-            time_penalty_per_frame=0.0,
-            failure_penalty=-20.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    energy_tracker.reset(_telemetry(race_distance=0.0))
-    energy_depleted = energy_tracker.step_summary(
+    energy_depleted = tracker.step_summary(
         _summary(max_race_distance=0.0),
-        _status(step_count=1, termination_reason="energy_depleted"),
+        _status(step_count=2, termination_reason="energy_depleted"),
         _telemetry(race_distance=0.0, energy=0.0),
     )
 
-    assert spinning.reward == -20.0
     assert spinning.breakdown == {"spinning_out": -20.0}
-    assert energy_depleted.reward == 0.0
     assert energy_depleted.breakdown == {}
 
 
-def test_race_v3_multiplies_time_penalty_by_frames_run() -> None:
+def test_reward_main_multiplies_time_penalty_by_frames_run() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             time_penalty_per_frame=-0.01,
             progress_bucket_reward=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -129,39 +140,13 @@ def test_race_v3_multiplies_time_penalty_by_frames_run() -> None:
     assert step.breakdown == {"time": -0.03}
 
 
-def test_race_v3_penalizes_lean_request_below_speed_threshold() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            lean_low_speed_penalty=-0.01,
-            lean_low_speed_penalty_max_speed_kph=800.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0))
-
-    step = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
-        _status(step_count=3),
-        _telemetry(race_distance=0.0, speed_kph=799.0),
-        RewardActionContext(lean_requested=True),
-    )
-
-    assert step.reward == pytest.approx(-0.03)
-    assert step.breakdown == {"lean_low_speed": -0.03}
-
-
-def test_race_v3_penalizes_lean_request() -> None:
+def test_reward_main_penalizes_lean_request() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             lean_request_penalty=-0.001,
-            lean_low_speed_penalty=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -177,60 +162,104 @@ def test_race_v3_penalizes_lean_request() -> None:
     assert step.breakdown == {"lean": -0.003}
 
 
-def test_race_v3_penalizes_airborne_pitch_up_request() -> None:
+def test_reward_main_penalizes_lean_activation_once() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            airborne_pitch_up_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            lean_request_penalty=-0.001,
+            lean_activation_penalty=-0.01,
+            impact_frame_penalty=0.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+    tracker.reset(_telemetry(race_distance=0.0))
 
-    step = tracker.step_summary(
+    first = tracker.step_summary(
         _summary(max_race_distance=0.0, frames_run=3),
         _status(step_count=3),
-        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
-        RewardActionContext(pitch_level=0.5),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
+    )
+    held = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=6),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
+    )
+    released = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=9),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=False),
+    )
+    reactivated = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=12),
+        _telemetry(race_distance=0.0, speed_kph=1_500.0),
+        RewardActionContext(lean_requested=True),
     )
 
-    assert step.reward == pytest.approx(-0.015)
-    assert step.breakdown == {"airborne_pitch_up": -0.015}
+    assert first.reward == pytest.approx(-0.013)
+    assert first.breakdown == {"lean": -0.003, "lean_activation": -0.01}
+    assert held.reward == pytest.approx(-0.003)
+    assert held.breakdown == {"lean": -0.003}
+    assert released.reward == 0.0
+    assert released.breakdown == {}
+    assert reactivated.reward == pytest.approx(-0.013)
+    assert reactivated.breakdown == {"lean": -0.003, "lean_activation": -0.01}
 
 
-def test_race_v3_does_not_penalize_airborne_pitch_down_request() -> None:
+def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            airborne_pitch_up_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            grounded_pitch_penalty=-0.01,
+            impact_frame_penalty=0.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0, state_labels=("active", "airborne")))
+    tracker.reset(_telemetry(race_distance=0.0))
 
     step = tracker.step_summary(
         _summary(max_race_distance=0.0, frames_run=3),
         _status(step_count=3),
-        _telemetry(race_distance=0.0, state_labels=("active", "airborne")),
-        RewardActionContext(pitch_level=-1.0),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(pitch_level=0.6, pitch_deadzone=0.1),
+    )
+
+    assert step.reward == pytest.approx(-0.0166666667)
+    assert step.breakdown == {"grounded_pitch": pytest.approx(-0.0166666667)}
+
+
+def test_reward_main_does_not_penalize_grounded_pitch_within_deadzone() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            grounded_pitch_penalty=-0.01,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, frames_run=3),
+        _status(step_count=3),
+        _telemetry(race_distance=0.0),
+        RewardActionContext(pitch_level=0.2, pitch_deadzone=0.25),
     )
 
     assert step.reward == 0.0
     assert step.breakdown == {}
 
 
-def test_race_v3_does_not_penalize_ground_pitch_up_request() -> None:
+def test_reward_main_penalizes_air_brake_request() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            airborne_pitch_up_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            air_brake_request_penalty=-0.01,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -239,77 +268,20 @@ def test_race_v3_does_not_penalize_ground_pitch_up_request() -> None:
         _summary(max_race_distance=0.0, frames_run=3),
         _status(step_count=3),
         _telemetry(race_distance=0.0),
-        RewardActionContext(pitch_level=1.0),
+        RewardActionContext(air_brake_requested=True),
     )
 
-    assert step.reward == 0.0
-    assert step.breakdown == {}
+    assert step.reward == pytest.approx(-0.03)
+    assert step.breakdown == {"air_brake": -0.03}
 
 
-def test_race_v3_penalizes_missing_discrete_gas_request() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            gas_underuse_penalty=-0.02,
-            gas_underuse_threshold=0.5,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0))
-
-    step = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
-        _status(step_count=3),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(gas_level=0.0),
-    )
-
-    assert step.reward == pytest.approx(-0.06)
-    assert step.breakdown == {"gas_underuse": -0.06}
-
-
-def test_race_v3_scales_gas_underuse_penalty_below_threshold() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            gas_underuse_penalty=-0.02,
-            gas_underuse_threshold=0.5,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0))
-
-    under_threshold = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=2),
-        _status(step_count=2),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(gas_level=0.25),
-    )
-    at_threshold = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=2),
-        _status(step_count=4),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(gas_level=0.5),
-    )
-
-    assert under_threshold.reward == pytest.approx(-0.02)
-    assert under_threshold.breakdown == {"gas_underuse": -0.02}
-    assert at_threshold.reward == 0.0
-    assert at_threshold.breakdown == {}
-
-
-def test_race_v3_rewards_manual_boost_request_once_per_env_step() -> None:
+def test_reward_main_rewards_manual_boost_request_once_per_env_step() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             manual_boost_reward=0.25,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -325,105 +297,154 @@ def test_race_v3_rewards_manual_boost_request_once_per_env_step() -> None:
     assert step.breakdown == {"manual_boost": 0.25}
 
 
-def test_race_v3_penalizes_steering_oscillation_acceleration() -> None:
+def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
+            progress_bucket_distance=100.0,
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            steer_oscillation_penalty=-0.001,
-            steer_oscillation_deadzone=0.0,
-            steer_oscillation_cap=2.0,
-            steer_oscillation_power=2.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=0,
+            airborne_landing_min_peak_height=50.0,
+            impact_frame_penalty=0.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0))
+    tracker.reset(
+        _telemetry(
+            race_distance=0.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=140.0,
+        )
+    )
 
-    first = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
+    first_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0),
         _status(step_count=1),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(steer_level=-1.0),
+        _telemetry(race_distance=350.0),
     )
-    second = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
+    takeoff_without_progress = tracker.step_summary(
+        _summary(max_race_distance=350.0),
         _status(step_count=2),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(steer_level=1.0),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
-    third = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
+    repeated_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0),
         _status(step_count=3),
-        _telemetry(race_distance=0.0),
-        RewardActionContext(steer_level=-1.0),
+        _telemetry(race_distance=350.0),
+    )
+    takeoff_with_progress = tracker.step_summary(
+        _summary(max_race_distance=450.0),
+        _status(step_count=4),
+        _telemetry(
+            race_distance=450.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
+    )
+    next_bucket_landing = tracker.step_summary(
+        _summary(max_race_distance=450.0),
+        _status(step_count=5),
+        _telemetry(race_distance=450.0),
     )
 
-    assert first.reward == 0.0
-    assert second.reward == 0.0
-    assert third.reward == pytest.approx(-0.001)
-    assert third.breakdown == {"steer_oscillation": pytest.approx(-0.001)}
+    assert first_landing.reward == 5.0
+    assert first_landing.breakdown == {"landing": 5.0}
+    assert takeoff_without_progress.reward == 0.0
+    assert takeoff_without_progress.breakdown == {}
+    assert repeated_landing.reward == 0.0
+    assert repeated_landing.breakdown == {}
+    assert takeoff_with_progress.reward == 0.0
+    assert takeoff_with_progress.breakdown == {}
+    assert next_bucket_landing.reward == 5.0
+    assert next_bucket_landing.breakdown == {"landing": 5.0}
 
 
-def test_race_v3_does_not_penalize_smooth_steering_ramp() -> None:
+def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
+            progress_bucket_distance=100.0,
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            steer_oscillation_penalty=-0.001,
-            steer_oscillation_deadzone=0.0,
-            steer_oscillation_cap=2.0,
-            steer_oscillation_power=2.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-        )
-    )
-    tracker.reset(_telemetry(race_distance=0.0))
-    step = None
-
-    for step_count, steer_level in enumerate((0.0, 0.2, 0.4), start=1):
-        step = tracker.step_summary(
-            _summary(max_race_distance=0.0),
-            _status(step_count=step_count),
-            _telemetry(race_distance=0.0),
-            RewardActionContext(steer_level=steer_level),
-        )
-
-    assert step is not None
-    assert step.reward == 0.0
-    assert step.breakdown == {}
-
-
-def test_race_v3_does_not_penalize_idle_or_high_speed_lean() -> None:
-    tracker = build_reward_tracker(
-        RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=0.0,
-            lean_low_speed_penalty=-0.01,
-            lean_low_speed_penalty_max_speed_kph=800.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=50,
+            airborne_landing_min_peak_height=50.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
 
-    idle_step = tracker.step_summary(
-        _summary(max_race_distance=0.0),
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=20),
         _status(step_count=1),
-        _telemetry(race_distance=0.0, speed_kph=700.0),
-        RewardActionContext(lean_requested=False),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
     )
-    fast_step = tracker.step_summary(
-        _summary(max_race_distance=0.0),
+    short_jump_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=20),
         _status(step_count=2),
-        _telemetry(race_distance=0.0, speed_kph=800.0),
-        RewardActionContext(lean_requested=True),
+        _telemetry(race_distance=350.0),
     )
 
-    assert idle_step.reward == 0.0
-    assert idle_step.breakdown == {}
-    assert fast_step.reward == 0.0
-    assert fast_step.breakdown == {}
+    tracker.reset(_telemetry(race_distance=0.0))
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=25),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=120.0,
+        ),
+    )
+    long_jump_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=25),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    assert short_jump_landing.reward == 0.0
+    assert short_jump_landing.breakdown == {}
+    assert long_jump_landing.reward == 5.0
+    assert long_jump_landing.breakdown == {"landing": 5.0}
+
+
+def test_reward_main_requires_peak_height_for_landing_reward() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            airborne_landing_reward=5.0,
+            airborne_landing_grace_frames=0,
+            airborne_landing_min_peak_height=50.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0))
+
+    tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=10),
+        _status(step_count=1),
+        _telemetry(
+            race_distance=350.0,
+            state_labels=("active", "airborne"),
+            height_above_ground=20.0,
+        ),
+    )
+    shallow_landing = tracker.step_summary(
+        _summary(max_race_distance=350.0, airborne_frames=10),
+        _status(step_count=2),
+        _telemetry(race_distance=350.0),
+    )
+
+    assert shallow_landing.reward == 0.0
+    assert shallow_landing.breakdown == {}
 
 
 def _telemetry(
@@ -439,6 +460,7 @@ def _telemetry(
     lap: int | None = None,
     reverse_timer: int = 0,
     on_energy_refill: bool = False,
+    height_above_ground: float = 0.0,
 ) -> FZeroXTelemetry:
     state_flags = encode_state_flags(state_labels)
     if on_energy_refill:
@@ -455,6 +477,7 @@ def _telemetry(
         laps_completed=laps_completed,
         lap=max(laps_completed + 1, 1) if lap is None else lap,
         reverse_timer=reverse_timer,
+        height_above_ground=height_above_ground,
     )
 
 
@@ -463,22 +486,22 @@ def _summary(
     max_race_distance: float,
     frames_run: int = 1,
     reverse_active_frames: int = 0,
-    low_speed_frames: int = 0,
-    energy_loss_total: float = 0.0,
+    collision_recoil_active_frames: int = 0,
     energy_gain_total: float = 0.0,
     damage_taken_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
+    airborne_frames: int = 0,
 ) -> StepSummary:
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
         reverse_active_frames=reverse_active_frames,
-        low_speed_frames=low_speed_frames,
-        energy_loss_total=energy_loss_total,
+        collision_recoil_active_frames=collision_recoil_active_frames,
         energy_gain_total=energy_gain_total,
         damage_taken_frames=damage_taken_frames,
         entered_state_labels=entered_state_labels,
         final_frame_index=frames_run,
+        airborne_frames=airborne_frames,
     )
 
 

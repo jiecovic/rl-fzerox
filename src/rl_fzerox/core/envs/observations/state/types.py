@@ -8,36 +8,20 @@ import numpy as np
 
 from fzerox_emulator.arrays import Float32Array
 from rl_fzerox.core.domain.observation_components import (
-    ActionHistoryControlName as ActionHistoryControl,
-)
-from rl_fzerox.core.domain.observation_components import (
-    ObservationCourseContextName as ObservationCourseContext,
-)
-from rl_fzerox.core.domain.observation_components import (
-    ObservationGroundEffectContextName as ObservationGroundEffectContext,
-)
-from rl_fzerox.core.domain.observation_components import (
-    ObservationStateProfileName as ObservationStateProfile,
+    ActionHistoryControlName,
 )
 
 ObservationMode: TypeAlias = Literal["image", "image_state"]
+ActionHistoryControl: TypeAlias = ActionHistoryControlName
 
 
 @dataclass(frozen=True, slots=True)
 class ObservationStateDefaults:
     """Default scalar-observation settings shared by env, watch, and tests."""
 
-    state_profile: ObservationStateProfile = "default"
-    course_context: ObservationCourseContext = "none"
-    ground_effect_context: ObservationGroundEffectContext = "none"
-    action_history_len: int | None = None
-    action_history_controls: tuple[ActionHistoryControl, ...] = (
-        "steer",
-        "gas",
-        "boost",
-        "lean",
-    )
     builtin_course_count: int = 24
+    speed_normalizer_kph: float = 1_500.0
+    lean_tap_guard_frames: int = 15
     lateral_velocity_normalizer: float = 32.0
     sliding_lateral_velocity_threshold: float = 8.0
 
@@ -59,10 +43,6 @@ class StateVectorSpec:
     """Ordered scalar state schema appended to image observations."""
 
     features: tuple[StateFeature, ...]
-    speed_normalizer_kph: float
-    lean_tap_guard_frames: int
-    recent_boost_window_frames: int
-    recent_steer_window_frames: int
 
     @property
     def names(self) -> tuple[str, ...]:

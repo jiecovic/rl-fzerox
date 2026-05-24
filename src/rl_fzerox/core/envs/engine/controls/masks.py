@@ -4,9 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from fzerox_emulator.arrays import ActionMask
-from rl_fzerox.core.config.schema import CurriculumConfig
 from rl_fzerox.core.envs.actions import ActionAdapter
-from rl_fzerox.core.envs.actions.hybrid.layouts import PITCH_BUCKETS
+from rl_fzerox.core.runtime_spec.schema import CurriculumConfig
 
 from .mask_config import (
     ActionMaskBranches,
@@ -35,7 +34,8 @@ class ActionMaskController:
     stage_boost_min_energy_fraction: tuple[float | None, ...]
     boost_unmask_max_speed_kph: float | None
     lean_unmask_min_speed_kph: float | None
-    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index
+    mask_air_brake_on_ground: bool
+    pitch_neutral_index: int = 2
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
@@ -51,6 +51,8 @@ class ActionMaskController:
         curriculum_config: CurriculumConfig | None,
         boost_unmask_max_speed_kph: float | None = None,
         lean_unmask_min_speed_kph: float | None = None,
+        mask_air_brake_on_ground: bool = True,
+        pitch_neutral_index: int = 2,
     ) -> ActionMaskController:
         stage_overrides = curriculum_stage_overrides(curriculum_config)
         validate_configured_overrides(
@@ -68,6 +70,8 @@ class ActionMaskController:
             stage_boost_min_energy_fraction=curriculum_stage_boost_energy_gates(curriculum_config),
             boost_unmask_max_speed_kph=boost_unmask_max_speed_kph,
             lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+            mask_air_brake_on_ground=bool(mask_air_brake_on_ground),
+            pitch_neutral_index=int(pitch_neutral_index),
             _stage_index=0 if stage_overrides else None,
         )
 
@@ -91,6 +95,7 @@ class ActionMaskController:
                 lean_allowed_values=self._lean_allowed_values,
                 speed_kph=self._speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
+                mask_air_brake_on_ground=self.mask_air_brake_on_ground,
                 pitch_neutral_index=self.pitch_neutral_index,
             ),
         )
@@ -190,7 +195,8 @@ def _dynamic_action_mask_overrides(
     lean_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
-    pitch_neutral_index: int = PITCH_BUCKETS.neutral_index,
+    mask_air_brake_on_ground: bool = True,
+    pitch_neutral_index: int = 2,
 ) -> ActionMaskOverrides | None:
     overrides: ActionMaskOverrides = {}
     # `None` means we do not yet have live telemetry for the current episode.
@@ -207,8 +213,9 @@ def _dynamic_action_mask_overrides(
             lean_values = (0,)
     if lean_values is not None:
         overrides["lean"] = lean_values
-    if airborne is False:
+    if airborne is False and mask_air_brake_on_ground:
         overrides["air_brake"] = (0,)
+    if airborne is False:
         overrides["pitch"] = (pitch_neutral_index,)
     if not overrides:
         return None

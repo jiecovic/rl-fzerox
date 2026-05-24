@@ -5,9 +5,18 @@ use std::ffi::{CString, c_void};
 
 use super::egl::egl_fns;
 
-pub(super) const GL_RGB: GlEnum = 0x1907;
-pub(super) const GL_UNSIGNED_BYTE: GlEnum = 0x1401;
-pub(super) const GL_PACK_ALIGNMENT: GlEnum = 0x0D05;
+#[derive(Clone, Copy)]
+pub(super) struct GlProtocolValues {
+    pub(super) rgb: GlEnum,
+    pub(super) unsigned_byte: GlEnum,
+    pub(super) pack_alignment: GlEnum,
+}
+
+pub(super) const GL_VALUES: GlProtocolValues = GlProtocolValues {
+    rgb: 0x1907,
+    unsigned_byte: 0x1401,
+    pack_alignment: 0x0D05,
+};
 
 type GlEnum = libc::c_uint;
 type GlInt = libc::c_int;
@@ -34,11 +43,16 @@ impl GlFns {
     }
 }
 
-pub(super) fn flip_rgb_rows(rgb_bottom_left: &[u8], width: usize, height: usize) -> Vec<u8> {
+pub(super) fn flip_rgb_rows_into(
+    rgb_bottom_left: &[u8],
+    width: usize,
+    height: usize,
+    rgb: &mut Vec<u8>,
+) {
     let row_len = width * 3;
-    let mut rgb = vec![0_u8; rgb_bottom_left.len()];
+    rgb.resize(rgb_bottom_left.len(), 0);
     if row_len == 0 || height == 0 {
-        return rgb;
+        return;
     }
     for (src_row, dst_row) in rgb_bottom_left
         .chunks_exact(row_len)
@@ -48,7 +62,6 @@ pub(super) fn flip_rgb_rows(rgb_bottom_left: &[u8], width: usize, height: usize)
     {
         dst_row.copy_from_slice(src_row);
     }
-    rgb
 }
 
 fn gl_symbol<T>(name: &str) -> Result<T, String>

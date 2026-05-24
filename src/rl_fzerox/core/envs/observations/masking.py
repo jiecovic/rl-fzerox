@@ -1,0 +1,69 @@
+# src/rl_fzerox/core/envs/observations/masking.py
+from __future__ import annotations
+
+from collections.abc import Collection, Sequence
+
+import numpy as np
+
+from fzerox_emulator.arrays import StateVector
+from rl_fzerox.core.policy.auxiliary_state.observations import (
+    auxiliary_state_targets_field,
+    auxiliary_state_targets_from_mapping,
+)
+
+from .value import ImageStateObservation, ObservationValue
+
+
+def state_feature_indices(
+    feature_names: Sequence[str],
+    *,
+    selected_feature_names: Collection[str],
+) -> tuple[int, ...]:
+    """Return ordered state-vector indices for the selected feature names."""
+
+    selected_names = frozenset(selected_feature_names)
+    if not selected_names:
+        return ()
+    return tuple(
+        index for index, feature_name in enumerate(feature_names) if feature_name in selected_names
+    )
+
+
+def mask_observation_state(
+    observation: ObservationValue,
+    *,
+    feature_indices: Sequence[int],
+) -> ObservationValue:
+    """Return one observation with the selected state-vector indices zeroed."""
+
+    if not feature_indices:
+        return observation
+
+    if not isinstance(observation, dict):
+        return observation
+    state = observation.get("state")
+    image = observation.get("image")
+    if not isinstance(state, np.ndarray) or not isinstance(image, np.ndarray):
+        return observation
+    masked_observation: ImageStateObservation = {
+        "image": image,
+        "state": mask_state_vector(state, feature_indices=feature_indices),
+    }
+    auxiliary_targets = auxiliary_state_targets_from_mapping(observation)
+    if auxiliary_targets is not None:
+        masked_observation[auxiliary_state_targets_field()] = auxiliary_targets
+    return masked_observation
+
+
+def mask_state_vector(
+    state: StateVector,
+    *,
+    feature_indices: Sequence[int],
+) -> StateVector:
+    """Return one copied state vector with the selected indices set to zero."""
+
+    if not feature_indices:
+        return state
+    masked_state: StateVector = np.array(state, copy=True)
+    masked_state[list(feature_indices)] = 0.0
+    return masked_state

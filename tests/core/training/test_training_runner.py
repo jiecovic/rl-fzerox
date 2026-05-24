@@ -7,7 +7,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from rl_fzerox.core.config.schema import (
+from rl_fzerox.core.envs import FZeroXEnv
+from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
+from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     ActionMaskConfig,
     CurriculumConfig,
@@ -24,14 +26,13 @@ from rl_fzerox.core.config.schema import (
     TrainAppConfig,
     TrainConfig,
 )
-from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.info import MONITOR_INFO_KEYS
 from rl_fzerox.core.training import runner
-from rl_fzerox.core.training.runs import build_run_paths, ensure_run_dirs
+from rl_fzerox.core.training.runs import RUN_LAYOUT, build_run_paths, ensure_run_dirs
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     atomic_save_artifact,
     load_policy_artifact_metadata,
+    policy_artifact_metadata_path,
     resolve_train_run_config,
     validate_training_baseline_state,
 )
@@ -45,7 +46,7 @@ from rl_fzerox.core.training.session.model import (
     build_ppo_model,
     resolve_policy_activation_fn,
 )
-from tests.support.fakes import SyntheticBackend
+from tests.support.fakes import SyntheticBackend, vec_env_fns
 
 
 class _CapturingLogger:
@@ -239,7 +240,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "damage_taken_frames": 0,
             "frames_run": 2,
             "airborne_frames": 1,
-            "collision_recoil_entered": False,
             "boost_pad_entered": True,
             "boost_used": True,
             "lean_used": False,
@@ -270,7 +270,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "damage_taken_frames": 2,
             "frames_run": 3,
             "airborne_frames": 3,
-            "collision_recoil_entered": True,
             "boost_pad_entered": False,
             "boost_used": False,
             "lean_used": True,
@@ -296,7 +295,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.state_metrics["step_reward_raw"].mean() == 25.0
     assert accumulator.state_metrics["step_reward_clip_abs_excess"].mean() == 12.5
     assert accumulator.step_rates["damage_taken_frames"].rate() == 0.5
-    assert accumulator.step_rates["collision_recoil_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_pad_entered"].rate() == 0.5
     assert accumulator.step_rates["boost_used"].rate() == 0.5
     assert accumulator.step_rates["lean_used"].rate() == 0.5
@@ -323,7 +321,6 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     accumulator.record_to(logger)
 
     assert logger.records["state/damage_taken_step_rate"] == 0.5
-    assert logger.records["state/collision_recoil_entry_rate"] == 0.5
     assert logger.records["state/boost_pad_entry_step_rate"] == 0.5
     assert logger.records["state/airborne_frame_ratio"] == 0.8
     assert logger.records["action/boost_used_step_rate"] == 0.5
@@ -363,12 +360,12 @@ def test_callbacks_save_latest_artifacts_at_training_start(tmp_path: Path) -> No
         run_paths=run_paths,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
             )
-        ]
+        )
     )
 
     try:
@@ -408,8 +405,10 @@ def test_resume_curriculum_stage_index_reads_full_model_artifact_metadata(
     core_path.touch()
     rom_path.touch()
     run_dir.mkdir(parents=True)
-    (run_dir / "latest_policy.zip").write_bytes(b"policy")
-    (run_dir / "latest_policy.metadata.json").write_text(
+    latest_policy_path = run_dir / RUN_LAYOUT.policy_artifacts.latest
+    latest_policy_path.parent.mkdir(parents=True, exist_ok=True)
+    latest_policy_path.write_bytes(b"policy")
+    policy_artifact_metadata_path(latest_policy_path).write_text(
         json.dumps(
             {
                 "curriculum_stage_index": 2,
@@ -462,15 +461,16 @@ def test_resolve_policy_activation_fn_supports_known_names() -> None:
 
     assert resolve_policy_activation_fn("tanh") is nn.Tanh
     assert resolve_policy_activation_fn("relu") is nn.ReLU
+    assert resolve_policy_activation_fn("gelu") is nn.GELU
 
 
 def test_resolve_policy_activation_fn_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unsupported policy activation"):
-        resolve_policy_activation_fn("gelu")
+        resolve_policy_activation_fn("silu")
 
 
 def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path) -> None:
-    target_path = tmp_path / "latest_policy.zip"
+    target_path = tmp_path / RUN_LAYOUT.policy_artifacts.latest
 
     def _fake_save(path: str) -> None:
         Path(path).write_bytes(b"new-policy")
@@ -478,7 +478,7 @@ def test_atomic_save_artifact_replaces_target_without_leaving_tmp(tmp_path: Path
     atomic_save_artifact(_fake_save, target_path)
 
     assert target_path.read_bytes() == b"new-policy"
-    assert list(tmp_path.glob("*.tmp.zip")) == []
+    assert list(target_path.parent.glob("*.tmp.zip")) == []
 
 
 def test_train_config_rejects_plain_ppo_algorithm(
@@ -763,13 +763,13 @@ def test_curriculum_callback_applies_stage_train_overrides(tmp_path: Path) -> No
         run_paths=run_paths,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
                 curriculum_config=curriculum,
             )
-        ]
+        )
     )
 
     try:
@@ -859,13 +859,13 @@ def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
         initial_curriculum_stage_index=1,
     )
     env = DummyVecEnv(
-        [
+        vec_env_fns(
             lambda: FZeroXEnv(
                 backend=SyntheticBackend(),
                 config=EnvConfig(action=ActionConfig(mask=ActionMaskConfig(lean=(0,)))),
                 curriculum_config=curriculum,
             )
-        ]
+        )
     )
 
     try:
@@ -894,14 +894,15 @@ def test_curriculum_callback_starts_from_resume_stage(tmp_path: Path) -> None:
 
 def test_monitor_info_keys_include_position_context() -> None:
     assert "position" in MONITOR_INFO_KEYS
+    assert "ko_star_count" in MONITOR_INFO_KEYS
     assert "total_racers" in MONITOR_INFO_KEYS
     assert "course_index" in MONITOR_INFO_KEYS
 
 
-def test_monitor_info_keys_include_finished_timing_and_collision_metrics() -> None:
+def test_monitor_info_keys_include_finished_timing_and_damage_metrics() -> None:
     assert "race_time_ms" in MONITOR_INFO_KEYS
+    assert "episode_completion_fraction" in MONITOR_INFO_KEYS
     assert "damage_taken_frames" in MONITOR_INFO_KEYS
-    assert "collision_recoil_entered" in MONITOR_INFO_KEYS
     assert "boost_pad_entries" in MONITOR_INFO_KEYS
     assert "boost_pad_entries_per_lap" in MONITOR_INFO_KEYS
     assert "episode_airborne_frames" in MONITOR_INFO_KEYS

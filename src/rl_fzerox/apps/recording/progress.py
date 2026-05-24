@@ -12,10 +12,12 @@ class ProgressPrinter:
         *,
         interval_seconds: float,
         attempt: int,
-        target_rank: int,
+        target_laps: int,
+        target_rank: int | None,
     ) -> None:
         self._interval_seconds = interval_seconds
         self._attempt = attempt
+        self._target_laps = target_laps
         self._target_rank = target_rank
         self._started_at = time.monotonic()
         self._next_print_time = 0.0
@@ -38,6 +40,7 @@ class ProgressPrinter:
         line = format_progress_line(
             info,
             attempt=self._attempt,
+            target_laps=self._target_laps,
             target_rank=self._target_rank,
             episode_return=episode_return,
             effective_fps=effective_fps(info, started_at=self._started_at, now=now),
@@ -57,7 +60,8 @@ def format_progress_line(
     info: dict[str, object],
     *,
     attempt: int,
-    target_rank: int,
+    target_laps: int,
+    target_rank: int | None,
     episode_return: float,
     effective_fps: float,
 ) -> str:
@@ -71,7 +75,7 @@ def format_progress_line(
         f"{format_compact_number(float_info(info, 'race_distance'))} prog | "
         f"{effective_fps:.1f} frames/s | "
         f"R {episode_return:.1f} | "
-        f"{format_target_rank(target_rank)}"
+        f"{format_recording_target(target_laps=target_laps, target_rank=target_rank)}"
     )
 
 
@@ -100,10 +104,13 @@ def format_compact_number(value: float) -> str:
     return f"{value:.0f}"
 
 
-def format_target_rank(target_rank: int) -> str:
+def format_recording_target(*, target_laps: int, target_rank: int | None) -> str:
+    target = f"need laps >= {target_laps}"
+    if target_rank is None:
+        return target
     if target_rank == 1:
-        return "need rank 1"
-    return f"need rank <= {target_rank}"
+        return f"{target}, rank 1"
+    return f"{target}, rank <= {target_rank}"
 
 
 def format_race_time_ms(milliseconds: int) -> str:

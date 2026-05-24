@@ -5,7 +5,6 @@ import numpy as np
 import pygame
 
 from fzerox_emulator import ControllerState, display_size
-from rl_fzerox.core.envs.observations import state_feature_names
 from rl_fzerox.ui.watch.app import _next_panel_tab_index
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.view.panels.core.model import (
@@ -20,12 +19,35 @@ from rl_fzerox.ui.watch.view.panels.rendering.tab_bar import (
     _draw_panel_tabs,
     _panel_tab_hint,
 )
-from rl_fzerox.ui.watch.view.screen.frame import _create_fonts
+from rl_fzerox.ui.watch.view.screen.frame import _create_fonts, _watch_window_size
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
 from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine
 from tests.ui.viewer_support import FakeScreen, fake_viewer_fonts
 from tests.ui.viewer_support import sample_telemetry as _sample_telemetry
+
+
+class _FakePygame:
+    @staticmethod
+    def Rect(x: int, y: int, width: int, height: int) -> tuple[int, int, int, int]:
+        return (x, y, width, height)
+
+    class draw:
+        @staticmethod
+        def circle(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def line(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def polygon(*args: object, **kwargs: object) -> None:
+            return None
+
+        @staticmethod
+        def rect(*args: object, **kwargs: object) -> None:
+            return None
 
 
 def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None:
@@ -50,6 +72,30 @@ def test_panel_value_rows_keep_stable_height_when_glyph_height_changes() -> None
     )
 
     assert no_y == yes_y
+
+
+def test_panel_value_rows_with_status_icons_still_draw_values() -> None:
+    fonts = fake_viewer_fonts()
+    screen = FakeScreen()
+
+    _draw_labeled_value_line(
+        pygame=_FakePygame,
+        screen=screen,
+        fonts=fonts,
+        x=0,
+        y=10,
+        width=220,
+        line=PanelLine(
+            "speed_kph_norm",
+            "0.500",
+            PALETTE.text_primary,
+            status_icon="toggle_on",
+            click_state_feature_name="speed_kph_norm",
+        ),
+    )
+
+    assert "speed_kph_norm" in [text for text, _ in screen.blits]
+    assert "0.500" in [text for text, _ in screen.blits]
 
 
 def test_point_in_rect_matches_clickable_region_bounds() -> None:
@@ -80,7 +126,7 @@ def test_target_display_size_falls_back_to_raw_frame_size() -> None:
 
 def test_next_panel_tab_index_cycles_tabs() -> None:
     assert _next_panel_tab_index(0, ViewerInput(panel_tab_delta=1)) == 1
-    assert _next_panel_tab_index(5, ViewerInput(panel_tab_delta=1)) == 0
+    assert _next_panel_tab_index(7, ViewerInput(panel_tab_delta=1)) == 0
 
 
 def test_next_panel_tab_index_honors_direct_selection() -> None:
@@ -88,12 +134,14 @@ def test_next_panel_tab_index_honors_direct_selection() -> None:
 
 
 def test_panel_tab_hint_shows_active_tab_position() -> None:
-    assert _panel_tab_hint(0) == "Tab 1/6"
-    assert _panel_tab_hint(2) == "Tab 3/6"
-    assert _panel_tab_hint(3) == "Tab 4/6"
-    assert _panel_tab_hint(4) == "Tab 5/6"
-    assert _panel_tab_hint(5) == "Tab 6/6"
-    assert _panel_tab_hint(6) == "Tab 1/6"
+    assert _panel_tab_hint(0) == "Tab 1/8"
+    assert _panel_tab_hint(2) == "Tab 3/8"
+    assert _panel_tab_hint(3) == "Tab 4/8"
+    assert _panel_tab_hint(4) == "Tab 5/8"
+    assert _panel_tab_hint(5) == "Tab 6/8"
+    assert _panel_tab_hint(6) == "Tab 7/8"
+    assert _panel_tab_hint(7) == "Tab 8/8"
+    assert _panel_tab_hint(8) == "Tab 1/8"
 
 
 def test_panel_tabs_fit_side_panel_content_width() -> None:
@@ -121,13 +169,34 @@ def test_panel_tabs_fit_side_panel_content_width() -> None:
 
 
 def test_window_size_adds_sidebar_width() -> None:
-    assert _window_size((592, 444), (84, 116, 12)) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1004, 980)
-    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1004, 980)
+    assert _window_size((592, 444), (84, 116, 12)) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=0) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=1) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=2) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=3) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=4) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=5) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=6) == (1204, 980)
+    assert _window_size((592, 444), (84, 116, 12), panel_tab_index=7) == (1204, 980)
+
+
+def test_watch_window_size_fits_native_observation_preview() -> None:
+    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+    pygame.init()
+
+    try:
+        fonts = _create_fonts(pygame)
+        size = _watch_window_size(
+            (592, 444),
+            (180, 240, 6),
+            fonts=fonts,
+            info={"observation_stack": 2, "observation_stack_mode": "rgb"},
+        )
+
+        assert size[0] >= 240 * 2 + (2 * LAYOUT.preview_padding) + LAYOUT.preview_gap
+        assert size[1] > 980
+    finally:
+        pygame.quit()
 
 
 def test_side_panel_fits_default_watch_window_height() -> None:
@@ -181,7 +250,16 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
 
     try:
         fonts = _create_fonts(pygame)
-        feature_names = state_feature_names("steer_history")
+        feature_names = (
+            "vehicle_state.speed_norm",
+            "vehicle_state.energy_frac",
+            "vehicle_state.reverse_active",
+            "vehicle_state.airborne",
+            "vehicle_state.boost_unlocked",
+            "vehicle_state.boost_active",
+            "control_history.prev_steer_1",
+            "control_history.prev_lean_1",
+        )
         observation_shape = (84, 116, 3)
         columns = _build_panel_columns(
             episode=0,
