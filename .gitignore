@@ -230,9 +230,15 @@ __marimo__/
 *.sfc
 *.smc
 
-# Local emulator scratch space and ROM archives
+# Local emulator scratch space and ROM archives.
 AGENTS.md
-/local/
+/local/**
+!/local/
+!/local/.gitkeep
+!/local/libretro/
+!/local/libretro/.gitkeep
+!/local/roms/
+!/local/roms/.gitkeep
 conf/local/*.yaml
 conf/local/*.yml
 conf/local/**/*.yaml
