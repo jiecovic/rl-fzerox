@@ -13,6 +13,7 @@ from rl_fzerox.core.domain.track_position import height_above_ground_feature
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw, on_refill_surface
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.envs.track_bounds import track_edge_state
+from rl_fzerox.core.policy.auxiliary_state.names import AuxiliaryStateTargetName
 
 _BUILTIN_COURSE_COUNT = 24
 _SPEED_NORMALIZER_KPH = 1_500.0
@@ -25,24 +26,6 @@ def _builtin_course_observation_feature_names() -> tuple[str, ...]:
     )
 
 
-AuxiliaryStateTargetName: TypeAlias = Literal[
-    "vehicle_state.speed_norm",
-    "vehicle_state.energy_frac",
-    "vehicle_state.reverse_active",
-    "vehicle_state.airborne",
-    "vehicle_state.boost_unlocked",
-    "vehicle_state.boost_active",
-    "vehicle_state.lateral_velocity_norm",
-    "vehicle_state.sliding_active",
-    "track_position.lap_progress",
-    "track_position.edge_ratio",
-    "track_position.height_above_ground_norm",
-    "track_position.outside_track_bounds",
-    "surface_state.on_refill_surface",
-    "surface_state.on_dirt_surface",
-    "surface_state.on_ice_surface",
-    "course_context.builtin_course_id",
-]
 AuxiliaryStateTargetKind: TypeAlias = Literal["scalar", "binary", "categorical"]
 AuxiliaryStateDecodedValue: TypeAlias = float | int | dict[str, float | int | None | list[float]]
 

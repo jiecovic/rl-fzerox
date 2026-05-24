@@ -10,7 +10,7 @@ from rl_fzerox.core.domain.cnn import (
     normalize_cnn_layer_kind,
     validate_cnn_layer_geometry,
 )
-from rl_fzerox.core.policy.auxiliary_state.targets import (
+from rl_fzerox.core.policy.auxiliary_state.names import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_supports_grounded_only,
 )
