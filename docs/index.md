@@ -5,7 +5,7 @@ toward a first stable version.
 
 - [Observation pipeline](observation_pipeline.md)
 - [Reward main](reward_shaping/reward_main.md)
+- [Architecture](architecture.md)
+- [Contributing](contributing.md)
 
-The main repository overview remains in [README.md](../README.md). Architecture
-notes that are still broad enough for the whole project remain in
-[ARCHITECTURE.md](../ARCHITECTURE.md).
+The main repository overview remains in [README.md](../README.md).

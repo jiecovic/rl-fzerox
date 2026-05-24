@@ -58,3 +58,5 @@ just run-manager
 
 The UI runs at `http://localhost:5174`. The local API runs at
 `http://127.0.0.1:8765`.
+
+More project notes live in [docs](docs/index.md).
