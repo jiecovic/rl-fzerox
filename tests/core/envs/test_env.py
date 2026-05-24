@@ -91,7 +91,8 @@ def test_watch_step_captures_each_repeated_display_frame():
 
     assert backend.frame_index == 3
     assert backend.capture_video_flags == [True, True, True]
-    assert len(watch_step.display_frames) == 3
+    assert not isinstance(watch_step.display_frames, tuple)
+    assert watch_step.display_frames.shape[0] == 3
     assert watch_step.display_frames[0].shape == (444, 592, 3)
     assert _image_obs(watch_step.observation).shape == (84, 84, 12)
     assert watch_step.info["repeat_index"] == 2

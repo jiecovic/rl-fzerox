@@ -269,8 +269,8 @@ pub struct NativeMultiObservationStepResult {
 
 /// Flat watch-frame storage for one repeated step.
 ///
-/// Watch mode still returns individual frames to Python, but internally this
-/// avoids one allocation per repeated display frame.
+/// Watch mode returns one batched Python array, and this flat native storage
+/// keeps the Rust side to a single display-frame allocation per repeated step.
 #[derive(Clone, Debug, Default)]
 pub struct DisplayFrameBatch {
     pub frame_len: usize,
@@ -278,6 +278,13 @@ pub struct DisplayFrameBatch {
 }
 
 impl DisplayFrameBatch {
+    pub fn frame_count(&self) -> usize {
+        if self.frame_len == 0 {
+            return 0;
+        }
+        self.bytes.len() / self.frame_len
+    }
+
     pub fn reserve_frame_capacity(&mut self, frame_len: usize, frame_count: usize) {
         if self.frame_len == 0 {
             self.frame_len = frame_len;

@@ -217,7 +217,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
     ) -> BackendStepResult:
-        """Execute one repeated watch step and return per-frame display images."""
+        """Execute one repeated watch step and return batched display images."""
 
         config = RepeatStepConfig(
             action_repeat=action_repeat,

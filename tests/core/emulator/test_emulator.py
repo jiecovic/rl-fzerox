@@ -194,10 +194,12 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
             assert step["action_repeat"] == 2
             assert observation_request["preset"] == "crop_84x84"
             observation = np.zeros((84, 84, 6), dtype=np.uint8)
-            display_frames = [
-                np.full((444, 592, 3), 1, dtype=np.uint8),
-                np.full((444, 592, 3), 2, dtype=np.uint8),
-            ]
+            display_frames = np.stack(
+                (
+                    np.full((444, 592, 3), 1, dtype=np.uint8),
+                    np.full((444, 592, 3), 2, dtype=np.uint8),
+                ),
+            )
             summary = make_step_summary(frames_run=2, max_race_distance=42.0)
             status = make_step_status(step_count=2, stalled_steps=0)
             telemetry = make_telemetry(race_distance=42.0)
@@ -219,8 +221,8 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     )
 
     assert result.observation.shape == (84, 84, 6)
-    assert len(result.display_frames) == 2
-    assert result.display_frames[0].shape == (444, 592, 3)
+    assert not isinstance(result.display_frames, tuple)
+    assert result.display_frames.shape == (2, 444, 592, 3)
     assert result.display_frames[1][0, 0, 0] == 2
 
 

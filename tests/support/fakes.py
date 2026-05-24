@@ -461,7 +461,7 @@ class SyntheticBackend:
                 truncation_reason=truncation_reason,
             ),
             telemetry=None,
-            display_frames=tuple(display_frames),
+            display_frames=np.stack(display_frames),
         )
 
     def step_repeat_multi_observation_raw(
