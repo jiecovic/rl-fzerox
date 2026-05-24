@@ -115,9 +115,7 @@ class SourceCropResolutionChoice(BaseModel):
 
 
 ObservationResolutionConfig: TypeAlias = Annotated[
-    PresetResolutionChoice
-    | CustomResolutionChoice
-    | SourceCropResolutionChoice,
+    PresetResolutionChoice | CustomResolutionChoice | SourceCropResolutionChoice,
     Field(discriminator="mode"),
 ]
 
