@@ -1,6 +1,6 @@
 # rl-fzerox
 
-Experimental reinforcement-learning project for training agents to race in
+  Experimental deep reinforcement-learning project for training agents to race in
 F-Zero X through a libretro N64 emulator.
 
 ## Requirements
@@ -48,6 +48,9 @@ TensorBoard views, and training runs under `local/`. None of those local files
 are included in git.
 
 ## Run Manager
+
+The run manager is the local UI/API for editing experiment specs, launching
+training, watching policies, and tracking run state.
 
 ```bash
 just run-manager
