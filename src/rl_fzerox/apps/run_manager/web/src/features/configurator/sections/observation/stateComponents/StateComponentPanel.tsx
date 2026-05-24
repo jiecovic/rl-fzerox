@@ -1,16 +1,20 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/stateComponents/StateComponentPanel.tsx
 import { ToggleSwitch } from "@/features/configurator/fields";
-import type { ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
-
 import {
   componentSummary,
   isRowZeroed,
   type StateFeatureRow,
+  stateComponentInfoForConfig,
   stateFeatureRows,
-} from "../featureRows";
-import { ComponentSettings } from "./ComponentSettings";
-import { type AuxiliaryStateTargetName, isRowIncluded, type StateComponentInfo } from "./model";
-import { StateFeatureTable } from "./StateFeatureTable";
+} from "@/features/configurator/sections/observation/featureRows";
+import { ComponentSettings } from "@/features/configurator/sections/observation/stateComponents/ComponentSettings";
+import {
+  type AuxiliaryStateTargetName,
+  isRowIncluded,
+  type StateComponentInfo,
+} from "@/features/configurator/sections/observation/stateComponents/model";
+import { StateFeatureTable } from "@/features/configurator/sections/observation/stateComponents/StateFeatureTable";
+import type { ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
 
 interface StateComponentPanelProps {
   checkpointLocked: boolean;
@@ -70,12 +74,14 @@ export function StateComponentPanel({
   }
 
   const enabled = component !== undefined;
-  const rows = stateFeatureRows(displayComponent.name, componentInfo.features);
+  const effectiveComponentInfo = stateComponentInfoForConfig(componentInfo, config);
+  const rows = stateFeatureRows(displayComponent.name, effectiveComponentInfo.features);
   const notIncludedCount = enabled
-    ? rows.filter((row) => !isRowIncluded(componentInfo, displayComponent, row)).length
+    ? rows.filter((row) => !isRowIncluded(effectiveComponentInfo, displayComponent, row)).length
     : rows.length;
   const zeroedCount = rows.filter(
-    (row) => isRowIncluded(componentInfo, displayComponent, row) && isRowZeroed(config, row),
+    (row) =>
+      isRowIncluded(effectiveComponentInfo, displayComponent, row) && isRowZeroed(config, row),
   ).length;
   const allRowsIncluded = enabled && notIncludedCount === 0;
 
@@ -129,7 +135,7 @@ export function StateComponentPanel({
           auxiliaryEnabled={config.policy.auxiliary_state_enabled}
           checkpointLocked={checkpointLocked}
           component={displayComponent}
-          componentInfo={componentInfo}
+          componentInfo={effectiveComponentInfo}
           config={config}
           enabled={enabled}
           rows={rows}
@@ -139,10 +145,15 @@ export function StateComponentPanel({
           onAuxiliaryLossWeightChange={onAuxiliaryLossWeightChange}
           onFeatureDropoutChange={onFeatureDropoutChange}
           onFeatureIncludedChange={(featureNames, included) =>
-            onFeatureIncludedChange(componentInfo, displayComponent.name, featureNames, included)
+            onFeatureIncludedChange(
+              effectiveComponentInfo,
+              displayComponent.name,
+              featureNames,
+              included,
+            )
           }
           onRowsIncludedChange={(included) =>
-            onRowsIncludedChange(componentInfo, displayComponent.name, rows, included)
+            onRowsIncludedChange(effectiveComponentInfo, displayComponent.name, rows, included)
           }
         />
       </div>

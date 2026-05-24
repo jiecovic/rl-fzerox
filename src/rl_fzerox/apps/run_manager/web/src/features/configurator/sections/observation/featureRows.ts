@@ -1,7 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/featureRows.ts
+import { stateFeatureInfo } from "@/features/configurator/sections/stateFeatureInfo";
 import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
-
-import { stateFeatureInfo } from "../stateFeatureInfo";
 
 export const TRACK_POSITION_PROGRESS_ROW_ID = "track_position.lap_progress";
 
@@ -15,6 +14,38 @@ export interface StateFeatureRow {
   defaultEnabled: boolean;
   auxiliaryTargetName?: ManagedRunConfig["policy"]["auxiliary_state_losses"][number]["name"];
   auxiliarySupportsGroundedOnly: boolean;
+}
+
+type StateComponentInfo = ConfigMetadata["state_components"][number];
+
+export function stateComponentInfoForConfig(
+  componentInfo: StateComponentInfo,
+  config: ManagedRunConfig,
+): StateComponentInfo {
+  if (
+    componentInfo.name !== "control_history" ||
+    config.action.lean_output_mode !== "independent_buttons"
+  ) {
+    return componentInfo;
+  }
+  return {
+    ...componentInfo,
+    features: componentInfo.features.flatMap((feature) => independentLeanHistoryFeatures(feature)),
+  };
+}
+
+function independentLeanHistoryFeatures(
+  feature: StateComponentInfo["features"][number],
+): StateComponentInfo["features"] {
+  const match = /^control_history\.prev_lean_(\d+)$/.exec(feature.name);
+  if (match === null) {
+    return [feature];
+  }
+  const [, age = ""] = match;
+  return [
+    { ...feature, name: `control_history.prev_lean_left_${age}`, low: 0, high: 1 },
+    { ...feature, name: `control_history.prev_lean_right_${age}`, low: 0, high: 1 },
+  ];
 }
 
 export function stateFeatureRows(
