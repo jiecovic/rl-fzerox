@@ -376,10 +376,7 @@ def _outside_edge_excess_ratio_summary(
 
 
 def _future_segment_distance_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
-    if (
-        live_series is None
-        or not live_series.future_local_nearest_segment_distance
-    ):
+    if live_series is None or not live_series.future_local_nearest_segment_distance:
         return "seg - · distance -"
     current_distance = live_series.future_local_nearest_segment_distance[-1]
     segment_index = live_series.current_future_local_nearest_segment_index

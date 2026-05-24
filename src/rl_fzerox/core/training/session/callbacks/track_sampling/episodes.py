@@ -24,9 +24,7 @@ def dynamic_step_balanced_sampling_configs(
 
 def uses_dynamic_step_balancing(config: TrackSamplingConfig) -> bool:
     return (
-        config.enabled
-        and uses_dynamic_runtime_mode(config.sampling_mode)
-        and bool(config.entries)
+        config.enabled and uses_dynamic_runtime_mode(config.sampling_mode) and bool(config.entries)
     )
 
 

@@ -126,6 +126,7 @@ class TrackResetSelector:
         self._sequential_course_buckets = _sequential_course_buckets(config.entries)
         self._cursor = 0
 
+
 def select_reset_track_by_course_id(
     config: TrackSamplingConfig,
     *,
