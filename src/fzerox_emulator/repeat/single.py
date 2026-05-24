@@ -5,7 +5,7 @@ from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator.base import BackendStepResult, ObservationImageRecipe, ObservationSpec
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.frames import expected_observation_shape, validated_observation_frame
-from fzerox_emulator.repeat.config import RepeatStepConfig
+from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
 
 def run_repeat_step(

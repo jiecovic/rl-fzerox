@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal, Protocol, TypeAlias
+from typing import Protocol
 
 from fzerox_emulator._native import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
@@ -20,9 +20,6 @@ from fzerox_emulator.base.results import (
     ResetState,
 )
 from fzerox_emulator.control import ControllerState
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
-
-RaceStartMode: TypeAlias = Literal["time_attack", "gp_race"]
 
 
 class EmulatorBackend(Protocol):
@@ -125,23 +122,23 @@ class EmulatorBackend(Protocol):
     def patch_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
 
     def patch_machine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
 
     def patch_time_attack_menu_mode(self) -> None: ...
@@ -149,21 +146,21 @@ class EmulatorBackend(Protocol):
     def patch_engine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         engine_setting_raw_value: int,
     ) -> None: ...
 
-    def force_race_reinit(self, *, mode: RaceStartMode) -> None: ...
+    def force_race_reinit(self, *, mode: str) -> None: ...
 
     def validate_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None: ...
 
     def patch_time_attack_race_start_setup(

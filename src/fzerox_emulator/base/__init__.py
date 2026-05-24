@@ -1,7 +1,7 @@
 # src/fzerox_emulator/base/__init__.py
 from __future__ import annotations
 
-from fzerox_emulator.base.backend import EmulatorBackend, RaceStartMode
+from fzerox_emulator.base.backend import EmulatorBackend
 from fzerox_emulator.base.observations import (
     FrameObservationOptions,
     ObservationImageRecipe,
@@ -28,7 +28,6 @@ __all__ = [
     "ObservationResizeFilter",
     "ObservationSpec",
     "ObservationStackMode",
-    "RaceStartMode",
     "ResetState",
     "normalize_observation_resolution",
     "stacked_observation_channels",

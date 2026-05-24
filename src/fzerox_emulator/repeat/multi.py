@@ -11,8 +11,8 @@ from fzerox_emulator.base import (
 )
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.frames import expected_observation_shape, validated_observation_frame
-from fzerox_emulator.repeat.config import RepeatStepConfig
 from fzerox_emulator.repeat.requests import native_observation_recipe
+from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
 
 def run_repeat_multi_observation_step(

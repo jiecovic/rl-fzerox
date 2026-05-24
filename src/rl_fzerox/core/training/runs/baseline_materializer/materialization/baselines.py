@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from fzerox_emulator.base import RaceStartMode
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName, is_race_difficulty_name
 from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting
 from rl_fzerox.core.training.runs.baseline_materializer.cache import (
@@ -30,6 +29,7 @@ from rl_fzerox.core.training.runs.baseline_materializer.settings import (
     BASELINE_MATERIALIZER_SETTINGS,
 )
 from rl_fzerox.core.training.runs.paths import RunPaths
+from rl_fzerox.core.training.runs.race_start.models import RaceStartMode
 
 
 def materialize_baseline_impl(

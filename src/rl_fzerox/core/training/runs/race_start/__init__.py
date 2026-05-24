@@ -18,6 +18,7 @@ from rl_fzerox.core.training.runs.race_start.models import (
     RACE_DEFAULTS,
     RaceStartDefaults,
     RaceStartMenuTiming,
+    RaceStartMode,
     RaceStartVariant,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "RACE_DEFAULTS",
     "RaceStartDefaults",
     "RaceStartMenuTiming",
+    "RaceStartMode",
     "RaceStartVariant",
     "materialize_generic_mode_seed",
     "materialize_gp_race_start_from_boot",

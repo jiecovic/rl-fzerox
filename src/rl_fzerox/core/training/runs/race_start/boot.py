@@ -9,6 +9,9 @@ from fzerox_emulator import (
 )
 from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_menu_row_and_column
+from rl_fzerox.core.training.runs.race_start.boundary import (
+    race_start_gp_difficulty_raw_value,
+)
 from rl_fzerox.core.training.runs.race_start.exact import write_engine_settings
 from rl_fzerox.core.training.runs.race_start.models import MENU_TIMING, RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.validation import (
@@ -297,7 +300,7 @@ def _apply_exact_race_start_setup(emulator: Emulator, variant: RaceStartVariant)
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
-        gp_difficulty=variant.gp_difficulty,
+        gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
     emulator.patch_race_start_setup(
         mode=variant.mode,
@@ -305,7 +308,7 @@ def _apply_exact_race_start_setup(emulator: Emulator, variant: RaceStartVariant)
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
-        gp_difficulty=variant.gp_difficulty,
+        gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
     emulator.force_race_reinit(mode=variant.mode)
 

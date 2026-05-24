@@ -24,9 +24,8 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from fzerox_emulator.base import RaceStartMode, normalize_observation_resolution
+from fzerox_emulator.base import normalize_observation_resolution
 from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
-from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from tests.support.native_objects import make_telemetry
 
 _ObservationStackKey = tuple[str, int, ObservationStackMode, bool, object, object]
@@ -68,7 +67,7 @@ class SyntheticBackend:
         self._system_ram = bytearray(0x0030_0000)
         self.last_race_start_setup: dict[str, object] | None = None
         self.last_machine_settings: dict[str, object] | None = None
-        self.last_race_reinit_mode: RaceStartMode | None = None
+        self.last_race_reinit_mode: str | None = None
 
     @property
     def name(self) -> str:
@@ -533,12 +532,12 @@ class SyntheticBackend:
     def patch_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         self.last_race_start_setup = {
             "mode": mode,
@@ -546,18 +545,18 @@ class SyntheticBackend:
             "character_index": character_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
-            "gp_difficulty": gp_difficulty,
+            "gp_difficulty_raw_value": gp_difficulty_raw_value,
         }
 
     def patch_machine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         self.last_machine_settings = {
             "mode": mode,
@@ -565,13 +564,13 @@ class SyntheticBackend:
             "character_index": character_index,
             "engine_setting_raw_value": engine_setting_raw_value,
             "total_lap_count": total_lap_count,
-            "gp_difficulty": gp_difficulty,
+            "gp_difficulty_raw_value": gp_difficulty_raw_value,
         }
 
     def patch_engine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         engine_setting_raw_value: int,
     ) -> None:
         self.last_engine_settings = {
@@ -582,18 +581,18 @@ class SyntheticBackend:
     def patch_time_attack_menu_mode(self) -> None:
         self.last_time_attack_menu_mode = True
 
-    def force_race_reinit(self, *, mode: RaceStartMode) -> None:
+    def force_race_reinit(self, *, mode: str) -> None:
         self.last_race_reinit_mode = mode
 
     def validate_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         self.patch_race_start_setup(
             mode=mode,
@@ -601,7 +600,7 @@ class SyntheticBackend:
             character_index=character_index,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
-            gp_difficulty=gp_difficulty,
+            gp_difficulty_raw_value=gp_difficulty_raw_value,
         )
 
     def patch_time_attack_race_start_setup(

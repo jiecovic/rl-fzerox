@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal, TypeAlias
 
-from fzerox_emulator.base import RaceStartMode
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+
+RaceStartMode: TypeAlias = Literal["time_attack", "gp_race"]
 
 
 @dataclass(frozen=True, slots=True)
