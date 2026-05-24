@@ -29,16 +29,18 @@ just native
 just run-manager-install
 ```
 
-`local/` is an ignored workspace on your machine. It may not exist after clone;
-create it and put the required local assets here:
+`local/` is the ignored machine-local workspace. After clone, it contains empty
+placeholder folders for required runtime assets. Put the default libretro core
+and ROM files here:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
 local/roms/F-Zero X (USA).n64
 ```
 
-The run manager also stores its SQLite DB, generated baselines, TensorBoard
-views, and training runs under `local/`. None of this is included in git.
+These are the default paths used by the run manager. It also stores its SQLite
+DB, generated baselines, TensorBoard views, and training runs under `local/`.
+None of those local files are included in git.
 
 ## Run Manager
 
