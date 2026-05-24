@@ -1,16 +1,18 @@
 # src/fzerox_emulator/repeat/requests.py
+"""Builders for the dictionary payloads passed into native repeated-step APIs."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fzerox_emulator.base import ObservationImageRecipe
+from fzerox_emulator.base.observations import ObservationImageRecipe
 from fzerox_emulator.control import ControllerState
 from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from fzerox_emulator._native import (
+    from fzerox_emulator.boundary import (
         ObservationImageRequestDict,
         RepeatMultiObservationStepRequestDict,
         RepeatObservationStepRequestDict,
@@ -19,6 +21,8 @@ if TYPE_CHECKING:
 
 
 def native_observation_recipe(recipe: ObservationImageRecipe) -> ObservationImageRequestDict:
+    """Translate one Python observation recipe into its native request payload."""
+
     payload: ObservationImageRequestDict = {
         "preset": "" if recipe.preset is None else recipe.preset,
         "frame_stack": recipe.frame_stack,
@@ -38,6 +42,8 @@ def native_repeat_step_request(
     config: RepeatStepConfig,
     controller_state: ControllerState,
 ) -> RepeatStepRequestDict:
+    """Translate repeat-step config and controller state into a native payload."""
+
     payload: RepeatStepRequestDict = {
         "action_repeat": config.action_repeat,
         "stuck_min_speed_kph": config.stuck_min_speed_kph,
@@ -64,6 +70,8 @@ def native_repeat_observation_request(
     controller_state: ControllerState,
     recipe: ObservationImageRecipe,
 ) -> RepeatObservationStepRequestDict:
+    """Build the native request for one repeated step with one observation view."""
+
     return {
         "step": native_repeat_step_request(config, controller_state),
         "observation": native_observation_recipe(recipe),
@@ -75,6 +83,8 @@ def native_repeat_multi_observation_request(
     controller_state: ControllerState,
     recipes: Sequence[ObservationImageRecipe],
 ) -> RepeatMultiObservationStepRequestDict:
+    """Build the native request for one repeated step with multiple observations."""
+
     return {
         "step": native_repeat_step_request(config, controller_state),
         "observations": [native_observation_recipe(recipe) for recipe in recipes],

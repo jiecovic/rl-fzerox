@@ -1,4 +1,6 @@
 # src/fzerox_emulator/emulator/client.py
+"""Concrete Python wrapper around the native Rust libretro host."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -6,14 +8,16 @@ from pathlib import Path
 
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
-from fzerox_emulator.base import (
-    BackendMultiObservationStepResult,
-    BackendStepResult,
-    FrameStep,
+from fzerox_emulator.base.observations import (
     ObservationImageRecipe,
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
+)
+from fzerox_emulator.base.results import (
+    BackendMultiObservationStepResult,
+    BackendStepResult,
+    FrameStep,
     ResetState,
 )
 from fzerox_emulator.control import ControllerState
@@ -30,7 +34,7 @@ _DEFAULT_RENDERER = "gliden64"
 
 
 class Emulator(RaceStartMixin, ObservationRenderingMixin):
-    """Python wrapper over the native Rust libretro host."""
+    """High-level emulator object exposed to training, watch, and tooling code."""
 
     def __init__(
         self,

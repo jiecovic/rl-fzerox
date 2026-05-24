@@ -606,41 +606,6 @@ class SyntheticBackend:
             gp_difficulty_raw_value=gp_difficulty_raw_value,
         )
 
-    def patch_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_race_start_setup(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def patch_time_attack_machine_settings(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_machine_settings(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def force_time_attack_reinit(self) -> None:
-        self.force_race_reinit(mode="time_attack")
-
     def close(self) -> None:
         return None
 

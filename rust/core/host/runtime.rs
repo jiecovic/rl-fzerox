@@ -7,14 +7,17 @@
 
 mod baseline;
 mod bootstrap;
+mod control;
 mod host;
 mod lean_slide;
 mod memory;
+mod race_start;
 mod render;
 mod repeat;
 mod rng;
 mod step;
 mod step_accumulator;
+mod telemetry;
 
 pub use host::Host;
 pub use step::{

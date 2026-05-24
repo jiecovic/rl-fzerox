@@ -1,4 +1,6 @@
 # src/fzerox_emulator/control/buttons.py
+"""Libretro joypad button identifiers exported from the native extension."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +10,8 @@ import fzerox_emulator._native as _native
 
 @dataclass(frozen=True, slots=True)
 class JoypadButtons:
+    """Named native button ids for code that should not depend on raw integers."""
+
     b: int
     y: int
     select: int
@@ -27,6 +31,8 @@ class JoypadButtons:
 
 
 def _button(name: str) -> int:
+    """Read and validate one button id from the native module."""
+
     value = getattr(_native, name)
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"{name} must be an int button id")

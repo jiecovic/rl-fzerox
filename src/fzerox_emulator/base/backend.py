@@ -1,4 +1,6 @@
 # src/fzerox_emulator/base/backend.py
+"""Structural emulator backend contract consumed by env and watch code."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -164,26 +166,6 @@ class EmulatorBackend(Protocol):
         total_lap_count: int,
         gp_difficulty_raw_value: int = -1,
     ) -> None: ...
-
-    def patch_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None: ...
-
-    def patch_time_attack_machine_settings(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None: ...
-
-    def force_time_attack_reinit(self) -> None: ...
 
     def render(self) -> RgbFrame: ...
 

@@ -12,34 +12,35 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import fzerox_emulator._native as _native
-    import fzerox_emulator.base as _base
+    import fzerox_emulator.base.backend as _backend
+    import fzerox_emulator.base.observations as _observations
+    import fzerox_emulator.base.results as _results
     import fzerox_emulator.control as _control
     import fzerox_emulator.emulator as _emulator
-    import fzerox_emulator.video as _video
 
-    BackendMultiObservationStepResult = _base.BackendMultiObservationStepResult
-    BackendStepResult = _base.BackendStepResult
+    BackendMultiObservationStepResult = _results.BackendMultiObservationStepResult
+    BackendStepResult = _results.BackendStepResult
     ControllerState = _control.ControllerState
     CoreInfo = _native.CoreInfo
     Emulator = _emulator.Emulator
-    EmulatorBackend = _base.EmulatorBackend
+    EmulatorBackend = _backend.EmulatorBackend
     FZeroXTelemetry = _native.FZeroXTelemetry
-    FrameStep = _base.FrameStep
+    FrameStep = _results.FrameStep
     JOYPAD_BUTTONS = _control.JOYPAD_BUTTONS
     JoypadButtons = _control.JoypadButtons
-    ObservationResizeFilter = _base.ObservationResizeFilter
-    ObservationImageRecipe = _base.ObservationImageRecipe
-    ObservationSpec = _base.ObservationSpec
-    ObservationStackMode = _base.ObservationStackMode
+    ObservationResizeFilter = _observations.ObservationResizeFilter
+    ObservationImageRecipe = _observations.ObservationImageRecipe
+    ObservationSpec = _observations.ObservationSpec
+    ObservationStackMode = _observations.ObservationStackMode
     PlayerTelemetry = _native.PlayerTelemetry
-    ResetState = _base.ResetState
+    ResetState = _results.ResetState
     StepStatus = _native.StepStatus
     StepSummary = _native.StepSummary
-    display_size = _video.display_size
+    display_size = _observations.display_size
     encode_state_flags = _native.encode_state_flags
     joypad_mask = _native.joypad_mask
     probe_core = _native.probe_core
-    stacked_observation_channels = _base.stacked_observation_channels
+    stacked_observation_channels = _observations.stacked_observation_channels
 
 _EXPORT_MODULES = {
     "CoreInfo": "fzerox_emulator._native",
@@ -50,21 +51,21 @@ _EXPORT_MODULES = {
     "encode_state_flags": "fzerox_emulator._native",
     "joypad_mask": "fzerox_emulator._native",
     "probe_core": "fzerox_emulator._native",
-    "BackendStepResult": "fzerox_emulator.base",
-    "BackendMultiObservationStepResult": "fzerox_emulator.base",
-    "EmulatorBackend": "fzerox_emulator.base",
-    "FrameStep": "fzerox_emulator.base",
-    "ObservationResizeFilter": "fzerox_emulator.base",
-    "ObservationImageRecipe": "fzerox_emulator.base",
-    "ObservationSpec": "fzerox_emulator.base",
-    "ObservationStackMode": "fzerox_emulator.base",
-    "ResetState": "fzerox_emulator.base",
-    "stacked_observation_channels": "fzerox_emulator.base",
+    "BackendStepResult": "fzerox_emulator.base.results",
+    "BackendMultiObservationStepResult": "fzerox_emulator.base.results",
+    "EmulatorBackend": "fzerox_emulator.base.backend",
+    "FrameStep": "fzerox_emulator.base.results",
+    "ObservationResizeFilter": "fzerox_emulator.base.observations",
+    "ObservationImageRecipe": "fzerox_emulator.base.observations",
+    "ObservationSpec": "fzerox_emulator.base.observations",
+    "ObservationStackMode": "fzerox_emulator.base.observations",
+    "ResetState": "fzerox_emulator.base.results",
+    "stacked_observation_channels": "fzerox_emulator.base.observations",
     "JOYPAD_BUTTONS": "fzerox_emulator.control",
     "JoypadButtons": "fzerox_emulator.control",
     "ControllerState": "fzerox_emulator.control",
     "Emulator": "fzerox_emulator.emulator",
-    "display_size": "fzerox_emulator.video",
+    "display_size": "fzerox_emulator.base.observations",
 }
 
 __all__ = [

@@ -2,10 +2,13 @@
 //! Python-facing player telemetry binding.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple};
+use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
+use crate::bindings::payload::{optional_item, required_item};
 use crate::core::telemetry::{MachineContextTelemetry, PlayerTelemetry, RacerGeometryTelemetry};
+
+const PLAYER_TELEMETRY_PAYLOAD: &str = "player telemetry";
 
 #[pyclass(
     name = "PlayerTelemetry",
@@ -25,21 +28,34 @@ impl PyPlayerTelemetry {
     fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
         Ok(Self {
             inner: PlayerTelemetry {
-                state_flags: required_item(data, "state_flags")?.extract()?,
-                speed_kph: required_item(data, "speed_kph")?.extract()?,
-                energy: required_item(data, "energy")?.extract()?,
-                max_energy: required_item(data, "max_energy")?.extract()?,
+                state_flags: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "state_flags")?
+                    .extract()?,
+                speed_kph: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "speed_kph")?.extract()?,
+                energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "energy")?.extract()?,
+                max_energy: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "max_energy")?
+                    .extract()?,
                 ko_star_count: optional_item(data, "ko_star_count", 0)?,
-                boost_timer: required_item(data, "boost_timer")?.extract()?,
-                recoil_tilt_magnitude: required_item(data, "recoil_tilt_magnitude")?.extract()?,
+                boost_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "boost_timer")?
+                    .extract()?,
+                recoil_tilt_magnitude: required_item(
+                    data,
+                    PLAYER_TELEMETRY_PAYLOAD,
+                    "recoil_tilt_magnitude",
+                )?
+                .extract()?,
                 damage_rumble_counter: optional_item(data, "damage_rumble_counter", 0)?,
-                reverse_timer: required_item(data, "reverse_timer")?.extract()?,
-                race_distance: required_item(data, "race_distance")?.extract()?,
-                lap_distance: required_item(data, "lap_distance")?.extract()?,
-                race_time_ms: required_item(data, "race_time_ms")?.extract()?,
-                lap: required_item(data, "lap")?.extract()?,
-                laps_completed: required_item(data, "laps_completed")?.extract()?,
-                position: required_item(data, "position")?.extract()?,
+                reverse_timer: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "reverse_timer")?
+                    .extract()?,
+                race_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_distance")?
+                    .extract()?,
+                lap_distance: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap_distance")?
+                    .extract()?,
+                race_time_ms: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "race_time_ms")?
+                    .extract()?,
+                lap: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "lap")?.extract()?,
+                laps_completed: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "laps_completed")?
+                    .extract()?,
+                position: required_item(data, PLAYER_TELEMETRY_PAYLOAD, "position")?.extract()?,
                 geometry: RacerGeometryTelemetry {
                     segment_index: optional_item(data, "segment_index", None)?,
                     segment_t: optional_item(data, "segment_t", 0.0)?,
@@ -457,21 +473,5 @@ impl PyPlayerTelemetry {
         Self {
             inner: player.clone(),
         }
-    }
-}
-
-fn required_item<'py>(data: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    data.get_item(key)?.ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!("player telemetry missing {key:?}"))
-    })
-}
-
-fn optional_item<'py, T>(data: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
-where
-    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
-{
-    match data.get_item(key)? {
-        Some(value) => value.extract(),
-        None => Ok(default),
     }
 }

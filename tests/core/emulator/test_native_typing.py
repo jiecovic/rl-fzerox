@@ -7,21 +7,7 @@ from pathlib import Path
 import fzerox_emulator
 import fzerox_emulator._native as native
 
-STUB_ONLY_TYPES = frozenset(
-    {
-        "FrameObservationOptionsDict",
-        "FZeroXTelemetryDict",
-        "ObservationImageRequestDict",
-        "ObservationSpecDict",
-        "PlayerTelemetryDict",
-        "RaceStartRequestDict",
-        "RepeatMultiObservationStepRequestDict",
-        "RepeatObservationStepRequestDict",
-        "RepeatStepRequestDict",
-        "StepSummaryDict",
-        "VehicleSetupInfoDict",
-    }
-)
+STUB_ONLY_TYPES: frozenset[str] = frozenset()
 
 
 def test_fzerox_emulator_declares_typed_package_marker() -> None:

@@ -1,23 +1,33 @@
 # src/fzerox_emulator/emulator/observations.py
+"""Observation rendering methods mixed into the concrete emulator wrapper."""
+
 from __future__ import annotations
 
-from fzerox_emulator._native import Emulator as NativeEmulator
+from typing import TYPE_CHECKING
+
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from fzerox_emulator.base import (
+from fzerox_emulator.base.observations import (
     FrameObservationOptions,
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
+    display_size,
 )
-from fzerox_emulator.video import display_size
+
+if TYPE_CHECKING:
+    from fzerox_emulator._native import Emulator as NativeEmulator
 
 
 class ObservationRenderingMixin:
+    """Methods that convert native frames into Python-facing frame objects."""
+
     _native: NativeEmulator
     _observation_specs: dict[tuple[str | None, int | None, int | None], ObservationSpec]
 
     @property
     def display_size(self) -> tuple[int, int]:
+        """Return the aspect-corrected display size for the latest frame shape."""
+
         return display_size(self._frame_shape(), self._display_aspect_ratio())
 
     def render(self) -> RgbFrame:

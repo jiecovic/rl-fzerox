@@ -2,7 +2,7 @@
 //! Repeated-step method bodies used by training and watch playback.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList, PyTuple};
 
 use crate::bindings::emulator::frame::{frame_to_pyarray, frames_to_pylist};
 use crate::bindings::emulator::step::{step_status_to_py, step_summary_to_py};
@@ -11,9 +11,13 @@ use crate::bindings::emulator::{
     ObservationImageRequest, PyEmulator, parse_observation_layout, parse_resize_filter,
 };
 use crate::bindings::error::map_core_error;
+use crate::bindings::payload::{optional_item, required_dict, required_item};
 use crate::core::host::{ObservationRenderConfig, RepeatedStepConfig};
 use crate::core::input::ControllerState;
 use crate::core::observation::ObservationStackMode;
+
+const REPEAT_PAYLOAD: &str = "repeat request";
+const REPEAT_STEP_PAYLOAD: &str = "repeat step request";
 
 pub(in crate::bindings::emulator) fn step_repeat_raw<'py>(
     emulator: &mut PyEmulator,
@@ -164,8 +168,8 @@ struct PreparedObservationRender {
 
 impl RepeatObservationBindingRequest {
     fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let step_request = required_dict(request, "step")?;
-        let observation_request = required_dict(request, "observation")?;
+        let step_request = required_dict(request, REPEAT_PAYLOAD, "step")?;
+        let observation_request = required_dict(request, REPEAT_PAYLOAD, "observation")?;
         let step_config = repeated_step_config(&step_request)?;
         let observation = observation_request_from_dict(&observation_request)?;
         Ok(Self {
@@ -177,9 +181,9 @@ impl RepeatObservationBindingRequest {
 
 impl RepeatMultiObservationBindingRequest {
     fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
-        let step_request = required_dict(request, "step")?;
+        let step_request = required_dict(request, REPEAT_PAYLOAD, "step")?;
         let step_config = repeated_step_config(&step_request)?;
-        let observations_raw = required_item(request, "observations")?;
+        let observations_raw = required_item(request, REPEAT_PAYLOAD, "observations")?;
         let observations_list = observations_raw.cast::<PyList>()?;
         if observations_list.is_empty() {
             return Err(pyo3::exceptions::PyValueError::new_err(
@@ -209,10 +213,13 @@ fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepCon
     );
     Ok(RepeatedStepConfig {
         controller_state,
-        action_repeat: required_item(request, "action_repeat")?.extract()?,
-        stuck_min_speed_kph: required_item(request, "stuck_min_speed_kph")?.extract()?,
-        energy_loss_epsilon: required_item(request, "energy_loss_epsilon")?.extract()?,
-        max_episode_steps: required_item(request, "max_episode_steps")?.extract()?,
+        action_repeat: required_item(request, REPEAT_STEP_PAYLOAD, "action_repeat")?.extract()?,
+        stuck_min_speed_kph: required_item(request, REPEAT_STEP_PAYLOAD, "stuck_min_speed_kph")?
+            .extract()?,
+        energy_loss_epsilon: required_item(request, REPEAT_STEP_PAYLOAD, "energy_loss_epsilon")?
+            .extract()?,
+        max_episode_steps: required_item(request, REPEAT_STEP_PAYLOAD, "max_episode_steps")?
+            .extract()?,
         progress_frontier_stall_limit_frames: optional_item(
             request,
             "progress_frontier_stall_limit_frames",
@@ -256,24 +263,4 @@ fn prepare_observation_render(
         stacked_channels: stack_mode.stacked_channels(spec.channels, request.frame_stack)
             + usize::from(request.minimap_layer),
     })
-}
-
-fn required_dict<'py>(request: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyDict>> {
-    Ok(required_item(request, key)?.cast_into::<PyDict>()?)
-}
-
-fn required_item<'py>(request: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    request.get_item(key)?.ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!("repeat request missing {key:?}"))
-    })
-}
-
-fn optional_item<'py, T>(request: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
-where
-    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
-{
-    match request.get_item(key)? {
-        Some(value) => value.extract(),
-        None => Ok(default),
-    }
 }

@@ -8,6 +8,18 @@ use super::host::Host;
 use crate::core::error::CoreError;
 
 impl Host {
+    pub fn system_ram_size(&mut self) -> Result<usize, CoreError> {
+        self.memory_size(libretro_sys::MEMORY_SYSTEM_RAM)
+    }
+
+    pub fn read_system_ram(&mut self, offset: usize, length: usize) -> Result<Vec<u8>, CoreError> {
+        self.read_memory(libretro_sys::MEMORY_SYSTEM_RAM, offset, length)
+    }
+
+    pub fn write_system_ram(&mut self, offset: usize, bytes: &[u8]) -> Result<(), CoreError> {
+        self.write_memory(libretro_sys::MEMORY_SYSTEM_RAM, offset, bytes)
+    }
+
     pub(super) fn memory_size(&mut self, memory_id: u32) -> Result<usize, CoreError> {
         self.ensure_open()?;
         let size = self.call_core(|core| unsafe { core.memory_size(memory_id) });

@@ -1,15 +1,18 @@
 # src/fzerox_emulator/emulator/race_start.py
+"""Race-start patching methods mixed into the concrete emulator wrapper."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fzerox_emulator._native import Emulator as NativeEmulator
-
 if TYPE_CHECKING:
-    from fzerox_emulator._native import RaceStartRequestDict
+    from fzerox_emulator._native import Emulator as NativeEmulator
+    from fzerox_emulator.boundary import RaceStartRequestDict
 
 
 class RaceStartMixin:
+    """Python method surface for native-owned race-start RAM patching."""
+
     _native: NativeEmulator
 
     def patch_race_start_setup(
@@ -99,57 +102,6 @@ class RaceStartMixin:
                 total_lap_count=total_lap_count,
                 gp_difficulty_raw_value=gp_difficulty_raw_value,
             )
-        )
-
-    def patch_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_race_start_setup(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def patch_time_attack_machine_settings(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_machine_settings(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def force_time_attack_reinit(self) -> None:
-        self.force_race_reinit(mode="time_attack")
-
-    def validate_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.validate_race_start_setup(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
         )
 
     def vehicle_setup_info(self) -> dict[str, object]:
