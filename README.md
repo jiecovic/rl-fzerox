@@ -30,17 +30,19 @@ just run-manager-install
 ```
 
 `local/` is the ignored machine-local workspace. After clone, it contains empty
-placeholder folders for required runtime assets. Put the default libretro core
-and ROM files here:
+placeholder folders for required runtime assets. Example paths used by the
+default run-manager config:
 
 ```text
 local/libretro/mupen64plus_next_libretro.so
 local/roms/F-Zero X (USA).n64
 ```
 
-These are the default paths used by the run manager. It also stores its SQLite
-DB, generated baselines, TensorBoard views, and training runs under `local/`.
-None of those local files are included in git.
+The ROM must be the US F-Zero X build; RAM offsets and telemetry are maintained
+only for that version. If you use different local filenames, update the paths in
+the run manager. The run manager also stores its SQLite DB, generated baselines,
+TensorBoard views, and training runs under `local/`. None of those local files
+are included in git.
 
 ## Run Manager
 
