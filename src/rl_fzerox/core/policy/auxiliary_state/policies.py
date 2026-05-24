@@ -92,7 +92,8 @@ def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
     aux_targets = obs.get(field_name)
     if not isinstance(aux_targets, torch.Tensor):
         raise TypeError(f"Auxiliary-state policies require tensor observation key {field_name!r}")
-    return torch.flatten(aux_targets.float(), start_dim=1)
+    aux_target_tensor: torch.Tensor = aux_targets
+    return torch.flatten(aux_target_tensor.float(), start_dim=1)
 
 
 class _AuxiliaryStatePolicyMixin:

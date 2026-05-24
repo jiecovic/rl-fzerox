@@ -4,6 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from fzerox_emulator import ObservationImageRecipe
+from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
 from rl_fzerox.core.runtime_spec.schema import EnvConfig, ObservationConfig
 from rl_fzerox.core.training.imitation import (
     BehaviorCloningBatch,
@@ -18,7 +19,7 @@ from rl_fzerox.core.training.imitation import (
 def test_observation_image_recipe_preserves_preset_runtime_settings() -> None:
     recipe = observation_image_recipe(
         ObservationConfig(
-            resolution={"mode": "preset", "preset": "crop_84x84"},
+            resolution=PresetResolutionChoice(preset="crop_84x84"),
             frame_stack=3,
             stack_mode="gray",
             minimap_layer=True,
