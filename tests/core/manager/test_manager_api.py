@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import rl_fzerox.apps.run_manager.api.routes as manager_api_routes
+import rl_fzerox.apps.run_manager.api.handlers.metrics as manager_api_metrics
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
 from rl_fzerox.core.manager import (
@@ -658,7 +658,7 @@ async def test_manager_api_metrics_full_mode_disables_recent_limit(
         return ()
 
     monkeypatch.setattr(
-        manager_api_routes,
+        manager_api_metrics,
         "load_run_metric_samples_from_tensorboard",
         fake_loader,
     )
