@@ -728,7 +728,9 @@ describe("Configurator", () => {
       screen.getByRole("combobox", { name: "Image proj activation" }),
       "gelu",
     );
+    await user.selectOptions(screen.getByRole("combobox", { name: "State activation" }), "gelu");
     await user.selectOptions(screen.getByRole("combobox", { name: "Fusion activation" }), "tanh");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Post-LN activation" }), "relu");
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 
     await waitFor(() =>
@@ -738,7 +740,9 @@ describe("Configurator", () => {
           policy: expect.objectContaining({
             features_dim: 1024,
             image_projection_activation: "gelu",
+            state_activation: "gelu",
             fusion_activation: "tanh",
+            layer_norm_activation: "relu",
           }),
         }),
       ),

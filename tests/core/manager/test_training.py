@@ -317,7 +317,9 @@ def test_manager_training_bridge_projects_extractor_activations(tmp_path: Path) 
     config = default_managed_run_config().model_copy(deep=True)
     config.policy.features_dim = 512
     config.policy.image_projection_activation = "gelu"
+    config.policy.state_activation = "tanh"
     config.policy.fusion_activation = "tanh"
+    config.policy.layer_norm_activation = "gelu"
 
     train_config = build_managed_train_app_config(
         config,
@@ -328,9 +330,13 @@ def test_manager_training_bridge_projects_extractor_activations(tmp_path: Path) 
     node_by_id = {node.id: node for lane in preview.architecture_lanes for node in lane.nodes}
 
     assert train_config.policy.extractor.image_projection_activation == "gelu"
+    assert train_config.policy.extractor.state_activation == "tanh"
     assert train_config.policy.extractor.fusion_activation == "tanh"
+    assert train_config.policy.extractor.layer_norm_activation == "gelu"
     assert node_by_id["image_projection"].detail.endswith(", gelu")
+    assert node_by_id["state_mlp"].detail.endswith(", tanh")
     assert node_by_id["fusion"].detail.endswith(", tanh")
+    assert node_by_id["layer_norm"].detail == "on, gelu"
 
 
 def test_manager_training_bridge_projects_individual_state_features(
@@ -599,7 +605,9 @@ def test_fork_compatibility_allows_nonstructural_observation_and_policy_edits() 
     candidate_config.observation.minimap_resize_filter = "bilinear"
     candidate_config.policy.activation = "gelu"
     candidate_config.policy.image_projection_activation = "gelu"
+    candidate_config.policy.state_activation = "gelu"
     candidate_config.policy.fusion_activation = "tanh"
+    candidate_config.policy.layer_norm_activation = "gelu"
 
     assert_managed_fork_compatible(source_config, candidate_config)
 

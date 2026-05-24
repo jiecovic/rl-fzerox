@@ -17,9 +17,11 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
             "features_dim": config.policy.features_dim,
             "image_projection_activation": config.policy.image_projection_activation,
             "state_net_arch": list(config.policy.state_net_arch),
+            "state_activation": config.policy.state_activation,
             "fusion_features_dim": config.policy.fusion_features_dim,
             "fusion_activation": config.policy.fusion_activation,
             "layer_norm": config.policy.layer_norm,
+            "layer_norm_activation": config.policy.layer_norm_activation,
         },
         "recurrent": {
             "enabled": config.policy.recurrent_enabled,

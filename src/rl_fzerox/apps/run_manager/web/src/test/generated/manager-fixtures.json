@@ -1364,12 +1364,14 @@
       "gas_on_logit": 0.0,
       "image_projection_activation": "relu",
       "layer_norm": true,
+      "layer_norm_activation": null,
       "pi_net_arch": [256, 128],
       "recurrent_enable_critic_lstm": true,
       "recurrent_enabled": true,
       "recurrent_hidden_size": 256,
       "recurrent_n_lstm_layers": 1,
       "recurrent_shared_lstm": false,
+      "state_activation": "relu",
       "state_net_arch": [64],
       "vf_net_arch": [256, 128]
     },
@@ -1598,7 +1600,7 @@
             "tone": "normal"
           },
           {
-            "detail": "on",
+            "detail": "on, none",
             "id": "layer_norm",
             "label": "LayerNorm",
             "params": 1536,
