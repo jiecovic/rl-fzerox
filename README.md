@@ -15,6 +15,9 @@ F-Zero X through a libretro N64 emulator.
 
 ## Setup
 
+`just native` builds the Rust/PyO3 emulator extension in release mode for the
+active Python environment.
+
 ```bash
 git clone https://github.com/jiecovic/rl-fzerox.git
 cd rl-fzerox
