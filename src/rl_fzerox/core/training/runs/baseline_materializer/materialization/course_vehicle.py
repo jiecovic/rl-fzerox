@@ -6,7 +6,6 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 
-from fzerox_emulator.base import RaceStartMode
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
 from rl_fzerox.core.envs.engine.info import read_live_telemetry
 from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
@@ -31,6 +30,7 @@ from rl_fzerox.core.training.runs.baseline_materializer.settings import (
     BASELINE_MATERIALIZER_SETTINGS,
 )
 from rl_fzerox.core.training.runs.race_start import RaceStartVariant
+from rl_fzerox.core.training.runs.race_start.models import RaceStartMode
 
 
 def ensure_course_vehicle_baseline(

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 from fzerox_emulator import Emulator
+from rl_fzerox.core.training.runs.race_start.boundary import (
+    race_start_gp_difficulty_raw_value,
+)
 from rl_fzerox.core.training.runs.race_start.models import RACE_DEFAULTS, RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.validation import (
     validate_materialized_setup,
@@ -41,7 +44,7 @@ def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
-        gp_difficulty=variant.gp_difficulty,
+        gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
 
 
@@ -52,7 +55,7 @@ def _write_full_machine_settings(emulator: Emulator, variant: RaceStartVariant) 
         character_index=variant.character_index,
         engine_setting_raw_value=variant.engine_setting_raw_value,
         total_lap_count=variant.total_lap_count,
-        gp_difficulty=variant.gp_difficulty,
+        gp_difficulty_raw_value=race_start_gp_difficulty_raw_value(variant),
     )
 
 

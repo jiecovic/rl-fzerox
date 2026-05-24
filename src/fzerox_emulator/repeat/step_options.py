@@ -1,4 +1,4 @@
-# src/fzerox_emulator/repeat/config.py
+# src/fzerox_emulator/repeat/step_options.py
 from __future__ import annotations
 
 from dataclasses import dataclass

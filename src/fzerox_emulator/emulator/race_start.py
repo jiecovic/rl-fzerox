@@ -2,11 +2,6 @@
 from __future__ import annotations
 
 from fzerox_emulator._native import Emulator as NativeEmulator
-from fzerox_emulator.base import RaceStartMode
-from rl_fzerox.core.domain.race_difficulty import (
-    RaceDifficultyName,
-    race_difficulty_raw_value,
-)
 
 
 class RaceStartMixin:
@@ -15,12 +10,12 @@ class RaceStartMixin:
     def patch_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         """Patch one live race start using native-owned RAM layout rules."""
 
@@ -33,24 +28,26 @@ class RaceStartMixin:
                 total_lap_count=total_lap_count,
             )
             return
+        if mode != "gp_race":
+            raise ValueError(f"Unsupported race-start mode {mode!r}")
         self._native.patch_gp_race_start_setup(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
+            gp_difficulty_raw_value=gp_difficulty_raw_value,
         )
 
     def patch_machine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         """Patch menu-level machine settings before race initialization."""
 
@@ -63,19 +60,21 @@ class RaceStartMixin:
                 total_lap_count=total_lap_count,
             )
             return
+        if mode != "gp_race":
+            raise ValueError(f"Unsupported race-start mode {mode!r}")
         self._native.patch_gp_race_machine_settings(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
+            gp_difficulty_raw_value=gp_difficulty_raw_value,
         )
 
     def patch_engine_settings(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         engine_setting_raw_value: int,
     ) -> None:
         """Patch only engine-related globals for the already selected machine."""
@@ -85,6 +84,8 @@ class RaceStartMixin:
                 engine_setting_raw_value=engine_setting_raw_value,
             )
             return
+        if mode != "gp_race":
+            raise ValueError(f"Unsupported race-start mode {mode!r}")
         self._native.patch_gp_race_engine_settings(
             engine_setting_raw_value=engine_setting_raw_value,
         )
@@ -94,23 +95,25 @@ class RaceStartMixin:
 
         self._native.patch_time_attack_menu_mode()
 
-    def force_race_reinit(self, *, mode: RaceStartMode) -> None:
+    def force_race_reinit(self, *, mode: str) -> None:
         """Force the game to rebuild the current race from menu globals."""
 
         if mode == "time_attack":
             self._native.force_time_attack_reinit()
             return
+        if mode != "gp_race":
+            raise ValueError(f"Unsupported race-start mode {mode!r}")
         self._native.force_gp_race_reinit()
 
     def validate_race_start_setup(
         self,
         *,
-        mode: RaceStartMode,
+        mode: str,
         course_index: int,
         character_index: int,
         engine_setting_raw_value: int,
         total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
+        gp_difficulty_raw_value: int = -1,
     ) -> None:
         """Validate that the native race-start RAM view matches the requested setup."""
 
@@ -123,13 +126,15 @@ class RaceStartMixin:
                 total_lap_count=total_lap_count,
             )
             return
+        if mode != "gp_race":
+            raise ValueError(f"Unsupported race-start mode {mode!r}")
         self._native.validate_gp_race_start_setup(
             course_index=course_index,
             character_index=character_index,
             machine_skin_index=-1,
             engine_setting_raw_value=engine_setting_raw_value,
             total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
+            gp_difficulty_raw_value=gp_difficulty_raw_value,
         )
 
     def patch_time_attack_race_start_setup(
@@ -187,7 +192,3 @@ class RaceStartMixin:
         """Return native-decoded setup info for HUD/debug checks."""
 
         return dict(self._native.vehicle_setup_info())
-
-
-def _gp_difficulty_raw_value(gp_difficulty: RaceDifficultyName | None) -> int:
-    return -1 if gp_difficulty is None else race_difficulty_raw_value(gp_difficulty)

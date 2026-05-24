@@ -25,7 +25,8 @@ from fzerox_emulator.repeat import (
     run_repeat_step,
     run_repeat_watch_step,
 )
-from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
+
+_DEFAULT_RENDERER = "gliden64"
 
 
 class Emulator(RaceStartMixin, ObservationRenderingMixin):
@@ -38,7 +39,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         rom_path: Path,
         runtime_dir: Path | None = None,
         baseline_state_path: Path | None = None,
-        renderer: RendererName = DEFAULT_RENDERER,
+        renderer: str = _DEFAULT_RENDERER,
     ) -> None:
         self._core_path = core_path.resolve()
         self._rom_path = rom_path.resolve()
@@ -46,7 +47,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         self._baseline_state_path = (
             baseline_state_path.resolve() if baseline_state_path is not None else None
         )
-        self._renderer: RendererName = renderer
+        self._renderer = renderer
         if not self._core_path.is_file():
             raise FileNotFoundError(f"Libretro core not found: {self._core_path}")
         if not self._rom_path.is_file():
@@ -76,7 +77,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         return float(self._native.display_aspect_ratio)
 
     @property
-    def renderer(self) -> RendererName:
+    def renderer(self) -> str:
         return self._renderer
 
     @property
