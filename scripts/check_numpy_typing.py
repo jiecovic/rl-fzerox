@@ -1,4 +1,13 @@
 # scripts/check_numpy_typing.py
+"""Prevent raw NumPy array annotations from spreading through project code.
+
+The emulator boundary has a small set of project-owned aliases in
+``fzerox_emulator.arrays`` for common array concepts such as RGB frames, action
+masks, observations, and state vectors. This check keeps public annotations on
+those aliases instead of ad hoc ``np.ndarray`` / ``NDArray`` types so call sites
+carry the intended dtype and shape concept.
+"""
+
 from __future__ import annotations
 
 import ast
