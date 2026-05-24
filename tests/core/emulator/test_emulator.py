@@ -49,7 +49,7 @@ def test_emulator_passes_renderer_to_native_backend(tmp_path: Path) -> None:
             assert renderer == "gliden64"
 
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr("fzerox_emulator.emulator.NativeEmulator", NativeStub)
+    monkeypatch.setattr("fzerox_emulator.emulator.client.NativeEmulator", NativeStub)
     try:
         Emulator(core_path=core_path, rom_path=rom_path, renderer="gliden64")
     finally:

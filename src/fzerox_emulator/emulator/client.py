@@ -1,4 +1,4 @@
-# src/fzerox_emulator/emulator.py
+# src/fzerox_emulator/emulator/client.py
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -6,42 +6,29 @@ from pathlib import Path
 
 from fzerox_emulator._native import Emulator as NativeEmulator
 from fzerox_emulator._native import FZeroXTelemetry
-from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base import (
     BackendMultiObservationStepResult,
     BackendStepResult,
-    FrameObservationOptions,
     FrameStep,
     ObservationImageRecipe,
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
-    RaceStartMode,
     ResetState,
-    normalize_observation_resolution,
 )
 from fzerox_emulator.control import ControllerState
-from fzerox_emulator.frames import (
-    expected_observation_shape,
-    validated_display_frame,
-    validated_observation_frame,
-    validated_raw_rgb_frame,
-)
+from fzerox_emulator.emulator.observations import ObservationRenderingMixin
+from fzerox_emulator.emulator.race_start import RaceStartMixin
 from fzerox_emulator.repeat import (
     RepeatStepConfig,
     run_repeat_multi_observation_step,
     run_repeat_step,
     run_repeat_watch_step,
 )
-from fzerox_emulator.video import display_size
-from rl_fzerox.core.domain.race_difficulty import (
-    RaceDifficultyName,
-    race_difficulty_raw_value,
-)
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
 
-class Emulator:
+class Emulator(RaceStartMixin, ObservationRenderingMixin):
     """Python wrapper over the native Rust libretro host."""
 
     def __init__(
@@ -96,10 +83,6 @@ class Emulator:
     def frame_shape(self) -> tuple[int, int, int]:
         height, width, channels = self._native.frame_shape
         return int(height), int(width), int(channels)
-
-    @property
-    def display_size(self) -> tuple[int, int]:
-        return display_size(self.frame_shape, self.display_aspect_ratio)
 
     @property
     def frame_index(self) -> int:
@@ -157,182 +140,6 @@ class Emulator:
         """Write raw N64 system RAM bytes for controlled reverse-engineering probes."""
 
         self._native.write_system_ram(offset, data)
-
-    def patch_race_start_setup(
-        self,
-        *,
-        mode: RaceStartMode,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
-    ) -> None:
-        """Patch one live race start using native-owned RAM layout rules."""
-
-        if mode == "time_attack":
-            self._native.patch_time_attack_race_start_setup(
-                course_index=course_index,
-                character_index=character_index,
-                machine_skin_index=-1,
-                engine_setting_raw_value=engine_setting_raw_value,
-                total_lap_count=total_lap_count,
-            )
-            return
-        self._native.patch_gp_race_start_setup(
-            course_index=course_index,
-            character_index=character_index,
-            machine_skin_index=-1,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
-        )
-
-    def patch_machine_settings(
-        self,
-        *,
-        mode: RaceStartMode,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
-    ) -> None:
-        """Patch menu-level machine settings before race initialization."""
-
-        if mode == "time_attack":
-            self._native.patch_time_attack_machine_settings(
-                course_index=course_index,
-                character_index=character_index,
-                machine_skin_index=-1,
-                engine_setting_raw_value=engine_setting_raw_value,
-                total_lap_count=total_lap_count,
-            )
-            return
-        self._native.patch_gp_race_machine_settings(
-            course_index=course_index,
-            character_index=character_index,
-            machine_skin_index=-1,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
-        )
-
-    def patch_engine_settings(
-        self,
-        *,
-        mode: RaceStartMode,
-        engine_setting_raw_value: int,
-    ) -> None:
-        """Patch only engine-related globals for the already selected machine."""
-
-        if mode == "time_attack":
-            self._native.patch_time_attack_engine_settings(
-                engine_setting_raw_value=engine_setting_raw_value,
-            )
-            return
-        self._native.patch_gp_race_engine_settings(
-            engine_setting_raw_value=engine_setting_raw_value,
-        )
-
-    def patch_time_attack_menu_mode(self) -> None:
-        """Select the Time Attack branch in the main-menu globals."""
-
-        self._native.patch_time_attack_menu_mode()
-
-    def force_race_reinit(self, *, mode: RaceStartMode) -> None:
-        """Force the game to rebuild the current race from menu globals."""
-
-        if mode == "time_attack":
-            self._native.force_time_attack_reinit()
-            return
-        self._native.force_gp_race_reinit()
-
-    def validate_race_start_setup(
-        self,
-        *,
-        mode: RaceStartMode,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-        gp_difficulty: RaceDifficultyName | None = None,
-    ) -> None:
-        """Validate that the native race-start RAM view matches the requested setup."""
-
-        if mode == "time_attack":
-            self._native.validate_time_attack_race_start_setup(
-                course_index=course_index,
-                character_index=character_index,
-                machine_skin_index=-1,
-                engine_setting_raw_value=engine_setting_raw_value,
-                total_lap_count=total_lap_count,
-            )
-            return
-        self._native.validate_gp_race_start_setup(
-            course_index=course_index,
-            character_index=character_index,
-            machine_skin_index=-1,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-            gp_difficulty_raw_value=_gp_difficulty_raw_value(gp_difficulty),
-        )
-
-    def patch_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_race_start_setup(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def patch_time_attack_machine_settings(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.patch_machine_settings(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def force_time_attack_reinit(self) -> None:
-        self.force_race_reinit(mode="time_attack")
-
-    def validate_time_attack_race_start_setup(
-        self,
-        *,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        total_lap_count: int,
-    ) -> None:
-        self.validate_race_start_setup(
-            mode="time_attack",
-            course_index=course_index,
-            character_index=character_index,
-            engine_setting_raw_value=engine_setting_raw_value,
-            total_lap_count=total_lap_count,
-        )
-
-    def vehicle_setup_info(self) -> dict[str, object]:
-        """Return native-decoded setup info for HUD/debug checks."""
-
-        return dict(self._native.vehicle_setup_info())
 
     def step_repeat_raw(
         self,
@@ -513,123 +320,9 @@ class Emulator:
         if path is not None:
             self._baseline_state_path = path.resolve()
 
-    def render(self) -> RgbFrame:
-        """Return the latest raw RGB frame as a NumPy array."""
-
-        return validated_raw_rgb_frame(self._native.frame_rgb(), self.frame_shape)
-
-    def render_display(
-        self,
-        *,
-        preset: str | None = None,
-        height: int | None = None,
-        width: int | None = None,
-    ) -> RgbFrame:
-        """Return one native display frame for the requested image layout."""
-
-        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
-            preset=preset,
-            height=height,
-            width=width,
-        )
-        spec = self.observation_spec(resolved_preset, height=resolved_height, width=resolved_width)
-        expected_shape = (spec.display_height, spec.display_width, 3)
-        return validated_display_frame(
-            self._native.frame_display(
-                "" if resolved_preset is None else resolved_preset,
-                height=resolved_height,
-                width=resolved_width,
-            ),
-            expected_shape=expected_shape,
-        )
-
-    def observation_spec(
-        self,
-        preset: str | None = None,
-        *,
-        height: int | None = None,
-        width: int | None = None,
-    ) -> ObservationSpec:
-        """Return the resolved native observation spec for one image layout."""
-
-        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
-            preset=preset,
-            height=height,
-            width=width,
-        )
-        cache_key = (resolved_preset, resolved_height, resolved_width)
-        cached = self._observation_specs.get(cache_key)
-        if cached is not None:
-            return cached
-        spec_data = self._native.observation_spec(
-            "" if resolved_preset is None else resolved_preset,
-            height=resolved_height,
-            width=resolved_width,
-        )
-        spec = ObservationSpec(
-            preset=str(spec_data["preset"]),
-            width=int(spec_data["width"]),
-            height=int(spec_data["height"]),
-            channels=int(spec_data["channels"]),
-            display_width=int(spec_data["display_width"]),
-            display_height=int(spec_data["display_height"]),
-        )
-        self._observation_specs[cache_key] = spec
-        return spec
-
-    def render_observation(
-        self,
-        *,
-        preset: str | None = None,
-        height: int | None = None,
-        width: int | None = None,
-        frame_stack: int,
-        stack_mode: ObservationStackMode = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: ObservationResizeFilter = "nearest",
-        minimap_resize_filter: ObservationResizeFilter = "nearest",
-    ) -> ObservationFrame:
-        """Return one native stacked observation tensor for the requested image layout."""
-
-        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
-            preset=preset,
-            height=height,
-            width=width,
-        )
-        spec = self.observation_spec(
-            resolved_preset,
-            height=resolved_height,
-            width=resolved_width,
-        )
-        options: FrameObservationOptions = {
-            "stack_mode": stack_mode,
-            "minimap_layer": minimap_layer,
-            "resize_filter": resize_filter,
-            "minimap_resize_filter": minimap_resize_filter,
-        }
-        if resolved_height is not None:
-            options["height"] = resolved_height
-        if resolved_width is not None:
-            options["width"] = resolved_width
-        frame = self._native.frame_observation(
-            "" if resolved_preset is None else resolved_preset,
-            frame_stack,
-            options,
-        )
-        expected_shape = expected_observation_shape(
-            spec,
-            frame_stack=frame_stack,
-            stack_mode=stack_mode,
-            minimap_layer=minimap_layer,
-        )
-        return validated_observation_frame(
-            frame,
-            expected_shape=expected_shape,
-            source_label="native emulator",
-        )
-
     def try_read_telemetry(self) -> FZeroXTelemetry | None:
         """Return the latest telemetry snapshot from the native host, if available."""
+
         return self._native.telemetry()
 
     def close(self) -> None:
@@ -652,7 +345,3 @@ class Emulator:
             "display_aspect_ratio": self.display_aspect_ratio,
             "native_fps": self.native_fps,
         }
-
-
-def _gp_difficulty_raw_value(gp_difficulty: RaceDifficultyName | None) -> int:
-    return -1 if gp_difficulty is None else race_difficulty_raw_value(gp_difficulty)
