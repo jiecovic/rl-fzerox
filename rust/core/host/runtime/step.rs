@@ -16,7 +16,7 @@ use crate::core::{
 ///
 /// This is the native summary Python reward trackers and limit trackers will
 /// consume once the repeated step loop moves behind the Rust boundary.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepSummary {
     /// Number of internal frames actually executed for this env step.
     pub frames_run: usize,
@@ -64,7 +64,7 @@ pub struct StepCounters {
 }
 
 /// Native stop/counter state after one repeated env step completes.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct StepStatus {
     /// Updated carried counters after the repeated env step.
     pub counters: StepCounters,
@@ -278,14 +278,17 @@ pub struct DisplayFrameBatch {
 }
 
 impl DisplayFrameBatch {
-    pub fn with_capacity(frame_len: usize, frame_count: usize) -> Self {
-        Self {
-            frame_len,
-            bytes: Vec::with_capacity(frame_len * frame_count),
+    pub fn reserve_frame_capacity(&mut self, frame_len: usize, frame_count: usize) {
+        if self.frame_len == 0 {
+            self.frame_len = frame_len;
+            self.bytes.reserve(frame_len * frame_count);
         }
     }
 
     pub fn push_frame(&mut self, frame: &[u8]) {
+        if self.frame_len == 0 {
+            self.frame_len = frame.len();
+        }
         debug_assert_eq!(frame.len(), self.frame_len);
         self.bytes.extend_from_slice(frame);
     }

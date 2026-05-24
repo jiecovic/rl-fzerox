@@ -470,8 +470,6 @@ impl PyPlayerTelemetry {
 
 impl PyPlayerTelemetry {
     pub(super) fn from_native(player: &PlayerTelemetry) -> Self {
-        Self {
-            inner: player.clone(),
-        }
+        Self { inner: *player }
     }
 }

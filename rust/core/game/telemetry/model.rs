@@ -130,7 +130,7 @@ pub(crate) fn terminal_reason_from_state_flags(state_flags: u32) -> Option<&'sta
     None
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct RacerGeometryTelemetry {
     pub segment_index: Option<i32>,
     pub segment_t: f32,
@@ -187,7 +187,7 @@ impl Default for RacerGeometryTelemetry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct MachineContextTelemetry {
     pub body_stat: i8,
     pub boost_stat: i8,
@@ -208,7 +208,7 @@ impl Default for MachineContextTelemetry {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct PlayerTelemetry {
     pub state_flags: u32,
     pub speed_kph: f32,
@@ -252,7 +252,7 @@ impl PlayerTelemetry {
 }
 
 /// Telemetry snapshot for the current frame, focused on player-one race state.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct TelemetrySnapshot {
     pub total_lap_count: i32,
     pub difficulty_raw: i32,

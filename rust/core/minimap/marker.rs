@@ -28,7 +28,7 @@ impl MinimapMarkerHold {
         }
     }
 
-    pub(super) fn update(&mut self, _marker_count: usize, current_marker: &[u8]) {
+    pub(super) fn update(&mut self, current_marker: &[u8]) {
         let current_pixels = marker_pixel_count(current_marker);
         if current_pixels > 0 {
             if self.should_replace_marker(current_marker, current_pixels) {

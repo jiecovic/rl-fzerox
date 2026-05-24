@@ -303,8 +303,8 @@ fn nearest_sample_on_segment(
     };
 
     let mut best_distance = f32::INFINITY;
+    let denominator = (FUTURE_LOCAL_SEGMENT_SCAN.samples_per_segment - 1).max(1) as f32;
     for sample_index in 0..FUTURE_LOCAL_SEGMENT_SCAN.samples_per_segment {
-        let denominator = (FUTURE_LOCAL_SEGMENT_SCAN.samples_per_segment - 1).max(1) as f32;
         let t = sample_index as f32 / denominator;
         let Some(sample_pos) = sample_segment_spline_position(system_ram, segment_offset, t)?
         else {
