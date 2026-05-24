@@ -8,6 +8,7 @@ from gymnasium import spaces
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch import nn
 
+from rl_fzerox.core.policy.activations import ActivationName, resolve_policy_activation_fn
 from rl_fzerox.core.policy.extractors.blocks import (
     PostActivationResidualConvBlock,
     PreActivationResidualConvBlock,
@@ -34,6 +35,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         custom_cnn_final_relu: bool = False,
+        image_projection_activation: ActivationName = "relu",
         layer_norm: bool = False,
     ) -> None:
         image_geometry = resolve_supported_image_geometry(
@@ -69,7 +71,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         else:
             self._linear = nn.Sequential(
                 nn.Linear(n_flatten, resolved_features_dim),
-                nn.ReLU(),
+                resolve_policy_activation_fn(image_projection_activation)(),
             )
         self._layer_norm: nn.Module = (
             nn.LayerNorm(resolved_features_dim) if layer_norm else nn.Identity()
@@ -166,6 +168,8 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         state_features_dim: int = 64,
         state_net_arch: tuple[int, ...] | None = None,
         fusion_features_dim: int | None = None,
+        image_projection_activation: ActivationName = "relu",
+        fusion_activation: ActivationName = "relu",
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         custom_cnn_final_relu: bool = False,
@@ -221,6 +225,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             conv_profile=conv_profile,
             custom_conv_layers=custom_conv_layers,
             custom_cnn_final_relu=custom_cnn_final_relu,
+            image_projection_activation=image_projection_activation,
             layer_norm=False,
         )
         self._state_mlp = _state_branch_mlp(
@@ -234,7 +239,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             # before the recurrent core, while keeping the legacy concat path.
             self._fusion_mlp = nn.Sequential(
                 nn.Linear(combined_features_dim, resolved_fusion_features_dim),
-                nn.ReLU(),
+                resolve_policy_activation_fn(fusion_activation)(),
             )
         self._layer_norm: nn.Module = (
             nn.LayerNorm(output_features_dim) if layer_norm else nn.Identity()

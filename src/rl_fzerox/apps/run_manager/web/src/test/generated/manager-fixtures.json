@@ -1359,8 +1359,10 @@
         }
       ],
       "features_dim": "auto",
+      "fusion_activation": "relu",
       "fusion_features_dim": 768,
       "gas_on_logit": 0.0,
+      "image_projection_activation": "relu",
       "layer_norm": true,
       "pi_net_arch": [256, 128],
       "recurrent_enable_critic_lstm": true,
