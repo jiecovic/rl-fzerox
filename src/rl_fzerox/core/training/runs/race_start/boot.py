@@ -180,6 +180,11 @@ def materialize_gp_race_start_from_boot(
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
     _press_until_mode(emulator, target_mode="machine_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
+
+    _select_machine(emulator, variant)
+    _wait_until_mode(emulator, target_mode="machine_settings")
+    emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
+
     _apply_exact_race_start_setup(emulator, variant)
     _step_until_ready_from_boot(emulator, variant)
 
@@ -220,6 +225,11 @@ def materialize_gp_race_start_from_menu_seed(
     _release_input(emulator)
     _wait_until_mode(emulator, target_mode="machine_select")
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
+
+    _select_machine(emulator, variant)
+    _wait_until_mode(emulator, target_mode="machine_settings")
+    emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
+
     _apply_exact_race_start_setup(emulator, variant)
     _step_until_ready_from_boot(emulator, variant)
 
