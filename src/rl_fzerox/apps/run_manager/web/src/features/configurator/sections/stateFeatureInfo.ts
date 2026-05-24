@@ -91,6 +91,8 @@ const CONTROL_LABELS: Record<string, string> = {
   air_brake: "Air brake",
   boost: "Boost",
   lean: "Lean",
+  lean_left: "Lean left",
+  lean_right: "Lean right",
   pitch: "Pitch",
   steer: "Stick X",
   thrust: "Gas",

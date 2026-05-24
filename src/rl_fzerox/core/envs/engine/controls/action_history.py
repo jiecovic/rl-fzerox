@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from fzerox_emulator import ControllerState
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
-from rl_fzerox.core.envs.engine.controls.lean import lean_index_from_mask, signed_lean
+from rl_fzerox.core.envs.engine.controls.lean import signed_lean
 from rl_fzerox.core.envs.observations import ActionHistoryControl
 
 
@@ -51,8 +51,8 @@ class ActionHistoryBuffer:
                 gas=normalized_gas,
                 air_brake=1.0 if joypad & RACE_CONTROL_MASKS.air_brake else 0.0,
                 boost=1.0 if joypad & RACE_CONTROL_MASKS.boost else 0.0,
-                lean_left=1.0 if lean_index_from_mask(joypad) == 1 else 0.0,
-                lean_right=1.0 if lean_index_from_mask(joypad) == 2 else 0.0,
+                lean_left=1.0 if joypad & RACE_CONTROL_MASKS.lean_left else 0.0,
+                lean_right=1.0 if joypad & RACE_CONTROL_MASKS.lean_right else 0.0,
                 pitch=clamp(float(control_state.left_stick_y), -1.0, 1.0),
             )
         )

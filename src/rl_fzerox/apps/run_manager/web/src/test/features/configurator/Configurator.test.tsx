@@ -508,6 +508,41 @@ describe("Configurator", () => {
     });
   });
 
+  it("shows split lean history rows for independent lean buttons", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={{
+          ...managedRunConfigFixture,
+          action: {
+            ...managedRunConfigFixture.action,
+            lean_output_mode: "independent_buttons",
+          },
+        }}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Observation" }));
+    await user.click(screen.getByText("control history"));
+
+    const controlHistoryPanel = screen.getByText("control history").closest("details");
+    if (!(controlHistoryPanel instanceof HTMLDetailsElement)) {
+      throw new Error("Missing control history panel");
+    }
+
+    expect(within(controlHistoryPanel).getByText("Lean left at time t-1")).toBeInTheDocument();
+    expect(within(controlHistoryPanel).getByText("Lean right at time t-1")).toBeInTheDocument();
+    expect(within(controlHistoryPanel).queryByText("Lean at time t-1")).not.toBeInTheDocument();
+    expect(within(controlHistoryPanel).getByText("7 entries")).toBeInTheDocument();
+  });
+
   it("persists progress-scalar dropout without requiring a blur before saving", async () => {
     const user = userEvent.setup();
     const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());

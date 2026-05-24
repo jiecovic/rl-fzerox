@@ -1,12 +1,14 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/stateComponents/model.ts
+import {
+  type StateFeatureRow,
+  stateComponentInfoForConfig,
+} from "@/features/configurator/sections/observation/featureRows";
 import type {
   ConfigMetadata,
   ManagedRunConfig,
   StateComponentConfig,
   StateFeatureDropoutConfig,
 } from "@/shared/api/contract";
-
-import type { StateFeatureRow } from "../featureRows";
 
 export type StateComponentInfo = ConfigMetadata["state_components"][number];
 type ObservationPatch = Partial<ManagedRunConfig["observation"]>;
@@ -49,10 +51,11 @@ export function setComponentEnabledPatch({
     nextComponentNames.delete(componentName);
   }
 
+  const componentInfo = metadata.state_components.find((item) => item.name === componentName);
   const componentFeatureNames = new Set(
-    metadata.state_components
-      .find((item) => item.name === componentName)
-      ?.features.map((feature) => feature.name) ?? [],
+    componentInfo === undefined
+      ? []
+      : stateComponentInfoForConfig(componentInfo, config).features.map((feature) => feature.name),
   );
 
   return {
