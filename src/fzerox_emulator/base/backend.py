@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator._native import FZeroXTelemetry
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from fzerox_emulator.base.observations import (
     ObservationImageRecipe,
@@ -20,6 +19,9 @@ from fzerox_emulator.base.results import (
     ResetState,
 )
 from fzerox_emulator.control import ControllerState
+
+if TYPE_CHECKING:
+    from fzerox_emulator._native import FZeroXTelemetry
 
 
 class EmulatorBackend(Protocol):

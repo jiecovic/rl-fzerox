@@ -1,8 +1,7 @@
 // rust/core/game/tests/race_start_tests.rs
 use super::{
-    RaceStartSetup, force_gp_race_reinit, force_time_attack_reinit, validate_gp_race_setup,
-    validate_time_attack_race_setup, write_gp_race_machine_settings, write_gp_race_setup,
-    write_time_attack_machine_settings, write_time_attack_menu_mode, write_time_attack_race_setup,
+    RaceStartMode, RaceStartSetup, force_race_reinit, validate_race_setup, write_machine_settings,
+    write_race_setup, write_time_attack_menu_mode,
 };
 use crate::core::game::telemetry::layout::{GLOBALS, TELEMETRY_CONFIG};
 
@@ -11,7 +10,8 @@ fn time_attack_setup_writes_expected_menu_and_live_fields() {
     let setup = sample_setup();
     let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
 
-    write_time_attack_machine_settings(&mut memory, setup).expect("machine settings should write");
+    write_machine_settings(&mut memory, RaceStartMode::TimeAttack, setup)
+        .expect("machine settings should write");
     assert_eq!(
         read_i32(&memory, GLOBALS.selected_mode),
         1,
@@ -23,8 +23,10 @@ fn time_attack_setup_writes_expected_menu_and_live_fields() {
         "time attack should disable ghosts in the menu globals"
     );
 
-    write_time_attack_race_setup(&mut memory, setup).expect("race setup should write");
-    validate_time_attack_race_setup(&memory, setup).expect("time attack validation should pass");
+    write_race_setup(&mut memory, RaceStartMode::TimeAttack, setup)
+        .expect("race setup should write");
+    validate_race_setup(&memory, RaceStartMode::TimeAttack, setup)
+        .expect("time attack validation should pass");
 }
 
 #[test]
@@ -32,7 +34,8 @@ fn gp_race_setup_writes_expected_menu_and_live_fields_without_ta_ghost_state() {
     let setup = sample_setup();
     let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
 
-    write_gp_race_machine_settings(&mut memory, setup).expect("machine settings should write");
+    write_machine_settings(&mut memory, RaceStartMode::GpRace, setup)
+        .expect("machine settings should write");
     assert_eq!(
         read_i32(&memory, GLOBALS.selected_mode),
         0,
@@ -44,24 +47,25 @@ fn gp_race_setup_writes_expected_menu_and_live_fields_without_ta_ghost_state() {
         "gp writes should leave unrelated ghost state untouched"
     );
 
-    write_gp_race_setup(&mut memory, setup).expect("race setup should write");
+    write_race_setup(&mut memory, RaceStartMode::GpRace, setup).expect("race setup should write");
     assert_eq!(
         read_i32(&memory, GLOBALS.difficulty),
         setup.gp_difficulty_raw_value
     );
-    validate_gp_race_setup(&memory, setup).expect("gp validation should pass");
+    validate_race_setup(&memory, RaceStartMode::GpRace, setup).expect("gp validation should pass");
 }
 
 #[test]
 fn force_reinit_sets_expected_target_game_mode() {
     let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
 
-    force_time_attack_reinit(&mut memory).expect("time attack reinit should write");
+    force_race_reinit(&mut memory, RaceStartMode::TimeAttack)
+        .expect("time attack reinit should write");
     assert_eq!(read_i32(&memory, GLOBALS.game_mode), 0x0E);
     assert_eq!(read_i32(&memory, GLOBALS.queued_game_mode), 0x0E);
     assert_eq!(read_i16(&memory, GLOBALS.game_mode_change_state), 3);
 
-    force_gp_race_reinit(&mut memory).expect("gp reinit should write");
+    force_race_reinit(&mut memory, RaceStartMode::GpRace).expect("gp reinit should write");
     assert_eq!(read_i32(&memory, GLOBALS.game_mode), 0x01);
     assert_eq!(read_i32(&memory, GLOBALS.queued_game_mode), 0x01);
     assert_eq!(read_i16(&memory, GLOBALS.game_mode_change_state), 3);
@@ -74,7 +78,8 @@ fn preserve_machine_skin_leaves_existing_skin_untouched() {
     setup.machine_skin_index = -1;
 
     write_i16(&mut memory, GLOBALS.player_machine_skins, 111);
-    write_time_attack_machine_settings(&mut memory, setup).expect("machine settings should write");
+    write_machine_settings(&mut memory, RaceStartMode::TimeAttack, setup)
+        .expect("machine settings should write");
     assert_eq!(
         read_i16(&memory, GLOBALS.player_machine_skins),
         111,

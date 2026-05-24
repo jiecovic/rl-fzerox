@@ -2,7 +2,7 @@
 //! Python-facing root F-Zero X telemetry binding.
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyAny, PyDict};
 
 use crate::bindings::emulator::telemetry::PyPlayerTelemetry;
 use crate::core::telemetry::TelemetrySnapshot;
@@ -33,58 +33,26 @@ pub struct PyTelemetry {
 #[pymethods]
 impl PyTelemetry {
     #[new]
-    #[pyo3(signature = (
-        total_lap_count,
-        game_mode_raw,
-        game_mode_name,
-        in_race_mode,
-        total_racers,
-        course_index,
-        player,
-        course_length = 0.0,
-        course_segment_count = 0,
-        difficulty_raw = 0,
-        difficulty_name = None,
-        camera_setting_raw = 2,
-        camera_setting_name = None,
-        race_intro_timer = 0,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 constructor mirrors the flat Python telemetry object"
-    )]
-    fn new(
-        total_lap_count: i32,
-        game_mode_raw: u32,
-        game_mode_name: String,
-        in_race_mode: bool,
-        total_racers: i32,
-        course_index: u32,
-        player: Py<PyPlayerTelemetry>,
-        course_length: f32,
-        course_segment_count: i32,
-        difficulty_raw: i32,
-        difficulty_name: Option<String>,
-        camera_setting_raw: i32,
-        camera_setting_name: Option<String>,
-        race_intro_timer: i32,
-    ) -> Self {
-        Self {
-            total_lap_count,
-            difficulty_raw,
+    #[pyo3(signature = (data))]
+    fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let difficulty_name: Option<String> = optional_item(data, "difficulty_name", None)?;
+        let camera_setting_name: Option<String> = optional_item(data, "camera_setting_name", None)?;
+        Ok(Self {
+            total_lap_count: required_item(data, "total_lap_count")?.extract()?,
+            difficulty_raw: optional_item(data, "difficulty_raw", 0)?,
             difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
-            camera_setting_raw,
+            camera_setting_raw: optional_item(data, "camera_setting_raw", 2)?,
             camera_setting_name: camera_setting_name.unwrap_or_else(|| "regular".to_owned()),
-            race_intro_timer,
-            game_mode_raw,
-            game_mode_name,
-            in_race_mode,
-            total_racers,
-            course_index,
-            course_segment_count,
-            course_length,
-            player,
-        }
+            race_intro_timer: optional_item(data, "race_intro_timer", 0)?,
+            game_mode_raw: required_item(data, "game_mode_raw")?.extract()?,
+            game_mode_name: required_item(data, "game_mode_name")?.extract()?,
+            in_race_mode: required_item(data, "in_race_mode")?.extract()?,
+            total_racers: required_item(data, "total_racers")?.extract()?,
+            course_index: required_item(data, "course_index")?.extract()?,
+            course_segment_count: optional_item(data, "course_segment_count", 0)?,
+            course_length: optional_item(data, "course_length", 0.0)?,
+            player: required_item(data, "player")?.extract()?,
+        })
     }
 
     #[getter]
@@ -200,5 +168,21 @@ impl PyTelemetry {
             course_length: telemetry.course_length,
             player,
         }
+    }
+}
+
+fn required_item<'py>(data: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+    data.get_item(key)?.ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err(format!("telemetry snapshot missing {key:?}"))
+    })
+}
+
+fn optional_item<'py, T>(data: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
+where
+    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
+{
+    match data.get_item(key)? {
+        Some(value) => value.extract(),
+        None => Ok(default),
     }
 }

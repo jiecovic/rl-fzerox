@@ -2,7 +2,7 @@
 //! PyO3 step objects exposed directly to Python.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyTuple};
+use pyo3::types::{PyAny, PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
 use crate::core::host::{StepStatus, StepSummary};
@@ -22,62 +22,36 @@ pub struct PyStepSummary {
 #[pymethods]
 impl PyStepSummary {
     #[new]
-    #[pyo3(signature = (
-        frames_run,
-        max_race_distance,
-        reverse_active_frames=0,
-        collision_recoil_active_frames=0,
-        low_speed_frames=0,
-        energy_loss_total=0.0,
-        energy_gain_total=0.0,
-        damage_taken_frames=0,
-        consecutive_low_speed_frames=0,
-        entered_state_flags=0,
-        entered_course_effects=0,
-        final_frame_index=0,
-        airborne_frames=0,
-        impact_frames=None,
-    ))]
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "PyO3 constructor mirrors the flat Python step-summary object"
-    )]
-    fn new(
-        frames_run: usize,
-        max_race_distance: f32,
-        reverse_active_frames: usize,
-        collision_recoil_active_frames: usize,
-        low_speed_frames: usize,
-        energy_loss_total: f32,
-        energy_gain_total: f32,
-        damage_taken_frames: usize,
-        consecutive_low_speed_frames: usize,
-        entered_state_flags: u32,
-        entered_course_effects: u32,
-        final_frame_index: usize,
-        airborne_frames: usize,
-        impact_frames: Option<usize>,
-    ) -> Self {
+    #[pyo3(signature = (data))]
+    fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let damage_taken_frames = optional_item(data, "damage_taken_frames", 0)?;
+        let collision_recoil_active_frames =
+            optional_item(data, "collision_recoil_active_frames", 0)?;
+        let impact_frames: Option<usize> = optional_item(data, "impact_frames", None)?;
         let resolved_impact_frames =
             impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
-        Self {
+        Ok(Self {
             inner: StepSummary {
-                frames_run,
-                max_race_distance,
-                reverse_active_frames,
+                frames_run: required_item(data, "frames_run")?.extract()?,
+                max_race_distance: required_item(data, "max_race_distance")?.extract()?,
+                reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
                 collision_recoil_active_frames,
-                low_speed_frames,
-                energy_loss_total,
-                energy_gain_total,
+                low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
+                energy_loss_total: optional_item(data, "energy_loss_total", 0.0)?,
+                energy_gain_total: optional_item(data, "energy_gain_total", 0.0)?,
                 damage_taken_frames,
                 impact_frames: resolved_impact_frames,
-                airborne_frames,
-                consecutive_low_speed_frames,
-                entered_state_flags,
-                entered_course_effects,
-                final_frame_index,
+                airborne_frames: optional_item(data, "airborne_frames", 0)?,
+                consecutive_low_speed_frames: optional_item(
+                    data,
+                    "consecutive_low_speed_frames",
+                    0,
+                )?,
+                entered_state_flags: optional_item(data, "entered_state_flags", 0)?,
+                entered_course_effects: optional_item(data, "entered_course_effects", 0)?,
+                final_frame_index: optional_item(data, "final_frame_index", 0)?,
             },
-        }
+        })
     }
 
     #[getter]
@@ -348,6 +322,22 @@ pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult
             inner: status.clone(),
         },
     )
+}
+
+fn required_item<'py>(data: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+    data.get_item(key)?.ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err(format!("step summary missing {key:?}"))
+    })
+}
+
+fn optional_item<'py, T>(data: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
+where
+    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
+{
+    match data.get_item(key)? {
+        Some(value) => value.extract(),
+        None => Ok(default),
+    }
 }
 
 fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {

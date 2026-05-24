@@ -103,9 +103,14 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
                 "display_height": 444,
             }
 
-        def step_repeat_raw(self, **kwargs: object):
-            assert kwargs["action_repeat"] == 2
-            assert kwargs["lean_timer_assist"] is False
+        def step_repeat_raw(self, request: dict[str, object]):
+            step = request["step"]
+            observation_request = request["observation"]
+            assert isinstance(step, dict)
+            assert isinstance(observation_request, dict)
+            assert step["action_repeat"] == 2
+            assert step["lean_timer_assist"] is False
+            assert observation_request["preset"] == "crop_84x84"
             observation = np.zeros((84, 84, 6), dtype=np.uint8)
             summary = make_step_summary(
                 frames_run=2,
@@ -181,8 +186,13 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
                 "display_height": 444,
             }
 
-        def step_repeat_watch_raw(self, **kwargs: object):
-            assert kwargs["action_repeat"] == 2
+        def step_repeat_watch_raw(self, request: dict[str, object]):
+            step = request["step"]
+            observation_request = request["observation"]
+            assert isinstance(step, dict)
+            assert isinstance(observation_request, dict)
+            assert step["action_repeat"] == 2
+            assert observation_request["preset"] == "crop_84x84"
             observation = np.zeros((84, 84, 6), dtype=np.uint8)
             display_frames = [
                 np.full((444, 592, 3), 1, dtype=np.uint8),
@@ -247,13 +257,17 @@ def test_step_repeat_multi_observation_raw_returns_multiple_validated_views() ->
                 "display_height": 444,
             }
 
-        def step_repeat_multi_observation_raw(self, **kwargs: object):
-            requests = kwargs["observation_requests"]
+        def step_repeat_multi_observation_raw(self, request: dict[str, object]):
+            requests = request["observations"]
             assert isinstance(requests, list)
-            assert requests[0]["preset"] == "crop_84x84"
-            assert requests[1]["preset"] == ""
-            assert requests[1]["height"] == 72
-            assert requests[1]["width"] == 96
+            first_request = requests[0]
+            second_request = requests[1]
+            assert isinstance(first_request, dict)
+            assert isinstance(second_request, dict)
+            assert first_request["preset"] == "crop_84x84"
+            assert second_request["preset"] == ""
+            assert second_request["height"] == 72
+            assert second_request["width"] == 96
             observations = [
                 np.zeros((84, 84, 6), dtype=np.uint8),
                 np.zeros((72, 96, 1), dtype=np.uint8),

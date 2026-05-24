@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
+
+if TYPE_CHECKING:
+    from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
 
 
 @dataclass(frozen=True)
