@@ -8,13 +8,6 @@ import {
   nextAvailableDraftName,
   runSessionId,
 } from "@/app/workspace/model";
-import type {
-  DraftEditorSession,
-  ForkSource,
-  RunSession,
-  WorkspaceTabId,
-} from "@/app/workspace/types";
-
 import {
   closeDraftSession,
   closeDraftSessionsForDraft,
@@ -23,14 +16,27 @@ import {
   normalizeDraftSessionTitle,
   openDraftSession,
   patchDraftSessions,
-} from "./drafts";
+} from "@/app/workspace/sessions/drafts";
 import {
   allKnownWorkspaceNames,
   reservedWorkspaceNamesForSession,
   resolveForkSourceRunLabel,
-} from "./names";
-import { closeRunSession, closeRunSessionsForRuns, openRunSession } from "./runs";
-import type { UseWorkspaceSessionsOptions, WorkspaceSessions } from "./types";
+} from "@/app/workspace/sessions/names";
+import {
+  closeRunSession,
+  closeRunSessionsForRuns,
+  openRunSession,
+} from "@/app/workspace/sessions/runs";
+import type {
+  UseWorkspaceSessionsOptions,
+  WorkspaceSessions,
+} from "@/app/workspace/sessions/types";
+import type {
+  DraftEditorSession,
+  ForkSource,
+  RunSession,
+  WorkspaceTabId,
+} from "@/app/workspace/types";
 
 export function useWorkspaceSessions({
   drafts,

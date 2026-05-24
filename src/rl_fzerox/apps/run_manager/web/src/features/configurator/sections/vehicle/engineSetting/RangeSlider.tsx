@@ -3,9 +3,19 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { clamp } from "@/features/configurator/fields/format";
 
-import { sliderRatio, valueFromClientX } from "./math";
-import { rangeFillStyle, thumbStyle, tickStyle } from "./styles";
-import type { RangeHandle, SliderTick } from "./types";
+import {
+  sliderRatio,
+  valueFromClientX,
+} from "@/features/configurator/sections/vehicle/engineSetting/math";
+import {
+  rangeFillStyle,
+  thumbStyle,
+  tickStyle,
+} from "@/features/configurator/sections/vehicle/engineSetting/styles";
+import type {
+  RangeHandle,
+  SliderTick,
+} from "@/features/configurator/sections/vehicle/engineSetting/types";
 
 interface RangeSliderProps {
   label: string;

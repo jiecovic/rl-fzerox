@@ -1,15 +1,14 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/RunChartSelectionPanel.tsx
 import { useCallback } from "react";
-import type { ManagedRun } from "@/shared/api/contract";
-import { ChevronIcon } from "@/shared/ui/icons";
-import { Notice } from "@/shared/ui/Panel";
-
 import {
   chartSeriesColor,
   type LineageRunGroup,
   type LineageSelectionState,
   lineageSelectionState,
-} from "./model";
+} from "@/features/runs/charts_panel/model";
+import type { ManagedRun } from "@/shared/api/contract";
+import { ChevronIcon } from "@/shared/ui/icons";
+import { Notice } from "@/shared/ui/Panel";
 
 interface RunChartSelectionPanelProps {
   colorByRunId: ReadonlyMap<string, string>;

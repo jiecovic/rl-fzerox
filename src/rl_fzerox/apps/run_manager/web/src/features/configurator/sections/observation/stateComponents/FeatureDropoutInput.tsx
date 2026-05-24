@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/stateComponents/FeatureDropoutInput.tsx
-import { BoundedDecimalInput } from "./BoundedDecimalInput";
+import { BoundedDecimalInput } from "@/features/configurator/sections/observation/stateComponents/BoundedDecimalInput";
 
 interface FeatureDropoutInputProps {
   disabled: boolean;

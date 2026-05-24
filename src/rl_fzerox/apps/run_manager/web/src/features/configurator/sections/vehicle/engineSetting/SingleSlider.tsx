@@ -3,9 +3,16 @@ import { useEffect, useRef, useState } from "react";
 
 import { clamp } from "@/features/configurator/fields/format";
 
-import { sliderRatio, valueFromClientX } from "./math";
-import { singleFillStyle, thumbStyle, tickStyle } from "./styles";
-import type { SliderTick } from "./types";
+import {
+  sliderRatio,
+  valueFromClientX,
+} from "@/features/configurator/sections/vehicle/engineSetting/math";
+import {
+  singleFillStyle,
+  thumbStyle,
+  tickStyle,
+} from "@/features/configurator/sections/vehicle/engineSetting/styles";
+import type { SliderTick } from "@/features/configurator/sections/vehicle/engineSetting/types";
 
 interface SingleSliderProps {
   label: string;

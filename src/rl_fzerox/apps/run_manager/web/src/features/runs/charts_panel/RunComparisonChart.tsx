@@ -2,9 +2,12 @@
 import { useMemo } from "react";
 
 import { RunPlotCard, type RunPlotPoint } from "@/features/runs/charts/RunPlotCard";
+import {
+  chartSeriesColor,
+  formatChartValue,
+  latestPointValue,
+} from "@/features/runs/charts_panel/model";
 import type { ManagedRun, ManagedRunMetricSample } from "@/shared/api/contract";
-
-import { chartSeriesColor, formatChartValue, latestPointValue } from "./model";
 
 interface RunComparisonChartProps {
   buildPoints: (run: ManagedRun, samples: ManagedRunMetricSample[]) => RunPlotPoint[];

@@ -1,11 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/charts_panel/useRunChartMetrics.ts
 import { useEffect, useState } from "react";
+import { cachedMetricsByRun } from "@/features/runs/charts_panel/storage";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import { fetchFreshRunMetrics } from "@/shared/api/client";
 import type { ManagedRunMetricSample } from "@/shared/api/contract";
 import { useDocumentVisible } from "@/shared/browser/useDocumentVisible";
-
-import { cachedMetricsByRun } from "./storage";
 
 const MAX_METRIC_REQUEST_CONCURRENCY = 4;
 

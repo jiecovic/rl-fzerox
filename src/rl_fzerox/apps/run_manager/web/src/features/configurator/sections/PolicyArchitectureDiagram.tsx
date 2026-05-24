@@ -1,12 +1,17 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicyArchitectureDiagram.tsx
 import { useEffect, useState } from "react";
+import { diagramMetrics } from "@/features/configurator/sections/policyArchitectureDiagram/constants";
+import { layoutGraph } from "@/features/configurator/sections/policyArchitectureDiagram/layout";
+import { buildArchitectureGraph } from "@/features/configurator/sections/policyArchitectureDiagram/model";
+import {
+  fallbackGraph,
+  toRenderedGraph,
+} from "@/features/configurator/sections/policyArchitectureDiagram/render";
+import type {
+  RenderedGraph,
+  RenderedNode,
+} from "@/features/configurator/sections/policyArchitectureDiagram/types";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
-
-import { diagramMetrics } from "./policyArchitectureDiagram/constants";
-import { layoutGraph } from "./policyArchitectureDiagram/layout";
-import { buildArchitectureGraph } from "./policyArchitectureDiagram/model";
-import { fallbackGraph, toRenderedGraph } from "./policyArchitectureDiagram/render";
-import type { RenderedGraph, RenderedNode } from "./policyArchitectureDiagram/types";
 
 export function PolicyArchitectureDiagram({ preview }: { preview: PolicyArchitecturePreview }) {
   const [layout, setLayout] = useState<RenderedGraph | null>(null);

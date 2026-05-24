@@ -1,10 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/model.ts
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk.bundled.js";
 import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
+import { diagramMetrics } from "@/features/configurator/sections/policyArchitectureDiagram/constants";
+import type {
+  ArchitectureGraph,
+  ArchitectureNode,
+  NodeVisual,
+} from "@/features/configurator/sections/policyArchitectureDiagram/types";
 import type { PolicyArchitecturePreview } from "@/shared/api/contract";
-
-import { diagramMetrics } from "./constants";
-import type { ArchitectureGraph, ArchitectureNode, NodeVisual } from "./types";
 
 export function buildArchitectureGraph(preview: PolicyArchitecturePreview): ArchitectureGraph {
   const visuals = new Map<string, NodeVisual>();
