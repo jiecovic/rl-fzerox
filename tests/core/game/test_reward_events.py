@@ -18,8 +18,7 @@ def test_reward_main_treats_finish_as_final_lap_reward_only() -> None:
             time_penalty_per_frame=0.0,
             lap_completion_bonus=5.0,
             lap_position_scale=1.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, laps_completed=2))
@@ -39,13 +38,11 @@ def test_reward_main_treats_finish_as_final_lap_reward_only() -> None:
     assert step.breakdown == {"lap_completion": 5.0, "lap_position": 29.0}
 
 
-def test_reward_main_applies_collision_recoil_penalty_per_frame_while_recoil_active() -> None:
+def test_reward_main_applies_impact_penalty_per_frame_while_recoil_active() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-            collision_recoil_penalty=-0.25,
+            impact_frame_penalty=-0.25,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -70,18 +67,16 @@ def test_reward_main_applies_collision_recoil_penalty_per_frame_while_recoil_act
     )
 
     assert first_step.reward == -0.75
-    assert first_step.breakdown == {"collision_recoil": -0.75}
+    assert first_step.breakdown == {"impact": -0.75}
     assert second_step.reward == -0.25
-    assert second_step.breakdown == {"collision_recoil": -0.25}
+    assert second_step.breakdown == {"impact": -0.25}
 
 
-def test_reward_main_does_not_apply_collision_recoil_penalty_from_entry_flag_alone() -> None:
+def test_reward_main_does_not_apply_impact_penalty_from_entry_flag_alone() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
-            collision_recoil_penalty=-0.25,
+            impact_frame_penalty=-0.25,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -101,8 +96,7 @@ def test_reward_main_uses_spinning_out_as_failure_not_raw_energy_depletion() -> 
         RewardConfig(
             time_penalty_per_frame=0.0,
             failure_penalty=-20.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -131,8 +125,7 @@ def test_reward_main_multiplies_time_penalty_by_frames_run() -> None:
         RewardConfig(
             time_penalty_per_frame=-0.01,
             progress_bucket_reward=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -153,8 +146,7 @@ def test_reward_main_penalizes_lean_request() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             lean_request_penalty=-0.001,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -177,8 +169,7 @@ def test_reward_main_penalizes_lean_activation_once() -> None:
             time_penalty_per_frame=0.0,
             lean_request_penalty=-0.001,
             lean_activation_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -224,8 +215,7 @@ def test_reward_main_penalizes_grounded_pitch_outside_deadzone() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             grounded_pitch_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -247,8 +237,7 @@ def test_reward_main_does_not_penalize_grounded_pitch_within_deadzone() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             grounded_pitch_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -270,8 +259,7 @@ def test_reward_main_penalizes_air_brake_request() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             air_brake_request_penalty=-0.01,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -293,8 +281,7 @@ def test_reward_main_rewards_manual_boost_request_once_per_env_step() -> None:
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             manual_boost_reward=0.25,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -319,8 +306,7 @@ def test_reward_main_rewards_landing_once_per_frontier_bucket() -> None:
             airborne_landing_reward=5.0,
             airborne_landing_grace_frames=0,
             airborne_landing_min_peak_height=50.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(
@@ -386,8 +372,7 @@ def test_reward_main_requires_airborne_grace_for_landing_reward() -> None:
             airborne_landing_reward=5.0,
             airborne_landing_grace_frames=50,
             airborne_landing_min_peak_height=50.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -438,8 +423,7 @@ def test_reward_main_requires_peak_height_for_landing_reward() -> None:
             airborne_landing_reward=5.0,
             airborne_landing_grace_frames=0,
             airborne_landing_min_peak_height=50.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))

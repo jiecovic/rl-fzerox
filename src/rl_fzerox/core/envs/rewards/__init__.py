@@ -56,9 +56,9 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         lap_completion_bonus=config.lap_completion_bonus,
         lap_position_scale=config.lap_position_scale,
         ko_star_reward=config.ko_star_reward,
-        damage_taken_frame_penalty=config.damage_taken_frame_penalty,
-        damage_taken_streak_ramp_penalty=config.damage_taken_streak_ramp_penalty,
-        damage_taken_streak_cap_frames=config.damage_taken_streak_cap_frames,
+        impact_frame_penalty=config.impact_frame_penalty,
+        energy_loss_penalty=config.energy_loss_penalty,
+        energy_gain_reward=config.energy_gain_reward,
         manual_boost_reward=config.manual_boost_reward,
         boost_pad_reward=config.boost_pad_reward,
         boost_pad_reward_progress_window=config.boost_pad_reward_progress_window,
@@ -75,7 +75,6 @@ def _weights_for(config: RewardConfig) -> RewardMainWeights:
         airborne_landing_reward=config.airborne_landing_reward,
         airborne_landing_grace_frames=config.airborne_landing_grace_frames,
         airborne_landing_min_peak_height=config.airborne_landing_min_peak_height,
-        collision_recoil_penalty=config.collision_recoil_penalty,
         failure_penalty=config.failure_penalty,
         truncation_penalty=config.truncation_penalty,
         step_reward_clip_min=config.step_reward_clip_min,
@@ -176,20 +175,20 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 if override.ko_star_reward is not None
                 else base.ko_star_reward
             ),
-            damage_taken_frame_penalty=(
-                override.damage_taken_frame_penalty
-                if override.damage_taken_frame_penalty is not None
-                else base.damage_taken_frame_penalty
+            impact_frame_penalty=(
+                override.impact_frame_penalty
+                if override.impact_frame_penalty is not None
+                else base.impact_frame_penalty
             ),
-            damage_taken_streak_ramp_penalty=(
-                override.damage_taken_streak_ramp_penalty
-                if override.damage_taken_streak_ramp_penalty is not None
-                else base.damage_taken_streak_ramp_penalty
+            energy_loss_penalty=(
+                override.energy_loss_penalty
+                if override.energy_loss_penalty is not None
+                else base.energy_loss_penalty
             ),
-            damage_taken_streak_cap_frames=(
-                override.damage_taken_streak_cap_frames
-                if override.damage_taken_streak_cap_frames is not None
-                else base.damage_taken_streak_cap_frames
+            energy_gain_reward=(
+                override.energy_gain_reward
+                if override.energy_gain_reward is not None
+                else base.energy_gain_reward
             ),
             manual_boost_reward=(
                 override.manual_boost_reward
@@ -270,11 +269,6 @@ def _course_weights_for(config: RewardConfig) -> dict[str, RewardMainWeights]:
                 override.airborne_landing_min_peak_height
                 if override.airborne_landing_min_peak_height is not None
                 else base.airborne_landing_min_peak_height
-            ),
-            collision_recoil_penalty=(
-                override.collision_recoil_penalty
-                if override.collision_recoil_penalty is not None
-                else base.collision_recoil_penalty
             ),
             failure_penalty=(
                 override.failure_penalty

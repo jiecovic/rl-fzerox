@@ -58,9 +58,9 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "lap_completion_bonus": 9.0,
         "lap_position_scale": 0.33,
         "ko_star_reward": 4.0,
-        "damage_taken_frame_penalty": -0.02,
-        "damage_taken_streak_ramp_penalty": -0.001,
-        "damage_taken_streak_cap_frames": 120,
+        "impact_frame_penalty": -0.02,
+        "energy_loss_penalty": -0.01,
+        "energy_gain_reward": 0.01,
         "manual_boost_reward": 0.25,
         "boost_pad_reward": 10.0,
         "boost_pad_reward_progress_window": 800.0,
@@ -77,7 +77,6 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "airborne_landing_reward": 5.0,
         "airborne_landing_grace_frames": 33,
         "airborne_landing_min_peak_height": 120.0,
-        "collision_recoil_penalty": -0.25,
         "failure_penalty": -30.0,
         "truncation_penalty": -15.0,
         "step_reward_clip_min": -12.0,
@@ -100,8 +99,7 @@ def test_reward_main_rewards_new_gp_ko_stars_once() -> None:
             ko_star_reward=2.5,
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(ko_star_count=1))
@@ -128,8 +126,7 @@ def test_reward_main_ignores_ko_star_reward_outside_gp_race() -> None:
             ko_star_reward=2.5,
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(game_mode_name="practice", ko_star_count=0))
@@ -150,8 +147,7 @@ def test_reward_main_rewards_each_frontier_bucket_once() -> None:
             progress_bucket_distance=1_000.0,
             progress_bucket_reward=2.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -188,8 +184,7 @@ def test_reward_main_can_delay_frontier_rewards_by_interval() -> None:
             progress_bucket_reward=1.0,
             progress_reward_interval_frames=3,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -216,8 +211,7 @@ def test_reward_main_can_suspend_frontier_progress_while_outside_track_bounds() 
             progress_bucket_reward=1.0,
             suspend_progress_while_outside_track_bounds=True,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -256,8 +250,7 @@ def test_reward_main_rewards_net_grounded_reentry_progress_without_surface_multi
             progress_bucket_reward=1.0,
             dirt_progress_multiplier=0.5,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -294,8 +287,7 @@ def test_reward_main_caps_grounded_reentry_progress_reward_without_holding_front
             progress_bucket_reward=1.0,
             outside_bounds_reentry_progress_distance_cap=200.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -333,8 +325,7 @@ def test_reward_main_clips_final_step_reward_after_breakdown_terms() -> None:
             step_reward_clip_min=-3.0,
             step_reward_clip_max=2.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -366,8 +357,7 @@ def test_reward_main_shapes_outside_track_recovery_by_direction() -> None:
             outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -458,8 +448,7 @@ def test_reward_main_uses_future_segment_distance_for_outside_track_recovery() -
             outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(
@@ -512,8 +501,7 @@ def test_reward_main_does_not_scale_recovery_by_active_side_radius() -> None:
             outside_track_recovery_reward_cap=10.0,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=200.0))
@@ -557,8 +545,7 @@ def test_reward_main_caps_outside_track_recovery_reward_after_weight() -> None:
             outside_track_recovery_reward_cap=0.1,
             outside_track_recovery_airborne_grace_frames=0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -624,8 +611,7 @@ def test_reward_main_keeps_short_airborne_outside_excursions_ungated() -> None:
             outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=30,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -682,8 +668,7 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
             outside_track_recovery_reward_cap=1.0,
             outside_track_recovery_airborne_grace_frames=30,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -720,7 +705,7 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
         _telemetry(
             race_distance=0.0,
             state_labels=("active", "airborne"),
-            signed_lateral_offset=110.0,
+            signed_lateral_offset=111.0,
             lateral_distance=90.0,
             current_radius_left=100.0,
             future_local_nearest_segment_index=12,
@@ -752,8 +737,7 @@ def test_reward_main_scales_time_pressure_when_speed_is_low() -> None:
             slow_speed_time_penalty_scale=3.0,
             slow_speed_time_penalty_start_kph=760.0,
             slow_speed_time_penalty_power=1.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, speed_kph=0.0))
@@ -775,8 +759,7 @@ def test_reward_main_resumes_reentry_progress_when_back_inside_airborne() -> Non
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
@@ -823,9 +806,9 @@ def test_reward_main_multiplies_frontier_progress_when_energy_refills() -> None:
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
             energy_refill_progress_multiplier=2.0,
+            energy_gain_reward=0.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, energy=89.0))
@@ -841,6 +824,60 @@ def test_reward_main_multiplies_frontier_progress_when_energy_refills() -> None:
     assert step.breakdown["energy_refill_progress"] == pytest.approx(1.0)
 
 
+def test_reward_main_penalizes_energy_loss_proportionally() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            energy_loss_penalty=-0.02,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=100.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0, energy_loss_total=7.5),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, energy=92.5),
+    )
+
+    assert step.reward == pytest.approx(-0.15)
+    assert step.breakdown == {"energy_loss": pytest.approx(-0.15)}
+
+
+def test_reward_main_gates_energy_gain_reward_on_progress() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            energy_refill_progress_multiplier=1.0,
+            energy_gain_reward=0.05,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, energy=80.0))
+
+    parked_refill = tracker.step_summary(
+        _summary(max_race_distance=0.0, energy_gain_total=10.0),
+        _status(step_count=1),
+        _telemetry(race_distance=0.0, energy=90.0, on_energy_refill=True),
+    )
+    moving_refill = tracker.step_summary(
+        _summary(max_race_distance=100.0, energy_gain_total=10.0),
+        _status(step_count=2),
+        _telemetry(race_distance=100.0, energy=100.0, on_energy_refill=True),
+    )
+
+    assert parked_refill.reward == 0.0
+    assert parked_refill.breakdown == {}
+    assert moving_refill.reward == pytest.approx(1.5)
+    assert moving_refill.breakdown == {
+        "frontier_progress": 1.0,
+        "energy_gain": pytest.approx(0.5),
+    }
+
+
 def test_reward_main_suppresses_refill_multiplier_at_full_energy() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
@@ -848,8 +885,7 @@ def test_reward_main_suppresses_refill_multiplier_at_full_energy() -> None:
             progress_bucket_reward=1.0,
             energy_refill_progress_multiplier=2.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, energy=178.0))
@@ -872,8 +908,7 @@ def test_reward_main_scales_frontier_progress_on_dirt_and_ice() -> None:
             dirt_progress_multiplier=0.5,
             ice_progress_multiplier=0.7,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -903,8 +938,7 @@ def test_reward_main_penalizes_bad_ground_entry_once_per_transition() -> None:
             time_penalty_per_frame=0.0,
             dirt_entry_penalty=-0.5,
             ice_entry_penalty=-0.25,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))
@@ -938,8 +972,7 @@ def test_reward_main_rewards_dash_pad_boost_entries_once_per_progress_window() -
             boost_pad_reward=0.5,
             boost_pad_reward_progress_window=1_000.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0))

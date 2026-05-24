@@ -117,8 +117,7 @@ def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
             progress_bucket_reward=1.0,
             step_reward_clip_max=5.0,
             time_penalty_per_frame=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         ),
     )
 
@@ -161,8 +160,7 @@ def test_grounded_pitch_penalty_uses_requested_pitch_before_ground_gate() -> Non
             progress_bucket_reward=0.0,
             time_penalty_per_frame=0.0,
             grounded_pitch_penalty=-0.5,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         ),
     )
 
@@ -793,8 +791,7 @@ def test_step_control_keeps_ground_air_brake_when_configured() -> None:
             time_penalty_per_frame=0.0,
             air_brake_request_penalty=-0.2,
             progress_bucket_reward=0.0,
-            damage_taken_frame_penalty=0.0,
-            damage_taken_streak_ramp_penalty=0.0,
+            impact_frame_penalty=0.0,
         ),
     )
     air_brake_state = ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake)

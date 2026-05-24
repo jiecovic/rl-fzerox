@@ -1,13 +1,12 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/TrackActionPanels.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { IntegerField, NumberField, RangeNumberField } from "@/features/configurator/fields";
+import type { RewardPanelProps } from "@/features/configurator/sections/reward/types";
 import {
   actionDefaults,
   energyDefaults,
   trackEventDefaults,
 } from "@/features/configurator/sections/rewardDefaults";
-
-import type { RewardPanelProps } from "./types";
 
 export function TrackActionPanels({
   config,

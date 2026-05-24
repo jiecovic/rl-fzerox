@@ -7,17 +7,16 @@ import {
   OptionalNumberField,
 } from "@/features/configurator/fields";
 import {
+  progressBucketRewardFromDensity,
+  progressRewardDensityPerThousand,
+  progressSummaryRows,
+} from "@/features/configurator/sections/reward/progressDerived";
+import type { RewardPanelProps } from "@/features/configurator/sections/reward/types";
+import {
   boundsDefaults,
   progressDefaults,
   timePressureDefaults,
 } from "@/features/configurator/sections/rewardDefaults";
-
-import {
-  progressBucketRewardFromDensity,
-  progressRewardDensityPerThousand,
-  progressSummaryRows,
-} from "./progressDerived";
-import type { RewardPanelProps } from "./types";
 
 export function TimeProgressPanels({
   config,

@@ -29,6 +29,7 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
     assert_eq!(summary.energy_loss_total, 12.0);
     assert_eq!(summary.energy_gain_total, 0.0);
     assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
     assert_eq!(summary.consecutive_low_speed_frames, 1);
     assert_eq!(summary.entered_state_flags, 0b110);
     assert_eq!(summary.final_frame_index, 42);
@@ -97,6 +98,7 @@ fn step_accumulator_counts_received_damage_state_as_damage_taken() {
     let summary = accumulator.finish();
 
     assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
 }
 
 #[test]
@@ -147,6 +149,31 @@ fn step_accumulator_counts_collision_recoil_active_frames() {
 
     assert_eq!(summary.frames_run, 3);
     assert_eq!(summary.collision_recoil_active_frames, 2);
+    assert_eq!(summary.impact_frames, 2);
+}
+
+#[test]
+fn step_accumulator_counts_damage_and_recoil_overlap_as_one_impact_frame() {
+    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+    let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
+
+    accumulator.observe(
+        &telemetry(
+            101.0,
+            100.0,
+            120.0,
+            ACTIVE_FLAG | COLLISION_RECOIL_FLAG,
+            0,
+            1,
+        ),
+        21,
+    );
+
+    let summary = accumulator.finish();
+
+    assert_eq!(summary.collision_recoil_active_frames, 1);
+    assert_eq!(summary.damage_taken_frames, 1);
+    assert_eq!(summary.impact_frames, 1);
 }
 
 #[test]

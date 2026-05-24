@@ -50,13 +50,12 @@ class ManagedRewardConfig(BaseModel):
     lean_request_penalty: float = Field(default=-0.003, le=0.0)
     lean_activation_penalty: float = Field(default=0.0, le=0.0)
     grounded_pitch_penalty: float = Field(default=0.0, le=0.0)
-    damage_taken_frame_penalty: float = Field(default=-0.02, le=0.0)
-    damage_taken_streak_ramp_penalty: float = Field(default=-0.001, le=0.0)
-    damage_taken_streak_cap_frames: NonNegativeInt = 120
+    impact_frame_penalty: float = Field(default=-0.02, le=0.0)
+    energy_loss_penalty: float = Field(default=-0.01, le=0.0)
+    energy_gain_reward: NonNegativeFloat = 0.01
     airborne_landing_reward: float = 1.0
     airborne_landing_grace_frames: NonNegativeInt = 50
     airborne_landing_min_peak_height: NonNegativeFloat = 50.0
-    collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0
     step_reward_clip_min: float | None = -100.0

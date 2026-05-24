@@ -26,4 +26,5 @@ def cap_outside_bounds_reentry_reward(
         progress=reward_cap,
         ground_effect_adjustment=0.0,
         energy_refill_bonus=0.0,
+        energy_gain_reward=0.0,
     )

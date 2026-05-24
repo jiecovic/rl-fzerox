@@ -134,7 +134,9 @@ class EngineStepAssembler:
         info["frames_run"] = int(step_result.summary.frames_run)
         info["repeat_index"] = max(step_result.summary.frames_run - 1, 0)
         info["energy_loss_total"] = float(step_result.summary.energy_loss_total)
+        info["energy_gain_total"] = float(step_result.summary.energy_gain_total)
         info["damage_taken_frames"] = int(step_result.summary.damage_taken_frames)
+        info["impact_frames"] = int(step_result.summary.impact_frames)
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["episode_airborne_frames"] = episode_airborne_frames
         info["boost_pad_entered"] = boost_pad_entered
