@@ -264,12 +264,12 @@ class StepSummary:
         energy_loss_total: float = 0.0,
         energy_gain_total: float = 0.0,
         damage_taken_frames: int = 0,
-        impact_frames: int | None = None,
         consecutive_low_speed_frames: int = 0,
         entered_state_flags: int = 0,
         entered_course_effects: int = 0,
         final_frame_index: int = 0,
         airborne_frames: int = 0,
+        impact_frames: int | None = None,
     ) -> None: ...
     @property
     def frames_run(self) -> int: ...

@@ -193,6 +193,33 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.entered_dash_surface is True
 
 
+def test_native_step_summary_positional_constructor_matches_stub_order() -> None:
+    summary = StepSummary(
+        2,
+        42.0,
+        1,
+        2,
+        3,
+        4.0,
+        5.0,
+        6,
+        7,
+        1 << 13,
+        1 << 3,
+        8,
+        9,
+        10,
+    )
+
+    assert summary.damage_taken_frames == 6
+    assert summary.consecutive_low_speed_frames == 7
+    assert summary.entered_state_flags == 1 << 13
+    assert summary.entered_course_effects == 1 << 3
+    assert summary.final_frame_index == 8
+    assert summary.airborne_frames == 9
+    assert summary.impact_frames == 10
+
+
 def test_encode_state_flags_builds_bitmask_from_labels() -> None:
     encoded = encode_state_flags(["collision_recoil", "finished"])
 
