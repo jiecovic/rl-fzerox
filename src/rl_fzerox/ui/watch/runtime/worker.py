@@ -136,6 +136,43 @@ def _run_simulation_loop(
             session.auxiliary_target_names
         )
 
+        def publish_snapshot() -> None:
+            publish_worker_message(
+                snapshot_queue,
+                _build_snapshot(
+                    config=config,
+                    env=env,
+                    emulator=emulator,
+                    observation=observation,
+                    info=info,
+                    reset_info=reset_info,
+                    episode=episode,
+                    episode_reward=episode_reward,
+                    control_fps=control_rate.rate_hz(),
+                    target_control_fps=target_control_fps,
+                    control_state=current_control_state,
+                    gas_level=current_gas_level,
+                    boost_lamp_level=boost_lamp_level,
+                    action_mask_branches=committed_action_mask_branches,
+                    policy_action=current_policy_action,
+                    policy_runner=policy_runner,
+                    policy_auxiliary_state_predictions=current_auxiliary_predictions,
+                    policy_auxiliary_state_targets=current_auxiliary_targets,
+                    include_auxiliary_state=auxiliary_visualization_enabled,
+                    auxiliary_target_names=auxiliary_target_names,
+                    deterministic_policy=deterministic_policy,
+                    manual_control_enabled=manual_control_enabled,
+                    policy_reload_error=policy_reload_error,
+                    cnn_activations=cnn_activations,
+                    best_finish_position=best_finish_position,
+                    best_finish_ranks=best_finish_ranks,
+                    best_finish_times=best_finish_times,
+                    latest_finish_times=latest_finish_times,
+                    latest_finish_deltas_ms=latest_finish_deltas_ms,
+                    failed_track_attempts=failed_track_attempts,
+                ),
+            )
+
         while config.watch.episodes is None or episode < config.watch.episodes:
             env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
@@ -173,41 +210,7 @@ def _run_simulation_loop(
             next_step_time = time.perf_counter()
             policy_reload_error = _policy_reload_error(policy_runner)
 
-            publish_worker_message(
-                snapshot_queue,
-                _build_snapshot(
-                    config=config,
-                    env=env,
-                    emulator=emulator,
-                    observation=observation,
-                    info=info,
-                    reset_info=reset_info,
-                    episode=episode,
-                    episode_reward=episode_reward,
-                    control_fps=control_rate.rate_hz(),
-                    target_control_fps=target_control_fps,
-                    control_state=current_control_state,
-                    gas_level=current_gas_level,
-                    boost_lamp_level=boost_lamp_level,
-                    action_mask_branches=committed_action_mask_branches,
-                    policy_action=current_policy_action,
-                    policy_runner=policy_runner,
-                    policy_auxiliary_state_predictions=current_auxiliary_predictions,
-                    policy_auxiliary_state_targets=current_auxiliary_targets,
-                    include_auxiliary_state=auxiliary_visualization_enabled,
-                    auxiliary_target_names=auxiliary_target_names,
-                    deterministic_policy=deterministic_policy,
-                    manual_control_enabled=manual_control_enabled,
-                    policy_reload_error=policy_reload_error,
-                    cnn_activations=None,
-                    best_finish_position=best_finish_position,
-                    best_finish_ranks=best_finish_ranks,
-                    best_finish_times=best_finish_times,
-                    latest_finish_times=latest_finish_times,
-                    latest_finish_deltas_ms=latest_finish_deltas_ms,
-                    failed_track_attempts=failed_track_attempts,
-                ),
-            )
+            publish_snapshot()
 
             while not (terminated or truncated):
                 previous_cnn_visualization_enabled = cnn_visualization_enabled
@@ -242,41 +245,7 @@ def _run_simulation_loop(
                         raw_info,
                         watch_zeroed_features=watch_zeroed_state_features,
                     )
-                    publish_worker_message(
-                        snapshot_queue,
-                        _build_snapshot(
-                            config=config,
-                            env=env,
-                            emulator=emulator,
-                            observation=observation,
-                            info=info,
-                            reset_info=reset_info,
-                            episode=episode,
-                            episode_reward=episode_reward,
-                            control_fps=control_rate.rate_hz(),
-                            target_control_fps=target_control_fps,
-                            control_state=current_control_state,
-                            gas_level=current_gas_level,
-                            boost_lamp_level=boost_lamp_level,
-                            action_mask_branches=committed_action_mask_branches,
-                            policy_action=current_policy_action,
-                            policy_runner=policy_runner,
-                            policy_auxiliary_state_predictions=current_auxiliary_predictions,
-                            policy_auxiliary_state_targets=current_auxiliary_targets,
-                            include_auxiliary_state=auxiliary_visualization_enabled,
-                            auxiliary_target_names=auxiliary_target_names,
-                            deterministic_policy=deterministic_policy,
-                            manual_control_enabled=manual_control_enabled,
-                            policy_reload_error=policy_reload_error,
-                            cnn_activations=cnn_activations,
-                            best_finish_position=best_finish_position,
-                            best_finish_ranks=best_finish_ranks,
-                            best_finish_times=best_finish_times,
-                            latest_finish_times=latest_finish_times,
-                            latest_finish_deltas_ms=latest_finish_deltas_ms,
-                            failed_track_attempts=failed_track_attempts,
-                        ),
-                    )
+                    publish_snapshot()
                 course_command = apply_course_navigation_commands(
                     commands,
                     env=env,
@@ -289,41 +258,7 @@ def _run_simulation_loop(
                 if course_command.reset_requested:
                     break
                 if course_command.lock_state_changed:
-                    publish_worker_message(
-                        snapshot_queue,
-                        _build_snapshot(
-                            config=config,
-                            env=env,
-                            emulator=emulator,
-                            observation=observation,
-                            info=info,
-                            reset_info=reset_info,
-                            episode=episode,
-                            episode_reward=episode_reward,
-                            control_fps=control_rate.rate_hz(),
-                            target_control_fps=target_control_fps,
-                            control_state=current_control_state,
-                            gas_level=current_gas_level,
-                            boost_lamp_level=boost_lamp_level,
-                            action_mask_branches=committed_action_mask_branches,
-                            policy_action=current_policy_action,
-                            policy_runner=policy_runner,
-                            policy_auxiliary_state_predictions=current_auxiliary_predictions,
-                            policy_auxiliary_state_targets=current_auxiliary_targets,
-                            include_auxiliary_state=auxiliary_visualization_enabled,
-                            auxiliary_target_names=auxiliary_target_names,
-                            deterministic_policy=deterministic_policy,
-                            manual_control_enabled=manual_control_enabled,
-                            policy_reload_error=policy_reload_error,
-                            cnn_activations=cnn_activations,
-                            best_finish_position=best_finish_position,
-                            best_finish_ranks=best_finish_ranks,
-                            best_finish_times=best_finish_times,
-                            latest_finish_times=latest_finish_times,
-                            latest_finish_deltas_ms=latest_finish_deltas_ms,
-                            failed_track_attempts=failed_track_attempts,
-                        ),
-                    )
+                    publish_snapshot()
                 if commands.reset_control_fps:
                     target_control_fps = native_control_fps
                     target_control_seconds = _target_seconds(target_control_fps)
@@ -386,41 +321,7 @@ def _run_simulation_loop(
                         or auxiliary_visualization_enabled
                         != previous_auxiliary_visualization_enabled
                     ):
-                        publish_worker_message(
-                            snapshot_queue,
-                            _build_snapshot(
-                                config=config,
-                                env=env,
-                                emulator=emulator,
-                                observation=observation,
-                                info=info,
-                                reset_info=reset_info,
-                                episode=episode,
-                                episode_reward=episode_reward,
-                                control_fps=control_rate.rate_hz(),
-                                target_control_fps=target_control_fps,
-                                control_state=current_control_state,
-                                gas_level=current_gas_level,
-                                boost_lamp_level=boost_lamp_level,
-                                action_mask_branches=committed_action_mask_branches,
-                                policy_action=current_policy_action,
-                                policy_runner=policy_runner,
-                                policy_auxiliary_state_predictions=current_auxiliary_predictions,
-                                policy_auxiliary_state_targets=current_auxiliary_targets,
-                                include_auxiliary_state=auxiliary_visualization_enabled,
-                                auxiliary_target_names=auxiliary_target_names,
-                                deterministic_policy=deterministic_policy,
-                                manual_control_enabled=manual_control_enabled,
-                                policy_reload_error=policy_reload_error,
-                                cnn_activations=cnn_activations,
-                                best_finish_position=best_finish_position,
-                                best_finish_ranks=best_finish_ranks,
-                                best_finish_times=best_finish_times,
-                                latest_finish_times=latest_finish_times,
-                                latest_finish_deltas_ms=latest_finish_deltas_ms,
-                                failed_track_attempts=failed_track_attempts,
-                            ),
-                        )
+                        publish_snapshot()
                     time.sleep(0.01)
                     continue
                 if not commands.paused and target_control_seconds is not None:

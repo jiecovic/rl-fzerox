@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol, TypeVar, cast
+from typing import Protocol, TypeGuard, TypeVar
 
 from stable_baselines3.common.utils import FloatSchedule
 from torch import nn
@@ -19,13 +19,12 @@ from rl_fzerox.core.training.session.model.algorithms import (
 )
 
 _ModelT = TypeVar("_ModelT")
-_ModelT_co = TypeVar("_ModelT_co", covariant=True)
 _AuxiliaryStateSignature = tuple[int, ...] | None
 
 
-class _FullModelLoader(Protocol[_ModelT_co]):
+class _FullModelLoader(Protocol):
     @classmethod
-    def load(cls, path: str, *, env: object, device: str) -> _ModelT_co: ...
+    def load(cls, path: str, *, env: object, device: str) -> object: ...
 
 
 def maybe_resume_training_model(
@@ -74,15 +73,16 @@ def maybe_resume_training_model(
     if train_config.resume_mode == "full_model":
         # The algorithm check above guarantees the artifact and current model
         # are from the same SB3 family; the class factory itself is dynamic.
-        algorithm_class = cast(
-            _FullModelLoader[_ModelT],
-            resolve_training_algorithm_class(current_algorithm),
-        )
+        algorithm_class = resolve_training_algorithm_class(current_algorithm)
+        if not _is_full_model_loader(algorithm_class):
+            raise TypeError("Training algorithm class does not expose load(...)")
         loaded_model = algorithm_class.load(
             str(model_path),
             env=train_env,
             device=train_config.device,
         )
+        if not _is_training_model_instance(loaded_model, model):
+            raise TypeError("Loaded training model type does not match the current model")
         _sync_loaded_model_training_config(
             loaded_model,
             train_config=train_config,
@@ -98,6 +98,14 @@ def maybe_resume_training_model(
         ),
     )
     return model
+
+
+def _is_full_model_loader(value: object) -> TypeGuard[_FullModelLoader]:
+    return callable(getattr(value, "load", None))
+
+
+def _is_training_model_instance(value: object, model: _ModelT) -> TypeGuard[_ModelT]:
+    return isinstance(value, type(model))
 
 
 def _set_model_parameters(

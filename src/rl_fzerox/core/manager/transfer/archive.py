@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/manager/transfer/archive.py
 from __future__ import annotations
 
+import json
 import shutil
 import sqlite3
 import stat
@@ -409,6 +410,11 @@ def _rewrite_imported_manifest_paths(
     replacements: tuple[tuple[str, str], ...],
 ) -> None:
     for file_path in _rewrite_candidate_files(run_dir):
+        if file_path.suffix.lower() == ".json" and _rewrite_json_paths(
+            file_path,
+            replacements=replacements,
+        ):
+            continue
         try:
             text = file_path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -430,6 +436,58 @@ def _rewrite_path_text(text: str, *, replacements: tuple[tuple[str, str], ...]) 
     for source, target in replacements:
         rewritten = rewritten.replace(source, target)
     return rewritten
+
+
+def _rewrite_json_paths(
+    file_path: Path,
+    *,
+    replacements: tuple[tuple[str, str], ...],
+) -> bool:
+    try:
+        value = json.loads(file_path.read_text(encoding="utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+
+    rewritten, changed = _rewrite_json_value(value, replacements=replacements)
+    if changed:
+        file_path.write_text(
+            json.dumps(rewritten, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    return True
+
+
+def _rewrite_json_value(
+    value: object,
+    *,
+    replacements: tuple[tuple[str, str], ...],
+) -> tuple[object, bool]:
+    if isinstance(value, str):
+        rewritten = _rewrite_path_text(value, replacements=replacements)
+        return rewritten, rewritten != value
+    if isinstance(value, list):
+        changed = False
+        rewritten_items: list[object] = []
+        for item in value:
+            rewritten_item, item_changed = _rewrite_json_value(
+                item,
+                replacements=replacements,
+            )
+            rewritten_items.append(rewritten_item)
+            changed = changed or item_changed
+        return rewritten_items, changed
+    if isinstance(value, dict):
+        changed = False
+        rewritten_dict: dict[object, object] = {}
+        for key, item in value.items():
+            rewritten_item, item_changed = _rewrite_json_value(
+                item,
+                replacements=replacements,
+            )
+            rewritten_dict[key] = rewritten_item
+            changed = changed or item_changed
+        return rewritten_dict, changed
+    return value, False
 
 
 def _rewritten_optional_path(

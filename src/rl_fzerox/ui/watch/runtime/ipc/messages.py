@@ -65,7 +65,7 @@ class WorkerError:
 
 @dataclass(frozen=True)
 class WorkerClosed:
-    pass
+    """Marker published when the simulation worker exits."""
 
 
 @dataclass(frozen=True)
