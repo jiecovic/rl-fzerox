@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry, ObservationImageRecipe
+from fzerox_emulator.arrays import ObservationFrame
 from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry
 
 
@@ -321,7 +322,7 @@ def test_render_observation_supports_custom_resolution() -> None:
             preset: str,
             frame_stack: int,
             options: dict[str, object] | None = None,
-        ) -> np.ndarray:
+        ) -> ObservationFrame:
             assert preset == ""
             assert frame_stack == 2
             assert options is not None

@@ -10,7 +10,7 @@ from typing import Protocol
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator.arrays import ActionMask, PolicyState
+from fzerox_emulator.arrays import ActionMask, BoolArray, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.observations import ImageStateObservation, ObservationValue
 from rl_fzerox.core.policy.auxiliary_state import (
@@ -59,7 +59,7 @@ class _AuxiliaryStatePredictor(Protocol):
         observation: ObservationValue,
         *,
         state: PolicyState = None,
-        episode_start: np.ndarray | None = None,
+        episode_start: BoolArray | None = None,
         target_names: tuple[AuxiliaryStateTargetName, ...] | None = None,
     ) -> dict[str, object]: ...
 
