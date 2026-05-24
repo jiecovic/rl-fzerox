@@ -40,8 +40,11 @@ def entry_from_course_variant(
         "" if variant.gp_difficulty is None else f"_{safe_id(variant.gp_difficulty)}"
     )
 
+    entry_id = (
+        f"{course_id}_{mode_id}{difficulty_suffix}_{variant.vehicle}_{variant.engine_setting}"
+    )
     entry: dict[str, object] = {
-        "id": f"{course_id}_{mode_id}{difficulty_suffix}_{variant.vehicle}_{variant.engine_setting}",
+        "id": entry_id,
         "display_name": (
             f"{course.get('display_name', course_id)} "
             f"{variant.mode.replace('_', ' ').title()} - "
