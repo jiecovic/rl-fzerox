@@ -213,6 +213,9 @@ def _dynamic_action_mask_overrides(
             lean_values = (0,)
     if lean_values is not None:
         overrides["lean"] = lean_values
+        if lean_values == (0,):
+            overrides["lean_left"] = (0,)
+            overrides["lean_right"] = (0,)
     if airborne is False and mask_air_brake_on_ground:
         overrides["air_brake"] = (0,)
     if airborne is False:

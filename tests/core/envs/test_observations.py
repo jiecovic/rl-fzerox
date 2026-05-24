@@ -384,7 +384,7 @@ def test_state_components_expand_independent_lean_history_channels() -> None:
 
     feature_names = state_feature_names(
         state_components=components,
-        independent_lean_buttons=True,
+        split_lean_history=True,
     )
     vector = telemetry_state_vector(
         None,
@@ -393,7 +393,7 @@ def test_state_components_expand_independent_lean_history_channels() -> None:
             "prev_lean_left_1": 1.0,
             "prev_lean_right_1": 0.0,
         },
-        independent_lean_buttons=True,
+        split_lean_history=True,
     )
     values = {name: float(value) for name, value in zip(feature_names, vector, strict=True)}
 

@@ -87,6 +87,7 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
         ),
         lean_output_modes=(
             SelectOption(value="three_way", label="3-way axis"),
+            SelectOption(value="four_way_categorical", label="4-way categorical"),
             SelectOption(value="independent_buttons", label="Independent buttons"),
         ),
         lean_modes=(
@@ -143,14 +144,14 @@ def _conv_profile_options() -> tuple[SelectOption, ...]:
 def component_features(
     component: ManagedStateComponentConfig,
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> tuple[StateFeature, ...]:
     settings = component.data()
     if component.name != "control_history":
         return state_component_definition(settings).features(settings)
     return state_component_definition(settings).features(
         settings,
-        independent_lean_buttons=independent_lean_buttons,
+        split_lean_history=split_lean_history,
     )
 
 

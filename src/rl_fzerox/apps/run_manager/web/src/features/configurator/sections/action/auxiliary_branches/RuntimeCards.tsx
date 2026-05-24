@@ -214,7 +214,7 @@ export function RuntimeCards({
           <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
             <div className="field-shell">
               <FieldLabel
-                help="Choose whether lean is one 3-way axis or two independent left and right buttons that can be pressed together."
+                help="Choose whether lean is one categorical branch or two independent left and right button branches."
                 label="Lean output"
               />
               <SegmentedChoiceStrip
@@ -232,11 +232,12 @@ export function RuntimeCards({
               />
             </div>
           </fieldset>
-          {action.lean_output_mode === "three_way" ? (
+          {action.lean_output_mode === "three_way" ||
+          action.lean_output_mode === "four_way_categorical" ? (
             <>
               <div className="field-shell">
                 <FieldLabel
-                  help="Choose how the 3-way lean axis is post-processed before it reaches the emulator."
+                  help="Choose how the categorical lean branch is post-processed before it reaches the emulator."
                   label="Lean mode"
                 />
                 <SegmentedChoiceStrip

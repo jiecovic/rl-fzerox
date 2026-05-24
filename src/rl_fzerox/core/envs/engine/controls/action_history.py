@@ -27,7 +27,7 @@ class ActionHistoryBuffer:
 
     length: int | None = None
     controls: tuple[ActionHistoryControl, ...] = ()
-    independent_lean_buttons: bool = False
+    split_lean_history: bool = False
     _resolved_length: int = field(init=False, default=0)
     _samples: deque[ActionHistorySample] = field(init=False)
 
@@ -67,7 +67,7 @@ class ActionHistoryBuffer:
             fields[f"prev_gas_{suffix}"] = sample.gas
             fields[f"prev_air_brake_{suffix}"] = sample.air_brake
             fields[f"prev_boost_{suffix}"] = sample.boost
-            if self.independent_lean_buttons:
+            if self.split_lean_history:
                 fields[f"prev_lean_left_{suffix}"] = sample.lean_left
                 fields[f"prev_lean_right_{suffix}"] = sample.lean_right
             else:

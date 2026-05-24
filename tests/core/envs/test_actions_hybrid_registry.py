@@ -39,15 +39,32 @@ def test_build_action_adapter_supports_configured_hybrid_layout() -> None:
     assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 3]
 
 
-def test_configured_hybrid_independent_lean_branch_exposes_four_values() -> None:
+def test_configured_hybrid_four_way_lean_branch_exposes_four_values() -> None:
     adapter = build_action_adapter(
         configured_hybrid_action(
             continuous_axes=("steer",),
             discrete_axes=("lean",),
-            independent_lean_buttons=True,
+            lean_output_mode="four_way_categorical",
         )
     )
 
     assert isinstance(adapter, ConfiguredHybridActionAdapter)
     assert adapter.action_space.spaces["discrete"].nvec.tolist() == [4]
     assert np.array_equal(adapter.idle_action["discrete"], np.array([0], dtype=np.int64))
+
+
+def test_configured_hybrid_independent_lean_exposes_two_binary_branches() -> None:
+    adapter = build_action_adapter(
+        configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("lean_left", "lean_right"),
+            lean_output_mode="independent_buttons",
+        )
+    )
+
+    assert isinstance(adapter, ConfiguredHybridActionAdapter)
+    assert adapter.action_space.spaces["discrete"].nvec.tolist() == [2, 2]
+    assert np.array_equal(
+        adapter.idle_action["discrete"],
+        np.array([0, 0], dtype=np.int64),
+    )

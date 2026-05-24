@@ -114,7 +114,7 @@ def action_branch_previews(config: ManagedRunConfig) -> tuple[ActionBranchPrevie
                 ActionBranchPreview(
                     name="lean",
                     kind="discrete",
-                    size=3,
+                    size=4 if config.action.lean_output_mode == "four_way_categorical" else 3,
                     enabled=config.action.enable_lean,
                     mask_label=lean_mask_label,
                 )

@@ -22,10 +22,7 @@ export function stateComponentInfoForConfig(
   componentInfo: StateComponentInfo,
   config: ManagedRunConfig,
 ): StateComponentInfo {
-  if (
-    componentInfo.name !== "control_history" ||
-    config.action.lean_output_mode !== "independent_buttons"
-  ) {
+  if (componentInfo.name !== "control_history" || config.action.lean_output_mode === "three_way") {
     return componentInfo;
   }
   return {

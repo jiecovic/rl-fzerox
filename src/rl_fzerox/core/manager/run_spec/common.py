@@ -7,6 +7,7 @@ from typing import Literal, TypeAlias
 
 from pydantic import PositiveInt
 
+from rl_fzerox.core.domain.lean import LeanOutputMode as LeanOutputMode
 from rl_fzerox.core.domain.observation_image import (
     ObservationPresetName,
 )
@@ -26,7 +27,6 @@ VehicleSelectionMode = Literal["fixed", "pool"]
 EngineSettingMode = Literal["fixed", "random_range"]
 ActionAxisMode = Literal["continuous", "discrete"]
 ActionDriveMode = Literal["pwm", "on_off"]
-LeanOutputMode = Literal["three_way", "independent_buttons"]
 ObservationPreset = ObservationPresetName
 ObservationResizeFilter = DomainObservationResizeFilter
 ConvProfile = Literal[

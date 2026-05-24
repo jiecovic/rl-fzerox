@@ -18,9 +18,9 @@ from rl_fzerox.core.envs.actions.base import (
 )
 from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.configured.layout import (
+    categorical_lean_mask,
     configured_dimensions,
     idle_discrete_values,
-    lean_mask,
     pitch_bucket_value,
 )
 from rl_fzerox.core.runtime_spec.schema import ActionConfig, ActionRuntimeConfig
@@ -73,10 +73,14 @@ class ConfiguredDiscreteActionAdapter:
             elif dimension.label == "boost" and value == 1:
                 joypad_mask |= RACE_CONTROL_MASKS.boost
             elif dimension.label == "lean":
-                joypad_mask |= lean_mask(
+                joypad_mask |= categorical_lean_mask(
                     value,
-                    independent_buttons=self._config.independent_lean_buttons,
+                    four_way=self._config.lean_output_mode == "four_way_categorical",
                 )
+            elif dimension.label == "lean_left" and value == 1:
+                joypad_mask |= RACE_CONTROL_MASKS.lean_left
+            elif dimension.label == "lean_right" and value == 1:
+                joypad_mask |= RACE_CONTROL_MASKS.lean_right
             elif dimension.label == "pitch":
                 pitch = pitch_bucket_value(value, bucket_count=self._config.pitch_buckets)
 

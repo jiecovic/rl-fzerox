@@ -43,7 +43,7 @@ def build_observation(
     mode: ObservationMode,
     action_history: Mapping[str, float] | None = None,
     state_components: StateComponentsSettings | None = None,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> ObservationValue:
     if mode == "image":
         return image
@@ -56,7 +56,7 @@ def build_observation(
                 telemetry,
                 state_components=state_components,
                 action_history=action_history,
-                independent_lean_buttons=independent_lean_buttons,
+                split_lean_history=split_lean_history,
             ),
         }
     raise ValueError(f"Unsupported observation mode: {mode!r}")
@@ -70,7 +70,7 @@ def build_observation_space(
     minimap_layer: bool = False,
     mode: ObservationMode,
     state_components: StateComponentsSettings | None = None,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> spaces.Box | spaces.Dict:
     image_space = build_image_observation_space(
         observation_spec,
@@ -85,7 +85,7 @@ def build_observation_space(
             raise ValueError("image_state observations require state_components")
         spec = state_vector_spec(
             state_components=state_components,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
         return spaces.Dict(
             {

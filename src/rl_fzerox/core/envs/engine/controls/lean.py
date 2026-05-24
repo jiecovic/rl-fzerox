@@ -171,6 +171,8 @@ class LeanControlState:
 
 
 def held_lean_index(*, left_held: bool, right_held: bool) -> int:
+    if left_held and right_held:
+        return 3
     if left_held:
         return 1
     if right_held:
@@ -179,11 +181,10 @@ def held_lean_index(*, left_held: bool, right_held: bool) -> int:
 
 
 def lean_index_from_mask(joypad_mask: int) -> int:
-    if joypad_mask & RACE_CONTROL_MASKS.lean_left:
-        return 1
-    if joypad_mask & RACE_CONTROL_MASKS.lean_right:
-        return 2
-    return 0
+    return held_lean_index(
+        left_held=bool(joypad_mask & RACE_CONTROL_MASKS.lean_left),
+        right_held=bool(joypad_mask & RACE_CONTROL_MASKS.lean_right),
+    )
 
 
 def signed_lean(lean_index: int) -> float:
@@ -198,9 +199,9 @@ def replace_lean_index(control_state: ControllerState, lean_index: int) -> Contr
     joypad_mask = control_state.joypad_mask & ~(
         RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
     )
-    if lean_index == 1:
+    if lean_index in {1, 3}:
         joypad_mask |= RACE_CONTROL_MASKS.lean_left
-    elif lean_index == 2:
+    if lean_index in {2, 3}:
         joypad_mask |= RACE_CONTROL_MASKS.lean_right
     return ControllerState(
         joypad_mask=joypad_mask,

@@ -345,6 +345,10 @@
         "value": "three_way"
       },
       {
+        "label": "4-way categorical",
+        "value": "four_way_categorical"
+      },
+      {
         "label": "Independent buttons",
         "value": "independent_buttons"
       }

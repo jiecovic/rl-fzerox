@@ -29,7 +29,7 @@ from rl_fzerox.core.domain.action_values import (
     ActionMaskSpec,
     compile_action_mask_values,
 )
-from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
+from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode, LeanOutputMode
 from rl_fzerox.core.runtime_spec.schema.common import (
     ActionMaskOverrides,
     ContinuousAirBrakeMode,
@@ -42,6 +42,8 @@ ConfiguredDiscreteAxis: TypeAlias = Literal[
     "air_brake",
     "boost",
     "lean",
+    "lean_left",
+    "lean_right",
     "pitch",
 ]
 
@@ -54,7 +56,7 @@ class ConfiguredActionLayoutCatalog:
         ("steer", "drive", "air_brake", "pitch")
     )
     discrete_axes: frozenset[ConfiguredDiscreteAxis] = frozenset(
-        ("steer", "gas", "air_brake", "boost", "lean", "pitch")
+        ("steer", "gas", "air_brake", "boost", "lean", "lean_left", "lean_right", "pitch")
     )
     default_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = (
         "steer",
@@ -88,9 +90,20 @@ class ActionMaskConfig(BaseModel):
     air_brake: ActionMaskSpec | None = None
     boost: ActionMaskSpec | None = None
     lean: ActionMaskSpec | None = None
+    lean_left: ActionMaskSpec | None = None
+    lean_right: ActionMaskSpec | None = None
     pitch: ActionMaskSpec | None = None
 
-    @field_validator("steer", "gas", "air_brake", "boost", "lean", "pitch")
+    @field_validator(
+        "steer",
+        "gas",
+        "air_brake",
+        "boost",
+        "lean",
+        "lean_left",
+        "lean_right",
+        "pitch",
+    )
     @classmethod
     def _validate_non_empty_mask_branch(
         cls,
@@ -107,7 +120,16 @@ class ActionMaskConfig(BaseModel):
         """Return the explicitly configured branch restrictions only."""
 
         overrides: dict[str, tuple[int, ...]] = {}
-        for branch_name in ("steer", "gas", "air_brake", "boost", "lean", "pitch"):
+        for branch_name in (
+            "steer",
+            "gas",
+            "air_brake",
+            "boost",
+            "lean",
+            "lean_left",
+            "lean_right",
+            "pitch",
+        ):
             values = getattr(self, branch_name)
             if values is not None:
                 overrides[branch_name] = compile_action_mask_values(branch_name, values)
@@ -132,6 +154,7 @@ class ActionRuntimeConfig:
     continuous_air_brake_mode: ContinuousAirBrakeMode
     continuous_lean_deadzone: float
     lean_mode: LeanMode
+    lean_output_mode: LeanOutputMode
     boost_unmask_max_speed_kph: float | None
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
@@ -139,10 +162,21 @@ class ActionRuntimeConfig:
     lean_initial_lockout_frames: int
     pitch_deadzone: float
     pitch_buckets: int
-    independent_lean_buttons: bool
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...]
     layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...]
     mask_overrides: ActionMaskOverrides | None
+
+    @property
+    def split_lean_history(self) -> bool:
+        """Return whether lean observations should expose left/right channels."""
+
+        return self.lean_output_mode != "three_way"
+
+    @property
+    def split_lean_action_branches(self) -> bool:
+        """Return whether lean uses two binary action branches."""
+
+        return self.lean_output_mode == "independent_buttons"
 
     def continuous_drive_axis_index(self) -> int | None:
         """Return the continuous drive-axis index when this layout exposes one."""
@@ -191,6 +225,7 @@ class ActionRuntimeConfig:
             continuous_air_brake_mode=config.continuous_air_brake_mode,
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
+            lean_output_mode=config.lean_output_mode,
             boost_unmask_max_speed_kph=(
                 None
                 if config.boost_unmask_max_speed_kph is None
@@ -206,7 +241,6 @@ class ActionRuntimeConfig:
             lean_initial_lockout_frames=int(config.lean_initial_lockout_frames),
             pitch_deadzone=float(config.pitch_deadzone),
             pitch_buckets=int(config.pitch_buckets),
-            independent_lean_buttons=bool(config.independent_lean_buttons),
             layout_continuous_axes=tuple(config.layout_continuous_axes),
             layout_discrete_axes=tuple(config.layout_discrete_axes),
             mask_overrides=config.resolved_mask_overrides(),
@@ -231,12 +265,12 @@ class ActionConfig(BaseModel):
     continuous_air_brake_mode: ContinuousAirBrakeMode = "always"
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
+    lean_output_mode: LeanOutputMode = "three_way"
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
     pitch_deadzone: float = Field(default=0.1, ge=0.0, lt=1.0)
     pitch_buckets: int = Field(default=5, ge=3)
-    independent_lean_buttons: bool = False
     layout_continuous_axes: tuple[ConfiguredContinuousAxis, ...] = ()
     layout_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = (
         CONFIGURED_ACTION_LAYOUTS.default_discrete_axes
@@ -310,6 +344,26 @@ class ActionConfig(BaseModel):
                 raise ValueError("configured_discrete cannot define continuous axes")
             if not self.layout_discrete_axes:
                 raise ValueError("configured_discrete requires at least one discrete axis")
-        if self.independent_lean_buttons and "lean" not in self.layout_discrete_axes:
-            raise ValueError("independent_lean_buttons requires a discrete lean axis")
+        if self.lean_output_mode == "independent_buttons":
+            self.lean_mode = "raw"
+        self._validate_lean_output_layout()
         return self
+
+    def _validate_lean_output_layout(self) -> None:
+        axes = set(self.layout_discrete_axes)
+        has_categorical_lean = "lean" in axes
+        has_split_lean = "lean_left" in axes or "lean_right" in axes
+        if has_categorical_lean and has_split_lean:
+            raise ValueError("configured action layout cannot mix lean and split lean axes")
+        if self.lean_output_mode == "independent_buttons":
+            if ("lean_left" in axes) != ("lean_right" in axes):
+                raise ValueError("independent_buttons requires both lean_left and lean_right axes")
+            if has_categorical_lean:
+                raise ValueError("independent_buttons cannot use the categorical lean axis")
+            return
+        if has_split_lean:
+            raise ValueError("split lean axes require lean_output_mode='independent_buttons'")
+        if self.lean_output_mode == "three_way" and has_categorical_lean:
+            return
+        if self.lean_output_mode == "four_way_categorical" and has_categorical_lean:
+            return

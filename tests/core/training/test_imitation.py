@@ -42,7 +42,7 @@ def test_observation_view_spec_from_env_config_carries_state_metadata() -> None:
     view_spec = ObservationViewSpec.from_env_config(
         EnvConfig.model_validate(
             {
-                "action": {"independent_lean_buttons": True},
+                "action": {"lean_output_mode": "four_way_categorical"},
                 "observation": {
                     "mode": "image_state",
                     "resolution": {"mode": "custom", "height": 72, "width": 96},
@@ -57,7 +57,7 @@ def test_observation_view_spec_from_env_config_carries_state_metadata() -> None:
         )
     )
 
-    assert view_spec.independent_lean_buttons is True
+    assert view_spec.split_lean_history is True
     assert view_spec.image_recipe == ObservationImageRecipe(
         height=72,
         width=96,

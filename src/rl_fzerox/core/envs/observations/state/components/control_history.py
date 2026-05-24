@@ -19,7 +19,7 @@ from rl_fzerox.core.envs.observations.state.types import StateFeature
 def control_history_component_features(
     component: ObservationStateComponentSettings,
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> tuple[StateFeature, ...]:
     length = component_int(component, "length", default=2)
     controls = component_controls(
@@ -29,7 +29,7 @@ def control_history_component_features(
     return component_action_history_features(
         length,
         controls=controls,
-        independent_lean_buttons=independent_lean_buttons,
+        split_lean_history=split_lean_history,
     )
 
 
@@ -37,7 +37,7 @@ def control_history_component_values(
     telemetry: FZeroXTelemetry | None,
     component: ObservationStateComponentSettings,
     action_history: Mapping[str, float],
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> list[float]:
     del telemetry
     length = component_int(component, "length", default=2)
@@ -49,5 +49,5 @@ def control_history_component_values(
         action_history,
         action_history_len=length,
         controls=controls,
-        independent_lean_buttons=independent_lean_buttons,
+        split_lean_history=split_lean_history,
     )

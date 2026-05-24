@@ -159,5 +159,5 @@ def _observation_state_feature_names(config: EnvConfig) -> tuple[str, ...]:
         return ()
     return state_feature_names(
         state_components=state_components,
-        independent_lean_buttons=config.action.independent_lean_buttons,
+        split_lean_history=config.action.runtime().split_lean_history,
     )

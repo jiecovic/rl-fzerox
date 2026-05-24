@@ -20,7 +20,7 @@ class ObservationViewSpec:
     image_recipe: ObservationImageRecipe
     mode: str
     state_components: StateComponentsSettings | None
-    independent_lean_buttons: bool = False
+    split_lean_history: bool = False
 
     @classmethod
     def from_observation_config(
@@ -28,13 +28,13 @@ class ObservationViewSpec:
         config: ObservationConfig,
         *,
         renderer: RendererName = DEFAULT_RENDERER,
-        independent_lean_buttons: bool = False,
+        split_lean_history: bool = False,
     ) -> ObservationViewSpec:
         return cls(
             image_recipe=observation_image_recipe(config, renderer=renderer),
             mode=config.mode,
             state_components=config.state_components_data(),
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
 
     @classmethod
@@ -47,7 +47,7 @@ class ObservationViewSpec:
         return cls.from_observation_config(
             config.observation,
             renderer=renderer,
-            independent_lean_buttons=config.action.independent_lean_buttons,
+            split_lean_history=config.action.runtime().split_lean_history,
         )
 
 

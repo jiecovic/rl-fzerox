@@ -346,7 +346,7 @@ def _reference_observation_state(
             observed_state=observed_state,
             info=info,
         ),
-        independent_lean_buttons=config.env.action.independent_lean_buttons,
+        split_lean_history=config.env.action.runtime().split_lean_history,
     )
 
 

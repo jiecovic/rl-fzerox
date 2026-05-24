@@ -86,6 +86,8 @@ class ControlViz:
     boost_active: bool
     boost_lamp_level: float
     lean_direction: int
+    lean_left_pressed: bool = False
+    lean_right_pressed: bool = False
     deterministic_policy: bool | None = None
     thrust_masked: bool = False
     air_brake_masked: bool = False

@@ -32,7 +32,7 @@ class EngineObservationBuilder:
     renderer: RendererName
     spec: ObservationSpec
     state_components: StateComponentsSettings | None
-    independent_lean_buttons: bool
+    split_lean_history: bool
     action_history_len: int | None
     action_history_controls: tuple[ActionHistoryControlName, ...]
     space: spaces.Space
@@ -49,7 +49,7 @@ class EngineObservationBuilder:
             **config.observation.native_resolution_kwargs(renderer=renderer)
         )
         state_components = config.observation.state_components_data()
-        independent_lean_buttons = config.action.independent_lean_buttons
+        split_lean_history = config.action.runtime().split_lean_history
         action_history_len, action_history_controls = action_history_settings_for_observation(
             state_components=state_components,
         )
@@ -60,7 +60,7 @@ class EngineObservationBuilder:
             minimap_layer=config.observation.minimap_layer,
             mode=config.observation.mode,
             state_components=state_components,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
         return cls(
             backend=backend,
@@ -68,7 +68,7 @@ class EngineObservationBuilder:
             renderer=renderer,
             spec=spec,
             state_components=state_components,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
             action_history_len=action_history_len,
             action_history_controls=action_history_controls,
             space=space,
@@ -99,7 +99,7 @@ class EngineObservationBuilder:
             mode=self.config.observation.mode,
             action_history=control_state.action_history_fields(),
             state_components=self.state_components,
-            independent_lean_buttons=self.independent_lean_buttons,
+            split_lean_history=self.split_lean_history,
         )
 
     def set_info(
@@ -121,5 +121,5 @@ class EngineObservationBuilder:
             action_history_len=self.action_history_len,
             action_history_controls=self.action_history_controls,
             observation_state_components=self.state_components,
-            independent_lean_buttons=self.independent_lean_buttons,
+            split_lean_history=self.split_lean_history,
         )

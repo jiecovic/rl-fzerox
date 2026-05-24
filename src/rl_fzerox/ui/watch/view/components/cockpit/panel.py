@@ -140,7 +140,7 @@ def _draw_control_viz(
         y=lean_y,
         width=lean_width,
         direction=-1,
-        active=control_viz.lean_direction < 0,
+        active=control_viz.lean_left_pressed,
     )
     _draw_boost_button(
         pygame=pygame,
@@ -157,7 +157,7 @@ def _draw_control_viz(
         y=lean_y,
         width=lean_width,
         direction=1,
-        active=control_viz.lean_direction > 0,
+        active=control_viz.lean_right_pressed,
     )
     led_radius = AVAILABILITY_LED_STYLE.radius
     lean_led_y = max(left_lean_rect.bottom, right_lean_rect.bottom) + led_clearance + led_radius

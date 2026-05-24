@@ -126,6 +126,37 @@ def test_configured_discrete_full_button_layout_decodes_parallel_buttons() -> No
     )
 
 
+def test_configured_discrete_four_way_lean_decodes_both_buttons() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action(
+            "lean",
+            lean_output_mode="four_way_categorical",
+        )
+    )
+
+    control_state = adapter.decode(np.array([3], dtype=np.int64))
+
+    assert control_state.joypad_mask == (
+        RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
+    )
+
+
+def test_configured_discrete_independent_lean_decodes_binary_buttons() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(
+        configured_discrete_action(
+            "lean_left",
+            "lean_right",
+            lean_output_mode="independent_buttons",
+        )
+    )
+
+    control_state = adapter.decode(np.array([1, 1], dtype=np.int64))
+
+    assert control_state.joypad_mask == (
+        RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
+    )
+
+
 def test_configured_discrete_masks_branches_separately() -> None:
     adapter = ConfiguredDiscreteActionAdapter(
         configured_discrete_action("steer", "gas", "air_brake", "boost", "lean", steer_buckets=3)
