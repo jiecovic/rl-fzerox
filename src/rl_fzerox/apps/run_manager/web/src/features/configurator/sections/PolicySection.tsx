@@ -75,6 +75,12 @@ export function PolicySection({
   const activationOptions = metadata.activation_functions.map(
     (option) => option.value,
   ) as ManagedRunConfig["policy"]["activation"][];
+  const optionalActivationOptions = ["none", ...activationOptions] as (
+    | "none"
+    | ManagedRunConfig["policy"]["activation"]
+  )[];
+  const layerNormActivationValue = config.policy.layer_norm_activation ?? "none";
+  const defaultLayerNormActivationValue = defaultConfig.policy.layer_norm_activation ?? "none";
   const fallbackFusionFeaturesDim =
     defaultConfig.policy.fusion_features_dim ?? preview?.fusion_input_dim ?? 768;
   const fusionFeaturesDim = config.policy.fusion_features_dim ?? fallbackFusionFeaturesDim;
@@ -99,9 +105,11 @@ export function PolicySection({
                     features_dim: defaultConfig.policy.features_dim,
                     image_projection_activation: defaultConfig.policy.image_projection_activation,
                     state_net_arch: defaultConfig.policy.state_net_arch,
+                    state_activation: defaultConfig.policy.state_activation,
                     fusion_features_dim: defaultConfig.policy.fusion_features_dim,
                     fusion_activation: defaultConfig.policy.fusion_activation,
                     layer_norm: defaultConfig.policy.layer_norm,
+                    layer_norm_activation: defaultConfig.policy.layer_norm_activation,
                   })
           }
         >
@@ -161,6 +169,19 @@ export function PolicySection({
               value={config.policy.state_net_arch}
               onChange={(value) => updatePolicy({ state_net_arch: value })}
             />
+            <fieldset
+              className="dependent-fieldset"
+              disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
+            >
+              <SelectField
+                help="Activation after each state-branch MLP layer."
+                label="State activation"
+                options={activationOptions}
+                resetValue={defaultConfig.policy.state_activation}
+                value={config.policy.state_activation}
+                onChange={(value) => updatePolicy({ state_activation: value })}
+              />
+            </fieldset>
             <BooleanField
               help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
               label="Fusion MLP"
@@ -193,6 +214,22 @@ export function PolicySection({
               value={config.policy.layer_norm}
               onChange={(value) => updatePolicy({ layer_norm: value })}
             />
+            <fieldset
+              className="dependent-fieldset"
+              disabled={checkpointLocked || !config.policy.layer_norm}
+            >
+              <SelectField
+                help="Optional activation applied after layer normalization."
+                label="Post-LN activation"
+                optionLabels={{ none: "None" }}
+                options={optionalActivationOptions}
+                resetValue={defaultLayerNormActivationValue}
+                value={layerNormActivationValue}
+                onChange={(value) =>
+                  updatePolicy({ layer_norm_activation: value === "none" ? null : value })
+                }
+              />
+            </fieldset>
           </fieldset>
         </ConfigPanel>
 

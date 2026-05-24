@@ -82,9 +82,11 @@ class ManagedPolicyConfig(BaseModel):
     features_dim: FeatureDim = "auto"
     image_projection_activation: ActivationName = "relu"
     state_net_arch: tuple[PositiveInt, ...] = (64,)
+    state_activation: ActivationName = "relu"
     fusion_features_dim: PositiveInt | None = 768
     fusion_activation: ActivationName = "relu"
     layer_norm: bool = True
+    layer_norm_activation: ActivationName | None = None
     activation: ActivationName = "relu"
     recurrent_enabled: bool = True
     recurrent_hidden_size: PositiveInt = 256

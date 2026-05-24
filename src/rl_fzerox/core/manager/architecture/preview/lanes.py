@@ -36,7 +36,11 @@ def architecture_lanes(
         )
     )
     image_projection_tone = "muted" if config.policy.features_dim == "auto" else "normal"
-    layer_norm_detail = "on" if config.policy.layer_norm else "off"
+    layer_norm_detail = (
+        f"on, {config.policy.layer_norm_activation or 'none'}"
+        if config.policy.layer_norm
+        else "off"
+    )
     layer_norm_tone = "normal" if config.policy.layer_norm else "muted"
     recurrent_detail = (
         recurrent_detail_text(config, extractor_output_dim)
@@ -188,7 +192,7 @@ def architecture_node_params(
 def state_mlp_detail(config: ManagedRunConfig, state_dim: int) -> str:
     if not config.policy.state_net_arch:
         return f"identity {state_dim}"
-    return f"{state_dim} → {list(config.policy.state_net_arch)}, relu"
+    return f"{state_dim} → {list(config.policy.state_net_arch)}, {config.policy.state_activation}"
 
 
 def recurrent_detail_text(config: ManagedRunConfig, extractor_output_dim: int) -> str:

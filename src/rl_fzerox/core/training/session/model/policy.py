@@ -66,9 +66,11 @@ def build_policy_kwargs(
             "image_projection_activation": policy_config.extractor.image_projection_activation,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "state_net_arch": policy_config.extractor.resolved_state_net_arch(),
+            "state_activation": policy_config.extractor.state_activation,
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
             "fusion_activation": policy_config.extractor.fusion_activation,
             "layer_norm": policy_config.extractor.layer_norm,
+            "layer_norm_activation": policy_config.extractor.layer_norm_activation,
         }
     else:
         extractor_class = FZeroXObservationCnnExtractor
@@ -82,6 +84,7 @@ def build_policy_kwargs(
             "features_dim": policy_config.extractor.features_dim,
             "image_projection_activation": policy_config.extractor.image_projection_activation,
             "layer_norm": policy_config.extractor.layer_norm,
+            "layer_norm_activation": policy_config.extractor.layer_norm_activation,
         }
 
     policy_kwargs: dict[str, object] = {

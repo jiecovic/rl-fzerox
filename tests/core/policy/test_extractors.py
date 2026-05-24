@@ -463,6 +463,7 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
         ),
         features_dim=512,
         state_features_dim=64,
+        state_activation="gelu",
         fusion_features_dim=512,
         fusion_activation="tanh",
     )
@@ -476,6 +477,8 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
 
     assert extractor.features_dim == 512
     assert tuple(features.shape) == (2, 512)
+    assert isinstance(extractor._state_mlp, torch.nn.Sequential)
+    assert isinstance(extractor._state_mlp[1], torch.nn.GELU)
     assert isinstance(extractor._fusion_mlp, torch.nn.Sequential)
     assert isinstance(extractor._fusion_mlp[1], torch.nn.Tanh)
 
@@ -491,6 +494,7 @@ def test_image_state_extractor_can_layer_norm_fused_features() -> None:
         features_dim="auto",
         state_features_dim=64,
         layer_norm=True,
+        layer_norm_activation="tanh",
     )
 
     features = extractor(
@@ -503,6 +507,7 @@ def test_image_state_extractor_can_layer_norm_fused_features() -> None:
     assert extractor.features_dim == 1_600
     assert tuple(features.shape) == (2, 1_600)
     assert isinstance(extractor._layer_norm, torch.nn.LayerNorm)
+    assert isinstance(extractor._layer_norm_activation, torch.nn.Tanh)
 
 
 def test_image_state_extractor_auto_features_dim_uses_image_flatten_plus_state_branch() -> None:

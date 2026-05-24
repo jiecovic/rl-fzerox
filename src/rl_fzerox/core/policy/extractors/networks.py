@@ -37,6 +37,7 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         custom_cnn_final_relu: bool = False,
         image_projection_activation: ActivationName = "relu",
         layer_norm: bool = False,
+        layer_norm_activation: ActivationName | None = None,
     ) -> None:
         image_geometry = resolve_supported_image_geometry(
             observation_space,
@@ -75,6 +76,10 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
             )
         self._layer_norm: nn.Module = (
             nn.LayerNorm(resolved_features_dim) if layer_norm else nn.Identity()
+        )
+        self._layer_norm_activation = _layer_norm_activation_layer(
+            layer_norm=layer_norm,
+            activation=layer_norm_activation,
         )
 
     def _build_conv_layers(
@@ -116,7 +121,9 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         """Convert either NHWC or NCHW observations into shared PPO features."""
 
         channels_first = self._channels_first_observations(observations)
-        return self._layer_norm(self._linear(self._cnn(channels_first)))
+        return self._layer_norm_activation(
+            self._layer_norm(self._linear(self._cnn(channels_first)))
+        )
 
     def convolution_activations(
         self,
@@ -167,6 +174,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         features_dim: int | Literal["auto"] = 512,
         state_features_dim: int = 64,
         state_net_arch: tuple[int, ...] | None = None,
+        state_activation: ActivationName = "relu",
         fusion_features_dim: int | None = None,
         image_projection_activation: ActivationName = "relu",
         fusion_activation: ActivationName = "relu",
@@ -174,6 +182,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
         custom_cnn_final_relu: bool = False,
         layer_norm: bool = False,
+        layer_norm_activation: ActivationName | None = None,
     ) -> None:
         if not isinstance(observation_space, spaces.Dict):
             raise ValueError(
@@ -231,6 +240,7 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         self._state_mlp = _state_branch_mlp(
             input_dim=self._state_dim,
             widths=resolved_state_net_arch,
+            activation=state_activation,
         )
         if resolved_fusion_features_dim is None:
             self._fusion_mlp: nn.Module = nn.Identity()
@@ -243,6 +253,10 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             )
         self._layer_norm: nn.Module = (
             nn.LayerNorm(output_features_dim) if layer_norm else nn.Identity()
+        )
+        self._layer_norm_activation = _layer_norm_activation_layer(
+            layer_norm=layer_norm,
+            activation=layer_norm_activation,
         )
 
     def forward(self, observations: dict[str, torch.Tensor]) -> torch.Tensor:
@@ -262,10 +276,25 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             [self._image_extractor(image), self._state_mlp(state_flat)],
             dim=1,
         )
-        return self._layer_norm(self._fusion_mlp(combined_features))
+        return self._layer_norm_activation(self._layer_norm(self._fusion_mlp(combined_features)))
 
 
-def _state_branch_mlp(*, input_dim: int, widths: tuple[int, ...]) -> nn.Module:
+def _layer_norm_activation_layer(
+    *,
+    layer_norm: bool,
+    activation: ActivationName | None,
+) -> nn.Module:
+    if not layer_norm or activation is None:
+        return nn.Identity()
+    return resolve_policy_activation_fn(activation)()
+
+
+def _state_branch_mlp(
+    *,
+    input_dim: int,
+    widths: tuple[int, ...],
+    activation: ActivationName,
+) -> nn.Module:
     if not widths:
         return nn.Identity()
 
@@ -273,6 +302,6 @@ def _state_branch_mlp(*, input_dim: int, widths: tuple[int, ...]) -> nn.Module:
     previous_dim = input_dim
     for width in widths:
         layers.append(nn.Linear(previous_dim, int(width)))
-        layers.append(nn.ReLU())
+        layers.append(resolve_policy_activation_fn(activation)())
         previous_dim = int(width)
     return nn.Sequential(*layers)

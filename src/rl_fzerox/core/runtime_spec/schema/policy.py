@@ -67,9 +67,11 @@ class ExtractorConfig(BaseModel):
     image_projection_activation: ActivationName = "relu"
     state_features_dim: PositiveInt = 64
     state_net_arch: tuple[PositiveInt, ...] | None = None
+    state_activation: ActivationName = "relu"
     fusion_features_dim: PositiveInt | None = None
     fusion_activation: ActivationName = "relu"
     layer_norm: bool = False
+    layer_norm_activation: ActivationName | None = None
 
     @model_validator(mode="after")
     def _validate_custom_conv_layers(self) -> ExtractorConfig:
