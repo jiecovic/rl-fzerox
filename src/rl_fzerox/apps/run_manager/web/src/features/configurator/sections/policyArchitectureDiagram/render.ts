@@ -1,8 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/policyArchitectureDiagram/render.ts
 import type { ElkEdgeSection, ElkExtendedEdge, ElkNode } from "elkjs/lib/elk.bundled.js";
 
-import { diagramMetrics } from "./constants";
-import type { NodeVisual, RenderedEdge, RenderedGraph, RenderedNode } from "./types";
+import { diagramMetrics } from "@/features/configurator/sections/policyArchitectureDiagram/constants";
+import type {
+  NodeVisual,
+  RenderedEdge,
+  RenderedGraph,
+  RenderedNode,
+} from "@/features/configurator/sections/policyArchitectureDiagram/types";
 
 export function toRenderedGraph(
   elkGraph: ElkNode,

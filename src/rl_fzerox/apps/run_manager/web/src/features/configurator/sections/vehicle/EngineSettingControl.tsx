@@ -1,10 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/vehicle/EngineSettingControl.tsx
 import { FieldLabel } from "@/features/configurator/fields/label";
 
-import { parseBoundedInt } from "./engineSetting/math";
-import { RangeSlider } from "./engineSetting/RangeSlider";
-import { SingleSlider } from "./engineSetting/SingleSlider";
-import type { EngineMode, SliderTick } from "./engineSetting/types";
+import { parseBoundedInt } from "@/features/configurator/sections/vehicle/engineSetting/math";
+import { RangeSlider } from "@/features/configurator/sections/vehicle/engineSetting/RangeSlider";
+import { SingleSlider } from "@/features/configurator/sections/vehicle/engineSetting/SingleSlider";
+import type {
+  EngineMode,
+  SliderTick,
+} from "@/features/configurator/sections/vehicle/engineSetting/types";
 
 interface EngineSettingControlProps {
   defaultFixedValue: number;

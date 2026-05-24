@@ -3,9 +3,10 @@
 import type { ConfigSectionPatch } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
-import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
-
-import { allStateComponentsOpen, type StateFeatureRow } from "./featureRows";
+import {
+  allStateComponentsOpen,
+  type StateFeatureRow,
+} from "@/features/configurator/sections/observation/featureRows";
 import {
   type AuxiliaryStateTargetName,
   type StateComponentInfo,
@@ -18,9 +19,10 @@ import {
   setFeatureIncludedPatch,
   setRowsIncludedPatch,
   updateComponentPatch,
-} from "./stateComponents/model";
-import { StateAuxiliaryToolbar } from "./stateComponents/StateAuxiliaryToolbar";
-import { StateComponentPanel } from "./stateComponents/StateComponentPanel";
+} from "@/features/configurator/sections/observation/stateComponents/model";
+import { StateAuxiliaryToolbar } from "@/features/configurator/sections/observation/stateComponents/StateAuxiliaryToolbar";
+import { StateComponentPanel } from "@/features/configurator/sections/observation/stateComponents/StateComponentPanel";
+import type { ConfigMetadata, ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
 
 interface StateComponentPanelsProps {
   checkpointLocked?: boolean;

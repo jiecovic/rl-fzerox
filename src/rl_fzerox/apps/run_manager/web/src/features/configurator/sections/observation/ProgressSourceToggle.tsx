@@ -1,7 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/ProgressSourceToggle.tsx
-import type { StateComponentConfig } from "@/shared/api/contract";
 
-import { progressOptionLabel, progressSourceOptions } from "./featureRows";
+import {
+  progressOptionLabel,
+  progressSourceOptions,
+} from "@/features/configurator/sections/observation/featureRows";
+import type { StateComponentConfig } from "@/shared/api/contract";
 
 interface ProgressSourceToggleProps {
   disabled: boolean;

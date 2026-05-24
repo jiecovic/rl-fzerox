@@ -11,12 +11,12 @@ import {
   IntegerField,
   SelectField,
 } from "@/features/configurator/fields";
+import { StateComponentPanels } from "@/features/configurator/sections/observation/StateComponentPanels";
 import type {
   ConfigMetadata,
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
-import { StateComponentPanels } from "./observation/StateComponentPanels";
 
 type ObservationResolution = ManagedRunConfig["observation"]["resolution"];
 type ObservationResolutionMode = ObservationResolution["mode"];

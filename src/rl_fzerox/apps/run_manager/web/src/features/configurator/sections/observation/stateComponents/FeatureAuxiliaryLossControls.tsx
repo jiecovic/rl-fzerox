@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { ToggleSwitch } from "@/features/configurator/fields";
 
-import { BoundedDecimalInput } from "./BoundedDecimalInput";
+import { BoundedDecimalInput } from "@/features/configurator/sections/observation/stateComponents/BoundedDecimalInput";
 
 interface FeatureAuxiliaryLossControlsProps {
   auxiliaryEnabled: boolean;

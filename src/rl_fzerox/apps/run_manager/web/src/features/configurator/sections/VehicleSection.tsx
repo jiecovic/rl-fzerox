@@ -6,16 +6,15 @@ import { type ConfigSetter, patchConfigSection } from "@/features/configurator/c
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentCollapsedIds } from "@/features/configurator/disclosureState";
 import { ToggleSwitch } from "@/features/configurator/fields";
-import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
-
-import { EngineSettingControl } from "./vehicle/EngineSettingControl";
+import { EngineSettingControl } from "@/features/configurator/sections/vehicle/EngineSettingControl";
 import {
   engineSettingSummary,
   orderedVehicles,
   selectionSummary,
   vehicleRows,
   vehicleSlotLabel,
-} from "./vehicle/model";
+} from "@/features/configurator/sections/vehicle/model";
+import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 
 interface VehicleSectionProps {
   config: ManagedRunConfig;

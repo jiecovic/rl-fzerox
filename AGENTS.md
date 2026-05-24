@@ -79,6 +79,9 @@ strong human engineer would be comfortable owning, extending, and reviewing.
   NumPy concepts such as RGB frames, observations, masks, and action vectors.
   Do not leave raw `np.ndarray` or direct `NDArray[...]` types on new
   project-owned interfaces when the dtype is known.
+- In the run-manager frontend, use configured path aliases such as `@/...` for
+  project-local source and asset imports instead of relative `./` or `../`
+  imports.
 - Treat pyright warnings about missing parameter annotations as work to clean up
   on touched code, but avoid broad type-hardening refactors unless the task is
   explicitly about typing.

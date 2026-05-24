@@ -1,21 +1,21 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/stateComponents/StateFeatureTable.tsx
 import { ToggleSwitch } from "@/features/configurator/fields";
-import type { ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
-import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 import {
   rowDropoutProb,
   type StateFeatureRow,
   TRACK_POSITION_PROGRESS_ROW_ID,
-} from "../featureRows";
-import { ProgressSourceToggle } from "../ProgressSourceToggle";
-import { FeatureAuxiliaryLossControls } from "./FeatureAuxiliaryLossControls";
-import { FeatureDropoutInput } from "./FeatureDropoutInput";
+} from "@/features/configurator/sections/observation/featureRows";
+import { ProgressSourceToggle } from "@/features/configurator/sections/observation/ProgressSourceToggle";
+import { FeatureAuxiliaryLossControls } from "@/features/configurator/sections/observation/stateComponents/FeatureAuxiliaryLossControls";
+import { FeatureDropoutInput } from "@/features/configurator/sections/observation/stateComponents/FeatureDropoutInput";
 import {
   type AuxiliaryStateTargetName,
   findAuxiliaryLoss,
   isRowIncluded,
   type StateComponentInfo,
-} from "./model";
+} from "@/features/configurator/sections/observation/stateComponents/model";
+import type { ManagedRunConfig, StateComponentConfig } from "@/shared/api/contract";
+import { HelpTooltipButton } from "@/shared/ui/HelpTooltipButton";
 
 interface StateFeatureTableProps {
   allRowsIncluded: boolean;

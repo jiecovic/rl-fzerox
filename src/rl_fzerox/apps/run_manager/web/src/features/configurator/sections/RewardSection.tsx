@@ -7,14 +7,13 @@ import {
 } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
-import type { ManagedRunConfig } from "@/shared/api/contract";
-
 import {
   allRewardSectionsOpen,
   type RewardDisclosureId,
   type RewardDisclosureState,
-} from "./reward/disclosureState";
-import { RewardPanels } from "./reward/RewardPanels";
+} from "@/features/configurator/sections/reward/disclosureState";
+import { RewardPanels } from "@/features/configurator/sections/reward/RewardPanels";
+import type { ManagedRunConfig } from "@/shared/api/contract";
 
 interface ConfigSectionProps {
   config: ManagedRunConfig;
