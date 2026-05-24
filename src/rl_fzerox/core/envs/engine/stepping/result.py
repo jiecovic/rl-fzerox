@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator.arrays import RgbFrame
+from fzerox_emulator.arrays import DisplayFrames
 from rl_fzerox.core.envs.observations import ObservationValue
 
 
@@ -16,7 +16,7 @@ class WatchEnvStep:
     terminated: bool
     truncated: bool
     info: dict[str, object]
-    display_frames: tuple[RgbFrame, ...]
+    display_frames: DisplayFrames
 
     def gym_result(self) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self.observation, self.reward, self.terminated, self.truncated, self.info

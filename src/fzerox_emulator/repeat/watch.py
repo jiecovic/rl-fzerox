@@ -32,5 +32,5 @@ def run_repeat_watch_step(
         summary=summary,
         status=status,
         telemetry=telemetry,
-        display_frames=tuple(display_frames),
+        display_frames=display_frames,
     )

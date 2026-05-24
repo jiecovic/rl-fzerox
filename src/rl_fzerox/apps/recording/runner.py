@@ -243,7 +243,9 @@ def _run_attempt(
                 info = watch_step.info
                 episode_return += reward
                 progress.print(info, episode_return=episode_return)
-                display_frames = watch_step.display_frames or (env.render(),)
+                display_frames = watch_step.display_frames
+                if len(display_frames) == 0:
+                    display_frames = (env.render(),)
                 for display_frame in display_frames:
                     writer.write(as_rgb_frame(display_frame))
 

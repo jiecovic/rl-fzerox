@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from fzerox_emulator.arrays import RgbFrame, StateVector
+from fzerox_emulator.arrays import DisplayFrames, RgbFrame, StateVector
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -71,7 +71,7 @@ def _publish_step_snapshots(
     env: _SnapshotEnv,
     emulator: TelemetryReader,
     snapshot_queue: WorkerMessageQueue,
-    display_frames: tuple[RgbFrame, ...],
+    display_frames: DisplayFrames,
     previous_observation: ObservationValue,
     previous_info: dict[str, object],
     previous_episode_reward: float,
@@ -149,7 +149,7 @@ def _publish_step_snapshots(
     if final_policy_action is None:
         final_policy_action = policy_action
 
-    frames = display_frames or (env.render(),)
+    frames = _display_frames_or_fallback(display_frames, fallback=env.render())
     frame_interval_seconds = (
         None if target_control_seconds is None else target_control_seconds / len(frames)
     )
@@ -205,6 +205,16 @@ def _publish_step_snapshots(
         )
         if frame_interval_seconds is not None and not is_final_frame:
             time.sleep(frame_interval_seconds)
+
+
+def _display_frames_or_fallback(
+    display_frames: DisplayFrames,
+    *,
+    fallback: RgbFrame,
+) -> DisplayFrames:
+    if isinstance(display_frames, tuple):
+        return display_frames if display_frames else (fallback,)
+    return display_frames if len(display_frames) > 0 else (fallback,)
 
 
 def _build_snapshot(

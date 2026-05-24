@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
-use crate::bindings::emulator::frame::{frame_to_pyarray, frames_to_pylist};
+use crate::bindings::emulator::frame::{frame_batch_to_pyarray, frame_to_pyarray};
 use crate::bindings::emulator::step::{step_status_to_py, step_summary_to_py};
 use crate::bindings::emulator::telemetry::telemetry_to_py;
 use crate::bindings::emulator::{
@@ -75,9 +75,9 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
         prepared.frame_width,
         prepared.stacked_channels,
     )?;
-    let display_frames = frames_to_pylist(
+    let display_frames = frame_batch_to_pyarray(
         py,
-        &result.display_frames,
+        result.display_frames,
         prepared.display_height,
         prepared.display_width,
         3,

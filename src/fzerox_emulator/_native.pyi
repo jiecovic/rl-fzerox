@@ -286,7 +286,7 @@ class Emulator:
         request: RepeatObservationStepRequestDict,
     ) -> tuple[
         npt.NDArray[np.uint8],
-        list[npt.NDArray[np.uint8]],
+        npt.NDArray[np.uint8],
         StepSummary,
         StepStatus,
         FZeroXTelemetry,
