@@ -1,6 +1,7 @@
 # tests/core/manager/test_transfer.py
 from __future__ import annotations
 
+import json
 import zipfile
 from pathlib import Path
 
@@ -32,6 +33,16 @@ def test_run_bundle_export_import_rewrites_paths(tmp_path: Path) -> None:
                 "run_name: run-a",
                 f"explicit_run_dir: {source_run_dir}",
             )
+        ),
+        encoding="utf-8",
+    )
+    (source_run_dir / "path_manifest.json").write_text(
+        json.dumps(
+            {
+                "runtime_dir": str(source_run_dir / "runtime"),
+                "lineage_dir": str(source_run_dir.parent),
+                "path_key_is_metadata": {str(source_run_dir): "unchanged key"},
+            }
         ),
         encoding="utf-8",
     )
@@ -80,6 +91,10 @@ def test_run_bundle_export_import_rewrites_paths(tmp_path: Path) -> None:
     assert "run_name: imported-run" in (imported.run_dir / "train_config.yaml").read_text(
         encoding="utf-8"
     )
+    imported_paths = json.loads((imported.run_dir / "path_manifest.json").read_text())
+    assert imported_paths["runtime_dir"] == str(imported.run_dir / "runtime")
+    assert imported_paths["lineage_dir"] == str(imported.run_dir.parent)
+    assert imported_paths["path_key_is_metadata"] == {str(source_run_dir): "unchanged key"}
 
 
 def test_run_bundle_import_rejects_path_traversal(tmp_path: Path) -> None:
