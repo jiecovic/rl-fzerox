@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, model_validator
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS, TrainAlgorithmName
 from rl_fzerox.core.runtime_spec.schema.common import WatchFpsSetting
@@ -36,6 +36,7 @@ class WatchConfig(BaseModel):
     policy_run_dir: Path | None = None
     policy_artifact: Literal["latest", "best", "final"] = "latest"
     policy_algorithm: TrainAlgorithmName | None = None
+    lineage_frame_offset: NonNegativeInt | None = None
     x_cup: WatchXCupConfig = Field(default_factory=WatchXCupConfig)
 
     @model_validator(mode="after")

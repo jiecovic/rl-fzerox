@@ -69,6 +69,7 @@ class FrameRenderData:
     policy_label: str | None
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
+    policy_experience_frames: int | None
     policy_deterministic: bool | None
     manual_control_enabled: bool
     policy_action: ActionValue | None
@@ -350,6 +351,7 @@ def _draw_frame(
             policy_label=data.policy_label,
             policy_curriculum_stage=data.policy_curriculum_stage,
             policy_num_timesteps=data.policy_num_timesteps,
+            policy_experience_frames=data.policy_experience_frames,
             policy_deterministic=data.policy_deterministic,
             manual_control_enabled=data.manual_control_enabled,
             policy_action=data.policy_action,

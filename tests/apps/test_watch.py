@@ -10,6 +10,7 @@ from types import SimpleNamespace
 import pytest
 
 from rl_fzerox.apps.watch import main, resolve_watch_app_config
+from rl_fzerox.core.manager import ManagerStore, default_managed_run_config
 from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     CurriculumConfig,
@@ -26,8 +27,13 @@ from rl_fzerox.core.runtime_spec.schema import (
     WatchAppConfig,
     WatchConfig,
 )
+from rl_fzerox.core.training.inference import LoadedPolicy, PolicyRunner
 from rl_fzerox.ui.watch.app import run_viewer
-from rl_fzerox.ui.watch.runtime.policy import _load_policy_runner, _sync_policy_curriculum_stage
+from rl_fzerox.ui.watch.runtime.policy import (
+    _load_policy_runner,
+    _policy_experience_frames,
+    _sync_policy_curriculum_stage,
+)
 
 
 class _FakePolicyRunner:
@@ -43,8 +49,18 @@ class _FakePolicyRunner:
     def refresh(self) -> None:
         self.refresh_calls += 1
 
+    def refresh_if_due(self, *, interval_seconds: float) -> None:
+        del interval_seconds
+        self.refresh()
+
     def reset(self) -> None:
         self.reset_calls += 1
+
+
+class _FakeInferencePolicy:
+    def predict(self, observation: object, **_kwargs: object) -> tuple[int, None]:
+        del observation
+        return 0, None
 
 
 class _FakeWatchEnv:
@@ -200,6 +216,57 @@ def test_resolve_watch_app_config_can_be_reused_by_headless_apps(
     assert config.emulator.core_path == core_path
     assert config.train == train_config.train
     assert config.policy == train_config.policy
+
+
+def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "manager" / "runs.db"
+    store = ManagerStore(db_path)
+    parent_config = default_managed_run_config().model_copy(deep=True)
+    parent_config.action.action_repeat = 2
+    child_config = default_managed_run_config().model_copy(deep=True)
+    child_config.action.action_repeat = 1
+    parent = store.create_run(
+        run_id="parent",
+        name="Parent",
+        config=parent_config,
+        managed_runs_root=tmp_path / "runs",
+    )
+    child = store.create_run(
+        run_id="child",
+        name="Child",
+        config=child_config,
+        managed_runs_root=tmp_path / "runs",
+        lineage_id=parent.lineage_id,
+        lineage_step_offset=1_000,
+        parent_run_id=parent.id,
+        source_run_id=parent.id,
+        source_artifact="latest",
+        source_num_timesteps=1_000,
+    )
+    child.run_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch_cli.resolve.materialize_train_run_config",
+        lambda config, *, run_paths: config,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.apps.watch_cli.resolve.materialize_watch_session_config",
+        lambda config, *, run_dir: config,
+    )
+
+    config = resolve_watch_app_config(
+        policy_run_dir=None,
+        policy_artifact="latest",
+        manager_db_path=db_path,
+        managed_run_id=child.id,
+        overrides=[],
+    )
+
+    assert config.env.action_repeat == 1
+    assert config.watch.lineage_frame_offset == 2_000
 
 
 def test_resolve_watch_app_config_disables_track_sampling_for_x_cup_watch(
@@ -413,6 +480,38 @@ def test_load_policy_runner_uses_configured_watch_device(monkeypatch: pytest.Mon
     }
 
 
+def test_policy_experience_frames_prefers_managed_frame_offset(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy.zip"
+    policy_path.touch()
+    runner = PolicyRunner(
+        LoadedPolicy(
+            run_dir=tmp_path,
+            policy_path=policy_path,
+            artifact="latest",
+            num_timesteps=1_000,
+            lineage_num_timesteps=5_000,
+        ),
+        _FakeInferencePolicy(),
+    )
+
+    assert (
+        _policy_experience_frames(
+            runner,
+            action_repeat=1,
+            lineage_frame_offset=8_000,
+        )
+        == 9_000
+    )
+    assert (
+        _policy_experience_frames(
+            runner,
+            action_repeat=2,
+            lineage_frame_offset=None,
+        )
+        == 10_000
+    )
+
+
 def test_sync_policy_curriculum_stage_applies_checkpoint_stage_to_watch_env() -> None:
     policy_runner = _FakePolicyRunner(stage_index=0)
     env = _FakeWatchEnv()
@@ -469,6 +568,14 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
 
     monkeypatch.setitem(sys.modules, "pygame", fake_pygame)
     monkeypatch.setattr("rl_fzerox.ui.watch.app.start_watch_worker", lambda _config: _FakeWorker())
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.app.AuxiliaryEpisodeMetricsTracker.observe_snapshot",
+        lambda _self, _snapshot: None,
+    )
+    monkeypatch.setattr(
+        "rl_fzerox.ui.watch.app.EpisodeLiveSeriesTracker.observe_snapshot",
+        lambda _self, _snapshot, **_kwargs: None,
+    )
     monkeypatch.setattr(
         "rl_fzerox.ui.watch.app.wait_initial_snapshot",
         lambda _worker: (SimpleNamespace(native_fps=30.0), False),

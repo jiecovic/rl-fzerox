@@ -56,6 +56,7 @@ def _build_panel_columns(
     policy_reload_age_seconds: float | None,
     policy_reload_error: str | None,
     policy_num_timesteps: int | None = None,
+    policy_experience_frames: int | None = None,
     gas_level: float = 0.0,
     thrust_warning_threshold: float | None = None,
     boost_active: bool = False,
@@ -125,12 +126,9 @@ def _build_panel_columns(
                     ),
                     _panel_line(
                         "Experience",
-                        _format_checkpoint_experience(
-                            policy_num_timesteps,
-                            action_repeat=action_repeat,
-                        ),
+                        _format_checkpoint_experience(policy_experience_frames),
                         PALETTE.text_primary
-                        if policy_num_timesteps is not None
+                        if policy_experience_frames is not None
                         else PALETTE.text_muted,
                     ),
                     _panel_line(

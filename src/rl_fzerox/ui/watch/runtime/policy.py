@@ -73,6 +73,26 @@ def _policy_num_timesteps(policy_runner: PolicyRunner | None) -> int | None:
     return policy_runner.checkpoint_num_timesteps
 
 
+def _policy_experience_frames(
+    policy_runner: PolicyRunner | None,
+    *,
+    action_repeat: int,
+    lineage_frame_offset: int | None,
+) -> int | None:
+    if policy_runner is None:
+        return None
+    repeat = max(1, int(action_repeat))
+    if lineage_frame_offset is None:
+        lineage_num_timesteps = policy_runner.checkpoint_num_timesteps
+        if lineage_num_timesteps is None:
+            return None
+        return max(0, int(lineage_num_timesteps)) * repeat
+    local_num_timesteps = policy_runner.checkpoint_local_num_timesteps
+    if local_num_timesteps is None:
+        return None
+    return max(0, int(lineage_frame_offset)) + (max(0, int(local_num_timesteps)) * repeat)
+
+
 def _policy_deterministic(policy_runner: PolicyRunner | None, deterministic: bool) -> bool | None:
     if policy_runner is None:
         return None

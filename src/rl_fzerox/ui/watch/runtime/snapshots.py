@@ -26,6 +26,7 @@ from rl_fzerox.ui.watch.runtime.ipc import (
 from rl_fzerox.ui.watch.runtime.policy import (
     _policy_curriculum_stage,
     _policy_deterministic,
+    _policy_experience_frames,
     _policy_label,
     _policy_num_timesteps,
     _policy_reload_age_seconds,
@@ -274,6 +275,11 @@ def _build_snapshot(
         policy_label=_policy_label(policy_runner),
         policy_curriculum_stage=_policy_curriculum_stage(policy_runner),
         policy_num_timesteps=_policy_num_timesteps(policy_runner),
+        policy_experience_frames=_policy_experience_frames(
+            policy_runner,
+            action_repeat=config.env.action_repeat,
+            lineage_frame_offset=config.watch.lineage_frame_offset,
+        ),
         policy_deterministic=_policy_deterministic(
             policy_runner,
             deterministic_policy,
