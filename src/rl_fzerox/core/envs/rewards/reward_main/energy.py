@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fzerox_emulator import FZeroXTelemetry, StepSummary
+from rl_fzerox.core.envs.course_effects import on_refill_surface
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
 
 
@@ -63,6 +64,29 @@ class EnergyRefillRewardTracker:
             return 0.0
 
         return progress_reward * (multiplier - 1.0)
+
+    def gain_reward(
+        self,
+        progress_reward: float,
+        summary: StepSummary,
+        telemetry: FZeroXTelemetry,
+        *,
+        weights: RewardMainWeights,
+    ) -> float:
+        gain_reward = max(float(weights.energy_gain_reward), 0.0)
+        energy_gain = max(float(summary.energy_gain_total), 0.0)
+        if (
+            progress_reward <= 0.0
+            or gain_reward <= 0.0
+            or energy_gain <= 0.0
+            or not on_refill_surface(telemetry)
+            or summary.reverse_active_frames > 0
+            or telemetry.player.reverse_timer > 0
+            or self._cooldown_frames_remaining > 0
+        ):
+            return 0.0
+
+        return energy_gain * gain_reward
 
     def advance_cooldown(self, frames_run: int) -> None:
         self._cooldown_frames_remaining = max(

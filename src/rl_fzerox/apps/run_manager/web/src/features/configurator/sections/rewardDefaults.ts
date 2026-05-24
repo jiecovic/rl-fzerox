@@ -70,12 +70,11 @@ export function actionDefaults(reward: RewardConfig): RewardPatch {
 
 export function damageDefaults(reward: RewardConfig): RewardPatch {
   return {
-    collision_recoil_penalty: reward.collision_recoil_penalty,
-    damage_taken_frame_penalty: reward.damage_taken_frame_penalty,
-    damage_taken_streak_cap_frames: reward.damage_taken_streak_cap_frames,
-    damage_taken_streak_ramp_penalty: reward.damage_taken_streak_ramp_penalty,
+    energy_gain_reward: reward.energy_gain_reward,
+    energy_loss_penalty: reward.energy_loss_penalty,
     energy_loss_epsilon: reward.energy_loss_epsilon,
     failure_penalty: reward.failure_penalty,
+    impact_frame_penalty: reward.impact_frame_penalty,
     step_reward_clip_max: reward.step_reward_clip_max,
     step_reward_clip_min: reward.step_reward_clip_min,
     truncation_penalty: reward.truncation_penalty,

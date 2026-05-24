@@ -25,9 +25,9 @@ class RewardMainWeights:
     lap_completion_bonus: float = 5.0
     lap_position_scale: float = 1.0
     ko_star_reward: float = 0.0
-    damage_taken_frame_penalty: float = -0.02
-    damage_taken_streak_ramp_penalty: float = -0.001
-    damage_taken_streak_cap_frames: int = 120
+    impact_frame_penalty: float = -0.02
+    energy_loss_penalty: float = -0.01
+    energy_gain_reward: float = 0.01
     manual_boost_reward: float = 0.01
     boost_pad_reward: float = 10.0
     boost_pad_reward_progress_window: float = 800.0
@@ -44,7 +44,6 @@ class RewardMainWeights:
     airborne_landing_reward: float = 1.0
     airborne_landing_grace_frames: int = 50
     airborne_landing_min_peak_height: float = 50.0
-    collision_recoil_penalty: float = -4.0
     failure_penalty: float = -30.0
     truncation_penalty: float = -30.0
     step_reward_clip_min: float | None = -100.0

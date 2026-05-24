@@ -1,8 +1,6 @@
 # src/rl_fzerox/core/envs/rewards/progress.py
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from fzerox_emulator import FZeroXTelemetry, StepSummary
 
 
@@ -33,40 +31,8 @@ class EpisodeProgressState:
         return max(race_distance - self._origin, 0.0)
 
 
-@dataclass
-class DamagePenaltyState:
-    """Accumulate continuous wall/damage pressure with an optional streak ramp."""
-
-    streak_frames: int = 0
-
-    def reset(self) -> None:
-        self.streak_frames = 0
-
-    def penalty(
-        self,
-        summary: StepSummary,
-        *,
-        frame_penalty: float,
-        streak_ramp_penalty: float,
-        streak_cap_frames: int,
-    ) -> float:
-        damage_frames = max(int(summary.damage_taken_frames), 0)
-        if damage_frames <= 0:
-            self.streak_frames = 0
-            return 0.0
-
-        previous_streak = self.streak_frames
-        cap = max(int(streak_cap_frames), 0)
-        self.streak_frames += damage_frames
-        if cap > 0:
-            self.streak_frames = min(self.streak_frames, cap)
-
-        penalty = damage_frames * frame_penalty
-        if streak_ramp_penalty == 0.0:
-            return penalty
-
-        streak_sum = 0
-        for frame_offset in range(1, damage_frames + 1):
-            streak = previous_streak + frame_offset
-            streak_sum += min(streak, cap) if cap > 0 else streak
-        return penalty + (streak_sum * streak_ramp_penalty)
+def impact_frame_penalty(summary: StepSummary, *, frame_penalty: float) -> float:
+    impact_frames = max(int(summary.impact_frames), 0)
+    if impact_frames <= 0 or frame_penalty == 0.0:
+        return 0.0
+    return impact_frames * frame_penalty

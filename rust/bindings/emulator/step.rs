@@ -36,6 +36,7 @@ impl PyStepSummary {
         entered_course_effects=0,
         final_frame_index=0,
         airborne_frames=0,
+        impact_frames=None,
     ))]
     #[expect(
         clippy::too_many_arguments,
@@ -55,7 +56,10 @@ impl PyStepSummary {
         entered_course_effects: u32,
         final_frame_index: usize,
         airborne_frames: usize,
+        impact_frames: Option<usize>,
     ) -> Self {
+        let resolved_impact_frames =
+            impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
         Self {
             inner: StepSummary {
                 frames_run,
@@ -66,6 +70,7 @@ impl PyStepSummary {
                 energy_loss_total,
                 energy_gain_total,
                 damage_taken_frames,
+                impact_frames: resolved_impact_frames,
                 airborne_frames,
                 consecutive_low_speed_frames,
                 entered_state_flags,
@@ -113,6 +118,11 @@ impl PyStepSummary {
     #[getter]
     fn damage_taken_frames(&self) -> usize {
         self.inner.damage_taken_frames
+    }
+
+    #[getter]
+    fn impact_frames(&self) -> usize {
+        self.inner.impact_frames
     }
 
     #[getter]
@@ -202,6 +212,7 @@ impl PyStepSummary {
         dict.set_item("energy_loss_total", self.energy_loss_total())?;
         dict.set_item("energy_gain_total", self.energy_gain_total())?;
         dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
+        dict.set_item("impact_frames", self.impact_frames())?;
         dict.set_item("airborne_frames", self.airborne_frames())?;
         dict.set_item(
             "consecutive_low_speed_frames",

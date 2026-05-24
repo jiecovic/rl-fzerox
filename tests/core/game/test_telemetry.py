@@ -173,6 +173,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         energy_loss_total=4.0,
         energy_gain_total=2.5,
         damage_taken_frames=1,
+        impact_frames=2,
         consecutive_low_speed_frames=2,
         entered_state_flags=(1 << 13) | (1 << 25),
         entered_course_effects=1 << 3,
@@ -183,6 +184,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
     assert summary.entered_crashed is False
     assert summary.energy_gain_total == 2.5
     assert summary.damage_taken_frames == 1
+    assert summary.impact_frames == 2
     assert summary.reverse_active_frames == 1
     assert summary.collision_recoil_active_frames == 2
     assert summary.low_speed_frames == 2

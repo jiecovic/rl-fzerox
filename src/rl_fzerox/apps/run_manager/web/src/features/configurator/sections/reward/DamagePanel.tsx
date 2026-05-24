@@ -1,9 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/DamagePanel.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
-import { IntegerField, NumberField, OptionalRangePairField } from "@/features/configurator/fields";
+import { NumberField, OptionalRangePairField } from "@/features/configurator/fields";
+import type { RewardPanelProps } from "@/features/configurator/sections/reward/types";
 import { damageDefaults } from "@/features/configurator/sections/rewardDefaults";
-
-import type { RewardPanelProps } from "./types";
 
 export function DamagePanel({
   config,
@@ -15,49 +14,42 @@ export function DamagePanel({
   return (
     <ConfigDisclosure
       open={openSections.damage}
-      title="Damage and terminal"
+      title="Impact, energy, and terminal"
       onToggle={(open) => setSectionOpen("damage", open)}
       onReset={() => updateReward(damageDefaults(defaultConfig.reward))}
     >
       <div className="config-field-grid">
         <NumberField
-          help="Penalty for frames that take damage."
-          label="Damage frame penalty"
-          resetValue={defaultConfig.reward.damage_taken_frame_penalty}
+          help="Penalty for each frame where the game reports damage or collision recoil."
+          label="Impact frame penalty"
+          resetValue={defaultConfig.reward.impact_frame_penalty}
           step="0.001"
-          value={config.reward.damage_taken_frame_penalty}
-          onChange={(value) => updateReward({ damage_taken_frame_penalty: value })}
+          value={config.reward.impact_frame_penalty}
+          onChange={(value) => updateReward({ impact_frame_penalty: value })}
         />
         <NumberField
-          help="Ramp penalty added during consecutive damage streaks."
-          label="Damage streak ramp"
-          resetValue={defaultConfig.reward.damage_taken_streak_ramp_penalty}
+          help="Penalty per energy point lost, including boost drain and collision damage."
+          label="Energy loss penalty"
+          resetValue={defaultConfig.reward.energy_loss_penalty}
           step="0.001"
-          value={config.reward.damage_taken_streak_ramp_penalty}
-          onChange={(value) => updateReward({ damage_taken_streak_ramp_penalty: value })}
-        />
-        <IntegerField
-          help="Maximum damage-streak frame count used by the ramp."
-          label="Damage streak cap"
-          resetValue={defaultConfig.reward.damage_taken_streak_cap_frames}
-          value={config.reward.damage_taken_streak_cap_frames}
-          onChange={(value) => updateReward({ damage_taken_streak_cap_frames: value })}
+          value={config.reward.energy_loss_penalty}
+          onChange={(value) => updateReward({ energy_loss_penalty: value })}
         />
         <NumberField
-          help="Minimum repeated-step energy drop treated as real damage, filtering tiny native noise."
+          help="Reward per energy point gained, paid only when a progress bucket is also rewarded."
+          label="Energy gain reward"
+          resetValue={defaultConfig.reward.energy_gain_reward}
+          step="0.001"
+          value={config.reward.energy_gain_reward}
+          onChange={(value) => updateReward({ energy_gain_reward: value })}
+        />
+        <NumberField
+          help="Minimum repeated-step energy change counted as loss or gain, filtering tiny native noise."
           label="Energy loss epsilon"
           resetValue={defaultConfig.reward.energy_loss_epsilon}
           step="0.001"
           value={config.reward.energy_loss_epsilon}
           onChange={(value) => updateReward({ energy_loss_epsilon: value })}
-        />
-        <NumberField
-          help="Penalty when collision recoil is entered."
-          label="Collision recoil penalty"
-          resetValue={defaultConfig.reward.collision_recoil_penalty}
-          step="0.5"
-          value={config.reward.collision_recoil_penalty}
-          onChange={(value) => updateReward({ collision_recoil_penalty: value })}
         />
         <NumberField
           help="Penalty for terminal race failure."

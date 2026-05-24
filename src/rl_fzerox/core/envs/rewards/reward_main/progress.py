@@ -16,6 +16,7 @@ class FrontierReward:
     progress: float
     ground_effect_adjustment: float
     energy_refill_bonus: float
+    energy_gain_reward: float
 
 
 class FrontierProgressRewardTracker:
@@ -29,6 +30,7 @@ class FrontierProgressRewardTracker:
         self._pending_reward = 0.0
         self._pending_ground_effect_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
+        self._pending_energy_gain_reward = 0.0
         self._pending_frames = 0
 
     @property
@@ -72,6 +74,7 @@ class FrontierProgressRewardTracker:
         outside_track_bounds: bool = False,
         race_distance: float | None = None,
         energy_refill_bonus_for_progress: Callable[[float], float],
+        energy_gain_reward_for_progress: Callable[[float], float],
     ) -> FrontierReward:
         progress_distance = summary.max_race_distance if race_distance is None else race_distance
         relative_progress = self._progress.relative_distance(progress_distance)
@@ -80,6 +83,7 @@ class FrontierProgressRewardTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
+                energy_gain_reward=0.0,
             )
         bucket_distance = weights.progress_bucket_distance
         if bucket_distance <= 0.0:
@@ -87,6 +91,7 @@ class FrontierProgressRewardTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
+                energy_gain_reward=0.0,
             )
         crossed_bucket_count = int((relative_progress - self._frontier_distance) // bucket_distance)
         if crossed_bucket_count <= 0:
@@ -94,6 +99,7 @@ class FrontierProgressRewardTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
+                energy_gain_reward=0.0,
             )
 
         self._frontier_distance += crossed_bucket_count * bucket_distance
@@ -103,18 +109,21 @@ class FrontierProgressRewardTracker:
         progress_reward = crossed_bucket_count * weights.progress_bucket_reward
         ground_effect_adjustment = progress_reward * (max(float(progress_multiplier), 0.0) - 1.0)
         energy_refill_bonus = energy_refill_bonus_for_progress(progress_reward)
+        energy_gain_reward = energy_gain_reward_for_progress(progress_reward)
         interval_frames = max(int(weights.progress_reward_interval_frames), 1)
         if interval_frames <= 1:
             return FrontierReward(
                 progress=progress_reward,
                 ground_effect_adjustment=ground_effect_adjustment,
                 energy_refill_bonus=energy_refill_bonus,
+                energy_gain_reward=energy_gain_reward,
             )
 
         self._pending_delta += crossed_bucket_count * bucket_distance
         self._pending_reward += progress_reward
         self._pending_ground_effect_adjustment += ground_effect_adjustment
         self._pending_energy_refill_bonus += energy_refill_bonus
+        self._pending_energy_gain_reward += energy_gain_reward
         self._pending_frames += max(int(summary.frames_run), 0)
         if (
             self._pending_frames < interval_frames
@@ -125,16 +134,19 @@ class FrontierProgressRewardTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
+                energy_gain_reward=0.0,
             )
 
         pending_reward = self._pending_reward
         pending_ground_effect_adjustment = self._pending_ground_effect_adjustment
         pending_refill_bonus = self._pending_energy_refill_bonus
+        pending_gain_reward = self._pending_energy_gain_reward
         self._clear_pending()
         return FrontierReward(
             progress=pending_reward,
             ground_effect_adjustment=pending_ground_effect_adjustment,
             energy_refill_bonus=pending_refill_bonus,
+            energy_gain_reward=pending_gain_reward,
         )
 
     def info(
@@ -169,6 +181,7 @@ class FrontierProgressRewardTracker:
         self._pending_reward = 0.0
         self._pending_ground_effect_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
+        self._pending_energy_gain_reward = 0.0
         self._pending_frames = 0
 
 

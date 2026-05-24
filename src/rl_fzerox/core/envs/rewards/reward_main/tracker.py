@@ -9,7 +9,7 @@ from rl_fzerox.core.envs.rewards.common import (
     RewardStep,
     RewardSummaryConfig,
 )
-from rl_fzerox.core.envs.rewards.progress import DamagePenaltyState
+from rl_fzerox.core.envs.rewards.progress import impact_frame_penalty
 from rl_fzerox.core.envs.rewards.reward_main.bounds import (
     cap_outside_bounds_reentry_reward,
 )
@@ -60,7 +60,6 @@ class RewardMainTracker:
         self._landings = LandingRewardTracker()
         self._bad_surfaces = BadSurfaceEntryPenaltyTracker()
         self._laps = LapRewardTracker()
-        self._damage = DamagePenaltyState()
         self._previous_airborne = False
         self._landing_airborne_frames = 0
         self._landing_airborne_peak_height = 0.0
@@ -91,7 +90,6 @@ class RewardMainTracker:
         self._landings.reset()
         self._bad_surfaces.reset(telemetry)
         self._laps.reset(telemetry)
-        self._damage.reset()
         self._previous_airborne = False if telemetry is None else telemetry.player.airborne
         self._landing_airborne_frames = 0
         self._landing_airborne_peak_height = _landing_airborne_peak_height(
@@ -128,7 +126,6 @@ class RewardMainTracker:
             self._boost_pads.reset()
             self._bad_surfaces.reset(None)
             self._laps.reset(None)
-            self._damage.reset()
             self._previous_airborne = False
             self._landing_airborne_frames = 0
             self._landing_airborne_peak_height = 0.0
@@ -209,6 +206,9 @@ class RewardMainTracker:
         if frontier_reward.energy_refill_bonus:
             reward += frontier_reward.energy_refill_bonus
             breakdown["energy_refill_progress"] = frontier_reward.energy_refill_bonus
+        if frontier_reward.energy_gain_reward:
+            reward += frontier_reward.energy_gain_reward
+            breakdown["energy_gain"] = frontier_reward.energy_gain_reward
         previous_recovery_distance_for_reward = _outside_track_recovery_baseline(
             previous_distance=self._previous_outside_recovery_distance,
             current_distance=current_outside_recovery_distance,
@@ -316,22 +316,20 @@ class RewardMainTracker:
             reward += landing
             breakdown["landing"] = landing
 
-        damage_penalty = self._damage.penalty(
-            summary,
-            frame_penalty=self._weights.damage_taken_frame_penalty,
-            streak_ramp_penalty=self._weights.damage_taken_streak_ramp_penalty,
-            streak_cap_frames=self._weights.damage_taken_streak_cap_frames,
+        loss_penalty = (
+            max(float(summary.energy_loss_total), 0.0) * self._weights.energy_loss_penalty
         )
-        if damage_penalty:
-            reward += damage_penalty
-            breakdown["damage_taken"] = damage_penalty
+        if loss_penalty:
+            reward += loss_penalty
+            breakdown["energy_loss"] = loss_penalty
 
-        if summary.collision_recoil_active_frames > 0:
-            collision_recoil_penalty = (
-                summary.collision_recoil_active_frames * self._weights.collision_recoil_penalty
-            )
-            reward += collision_recoil_penalty
-            breakdown["collision_recoil"] = collision_recoil_penalty
+        impact_penalty = impact_frame_penalty(
+            summary,
+            frame_penalty=self._weights.impact_frame_penalty,
+        )
+        if impact_penalty:
+            reward += impact_penalty
+            breakdown["impact"] = impact_penalty
 
         terminal_penalty = terminal_or_truncation_penalty(
             status,
@@ -379,7 +377,6 @@ class RewardMainTracker:
             "landing_reward_frontier_bucket_index": (
                 self._landings.last_rewarded_frontier_bucket_index
             ),
-            "damage_taken_streak_frames": self._damage.streak_frames,
             "rewarded_laps_completed": self._laps.awarded_laps_completed,
         }
         info.update(self._progress.info(telemetry, weights=self._weights))
@@ -433,17 +430,27 @@ class RewardMainTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 energy_refill_bonus=0.0,
+                energy_gain_reward=0.0,
             )
 
         if use_visible_reentry_progress:
             progress_multiplier = 1.0
             race_distance = telemetry.player.race_distance
             energy_refill_bonus_for_progress = _zero_progress_bonus
+            energy_gain_reward_for_progress = _zero_progress_bonus
         else:
             race_distance = None
 
             def energy_refill_bonus_for_progress(progress_reward: float) -> float:
                 return self._energy.progress_bonus(
+                    progress_reward,
+                    summary,
+                    telemetry,
+                    weights=self._weights,
+                )
+
+            def energy_gain_reward_for_progress(progress_reward: float) -> float:
+                return self._energy.gain_reward(
                     progress_reward,
                     summary,
                     telemetry,
@@ -458,6 +465,7 @@ class RewardMainTracker:
             outside_track_bounds=outside_track_bounds,
             race_distance=race_distance,
             energy_refill_bonus_for_progress=energy_refill_bonus_for_progress,
+            energy_gain_reward_for_progress=energy_gain_reward_for_progress,
         )
         if use_visible_reentry_progress:
             return cap_outside_bounds_reentry_reward(frontier_reward, weights=self._weights)

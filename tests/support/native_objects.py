@@ -224,6 +224,7 @@ def make_step_summary(
     energy_loss_total: float = 0.0,
     energy_gain_total: float = 0.0,
     damage_taken_frames: int = 0,
+    impact_frames: int | None = None,
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     entered_state_flags: int | None = None,
@@ -236,6 +237,11 @@ def make_step_summary(
         if entered_state_flags is None
         else entered_state_flags
     )
+    resolved_impact_frames = (
+        max(damage_taken_frames, collision_recoil_active_frames)
+        if impact_frames is None
+        else impact_frames
+    )
     return StepSummary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
@@ -245,6 +251,7 @@ def make_step_summary(
         energy_loss_total=energy_loss_total,
         energy_gain_total=energy_gain_total,
         damage_taken_frames=damage_taken_frames,
+        impact_frames=resolved_impact_frames,
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_flags=resolved_entered_state_flags,
         entered_course_effects=entered_course_effects,

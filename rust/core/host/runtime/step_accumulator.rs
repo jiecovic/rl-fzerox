@@ -51,11 +51,16 @@ impl StepAccumulator {
         if telemetry.reverse_timer > 0 {
             self.summary.reverse_active_frames += 1;
         }
-        if telemetry.collision_recoil() {
+        let collision_recoil = telemetry.collision_recoil();
+        let damage_taken = telemetry.damage_taken();
+        if collision_recoil {
             self.summary.collision_recoil_active_frames += 1;
         }
-        if telemetry.damage_taken() {
+        if damage_taken {
             self.summary.damage_taken_frames += 1;
+        }
+        if collision_recoil || damage_taken {
+            self.summary.impact_frames += 1;
         }
         if telemetry.airborne() {
             self.summary.airborne_frames += 1;

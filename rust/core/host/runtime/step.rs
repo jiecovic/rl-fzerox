@@ -34,6 +34,8 @@ pub struct StepSummary {
     pub energy_gain_total: f32,
     /// Number of internal frames where the game damage pulse was active.
     pub damage_taken_frames: usize,
+    /// Number of internal frames where damage or collision recoil was active.
+    pub impact_frames: usize,
     /// Number of internal frames where the player machine was airborne.
     pub airborne_frames: usize,
     /// Low-speed streak length at the end of the repeated step.
