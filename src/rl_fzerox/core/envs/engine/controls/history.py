@@ -22,7 +22,7 @@ class ControlStateTracker:
     boost_request_lockout_frames: int = 0
     action_history_len: int | None = None
     action_history_controls: tuple[ActionHistoryControl, ...] = ()
-    independent_lean_buttons: bool = False
+    split_lean_history: bool = False
     _lean: LeanControlState = field(init=False)
     _boost: BoostTimingState = field(init=False)
     _action_history: ActionHistoryBuffer = field(init=False)
@@ -39,7 +39,7 @@ class ControlStateTracker:
         self._action_history = ActionHistoryBuffer(
             length=self.action_history_len,
             controls=self.action_history_controls,
-            independent_lean_buttons=self.independent_lean_buttons,
+            split_lean_history=self.split_lean_history,
         )
 
     def reset(self) -> None:

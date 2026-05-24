@@ -336,7 +336,7 @@ def _observation_state_feature_names(
         return ()
     return observation_access.state_feature_names(
         state_components=state_components,
-        independent_lean_buttons=config.env.action.independent_lean_buttons,
+        split_lean_history=config.env.action.runtime().split_lean_history,
     )
 
 

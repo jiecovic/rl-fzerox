@@ -33,14 +33,14 @@ class StateComponentDefinition:
 def state_vector_spec_from_components(
     state_components: StateComponentsSettings,
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> StateVectorSpec:
     features: list[StateFeature] = []
     for component in state_components:
         features.extend(
             state_component_features(
                 component,
-                independent_lean_buttons=independent_lean_buttons,
+                split_lean_history=split_lean_history,
             )
         )
 
@@ -52,13 +52,13 @@ def component_state_values(
     *,
     state_components: StateComponentsSettings,
     action_history: Mapping[str, float],
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> list[float]:
     values: list[float] = []
     for component in state_components:
         raw_features = raw_state_component_features(
             component,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
         definition = state_component_definition(component)
         if component.name == "control_history":
@@ -66,7 +66,7 @@ def component_state_values(
                 telemetry,
                 component,
                 action_history,
-                independent_lean_buttons=independent_lean_buttons,
+                split_lean_history=split_lean_history,
             )
         else:
             raw_values = definition.values(
@@ -98,13 +98,13 @@ def action_history_settings_for_observation(
 def state_component_features(
     component: ObservationStateComponentSettings,
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> tuple[StateFeature, ...]:
     return selected_state_component_features(
         component,
         raw_state_component_features(
             component,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         ),
     )
 
@@ -112,7 +112,7 @@ def state_component_features(
 def raw_state_component_features(
     component: ObservationStateComponentSettings,
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> tuple[StateFeature, ...]:
     """Return every feature one component can emit before inclusion filtering."""
 
@@ -121,7 +121,7 @@ def raw_state_component_features(
         return definition.features(component)
     return definition.features(
         component,
-        independent_lean_buttons=independent_lean_buttons,
+        split_lean_history=split_lean_history,
     )
 
 

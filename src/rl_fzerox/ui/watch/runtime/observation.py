@@ -38,13 +38,13 @@ def configured_watch_zeroed_features(config: WatchAppConfig) -> frozenset[str]:
     if train_config is None or state_components is None:
         return frozenset()
 
-    independent_lean_buttons = config.env.action.independent_lean_buttons
+    split_lean_history = config.env.action.runtime().split_lean_history
     component_feature_names = {
         component.name: frozenset(
             feature.name
             for feature in state_component_features(
                 component,
-                independent_lean_buttons=independent_lean_buttons,
+                split_lean_history=split_lean_history,
             )
         )
         for component in state_components

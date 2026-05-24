@@ -22,12 +22,12 @@ def state_feature_previews(config: ManagedRunConfig) -> tuple[StateFeaturePrevie
         feature.name: float(feature.dropout_prob)
         for feature in config.observation.state_feature_dropouts
     }
-    independent_lean_buttons = config.action.lean_output_mode == "independent_buttons"
+    split_lean_history = config.action.lean_output_mode != "three_way"
     features: list[StateFeaturePreview] = []
     for component in config.observation.state_components:
         for feature in component_features(
             component,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         ):
             features.append(
                 StateFeaturePreview(

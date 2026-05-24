@@ -1001,7 +1001,9 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "balanced" in {preset["id"] for preset in payload["engine_setting_presets"]}
     assert "continuous" in {mode["value"] for mode in payload["steering_modes"]}
     assert "on_off" in {mode["value"] for mode in payload["drive_modes"]}
-    assert "independent_buttons" in {mode["value"] for mode in payload["lean_output_modes"]}
+    lean_output_modes = {mode["value"] for mode in payload["lean_output_modes"]}
+    assert "four_way_categorical" in lean_output_modes
+    assert "independent_buttons" in lean_output_modes
     lean_modes = {mode["value"] for mode in payload["lean_modes"]}
     assert "release_cooldown" in lean_modes
     assert "raw" in lean_modes

@@ -27,7 +27,7 @@ def build_observation_data(config: ManagedRunConfig) -> dict[str, object]:
 def component_feature_names(
     component: ManagedStateComponentConfig,
     *,
-    independent_lean_buttons: bool,
+    split_lean_history: bool,
 ) -> tuple[str, ...]:
     from rl_fzerox.core.envs.observations.state.components import state_component_features
 
@@ -36,7 +36,7 @@ def component_feature_names(
         feature.name
         for feature in state_component_features(
             settings,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
     )
 
@@ -46,11 +46,11 @@ def build_state_feature_dropout_groups(config: ManagedRunConfig) -> list[dict[st
         feature.name: feature for feature in config.observation.state_feature_dropouts
     }
     groups: list[dict[str, object]] = []
-    independent_lean_buttons = config.action.lean_output_mode == "independent_buttons"
+    split_lean_history = config.action.lean_output_mode != "three_way"
     for component in config.observation.state_components:
         feature_names = component_feature_names(
             component,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
         if component.name == "course_context":
             feature_probs = [

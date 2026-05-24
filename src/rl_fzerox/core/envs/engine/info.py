@@ -67,7 +67,7 @@ def set_observation_info(
     action_history_len: int | None,
     action_history_controls: tuple[ActionHistoryControl, ...],
     observation_state_components: StateComponentsSettings | None,
-    independent_lean_buttons: bool,
+    split_lean_history: bool,
 ) -> None:
     """Attach observation metadata used by watch/debug surfaces."""
 
@@ -106,12 +106,12 @@ def set_observation_info(
         info["observation_state_shape"] = (
             state_feature_count(
                 state_components=observation_state_components,
-                independent_lean_buttons=independent_lean_buttons,
+                split_lean_history=split_lean_history,
             ),
         )
         info["observation_state_features"] = state_feature_names(
             state_components=observation_state_components,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         )
 
 

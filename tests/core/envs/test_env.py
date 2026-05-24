@@ -680,10 +680,12 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
     assert info["observation_minimap_layer"] is True
 
 
-def test_env_config_accepts_independent_lean_history_feature_selection() -> None:
+def test_env_config_accepts_split_lean_history_feature_selection() -> None:
     config = EnvConfig.model_validate(
         {
-            "action": {"independent_lean_buttons": True},
+            "action": {
+                "lean_output_mode": "four_way_categorical",
+            },
             "observation": {
                 "mode": "image_state",
                 "state_components": [
@@ -705,7 +707,7 @@ def test_env_config_accepts_independent_lean_history_feature_selection() -> None
 
     assert state_feature_names(
         state_components=tuple(component.data() for component in components),
-        independent_lean_buttons=config.action.independent_lean_buttons,
+        split_lean_history=config.action.runtime().split_lean_history,
     ) == (
         "control_history.prev_lean_left_1",
         "control_history.prev_lean_right_1",

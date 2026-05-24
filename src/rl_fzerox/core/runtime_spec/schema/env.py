@@ -56,7 +56,7 @@ class EnvConfig(BaseModel):
         for component in self.observation.state_components:
             state_component_features(
                 component.data(),
-                independent_lean_buttons=self.action.independent_lean_buttons,
+                split_lean_history=self.action.runtime().split_lean_history,
             )
         return self
 

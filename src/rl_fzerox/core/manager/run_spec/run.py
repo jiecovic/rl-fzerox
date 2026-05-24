@@ -78,7 +78,7 @@ class ManagedRunConfig(BaseModel):
         )
         active_features = managed_state_component_feature_names(
             self.observation.state_components,
-            independent_lean_buttons=self.action.lean_output_mode == "independent_buttons",
+            split_lean_history=self.action.lean_output_mode != "three_way",
         )
         unknown_features = [
             feature.name

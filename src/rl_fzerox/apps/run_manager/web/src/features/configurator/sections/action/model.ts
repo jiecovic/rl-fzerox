@@ -114,7 +114,7 @@ function actionHeadShape(action: ManagedActionConfig): {
     discreteLogits += 2;
   }
   if (action.include_lean) {
-    discreteLogits += action.lean_output_mode === "independent_buttons" ? 4 : 3;
+    discreteLogits += action.lean_output_mode === "three_way" ? 3 : 4;
   }
   if (action.include_pitch) {
     if (action.pitch_mode === "continuous") {
@@ -171,7 +171,12 @@ function boostOutputSummary(action: ManagedActionConfig): string {
 }
 
 function leanOutputSummary(action: ManagedActionConfig): string {
-  const base = action.lean_output_mode === "independent_buttons" ? "lean buttons" : "lean";
+  const base =
+    action.lean_output_mode === "independent_buttons"
+      ? "lean buttons"
+      : action.lean_output_mode === "four_way_categorical"
+        ? "4-way lean"
+        : "lean";
   if (!action.enable_lean) {
     return `${base} masked`;
   }
@@ -179,6 +184,9 @@ function leanOutputSummary(action: ManagedActionConfig): string {
     return action.lean_unmask_min_speed_kph === null
       ? `${base}, fully free`
       : `${base}, above ${action.lean_unmask_min_speed_kph} kph`;
+  }
+  if (action.lean_output_mode === "four_way_categorical") {
+    return action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
   }
   return action.lean_mode === "raw" ? `${base}, raw` : `${base}, ${action.lean_mode}`;
 }

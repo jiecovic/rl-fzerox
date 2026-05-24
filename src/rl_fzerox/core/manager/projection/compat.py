@@ -60,7 +60,7 @@ def fork_compatibility_signature(train_config: TrainAppConfig) -> dict[str, obje
         "name": runtime_action.name,
         "steer_buckets": runtime_action.steer_buckets,
         "pitch_buckets": runtime_action.pitch_buckets,
-        "independent_lean_buttons": runtime_action.independent_lean_buttons,
+        "lean_output_mode": runtime_action.lean_output_mode,
         "layout_continuous_axes": tuple(runtime_action.layout_continuous_axes),
         "layout_discrete_axes": tuple(runtime_action.layout_discrete_axes),
     }

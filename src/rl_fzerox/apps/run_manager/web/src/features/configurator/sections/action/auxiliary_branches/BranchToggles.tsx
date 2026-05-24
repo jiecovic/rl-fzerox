@@ -78,7 +78,9 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
           description={
             action.lean_output_mode === "independent_buttons"
               ? "Expose separate left and right lean buttons that can co-activate."
-              : "Expose lean left / neutral / right as a 3-logit branch."
+              : action.lean_output_mode === "four_way_categorical"
+                ? "Expose one 4-way lean branch: idle, left, right, or both."
+                : "Expose lean left / neutral / right as a 3-logit branch."
           }
           enabled={action.enable_lean}
           enabledLabel="Lean enabled"

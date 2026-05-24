@@ -3,11 +3,11 @@ from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 
 
-def test_action_history_records_independent_lean_buttons_separately() -> None:
+def test_action_history_records_split_lean_history_separately() -> None:
     history = ActionHistoryBuffer(
         length=1,
         controls=("lean",),
-        independent_lean_buttons=True,
+        split_lean_history=True,
     )
 
     history.record(

@@ -128,7 +128,11 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
   }
   if (config.action.include_lean) {
     const leanSummary =
-      config.action.lean_output_mode === "independent_buttons" ? "lean buttons" : "lean";
+      config.action.lean_output_mode === "independent_buttons"
+        ? "lean buttons"
+        : config.action.lean_output_mode === "four_way_categorical"
+          ? "4-way lean"
+          : "lean";
     if (!config.action.enable_lean) {
       labels.push(`${leanSummary} masked`);
     } else if (config.action.lean_output_mode === "independent_buttons") {

@@ -75,18 +75,17 @@ def apply_dynamic_control_gates(
         missing_allowed=True,
     ):
         control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.boost)
-    if not action_branch_value_allowed(
-        branches,
-        "lean",
-        1,
-        missing_allowed=True,
+    lean_mask = RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
+    requested_lean = control_state.joypad_mask & lean_mask
+    if requested_lean == lean_mask:
+        if not _lean_button_pair_allowed(branches):
+            control_state = without_joypad_mask(control_state, lean_mask)
+    elif requested_lean & RACE_CONTROL_MASKS.lean_left and not _lean_button_allowed(
+        branches, split_label="lean_left", categorical_index=1
     ):
         control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.lean_left)
-    if not action_branch_value_allowed(
-        branches,
-        "lean",
-        2,
-        missing_allowed=True,
+    elif requested_lean & RACE_CONTROL_MASKS.lean_right and not _lean_button_allowed(
+        branches, split_label="lean_right", categorical_index=2
     ):
         control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.lean_right)
     if not action_branch_value_allowed(
@@ -114,3 +113,35 @@ def apply_dynamic_control_gates(
     if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
         control_state = without_joypad_mask(control_state, RACE_CONTROL_MASKS.air_brake)
     return with_left_stick_y(control_state, 0.0)
+
+
+def _lean_button_allowed(
+    branches: dict[str, tuple[bool, ...]],
+    *,
+    split_label: str,
+    categorical_index: int,
+) -> bool:
+    if split_label in branches:
+        return action_branch_value_allowed(
+            branches,
+            split_label,
+            1,
+            missing_allowed=True,
+        )
+    return action_branch_value_allowed(
+        branches,
+        "lean",
+        categorical_index,
+        missing_allowed=True,
+    )
+
+
+def _lean_button_pair_allowed(branches: dict[str, tuple[bool, ...]]) -> bool:
+    if "lean_left" in branches or "lean_right" in branches:
+        return _lean_button_allowed(
+            branches, split_label="lean_left", categorical_index=1
+        ) and _lean_button_allowed(branches, split_label="lean_right", categorical_index=2)
+    lean_branch = branches.get("lean")
+    if lean_branch is not None and len(lean_branch) >= 4:
+        return action_branch_value_allowed(branches, "lean", 3, missing_allowed=True)
+    return False

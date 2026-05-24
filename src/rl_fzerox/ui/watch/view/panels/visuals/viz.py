@@ -82,13 +82,10 @@ def _control_viz(
         "boost",
         fallback=bool(joypad_mask & RACE_CONTROL_MASKS.boost),
     )
-    lean_direction = _lean_direction(
+    lean_left_pressed, lean_right_pressed = _lean_buttons(
         selected_branches,
-        fallback=-1
-        if joypad_mask & RACE_CONTROL_MASKS.lean_left
-        else 1
-        if joypad_mask & RACE_CONTROL_MASKS.lean_right
-        else 0,
+        fallback_left=bool(joypad_mask & RACE_CONTROL_MASKS.lean_left),
+        fallback_right=bool(joypad_mask & RACE_CONTROL_MASKS.lean_right),
     )
     normalized_boost_lamp_level = max(
         0.0,
@@ -122,7 +119,12 @@ def _control_viz(
         boost_pressed=boost_pressed,
         boost_active=boost_active,
         boost_lamp_level=normalized_boost_lamp_level,
-        lean_direction=lean_direction,
+        lean_direction=_lean_direction(
+            left_pressed=lean_left_pressed,
+            right_pressed=lean_right_pressed,
+        ),
+        lean_left_pressed=lean_left_pressed,
+        lean_right_pressed=lean_right_pressed,
         deterministic_policy=policy_deterministic,
         thrust_masked=(
             False
@@ -150,18 +152,8 @@ def _control_viz(
             1,
             missing_allowed=False,
         ),
-        lean_left_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "lean",
-            1,
-            missing_allowed=False,
-        ),
-        lean_right_masked=not action_branch_value_allowed(
-            action_mask_branches,
-            "lean",
-            2,
-            missing_allowed=False,
-        ),
+        lean_left_masked=not _lean_button_allowed(action_mask_branches, "lean_left", 1),
+        lean_right_masked=not _lean_button_allowed(action_mask_branches, "lean_right", 2),
         pitch_masked=(
             False
             if continuous_pitch_enabled
@@ -210,15 +202,62 @@ def _branch_pressed(
     return selected_branches[label] == 1
 
 
-def _lean_direction(selected_branches: dict[str, int], *, fallback: int) -> int:
+def _lean_buttons(
+    selected_branches: dict[str, int],
+    *,
+    fallback_left: bool,
+    fallback_right: bool,
+) -> tuple[bool, bool]:
+    if "lean_left" in selected_branches or "lean_right" in selected_branches:
+        return (
+            selected_branches.get("lean_left") == 1,
+            selected_branches.get("lean_right") == 1,
+        )
     lean = selected_branches.get("lean")
     if lean is None:
-        return fallback
+        return fallback_left, fallback_right
     if lean == 1:
-        return -1
+        return True, False
     if lean == 2:
-        return 1
-    return 0
+        return False, True
+    if lean == 3:
+        return True, True
+    return False, False
+
+
+def _lean_direction(*, left_pressed: bool, right_pressed: bool) -> int:
+    if left_pressed == right_pressed:
+        return 0
+    return -1 if left_pressed else 1
+
+
+def _lean_button_allowed(
+    branches: ActionMaskBranches | None,
+    split_label: str,
+    categorical_index: int,
+) -> bool:
+    if branches is not None and split_label in branches:
+        return action_branch_value_allowed(
+            branches,
+            split_label,
+            1,
+            missing_allowed=False,
+        )
+    pair_allowed = action_branch_value_allowed(
+        branches,
+        "lean",
+        3,
+        missing_allowed=False,
+    )
+    return (
+        action_branch_value_allowed(
+            branches,
+            "lean",
+            categorical_index,
+            missing_allowed=False,
+        )
+        or pair_allowed
+    )
 
 
 def _continuous_air_brake_axis_from_action(

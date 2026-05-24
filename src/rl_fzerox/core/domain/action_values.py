@@ -23,6 +23,8 @@ DISCRETE_ACTION_BRANCH_VALUES: dict[str, tuple[ActionBranchValue, ...]] = {
     "air_brake": ("idle", "engaged"),
     "boost": ("idle", "engaged"),
     "lean": ("idle", "left", "right"),
+    "lean_left": ("idle", "engaged"),
+    "lean_right": ("idle", "engaged"),
     "pitch": ("down_full", "down", "neutral", "up", "up_full"),
 }
 

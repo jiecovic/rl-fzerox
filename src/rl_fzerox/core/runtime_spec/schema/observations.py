@@ -235,11 +235,11 @@ def _supported_state_feature_names(component: ObservationStateComponentConfig) -
         feature.name
         for feature in raw_state_component_features(
             settings,
-            independent_lean_buttons=False,
+            split_lean_history=False,
         )
     ]
     if component.name == "control_history":
-        for feature in raw_state_component_features(settings, independent_lean_buttons=True):
+        for feature in raw_state_component_features(settings, split_lean_history=True):
             if feature.name not in feature_names:
                 feature_names.append(feature.name)
     return tuple(feature_names)

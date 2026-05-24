@@ -49,7 +49,9 @@ def discrete_axis_size(axis: str, config: ActionRuntimeConfig) -> int:
     if axis in {"gas", "air_brake", "boost"}:
         return 2
     if axis == "lean":
-        return 4 if config.independent_lean_buttons else 3
+        return 4 if config.lean_output_mode == "four_way_categorical" else 3
+    if axis in {"lean_left", "lean_right"}:
+        return 2
     if axis == "pitch":
         return int(config.pitch_buckets)
     raise ValueError(f"Unsupported configured discrete axis: {axis!r}")
@@ -81,19 +83,13 @@ def pitch_bucket_value(index: int, *, bucket_count: int) -> float:
     return float(index - neutral_index) / float(neutral_index)
 
 
-def lean_mask(index: int, *, independent_buttons: bool) -> int:
-    """Translate one configured lean branch value into joypad button bits."""
+def categorical_lean_mask(index: int, *, four_way: bool) -> int:
+    """Translate one categorical lean branch value into joypad button bits."""
 
-    if independent_buttons:
-        if index == 1:
-            return RACE_CONTROL_MASKS.lean_left
-        if index == 2:
-            return RACE_CONTROL_MASKS.lean_right
-        if index == 3:
-            return RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
-        return 0
     if index == 1:
         return RACE_CONTROL_MASKS.lean_left
     if index == 2:
         return RACE_CONTROL_MASKS.lean_right
+    if four_way and index == 3:
+        return RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
     return 0

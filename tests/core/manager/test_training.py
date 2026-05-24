@@ -24,7 +24,7 @@ from rl_fzerox.core.manager.training import (
 def _manager_config_data_with_control_history_features(
     included_features: tuple[str, ...],
     *,
-    lean_output_mode: Literal["three_way", "independent_buttons"],
+    lean_output_mode: Literal["three_way", "four_way_categorical", "independent_buttons"],
 ) -> dict[str, object]:
     return {
         "action": {"lean_output_mode": lean_output_mode},
@@ -110,8 +110,36 @@ def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.force_full_throttle is True
     assert train_config.env.action.layout_continuous_axes == ("drive", "pitch")
-    assert train_config.env.action.layout_discrete_axes == ("steer", "lean")
-    assert train_config.env.action.independent_lean_buttons is True
+    assert train_config.env.action.layout_discrete_axes == (
+        "steer",
+        "lean_left",
+        "lean_right",
+    )
+    assert train_config.env.action.lean_output_mode == "independent_buttons"
+    assert train_config.env.action.runtime().split_lean_action_branches is True
+
+
+def test_manager_training_bridge_supports_four_way_categorical_lean(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.lean_output_mode = "four_way_categorical"
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-four-way-lean",
+        run_dir=tmp_path / "runs" / "bridge-four-way-lean_0001",
+    )
+
+    assert train_config.env.action.layout_discrete_axes == (
+        "gas",
+        "air_brake",
+        "boost",
+        "lean",
+        "pitch",
+    )
+    assert train_config.env.action.lean_output_mode == "four_way_categorical"
+    assert train_config.env.action.runtime().split_lean_history is True
 
 
 def test_manager_run_config_accepts_independent_lean_history_features(
@@ -136,7 +164,7 @@ def test_manager_run_config_accepts_independent_lean_history_features(
 
     assert state_feature_names(
         state_components=tuple(component.data() for component in components),
-        independent_lean_buttons=train_config.env.action.independent_lean_buttons,
+        split_lean_history=train_config.env.action.runtime().split_lean_history,
     ) == (
         "control_history.prev_lean_left_1",
         "control_history.prev_lean_right_1",

@@ -508,7 +508,10 @@ describe("Configurator", () => {
     });
   });
 
-  it("shows split lean history rows for independent lean buttons", async () => {
+  it.each([
+    "four_way_categorical",
+    "independent_buttons",
+  ] as const)("shows split lean history rows for %s lean output", async (leanOutputMode) => {
     const user = userEvent.setup();
 
     render(
@@ -517,7 +520,7 @@ describe("Configurator", () => {
           ...managedRunConfigFixture,
           action: {
             ...managedRunConfigFixture.action,
-            lean_output_mode: "independent_buttons",
+            lean_output_mode: leanOutputMode,
           },
         }}
         existingNames={[]}

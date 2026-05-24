@@ -215,7 +215,7 @@ def default_state_feature_dropouts() -> tuple[ManagedStateFeatureDropoutConfig, 
 def managed_state_component_feature_names(
     components: tuple[ManagedStateComponentConfig, ...],
     *,
-    independent_lean_buttons: bool = False,
+    split_lean_history: bool = False,
 ) -> frozenset[str]:
     from rl_fzerox.core.envs.observations.state.components import state_component_features
 
@@ -224,7 +224,7 @@ def managed_state_component_feature_names(
         settings = component.data()
         for feature in state_component_features(
             settings,
-            independent_lean_buttons=independent_lean_buttons,
+            split_lean_history=split_lean_history,
         ):
             names.add(feature.name)
     return frozenset(names)
@@ -238,11 +238,11 @@ def _supported_state_feature_names(component: ManagedStateComponentConfig) -> tu
         feature.name
         for feature in raw_state_component_features(
             settings,
-            independent_lean_buttons=False,
+            split_lean_history=False,
         )
     ]
     if component.name == "control_history":
-        for feature in raw_state_component_features(settings, independent_lean_buttons=True):
+        for feature in raw_state_component_features(settings, split_lean_history=True):
             if feature.name not in feature_names:
                 feature_names.append(feature.name)
     return tuple(feature_names)
