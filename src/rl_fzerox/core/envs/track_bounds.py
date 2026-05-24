@@ -51,7 +51,7 @@ def track_edge_state(
     player: PlayerTelemetry,
     *,
     near_edge_ratio_threshold: float = 0.8,
-    outside_edge_ratio_threshold: float = 1.05,
+    outside_edge_ratio_threshold: float = 1.10,
 ) -> TrackEdgeState:
     offset = float(player.signed_lateral_offset)
     if offset >= 0.0:

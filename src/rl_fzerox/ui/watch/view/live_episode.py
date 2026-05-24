@@ -179,7 +179,10 @@ def _outside_edge_excess_ratio(snapshot: _LiveEpisodeSnapshot) -> float:
     )
     if side_radius <= 0.0:
         return 0.0
-    return max(0.0, (abs(offset) / side_radius) - 1.0)
+    edge_ratio = abs(offset) / side_radius
+    if edge_ratio <= 1.10:
+        return 0.0
+    return edge_ratio - 1.0
 
 
 def _player_telemetry_data(snapshot: _LiveEpisodeSnapshot) -> Mapping[object, object] | None:
