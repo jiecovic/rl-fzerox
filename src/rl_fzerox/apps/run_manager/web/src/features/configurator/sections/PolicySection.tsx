@@ -97,8 +97,10 @@ export function PolicySection({
                     custom_conv_layers: defaultConfig.policy.custom_conv_layers,
                     custom_cnn_final_relu: defaultConfig.policy.custom_cnn_final_relu,
                     features_dim: defaultConfig.policy.features_dim,
+                    image_projection_activation: defaultConfig.policy.image_projection_activation,
                     state_net_arch: defaultConfig.policy.state_net_arch,
                     fusion_features_dim: defaultConfig.policy.fusion_features_dim,
+                    fusion_activation: defaultConfig.policy.fusion_activation,
                     layer_norm: defaultConfig.policy.layer_norm,
                   })
           }
@@ -127,6 +129,19 @@ export function PolicySection({
               value={config.policy.features_dim}
               onChange={(value) => updatePolicy({ features_dim: value })}
             />
+            <fieldset
+              className="dependent-fieldset"
+              disabled={checkpointLocked || config.policy.features_dim === "auto"}
+            >
+              <SelectField
+                help="Activation after the optional image feature projection."
+                label="Image proj activation"
+                options={activationOptions}
+                resetValue={defaultConfig.policy.image_projection_activation}
+                value={config.policy.image_projection_activation}
+                onChange={(value) => updatePolicy({ image_projection_activation: value })}
+              />
+            </fieldset>
             <fieldset
               className="dependent-fieldset"
               disabled={checkpointLocked || config.policy.conv_profile !== "custom"}
@@ -161,6 +176,14 @@ export function PolicySection({
                 resetValue={defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim}
                 value={fusionFeaturesDim}
                 onChange={(value) => updatePolicy({ fusion_features_dim: value })}
+              />
+              <SelectField
+                help="Activation after the learned fusion projection."
+                label="Fusion activation"
+                options={activationOptions}
+                resetValue={defaultConfig.policy.fusion_activation}
+                value={config.policy.fusion_activation}
+                onChange={(value) => updatePolicy({ fusion_activation: value })}
               />
             </fieldset>
             <BooleanField

@@ -63,6 +63,17 @@ def test_observation_extractor_accepts_larger_aspect_correct_preset() -> None:
     assert tuple(features.shape) == (2, 512)
 
 
+def test_observation_extractor_uses_configured_projection_activation() -> None:
+    extractor = FZeroXObservationCnnExtractor(
+        spaces.Box(low=0, high=255, shape=(84, 116, 12), dtype=np.uint8),
+        features_dim=512,
+        image_projection_activation="gelu",
+    )
+
+    assert isinstance(extractor._linear, torch.nn.Sequential)
+    assert isinstance(extractor._linear[1], torch.nn.GELU)
+
+
 def test_observation_extractor_auto_features_dim_uses_medium_flatten() -> None:
     extractor = FZeroXObservationCnnExtractor(
         spaces.Box(low=0, high=255, shape=(92, 124, 12), dtype=np.uint8),
@@ -453,6 +464,7 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
         features_dim=512,
         state_features_dim=64,
         fusion_features_dim=512,
+        fusion_activation="tanh",
     )
 
     features = extractor(
@@ -465,6 +477,7 @@ def test_image_state_extractor_can_fuse_concatenated_features() -> None:
     assert extractor.features_dim == 512
     assert tuple(features.shape) == (2, 512)
     assert isinstance(extractor._fusion_mlp, torch.nn.Sequential)
+    assert isinstance(extractor._fusion_mlp[1], torch.nn.Tanh)
 
 
 def test_image_state_extractor_can_layer_norm_fused_features() -> None:

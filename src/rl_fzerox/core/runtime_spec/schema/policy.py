@@ -10,6 +10,7 @@ from rl_fzerox.core.domain.cnn import (
     normalize_cnn_layer_kind,
     validate_cnn_layer_geometry,
 )
+from rl_fzerox.core.policy.activations import ActivationName
 from rl_fzerox.core.policy.auxiliary_state.names import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_supports_grounded_only,
@@ -63,9 +64,11 @@ class ExtractorConfig(BaseModel):
     custom_conv_layers: tuple[CustomConvLayer, ...] = ()
     custom_cnn_final_relu: bool = False
     features_dim: PositiveInt | Literal["auto"] = 512
+    image_projection_activation: ActivationName = "relu"
     state_features_dim: PositiveInt = 64
     state_net_arch: tuple[PositiveInt, ...] | None = None
     fusion_features_dim: PositiveInt | None = None
+    fusion_activation: ActivationName = "relu"
     layer_norm: bool = False
 
     @model_validator(mode="after")

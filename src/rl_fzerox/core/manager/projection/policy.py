@@ -15,8 +15,10 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
             ],
             "custom_cnn_final_relu": config.policy.custom_cnn_final_relu,
             "features_dim": config.policy.features_dim,
+            "image_projection_activation": config.policy.image_projection_activation,
             "state_net_arch": list(config.policy.state_net_arch),
             "fusion_features_dim": config.policy.fusion_features_dim,
+            "fusion_activation": config.policy.fusion_activation,
             "layer_norm": config.policy.layer_norm,
         },
         "recurrent": {

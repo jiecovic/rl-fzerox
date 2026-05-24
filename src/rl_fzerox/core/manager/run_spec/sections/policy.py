@@ -80,8 +80,10 @@ class ManagedPolicyConfig(BaseModel):
     )
     custom_cnn_final_relu: bool = False
     features_dim: FeatureDim = "auto"
+    image_projection_activation: ActivationName = "relu"
     state_net_arch: tuple[PositiveInt, ...] = (64,)
     fusion_features_dim: PositiveInt | None = 768
+    fusion_activation: ActivationName = "relu"
     layer_norm: bool = True
     activation: ActivationName = "relu"
     recurrent_enabled: bool = True

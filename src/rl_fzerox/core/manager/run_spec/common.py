@@ -14,6 +14,7 @@ from rl_fzerox.core.domain.observation_image import (
     ObservationResizeFilter as DomainObservationResizeFilter,
 )
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.policy.activations import ActivationName as ActivationName
 
 ConfigVersion = Literal[1]
 StackMode = Literal["rgb", "gray", "luma_chroma"]
@@ -35,4 +36,3 @@ ConvProfile = Literal[
     "custom",
 ]
 FeatureDim: TypeAlias = PositiveInt | Literal["auto"]
-ActivationName = Literal["relu", "tanh", "gelu"]

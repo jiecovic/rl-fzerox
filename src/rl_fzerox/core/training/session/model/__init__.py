@@ -1,6 +1,7 @@
 # src/rl_fzerox/core/training/session/model/__init__.py
 from __future__ import annotations
 
+from rl_fzerox.core.policy.activations import resolve_policy_activation_fn
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
     training_requires_action_masks,
@@ -9,7 +10,6 @@ from rl_fzerox.core.training.session.model.builders import (
     build_ppo_model,
     build_training_model,
 )
-from rl_fzerox.core.training.session.model.policy import resolve_policy_activation_fn
 from rl_fzerox.core.training.session.model.preload import maybe_resume_training_model
 from rl_fzerox.core.training.session.model.startup import (
     build_tensorboard_logger,

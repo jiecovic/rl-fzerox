@@ -4,6 +4,7 @@ from __future__ import annotations
 from stable_baselines3.common.vec_env import VecEnv
 
 from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.policy.activations import resolve_policy_activation_fn
 from rl_fzerox.core.policy.auxiliary_state.policies import (
     AuxiliaryStateMaskableHybridActionMultiInputPolicy,
     AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy,
@@ -62,9 +63,11 @@ def build_policy_kwargs(
             ),
             "custom_cnn_final_relu": policy_config.extractor.custom_cnn_final_relu,
             "features_dim": policy_config.extractor.features_dim,
+            "image_projection_activation": policy_config.extractor.image_projection_activation,
             "state_features_dim": policy_config.extractor.state_features_dim,
             "state_net_arch": policy_config.extractor.resolved_state_net_arch(),
             "fusion_features_dim": policy_config.extractor.fusion_features_dim,
+            "fusion_activation": policy_config.extractor.fusion_activation,
             "layer_norm": policy_config.extractor.layer_norm,
         }
     else:
@@ -77,6 +80,7 @@ def build_policy_kwargs(
             ),
             "custom_cnn_final_relu": policy_config.extractor.custom_cnn_final_relu,
             "features_dim": policy_config.extractor.features_dim,
+            "image_projection_activation": policy_config.extractor.image_projection_activation,
             "layer_norm": policy_config.extractor.layer_norm,
         }
 
@@ -92,17 +96,3 @@ def build_policy_kwargs(
     if policy_config.auxiliary_state.enabled:
         policy_kwargs["auxiliary_state"] = policy_config.auxiliary_state.model_dump(mode="python")
     return policy_kwargs
-
-
-def resolve_policy_activation_fn(name: str):
-    """Map the configured SB3 policy-head activation name to a torch module."""
-
-    from torch import nn
-
-    if name == "tanh":
-        return nn.Tanh
-    if name == "relu":
-        return nn.ReLU
-    if name == "gelu":
-        return nn.GELU
-    raise ValueError(f"Unsupported policy activation: {name!r}")

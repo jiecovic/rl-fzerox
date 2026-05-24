@@ -724,6 +724,11 @@ describe("Configurator", () => {
     const imageFeaturesInput = screen.getByRole("textbox", { name: "Image features" });
     await user.clear(imageFeaturesInput);
     await user.type(imageFeaturesInput, "1024");
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Image proj activation" }),
+      "gelu",
+    );
+    await user.selectOptions(screen.getByRole("combobox", { name: "Fusion activation" }), "tanh");
     await user.click(screen.getByRole("button", { name: "Save draft" }));
 
     await waitFor(() =>
@@ -732,6 +737,8 @@ describe("Configurator", () => {
         expect.objectContaining({
           policy: expect.objectContaining({
             features_dim: 1024,
+            image_projection_activation: "gelu",
+            fusion_activation: "tanh",
           }),
         }),
       ),
