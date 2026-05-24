@@ -59,7 +59,7 @@ duplicate that geometry logic.
   hybrid continuous-plus-discrete action spaces. The lean inputs are the Z/R
   lean/slide buttons.
 
-- `src/rl_fzerox/core/envs/rewards/race_v3/`
+- `src/rl_fzerox/core/envs/rewards/reward_main/`
   Reward shaping for spline-frontier progress, lap position, damage, energy
   refill, boost-pad usage, landing events, failures, and truncations.
 
