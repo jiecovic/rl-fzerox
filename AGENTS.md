@@ -33,15 +33,15 @@ Use Conventional Commits with a scope:
 
 ### Examples
 
-- `feat(ocr): retry once when llm ocr response is truncated`
-- `fix(agent): prevent duplicate box id assignment in page merge`
-- `chore(repo): ignore local agent guidance file`
-- `docs(readme): clarify backend and frontend dev ports`
+- `feat(run-manager): add run comparison chart`
+- `fix(emulator): reject unsupported rom revisions`
+- `docs(readme): clarify local asset paths`
+- `refactor(policy): split extractor network blocks`
 
 ## Code Quality Principles
 
-This repository should not become an AI-slop codebase. Favor code that a
-strong human engineer would be comfortable owning, extending, and reviewing.
+Favor code that a strong human engineer would be comfortable owning,
+extending, and reviewing.
 
 ### Standards
 
@@ -56,9 +56,9 @@ strong human engineer would be comfortable owning, extending, and reviewing.
   clearer module boundary or nested module name can express the responsibility.
 - Use clear names, straightforward control flow, and predictable data flow.
 - Document the intent behind non-obvious behavior, invariants, and tradeoffs.
-- Write code and comments for the next human maintainer, not for the model.
-- Avoid speculative abstractions, premature generalization, and pattern cargo
-  culting.
+- Write code and comments for the next human maintainer.
+- Avoid speculative abstractions, premature generalization, and copying
+  patterns without a clear reason.
 - Do not introduce large framework layers or indirection unless they solve a
   concrete problem already present in the codebase.
 - Keep public interfaces narrow and well-defined.
@@ -67,9 +67,9 @@ strong human engineer would be comfortable owning, extending, and reviewing.
 - Avoid loose “constant soup” for related literal values when a proper data
   structure would be clearer. Group RAM offsets, protocol ids, wire values, and
   enum constants in small immutable data structures when reasonable.
-- Prefer proper typing over escape hatches. Do not use `typing.cast` as a
-  shortcut for “trust me”; tighten the real types with better stubs,
-  `TypedDict`, protocols, helper functions, or runtime narrowing.
+- Prefer proper typing over escape hatches. Do not use `typing.cast` to bypass
+  weak types; tighten the real types with better stubs, `TypedDict`,
+  protocols, helper functions, or runtime narrowing.
 - Keep static typing pragmatic at third-party dynamic boundaries. Do not add
   large local `Protocol` layers just to compensate for weak or missing typing in
   libraries such as pygame, Stable-Baselines3, Gymnasium, or native extension
