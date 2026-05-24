@@ -93,6 +93,7 @@ def draw_watch_frame(
             policy_label=snapshot.policy_label,
             policy_curriculum_stage=snapshot.policy_curriculum_stage,
             policy_num_timesteps=snapshot.policy_num_timesteps,
+            policy_experience_frames=snapshot.policy_experience_frames,
             policy_deterministic=snapshot.policy_deterministic,
             manual_control_enabled=snapshot.manual_control_enabled,
             policy_action=snapshot.policy_action,

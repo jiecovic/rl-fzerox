@@ -524,6 +524,7 @@ def test_policy_runner_prefers_lineage_checkpoint_timesteps(tmp_path: Path) -> N
     runner.refresh()
 
     assert runner.checkpoint_num_timesteps == 14_820_470
+    assert runner.checkpoint_local_num_timesteps == 660_000
 
 
 def test_load_saved_policy_algorithm_rejects_invalid_train_config(tmp_path: Path) -> None:

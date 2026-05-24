@@ -156,3 +156,32 @@ def test_live_episode_tracker_computes_left_edge_excess_ratio() -> None:
     snapshot = tracker.snapshot()
     assert snapshot is not None
     assert snapshot.outside_edge_excess_ratio == (0.5,)
+
+
+def test_live_episode_tracker_suppresses_edge_margin_spikes() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+
+    tracker.observe_snapshot(
+        _Snapshot(
+            episode=1,
+            policy_decision_frame=True,
+            info={
+                "episode_step": 2,
+                "episode_completion_fraction": 0.1,
+                "speed_kph": 250.0,
+            },
+            episode_reward=0.5,
+            telemetry_data={
+                "player": {
+                    "signed_lateral_offset": 10.8,
+                    "current_radius_left": 10.0,
+                    "current_radius_right": 30.0,
+                }
+            },
+        ),
+        action_repeat=1,
+    )
+
+    snapshot = tracker.snapshot()
+    assert snapshot is not None
+    assert snapshot.outside_edge_excess_ratio == (0.0,)

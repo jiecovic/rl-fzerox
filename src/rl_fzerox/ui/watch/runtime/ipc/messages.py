@@ -91,6 +91,7 @@ class WatchSnapshot:
     policy_label: str | None
     policy_curriculum_stage: str | None
     policy_num_timesteps: int | None
+    policy_experience_frames: int | None
     policy_deterministic: bool | None
     manual_control_enabled: bool
     policy_reload_age_seconds: float | None

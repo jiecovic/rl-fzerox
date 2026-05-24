@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -11,7 +12,7 @@ from gymnasium import spaces
 
 from fzerox_emulator.arrays import ActionMask, PolicyState
 from rl_fzerox.core.envs.actions import ActionValue
-from rl_fzerox.core.envs.observations import ObservationValue
+from rl_fzerox.core.envs.observations import ImageStateObservation, ObservationValue
 from rl_fzerox.core.policy.auxiliary_state import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_spec,
@@ -19,7 +20,6 @@ from rl_fzerox.core.policy.auxiliary_state import (
 from rl_fzerox.core.policy.auxiliary_state.observations import (
     auxiliary_state_targets_field,
     mapping_has_auxiliary_state_targets,
-    mapping_with_auxiliary_state_targets,
 )
 from rl_fzerox.core.training.inference.activations import (
     PolicyCnnActivation,
@@ -123,6 +123,12 @@ class PolicyRunner:
         return self._loaded_policy.lineage_num_timesteps or self._loaded_policy.num_timesteps
 
     @property
+    def checkpoint_local_num_timesteps(self) -> int | None:
+        """Return checkpoint timesteps local to the loaded run."""
+
+        return self._loaded_policy.num_timesteps
+
+    @property
     def supports_action_masks(self) -> bool:
         """Return whether the loaded policy accepts action_masks during prediction."""
 
@@ -204,8 +210,10 @@ class PolicyRunner:
         observation_space = _policy_observation_space(self._policy)
         if not isinstance(observation_space, spaces.Dict):
             return observation
+        dict_space = observation_space
         field_name = auxiliary_state_targets_field()
-        if field_name not in observation_space.spaces:
+        dict_fields = getattr(dict_space, "spaces", {})
+        if not isinstance(dict_fields, Mapping) or field_name not in dict_fields:
             return observation
         if not isinstance(observation, dict):
             raise TypeError("Auxiliary-state policy expects dict observations")
@@ -213,7 +221,12 @@ class PolicyRunner:
             return observation
 
         zeros = np.zeros(auxiliary_state_target_spec().count, dtype=np.float32)
-        return mapping_with_auxiliary_state_targets(observation, targets=zeros)
+        augmented_observation: ImageStateObservation = {
+            "image": observation["image"],
+            "state": observation["state"],
+            "auxiliary_state_targets": zeros,
+        }
+        return augmented_observation
 
     def _maybe_reload(self) -> None:
         try:
@@ -305,12 +318,15 @@ __all__ = [
 ]
 
 
-def _policy_observation_space(policy: object) -> object | None:
+def _policy_observation_space(policy: object) -> spaces.Space | None:
     observation_space = getattr(policy, "observation_space", None)
-    if observation_space is not None:
+    if isinstance(observation_space, spaces.Space):
         return observation_space
     inner_policy = getattr(policy, "policy", None)
-    return getattr(inner_policy, "observation_space", None)
+    inner_observation_space = getattr(inner_policy, "observation_space", None)
+    if isinstance(inner_observation_space, spaces.Space):
+        return inner_observation_space
+    return None
 
 
 def _policy_auxiliary_state_predictor(policy: object) -> _AuxiliaryStatePredictor | None:

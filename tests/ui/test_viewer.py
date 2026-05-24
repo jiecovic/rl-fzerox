@@ -731,7 +731,7 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
     assert curriculum_line.value == "lean_enabled"
 
 
-def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
+def test_session_section_shows_checkpoint_experience_from_frames() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={
@@ -744,6 +744,7 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
         control_state=ControllerState(),
         policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=660_000,
+        policy_experience_frames=1_320_000,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
         policy_reload_error=None,
@@ -758,6 +759,36 @@ def test_session_section_shows_checkpoint_experience_from_timesteps() -> None:
     experience_line = next(line for line in session_section.lines if line.label == "Experience")
 
     assert experience_line.value == "6h 06m"
+
+
+def test_session_section_keeps_mixed_action_repeat_lineage_experience() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={
+            "frame_index": 0,
+            "native_fps": 60.0,
+        },
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=ControllerState(),
+        policy_curriculum_stage="lean_enabled",
+        policy_num_timesteps=10_000,
+        policy_experience_frames=15_000,
+        policy_action=np.array([2, 1, 0], dtype=np.int64),
+        policy_reload_age_seconds=5.0,
+        policy_reload_error=None,
+        action_repeat=1,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(),
+    )
+
+    session_section = next(section for section in columns.left if section.title == "Run")
+    experience_line = next(line for line in session_section.lines if line.label == "Experience")
+
+    assert experience_line.value == "4m"
 
 
 def test_session_section_shows_policy_deterministic_mode() -> None:

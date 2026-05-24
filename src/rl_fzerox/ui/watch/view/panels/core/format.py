@@ -53,16 +53,11 @@ def _format_reload_age(reload_age_seconds: float | None) -> str:
     return f"{hours}h {minutes:02d}m"
 
 
-def _format_checkpoint_experience(
-    num_timesteps: int | None,
-    *,
-    action_repeat: int,
-) -> str:
-    if num_timesteps is None:
+def _format_checkpoint_experience(total_frames: int | None) -> str:
+    if total_frames is None:
         return "-"
 
-    total_frames = max(0, int(num_timesteps)) * max(1, int(action_repeat))
-    total_seconds = total_frames // 60
+    total_seconds = max(0, int(total_frames)) // 60
     minutes, _ = divmod(total_seconds, 60)
     hours, minutes = divmod(minutes, 60)
     days, hours = divmod(hours, 24)

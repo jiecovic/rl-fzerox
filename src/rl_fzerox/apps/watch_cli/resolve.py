@@ -10,7 +10,7 @@ from rl_fzerox.apps.watch_cli.delta import (
     apply_watch_config_delta,
     watch_config_delta_from_dotlist,
 )
-from rl_fzerox.core.manager import ManagerStore, default_manager_db_path
+from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_manager_db_path
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.training.runs import (
@@ -43,6 +43,7 @@ def resolve_watch_app_config(
     )
     cli_override_delta: dict[str, object] = {}
     train_config: TrainAppConfig | None = None
+    lineage_frame_offset: int | None = None
     if policy_artifact is not None and cli_run_dir is None and managed_run_id is None:
         raise ValueError("--artifact requires --run-dir or --managed-run-id")
     if cli_run_dir is None and managed_run_id is None:
@@ -50,7 +51,7 @@ def resolve_watch_app_config(
     if normalized_overrides:
         cli_override_delta = watch_config_delta_from_dotlist(normalized_overrides)
     if managed_run_id is not None:
-        cli_run_dir, train_config = _managed_watch_train_config(
+        cli_run_dir, train_config, lineage_frame_offset = _managed_watch_train_config(
             db_path=resolved_manager_db_path,
             run_id=managed_run_id,
         )
@@ -63,6 +64,14 @@ def resolve_watch_app_config(
         run_dir=cli_run_dir,
         artifact=policy_artifact or "latest",
     )
+    if lineage_frame_offset is not None:
+        config = config.model_copy(
+            update={
+                "watch": config.watch.model_copy(
+                    update={"lineage_frame_offset": lineage_frame_offset}
+                )
+            }
+        )
 
     resolved_run_dir = cli_run_dir if cli_run_dir is not None else config.watch.policy_run_dir
     if policy_artifact is not None and resolved_run_dir is None:
@@ -116,22 +125,50 @@ def default_watch_config_from_train_run(
     )
 
 
-def _managed_watch_train_config(*, db_path: Path, run_id: str) -> tuple[Path, TrainAppConfig]:
+def _managed_watch_train_config(
+    *,
+    db_path: Path,
+    run_id: str,
+) -> tuple[Path, TrainAppConfig, int | None]:
     """Resolve one manager-owned run into a materialized runtime training config."""
 
     store = ManagerStore(db_path)
     run = store.get_run(run_id)
     if run is None:
         raise ValueError(f"managed run not found: {run_id}")
+    lineage_frame_offset = _lineage_frame_offset(store, run)
     train_config = build_managed_train_app_config(
         run.config,
         run_id=run.id,
         run_dir=run.run_dir,
     )
-    return run.run_dir, materialize_train_run_config(
-        train_config,
-        run_paths=continue_run_paths(run.run_dir),
+    return (
+        run.run_dir,
+        materialize_train_run_config(
+            train_config,
+            run_paths=continue_run_paths(run.run_dir),
+        ),
+        lineage_frame_offset,
     )
+
+
+def _lineage_frame_offset(store: ManagerStore, run: ManagedRun) -> int | None:
+    """Return emulator frames completed before this run's local checkpoint timeline."""
+
+    total_frames = 0
+    current_run = run
+    while current_run.parent_run_id is not None:
+        parent_run = store.get_run(current_run.parent_run_id)
+        if parent_run is None:
+            return None
+        source_steps = current_run.source_num_timesteps
+        if source_steps is None:
+            source_steps = current_run.lineage_step_offset - parent_run.lineage_step_offset
+        if source_steps < 0:
+            return None
+        total_frames += source_steps * max(1, int(parent_run.config.action.action_repeat))
+        current_run = parent_run
+    return total_frames
 
 
 def apply_x_cup_watch_overrides(config: WatchAppConfig) -> WatchAppConfig:
