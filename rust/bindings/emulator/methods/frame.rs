@@ -2,7 +2,7 @@
 //! Frame, observation, and display method bodies.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::PyDict;
 
 use crate::bindings::emulator::frame::frame_to_pyarray;
 use crate::bindings::emulator::{
@@ -14,9 +14,10 @@ use crate::core::observation::ObservationStackMode;
 pub(in crate::bindings::emulator) fn frame_rgb<'py>(
     emulator: &mut PyEmulator,
     py: Python<'py>,
-) -> PyResult<Bound<'py, PyBytes>> {
+) -> PyResult<Bound<'py, PyAny>> {
+    let (height, width, channels) = emulator.host.frame_shape();
     let frame = emulator.host.frame_rgb().map_err(map_core_error)?;
-    Ok(PyBytes::new(py, frame))
+    frame_to_pyarray(py, frame, height, width, channels)
 }
 
 pub(in crate::bindings::emulator) fn observation_spec<'py>(

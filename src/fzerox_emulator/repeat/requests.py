@@ -10,17 +10,16 @@ if TYPE_CHECKING:
 
 
 def native_observation_recipe(recipe: ObservationImageRecipe) -> ObservationImageRequestDict:
-    preset, height, width = recipe.normalized_resolution()
     payload: ObservationImageRequestDict = {
-        "preset": "" if preset is None else preset,
+        "preset": "" if recipe.preset is None else recipe.preset,
         "frame_stack": recipe.frame_stack,
         "stack_mode": recipe.stack_mode,
         "minimap_layer": recipe.minimap_layer,
         "resize_filter": recipe.resize_filter,
         "minimap_resize_filter": recipe.minimap_resize_filter,
     }
-    if height is not None:
-        payload["height"] = height
-    if width is not None:
-        payload["width"] = width
+    if recipe.height is not None:
+        payload["height"] = recipe.height
+    if recipe.width is not None:
+        payload["width"] = recipe.width
     return payload

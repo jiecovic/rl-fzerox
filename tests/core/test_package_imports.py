@@ -19,6 +19,17 @@ def test_importing_fzerox_emulator_package_does_not_load_native_extension() -> N
     assert result["after_import"]["fzerox_emulator._native"] is False
 
 
+def test_importing_controller_state_does_not_load_native_extension() -> None:
+    result = _probe_import(
+        module_name="fzerox_emulator.control",
+        attribute_name="ControllerState",
+        watched_modules=("fzerox_emulator._native",),
+    )
+
+    assert result["after_import"]["fzerox_emulator._native"] is False
+    assert result["after_access"]["fzerox_emulator._native"] is False
+
+
 def test_importing_rl_fzerox_package_does_not_load_env_or_native() -> None:
     result = _probe_import(
         module_name="rl_fzerox",

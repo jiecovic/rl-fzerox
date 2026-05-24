@@ -123,7 +123,7 @@ pub(in crate::bindings::emulator) fn step_repeat_multi_observation_raw<'py>(
     let mut prepared_observations = Vec::with_capacity(observation_requests.len());
     for request in observation_requests.iter() {
         let request_dict = request.cast::<PyDict>()?;
-        let parsed_request = ObservationImageRequest::from_py_dict(&request_dict)?;
+        let parsed_request = ObservationImageRequest::from_py_dict(request_dict)?;
         prepared_observations.push(prepare_observation_render(emulator, &parsed_request)?);
     }
     let observation_configs = prepared_observations

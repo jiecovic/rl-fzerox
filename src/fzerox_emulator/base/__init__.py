@@ -8,7 +8,6 @@ from fzerox_emulator.base.observations import (
     ObservationResizeFilter,
     ObservationSpec,
     ObservationStackMode,
-    normalize_observation_resolution,
     stacked_observation_channels,
 )
 from fzerox_emulator.base.results import (
@@ -29,6 +28,5 @@ __all__ = [
     "ObservationSpec",
     "ObservationStackMode",
     "ResetState",
-    "normalize_observation_resolution",
     "stacked_observation_channels",
 ]

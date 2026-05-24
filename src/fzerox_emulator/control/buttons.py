@@ -1,4 +1,4 @@
-# src/fzerox_emulator/buttons.py
+# src/fzerox_emulator/control/buttons.py
 from __future__ import annotations
 
 from dataclasses import dataclass

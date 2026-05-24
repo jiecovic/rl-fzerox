@@ -1,5 +1,6 @@
 // rust/bindings/emulator/methods/control.rs
 //! Runtime-control, state, RAM, RNG, and telemetry method bodies.
+#![allow(clippy::too_many_arguments)]
 
 use std::path::Path;
 

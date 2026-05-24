@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import fzerox_emulator._native as _native
     import fzerox_emulator.base as _base
-    import fzerox_emulator.buttons as _buttons
     import fzerox_emulator.control as _control
     import fzerox_emulator.emulator as _emulator
     import fzerox_emulator.video as _video
@@ -26,8 +25,8 @@ if TYPE_CHECKING:
     EmulatorBackend = _base.EmulatorBackend
     FZeroXTelemetry = _native.FZeroXTelemetry
     FrameStep = _base.FrameStep
-    JOYPAD_BUTTONS = _buttons.JOYPAD_BUTTONS
-    JoypadButtons = _buttons.JoypadButtons
+    JOYPAD_BUTTONS = _control.JOYPAD_BUTTONS
+    JoypadButtons = _control.JoypadButtons
     ObservationResizeFilter = _base.ObservationResizeFilter
     ObservationImageRecipe = _base.ObservationImageRecipe
     ObservationSpec = _base.ObservationSpec
@@ -61,8 +60,8 @@ _EXPORT_MODULES = {
     "ObservationStackMode": "fzerox_emulator.base",
     "ResetState": "fzerox_emulator.base",
     "stacked_observation_channels": "fzerox_emulator.base",
-    "JOYPAD_BUTTONS": "fzerox_emulator.buttons",
-    "JoypadButtons": "fzerox_emulator.buttons",
+    "JOYPAD_BUTTONS": "fzerox_emulator.control",
+    "JoypadButtons": "fzerox_emulator.control",
     "ControllerState": "fzerox_emulator.control",
     "Emulator": "fzerox_emulator.emulator",
     "display_size": "fzerox_emulator.video",

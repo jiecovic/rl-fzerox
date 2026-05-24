@@ -44,30 +44,6 @@ class ObservationImageRecipe:
     resize_filter: ObservationResizeFilter = "nearest"
     minimap_resize_filter: ObservationResizeFilter = "nearest"
 
-    def normalized_resolution(self) -> tuple[str | None, int | None, int | None]:
-        return normalize_observation_resolution(
-            preset=self.preset,
-            height=self.height,
-            width=self.width,
-        )
-
-
-def normalize_observation_resolution(
-    *,
-    preset: str | None = None,
-    height: int | None = None,
-    width: int | None = None,
-) -> tuple[str | None, int | None, int | None]:
-    """Return one validated preset-or-custom resolution triple."""
-
-    if preset is not None:
-        if height is not None or width is not None:
-            raise ValueError("preset cannot be combined with custom observation height/width")
-        return preset, None, None
-    if height is None or width is None:
-        raise ValueError("custom observation height and width must both be set")
-    return None, int(height), int(width)
-
 
 def stacked_observation_channels(
     single_frame_channels: int,
@@ -78,13 +54,13 @@ def stacked_observation_channels(
 ) -> int:
     """Return channel count after temporal frame-stack encoding."""
 
-    if frame_stack <= 0:
-        raise ValueError("frame_stack must be positive")
-    extra_channels = 1 if minimap_layer else 0
-    if stack_mode == "rgb":
-        return (single_frame_channels * frame_stack) + extra_channels
-    if stack_mode == "gray":
-        return frame_stack + extra_channels
-    if stack_mode == "luma_chroma":
-        return (frame_stack * 2) + extra_channels
-    raise ValueError(f"Unsupported observation stack mode: {stack_mode!r}")
+    import fzerox_emulator._native as _native
+
+    return int(
+        _native.stacked_observation_channels(
+            single_frame_channels,
+            frame_stack,
+            stack_mode,
+            minimap_layer,
+        )
+    )
