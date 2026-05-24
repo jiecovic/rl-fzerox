@@ -2,10 +2,13 @@
 //! Python-facing root F-Zero X telemetry binding.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::PyDict;
 
 use crate::bindings::emulator::telemetry::PyPlayerTelemetry;
+use crate::bindings::payload::{optional_item, required_item};
 use crate::core::telemetry::TelemetrySnapshot;
+
+const TELEMETRY_PAYLOAD: &str = "telemetry snapshot";
 
 #[pyclass(
     name = "FZeroXTelemetry",
@@ -38,20 +41,21 @@ impl PyTelemetry {
         let difficulty_name: Option<String> = optional_item(data, "difficulty_name", None)?;
         let camera_setting_name: Option<String> = optional_item(data, "camera_setting_name", None)?;
         Ok(Self {
-            total_lap_count: required_item(data, "total_lap_count")?.extract()?,
+            total_lap_count: required_item(data, TELEMETRY_PAYLOAD, "total_lap_count")?
+                .extract()?,
             difficulty_raw: optional_item(data, "difficulty_raw", 0)?,
             difficulty_name: difficulty_name.unwrap_or_else(|| "novice".to_owned()),
             camera_setting_raw: optional_item(data, "camera_setting_raw", 2)?,
             camera_setting_name: camera_setting_name.unwrap_or_else(|| "regular".to_owned()),
             race_intro_timer: optional_item(data, "race_intro_timer", 0)?,
-            game_mode_raw: required_item(data, "game_mode_raw")?.extract()?,
-            game_mode_name: required_item(data, "game_mode_name")?.extract()?,
-            in_race_mode: required_item(data, "in_race_mode")?.extract()?,
-            total_racers: required_item(data, "total_racers")?.extract()?,
-            course_index: required_item(data, "course_index")?.extract()?,
+            game_mode_raw: required_item(data, TELEMETRY_PAYLOAD, "game_mode_raw")?.extract()?,
+            game_mode_name: required_item(data, TELEMETRY_PAYLOAD, "game_mode_name")?.extract()?,
+            in_race_mode: required_item(data, TELEMETRY_PAYLOAD, "in_race_mode")?.extract()?,
+            total_racers: required_item(data, TELEMETRY_PAYLOAD, "total_racers")?.extract()?,
+            course_index: required_item(data, TELEMETRY_PAYLOAD, "course_index")?.extract()?,
             course_segment_count: optional_item(data, "course_segment_count", 0)?,
             course_length: optional_item(data, "course_length", 0.0)?,
-            player: required_item(data, "player")?.extract()?,
+            player: required_item(data, TELEMETRY_PAYLOAD, "player")?.extract()?,
         })
     }
 
@@ -168,21 +172,5 @@ impl PyTelemetry {
             course_length: telemetry.course_length,
             player,
         }
-    }
-}
-
-fn required_item<'py>(data: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    data.get_item(key)?.ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!("telemetry snapshot missing {key:?}"))
-    })
-}
-
-fn optional_item<'py, T>(data: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
-where
-    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
-{
-    match data.get_item(key)? {
-        Some(value) => value.extract(),
-        None => Ok(default),
     }
 }

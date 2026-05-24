@@ -5,6 +5,7 @@ pub mod emulator;
 pub mod error;
 pub mod input;
 pub mod observation;
+pub mod payload;
 pub mod probe;
 pub mod video;
 

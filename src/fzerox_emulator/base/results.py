@@ -1,4 +1,6 @@
 # src/fzerox_emulator/base/results.py
+"""Small result value objects returned by emulator backend operations."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

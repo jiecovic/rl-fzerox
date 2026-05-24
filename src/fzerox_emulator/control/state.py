@@ -1,4 +1,6 @@
 # src/fzerox_emulator/control/state.py
+"""Pure Python controller value object passed across the native boundary."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

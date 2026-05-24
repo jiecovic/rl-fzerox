@@ -1,4 +1,6 @@
 # src/fzerox_emulator/arrays.py
+"""Project-owned NumPy aliases for emulator frames, observations, and actions."""
+
 from __future__ import annotations
 
 from typing import TypeAlias

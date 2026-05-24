@@ -2,11 +2,14 @@
 //! PyO3 step objects exposed directly to Python.
 
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict, PyTuple};
+use pyo3::types::{PyDict, PyTuple};
 
 use crate::bindings::emulator::state::{RACER_STATE_FLAGS, has_state_flag, state_flag_labels};
+use crate::bindings::payload::{optional_item, required_item};
 use crate::core::host::{StepStatus, StepSummary};
 use crate::core::telemetry::CourseEffect;
+
+const STEP_SUMMARY_PAYLOAD: &str = "step summary";
 
 #[pyclass(
     name = "StepSummary",
@@ -32,8 +35,9 @@ impl PyStepSummary {
             impact_frames.unwrap_or(damage_taken_frames.max(collision_recoil_active_frames));
         Ok(Self {
             inner: StepSummary {
-                frames_run: required_item(data, "frames_run")?.extract()?,
-                max_race_distance: required_item(data, "max_race_distance")?.extract()?,
+                frames_run: required_item(data, STEP_SUMMARY_PAYLOAD, "frames_run")?.extract()?,
+                max_race_distance: required_item(data, STEP_SUMMARY_PAYLOAD, "max_race_distance")?
+                    .extract()?,
                 reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
                 collision_recoil_active_frames,
                 low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
@@ -322,22 +326,6 @@ pub(super) fn step_status_to_py(py: Python<'_>, status: &StepStatus) -> PyResult
             inner: status.clone(),
         },
     )
-}
-
-fn required_item<'py>(data: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
-    data.get_item(key)?.ok_or_else(|| {
-        pyo3::exceptions::PyValueError::new_err(format!("step summary missing {key:?}"))
-    })
-}
-
-fn optional_item<'py, T>(data: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
-where
-    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
-{
-    match data.get_item(key)? {
-        Some(value) => value.extract(),
-        None => Ok(default),
-    }
 }
 
 fn parse_reason(reason: Option<String>) -> PyResult<Option<&'static str>> {
