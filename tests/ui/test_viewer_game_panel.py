@@ -257,7 +257,7 @@ def test_outside_track_bounds_lights_outside_flag() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(
-            signed_lateral_offset=-130.0,
+            signed_lateral_offset=-140.0,
             current_radius_left=100.0,
             current_radius_right=120.0,
         ),
