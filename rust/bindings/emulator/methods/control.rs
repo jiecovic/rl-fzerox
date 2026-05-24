@@ -1,16 +1,16 @@
 // rust/bindings/emulator/methods/control.rs
 //! Runtime-control, state, RAM, RNG, and telemetry method bodies.
-#![allow(clippy::too_many_arguments)]
 
 use std::path::Path;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyBytes, PyDict};
+use pyo3::types::{PyAny, PyBytes, PyDict};
 
 use crate::bindings::emulator::telemetry::telemetry_to_py;
 use crate::bindings::emulator::{PyEmulator, PyTelemetry};
 use crate::bindings::error::map_core_error;
-use crate::core::game::race_start::RaceStartSetup;
+use crate::core::game::race_start::{RaceStartMode, RaceStartSetup};
 use crate::core::input::ControllerState;
 
 pub(in crate::bindings::emulator) fn reset(
@@ -101,45 +101,70 @@ pub(in crate::bindings::emulator) fn telemetry(
     telemetry_to_py(py, &telemetry)
 }
 
-pub(in crate::bindings::emulator) fn patch_time_attack_race_start_setup(
+pub(in crate::bindings::emulator) fn patch_race_start_setup(
     emulator: &mut PyEmulator,
     py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
+    request: &Bound<'_, PyDict>,
 ) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value: -1,
-    };
-    py.detach(|| emulator.host.patch_time_attack_race_start_setup(setup))
-        .map_err(map_core_error)
+    let request = RaceStartBindingRequest::from_py_dict(request)?;
+    py.detach(|| {
+        emulator
+            .host
+            .patch_race_start_setup(request.mode, request.setup)
+    })
+    .map_err(map_core_error)
 }
 
-pub(in crate::bindings::emulator) fn patch_time_attack_machine_settings(
+pub(in crate::bindings::emulator) fn patch_machine_settings(
     emulator: &mut PyEmulator,
     py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
+    request: &Bound<'_, PyDict>,
 ) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value: -1,
-    };
-    py.detach(|| emulator.host.patch_time_attack_machine_settings(setup))
+    let request = RaceStartBindingRequest::from_py_dict(request)?;
+    py.detach(|| {
+        emulator
+            .host
+            .patch_machine_settings(request.mode, request.setup)
+    })
+    .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn validate_race_start_setup(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    request: &Bound<'_, PyDict>,
+) -> PyResult<()> {
+    let request = RaceStartBindingRequest::from_py_dict(request)?;
+    py.detach(|| {
+        emulator
+            .host
+            .validate_race_start_setup(request.mode, request.setup)
+    })
+    .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn patch_engine_settings(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    mode: &str,
+    engine_setting_raw_value: i32,
+) -> PyResult<()> {
+    let mode = parse_race_start_mode(mode)?;
+    py.detach(|| {
+        emulator
+            .host
+            .patch_engine_settings(mode, engine_setting_raw_value)
+    })
+    .map_err(map_core_error)
+}
+
+pub(in crate::bindings::emulator) fn force_race_reinit(
+    emulator: &mut PyEmulator,
+    py: Python<'_>,
+    mode: &str,
+) -> PyResult<()> {
+    let mode = parse_race_start_mode(mode)?;
+    py.detach(|| emulator.host.force_race_reinit(mode))
         .map_err(map_core_error)
 }
 
@@ -151,133 +176,46 @@ pub(in crate::bindings::emulator) fn patch_time_attack_menu_mode(
         .map_err(map_core_error)
 }
 
-pub(in crate::bindings::emulator) fn patch_time_attack_engine_settings(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    engine_setting_raw_value: i32,
-) -> PyResult<()> {
-    py.detach(|| {
-        emulator
-            .host
-            .patch_time_attack_engine_settings(engine_setting_raw_value)
-    })
-    .map_err(map_core_error)
+fn parse_race_start_mode(mode: &str) -> PyResult<RaceStartMode> {
+    RaceStartMode::parse(mode).map_err(map_core_error)
 }
 
-pub(in crate::bindings::emulator) fn patch_gp_race_start_setup(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
-    gp_difficulty_raw_value: i32,
-) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value,
-    };
-    py.detach(|| emulator.host.patch_gp_race_start_setup(setup))
-        .map_err(map_core_error)
+struct RaceStartBindingRequest {
+    mode: RaceStartMode,
+    setup: RaceStartSetup,
 }
 
-pub(in crate::bindings::emulator) fn patch_gp_race_machine_settings(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
-    gp_difficulty_raw_value: i32,
-) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value,
-    };
-    py.detach(|| emulator.host.patch_gp_race_machine_settings(setup))
-        .map_err(map_core_error)
+impl RaceStartBindingRequest {
+    fn from_py_dict(request: &Bound<'_, PyDict>) -> PyResult<Self> {
+        let mode_raw: String = required_item(request, "mode")?.extract()?;
+        let mode = parse_race_start_mode(&mode_raw)?;
+        let setup = RaceStartSetup {
+            course_index: required_item(request, "course_index")?.extract()?,
+            character_index: required_item(request, "character_index")?.extract()?,
+            machine_skin_index: optional_item(request, "machine_skin_index", -1)?,
+            engine_setting_raw_value: required_item(request, "engine_setting_raw_value")?
+                .extract()?,
+            total_lap_count: optional_item(request, "total_lap_count", 3)?,
+            gp_difficulty_raw_value: optional_item(request, "gp_difficulty_raw_value", -1)?,
+        };
+        Ok(Self { mode, setup })
+    }
 }
 
-pub(in crate::bindings::emulator) fn patch_gp_race_engine_settings(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    engine_setting_raw_value: i32,
-) -> PyResult<()> {
-    py.detach(|| {
-        emulator
-            .host
-            .patch_gp_race_engine_settings(engine_setting_raw_value)
-    })
-    .map_err(map_core_error)
+fn required_item<'py>(request: &Bound<'py, PyDict>, key: &str) -> PyResult<Bound<'py, PyAny>> {
+    request
+        .get_item(key)?
+        .ok_or_else(|| PyValueError::new_err(format!("race-start request missing {key:?}")))
 }
 
-pub(in crate::bindings::emulator) fn force_time_attack_reinit(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-) -> PyResult<()> {
-    py.detach(|| emulator.host.force_time_attack_reinit())
-        .map_err(map_core_error)
-}
-
-pub(in crate::bindings::emulator) fn force_gp_race_reinit(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-) -> PyResult<()> {
-    py.detach(|| emulator.host.force_gp_race_reinit())
-        .map_err(map_core_error)
-}
-
-pub(in crate::bindings::emulator) fn validate_time_attack_race_start_setup(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
-) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value: -1,
-    };
-    py.detach(|| emulator.host.validate_time_attack_race_start_setup(setup))
-        .map_err(map_core_error)
-}
-
-pub(in crate::bindings::emulator) fn validate_gp_race_start_setup(
-    emulator: &mut PyEmulator,
-    py: Python<'_>,
-    course_index: i32,
-    character_index: i16,
-    engine_setting_raw_value: i32,
-    machine_skin_index: i16,
-    total_lap_count: i32,
-    gp_difficulty_raw_value: i32,
-) -> PyResult<()> {
-    let setup = RaceStartSetup {
-        course_index,
-        character_index,
-        machine_skin_index,
-        engine_setting_raw_value,
-        total_lap_count,
-        gp_difficulty_raw_value,
-    };
-    py.detach(|| emulator.host.validate_gp_race_start_setup(setup))
-        .map_err(map_core_error)
+fn optional_item<'py, T>(request: &Bound<'py, PyDict>, key: &str, default: T) -> PyResult<T>
+where
+    T: pyo3::prelude::FromPyObjectOwned<'py, Error = pyo3::PyErr>,
+{
+    match request.get_item(key)? {
+        Some(value) => value.extract(),
+        None => Ok(default),
+    }
 }
 
 pub(in crate::bindings::emulator) fn vehicle_setup_info<'py>(

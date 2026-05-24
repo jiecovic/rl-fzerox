@@ -343,17 +343,19 @@ class SyntheticBackend:
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
-                frames_run=action_repeat,
-                max_race_distance=self._state.progress,
-                reverse_active_frames=0,
-                collision_recoil_active_frames=0,
-                low_speed_frames=0,
-                energy_loss_total=0.0,
-                energy_gain_total=0.0,
-                damage_taken_frames=0,
-                consecutive_low_speed_frames=0,
-                entered_state_flags=0,
-                final_frame_index=self._state.frame_index,
+                {
+                    "frames_run": action_repeat,
+                    "max_race_distance": self._state.progress,
+                    "reverse_active_frames": 0,
+                    "collision_recoil_active_frames": 0,
+                    "low_speed_frames": 0,
+                    "energy_loss_total": 0.0,
+                    "energy_gain_total": 0.0,
+                    "damage_taken_frames": 0,
+                    "consecutive_low_speed_frames": 0,
+                    "entered_state_flags": 0,
+                    "final_frame_index": self._state.frame_index,
+                }
             ),
             status=StepStatus(
                 step_count=self._state.step_count,
@@ -437,17 +439,19 @@ class SyntheticBackend:
         return BackendStepResult(
             observation=observation,
             summary=StepSummary(
-                frames_run=action_repeat,
-                max_race_distance=self._state.progress,
-                reverse_active_frames=0,
-                collision_recoil_active_frames=0,
-                low_speed_frames=0,
-                energy_loss_total=0.0,
-                energy_gain_total=0.0,
-                damage_taken_frames=0,
-                consecutive_low_speed_frames=0,
-                entered_state_flags=0,
-                final_frame_index=self._state.frame_index,
+                {
+                    "frames_run": action_repeat,
+                    "max_race_distance": self._state.progress,
+                    "reverse_active_frames": 0,
+                    "collision_recoil_active_frames": 0,
+                    "low_speed_frames": 0,
+                    "energy_loss_total": 0.0,
+                    "energy_gain_total": 0.0,
+                    "damage_taken_frames": 0,
+                    "consecutive_low_speed_frames": 0,
+                    "entered_state_flags": 0,
+                    "final_frame_index": self._state.frame_index,
+                }
             ),
             status=StepStatus(
                 step_count=self._state.step_count,

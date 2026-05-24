@@ -9,7 +9,7 @@ use libretro_sys::MEMORY_SYSTEM_RAM;
 use crate::core::api::LoadedCore;
 use crate::core::callbacks::{CallbackGuard, CallbackState};
 use crate::core::error::CoreError;
-use crate::core::game::race_start::{RaceStartSetup, VehicleSetupInfo};
+use crate::core::game::race_start::{RaceStartMode, RaceStartSetup, VehicleSetupInfo};
 use crate::core::input::ControllerState;
 use crate::core::observation::ObservationCropProfile;
 use crate::core::rom::validate_supported_rom;
@@ -212,83 +212,54 @@ impl Host {
         crate::core::telemetry::read_snapshot(system_ram)
     }
 
-    pub fn patch_time_attack_race_start_setup(
-        &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_time_attack_race_setup(system_ram, setup)
-    }
-
-    pub fn patch_time_attack_machine_settings(
-        &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_time_attack_machine_settings(system_ram, setup)
-    }
-
     pub fn patch_time_attack_menu_mode(&mut self) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice_mut()?;
         crate::core::game::race_start::write_time_attack_menu_mode(system_ram)
     }
 
-    pub fn patch_time_attack_engine_settings(
+    pub fn patch_race_start_setup(
         &mut self,
+        mode: RaceStartMode,
+        setup: RaceStartSetup,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_race_setup(system_ram, mode, setup)
+    }
+
+    pub fn patch_machine_settings(
+        &mut self,
+        mode: RaceStartMode,
+        setup: RaceStartSetup,
+    ) -> Result<(), CoreError> {
+        let system_ram = self.system_ram_slice_mut()?;
+        crate::core::game::race_start::write_machine_settings(system_ram, mode, setup)
+    }
+
+    pub fn patch_engine_settings(
+        &mut self,
+        mode: RaceStartMode,
         engine_setting_raw_value: i32,
     ) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_time_attack_engine_settings(
+        crate::core::game::race_start::write_engine_settings(
             system_ram,
+            mode,
             engine_setting_raw_value,
         )
     }
 
-    pub fn patch_gp_race_start_setup(&mut self, setup: RaceStartSetup) -> Result<(), CoreError> {
+    pub fn force_race_reinit(&mut self, mode: RaceStartMode) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_gp_race_setup(system_ram, setup)
+        crate::core::game::race_start::force_race_reinit(system_ram, mode)
     }
 
-    pub fn patch_gp_race_machine_settings(
+    pub fn validate_race_start_setup(
         &mut self,
-        setup: RaceStartSetup,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_gp_race_machine_settings(system_ram, setup)
-    }
-
-    pub fn patch_gp_race_engine_settings(
-        &mut self,
-        engine_setting_raw_value: i32,
-    ) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::write_gp_race_engine_settings(
-            system_ram,
-            engine_setting_raw_value,
-        )
-    }
-
-    pub fn force_time_attack_reinit(&mut self) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::force_time_attack_reinit(system_ram)
-    }
-
-    pub fn force_gp_race_reinit(&mut self) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice_mut()?;
-        crate::core::game::race_start::force_gp_race_reinit(system_ram)
-    }
-
-    pub fn validate_time_attack_race_start_setup(
-        &mut self,
+        mode: RaceStartMode,
         setup: RaceStartSetup,
     ) -> Result<(), CoreError> {
         let system_ram = self.system_ram_slice()?;
-        crate::core::game::race_start::validate_time_attack_race_setup(system_ram, setup)
-    }
-
-    pub fn validate_gp_race_start_setup(&mut self, setup: RaceStartSetup) -> Result<(), CoreError> {
-        let system_ram = self.system_ram_slice()?;
-        crate::core::game::race_start::validate_gp_race_setup(system_ram, setup)
+        crate::core::game::race_start::validate_race_setup(system_ram, mode, setup)
     }
 
     pub fn vehicle_setup_info(&mut self) -> Result<VehicleSetupInfo, CoreError> {

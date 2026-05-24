@@ -38,53 +38,85 @@ class VehicleSetupInfoDict(TypedDict):
     character_engine_setting_ram: float
     racer_engine_curve_ram: float
 
+class RaceStartRequestDict(TypedDict, total=False):
+    mode: str
+    course_index: int
+    character_index: int
+    machine_skin_index: int
+    engine_setting_raw_value: int
+    total_lap_count: int
+    gp_difficulty_raw_value: int
+
+class RepeatStepRequestDict(TypedDict, total=False):
+    action_repeat: int
+    stuck_min_speed_kph: float
+    energy_loss_epsilon: float
+    max_episode_steps: int
+    progress_frontier_stall_limit_frames: int | None
+    progress_frontier_epsilon: float
+    terminate_on_energy_depleted: bool
+    lean_timer_assist: bool
+    joypad_mask: int
+    left_stick_x: float
+    left_stick_y: float
+    right_stick_x: float
+    right_stick_y: float
+
+class RepeatObservationStepRequestDict(TypedDict):
+    step: RepeatStepRequestDict
+    observation: ObservationImageRequestDict
+
+class RepeatMultiObservationStepRequestDict(TypedDict):
+    step: RepeatStepRequestDict
+    observations: list[ObservationImageRequestDict]
+
+class PlayerTelemetryDict(TypedDict, total=False):
+    state_flags: int
+    speed_kph: float
+    energy: float
+    max_energy: float
+    boost_timer: int
+    recoil_tilt_magnitude: float
+    reverse_timer: int
+    race_distance: float
+    lap_distance: float
+    race_time_ms: int
+    lap: int
+    laps_completed: int
+    position: int
+    ko_star_count: int
+    damage_rumble_counter: int
+    segment_index: int | None
+    segment_t: float
+    segment_length_proportion: float
+    world_pos_x: float
+    world_pos_y: float
+    world_pos_z: float
+    segment_center_x: float
+    segment_center_y: float
+    segment_center_z: float
+    local_lateral_velocity: float
+    signed_lateral_offset: float
+    lateral_distance: float
+    lateral_displacement_magnitude: float
+    current_radius_left: float
+    current_radius_right: float
+    height_above_ground: float
+    future_local_nearest_segment_index: int | None
+    future_local_nearest_segment_distance: float
+    velocity_magnitude: float
+    acceleration_magnitude: float
+    acceleration_force: float
+    drift_attack_force: float
+    collision_mass: float
+    machine_body_stat: int
+    machine_boost_stat: int
+    machine_grip_stat: int
+    machine_weight: int
+    engine_setting: float
+
 class PlayerTelemetry:
-    def __init__(
-        self,
-        state_flags: int,
-        speed_kph: float,
-        energy: float,
-        max_energy: float,
-        boost_timer: int,
-        recoil_tilt_magnitude: float,
-        reverse_timer: int,
-        race_distance: float,
-        lap_distance: float,
-        race_time_ms: int,
-        lap: int,
-        laps_completed: int,
-        position: int,
-        ko_star_count: int = 0,
-        damage_rumble_counter: int = 0,
-        segment_index: int | None = None,
-        segment_t: float = 0.0,
-        segment_length_proportion: float = 0.0,
-        world_pos_x: float = 0.0,
-        world_pos_y: float = 0.0,
-        world_pos_z: float = 0.0,
-        segment_center_x: float = 0.0,
-        segment_center_y: float = 0.0,
-        segment_center_z: float = 0.0,
-        local_lateral_velocity: float = 0.0,
-        signed_lateral_offset: float = 0.0,
-        lateral_distance: float = 0.0,
-        lateral_displacement_magnitude: float = 0.0,
-        current_radius_left: float = 0.0,
-        current_radius_right: float = 0.0,
-        height_above_ground: float = 0.0,
-        future_local_nearest_segment_index: int | None = None,
-        future_local_nearest_segment_distance: float = 0.0,
-        velocity_magnitude: float = 0.0,
-        acceleration_magnitude: float = 0.0,
-        acceleration_force: float = 0.0,
-        drift_attack_force: float = 0.0,
-        collision_mass: float = 0.0,
-        machine_body_stat: int = 0,
-        machine_boost_stat: int = 0,
-        machine_grip_stat: int = 0,
-        machine_weight: int = 0,
-        engine_setting: float = 0.0,
-    ) -> None: ...
+    def __init__(self, data: PlayerTelemetryDict) -> None: ...
     @property
     def state_flags(self) -> int: ...
     @property
@@ -205,24 +237,24 @@ class PlayerTelemetry:
     def terminal_reason(self) -> str | None: ...
     def to_dict(self) -> dict[str, object]: ...
 
+class FZeroXTelemetryDict(TypedDict, total=False):
+    total_lap_count: int
+    game_mode_raw: int
+    game_mode_name: str
+    in_race_mode: bool
+    total_racers: int
+    course_index: int
+    player: PlayerTelemetry
+    course_length: float
+    course_segment_count: int
+    difficulty_raw: int
+    difficulty_name: str | None
+    camera_setting_raw: int
+    camera_setting_name: str | None
+    race_intro_timer: int
+
 class FZeroXTelemetry:
-    def __init__(
-        self,
-        total_lap_count: int,
-        game_mode_raw: int,
-        game_mode_name: str,
-        in_race_mode: bool,
-        total_racers: int,
-        course_index: int,
-        player: PlayerTelemetry,
-        course_length: float = 0.0,
-        course_segment_count: int = 0,
-        difficulty_raw: int = 0,
-        difficulty_name: str | None = None,
-        camera_setting_raw: int = 2,
-        camera_setting_name: str | None = None,
-        race_intro_timer: int = 0,
-    ) -> None: ...
+    def __init__(self, data: FZeroXTelemetryDict) -> None: ...
     @property
     def total_lap_count(self) -> int: ...
     @property
@@ -253,24 +285,24 @@ class FZeroXTelemetry:
     def player(self) -> PlayerTelemetry: ...
     def to_dict(self) -> dict[str, object]: ...
 
+class StepSummaryDict(TypedDict, total=False):
+    frames_run: int
+    max_race_distance: float
+    reverse_active_frames: int
+    collision_recoil_active_frames: int
+    low_speed_frames: int
+    energy_loss_total: float
+    energy_gain_total: float
+    damage_taken_frames: int
+    consecutive_low_speed_frames: int
+    entered_state_flags: int
+    entered_course_effects: int
+    final_frame_index: int
+    airborne_frames: int
+    impact_frames: int | None
+
 class StepSummary:
-    def __init__(
-        self,
-        frames_run: int,
-        max_race_distance: float,
-        reverse_active_frames: int = 0,
-        collision_recoil_active_frames: int = 0,
-        low_speed_frames: int = 0,
-        energy_loss_total: float = 0.0,
-        energy_gain_total: float = 0.0,
-        damage_taken_frames: int = 0,
-        consecutive_low_speed_frames: int = 0,
-        entered_state_flags: int = 0,
-        entered_course_effects: int = 0,
-        final_frame_index: int = 0,
-        airborne_frames: int = 0,
-        impact_frames: int | None = None,
-    ) -> None: ...
+    def __init__(self, data: StepSummaryDict) -> None: ...
     @property
     def frames_run(self) -> int: ...
     @property
@@ -372,68 +404,15 @@ class Emulator:
     def step_frames(self, count: int = 1, capture_video: bool = True) -> None: ...
     def step_repeat_raw(
         self,
-        action_repeat: int,
-        preset: str,
-        frame_stack: int,
-        stuck_min_speed_kph: float,
-        energy_loss_epsilon: float,
-        max_episode_steps: int,
-        progress_frontier_stall_limit_frames: int | None,
-        progress_frontier_epsilon: float,
-        terminate_on_energy_depleted: bool = True,
-        lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        joypad_mask: int = 0,
-        left_stick_x: float = 0.0,
-        left_stick_y: float = 0.0,
-        right_stick_x: float = 0.0,
-        right_stick_y: float = 0.0,
-        height: int | None = None,
-        width: int | None = None,
+        request: RepeatObservationStepRequestDict,
     ) -> tuple[npt.NDArray[np.uint8], StepSummary, StepStatus, FZeroXTelemetry]: ...
     def step_repeat_multi_observation_raw(
         self,
-        action_repeat: int,
-        observation_requests: list[ObservationImageRequestDict],
-        stuck_min_speed_kph: float,
-        energy_loss_epsilon: float,
-        max_episode_steps: int,
-        progress_frontier_stall_limit_frames: int | None,
-        progress_frontier_epsilon: float,
-        terminate_on_energy_depleted: bool = True,
-        lean_timer_assist: bool = False,
-        joypad_mask: int = 0,
-        left_stick_x: float = 0.0,
-        left_stick_y: float = 0.0,
-        right_stick_x: float = 0.0,
-        right_stick_y: float = 0.0,
+        request: RepeatMultiObservationStepRequestDict,
     ) -> tuple[list[npt.NDArray[np.uint8]], StepSummary, StepStatus, FZeroXTelemetry]: ...
     def step_repeat_watch_raw(
         self,
-        action_repeat: int,
-        preset: str,
-        frame_stack: int,
-        stuck_min_speed_kph: float,
-        energy_loss_epsilon: float,
-        max_episode_steps: int,
-        progress_frontier_stall_limit_frames: int | None,
-        progress_frontier_epsilon: float,
-        terminate_on_energy_depleted: bool = True,
-        lean_timer_assist: bool = False,
-        stack_mode: Literal["rgb", "gray", "luma_chroma"] = "rgb",
-        minimap_layer: bool = False,
-        resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        minimap_resize_filter: Literal["nearest", "bilinear"] = "nearest",
-        joypad_mask: int = 0,
-        left_stick_x: float = 0.0,
-        left_stick_y: float = 0.0,
-        right_stick_x: float = 0.0,
-        right_stick_y: float = 0.0,
-        height: int | None = None,
-        width: int | None = None,
+        request: RepeatObservationStepRequestDict,
     ) -> tuple[
         npt.NDArray[np.uint8],
         list[npt.NDArray[np.uint8]],
@@ -475,68 +454,12 @@ class Emulator:
         width: int | None = None,
     ) -> npt.NDArray[np.uint8]: ...
     def telemetry(self) -> FZeroXTelemetry | None: ...
-    def patch_time_attack_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-    ) -> None: ...
-    def patch_time_attack_machine_settings(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-    ) -> None: ...
+    def patch_race_start_setup(self, request: RaceStartRequestDict) -> None: ...
+    def patch_machine_settings(self, request: RaceStartRequestDict) -> None: ...
+    def patch_engine_settings(self, mode: str, engine_setting_raw_value: int) -> None: ...
+    def force_race_reinit(self, mode: str) -> None: ...
+    def validate_race_start_setup(self, request: RaceStartRequestDict) -> None: ...
     def patch_time_attack_menu_mode(self) -> None: ...
-    def patch_time_attack_engine_settings(
-        self,
-        engine_setting_raw_value: int,
-    ) -> None: ...
-    def patch_gp_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-        gp_difficulty_raw_value: int = -1,
-    ) -> None: ...
-    def patch_gp_race_machine_settings(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-        gp_difficulty_raw_value: int = -1,
-    ) -> None: ...
-    def patch_gp_race_engine_settings(
-        self,
-        engine_setting_raw_value: int,
-    ) -> None: ...
-    def force_time_attack_reinit(self) -> None: ...
-    def force_gp_race_reinit(self) -> None: ...
-    def validate_time_attack_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-    ) -> None: ...
-    def validate_gp_race_start_setup(
-        self,
-        course_index: int,
-        character_index: int,
-        engine_setting_raw_value: int,
-        machine_skin_index: int = -1,
-        total_lap_count: int = 3,
-        gp_difficulty_raw_value: int = -1,
-    ) -> None: ...
     def vehicle_setup_info(self) -> VehicleSetupInfoDict: ...
     def read_system_ram(self, offset: int, length: int) -> bytes: ...
     def write_system_ram(self, offset: int, data: bytes) -> None: ...
