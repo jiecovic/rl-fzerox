@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -10,7 +11,7 @@ from rl_fzerox.core.domain.observation_image import (
     SourceCropResolutionChoice,
 )
 from rl_fzerox.core.envs.observations.state import state_feature_names
-from rl_fzerox.core.manager import default_managed_run_config
+from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config
 from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
 from rl_fzerox.core.manager.training import (
     assert_managed_fork_compatible,
@@ -18,6 +19,27 @@ from rl_fzerox.core.manager.training import (
     build_managed_resume_train_app_config,
     build_managed_train_app_config,
 )
+
+
+def _manager_config_data_with_control_history_features(
+    included_features: tuple[str, ...],
+    *,
+    lean_output_mode: Literal["three_way", "independent_buttons"],
+) -> dict[str, object]:
+    return {
+        "action": {"lean_output_mode": lean_output_mode},
+        "observation": {
+            "state_components": [
+                {
+                    "name": "control_history",
+                    "length": 1,
+                    "controls": ["lean"],
+                    "included_features": list(included_features),
+                }
+            ],
+            "state_feature_dropouts": [],
+        },
+    }
 
 
 def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
@@ -90,6 +112,45 @@ def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     assert train_config.env.action.layout_continuous_axes == ("drive", "pitch")
     assert train_config.env.action.layout_discrete_axes == ("steer", "lean")
     assert train_config.env.action.independent_lean_buttons is True
+
+
+def test_manager_run_config_accepts_independent_lean_history_features(
+    tmp_path: Path,
+) -> None:
+    config_data = _manager_config_data_with_control_history_features(
+        (
+            "control_history.prev_lean_left_1",
+            "control_history.prev_lean_right_1",
+        ),
+        lean_output_mode="independent_buttons",
+    )
+
+    config = ManagedRunConfig.model_validate(config_data)
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-independent-lean-history",
+        run_dir=tmp_path / "runs" / "bridge-independent-lean-history_0001",
+    )
+    components = train_config.env.observation.state_components
+    assert components is not None
+
+    assert state_feature_names(
+        state_components=tuple(component.data() for component in components),
+        independent_lean_buttons=train_config.env.action.independent_lean_buttons,
+    ) == (
+        "control_history.prev_lean_left_1",
+        "control_history.prev_lean_right_1",
+    )
+
+
+def test_manager_run_config_rejects_split_lean_history_for_three_way_lean() -> None:
+    config_data = _manager_config_data_with_control_history_features(
+        ("control_history.prev_lean_left_1",),
+        lean_output_mode="three_way",
+    )
+
+    with pytest.raises(ValueError, match="control_history.prev_lean_left_1"):
+        ManagedRunConfig.model_validate(config_data)
 
 
 def test_manager_training_bridge_can_mask_air_brake_on_ground(

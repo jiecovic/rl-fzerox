@@ -47,6 +47,19 @@ class EnvConfig(BaseModel):
     action: ActionConfig = Field(default_factory=ActionConfig)
     observation: ObservationConfig = Field(default_factory=ObservationConfig)
 
+    @model_validator(mode="after")
+    def _validate_action_aware_observation_features(self) -> EnvConfig:
+        from rl_fzerox.core.envs.observations.state.components import state_component_features
+
+        if self.observation.state_components is None:
+            return self
+        for component in self.observation.state_components:
+            state_component_features(
+                component.data(),
+                independent_lean_buttons=self.action.independent_lean_buttons,
+            )
+        return self
+
 
 class RewardCourseOverrideConfig(BaseModel):
     """Course-local reward overrides for fields in :class:`RewardConfig`."""
