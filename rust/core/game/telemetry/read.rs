@@ -287,9 +287,9 @@ fn future_local_nearest_segment(
 
 fn outside_track_bounds(offset: f32, current_radius_left: f32, current_radius_right: f32) -> bool {
     if offset >= 0.0 {
-        current_radius_left > 0.0 && offset > current_radius_left
+        current_radius_left > 0.0 && offset > current_radius_left * 1.10
     } else {
-        current_radius_right > 0.0 && offset < -current_radius_right
+        current_radius_right > 0.0 && offset < -current_radius_right * 1.10
     }
 }
 
