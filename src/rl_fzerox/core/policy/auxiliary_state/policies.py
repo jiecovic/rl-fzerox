@@ -24,6 +24,8 @@ from sb3x.ppo_mask_recurrent.policies import MaskableRecurrentMultiInputActorCri
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from torch import nn
 
+from fzerox_emulator.arrays import BoolArray, PolicyState
+from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state.heads import (
     AuxiliaryStateHeadBank,
     AuxiliaryStateLossTerm,
@@ -142,9 +144,9 @@ def _recurrent_tensor_state(
     *,
     policy: MaskableRecurrentMultiInputActorCriticPolicy
     | MaskableHybridRecurrentMultiInputActorCriticPolicy,
-    state: tuple[np.ndarray, ...] | None,
+    state: PolicyState,
     obs: PyTorchObs,
-    episode_start: np.ndarray | None,
+    episode_start: BoolArray | None,
 ) -> tuple[tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
     n_envs = count_vectorized_envs(obs)
     if state is None:
@@ -231,10 +233,10 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
 
     def predict_auxiliary_state(
         self,
-        observation: np.ndarray | dict[str, np.ndarray],
+        observation: ObservationValue,
         *,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         target_names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
         del state, episode_start
@@ -330,10 +332,10 @@ class AuxiliaryStateMaskableRecurrentMultiInputPolicy(
 
     def predict_auxiliary_state(
         self,
-        observation: np.ndarray | dict[str, np.ndarray],
+        observation: ObservationValue,
         *,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         target_names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
         self.set_training_mode(False)
@@ -435,10 +437,10 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
 
     def predict_auxiliary_state(
         self,
-        observation: np.ndarray | dict[str, np.ndarray],
+        observation: ObservationValue,
         *,
-        state: tuple[np.ndarray, ...] | None = None,
-        episode_start: np.ndarray | None = None,
+        state: PolicyState = None,
+        episode_start: BoolArray | None = None,
         target_names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
         self.set_training_mode(False)
