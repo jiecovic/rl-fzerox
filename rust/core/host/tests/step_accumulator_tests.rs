@@ -5,11 +5,26 @@ use crate::core::host::RepeatedStepConfig;
 use crate::core::input::ControllerState;
 use crate::core::telemetry::StepTelemetrySample;
 
-const AIRBORNE_FLAG: u32 = 1 << 26;
-const ACTIVE_FLAG: u32 = 1 << 30;
-const COLLISION_RECOIL_FLAG: u32 = 1 << 13;
-const COURSE_EFFECT_DASH: u32 = 3;
-const COURSE_EFFECT_DIRT: u32 = 2;
+#[derive(Clone, Copy)]
+struct TestStateFlags {
+    airborne: u32,
+    active: u32,
+    collision_recoil: u32,
+}
+
+#[derive(Clone, Copy)]
+struct TestCourseEffects {
+    dash: u32,
+    dirt: u32,
+}
+
+const STATE_FLAGS: TestStateFlags = TestStateFlags {
+    airborne: 1 << 26,
+    active: 1 << 30,
+    collision_recoil: 1 << 13,
+};
+
+const COURSE_EFFECTS: TestCourseEffects = TestCourseEffects { dash: 3, dirt: 2 };
 
 #[test]
 fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
@@ -106,8 +121,14 @@ fn step_accumulator_counts_airborne_frames() {
     let initial = telemetry(100.0, 100.0, 120.0, 0b001, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
-    accumulator.observe(&telemetry(101.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 21);
-    accumulator.observe(&telemetry(102.0, 100.0, 120.0, AIRBORNE_FLAG, 0, 0), 22);
+    accumulator.observe(
+        &telemetry(101.0, 100.0, 120.0, STATE_FLAGS.airborne, 0, 0),
+        21,
+    );
+    accumulator.observe(
+        &telemetry(102.0, 100.0, 120.0, STATE_FLAGS.airborne, 0, 0),
+        22,
+    );
     accumulator.observe(&telemetry(103.0, 100.0, 120.0, 0, 0, 0), 23);
 
     let summary = accumulator.finish();
@@ -118,7 +139,7 @@ fn step_accumulator_counts_airborne_frames() {
 
 #[test]
 fn step_accumulator_counts_collision_recoil_active_frames() {
-    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
     accumulator.observe(
@@ -126,7 +147,7 @@ fn step_accumulator_counts_collision_recoil_active_frames() {
             101.0,
             100.0,
             120.0,
-            ACTIVE_FLAG | COLLISION_RECOIL_FLAG,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
             0,
             0,
         ),
@@ -137,13 +158,16 @@ fn step_accumulator_counts_collision_recoil_active_frames() {
             102.0,
             100.0,
             120.0,
-            ACTIVE_FLAG | COLLISION_RECOIL_FLAG,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
             0,
             0,
         ),
         22,
     );
-    accumulator.observe(&telemetry(103.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0), 23);
+    accumulator.observe(
+        &telemetry(103.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0),
+        23,
+    );
 
     let summary = accumulator.finish();
 
@@ -154,7 +178,7 @@ fn step_accumulator_counts_collision_recoil_active_frames() {
 
 #[test]
 fn step_accumulator_counts_damage_and_recoil_overlap_as_one_impact_frame() {
-    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
     accumulator.observe(
@@ -162,7 +186,7 @@ fn step_accumulator_counts_damage_and_recoil_overlap_as_one_impact_frame() {
             101.0,
             100.0,
             120.0,
-            ACTIVE_FLAG | COLLISION_RECOIL_FLAG,
+            STATE_FLAGS.active | STATE_FLAGS.collision_recoil,
             0,
             1,
         ),
@@ -178,31 +202,52 @@ fn step_accumulator_counts_damage_and_recoil_overlap_as_one_impact_frame() {
 
 #[test]
 fn step_accumulator_tracks_entered_course_effects() {
-    let initial = telemetry(100.0, 100.0, 120.0, ACTIVE_FLAG, 0, 0);
+    let initial = telemetry(100.0, 100.0, 120.0, STATE_FLAGS.active, 0, 0);
     let mut accumulator = StepAccumulator::new(&initial, repeated_step_config(100, 5), 20);
 
     accumulator.observe(
-        &telemetry(101.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        &telemetry(
+            101.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dash,
+            0,
+            0,
+        ),
         21,
     );
     accumulator.observe(
-        &telemetry(102.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DASH, 0, 0),
+        &telemetry(
+            102.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dash,
+            0,
+            0,
+        ),
         22,
     );
     accumulator.observe(
-        &telemetry(103.0, 100.0, 120.0, ACTIVE_FLAG | COURSE_EFFECT_DIRT, 0, 0),
+        &telemetry(
+            103.0,
+            100.0,
+            120.0,
+            STATE_FLAGS.active | COURSE_EFFECTS.dirt,
+            0,
+            0,
+        ),
         23,
     );
 
     let summary = accumulator.finish();
 
     assert_eq!(
-        summary.entered_course_effects & (1 << COURSE_EFFECT_DASH),
-        1 << COURSE_EFFECT_DASH
+        summary.entered_course_effects & (1 << COURSE_EFFECTS.dash),
+        1 << COURSE_EFFECTS.dash
     );
     assert_eq!(
-        summary.entered_course_effects & (1 << COURSE_EFFECT_DIRT),
-        1 << COURSE_EFFECT_DIRT
+        summary.entered_course_effects & (1 << COURSE_EFFECTS.dirt),
+        1 << COURSE_EFFECTS.dirt
     );
 }
 

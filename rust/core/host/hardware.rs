@@ -20,7 +20,7 @@ use egl::{
     EglContext, EglDisplay, EglFns, EglSurface, bind_opengl_api, choose_config, context_type,
     create_context, create_display, create_surface, egl_fns, make_current,
 };
-use gl::{GL_PACK_ALIGNMENT, GL_RGB, GL_UNSIGNED_BYTE, GlFns, GlSizei, flip_rgb_rows};
+use gl::{GL_VALUES, GlFns, GlSizei, flip_rgb_rows};
 
 pub struct HardwareRenderContext {
     egl: &'static EglFns,
@@ -100,14 +100,14 @@ impl HardwareRenderContext {
         self.scratch.resize(byte_len, 0);
         unsafe {
             (self.gl.finish)();
-            (self.gl.pixel_storei)(GL_PACK_ALIGNMENT, 1);
+            (self.gl.pixel_storei)(GL_VALUES.pack_alignment, 1);
             (self.gl.read_pixels)(
                 0,
                 0,
                 width as GlSizei,
                 height as GlSizei,
-                GL_RGB,
-                GL_UNSIGNED_BYTE,
+                GL_VALUES.rgb,
+                GL_VALUES.unsigned_byte,
                 self.scratch.as_mut_ptr().cast::<c_void>(),
             );
         }

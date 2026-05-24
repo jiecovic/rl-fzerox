@@ -5,9 +5,18 @@ use std::ffi::{CString, c_void};
 
 use super::egl::egl_fns;
 
-pub(super) const GL_RGB: GlEnum = 0x1907;
-pub(super) const GL_UNSIGNED_BYTE: GlEnum = 0x1401;
-pub(super) const GL_PACK_ALIGNMENT: GlEnum = 0x0D05;
+#[derive(Clone, Copy)]
+pub(super) struct GlProtocolValues {
+    pub(super) rgb: GlEnum,
+    pub(super) unsigned_byte: GlEnum,
+    pub(super) pack_alignment: GlEnum,
+}
+
+pub(super) const GL_VALUES: GlProtocolValues = GlProtocolValues {
+    rgb: 0x1907,
+    unsigned_byte: 0x1401,
+    pack_alignment: 0x0D05,
+};
 
 type GlEnum = libc::c_uint;
 type GlInt = libc::c_int;
