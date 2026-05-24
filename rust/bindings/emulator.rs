@@ -1,5 +1,6 @@
 // rust/bindings/emulator.rs
 //! Python binding facade for the native libretro host runtime.
+#![allow(clippy::too_many_arguments)]
 
 use std::path::Path;
 
@@ -506,7 +507,7 @@ impl PyEmulator {
         methods::control::capture_current_as_baseline(self, py, path)
     }
 
-    fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+    fn frame_rgb<'py>(&mut self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         methods::frame::frame_rgb(self, py)
     }
 

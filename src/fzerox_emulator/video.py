@@ -9,8 +9,11 @@ def display_size(frame_shape: tuple[int, ...], aspect_ratio: float) -> tuple[int
         raise ValueError("Frame shape must include height and width")
 
     frame_height, frame_width = frame_shape[:2]
-    if aspect_ratio <= 0.0:
-        return frame_width, frame_height
+    import fzerox_emulator._native as _native
 
-    display_height = max(1, round(frame_width / aspect_ratio))
-    return frame_width, int(display_height)
+    display_width, display_height = _native.display_size(
+        int(frame_width),
+        int(frame_height),
+        float(aspect_ratio),
+    )
+    return int(display_width), int(display_height)

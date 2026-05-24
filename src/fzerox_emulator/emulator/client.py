@@ -190,7 +190,6 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             controller_state,
             config=config,
             recipe=recipe,
-            spec=self.observation_spec(preset, height=height, width=width),
         )
 
     def step_repeat_watch_raw(
@@ -241,7 +240,6 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             controller_state,
             config=config,
             recipe=recipe,
-            spec=self.observation_spec(preset, height=height, width=width),
         )
 
     def step_repeat_multi_observation_raw(
@@ -270,28 +268,22 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
         )
-        specs = tuple(
-            self.observation_spec(recipe.preset, height=recipe.height, width=recipe.width)
-            for recipe in observation_recipes
-        )
         return run_repeat_multi_observation_step(
             self._native,
             controller_state,
             config=config,
             recipes=observation_recipes,
-            specs=specs,
         )
 
     def set_controller_state(self, controller_state: ControllerState) -> None:
         """Set the held controller state used for subsequent frame stepping."""
 
-        state = controller_state.clamped()
         self._native.set_controller_state(
-            joypad_mask=state.joypad_mask,
-            left_stick_x=state.left_stick_x,
-            left_stick_y=state.left_stick_y,
-            right_stick_x=state.right_stick_x,
-            right_stick_y=state.right_stick_y,
+            joypad_mask=controller_state.joypad_mask,
+            left_stick_x=controller_state.left_stick_x,
+            left_stick_y=controller_state.left_stick_y,
+            right_stick_x=controller_state.right_stick_x,
+            right_stick_y=controller_state.right_stick_y,
         )
 
     def save_state(self, path: Path) -> None:

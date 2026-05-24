@@ -24,7 +24,6 @@ from fzerox_emulator import (
     display_size,
 )
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
-from fzerox_emulator.base import normalize_observation_resolution
 from rl_fzerox.core.domain.observation_image import ObservationPresetName, preset_geometry
 from tests.support.native_objects import make_telemetry
 
@@ -143,7 +142,7 @@ class SyntheticBackend:
         height: int | None = None,
         width: int | None = None,
     ) -> ObservationSpec:
-        resolved_preset, resolved_height, resolved_width = normalize_observation_resolution(
+        resolved_preset, resolved_height, resolved_width = _normalize_observation_resolution(
             preset=preset,
             height=height,
             width=width,
@@ -664,6 +663,21 @@ def _canonical_observation_preset(preset: str) -> ObservationPresetName | None:
         "crop_84x84": "crop_84x84",
     }
     return aliases.get(preset)
+
+
+def _normalize_observation_resolution(
+    *,
+    preset: str | None = None,
+    height: int | None = None,
+    width: int | None = None,
+) -> tuple[str | None, int | None, int | None]:
+    if preset is not None:
+        if height is not None or width is not None:
+            raise ValueError("preset cannot be combined with custom observation height/width")
+        return preset, None, None
+    if height is None or width is None:
+        raise ValueError("custom observation height and width must both be set")
+    return None, int(height), int(width)
 
 
 def _crop_visible_game_area(frame: RgbFrame) -> RgbFrame:
