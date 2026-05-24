@@ -5,7 +5,7 @@ F-Zero X through a libretro N64 emulator.
 
 ## Requirements
 
-- Linux
+- Linux userspace, either native Linux or Windows with WSL2
 - Python 3.11
 - Rust toolchain with Cargo
 - Node.js and npm
