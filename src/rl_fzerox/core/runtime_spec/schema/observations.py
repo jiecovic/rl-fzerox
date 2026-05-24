@@ -231,7 +231,18 @@ def _supported_state_feature_names(component: ObservationStateComponentConfig) -
     from rl_fzerox.core.envs.observations.state.components import raw_state_component_features
 
     settings = _component_settings(component, included_features=None)
-    return tuple(feature.name for feature in raw_state_component_features(settings))
+    feature_names = [
+        feature.name
+        for feature in raw_state_component_features(
+            settings,
+            independent_lean_buttons=False,
+        )
+    ]
+    if component.name == "control_history":
+        for feature in raw_state_component_features(settings, independent_lean_buttons=True):
+            if feature.name not in feature_names:
+                feature_names.append(feature.name)
+    return tuple(feature_names)
 
 
 def _default_state_feature_names(component: ObservationStateComponentConfig) -> tuple[str, ...]:

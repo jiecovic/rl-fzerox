@@ -13,6 +13,7 @@ from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.observations import ObservationStackMode
+from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.runtime_spec.schema import (
     EnvConfig,
     ObservationConfig,
@@ -676,6 +677,57 @@ def test_env_reset_uses_optional_minimap_layer_shape() -> None:
     assert isinstance(env.observation_space, Box)
     assert env.observation_space.shape == (84, 84, 13)
     assert info["observation_minimap_layer"] is True
+
+
+def test_env_config_accepts_independent_lean_history_feature_selection() -> None:
+    config = EnvConfig.model_validate(
+        {
+            "action": {"independent_lean_buttons": True},
+            "observation": {
+                "mode": "image_state",
+                "state_components": [
+                    {
+                        "name": "control_history",
+                        "length": 1,
+                        "controls": ["lean"],
+                        "included_features": [
+                            "control_history.prev_lean_left_1",
+                            "control_history.prev_lean_right_1",
+                        ],
+                    }
+                ],
+            },
+        }
+    )
+    components = config.observation.state_components
+    assert components is not None
+
+    assert state_feature_names(
+        state_components=tuple(component.data() for component in components),
+        independent_lean_buttons=config.action.independent_lean_buttons,
+    ) == (
+        "control_history.prev_lean_left_1",
+        "control_history.prev_lean_right_1",
+    )
+
+
+def test_env_config_rejects_split_lean_history_for_three_way_lean() -> None:
+    with pytest.raises(ValueError, match="control_history.prev_lean_left_1"):
+        EnvConfig.model_validate(
+            {
+                "observation": {
+                    "mode": "image_state",
+                    "state_components": [
+                        {
+                            "name": "control_history",
+                            "length": 1,
+                            "controls": ["lean"],
+                            "included_features": ["control_history.prev_lean_left_1"],
+                        }
+                    ],
+                },
+            }
+        )
 
 
 def test_env_render_uses_cropped_aspect_corrected_display_size() -> None:
