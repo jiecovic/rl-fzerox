@@ -79,5 +79,6 @@ def _current_auxiliary_state_targets(
         raw_targets = env_targets()
         if not isinstance(raw_targets, np.ndarray):
             return None
-        return raw_targets.astype(np.float32, copy=False)
+        targets: StateVector = np.asarray(raw_targets, dtype=np.float32)
+        return targets
     return auxiliary_state_targets_from_mapping(info)
