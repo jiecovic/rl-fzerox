@@ -148,12 +148,12 @@ def test_side_panel_drops_cockpit_control_section() -> None:
 
     assert "Cockpit Control" not in [section.title for section in columns.left]
     assert [section.title for section in columns.left] == [
-        "Run",
-        "Policy Details",
-        "Race",
-        "Game Details",
-        "Timing",
-        "Display",
+        "Run State",
+        "Episode Progress",
+        "Policy Output",
+        "Race State",
+        "Race Setup",
+        "Runtime",
     ]
     assert [section.title for section in columns.middle] == [
         "Track Geometry",
@@ -177,8 +177,11 @@ def test_train_tab_shows_current_training_hparams() -> None:
         game_display_size=(592, 444),
         observation_shape=(84, 116, 12),
         telemetry=_sample_telemetry(),
+        emulator_renderer="gliden64",
+        watch_device="cpu",
         train_config=TrainConfig(
             algorithm="maskable_hybrid_action_ppo",
+            device="cuda",
             total_timesteps=50_000_000,
             learning_rate=2e-4,
             n_steps=2048,
@@ -188,15 +191,26 @@ def test_train_tab_shows_current_training_hparams() -> None:
         policy_config=PolicyConfig.model_validate({"extractor": {"conv_profile": "nature"}}),
     )
 
+    live_policy_section = next(
+        section for section in columns.left if section.title == "Policy Output"
+    )
+    runtime_section = next(section for section in columns.left if section.title == "Runtime")
     training_section = next(section for section in columns.train if section.title == "Training")
     policy_section = next(section for section in columns.train if section.title == "Policy")
+    live_policy_values = {line.label: line.value for line in live_policy_section.lines}
+    runtime_values = {line.label: line.value for line in runtime_section.lines}
     training_values = {line.label: line.value for line in training_section.lines}
     policy_values = {line.label: line.value for line in policy_section.lines}
 
     assert training_values["Algorithm"] == "maskable_hybrid_action_ppo"
+    assert training_values["Train device"] == "cuda"
+    assert "Renderer" not in training_values
+    assert "Device" not in training_values
     assert "Run" not in training_values
     assert training_values["Target steps"] == "50,000,000"
     assert training_values["LR"] == "2e-04"
+    assert live_policy_values["Device"] == "cpu"
+    assert runtime_values["Renderer"] == "gliden64"
     assert policy_values["Conv"] == "nature"
     assert policy_values["Pi net"] == "[256, 256]"
 
@@ -293,7 +307,9 @@ def test_session_section_shows_episode_step_counter() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = columns.left[0]
+    session_section = next(
+        section for section in columns.left if section.title == "Episode Progress"
+    )
     episode_frame_line = next(
         line for line in session_section.lines if line.label == "Episode frame"
     )
@@ -330,7 +346,9 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = columns.left[0]
+    session_section = next(
+        section for section in columns.left if section.title == "Episode Progress"
+    )
     labels = {line.label for line in session_section.lines}
     assert "Reverse frames" not in labels
     assert "Stuck frames" not in labels
@@ -353,7 +371,7 @@ def test_format_policy_action_is_human_readable() -> None:
     )
 
 
-def test_display_section_includes_action_repeat() -> None:
+def test_timing_section_shows_compact_runtime_rates() -> None:
     columns = _build_panel_columns(
         episode=0,
         info={
@@ -381,18 +399,19 @@ def test_display_section_includes_action_repeat() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    timing_section = next(section for section in columns.left if section.title == "Timing")
-    repeat_line = next(line for line in timing_section.lines if line.label == "Action repeat")
-    control_rate_line = next(line for line in timing_section.lines if line.label == "Control FPS")
-    speed_line = next(line for line in timing_section.lines if line.label == "Game speed")
-    game_rate_line = next(line for line in timing_section.lines if line.label == "Game FPS")
-    render_rate_line = next(line for line in timing_section.lines if line.label == "Render FPS")
+    runtime_section = next(section for section in columns.left if section.title == "Runtime")
+    values = {line.label: line.value for line in runtime_section.lines}
 
-    assert repeat_line.value == "2"
-    assert control_rate_line.value == "30.0 / 120.0"
-    assert speed_line.value == "1.00x"
-    assert game_rate_line.value == "60.0 / 240.0"
-    assert render_rate_line.value == "60.0 / 60.0"
+    assert values == {
+        "Renderer": "unknown",
+        "Repeat": "x2",
+        "Control FPS": "30.0",
+        "Game FPS": "60.0",
+        "Render FPS": "60.0",
+        "Speed multiplier": "1.00x",
+        "Game size": "444x592",
+        "Obs size": "84x116x12",
+    }
 
 
 def test_timing_section_shows_game_speed_multiplier() -> None:
@@ -421,8 +440,8 @@ def test_timing_section_shows_game_speed_multiplier() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    timing_section = next(section for section in columns.left if section.title == "Timing")
-    speed_line = next(line for line in timing_section.lines if line.label == "Game speed")
+    runtime_section = next(section for section in columns.left if section.title == "Runtime")
+    speed_line = next(line for line in runtime_section.lines if line.label == "Speed multiplier")
 
     assert speed_line.value == "2.00x"
 
@@ -446,14 +465,14 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    display_section = next(section for section in columns.left if section.title == "Display")
-    key_map = {line.label: line.value for line in display_section.lines}
+    runtime_section = next(section for section in columns.left if section.title == "Runtime")
+    key_map = {line.label: line.value for line in runtime_section.lines}
     hint_map = {hint.keys: (hint.controller, hint.action) for hint in MACRO_LEGEND_HINTS}
 
     assert "Keys" not in key_map
     assert "More keys" not in key_map
-    assert key_map["Game"] == "444x592"
-    assert key_map["Obs"] == "84x116x12"
+    assert key_map["Game size"] == "444x592"
+    assert key_map["Obs size"] == "84x116x12"
     assert hint_map == {
         "Esc": (None, "close"),
         "P": (None, "pause"),
@@ -714,7 +733,7 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
+    session_section = next(section for section in columns.left if section.title == "Run State")
     curriculum_line = next(line for line in session_section.lines if line.label == "Stage")
 
     assert curriculum_line.value == "lean_enabled"
@@ -744,7 +763,7 @@ def test_session_section_shows_checkpoint_experience_from_frames() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
+    session_section = next(section for section in columns.left if section.title == "Run State")
     experience_line = next(line for line in session_section.lines if line.label == "Experience")
 
     assert experience_line.value == "6h 06m"
@@ -774,7 +793,7 @@ def test_session_section_keeps_mixed_action_repeat_lineage_experience() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
+    session_section = next(section for section in columns.left if section.title == "Run State")
     experience_line = next(line for line in session_section.lines if line.label == "Experience")
 
     assert experience_line.value == "4m"
@@ -800,10 +819,8 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Policy Details")
-    deterministic_line = next(
-        line for line in session_section.lines if line.label == "Deterministic"
-    )
+    session_section = next(section for section in columns.left if section.title == "Policy Output")
+    deterministic_line = next(line for line in session_section.lines if line.label == "Mode")
 
     assert deterministic_line.value == "stochastic"
 
@@ -830,7 +847,7 @@ def test_session_section_shows_manual_driver_mode() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
+    session_section = next(section for section in columns.left if section.title == "Run State")
     driver_line = next(line for line in session_section.lines if line.label == "Driver")
 
     assert driver_line.value == "manual"
@@ -859,7 +876,7 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Policy Details")
+    session_section = next(section for section in columns.left if section.title == "Policy Output")
     action_line = next(line for line in session_section.lines if line.label == "Action")
 
     assert action_line.value == "c=[+0.00,+0.50,-0.50] d=[0,0]"
@@ -888,9 +905,11 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
-    step_line = next(line for line in session_section.lines if line.label == "Step")
-    return_line = next(line for line in session_section.lines if line.label == "Return")
+    episode_section = next(
+        section for section in columns.left if section.title == "Episode Progress"
+    )
+    step_line = next(line for line in episode_section.lines if line.label == "Step reward")
+    return_line = next(line for line in episode_section.lines if line.label == "Return")
 
     assert step_line.value == "-0.0160"
     assert return_line.value == "-12.3457"
@@ -916,7 +935,7 @@ def test_session_section_omits_global_best_finish_position() -> None:
         telemetry=_sample_telemetry(),
     )
 
-    session_section = next(section for section in columns.left if section.title == "Run")
+    session_section = next(section for section in columns.left if section.title == "Run State")
 
     assert all(line.label != "Best position" for line in session_section.lines)
 

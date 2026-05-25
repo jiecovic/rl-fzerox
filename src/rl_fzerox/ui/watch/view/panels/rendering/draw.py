@@ -91,6 +91,8 @@ class SidePanelData:
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None
     live_episode_series: EpisodeLiveSeriesSnapshot | None
     telemetry: FZeroXTelemetry | None
+    emulator_renderer: str
+    watch_device: str
     train_config: TrainConfig | None
     policy_config: PolicyConfig | None
 
@@ -163,6 +165,8 @@ def _draw_side_panel(
         policy_auxiliary_state_targets=data.policy_auxiliary_state_targets,
         auxiliary_episode_metrics=data.auxiliary_episode_metrics,
         telemetry=data.telemetry,
+        emulator_renderer=data.emulator_renderer,
+        watch_device=data.watch_device,
         train_config=data.train_config,
         policy_config=data.policy_config,
     )

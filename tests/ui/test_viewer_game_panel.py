@@ -24,11 +24,11 @@ def race_control_state(
 
 
 def _race_section(columns: PanelColumns) -> PanelSection:
-    return next(section for section in columns.left if section.title == "Race")
+    return next(section for section in columns.left if section.title == "Race State")
 
 
-def _game_details_section(columns: PanelColumns) -> PanelSection:
-    return next(section for section in columns.left if section.title == "Game Details")
+def _setup_section(columns: PanelColumns) -> PanelSection:
+    return next(section for section in columns.left if section.title == "Race Setup")
 
 
 def test_game_flags_are_rendered_in_fixed_rows() -> None:
@@ -436,8 +436,8 @@ def test_game_section_shows_camera_setting() -> None:
         telemetry=_sample_telemetry(camera_setting_raw=1, camera_setting_name="close_behind"),
     )
 
-    game_section = _game_details_section(columns)
-    camera_line = next(line for line in game_section.lines if line.label == "Camera")
+    setup_section = _setup_section(columns)
+    camera_line = next(line for line in setup_section.lines if line.label == "Camera")
     assert camera_line.value == "close behind"
 
 
@@ -460,8 +460,8 @@ def test_game_section_shows_unknown_camera_setting_raw_value() -> None:
         telemetry=_sample_telemetry(camera_setting_raw=99, camera_setting_name="unknown"),
     )
 
-    game_section = _game_details_section(columns)
-    camera_line = next(line for line in game_section.lines if line.label == "Camera")
+    setup_section = _setup_section(columns)
+    camera_line = next(line for line in setup_section.lines if line.label == "Camera")
     assert camera_line.value == "unknown (99)"
 
 

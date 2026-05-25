@@ -140,14 +140,6 @@ def _ceil_div(value: int, divisor: int) -> int:
     return (value + divisor - 1) // divisor
 
 
-def _format_control_rate(info: dict[str, object]) -> str:
-    return _format_rate_pair(info, actual_key="control_fps", target_key="control_fps_target")
-
-
-def _format_game_rate(info: dict[str, object]) -> str:
-    return _format_rate_pair(info, actual_key="game_fps", target_key="game_fps_target")
-
-
 def _format_game_speed(info: dict[str, object], *, action_repeat: int) -> str:
     native_fps = _float_info(info, "native_fps")
     if native_fps <= 0.0:
@@ -159,28 +151,6 @@ def _format_game_speed(info: dict[str, object], *, action_repeat: int) -> str:
     if actual_game_fps <= 0.0:
         return "-"
     return f"{actual_game_fps / native_fps:.2f}x"
-
-
-def _format_render_rate(info: dict[str, object]) -> str:
-    return _format_rate_pair(info, actual_key="render_fps", target_key="render_fps_target")
-
-
-def _format_rate_pair(
-    info: dict[str, object],
-    *,
-    actual_key: str,
-    target_key: str,
-) -> str:
-    return f"{_float_info(info, actual_key):.1f} / {_format_rate_target(info, target_key)}"
-
-
-def _format_rate_target(info: dict[str, object], key: str) -> str:
-    value = info.get(key)
-    if value == "unlimited":
-        return "unlimited"
-    if isinstance(value, int | float):
-        return f"{float(value):.1f}"
-    return "-"
 
 
 def _float_info(info: dict[str, object], key: str) -> float:

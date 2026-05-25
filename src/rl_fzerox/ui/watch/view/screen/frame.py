@@ -107,6 +107,8 @@ class FrameRenderData:
     progress_frontier_stall_limit_frames: int | None
     stuck_min_speed_kph: float
     telemetry: FZeroXTelemetry | None
+    emulator_renderer: str
+    watch_device: str
     train_config: TrainConfig | None
     policy_config: PolicyConfig | None
 
@@ -417,6 +419,8 @@ def _draw_frame(
             auxiliary_episode_metrics=data.auxiliary_episode_metrics,
             live_episode_series=data.live_episode_series,
             telemetry=data.telemetry,
+            emulator_renderer=data.emulator_renderer,
+            watch_device=data.watch_device,
             train_config=data.train_config,
             policy_config=data.policy_config,
         ),
