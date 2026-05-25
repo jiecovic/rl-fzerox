@@ -161,6 +161,8 @@ const actionConfigSchema = z
     lean_mode: leanModeSchema,
     lean_unmask_min_speed_kph: z.number().nonnegative().nullable(),
     lean_initial_lockout_frames: z.number().int().nonnegative(),
+    include_spin: z.boolean().default(false),
+    enable_spin: z.boolean().default(false),
     include_pitch: z.boolean(),
     enable_pitch: z.boolean(),
     pitch_mode: actionAxisModeSchema,
@@ -272,15 +274,17 @@ const policyConfigSchema = z.object({
 const rewardConfigSchema = z
   .object({
     time_penalty_per_frame: z.number(),
-    reverse_time_penalty_scale: z.number().nonnegative(),
-    slow_speed_time_penalty_scale: z.number().nonnegative(),
-    slow_speed_time_penalty_start_kph: z.number().nonnegative(),
-    slow_speed_time_penalty_power: z.number().positive(),
     progress_bucket_distance: z.number().positive(),
     progress_bucket_reward: z.number().nonnegative(),
     progress_reward_interval_frames: z.number().int().positive(),
     suspend_progress_while_outside_track_bounds: z.boolean(),
-    outside_bounds_reentry_progress_distance_cap: z.number().nonnegative().nullable(),
+    progress_track_distance_tolerance: z.number().nonnegative(),
+    progress_speed_min_kph: z.number().nonnegative(),
+    progress_speed_min_multiplier: z.number().nonnegative(),
+    progress_speed_reference_kph: z.number().positive(),
+    progress_speed_max_kph: z.number().positive(),
+    progress_speed_max_multiplier: z.number().nonnegative(),
+    progress_speed_curve_power: z.number().positive(),
     outside_track_recovery_reward: z.number().nonnegative(),
     outside_track_recovery_reward_cap: z.number().nonnegative(),
     outside_track_recovery_airborne_grace_frames: z.number().int().nonnegative(),
@@ -321,7 +325,15 @@ const rewardConfigSchema = z
       message: "step_reward_clip_min must be <= step_reward_clip_max",
       path: ["step_reward_clip_min"],
     },
-  );
+  )
+  .refine((reward) => reward.progress_speed_reference_kph > reward.progress_speed_min_kph, {
+    message: "progress_speed_reference_kph must be greater than min kph",
+    path: ["progress_speed_reference_kph"],
+  })
+  .refine((reward) => reward.progress_speed_max_kph > reward.progress_speed_reference_kph, {
+    message: "progress_speed_max_kph must be greater than reference kph",
+    path: ["progress_speed_max_kph"],
+  });
 
 export const managedRunConfigSchema = z.object({
   version: z.literal(1),

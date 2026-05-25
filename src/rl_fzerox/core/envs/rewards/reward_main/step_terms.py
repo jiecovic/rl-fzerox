@@ -27,11 +27,6 @@ def ground_effect_progress_modifier(
     return "ground_effect", 1.0
 
 
-def zero_progress_bonus(progress_reward: float) -> float:
-    del progress_reward
-    return 0.0
-
-
 def ko_star_reward(
     *,
     previous_count: int | None,

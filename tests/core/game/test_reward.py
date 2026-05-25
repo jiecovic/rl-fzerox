@@ -46,15 +46,17 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "progress_bucket_reward": 2.5,
         "progress_reward_interval_frames": 7,
         "suspend_progress_while_outside_track_bounds": False,
-        "outside_bounds_reentry_progress_distance_cap": 300.0,
+        "progress_track_distance_tolerance": 250.0,
+        "progress_speed_min_kph": 100.0,
+        "progress_speed_min_multiplier": 0.25,
+        "progress_speed_reference_kph": 760.0,
+        "progress_speed_max_kph": 1_500.0,
+        "progress_speed_max_multiplier": 1.5,
+        "progress_speed_curve_power": 2.0,
         "outside_track_recovery_reward": 0.125,
         "outside_track_recovery_reward_cap": 0.75,
         "outside_track_recovery_airborne_grace_frames": 11,
         "time_penalty_per_frame": -0.002,
-        "reverse_time_penalty_scale": 1.25,
-        "slow_speed_time_penalty_scale": 0.8,
-        "slow_speed_time_penalty_start_kph": 760.0,
-        "slow_speed_time_penalty_power": 2.0,
         "lap_completion_bonus": 9.0,
         "lap_position_scale": 0.33,
         "ko_star_reward": 4.0,
@@ -229,6 +231,8 @@ def test_reward_main_can_suspend_frontier_progress_while_outside_track_bounds() 
             state_labels=("active", "airborne"),
             signed_lateral_offset=150.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=1_500.0,
         ),
     )
     landing = tracker.step_summary(
@@ -240,52 +244,43 @@ def test_reward_main_can_suspend_frontier_progress_while_outside_track_bounds() 
     assert airborne.breakdown == {"frontier_progress": 3.0}
     assert outside_bounds.reward == 0.0
     assert outside_bounds.breakdown == {}
-    assert landing.breakdown == {"frontier_progress": 2.0}
+    assert landing.breakdown == {"frontier_progress": 1.0}
 
 
-def test_reward_main_rewards_net_grounded_reentry_progress_without_surface_multiplier() -> None:
+def test_reward_main_keeps_frontier_progress_near_track_bounds() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            dirt_progress_multiplier=0.5,
+            progress_track_distance_tolerance=200.0,
             time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
         )
     )
     tracker.reset(_telemetry(race_distance=0.0, current_radius_left=100.0))
 
-    outside = tracker.step_summary(
-        _summary(max_race_distance=1_800.0),
+    near_bounds = tracker.step_summary(
+        _summary(max_race_distance=300.0),
         _status(step_count=1),
         _telemetry(
-            race_distance=1_800.0,
+            race_distance=300.0,
             signed_lateral_offset=150.0,
             current_radius_left=100.0,
-        ),
-    )
-    reentry = tracker.step_summary(
-        _summary(max_race_distance=1_800.0),
-        _status(step_count=2),
-        _telemetry(
-            race_distance=1_300.0,
-            course_effect_raw=_COURSE_EFFECT_DIRT,
-            signed_lateral_offset=80.0,
-            current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=150.0,
         ),
     )
 
-    assert outside.breakdown == {}
-    assert reentry.reward == 13.0
-    assert reentry.breakdown == {"frontier_progress": 13.0}
+    assert near_bounds.reward == 3.0
+    assert near_bounds.breakdown == {"frontier_progress": 3.0}
 
 
-def test_reward_main_caps_grounded_reentry_progress_reward_without_holding_frontier() -> None:
+def test_reward_main_skips_far_off_track_progress_without_reentry_payout() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_distance=100.0,
             progress_bucket_reward=1.0,
-            outside_bounds_reentry_progress_distance_cap=200.0,
+            progress_track_distance_tolerance=200.0,
             time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
         )
@@ -299,6 +294,8 @@ def test_reward_main_caps_grounded_reentry_progress_reward_without_holding_front
             race_distance=1_800.0,
             signed_lateral_offset=150.0,
             current_radius_left=100.0,
+            future_local_nearest_segment_index=12,
+            future_local_nearest_segment_distance=1_000.0,
         ),
     )
     reentry = tracker.step_summary(
@@ -311,10 +308,10 @@ def test_reward_main_caps_grounded_reentry_progress_reward_without_holding_front
         ),
     )
 
-    assert reentry.reward == 2.0
-    assert reentry.breakdown == {"frontier_progress": 2.0}
+    assert reentry.reward == 0.0
+    assert reentry.breakdown == {}
     info = tracker.info(_telemetry(race_distance=1_350.0, current_radius_left=100.0))
-    assert info["frontier_progress_distance"] == 1_300.0
+    assert info["frontier_progress_distance"] == 1_800.0
 
 
 def test_reward_main_clips_final_step_reward_after_breakdown_terms() -> None:
@@ -729,31 +726,125 @@ def test_reward_main_arms_airborne_outside_recovery_after_grace() -> None:
     assert landing_inside.breakdown == {"outside_track_recovery": pytest.approx(0.011)}
 
 
-def test_reward_main_scales_time_pressure_when_speed_is_low() -> None:
+def test_reward_main_scales_progress_by_frontier_speed() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
-            progress_bucket_reward=0.0,
-            time_penalty_per_frame=-0.001,
-            slow_speed_time_penalty_scale=3.0,
-            slow_speed_time_penalty_start_kph=760.0,
-            slow_speed_time_penalty_power=1.0,
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            progress_speed_min_multiplier=0.0,
+            progress_speed_reference_kph=760.0,
+            progress_speed_max_kph=1_500.0,
+            progress_speed_max_multiplier=2.0,
+            progress_speed_curve_power=1.0,
+            time_penalty_per_frame=0.0,
             impact_frame_penalty=0.0,
         )
     )
-    tracker.reset(_telemetry(race_distance=0.0, speed_kph=0.0))
+    tracker.reset(_telemetry(race_distance=0.0, speed_kph=760.0))
 
-    stopped = tracker.step_summary(
-        _summary(max_race_distance=0.0, frames_run=3),
+    half_reference_speed = tracker.step_summary(
+        _summary(max_race_distance=100.0, max_race_distance_speed_kph=380.0),
         _status(step_count=1),
-        _telemetry(race_distance=0.0, speed_kph=0.0),
+        _telemetry(race_distance=100.0, speed_kph=380.0),
+    )
+    half_top_speed_bonus = tracker.step_summary(
+        _summary(max_race_distance=200.0, max_race_distance_speed_kph=1_130.0),
+        _status(step_count=2),
+        _telemetry(race_distance=200.0, speed_kph=1_130.0),
     )
 
-    assert stopped.breakdown["time"] == pytest.approx(-0.003)
-    assert stopped.breakdown["slow_speed_time"] == pytest.approx(-0.009)
-    assert stopped.reward == pytest.approx(-0.012)
+    assert half_reference_speed.reward == pytest.approx(0.5)
+    assert half_reference_speed.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(-0.5),
+    }
+    assert half_top_speed_bonus.reward == pytest.approx(1.5)
+    assert half_top_speed_bonus.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(0.5),
+    }
 
 
-def test_reward_main_resumes_reentry_progress_when_back_inside_airborne() -> None:
+def test_reward_main_speed_curve_power_eases_out_above_reference_speed() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            progress_speed_min_multiplier=0.0,
+            progress_speed_reference_kph=1_000.0,
+            progress_speed_max_kph=2_000.0,
+            progress_speed_max_multiplier=2.0,
+            progress_speed_curve_power=2.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, speed_kph=1_000.0))
+
+    half_reference_speed = tracker.step_summary(
+        _summary(max_race_distance=100.0, max_race_distance_speed_kph=500.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, speed_kph=500.0),
+    )
+    half_top_speed_bonus = tracker.step_summary(
+        _summary(max_race_distance=200.0, max_race_distance_speed_kph=1_500.0),
+        _status(step_count=2),
+        _telemetry(race_distance=200.0, speed_kph=1_500.0),
+    )
+
+    assert half_reference_speed.reward == pytest.approx(0.25)
+    assert half_reference_speed.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(-0.75),
+    }
+    assert half_top_speed_bonus.reward == pytest.approx(1.75)
+    assert half_top_speed_bonus.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(0.75),
+    }
+
+
+def test_reward_main_speed_curve_can_start_above_zero_speed() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            progress_speed_min_kph=500.0,
+            progress_speed_min_multiplier=0.25,
+            progress_speed_reference_kph=1_000.0,
+            progress_speed_max_kph=2_000.0,
+            progress_speed_max_multiplier=2.0,
+            progress_speed_curve_power=1.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, speed_kph=500.0))
+
+    below_min_speed = tracker.step_summary(
+        _summary(max_race_distance=100.0, max_race_distance_speed_kph=250.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, speed_kph=250.0),
+    )
+    halfway_to_reference = tracker.step_summary(
+        _summary(max_race_distance=200.0, max_race_distance_speed_kph=750.0),
+        _status(step_count=2),
+        _telemetry(race_distance=200.0, speed_kph=750.0),
+    )
+
+    assert below_min_speed.reward == pytest.approx(0.25)
+    assert below_min_speed.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(-0.75),
+    }
+    assert halfway_to_reference.reward == pytest.approx(0.625)
+    assert halfway_to_reference.breakdown == {
+        "frontier_progress": 1.0,
+        "speed_progress": pytest.approx(-0.375),
+    }
+
+
+def test_reward_main_does_not_repay_skipped_progress_after_reentry() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
             progress_bucket_distance=100.0,
@@ -795,8 +886,8 @@ def test_reward_main_resumes_reentry_progress_when_back_inside_airborne() -> Non
     )
 
     assert outside_airborne.breakdown == {}
-    assert inside_airborne.reward == 15.0
-    assert inside_airborne.breakdown == {"frontier_progress": 15.0}
+    assert inside_airborne.reward == 0.0
+    assert inside_airborne.breakdown == {}
     assert inside_grounded.breakdown == {}
 
 
@@ -1101,6 +1192,7 @@ def _telemetry(
 def _summary(
     *,
     max_race_distance: float,
+    max_race_distance_speed_kph: float = 760.0,
     frames_run: int = 1,
     airborne_frames: int = 0,
     reverse_active_frames: int = 0,
@@ -1114,6 +1206,7 @@ def _summary(
     return make_step_summary(
         frames_run=frames_run,
         max_race_distance=max_race_distance,
+        max_race_distance_speed_kph=max_race_distance_speed_kph,
         reverse_active_frames=reverse_active_frames,
         low_speed_frames=low_speed_frames,
         energy_loss_total=energy_loss_total,
@@ -1135,11 +1228,13 @@ def _status(
     truncation_reason: str | None = None,
 ) -> StepStatus:
     return StepStatus(
-        step_count=step_count,
-        stalled_steps=stalled_steps,
-        reverse_timer=reverse_timer,
-        termination_reason=termination_reason,
-        truncation_reason=truncation_reason,
+        {
+            "step_count": step_count,
+            "stalled_steps": stalled_steps,
+            "reverse_timer": reverse_timer,
+            "termination_reason": termination_reason,
+            "truncation_reason": truncation_reason,
+        }
     )
 
 

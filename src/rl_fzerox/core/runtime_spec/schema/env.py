@@ -67,15 +67,17 @@ class RewardCourseOverrideConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     time_penalty_per_frame: float | None = None
-    reverse_time_penalty_scale: NonNegativeFloat | None = None
-    slow_speed_time_penalty_scale: NonNegativeFloat | None = None
-    slow_speed_time_penalty_start_kph: NonNegativeFloat | None = None
-    slow_speed_time_penalty_power: PositiveFloat | None = None
     progress_bucket_distance: PositiveFloat | None = None
     progress_bucket_reward: NonNegativeFloat | None = None
     progress_reward_interval_frames: PositiveInt | None = None
     suspend_progress_while_outside_track_bounds: bool | None = None
-    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    progress_track_distance_tolerance: NonNegativeFloat | None = None
+    progress_speed_min_kph: NonNegativeFloat | None = None
+    progress_speed_min_multiplier: NonNegativeFloat | None = None
+    progress_speed_reference_kph: PositiveFloat | None = None
+    progress_speed_max_kph: PositiveFloat | None = None
+    progress_speed_max_multiplier: NonNegativeFloat | None = None
+    progress_speed_curve_power: PositiveFloat | None = None
     outside_track_recovery_reward: NonNegativeFloat | None = None
     outside_track_recovery_reward_cap: NonNegativeFloat | None = None
     outside_track_recovery_airborne_grace_frames: NonNegativeInt | None = None
@@ -108,10 +110,15 @@ class RewardCourseOverrideConfig(BaseModel):
     step_reward_clip_max: float | None = None
 
     @model_validator(mode="after")
-    def _validate_step_reward_clip_bounds(self) -> RewardCourseOverrideConfig:
+    def _validate_reward_bounds(self) -> RewardCourseOverrideConfig:
         _validate_step_reward_clip_bounds(
             min_value=self.step_reward_clip_min,
             max_value=self.step_reward_clip_max,
+        )
+        _validate_progress_speed_bounds(
+            min_kph=self.progress_speed_min_kph,
+            reference_kph=self.progress_speed_reference_kph,
+            max_kph=self.progress_speed_max_kph,
         )
         return self
 
@@ -123,15 +130,17 @@ class RewardConfig(BaseModel):
 
     name: Literal["reward_main"] = "reward_main"
     time_penalty_per_frame: float = -0.005
-    reverse_time_penalty_scale: NonNegativeFloat = 2.0
-    slow_speed_time_penalty_scale: NonNegativeFloat = 0.0
-    slow_speed_time_penalty_start_kph: NonNegativeFloat = 0.0
-    slow_speed_time_penalty_power: PositiveFloat = 1.0
     progress_bucket_distance: PositiveFloat = 1_000.0
     progress_bucket_reward: NonNegativeFloat = 1.0
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True
-    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = None
+    progress_track_distance_tolerance: NonNegativeFloat = 1_000.0
+    progress_speed_min_kph: NonNegativeFloat = 0.0
+    progress_speed_min_multiplier: NonNegativeFloat = 1.0
+    progress_speed_reference_kph: PositiveFloat = 760.0
+    progress_speed_max_kph: PositiveFloat = 1_500.0
+    progress_speed_max_multiplier: NonNegativeFloat = 1.0
+    progress_speed_curve_power: PositiveFloat = 1.0
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
@@ -165,10 +174,15 @@ class RewardConfig(BaseModel):
     course_overrides: dict[str, RewardCourseOverrideConfig] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _validate_step_reward_clip_bounds(self) -> RewardConfig:
+    def _validate_reward_bounds(self) -> RewardConfig:
         _validate_step_reward_clip_bounds(
             min_value=self.step_reward_clip_min,
             max_value=self.step_reward_clip_max,
+        )
+        _validate_progress_speed_bounds(
+            min_kph=self.progress_speed_min_kph,
+            reference_kph=self.progress_speed_reference_kph,
+            max_kph=self.progress_speed_max_kph,
         )
         return self
 
@@ -180,6 +194,18 @@ def _validate_step_reward_clip_bounds(
 ) -> None:
     if min_value is not None and max_value is not None and min_value > max_value:
         raise ValueError("step_reward_clip_min must be <= step_reward_clip_max")
+
+
+def _validate_progress_speed_bounds(
+    *,
+    min_kph: float | None,
+    reference_kph: float | None,
+    max_kph: float | None,
+) -> None:
+    if min_kph is not None and reference_kph is not None and reference_kph <= min_kph:
+        raise ValueError("progress_speed_reference_kph must be greater than min kph")
+    if reference_kph is not None and max_kph is not None and max_kph <= reference_kph:
+        raise ValueError("progress_speed_max_kph must be greater than reference kph")
 
 
 class EmulatorConfig(BaseModel):

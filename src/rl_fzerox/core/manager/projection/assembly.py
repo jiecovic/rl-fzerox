@@ -82,19 +82,19 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
     return {
         "name": "reward_main",
         "time_penalty_per_frame": reward.time_penalty_per_frame,
-        "reverse_time_penalty_scale": reward.reverse_time_penalty_scale,
-        "slow_speed_time_penalty_scale": reward.slow_speed_time_penalty_scale,
-        "slow_speed_time_penalty_start_kph": reward.slow_speed_time_penalty_start_kph,
-        "slow_speed_time_penalty_power": reward.slow_speed_time_penalty_power,
         "progress_bucket_distance": reward.progress_bucket_distance,
         "progress_bucket_reward": reward.progress_bucket_reward,
         "progress_reward_interval_frames": reward.progress_reward_interval_frames,
         "suspend_progress_while_outside_track_bounds": (
             reward.suspend_progress_while_outside_track_bounds
         ),
-        "outside_bounds_reentry_progress_distance_cap": (
-            reward.outside_bounds_reentry_progress_distance_cap
-        ),
+        "progress_track_distance_tolerance": reward.progress_track_distance_tolerance,
+        "progress_speed_min_kph": reward.progress_speed_min_kph,
+        "progress_speed_min_multiplier": reward.progress_speed_min_multiplier,
+        "progress_speed_reference_kph": reward.progress_speed_reference_kph,
+        "progress_speed_max_kph": reward.progress_speed_max_kph,
+        "progress_speed_max_multiplier": reward.progress_speed_max_multiplier,
+        "progress_speed_curve_power": reward.progress_speed_curve_power,
         "outside_track_recovery_reward": reward.outside_track_recovery_reward,
         "outside_track_recovery_reward_cap": reward.outside_track_recovery_reward_cap,
         "outside_track_recovery_airborne_grace_frames": (

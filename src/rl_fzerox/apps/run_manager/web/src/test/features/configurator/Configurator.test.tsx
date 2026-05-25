@@ -1050,6 +1050,57 @@ describe("Configurator", () => {
     expect(screen.getByRole("checkbox", { name: "Force full throttle" })).toBeEnabled();
   });
 
+  it("only allows spin output with 3-way lean", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={vi.fn()}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Action" }));
+    await user.click(screen.getByText("Auxiliary branches"));
+
+    const spinOutput = screen.getByRole("checkbox", { name: "Spin in output" });
+    const spinEnabled = screen.getByRole("checkbox", { name: "Spin enabled" });
+
+    expect(spinOutput).toBeEnabled();
+    expect(spinOutput).not.toBeChecked();
+    await user.click(spinOutput);
+    expect(spinOutput).toBeChecked();
+    expect(spinEnabled).toBeChecked();
+
+    await user.click(screen.getByRole("button", { name: "4-way categorical" }));
+    await waitFor(() => {
+      expect(spinOutput).toBeDisabled();
+      expect(spinOutput).not.toBeChecked();
+      expect(spinEnabled).toBeDisabled();
+      expect(spinEnabled).not.toBeChecked();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Independent buttons" }));
+    await waitFor(() => {
+      expect(spinOutput).toBeDisabled();
+      expect(spinOutput).not.toBeChecked();
+      expect(spinEnabled).toBeDisabled();
+      expect(spinEnabled).not.toBeChecked();
+    });
+
+    await user.click(screen.getByRole("button", { name: "3-way axis" }));
+    await waitFor(() => {
+      expect(spinOutput).toBeEnabled();
+      expect(spinOutput).not.toBeChecked();
+      expect(spinEnabled).toBeDisabled();
+    });
+  });
+
   it("lets you switch image features from auto to a custom width", async () => {
     const user = userEvent.setup();
 
