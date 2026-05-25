@@ -364,9 +364,9 @@ def test_policy_runner_injects_zero_auxiliary_targets_for_aux_enabled_policy(
     assert predictions == {"track_position.edge_ratio": 0.25}
     assert isinstance(fake_policy.last_aux_observation, dict)
     aux_targets = fake_policy.last_aux_observation.get("auxiliary_state_targets")
-    assert isinstance(aux_targets, np.ndarray)
-    assert aux_targets.shape == (39,)
-    assert float(np.max(aux_targets)) == 0.0
+    aux_targets_array = _array_action(aux_targets)
+    assert aux_targets_array.shape == (39,)
+    assert float(np.max(aux_targets_array)) == 0.0
 
 
 def test_non_recurrent_auxiliary_policy_accepts_runner_recurrent_kwargs() -> None:

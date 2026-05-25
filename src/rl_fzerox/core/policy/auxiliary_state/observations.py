@@ -21,7 +21,8 @@ def auxiliary_state_targets_from_mapping(
     raw_targets = mapping.get(auxiliary_state_targets_field())
     if not isinstance(raw_targets, np.ndarray):
         return None
-    return raw_targets.astype(np.float32, copy=False)
+    targets: StateVector = np.asarray(raw_targets, dtype=np.float32)
+    return targets
 
 
 def mapping_has_auxiliary_state_targets(mapping: Mapping[str, object]) -> bool:
