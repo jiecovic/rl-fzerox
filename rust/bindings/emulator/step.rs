@@ -10,6 +10,7 @@ use crate::core::host::{StepStatus, StepSummary};
 use crate::core::telemetry::CourseEffect;
 
 const STEP_SUMMARY_PAYLOAD: &str = "step summary";
+const STEP_STATUS_PAYLOAD: &str = "step status";
 
 #[pyclass(
     name = "StepSummary",
@@ -38,6 +39,11 @@ impl PyStepSummary {
                 frames_run: required_item(data, STEP_SUMMARY_PAYLOAD, "frames_run")?.extract()?,
                 max_race_distance: required_item(data, STEP_SUMMARY_PAYLOAD, "max_race_distance")?
                     .extract()?,
+                max_race_distance_speed_kph: optional_item(
+                    data,
+                    "max_race_distance_speed_kph",
+                    0.0,
+                )?,
                 reverse_active_frames: optional_item(data, "reverse_active_frames", 0)?,
                 collision_recoil_active_frames,
                 low_speed_frames: optional_item(data, "low_speed_frames", 0)?,
@@ -46,6 +52,9 @@ impl PyStepSummary {
                 damage_taken_frames,
                 impact_frames: resolved_impact_frames,
                 airborne_frames: optional_item(data, "airborne_frames", 0)?,
+                spin_macro_started: optional_item(data, "spin_macro_started", false)?,
+                spin_macro_active_frames: optional_item(data, "spin_macro_active_frames", 0)?,
+                lean_macro_owned_frames: optional_item(data, "lean_macro_owned_frames", 0)?,
                 consecutive_low_speed_frames: optional_item(
                     data,
                     "consecutive_low_speed_frames",
@@ -66,6 +75,11 @@ impl PyStepSummary {
     #[getter]
     fn max_race_distance(&self) -> f32 {
         self.inner.max_race_distance
+    }
+
+    #[getter]
+    fn max_race_distance_speed_kph(&self) -> f32 {
+        self.inner.max_race_distance_speed_kph
     }
 
     #[getter]
@@ -106,6 +120,21 @@ impl PyStepSummary {
     #[getter]
     fn airborne_frames(&self) -> usize {
         self.inner.airborne_frames
+    }
+
+    #[getter]
+    fn spin_macro_started(&self) -> bool {
+        self.inner.spin_macro_started
+    }
+
+    #[getter]
+    fn spin_macro_active_frames(&self) -> usize {
+        self.inner.spin_macro_active_frames
+    }
+
+    #[getter]
+    fn lean_macro_owned_frames(&self) -> usize {
+        self.inner.lean_macro_owned_frames
     }
 
     #[getter]
@@ -181,6 +210,10 @@ impl PyStepSummary {
         let dict = PyDict::new(py);
         dict.set_item("frames_run", self.frames_run())?;
         dict.set_item("max_race_distance", self.max_race_distance())?;
+        dict.set_item(
+            "max_race_distance_speed_kph",
+            self.max_race_distance_speed_kph(),
+        )?;
         dict.set_item("reverse_active_frames", self.reverse_active_frames())?;
         dict.set_item(
             "collision_recoil_active_frames",
@@ -192,6 +225,9 @@ impl PyStepSummary {
         dict.set_item("damage_taken_frames", self.damage_taken_frames())?;
         dict.set_item("impact_frames", self.impact_frames())?;
         dict.set_item("airborne_frames", self.airborne_frames())?;
+        dict.set_item("spin_macro_started", self.spin_macro_started())?;
+        dict.set_item("spin_macro_active_frames", self.spin_macro_active_frames())?;
+        dict.set_item("lean_macro_owned_frames", self.lean_macro_owned_frames())?;
         dict.set_item(
             "consecutive_low_speed_frames",
             self.consecutive_low_speed_frames(),
@@ -225,34 +261,36 @@ pub struct PyStepStatus {
 #[pymethods]
 impl PyStepStatus {
     #[new]
-    #[pyo3(signature = (
-        step_count,
-        stalled_steps,
-        reverse_timer=0,
-        progress_frontier_stalled_frames=0,
-        termination_reason=None,
-        truncation_reason=None,
-    ))]
-    fn new(
-        step_count: usize,
-        stalled_steps: usize,
-        reverse_timer: usize,
-        progress_frontier_stalled_frames: usize,
-        termination_reason: Option<String>,
-        truncation_reason: Option<String>,
-    ) -> PyResult<Self> {
+    #[pyo3(signature = (data))]
+    fn new(data: &Bound<'_, PyDict>) -> PyResult<Self> {
         Ok(Self {
             inner: StepStatus {
                 counters: crate::core::host::StepCounters {
-                    step_count,
-                    stalled_steps,
-                    progress_frontier_stalled_frames,
+                    step_count: required_item(data, STEP_STATUS_PAYLOAD, "step_count")?
+                        .extract()?,
+                    stalled_steps: optional_item(data, "stalled_steps", 0)?,
+                    progress_frontier_stalled_frames: optional_item(
+                        data,
+                        "progress_frontier_stalled_frames",
+                        0,
+                    )?,
                     progress_frontier_distance: 0.0,
                     progress_frontier_initialized: false,
                 },
-                reverse_timer,
-                termination_reason: parse_reason(termination_reason)?,
-                truncation_reason: parse_reason(truncation_reason)?,
+                reverse_timer: optional_item(data, "reverse_timer", 0)?,
+                termination_reason: parse_reason(optional_item(
+                    data,
+                    "termination_reason",
+                    None::<String>,
+                )?)?,
+                truncation_reason: parse_reason(optional_item(
+                    data,
+                    "truncation_reason",
+                    None::<String>,
+                )?)?,
+                spin_macro_active: optional_item(data, "spin_macro_active", false)?,
+                spin_macro_frames_remaining: optional_item(data, "spin_macro_frames_remaining", 0)?,
+                spin_macro_cooldown_frames: optional_item(data, "spin_macro_cooldown_frames", 0)?,
             },
         })
     }
@@ -297,6 +335,21 @@ impl PyStepStatus {
         self.inner.truncation_reason
     }
 
+    #[getter]
+    fn spin_macro_active(&self) -> bool {
+        self.inner.spin_macro_active
+    }
+
+    #[getter]
+    fn spin_macro_frames_remaining(&self) -> usize {
+        self.inner.spin_macro_frames_remaining
+    }
+
+    #[getter]
+    fn spin_macro_cooldown_frames(&self) -> usize {
+        self.inner.spin_macro_cooldown_frames
+    }
+
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
         dict.set_item("step_count", self.step_count())?;
@@ -310,6 +363,15 @@ impl PyStepStatus {
         dict.set_item("truncated", self.truncated())?;
         dict.set_item("termination_reason", self.termination_reason())?;
         dict.set_item("truncation_reason", self.truncation_reason())?;
+        dict.set_item("spin_macro_active", self.spin_macro_active())?;
+        dict.set_item(
+            "spin_macro_frames_remaining",
+            self.spin_macro_frames_remaining(),
+        )?;
+        dict.set_item(
+            "spin_macro_cooldown_frames",
+            self.spin_macro_cooldown_frames(),
+        )?;
         Ok(dict)
     }
 }

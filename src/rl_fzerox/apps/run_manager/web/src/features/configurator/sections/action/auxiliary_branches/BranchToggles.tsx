@@ -13,6 +13,14 @@ interface BranchTogglesProps {
 }
 
 export function BranchToggles({ action, checkpointLocked, updateAction }: BranchTogglesProps) {
+  const spinBlockedReason = spinDependencyDisabledReason(action);
+  const spinAvailable = spinBlockedReason === undefined;
+  const spinOutputDisabledReason =
+    checkpointLocked && spinAvailable
+      ? "Forked checkpoints keep the original action outputs."
+      : spinBlockedReason;
+  const spinOutput = spinAvailable && action.include_spin;
+  const spinEnabled = spinAvailable && action.enable_spin;
   return (
     <>
       <div className="action-toggle-header">
@@ -99,6 +107,29 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
           }
         />
         <ActionToggleRow
+          description="Expose a 3-way spin macro branch: idle, spin left, or spin right."
+          enabled={spinEnabled}
+          enabledDisabledReason={spinBlockedReason}
+          enabledLabel="Spin enabled"
+          outputDisabledReason={spinOutputDisabledReason}
+          output={spinOutput}
+          outputLabel="Spin in output"
+          label="Spin"
+          onEnabledChange={(checked) => {
+            if (spinAvailable && action.include_spin) {
+              updateAction({ enable_spin: checked });
+            }
+          }}
+          onOutputChange={(checked) => {
+            if (spinAvailable) {
+              updateAction({
+                enable_spin: checked,
+                include_spin: checked,
+              });
+            }
+          }}
+        />
+        <ActionToggleRow
           description={
             action.pitch_mode === "continuous"
               ? "Expose one continuous airborne pitch lane."
@@ -128,4 +159,14 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
       </div>
     </>
   );
+}
+
+function spinDependencyDisabledReason(action: AuxiliaryActionConfig): string | undefined {
+  if (!action.include_lean) {
+    return "Spin requires lean in the action output.";
+  }
+  if (action.lean_output_mode !== "three_way") {
+    return "Spin is only available with 3-way lean.";
+  }
+  return undefined;
 }

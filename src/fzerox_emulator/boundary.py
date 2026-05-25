@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, TypedDict
 
+from fzerox_emulator.control.spin import SpinRequest
+
 if TYPE_CHECKING:
     # Keep the runtime module import-free from `_native`; these types document
     # payload shape without forcing extension loading during lightweight imports.
@@ -80,6 +82,7 @@ class RepeatStepRequestDict(TypedDict, total=False):
     progress_frontier_epsilon: float
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
+    spin_request: SpinRequest
     joypad_mask: int
     left_stick_x: float
     left_stick_y: float
@@ -173,6 +176,7 @@ class StepSummaryDict(TypedDict, total=False):
 
     frames_run: int
     max_race_distance: float
+    max_race_distance_speed_kph: float
     reverse_active_frames: int
     collision_recoil_active_frames: int
     low_speed_frames: int
@@ -184,4 +188,21 @@ class StepSummaryDict(TypedDict, total=False):
     entered_course_effects: int
     final_frame_index: int
     airborne_frames: int
+    spin_macro_started: bool
+    spin_macro_active_frames: int
+    lean_macro_owned_frames: int
     impact_frames: int | None
+
+
+class StepStatusDict(TypedDict, total=False):
+    """Step-limit status returned by native repeated-step execution."""
+
+    step_count: int
+    stalled_steps: int
+    reverse_timer: int
+    progress_frontier_stalled_frames: int
+    termination_reason: str | None
+    truncation_reason: str | None
+    spin_macro_active: bool
+    spin_macro_frames_remaining: int
+    spin_macro_cooldown_frames: int

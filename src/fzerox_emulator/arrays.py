@@ -13,10 +13,12 @@ BoolArray: TypeAlias = NDArray[np.bool_]
 UInt8Array: TypeAlias = NDArray[np.uint8]
 Float32Array: TypeAlias = NDArray[np.float32]
 Int64Array: TypeAlias = NDArray[np.int64]
+UInt16Array: TypeAlias = NDArray[np.uint16]
 
 RgbFrame: TypeAlias = UInt8Array
 RgbFrameBatch: TypeAlias = UInt8Array
 DisplayFrames: TypeAlias = RgbFrameBatch | tuple[RgbFrame, ...]
+ControllerMaskBatch: TypeAlias = UInt16Array | tuple[int, ...]
 ObservationFrame: TypeAlias = UInt8Array
 StateVector: TypeAlias = Float32Array
 ActionMask: TypeAlias = BoolArray

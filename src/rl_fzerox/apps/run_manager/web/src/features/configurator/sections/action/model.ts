@@ -25,8 +25,16 @@ export function normalizedActionConfig(action: ManagedActionConfig): ManagedActi
   }
   if (!nextAction.include_lean) {
     nextAction.enable_lean = false;
+    nextAction.include_spin = false;
+    nextAction.enable_spin = false;
   } else if (nextAction.lean_output_mode === "independent_buttons") {
     nextAction.lean_mode = "raw";
+  }
+  if (nextAction.lean_output_mode !== "three_way") {
+    nextAction.include_spin = false;
+    nextAction.enable_spin = false;
+  } else if (!nextAction.include_spin) {
+    nextAction.enable_spin = false;
   }
   if (!nextAction.include_pitch) {
     nextAction.enable_pitch = false;
@@ -116,6 +124,9 @@ function actionHeadShape(action: ManagedActionConfig): {
   if (action.include_lean) {
     discreteLogits += action.lean_output_mode === "three_way" ? 3 : 4;
   }
+  if (action.include_spin) {
+    discreteLogits += 3;
+  }
   if (action.include_pitch) {
     if (action.pitch_mode === "continuous") {
       continuousDims += 1;
@@ -144,6 +155,9 @@ function auxiliaryOutputSummary(action: ManagedActionConfig): string {
   }
   if (action.include_lean) {
     labels.push(leanOutputSummary(action));
+  }
+  if (action.include_spin) {
+    labels.push(action.enable_spin ? "spin macro" : "spin macro masked");
   }
   if (action.include_pitch) {
     labels.push(pitchOutputSummary(action));

@@ -60,6 +60,8 @@ def discrete_action_axes(config: ManagedRunConfig) -> tuple[str, ...]:
             axes.extend(("lean_left", "lean_right"))
         else:
             axes.append("lean")
+            if config.action.include_spin:
+                axes.append("spin")
     if config.action.include_pitch and config.action.pitch_mode == "discrete":
         axes.append("pitch")
     return tuple(axes)
@@ -83,6 +85,8 @@ def _action_mask_data(config: ManagedRunConfig) -> dict[str, tuple[int, ...]] | 
             mask_data["lean_right"] = (0,)
         else:
             mask_data["lean"] = (0,)
+    if config.action.include_spin and not config.action.enable_spin:
+        mask_data["spin"] = (0,)
     if (
         config.action.include_pitch
         and config.action.pitch_mode == "discrete"

@@ -142,6 +142,43 @@ def test_manager_training_bridge_supports_four_way_categorical_lean(
     assert train_config.env.action.runtime().split_lean_history is True
 
 
+def test_manager_training_bridge_supports_optional_spin_macro(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.include_spin = True
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-spin",
+        run_dir=tmp_path / "runs" / "bridge-spin_0001",
+    )
+
+    assert train_config.env.action.layout_discrete_axes == (
+        "gas",
+        "air_brake",
+        "boost",
+        "lean",
+        "spin",
+        "pitch",
+    )
+
+
+def test_manager_action_config_disables_spin_outside_three_way_lean() -> None:
+    config = ManagedRunConfig.model_validate(
+        {
+            "action": {
+                "lean_output_mode": "four_way_categorical",
+                "include_spin": True,
+                "enable_spin": True,
+            }
+        }
+    )
+
+    assert config.action.include_spin is False
+    assert config.action.enable_spin is False
+
+
 def test_manager_run_config_accepts_independent_lean_history_features(
     tmp_path: Path,
 ) -> None:

@@ -149,6 +149,9 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
       );
     }
   }
+  if (config.action.include_spin) {
+    labels.push(config.action.enable_spin ? "spin macro" : "spin macro masked");
+  }
   if (config.action.include_pitch) {
     if (config.action.pitch_mode === "continuous") {
       labels.push("pitch continuous");

@@ -1,6 +1,7 @@
 // rust/bindings/emulator/methods/repeat.rs
 //! Repeated-step method bodies used by training and watch playback.
 
+use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyTuple};
 
@@ -12,6 +13,7 @@ use crate::bindings::emulator::{
 };
 use crate::bindings::error::map_core_error;
 use crate::bindings::payload::{optional_item, required_dict, required_item};
+use crate::core::host::SpinRequest;
 use crate::core::host::{ObservationRenderConfig, RepeatedStepConfig};
 use crate::core::input::ControllerState;
 use crate::core::observation::ObservationStackMode;
@@ -82,6 +84,7 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
         prepared.display_width,
         3,
     )?;
+    let display_controller_masks = PyArray1::<u16>::from_vec(py, result.display_controller_masks);
     let summary = step_summary_to_py(py, &result.summary)?;
     let status = step_status_to_py(py, &result.status)?;
     let telemetry = telemetry_to_py(py, &result.final_telemetry)?;
@@ -90,6 +93,7 @@ pub(in crate::bindings::emulator) fn step_repeat_watch_raw<'py>(
         [
             observation,
             display_frames.into_any(),
+            display_controller_masks.into_any(),
             summary.into_bound(py).into_any(),
             status.into_bound(py).into_any(),
             telemetry.into_bound(py).into_any(),
@@ -228,6 +232,19 @@ fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepCon
         progress_frontier_epsilon: optional_item(request, "progress_frontier_epsilon", 100.0)?,
         terminate_on_energy_depleted: optional_item(request, "terminate_on_energy_depleted", true)?,
         lean_timer_assist: optional_item(request, "lean_timer_assist", false)?,
+        spin_request: parse_spin_request(&optional_item(
+            request,
+            "spin_request",
+            String::from("none"),
+        )?)?,
+    })
+}
+
+fn parse_spin_request(value: &str) -> PyResult<SpinRequest> {
+    SpinRequest::parse(value).ok_or_else(|| {
+        pyo3::exceptions::PyValueError::new_err(format!(
+            "Invalid spin_request {value:?}; expected 'none', 'left', or 'right'"
+        ))
     })
 }
 

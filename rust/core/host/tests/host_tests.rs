@@ -2,6 +2,7 @@
 // Covers host bootstrap helpers and runtime step-summary/status types.
 use super::{
     resolve_display_aspect_ratio,
+    spin::SpinRequest,
     step::{RepeatedStepConfig, StepCounters, StepStatus, StepSummary},
 };
 use crate::core::input::ControllerState;
@@ -37,7 +38,7 @@ fn step_summary_defaults_to_empty_step_accumulators() {
 
 #[test]
 fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters {
             step_count: 9,
             stalled_steps: 2,
@@ -53,6 +54,7 @@ fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
         },
         &telemetry(true, 1 << 25, 100),
         repeated_step_config(10, 4, 180),
+        Default::default(),
     );
 
     assert_eq!(status.counters.step_count, 11);
@@ -65,7 +67,7 @@ fn step_status_derives_carried_counters_and_timeout_once_per_outer_step() {
 
 #[test]
 fn step_status_resets_non_race_trailing_counters() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters {
             step_count: 3,
             stalled_steps: 5,
@@ -81,6 +83,7 @@ fn step_status_resets_non_race_trailing_counters() {
         },
         &telemetry(false, 0, 0),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.counters.step_count, 4);
@@ -94,7 +97,7 @@ fn step_status_resets_non_race_trailing_counters() {
 
 #[test]
 fn step_status_accumulates_progress_frontier_stall_frames_until_new_best_distance() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters {
             step_count: 10,
             stalled_steps: 0,
@@ -109,6 +112,7 @@ fn step_status_accumulates_progress_frontier_stall_frames_until_new_best_distanc
         },
         &telemetry(true, 0, 0),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.counters.progress_frontier_stalled_frames, 9);
@@ -122,7 +126,7 @@ fn step_status_truncates_when_progress_frontier_stall_limit_is_reached() {
     config.progress_frontier_stall_limit_frames = Some(8);
     config.progress_frontier_epsilon = 25.0;
 
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters {
             step_count: 10,
             stalled_steps: 0,
@@ -137,6 +141,7 @@ fn step_status_truncates_when_progress_frontier_stall_limit_is_reached() {
         },
         &telemetry(true, 0, 0),
         config,
+        Default::default(),
     );
 
     assert_eq!(status.counters.progress_frontier_stalled_frames, 8);
@@ -145,7 +150,7 @@ fn step_status_truncates_when_progress_frontier_stall_limit_is_reached() {
 
 #[test]
 fn step_status_tracks_reverse_timer_without_truncating() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -153,6 +158,7 @@ fn step_status_tracks_reverse_timer_without_truncating() {
         },
         &telemetry(true, 0, 180),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.reverse_timer, 180);
@@ -161,7 +167,7 @@ fn step_status_tracks_reverse_timer_without_truncating() {
 
 #[test]
 fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -169,6 +175,7 @@ fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
         },
         &telemetry(true, 0, 100),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.reverse_timer, 100);
@@ -177,7 +184,7 @@ fn step_status_does_not_truncate_below_configured_reverse_timer_limit() {
 
 #[test]
 fn step_status_reports_spinning_out_before_energy_depletion_fallback() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -185,6 +192,7 @@ fn step_status_reports_spinning_out_before_energy_depletion_fallback() {
         },
         &telemetry_with_energy(true, (1 << 14) | (1 << 30), 0, 0.0, 178.0),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.termination_reason, Some("spinning_out"));
@@ -192,7 +200,7 @@ fn step_status_reports_spinning_out_before_energy_depletion_fallback() {
 
 #[test]
 fn step_status_terminates_on_active_race_energy_depletion() {
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -200,6 +208,7 @@ fn step_status_terminates_on_active_race_energy_depletion() {
         },
         &telemetry_with_energy(true, 1 << 30, 0, 0.0, 178.0),
         repeated_step_config(100, 5, 180),
+        Default::default(),
     );
 
     assert_eq!(status.termination_reason, Some("energy_depleted"));
@@ -210,7 +219,7 @@ fn step_status_allows_disabling_energy_depletion_termination() {
     let mut config = repeated_step_config(100, 5, 180);
     config.terminate_on_energy_depleted = false;
 
-    let status = StepStatus::from_step(
+    let status = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -218,6 +227,7 @@ fn step_status_allows_disabling_energy_depletion_termination() {
         },
         &telemetry_with_energy(true, 1 << 30, 0, 0.0, 178.0),
         config,
+        Default::default(),
     );
 
     assert_eq!(status.termination_reason, None);
@@ -227,7 +237,7 @@ fn step_status_allows_disabling_energy_depletion_termination() {
 fn step_status_ignores_energy_depletion_outside_active_race_state() {
     let config = repeated_step_config(100, 5, 180);
 
-    let non_race = StepStatus::from_step(
+    let non_race = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -235,8 +245,9 @@ fn step_status_ignores_energy_depletion_outside_active_race_state() {
         },
         &telemetry_with_energy(false, 1 << 30, 0, 0.0, 178.0),
         config,
+        Default::default(),
     );
-    let inactive = StepStatus::from_step(
+    let inactive = StepStatus::from_step_with_spin(
         StepCounters::default(),
         &StepSummary {
             frames_run: 1,
@@ -244,6 +255,7 @@ fn step_status_ignores_energy_depletion_outside_active_race_state() {
         },
         &telemetry_with_energy(true, 0, 0, 0.0, 178.0),
         config,
+        Default::default(),
     );
 
     assert_eq!(non_race.termination_reason, None);
@@ -265,6 +277,7 @@ fn repeated_step_config(
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
         lean_timer_assist: false,
+        spin_request: SpinRequest::None,
     }
 }
 

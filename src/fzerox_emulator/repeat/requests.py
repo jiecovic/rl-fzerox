@@ -52,6 +52,7 @@ def native_repeat_step_request(
         "progress_frontier_epsilon": config.progress_frontier_epsilon,
         "terminate_on_energy_depleted": config.terminate_on_energy_depleted,
         "lean_timer_assist": config.lean_timer_assist,
+        "spin_request": config.spin_request,
         "joypad_mask": controller_state.joypad_mask,
         "left_stick_x": controller_state.left_stick_x,
         "left_stick_y": controller_state.left_stick_y,

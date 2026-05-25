@@ -12,7 +12,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from fzerox_emulator import SpinRequest
 from fzerox_emulator.arrays import DiscreteAction
+from fzerox_emulator.control import spin_request_from_index
 from rl_fzerox.core.envs.actions.base import DiscreteActionDimension
 from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.runtime_spec.schema import ActionRuntimeConfig
@@ -52,6 +54,8 @@ def discrete_axis_size(axis: str, config: ActionRuntimeConfig) -> int:
         return 4 if config.lean_output_mode == "four_way_categorical" else 3
     if axis in {"lean_left", "lean_right"}:
         return 2
+    if axis == "spin":
+        return 3
     if axis == "pitch":
         return int(config.pitch_buckets)
     raise ValueError(f"Unsupported configured discrete axis: {axis!r}")
@@ -93,3 +97,9 @@ def categorical_lean_mask(index: int, *, four_way: bool) -> int:
     if four_way and index == 3:
         return RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
     return 0
+
+
+def spin_request_value(index: int) -> SpinRequest:
+    """Translate one 3-way spin branch value into a native macro request."""
+
+    return spin_request_from_index(index)

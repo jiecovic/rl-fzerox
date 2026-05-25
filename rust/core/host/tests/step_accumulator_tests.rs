@@ -1,7 +1,7 @@
 // rust/core/host/tests/step_accumulator_tests.rs
 // Covers step-local aggregation for one repeated env step.
 use super::step_accumulator::StepAccumulator;
-use crate::core::host::RepeatedStepConfig;
+use crate::core::host::{RepeatedStepConfig, SpinRequest};
 use crate::core::input::ControllerState;
 use crate::core::telemetry::StepTelemetrySample;
 
@@ -38,6 +38,7 @@ fn step_accumulator_tracks_progress_energy_loss_and_entered_flags() {
 
     assert_eq!(summary.frames_run, 2);
     assert_eq!(summary.max_race_distance, 140.0);
+    assert_eq!(summary.max_race_distance_speed_kph, 45.0);
     assert_eq!(summary.reverse_active_frames, 1);
     assert_eq!(summary.collision_recoil_active_frames, 0);
     assert_eq!(summary.low_speed_frames, 1);
@@ -281,6 +282,7 @@ fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> Repea
         progress_frontier_epsilon: 25.0,
         terminate_on_energy_depleted: true,
         lean_timer_assist: false,
+        spin_request: SpinRequest::None,
     }
 }
 

@@ -3,7 +3,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator import BackendStepResult, ControllerState, EmulatorBackend, FZeroXTelemetry
+from fzerox_emulator import (
+    BackendStepResult,
+    ControllerState,
+    EmulatorBackend,
+    FZeroXTelemetry,
+    SpinRequest,
+)
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
@@ -27,6 +33,7 @@ class EnvStepRequest:
     action_repeat: int
     requested_control_state: ControllerState | None
     action_drive_axis: float | None
+    spin_request: SpinRequest
     capture_display_frames: bool
     active_track: SelectedTrack | None
     episode_return: float
@@ -88,6 +95,9 @@ class EngineStepAssembler:
             applied_control_state.joypad_mask
             & (RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right)
         )
+        spin_requested = request.spin_request != "none"
+        spin_started = bool(step_result.summary.spin_macro_started)
+        spin_active_frames = int(step_result.summary.spin_macro_active_frames)
         air_brake_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.air_brake)
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
@@ -142,6 +152,13 @@ class EngineStepAssembler:
         info["boost_pad_entered"] = boost_pad_entered
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
+        info["spin_requested"] = spin_requested
+        info["spin_started"] = spin_started
+        info["spin_macro_active_frames"] = spin_active_frames
+        info["lean_macro_owned_frames"] = int(step_result.summary.lean_macro_owned_frames)
+        info["spin_macro_active"] = bool(step_result.status.spin_macro_active)
+        info["spin_macro_frames_remaining"] = int(step_result.status.spin_macro_frames_remaining)
+        info["spin_macro_cooldown_frames"] = int(step_result.status.spin_macro_cooldown_frames)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
         info["episode_step"] = step_result.status.step_count
@@ -170,7 +187,17 @@ class EngineStepAssembler:
             gas_level=gas_level,
         )
         self.mask_controller.set_lean_allowed_values(
-            self.control_state.lean_action_mask_override(),
+            (
+                (0,)
+                if step_result.status.spin_macro_active
+                else self.control_state.lean_action_mask_override()
+            ),
+        )
+        self.mask_controller.set_spin_allowed_values(
+            (0,)
+            if step_result.status.spin_macro_active
+            or step_result.status.spin_macro_cooldown_frames > 0
+            else None,
         )
         sync_dynamic_action_masks(
             mask_controller=self.mask_controller,
@@ -201,6 +228,7 @@ class EngineStepAssembler:
                 truncated=truncated,
                 info=info,
                 display_frames=step_result.display_frames,
+                display_controller_masks=step_result.display_controller_masks,
             ),
             telemetry=telemetry,
             requested_control_state=requested_control_state,
@@ -234,6 +262,7 @@ class EngineStepAssembler:
                 progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
                 terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
                 lean_timer_assist=lean_timer_assist,
+                spin_request=request.spin_request,
                 **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
             )
         return self.backend.step_repeat_raw(
@@ -251,6 +280,7 @@ class EngineStepAssembler:
             progress_frontier_epsilon=float(self.config.progress_frontier_epsilon),
             terminate_on_energy_depleted=self.config.terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
+            spin_request=request.spin_request,
             **self.config.observation.native_resolution_kwargs(renderer=self.renderer),
         )
 

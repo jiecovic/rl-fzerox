@@ -119,6 +119,16 @@ def action_branch_previews(config: ManagedRunConfig) -> tuple[ActionBranchPrevie
                     mask_label=lean_mask_label,
                 )
             )
+            if config.action.include_spin:
+                branches.append(
+                    ActionBranchPreview(
+                        name="spin",
+                        kind="discrete",
+                        size=3,
+                        enabled=config.action.enable_spin,
+                        mask_label=None if config.action.enable_spin else "masked idle",
+                    )
+                )
     if config.action.include_pitch:
         if config.action.pitch_mode == "continuous":
             branches.append(

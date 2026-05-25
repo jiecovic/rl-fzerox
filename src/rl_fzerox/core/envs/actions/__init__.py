@@ -5,6 +5,7 @@ from rl_fzerox.core.domain.action_adapters import ActionAdapterName
 from rl_fzerox.core.envs.actions.base import (
     ActionAdapter,
     ActionValue,
+    DecodedAction,
     DiscreteActionDimension,
     ResettableActionAdapter,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "ActionValue",
     "ConfiguredDiscreteActionAdapter",
     "ConfiguredHybridActionAdapter",
+    "DecodedAction",
     "DiscreteActionDimension",
     "RACE_CONTROL_MASKS",
     "ResettableActionAdapter",

@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     ResetState = _results.ResetState
     StepStatus = _native.StepStatus
     StepSummary = _native.StepSummary
+    SpinRequest = _control.SpinRequest
     display_size = _observations.display_size
     encode_state_flags = _native.encode_state_flags
     joypad_mask = _native.joypad_mask
@@ -63,6 +64,7 @@ _EXPORT_MODULES = {
     "stacked_observation_channels": "fzerox_emulator.base.observations",
     "JOYPAD_BUTTONS": "fzerox_emulator.control",
     "JoypadButtons": "fzerox_emulator.control",
+    "SpinRequest": "fzerox_emulator.control",
     "ControllerState": "fzerox_emulator.control",
     "Emulator": "fzerox_emulator.emulator",
     "display_size": "fzerox_emulator.base.observations",
@@ -87,6 +89,7 @@ __all__ = [
     "ResetState",
     "StepStatus",
     "StepSummary",
+    "SpinRequest",
     "display_size",
     "encode_state_flags",
     "joypad_mask",

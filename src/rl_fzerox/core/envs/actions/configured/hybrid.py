@@ -8,11 +8,12 @@ from collections.abc import Mapping
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import ControllerState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, NumpyArray
 from rl_fzerox.core.envs.actions.base import (
     ActionBranchValue,
     ActionValue,
+    DecodedAction,
     DiscreteActionDimension,
     HybridActionValue,
     build_flat_action_mask,
@@ -25,6 +26,7 @@ from rl_fzerox.core.envs.actions.configured.layout import (
     configured_dimensions,
     idle_discrete_values,
     pitch_bucket_value,
+    spin_request_value,
 )
 from rl_fzerox.core.envs.actions.continuous_controls import (
     ContinuousButtonPwmDecoder,
@@ -84,6 +86,9 @@ class ConfiguredHybridActionAdapter:
         return self._dimensions
 
     def decode(self, action: ActionValue) -> ControllerState:
+        return self.decode_request(action).control_state
+
+    def decode_request(self, action: ActionValue) -> DecodedAction:
         mapping = _hybrid_action_mapping(action)
         continuous_values = continuous_action_array(
             _required_branch(mapping, "continuous"),
@@ -114,6 +119,7 @@ class ConfiguredHybridActionAdapter:
                 pitch = clipped
 
         joypad_mask = 0
+        spin_request: SpinRequest = "none"
         if drive is not None:
             joypad_mask |= self._drive_decoder.decode(
                 1.0 if self._config.force_full_throttle else drive
@@ -143,16 +149,21 @@ class ConfiguredHybridActionAdapter:
                 joypad_mask |= RACE_CONTROL_MASKS.lean_left
             elif dimension.label == "lean_right" and value == 1:
                 joypad_mask |= RACE_CONTROL_MASKS.lean_right
+            elif dimension.label == "spin":
+                spin_request = spin_request_value(value)
             elif dimension.label == "pitch":
                 pitch = pitch_bucket_value(value, bucket_count=self._config.pitch_buckets)
 
         if self._config.force_full_throttle:
             joypad_mask |= RACE_CONTROL_MASKS.accelerate
 
-        return ControllerState(
-            joypad_mask=joypad_mask,
-            left_stick_x=steer,
-            left_stick_y=pitch,
+        return DecodedAction(
+            control_state=ControllerState(
+                joypad_mask=joypad_mask,
+                left_stick_x=steer,
+                left_stick_y=pitch,
+            ),
+            spin_request=spin_request,
         )
 
     def reset(self) -> None:

@@ -8,7 +8,7 @@ from typing import Protocol, TypeAlias, TypeGuard, runtime_checkable
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import ControllerState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, DiscreteAction, Float32Array, NumpyArray
 
 ActionScalar: TypeAlias = int | float | np.integer | np.floating
@@ -23,6 +23,14 @@ class DiscreteActionDimension:
 
     label: str
     size: int
+
+
+@dataclass(frozen=True, slots=True)
+class DecodedAction:
+    """One decoded policy action plus native macro requests."""
+
+    control_state: ControllerState
+    spin_request: SpinRequest = "none"
 
 
 class ActionAdapter(Protocol):
@@ -45,6 +53,10 @@ class ActionAdapter(Protocol):
 
     def decode(self, action: ActionValue) -> ControllerState:
         """Translate one policy action into a held controller state."""
+        ...
+
+    def decode_request(self, action: ActionValue) -> DecodedAction:
+        """Translate one policy action into controls plus native macro requests."""
         ...
 
     def action_mask(

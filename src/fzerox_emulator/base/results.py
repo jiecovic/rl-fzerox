@@ -6,7 +6,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from fzerox_emulator.arrays import DisplayFrames, ObservationFrame, RgbFrame
+from fzerox_emulator.arrays import (
+    ControllerMaskBatch,
+    DisplayFrames,
+    ObservationFrame,
+    RgbFrame,
+)
 
 if TYPE_CHECKING:
     from fzerox_emulator._native import FZeroXTelemetry, StepStatus, StepSummary
@@ -40,6 +45,7 @@ class BackendStepResult:
     status: StepStatus
     telemetry: FZeroXTelemetry | None
     display_frames: DisplayFrames = ()
+    display_controller_masks: ControllerMaskBatch = ()
 
 
 @dataclass(frozen=True)

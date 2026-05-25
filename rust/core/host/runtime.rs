@@ -15,11 +15,13 @@ mod race_start;
 mod render;
 mod repeat;
 mod rng;
+mod spin;
 mod step;
 mod step_accumulator;
 mod telemetry;
 
 pub use host::Host;
+pub use spin::SpinRequest;
 pub use step::{
     DisplayFrameBatch, ObservationRenderConfig, RepeatedStepConfig, StepCounters, StepStatus,
     StepSummary,

@@ -30,6 +30,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,
     PygameRect,
     PygameSurface,
+    RenderFont,
     ViewerFonts,
 )
 
@@ -179,6 +180,14 @@ def _draw_control_viz(
         center=(right_lean_rect.centerx, lean_led_y),
         available=not control_viz.lean_right_masked,
     )
+    _draw_spin_status(
+        pygame=pygame,
+        screen=screen,
+        font=fonts.small,
+        x=boost_center_x,
+        y=lean_led_y + led_radius + (10 if wide else 6),
+        control_viz=control_viz,
+    )
     if wide:
         speed_x = right_lean_rect.right + 18
         speed_width = min(220, max(0, thrust_x - speed_x - 12))
@@ -282,6 +291,47 @@ def _draw_control_viz(
         ),
     )
     return panel.bottom, mode_switch_rect
+
+
+def _draw_spin_status(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    font: RenderFont,
+    x: int,
+    y: int,
+    control_viz: ControlViz,
+) -> None:
+    if not (
+        control_viz.spin_requested
+        or control_viz.spin_macro_active
+        or control_viz.spin_macro_cooldown_frames > 0
+    ):
+        return
+    direction = (
+        "L" if control_viz.spin_direction < 0 else "R" if control_viz.spin_direction > 0 else "-"
+    )
+    if control_viz.spin_macro_active:
+        label = f"SPIN {direction}"
+        color = PALETTE.text_accent
+    elif control_viz.spin_macro_cooldown_frames > 0:
+        label = f"SPIN CD {control_viz.spin_macro_cooldown_frames}"
+        color = PALETTE.text_muted
+    else:
+        label = f"SPIN {direction}"
+        color = PALETTE.text_accent
+    text = font.render(label, True, color)
+    pad_x = 5
+    pad_y = 2
+    rect = pygame.Rect(
+        x - (text.get_width() // 2) - pad_x,
+        y,
+        text.get_width() + (2 * pad_x),
+        text.get_height() + (2 * pad_y),
+    )
+    pygame.draw.rect(screen, COCKPIT_PANEL_STYLE.fill, rect, border_radius=4)
+    pygame.draw.rect(screen, color, rect, width=1, border_radius=4)
+    screen.blit(text, (rect.x + pad_x, rect.y + pad_y))
 
 
 def _control_viz_panel_height(width: int) -> int:

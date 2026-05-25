@@ -130,6 +130,77 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert snapshot.failed_track_attempts == frozenset({"silence"})
 
 
+def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    core_path.touch()
+    rom_path.touch()
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+    )
+    queue = _SnapshotQueue()
+    previous_action = np.array([0], dtype=np.int64)
+    final_action = np.array([2], dtype=np.int64)
+
+    _publish_step_snapshots(
+        config=config,
+        env=_Env(),
+        emulator=_Emulator(),
+        snapshot_queue=queue,
+        display_frames=(_rgb(1), _rgb(2), _rgb(3)),
+        display_controller_masks=np.array([11, 12, 14], dtype=np.uint16),
+        previous_observation=_rgb(10),
+        previous_info={"phase": "previous"},
+        previous_episode_reward=12.0,
+        previous_telemetry=None,
+        final_observation=_rgb(20),
+        final_info={"phase": "final"},
+        final_episode_reward=15.0,
+        final_telemetry=None,
+        reset_info={},
+        episode=4,
+        control_fps=20.0,
+        target_control_fps=20.0,
+        target_control_seconds=None,
+        previous_control_state=ControllerState(joypad_mask=1, left_stick_x=-0.5),
+        final_control_state=ControllerState(joypad_mask=2, left_stick_x=0.5),
+        previous_gas_level=0.0,
+        final_gas_level=1.0,
+        previous_action_mask_branches={"spin": (True, False, False)},
+        final_action_mask_branches={"spin": (True, True, True)},
+        previous_policy_action=previous_action,
+        final_policy_action=final_action,
+        boost_lamp_level=0.0,
+        policy_runner=None,
+        deterministic_policy=True,
+        manual_control_enabled=True,
+        policy_reload_error=None,
+        cnn_activations=None,
+        best_finish_position=None,
+        best_finish_ranks={},
+        best_finish_times={},
+        latest_finish_times={},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset(),
+    )
+
+    snapshots: list[WatchSnapshot] = []
+    for message in queue.messages:
+        assert isinstance(message, WatchSnapshot)
+        snapshots.append(message)
+
+    assert [snapshot.control_state.joypad_mask for snapshot in snapshots] == [11, 12, 14]
+    assert [snapshot.control_state.left_stick_x for snapshot in snapshots] == [0.5, 0.5, 0.5]
+    assert [snapshot.action_mask_branches for snapshot in snapshots] == [
+        {"spin": (True, True, True)},
+        {"spin": (True, True, True)},
+        {"spin": (True, True, True)},
+    ]
+    for snapshot in snapshots:
+        assert isinstance(snapshot.policy_action, np.ndarray)
+        assert np.array_equal(snapshot.policy_action, final_action)
+
+
 def _rgb(value: int) -> RgbFrame:
     return np.full((2, 2, 3), value, dtype=np.uint8)
 

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from fzerox_emulator.control.spin import SpinRequest
+
 
 @dataclass(frozen=True, slots=True)
 class RepeatStepConfig:
@@ -18,3 +20,4 @@ class RepeatStepConfig:
     progress_frontier_epsilon: float
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
+    spin_request: SpinRequest = "none"

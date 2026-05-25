@@ -51,6 +51,9 @@ def _control_viz(
     continuous_air_brake_min_duty: float = 0.0,
     continuous_air_brake_mode: str = "always",
     continuous_air_brake_disabled: bool = False,
+    spin_requested: bool = False,
+    spin_macro_active: bool = False,
+    spin_macro_cooldown_frames: int = 0,
 ) -> ControlViz:
     joypad_mask = control_state.joypad_mask
     continuous_air_brake_enabled = continuous_air_brake_mode != "off"
@@ -77,13 +80,14 @@ def _control_viz(
         action_mask_branches=action_mask_branches,
         policy_action=policy_action,
     )
+    spin_direction = _spin_direction(selected_branches)
     boost_pressed = _branch_pressed(
         selected_branches,
         "boost",
         fallback=bool(joypad_mask & RACE_CONTROL_MASKS.boost),
     )
     lean_left_pressed, lean_right_pressed = _lean_buttons(
-        selected_branches,
+        {} if spin_direction != 0 or spin_macro_active else selected_branches,
         fallback_left=bool(joypad_mask & RACE_CONTROL_MASKS.lean_left),
         fallback_right=bool(joypad_mask & RACE_CONTROL_MASKS.lean_right),
     )
@@ -123,6 +127,10 @@ def _control_viz(
             left_pressed=lean_left_pressed,
             right_pressed=lean_right_pressed,
         ),
+        spin_direction=spin_direction,
+        spin_requested=spin_requested or spin_direction != 0,
+        spin_macro_active=spin_macro_active,
+        spin_macro_cooldown_frames=max(0, int(spin_macro_cooldown_frames)),
         lean_left_pressed=lean_left_pressed,
         lean_right_pressed=lean_right_pressed,
         deterministic_policy=policy_deterministic,
@@ -229,6 +237,15 @@ def _lean_direction(*, left_pressed: bool, right_pressed: bool) -> int:
     if left_pressed == right_pressed:
         return 0
     return -1 if left_pressed else 1
+
+
+def _spin_direction(selected_branches: dict[str, int]) -> int:
+    spin = selected_branches.get("spin")
+    if spin == 1:
+        return -1
+    if spin == 2:
+        return 1
+    return 0
 
 
 def _lean_button_allowed(

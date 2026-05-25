@@ -223,11 +223,16 @@ export function RuntimeCards({
                   active: action.lean_output_mode === option.value,
                   key: option.value,
                   label: option.label,
-                  onClick: () =>
+                  onClick: () => {
+                    const leanOutputMode =
+                      option.value as ManagedRunConfig["action"]["lean_output_mode"];
                     updateAction({
-                      lean_output_mode:
-                        option.value as ManagedRunConfig["action"]["lean_output_mode"],
-                    }),
+                      lean_output_mode: leanOutputMode,
+                      ...(leanOutputMode === "three_way"
+                        ? {}
+                        : { enable_spin: false, include_spin: false }),
+                    });
+                  },
                 }))}
               />
             </div>

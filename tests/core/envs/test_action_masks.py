@@ -28,6 +28,15 @@ def _discrete_gas_boost_lean_action(*, lean_index: int = 0, boost_index: int = 0
     return np.array([3, 0, boost_index, lean_index], dtype=np.int64)
 
 
+def _discrete_gas_boost_lean_spin_action(
+    *,
+    lean_index: int = 0,
+    boost_index: int = 0,
+    spin_index: int = 0,
+) -> Int64Array:
+    return np.array([3, 0, boost_index, lean_index, spin_index], dtype=np.int64)
+
+
 def _discrete_gas_boost_action(*, boost_index: int = 0) -> Int64Array:
     return np.array([3, 0, boost_index], dtype=np.int64)
 
@@ -296,6 +305,47 @@ def test_env_action_masks_disable_lean_below_speed_threshold() -> None:
 
     env.step(_discrete_gas_boost_lean_action())
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2 + 3))
+
+
+def test_env_action_masks_disable_spin_and_lean_during_native_spin_macro() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
+                summary=_step_summary(
+                    max_race_distance=10.0,
+                    final_frame_index=1,
+                    spin_macro_started=True,
+                    spin_macro_active_frames=1,
+                    lean_macro_owned_frames=1,
+                ),
+                status=make_step_status(
+                    step_count=1,
+                    spin_macro_active=True,
+                    spin_macro_frames_remaining=5,
+                ),
+            )
+        ],
+        reset_telemetry=_telemetry(race_distance=0.0, state_labels=("active", "can_boost")),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action("steer", "gas", "boost", "lean", "spin"),
+        ),
+    )
+
+    env.reset(seed=1)
+    assert env.action_masks().tolist() == ([True] * (7 + 2 + 2 + 3 + 3))
+
+    _, _, _, _, info = env.step(_discrete_gas_boost_lean_spin_action(spin_index=1))
+
+    assert info["spin_requested"] is True
+    assert info["spin_started"] is True
+    assert info["spin_macro_active_frames"] == 1
+    assert env.action_masks().tolist() == (
+        ([True] * 7) + ([True] * 2) + ([True] * 2) + [True, False, False] + [True, False, False]
+    )
 
 
 def test_env_action_masks_disable_boost_below_energy_threshold() -> None:

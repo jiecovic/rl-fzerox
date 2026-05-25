@@ -44,6 +44,7 @@ ConfiguredDiscreteAxis: TypeAlias = Literal[
     "lean",
     "lean_left",
     "lean_right",
+    "spin",
     "pitch",
 ]
 
@@ -56,7 +57,7 @@ class ConfiguredActionLayoutCatalog:
         ("steer", "drive", "air_brake", "pitch")
     )
     discrete_axes: frozenset[ConfiguredDiscreteAxis] = frozenset(
-        ("steer", "gas", "air_brake", "boost", "lean", "lean_left", "lean_right", "pitch")
+        ("steer", "gas", "air_brake", "boost", "lean", "lean_left", "lean_right", "spin", "pitch")
     )
     default_discrete_axes: tuple[ConfiguredDiscreteAxis, ...] = (
         "steer",
@@ -92,6 +93,7 @@ class ActionMaskConfig(BaseModel):
     lean: ActionMaskSpec | None = None
     lean_left: ActionMaskSpec | None = None
     lean_right: ActionMaskSpec | None = None
+    spin: ActionMaskSpec | None = None
     pitch: ActionMaskSpec | None = None
 
     @field_validator(
@@ -102,6 +104,7 @@ class ActionMaskConfig(BaseModel):
         "lean",
         "lean_left",
         "lean_right",
+        "spin",
         "pitch",
     )
     @classmethod
@@ -128,6 +131,7 @@ class ActionMaskConfig(BaseModel):
             "lean",
             "lean_left",
             "lean_right",
+            "spin",
             "pitch",
         ):
             values = getattr(self, branch_name)
@@ -353,6 +357,9 @@ class ActionConfig(BaseModel):
         axes = set(self.layout_discrete_axes)
         has_categorical_lean = "lean" in axes
         has_split_lean = "lean_left" in axes or "lean_right" in axes
+        has_spin = "spin" in axes
+        if has_spin and (not has_categorical_lean or self.lean_output_mode != "three_way"):
+            raise ValueError("spin axis requires three_way categorical lean")
         if has_categorical_lean and has_split_lean:
             raise ValueError("configured action layout cannot mix lean and split lean axes")
         if self.lean_output_mode == "independent_buttons":

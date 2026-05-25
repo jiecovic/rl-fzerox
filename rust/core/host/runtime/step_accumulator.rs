@@ -31,6 +31,7 @@ impl StepAccumulator {
         Self {
             summary: StepSummary {
                 max_race_distance: telemetry.race_distance,
+                max_race_distance_speed_kph: telemetry.speed_kph,
                 final_frame_index: frame_index,
                 ..StepSummary::default()
             },
@@ -46,8 +47,10 @@ impl StepAccumulator {
     pub(super) fn observe(&mut self, telemetry: &StepTelemetrySample, frame_index: usize) {
         self.summary.frames_run += 1;
         self.summary.final_frame_index = frame_index;
-        self.summary.max_race_distance =
-            self.summary.max_race_distance.max(telemetry.race_distance);
+        if telemetry.race_distance > self.summary.max_race_distance {
+            self.summary.max_race_distance = telemetry.race_distance;
+            self.summary.max_race_distance_speed_kph = telemetry.speed_kph;
+        }
         if telemetry.reverse_timer > 0 {
             self.summary.reverse_active_frames += 1;
         }

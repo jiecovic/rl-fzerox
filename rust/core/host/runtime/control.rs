@@ -16,6 +16,7 @@ impl Host {
             .set_controller_state(ControllerState::default());
         self.frame_index = 0;
         self.step_counters = StepCounters::default();
+        self.spin_macro.reset();
         self.refresh_shape_from_frame();
         Ok(())
     }
@@ -45,6 +46,7 @@ impl Host {
         controller_state: ControllerState,
     ) -> Result<(), CoreError> {
         self.ensure_open()?;
+        self.spin_macro.reset();
         self.callbacks.set_controller_state(controller_state);
         Ok(())
     }
