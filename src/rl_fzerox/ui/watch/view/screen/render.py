@@ -128,6 +128,8 @@ def draw_watch_frame(
             progress_frontier_stall_limit_frames=config.env.progress_frontier_stall_limit_frames,
             stuck_min_speed_kph=config.env.stuck_min_speed_kph,
             telemetry=telemetry,
+            emulator_renderer=config.emulator.renderer,
+            watch_device=config.watch.device,
             train_config=config.train,
             policy_config=config.policy,
         ),

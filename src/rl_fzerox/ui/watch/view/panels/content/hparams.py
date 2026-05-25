@@ -33,7 +33,7 @@ def training_hparam_sections(
             title="Training",
             lines=[
                 _panel_line("Algorithm", str(train_config.algorithm), PALETTE.text_primary),
-                _panel_line("Device", str(train_config.device), PALETTE.text_primary),
+                _panel_line("Train device", str(train_config.device), PALETTE.text_primary),
                 _panel_line("Vec env", str(train_config.vec_env), PALETTE.text_primary),
                 _panel_line("Num envs", str(train_config.num_envs), PALETTE.text_primary),
                 _panel_line(

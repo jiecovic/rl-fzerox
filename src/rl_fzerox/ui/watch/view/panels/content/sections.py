@@ -11,8 +11,8 @@ from rl_fzerox.ui.watch.view.panels.content.auxiliary import (
     auxiliary_episode_sections,
 )
 from rl_fzerox.ui.watch.view.panels.content.game import (
-    game_detail_section,
-    game_overview_section,
+    race_setup_section,
+    race_state_section,
 )
 from rl_fzerox.ui.watch.view.panels.content.geometry import track_geometry_sections
 from rl_fzerox.ui.watch.view.panels.content.hparams import training_hparam_sections
@@ -21,17 +21,14 @@ from rl_fzerox.ui.watch.view.panels.content.state_vector import policy_state_sec
 from rl_fzerox.ui.watch.view.panels.core.format import (
     _float_info,
     _format_checkpoint_experience,
-    _format_control_rate,
     _format_env_step,
     _format_episode_frames,
-    _format_game_rate,
     _format_game_speed,
     _format_height_width,
     _format_observation_shape,
     _format_policy_action,
     _format_progress_frontier_counter,
     _format_reload_age,
-    _format_render_rate,
     _int_info,
 )
 from rl_fzerox.ui.watch.view.panels.core.lines import panel_line as _panel_line
@@ -91,6 +88,8 @@ def _build_panel_columns(
     policy_auxiliary_state_predictions: dict[str, object] | None = None,
     policy_auxiliary_state_targets: dict[str, object] | None = None,
     auxiliary_episode_metrics: AuxiliaryEpisodeMetricsSnapshot | None = None,
+    emulator_renderer: str = "unknown",
+    watch_device: str = "unknown",
     train_config: TrainConfig | None = None,
     policy_config: PolicyConfig | None = None,
 ) -> PanelColumns:
@@ -101,17 +100,12 @@ def _build_panel_columns(
     return PanelColumns(
         left=[
             PanelSection(
-                title="Run",
+                title="Run State",
                 lines=[
                     _panel_line(
                         "State",
                         "paused" if paused else "running",
                         PALETTE.text_warning if paused else PALETTE.text_accent,
-                    ),
-                    _panel_line(
-                        "Stage",
-                        curriculum_stage,
-                        PALETTE.text_primary if curriculum_stage != "-" else PALETTE.text_muted,
                     ),
                     _panel_line(
                         "Driver",
@@ -125,6 +119,11 @@ def _build_panel_columns(
                         ),
                     ),
                     _panel_line(
+                        "Stage",
+                        curriculum_stage,
+                        PALETTE.text_primary if curriculum_stage != "-" else PALETTE.text_muted,
+                    ),
+                    _panel_line(
                         "Experience",
                         _format_checkpoint_experience(policy_experience_frames),
                         PALETTE.text_primary
@@ -136,6 +135,11 @@ def _build_panel_columns(
                         _format_reload_age(policy_reload_age_seconds),
                         PALETTE.text_primary,
                     ),
+                ],
+            ),
+            PanelSection(
+                title="Episode Progress",
+                lines=[
                     _panel_line("Episode", str(episode), PALETTE.text_primary),
                     _panel_line(
                         "Episode frame",
@@ -164,7 +168,7 @@ def _build_panel_columns(
                         else PALETTE.text_muted,
                     ),
                     _panel_line(
-                        "Step",
+                        "Step reward",
                         _format_reward_value(_float_info(info, "step_reward")),
                         PALETTE.text_primary,
                     ),
@@ -176,15 +180,16 @@ def _build_panel_columns(
                 ],
             ),
             PanelSection(
-                title="Policy Details",
+                title="Policy Output",
                 lines=[
                     _panel_line(
-                        "Deterministic",
+                        "Mode",
                         _format_policy_deterministic(policy_deterministic),
                         PALETTE.text_primary
                         if policy_deterministic is not None
                         else PALETTE.text_muted,
                     ),
+                    _panel_line("Device", watch_device, PALETTE.text_primary),
                     _panel_line(
                         "Action",
                         _format_policy_action(policy_action),
@@ -192,52 +197,48 @@ def _build_panel_columns(
                     ),
                 ],
             ),
-            game_overview_section(
+            race_state_section(
                 info,
                 telemetry,
                 stuck_min_speed_kph=stuck_min_speed_kph,
             ),
-            game_detail_section(info, telemetry),
+            race_setup_section(info, telemetry),
             PanelSection(
-                title="Timing",
+                title="Runtime",
                 lines=[
+                    _panel_line("Renderer", emulator_renderer, PALETTE.text_primary),
                     _panel_line(
-                        "Action repeat",
-                        str(action_repeat),
+                        "Repeat",
+                        f"x{action_repeat}",
                         PALETTE.text_primary,
                     ),
                     _panel_line(
                         "Control FPS",
-                        _format_control_rate(info),
-                        PALETTE.text_primary,
-                    ),
-                    _panel_line(
-                        "Game speed",
-                        _format_game_speed(info, action_repeat=action_repeat),
+                        _format_fps_value(info, "control_fps"),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
                         "Game FPS",
-                        _format_game_rate(info),
+                        _format_fps_value(info, "game_fps"),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
                         "Render FPS",
-                        _format_render_rate(info),
+                        _format_fps_value(info, "render_fps"),
                         PALETTE.text_primary,
                     ),
-                ],
-            ),
-            PanelSection(
-                title="Display",
-                lines=[
                     _panel_line(
-                        "Game",
+                        "Speed multiplier",
+                        _format_game_speed(info, action_repeat=action_repeat),
+                        PALETTE.text_primary,
+                    ),
+                    _panel_line(
+                        "Game size",
                         _format_height_width(game_display_size[1], game_display_size[0]),
                         PALETTE.text_primary,
                     ),
                     _panel_line(
-                        "Obs",
+                        "Obs size",
                         _format_observation_shape(observation_shape),
                         PALETTE.text_primary,
                     ),
@@ -294,6 +295,10 @@ def _watch_zeroed_state_features(info: dict[str, object]) -> frozenset[str]:
 
 def _format_reward_value(value: float) -> str:
     return f"{value:.4f}"
+
+
+def _format_fps_value(info: dict[str, object], key: str) -> str:
+    return f"{_float_info(info, key):.1f}"
 
 
 def _format_policy_deterministic(value: bool | None) -> str:

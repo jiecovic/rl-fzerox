@@ -18,7 +18,7 @@ from rl_fzerox.ui.watch.view.screen.theme import PALETTE
 from rl_fzerox.ui.watch.view.screen.types import PanelLine, PanelSection
 
 
-def game_overview_section(
+def race_state_section(
     info: dict[str, object],
     telemetry: FZeroXTelemetry | None,
     *,
@@ -26,7 +26,7 @@ def game_overview_section(
 ) -> PanelSection:
     if telemetry is None:
         return PanelSection(
-            title="Race",
+            title="Race State",
             lines=[
                 panel_line("Status", "unavailable", PALETTE.text_warning),
             ],
@@ -65,7 +65,7 @@ def game_overview_section(
         lines.insert(1, difficulty_line)
 
     return PanelSection(
-        title="Race",
+        title="Race State",
         lines=lines,
         flag_viz=_flag_viz(
             telemetry.player.state_labels,
@@ -84,31 +84,23 @@ def game_overview_section(
     )
 
 
-def game_detail_section(
+def race_setup_section(
     info: dict[str, object],
     telemetry: FZeroXTelemetry | None,
 ) -> PanelSection:
     if telemetry is None:
         return PanelSection(
-            title="Game Details",
+            title="Race Setup",
             lines=[
                 panel_line("Status", "unavailable", PALETTE.text_warning),
             ],
         )
 
-    recoil_magnitude = (
-        telemetry.player.recoil_tilt_magnitude if telemetry.player.collision_recoil else 0.0
-    )
     return PanelSection(
-        title="Game Details",
+        title="Race Setup",
         lines=[
-            panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
             panel_line("Vehicle", _format_vehicle_setup(info), PALETTE.text_primary),
-            panel_line(
-                "Recoil",
-                f"{recoil_magnitude:.3f}",
-                PALETTE.text_warning if recoil_magnitude > 0.001 else PALETTE.text_muted,
-            ),
+            panel_line("Camera", _format_camera_setting(telemetry), PALETTE.text_primary),
         ],
     )
 
