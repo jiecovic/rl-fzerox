@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 from fzerox_emulator import ControllerState, FZeroXTelemetry
-from fzerox_emulator.arrays import DisplayFrames, RgbFrame, StateVector
+from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames, RgbFrame, StateVector
 from rl_fzerox.core.envs import observations as observation_access
 from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -72,6 +72,7 @@ def _publish_step_snapshots(
     emulator: TelemetryReader,
     snapshot_queue: WorkerMessageQueue,
     display_frames: DisplayFrames,
+    display_controller_masks: ControllerMaskBatch = (),
     previous_observation: ObservationValue,
     previous_info: dict[str, object],
     previous_episode_reward: float,
@@ -150,6 +151,12 @@ def _publish_step_snapshots(
         final_policy_action = policy_action
 
     frames = _display_frames_or_fallback(display_frames, fallback=env.render())
+    frame_control_states, exact_frame_controls = _display_controller_states(
+        display_controller_masks,
+        frames=frames,
+        fallback_previous=previous_control_state,
+        fallback_final=final_control_state,
+    )
     frame_interval_seconds = (
         None if target_control_seconds is None else target_control_seconds / len(frames)
     )
@@ -171,14 +178,20 @@ def _publish_step_snapshots(
                 ),
                 control_fps=control_fps,
                 target_control_fps=target_control_fps,
-                control_state=final_control_state if is_final_frame else previous_control_state,
+                control_state=frame_control_states[index],
                 gas_level=final_gas_level if is_final_frame else previous_gas_level,
                 boost_lamp_level=boost_lamp_level,
                 action_mask_branches=(
-                    final_action_mask_branches if is_final_frame else previous_action_mask_branches
+                    final_action_mask_branches
+                    if is_final_frame or exact_frame_controls
+                    else previous_action_mask_branches
                 ),
                 telemetry=final_telemetry if is_final_frame else previous_telemetry,
-                policy_action=final_policy_action if is_final_frame else previous_policy_action,
+                policy_action=(
+                    final_policy_action
+                    if is_final_frame or exact_frame_controls
+                    else previous_policy_action
+                ),
                 policy_runner=policy_runner,
                 policy_auxiliary_state_predictions=(
                     final_auxiliary_predictions
@@ -215,6 +228,38 @@ def _display_frames_or_fallback(
     if isinstance(display_frames, tuple):
         return display_frames if display_frames else (fallback,)
     return display_frames if len(display_frames) > 0 else (fallback,)
+
+
+def _display_controller_states(
+    display_controller_masks: ControllerMaskBatch,
+    *,
+    frames: DisplayFrames,
+    fallback_previous: ControllerState,
+    fallback_final: ControllerState,
+) -> tuple[tuple[ControllerState, ...], bool]:
+    frame_count = len(frames)
+    masks = tuple(int(mask) for mask in display_controller_masks)
+    if len(masks) != frame_count:
+        return (
+            tuple(
+                fallback_final if index == frame_count - 1 else fallback_previous
+                for index in range(frame_count)
+            ),
+            False,
+        )
+    return (
+        tuple(
+            ControllerState(
+                joypad_mask=mask,
+                left_stick_x=fallback_final.left_stick_x,
+                left_stick_y=fallback_final.left_stick_y,
+                right_stick_x=fallback_final.right_stick_x,
+                right_stick_y=fallback_final.right_stick_y,
+            )
+            for mask in masks
+        ),
+        True,
+    )
 
 
 def _build_snapshot(

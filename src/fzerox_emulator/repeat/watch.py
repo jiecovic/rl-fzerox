@@ -24,7 +24,14 @@ def run_repeat_watch_step(
 ) -> BackendStepResult:
     """Run the native watch repeated-step API and wrap observation/display frames."""
 
-    observation, display_frames, summary, status, telemetry = native.step_repeat_watch_raw(
+    (
+        observation,
+        display_frames,
+        display_controller_masks,
+        summary,
+        status,
+        telemetry,
+    ) = native.step_repeat_watch_raw(
         native_repeat_observation_request(config, controller_state, recipe)
     )
     return BackendStepResult(
@@ -33,4 +40,5 @@ def run_repeat_watch_step(
         status=status,
         telemetry=telemetry,
         display_frames=display_frames,
+        display_controller_masks=display_controller_masks,
     )

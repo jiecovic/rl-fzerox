@@ -86,6 +86,10 @@ class ControlViz:
     boost_active: bool
     boost_lamp_level: float
     lean_direction: int
+    spin_direction: int = 0
+    spin_requested: bool = False
+    spin_macro_active: bool = False
+    spin_macro_cooldown_frames: int = 0
     lean_left_pressed: bool = False
     lean_right_pressed: bool = False
     deterministic_policy: bool | None = None

@@ -348,10 +348,12 @@ def _run_simulation_loop(
                             current_control_state
                         )
                         display_frames = (env.render(),)
+                        display_controller_masks = (current_control_state.joypad_mask,)
                     else:
                         watch_step = env.step_control_watch(current_control_state)
                         observation, reward, terminated, truncated, info = watch_step.gym_result()
                         display_frames = watch_step.display_frames
+                        display_controller_masks = watch_step.display_controller_masks
                     current_policy_action = None
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
@@ -389,6 +391,7 @@ def _run_simulation_loop(
                         watch_step.gym_result()
                     )
                     display_frames = watch_step.display_frames
+                    display_controller_masks = watch_step.display_controller_masks
                     current_control_state = env.last_requested_control_state
                     current_gas_level = env.last_gas_level
                 if manual_control_enabled:
@@ -459,6 +462,7 @@ def _run_simulation_loop(
                     emulator=emulator,
                     snapshot_queue=snapshot_queue,
                     display_frames=display_frames,
+                    display_controller_masks=display_controller_masks,
                     previous_observation=previous_observation,
                     previous_info=previous_info,
                     previous_episode_reward=previous_episode_reward,

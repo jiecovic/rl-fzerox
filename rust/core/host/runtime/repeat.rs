@@ -78,15 +78,26 @@ impl Host {
         }
 
         let initial_sample = self.telemetry_sample()?;
-        self.callbacks.set_controller_state(config.controller_state);
+        let mut spin_stats = self.spin_macro.begin_step(config.spin_request);
+        let spin_controls_active = self.spin_controls_active(spin_stats.started);
+        if !spin_controls_active {
+            self.callbacks.set_controller_state(config.controller_state);
+        }
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
             let mut display_frames = DisplayFrameBatch::default();
+            let mut display_controller_masks = Vec::with_capacity(config.action_repeat);
 
             for _ in 0..config.action_repeat {
                 self.callbacks.set_capture_video(true);
+                let controller_state = self.controller_for_repeated_frame(
+                    config.controller_state,
+                    spin_controls_active,
+                    &mut spin_stats,
+                );
+                display_controller_masks.push(controller_state.joypad_mask());
                 if config.lean_timer_assist {
-                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
+                    self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
                 self.call_core(|core| unsafe {
                     core.run();
@@ -100,12 +111,16 @@ impl Host {
                 display_frames.push_frame(display_frame);
             }
 
-            Ok((accumulator.finish(), display_frames))
+            Ok((
+                self.finish_repeated_step(accumulator, spin_stats),
+                display_frames,
+                display_controller_masks,
+            ))
         });
         self.callbacks.set_capture_video(true);
         self.refresh_shape_from_frame();
 
-        let (summary, display_frames) = step_result?;
+        let (summary, display_frames, display_controller_masks) = step_result?;
         if !self.callbacks.has_frame() {
             return Err(CoreError::NoFrameAvailable);
         }
@@ -115,6 +130,7 @@ impl Host {
         Ok(NativeWatchStepResult {
             observation,
             display_frames,
+            display_controller_masks,
             summary,
             status,
             final_telemetry,
@@ -133,15 +149,24 @@ impl Host {
         }
 
         let initial_sample = self.telemetry_sample()?;
-        self.callbacks.set_controller_state(config.controller_state);
+        let mut spin_stats = self.spin_macro.begin_step(config.spin_request);
+        let spin_controls_active = self.spin_controls_active(spin_stats.started);
+        if !spin_controls_active {
+            self.callbacks.set_controller_state(config.controller_state);
+        }
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
 
             for repeat_index in 0..config.action_repeat {
                 let capture_video = repeat_index + 1 == config.action_repeat;
                 self.callbacks.set_capture_video(capture_video);
+                let controller_state = self.controller_for_repeated_frame(
+                    config.controller_state,
+                    spin_controls_active,
+                    &mut spin_stats,
+                );
                 if config.lean_timer_assist {
-                    self.patch_lean_timers_for_slide_assist(config.controller_state)?;
+                    self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
                 self.call_core(|core| unsafe {
                     core.run();
@@ -152,7 +177,7 @@ impl Host {
                 accumulator.observe(&telemetry, self.frame_index);
             }
 
-            Ok(accumulator.finish())
+            Ok(self.finish_repeated_step(accumulator, spin_stats))
         });
         self.callbacks.set_capture_video(true);
         self.refresh_shape_from_frame();
@@ -164,13 +189,58 @@ impl Host {
         Ok(summary)
     }
 
+    fn spin_controls_active(&self, spin_started: bool) -> bool {
+        if spin_started {
+            return true;
+        }
+        let spin_status = self.spin_macro.status();
+        spin_status.active || spin_status.cooldown_frames > 0
+    }
+
+    fn controller_for_repeated_frame(
+        &mut self,
+        base_controller_state: crate::core::input::ControllerState,
+        spin_controls_active: bool,
+        spin_stats: &mut super::spin::SpinStepStats,
+    ) -> crate::core::input::ControllerState {
+        if !spin_controls_active {
+            return base_controller_state;
+        }
+        let frame_controller = self.spin_macro.next_controller(base_controller_state);
+        if frame_controller.macro_owns_lean {
+            spin_stats.active_frames += 1;
+            spin_stats.lean_owned_frames += 1;
+        }
+        self.callbacks
+            .set_controller_state(frame_controller.controller_state);
+        frame_controller.controller_state
+    }
+
+    fn finish_repeated_step(
+        &self,
+        accumulator: StepAccumulator,
+        spin_stats: super::spin::SpinStepStats,
+    ) -> StepSummary {
+        let mut summary = accumulator.finish();
+        summary.spin_macro_started = spin_stats.started;
+        summary.spin_macro_active_frames = spin_stats.active_frames;
+        summary.lean_macro_owned_frames = spin_stats.lean_owned_frames;
+        summary
+    }
+
     fn finalize_repeated_step(
         &mut self,
         config: RepeatedStepConfig,
         summary: &StepSummary,
     ) -> Result<(StepStatus, crate::core::telemetry::TelemetrySnapshot), CoreError> {
         let final_telemetry = self.telemetry()?;
-        let status = StepStatus::from_step(self.step_counters, summary, &final_telemetry, config);
+        let status = StepStatus::from_step_with_spin(
+            self.step_counters,
+            summary,
+            &final_telemetry,
+            config,
+            self.spin_macro.status(),
+        );
         self.step_counters = status.counters;
         Ok((status, final_telemetry))
     }

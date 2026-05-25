@@ -151,13 +151,13 @@ def test_step_keeps_running_when_driving_in_reverse() -> None:
     env.reset(seed=4)
     _, reward, terminated, truncated, info = env.step(_neutral_action())
 
-    assert reward == pytest.approx(-0.01)
+    assert reward == pytest.approx(-0.005)
     assert not terminated
     assert not truncated
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
     assert reward_breakdown["time"] == pytest.approx(-0.005)
-    assert reward_breakdown["reverse_time"] == -0.005
+    assert "reverse_time" not in reward_breakdown
     assert info["reverse_timer"] == 10_000
 
 

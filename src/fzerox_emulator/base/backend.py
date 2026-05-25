@@ -21,6 +21,7 @@ from fzerox_emulator.base.results import (
     ResetState,
 )
 from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control.spin import SpinRequest
 
 if TYPE_CHECKING:
     from fzerox_emulator._native import FZeroXTelemetry
@@ -78,6 +79,7 @@ class EmulatorBackend(Protocol):
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: SpinRequest = "none",
     ) -> BackendStepResult: ...
 
     def step_repeat_watch_raw(
@@ -100,6 +102,7 @@ class EmulatorBackend(Protocol):
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: SpinRequest = "none",
     ) -> BackendStepResult: ...
 
     def step_repeat_multi_observation_raw(
@@ -115,6 +118,7 @@ class EmulatorBackend(Protocol):
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: SpinRequest = "none",
     ) -> BackendMultiObservationStepResult: ...
 
     def set_controller_state(self, controller_state: ControllerState) -> None: ...

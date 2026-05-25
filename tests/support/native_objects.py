@@ -222,6 +222,7 @@ def make_step_summary(
     *,
     frames_run: int = 1,
     max_race_distance: float,
+    max_race_distance_speed_kph: float = 760.0,
     reverse_active_frames: int = 0,
     collision_recoil_active_frames: int = 0,
     low_speed_frames: int = 0,
@@ -235,6 +236,9 @@ def make_step_summary(
     entered_course_effects: int = 0,
     final_frame_index: int = 1,
     airborne_frames: int = 0,
+    spin_macro_started: bool = False,
+    spin_macro_active_frames: int = 0,
+    lean_macro_owned_frames: int = 0,
 ) -> StepSummary:
     resolved_entered_state_flags = (
         encode_state_flags(entered_state_labels)
@@ -250,6 +254,7 @@ def make_step_summary(
         {
             "frames_run": frames_run,
             "max_race_distance": max_race_distance,
+            "max_race_distance_speed_kph": max_race_distance_speed_kph,
             "reverse_active_frames": reverse_active_frames,
             "collision_recoil_active_frames": collision_recoil_active_frames,
             "low_speed_frames": low_speed_frames,
@@ -262,6 +267,9 @@ def make_step_summary(
             "entered_course_effects": entered_course_effects,
             "final_frame_index": final_frame_index,
             "airborne_frames": airborne_frames,
+            "spin_macro_started": spin_macro_started,
+            "spin_macro_active_frames": spin_macro_active_frames,
+            "lean_macro_owned_frames": lean_macro_owned_frames,
         }
     )
 
@@ -274,12 +282,20 @@ def make_step_status(
     progress_frontier_stalled_frames: int = 0,
     termination_reason: str | None = None,
     truncation_reason: str | None = None,
+    spin_macro_active: bool = False,
+    spin_macro_frames_remaining: int = 0,
+    spin_macro_cooldown_frames: int = 0,
 ) -> StepStatus:
     return StepStatus(
-        step_count=step_count,
-        stalled_steps=stalled_steps,
-        reverse_timer=reverse_timer,
-        progress_frontier_stalled_frames=progress_frontier_stalled_frames,
-        termination_reason=termination_reason,
-        truncation_reason=truncation_reason,
+        {
+            "step_count": step_count,
+            "stalled_steps": stalled_steps,
+            "reverse_timer": reverse_timer,
+            "progress_frontier_stalled_frames": progress_frontier_stalled_frames,
+            "termination_reason": termination_reason,
+            "truncation_reason": truncation_reason,
+            "spin_macro_active": spin_macro_active,
+            "spin_macro_frames_remaining": spin_macro_frames_remaining,
+            "spin_macro_cooldown_frames": spin_macro_cooldown_frames,
+        }
     )

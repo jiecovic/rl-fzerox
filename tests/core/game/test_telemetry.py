@@ -178,6 +178,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
         {
             "frames_run": 2,
             "max_race_distance": 42.0,
+            "max_race_distance_speed_kph": 930.0,
             "reverse_active_frames": 1,
             "collision_recoil_active_frames": 2,
             "low_speed_frames": 2,
@@ -194,6 +195,7 @@ def test_native_step_summary_exposes_entered_state_helpers() -> None:
 
     assert summary.entered_finished is True
     assert summary.entered_crashed is False
+    assert summary.max_race_distance_speed_kph == 930.0
     assert summary.energy_gain_total == 2.5
     assert summary.damage_taken_frames == 1
     assert summary.impact_frames == 2

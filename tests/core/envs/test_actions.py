@@ -63,6 +63,15 @@ def test_action_config_rejects_non_positive_steer_response_power() -> None:
         ActionConfig(steer_response_power=0.0)
 
 
+def test_action_config_rejects_spin_without_three_way_lean() -> None:
+    with pytest.raises(ValueError, match="spin axis requires three_way categorical lean"):
+        configured_discrete_action(
+            "lean",
+            "spin",
+            lean_output_mode="four_way_categorical",
+        )
+
+
 def test_configured_discrete_gas_air_brake_layout_decodes_buttons() -> None:
     adapter = ConfiguredDiscreteActionAdapter(
         configured_discrete_action("steer", "gas", "air_brake")
@@ -124,6 +133,15 @@ def test_configured_discrete_full_button_layout_decodes_parallel_buttons() -> No
         | RACE_CONTROL_MASKS.lean_right,
         left_stick_x=-1.0,
     )
+
+
+def test_configured_discrete_spin_branch_decodes_macro_request_only() -> None:
+    adapter = ConfiguredDiscreteActionAdapter(configured_discrete_action("lean", "spin"))
+
+    decoded = adapter.decode_request(np.array([0, 2], dtype=np.int64))
+
+    assert decoded.control_state == ControllerState()
+    assert decoded.spin_request == "right"
 
 
 def test_configured_discrete_four_way_lean_decodes_both_buttons() -> None:
@@ -230,6 +248,28 @@ def test_configured_hybrid_steer_gas_boost_lean_decodes_discrete_buttons() -> No
         | RACE_CONTROL_MASKS.lean_right,
         left_stick_x=-0.75,
     )
+
+
+def test_configured_hybrid_spin_branch_decodes_macro_request() -> None:
+    adapter = ConfiguredHybridActionAdapter(
+        configured_hybrid_action(
+            continuous_axes=("steer",),
+            discrete_axes=("lean", "spin"),
+        )
+    )
+
+    decoded = adapter.decode_request(
+        {
+            "continuous": np.array([0.25], dtype=np.float32),
+            "discrete": np.array([1, 1], dtype=np.int64),
+        }
+    )
+
+    assert decoded.control_state == ControllerState(
+        joypad_mask=RACE_CONTROL_MASKS.lean_left,
+        left_stick_x=0.25,
+    )
+    assert decoded.spin_request == "left"
 
 
 def test_configured_hybrid_pitch_ignores_deadzone_for_controller_output() -> None:

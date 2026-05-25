@@ -12,6 +12,7 @@ use crate::core::rom::validate_supported_rom;
 use crate::core::stdio::with_silenced_stdio;
 use crate::core::video::VideoFrame;
 
+use super::spin::SpinMacroState;
 use super::step::StepCounters;
 
 // Maximum number of `core.run()` calls we allow while waiting for a reset/load
@@ -40,6 +41,7 @@ pub struct Host {
     pub(super) frame_index: usize,
     pub(super) system_ram_size: usize,
     pub(super) step_counters: StepCounters,
+    pub(super) spin_macro: SpinMacroState,
     pub(super) closed: bool,
 }
 
@@ -88,6 +90,7 @@ impl Host {
             frame_index: 0,
             system_ram_size: 0,
             step_counters: StepCounters::default(),
+            spin_macro: SpinMacroState::default(),
             closed: false,
         };
         host.configure_callbacks();

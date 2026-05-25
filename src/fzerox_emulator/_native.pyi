@@ -14,6 +14,7 @@ from fzerox_emulator.boundary import (
     RaceStartRequestDict,
     RepeatMultiObservationStepRequestDict,
     RepeatObservationStepRequestDict,
+    StepStatusDict,
     StepSummaryDict,
     VehicleSetupInfoDict,
 )
@@ -179,6 +180,8 @@ class StepSummary:
     @property
     def max_race_distance(self) -> float: ...
     @property
+    def max_race_distance_speed_kph(self) -> float: ...
+    @property
     def reverse_active_frames(self) -> int: ...
     @property
     def collision_recoil_active_frames(self) -> int: ...
@@ -194,6 +197,12 @@ class StepSummary:
     def impact_frames(self) -> int: ...
     @property
     def airborne_frames(self) -> int: ...
+    @property
+    def spin_macro_started(self) -> bool: ...
+    @property
+    def spin_macro_active_frames(self) -> int: ...
+    @property
+    def lean_macro_owned_frames(self) -> int: ...
     @property
     def consecutive_low_speed_frames(self) -> int: ...
     @property
@@ -221,15 +230,7 @@ class StepSummary:
     def to_dict(self) -> dict[str, object]: ...
 
 class StepStatus:
-    def __init__(
-        self,
-        step_count: int,
-        stalled_steps: int,
-        reverse_timer: int = 0,
-        progress_frontier_stalled_frames: int = 0,
-        termination_reason: str | None = None,
-        truncation_reason: str | None = None,
-    ) -> None: ...
+    def __init__(self, data: StepStatusDict) -> None: ...
     @property
     def step_count(self) -> int: ...
     @property
@@ -246,6 +247,12 @@ class StepStatus:
     def termination_reason(self) -> str | None: ...
     @property
     def truncation_reason(self) -> str | None: ...
+    @property
+    def spin_macro_active(self) -> bool: ...
+    @property
+    def spin_macro_frames_remaining(self) -> int: ...
+    @property
+    def spin_macro_cooldown_frames(self) -> int: ...
     def to_dict(self) -> dict[str, object]: ...
 
 class Emulator:
@@ -287,6 +294,7 @@ class Emulator:
     ) -> tuple[
         npt.NDArray[np.uint8],
         npt.NDArray[np.uint8],
+        npt.NDArray[np.uint16],
         StepSummary,
         StepStatus,
         FZeroXTelemetry,

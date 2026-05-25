@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, EmulatorBackend
+from fzerox_emulator import ControllerState, EmulatorBackend, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import (
     ActionValue,
+    DecodedAction,
     DiscreteActionDimension,
     ResettableActionAdapter,
     build_action_adapter,
@@ -29,6 +30,7 @@ from .controls import (
     ActionMaskController,
     ActionMaskSnapshot,
     ControlStateTracker,
+    action_branch_value_allowed,
     apply_dynamic_control_gates,
     sync_dynamic_action_masks,
 )
@@ -221,6 +223,7 @@ class FZeroXEnvEngine:
         self._mask_controller.set_lean_allowed_values(
             self._control_state.lean_action_mask_override()
         )
+        self._mask_controller.set_spin_allowed_values(None)
         sync_dynamic_action_masks(
             mask_controller=self._mask_controller,
             control_state=self._control_state,
@@ -269,8 +272,8 @@ class FZeroXEnvEngine:
         self,
         action: ActionValue,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
-        return self._step_control_state(
-            self._action_adapter.decode(action),
+        return self._step_decoded_action(
+            self._action_adapter.decode_request(action),
             action_drive_axis=action_drive_axis(
                 action,
                 self._action_space,
@@ -281,8 +284,8 @@ class FZeroXEnvEngine:
     def step_watch(self, action: ActionValue) -> WatchEnvStep:
         """Step a policy action while collecting watch-only intermediate frames."""
 
-        return self._step_control_state_watch(
-            self._action_adapter.decode(action),
+        return self._step_decoded_action_watch(
+            self._action_adapter.decode_request(action),
             action_drive_axis=action_drive_axis(
                 action,
                 self._action_space,
@@ -320,6 +323,25 @@ class FZeroXEnvEngine:
             action_repeat=self.config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
+            spin_request="none",
+        )
+
+    def _step_decoded_action(
+        self,
+        decoded_action: DecodedAction,
+        *,
+        action_drive_axis: float | None,
+    ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
+        requested_control_state = decoded_action.control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
+        self._episode.held_controller_state = applied_control_state
+        return self._run_env_step(
+            applied_control_state,
+            action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
         )
 
     def _step_control_state_watch(
@@ -336,6 +358,26 @@ class FZeroXEnvEngine:
             action_repeat=self.config.action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
+            spin_request="none",
+            capture_display_frames=True,
+        )
+
+    def _step_decoded_action_watch(
+        self,
+        decoded_action: DecodedAction,
+        *,
+        action_drive_axis: float | None,
+    ) -> WatchEnvStep:
+        requested_control_state = decoded_action.control_state
+        applied_control_state = self._apply_control_semantics(requested_control_state)
+        spin_request = self._apply_spin_semantics(decoded_action.spin_request)
+        self._episode.held_controller_state = applied_control_state
+        return self._run_env_step_result(
+            applied_control_state,
+            action_repeat=self.config.action_repeat,
+            requested_control_state=requested_control_state,
+            action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
             capture_display_frames=True,
         )
 
@@ -354,6 +396,7 @@ class FZeroXEnvEngine:
             action_repeat=1,
             requested_control_state=requested_control_state,
             action_drive_axis=None,
+            spin_request="none",
         )
 
     def render(self) -> RgbFrame:
@@ -371,12 +414,14 @@ class FZeroXEnvEngine:
         action_repeat: int,
         requested_control_state: ControllerState | None = None,
         action_drive_axis: float | None = None,
+        spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._run_env_step_result(
             control_state,
             action_repeat=action_repeat,
             requested_control_state=requested_control_state,
             action_drive_axis=action_drive_axis,
+            spin_request=spin_request,
             capture_display_frames=False,
         ).gym_result()
 
@@ -387,6 +432,7 @@ class FZeroXEnvEngine:
         action_repeat: int,
         requested_control_state: ControllerState | None,
         action_drive_axis: float | None,
+        spin_request: SpinRequest,
         capture_display_frames: bool,
     ) -> WatchEnvStep:
         assembly = self._step_assembler.run(
@@ -395,6 +441,7 @@ class FZeroXEnvEngine:
                 action_repeat=action_repeat,
                 requested_control_state=requested_control_state,
                 action_drive_axis=action_drive_axis,
+                spin_request=spin_request,
                 capture_display_frames=capture_display_frames,
                 active_track=self._episode.active_track,
                 episode_return=self._episode.return_value,
@@ -427,6 +474,21 @@ class FZeroXEnvEngine:
             last_telemetry=self._episode.last_telemetry,
         )
         return self._control_state.apply_lean_semantics(gated_control_state)
+
+    def _apply_spin_semantics(self, spin_request: SpinRequest) -> SpinRequest:
+        """Suppress spin requests currently masked by runtime gates."""
+
+        if spin_request == "none":
+            return "none"
+        spin_index = 1 if spin_request == "left" else 2
+        if action_branch_value_allowed(
+            self._mask_controller.action_mask_branches(),
+            "spin",
+            spin_index,
+            missing_allowed=True,
+        ):
+            return spin_request
+        return "none"
 
 
 _RENDERERS_BY_NAME: dict[str, RendererName] = {name: name for name in KNOWN_RENDERERS}

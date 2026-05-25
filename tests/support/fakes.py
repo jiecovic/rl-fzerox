@@ -292,12 +292,14 @@ class SyntheticBackend:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: object = "none",
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
             energy_loss_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
+            spin_request,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:
@@ -346,6 +348,7 @@ class SyntheticBackend:
                 {
                     "frames_run": action_repeat,
                     "max_race_distance": self._state.progress,
+                    "max_race_distance_speed_kph": 760.0,
                     "reverse_active_frames": 0,
                     "collision_recoil_active_frames": 0,
                     "low_speed_frames": 0,
@@ -358,11 +361,15 @@ class SyntheticBackend:
                 }
             ),
             status=StepStatus(
-                step_count=self._state.step_count,
-                stalled_steps=self._state.stalled_steps,
-                reverse_timer=self._state.reverse_timer,
-                progress_frontier_stalled_frames=self._state.progress_frontier_stalled_frames,
-                truncation_reason=truncation_reason,
+                {
+                    "step_count": self._state.step_count,
+                    "stalled_steps": self._state.stalled_steps,
+                    "reverse_timer": self._state.reverse_timer,
+                    "progress_frontier_stalled_frames": (
+                        self._state.progress_frontier_stalled_frames
+                    ),
+                    "truncation_reason": truncation_reason,
+                }
             ),
             telemetry=None,
         )
@@ -387,12 +394,14 @@ class SyntheticBackend:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: object = "none",
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
             energy_loss_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
+            spin_request,
         )
         self.set_controller_state(controller_state)
         if action_repeat <= 0:
@@ -442,6 +451,7 @@ class SyntheticBackend:
                 {
                     "frames_run": action_repeat,
                     "max_race_distance": self._state.progress,
+                    "max_race_distance_speed_kph": 760.0,
                     "reverse_active_frames": 0,
                     "collision_recoil_active_frames": 0,
                     "low_speed_frames": 0,
@@ -454,14 +464,23 @@ class SyntheticBackend:
                 }
             ),
             status=StepStatus(
-                step_count=self._state.step_count,
-                stalled_steps=self._state.stalled_steps,
-                reverse_timer=self._state.reverse_timer,
-                progress_frontier_stalled_frames=self._state.progress_frontier_stalled_frames,
-                truncation_reason=truncation_reason,
+                {
+                    "step_count": self._state.step_count,
+                    "stalled_steps": self._state.stalled_steps,
+                    "reverse_timer": self._state.reverse_timer,
+                    "progress_frontier_stalled_frames": (
+                        self._state.progress_frontier_stalled_frames
+                    ),
+                    "truncation_reason": truncation_reason,
+                }
             ),
             telemetry=None,
             display_frames=np.stack(display_frames),
+            display_controller_masks=np.full(
+                action_repeat,
+                controller_state.joypad_mask,
+                dtype=np.uint16,
+            ),
         )
 
     def step_repeat_multi_observation_raw(
@@ -477,6 +496,7 @@ class SyntheticBackend:
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: object = "none",
     ) -> BackendMultiObservationStepResult:
         if len(observation_recipes) == 0:
             raise ValueError("At least one observation recipe is required")
@@ -500,6 +520,7 @@ class SyntheticBackend:
             progress_frontier_epsilon=progress_frontier_epsilon,
             terminate_on_energy_depleted=terminate_on_energy_depleted,
             lean_timer_assist=lean_timer_assist,
+            spin_request=spin_request,
         )
         observations = tuple(
             self.render_observation(

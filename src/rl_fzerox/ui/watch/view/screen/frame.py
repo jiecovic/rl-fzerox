@@ -39,6 +39,12 @@ from rl_fzerox.ui.watch.view.screen.types import (
     ViewerHitboxes,
 )
 
+_WINDOW_TITLE = "F-Zero X Watch"
+_WINDOW_ICON_SIZE = 32
+_WINDOW_ICON_RADIUS = 6
+_WINDOW_ICON_BACKGROUND = (28, 36, 48)
+_WINDOW_ICON_TEXT = (141, 189, 255)
+
 
 @dataclass(frozen=True, slots=True)
 class FrameRenderData:
@@ -136,6 +142,7 @@ def _create_screen(
     panel_tab_index: int = 0,
 ) -> PygameSurface:
     _apply_window_position_hint()
+    _set_window_icon(pygame)
     screen = pygame.display.set_mode(
         _watch_window_size(
             game_display_size,
@@ -145,8 +152,26 @@ def _create_screen(
             panel_tab_index=panel_tab_index,
         )
     )
-    pygame.display.set_caption("F-Zero X Watch")
+    pygame.display.set_caption(_WINDOW_TITLE)
     return screen
+
+
+def _set_window_icon(pygame: PygameModule) -> None:
+    icon = pygame.Surface(
+        (_WINDOW_ICON_SIZE, _WINDOW_ICON_SIZE),
+        flags=pygame.SRCALPHA,
+    )
+    pygame.draw.rect(
+        icon,
+        _WINDOW_ICON_BACKGROUND,
+        icon.get_rect(),
+        border_radius=_WINDOW_ICON_RADIUS,
+    )
+    font = pygame.font.Font(None, 18)
+    font.set_bold(True)
+    text = font.render("FX", True, _WINDOW_ICON_TEXT)
+    icon.blit(text, text.get_rect(center=icon.get_rect().center))
+    pygame.display.set_icon(icon)
 
 
 def _ensure_screen(
@@ -299,6 +324,9 @@ def _draw_frame(
         continuous_air_brake_min_duty=data.continuous_air_brake_min_duty,
         continuous_air_brake_mode=data.continuous_air_brake_mode,
         continuous_air_brake_disabled=data.continuous_air_brake_disabled,
+        spin_requested=_bool_info(data.info, "spin_requested"),
+        spin_macro_active=_bool_info(data.info, "spin_macro_active"),
+        spin_macro_cooldown_frames=_int_info(data.info, "spin_macro_cooldown_frames"),
     )
     control_hitboxes, control_bottom = _draw_control_viz_below_game(
         pygame=pygame,
@@ -499,6 +527,17 @@ def _finite_float_info(info: dict[str, object], key: str) -> float | None:
         return None
     number = float(value)
     return number if math.isfinite(number) else None
+
+
+def _bool_info(info: dict[str, object], key: str) -> bool:
+    return info.get(key) is True
+
+
+def _int_info(info: dict[str, object], key: str) -> int:
+    value = info.get(key)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return max(0, value)
 
 
 def _course_cup_name(info: dict[str, object]) -> str | None:

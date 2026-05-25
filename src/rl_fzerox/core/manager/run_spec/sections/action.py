@@ -52,6 +52,8 @@ class ManagedActionConfig(BaseModel):
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0
+    include_spin: bool = False
+    enable_spin: bool = True
     include_pitch: bool = True
     enable_pitch: bool = True
     pitch_mode: ActionAxisMode = "discrete"
@@ -82,8 +84,15 @@ class ManagedActionConfig(BaseModel):
             self.enable_boost = False
         if not self.include_lean:
             self.enable_lean = False
+            self.include_spin = False
+            self.enable_spin = False
         elif self.lean_output_mode == "independent_buttons":
             self.lean_mode = "raw"
+        if self.lean_output_mode != "three_way":
+            self.include_spin = False
+            self.enable_spin = False
+        elif not self.include_spin:
+            self.enable_spin = False
         if not self.include_pitch:
             self.enable_pitch = False
         elif self.pitch_mode == "continuous":

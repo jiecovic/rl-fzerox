@@ -12,6 +12,8 @@ use crate::core::{
     video::VideoResizeFilter,
 };
 
+use super::spin::SpinRequest;
+
 /// Aggregated per-step features collected across repeated internal frames.
 ///
 /// This is the native summary Python reward trackers and limit trackers will
@@ -22,6 +24,8 @@ pub struct StepSummary {
     pub frames_run: usize,
     /// Highest race distance reached during this repeated step.
     pub max_race_distance: f32,
+    /// Speed at the highest race distance reached during this repeated step.
+    pub max_race_distance_speed_kph: f32,
     /// Number of internal frames spent with the game reverse timer active.
     pub reverse_active_frames: usize,
     /// Number of internal frames spent in collision recoil.
@@ -38,6 +42,12 @@ pub struct StepSummary {
     pub impact_frames: usize,
     /// Number of internal frames where the player machine was airborne.
     pub airborne_frames: usize,
+    /// Whether a spin macro began during this env step.
+    pub spin_macro_started: bool,
+    /// Number of internal frames where a spin macro controlled lean buttons.
+    pub spin_macro_active_frames: usize,
+    /// Number of internal frames where normal lean was masked by a spin macro.
+    pub lean_macro_owned_frames: usize,
     /// Low-speed streak length at the end of the repeated step.
     pub consecutive_low_speed_frames: usize,
     /// OR of state flags newly entered at least once during this env step.
@@ -46,6 +56,14 @@ pub struct StepSummary {
     pub entered_course_effects: u32,
     /// Frame index after the repeated step completed.
     pub final_frame_index: usize,
+}
+
+/// Spin macro state after one outer env step.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct StepSpinStatus {
+    pub active: bool,
+    pub frames_remaining: usize,
+    pub cooldown_frames: usize,
 }
 
 /// Carried limit counters that persist across outer env steps.
@@ -74,14 +92,21 @@ pub struct StepStatus {
     pub termination_reason: Option<&'static str>,
     /// Truncation reason detected while advancing the repeated env step, if any.
     pub truncation_reason: Option<&'static str>,
+    /// Whether a spin macro remains active after this env step.
+    pub spin_macro_active: bool,
+    /// Internal frames left in the active spin macro after this env step.
+    pub spin_macro_frames_remaining: usize,
+    /// Internal frames left before a new spin macro may start.
+    pub spin_macro_cooldown_frames: usize,
 }
 
 impl StepStatus {
-    pub fn from_step(
+    pub fn from_step_with_spin(
         previous: StepCounters,
         summary: &StepSummary,
         final_telemetry: &TelemetrySnapshot,
         config: RepeatedStepConfig,
+        spin_status: StepSpinStatus,
     ) -> Self {
         let counters = StepCounters {
             step_count: previous.step_count + summary.frames_run,
@@ -113,6 +138,9 @@ impl StepStatus {
             reverse_timer,
             termination_reason,
             truncation_reason,
+            spin_macro_active: spin_status.active,
+            spin_macro_frames_remaining: spin_status.frames_remaining,
+            spin_macro_cooldown_frames: spin_status.cooldown_frames,
         }
     }
 
@@ -313,6 +341,8 @@ pub struct NativeWatchStepResult<'a> {
     pub observation: &'a [u8],
     /// Display-sized RGB frames captured after each internal repeated frame.
     pub display_frames: DisplayFrameBatch,
+    /// Joypad masks applied for each captured display frame.
+    pub display_controller_masks: Vec<u16>,
     /// Aggregated step features spanning the internal repeated frames.
     pub summary: StepSummary,
     /// Native counter/stop state after the repeated env step completed.
@@ -342,4 +372,6 @@ pub struct RepeatedStepConfig {
     pub terminate_on_energy_depleted: bool,
     /// Patch lean timers so short lean taps cannot become side attacks.
     pub lean_timer_assist: bool,
+    /// Optional high-level spin macro request for this outer env step.
+    pub spin_request: SpinRequest,
 }

@@ -53,6 +53,7 @@ class ScriptedStepBackend(SyntheticBackend):
         progress_frontier_epsilon: float,
         terminate_on_energy_depleted: bool,
         lean_timer_assist: bool = False,
+        spin_request: object = "none",
     ) -> BackendStepResult:
         _ = (
             stuck_min_speed_kph,
@@ -62,6 +63,7 @@ class ScriptedStepBackend(SyntheticBackend):
             progress_frontier_epsilon,
             terminate_on_energy_depleted,
             lean_timer_assist,
+            spin_request,
             resize_filter,
             minimap_resize_filter,
             height,
@@ -206,6 +208,9 @@ def step_summary(
     consecutive_low_speed_frames: int = 0,
     entered_state_labels: tuple[str, ...] = (),
     final_frame_index: int = 1,
+    spin_macro_started: bool = False,
+    spin_macro_active_frames: int = 0,
+    lean_macro_owned_frames: int = 0,
 ) -> StepSummary:
     return make_step_summary(
         frames_run=frames_run,
@@ -217,6 +222,9 @@ def step_summary(
         consecutive_low_speed_frames=consecutive_low_speed_frames,
         entered_state_labels=entered_state_labels,
         final_frame_index=final_frame_index,
+        spin_macro_started=spin_macro_started,
+        spin_macro_active_frames=spin_macro_active_frames,
+        lean_macro_owned_frames=lean_macro_owned_frames,
     )
 
 

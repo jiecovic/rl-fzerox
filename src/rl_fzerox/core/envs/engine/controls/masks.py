@@ -39,6 +39,7 @@ class ActionMaskController:
     _stage_index: int | None = None
     _boost_unlocked: bool | None = None
     _lean_allowed_values: tuple[int, ...] | None = None
+    _spin_allowed_values: tuple[int, ...] | None = None
     _speed_kph: float | None = None
     _airborne: bool | None = None
 
@@ -93,6 +94,7 @@ class ActionMaskController:
                 boost_unlocked=self._boost_unlocked,
                 airborne=self._airborne,
                 lean_allowed_values=self._lean_allowed_values,
+                spin_allowed_values=self._spin_allowed_values,
                 speed_kph=self._speed_kph,
                 lean_unmask_min_speed_kph=lean_unmask_min_speed_kph,
                 mask_air_brake_on_ground=self.mask_air_brake_on_ground,
@@ -148,6 +150,11 @@ class ActionMaskController:
 
         self._lean_allowed_values = values
 
+    def set_spin_allowed_values(self, values: tuple[int, ...] | None) -> None:
+        """Update live spin restrictions used by the native spin macro."""
+
+        self._spin_allowed_values = values
+
     def set_speed_kph(self, speed_kph: float | None) -> None:
         """Update the live speed used by dynamic speed-gated masks."""
 
@@ -193,6 +200,7 @@ def _dynamic_action_mask_overrides(
     boost_unlocked: bool | None,
     airborne: bool | None = None,
     lean_allowed_values: tuple[int, ...] | None = None,
+    spin_allowed_values: tuple[int, ...] | None = None,
     speed_kph: float | None = None,
     lean_unmask_min_speed_kph: float | None = None,
     mask_air_brake_on_ground: bool = True,
@@ -216,6 +224,8 @@ def _dynamic_action_mask_overrides(
         if lean_values == (0,):
             overrides["lean_left"] = (0,)
             overrides["lean_right"] = (0,)
+    if spin_allowed_values is not None:
+        overrides["spin"] = spin_allowed_values
     if airborne is False and mask_air_brake_on_ground:
         overrides["air_brake"] = (0,)
     if airborne is False:

@@ -13,6 +13,6 @@ pub mod stdio;
 pub mod video;
 
 pub use runtime::{
-    DisplayFrameBatch, Host, ObservationRenderConfig, RepeatedStepConfig, StepCounters, StepStatus,
-    StepSummary,
+    DisplayFrameBatch, Host, ObservationRenderConfig, RepeatedStepConfig, SpinRequest,
+    StepCounters, StepStatus, StepSummary,
 };

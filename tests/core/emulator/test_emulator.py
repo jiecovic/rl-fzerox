@@ -200,10 +200,11 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
                     np.full((444, 592, 3), 2, dtype=np.uint8),
                 ),
             )
+            display_controller_masks = np.array([1, 2], dtype=np.uint16)
             summary = make_step_summary(frames_run=2, max_race_distance=42.0)
             status = make_step_status(step_count=2, stalled_steps=0)
             telemetry = make_telemetry(race_distance=42.0)
-            return observation, display_frames, summary, status, telemetry
+            return observation, display_frames, display_controller_masks, summary, status, telemetry
 
     emulator.__dict__["_native"] = NativeStub()
 
@@ -224,6 +225,8 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     assert not isinstance(result.display_frames, tuple)
     assert result.display_frames.shape == (2, 444, 592, 3)
     assert result.display_frames[1][0, 0, 0] == 2
+    assert not isinstance(result.display_controller_masks, tuple)
+    assert result.display_controller_masks.tolist() == [1, 2]
 
 
 def test_step_repeat_multi_observation_raw_returns_multiple_validated_views() -> None:

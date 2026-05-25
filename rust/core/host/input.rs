@@ -44,6 +44,17 @@ impl ControllerState {
         (((self.joypad_mask >> button_id) & 1) != 0) as i16
     }
 
+    pub fn joypad_mask(&self) -> u16 {
+        self.joypad_mask
+    }
+
+    pub fn with_joypad_mask(self, joypad_mask: u16) -> Self {
+        Self {
+            joypad_mask,
+            ..self
+        }
+    }
+
     pub fn analog_state(&self, index: u32, id: u32) -> i16 {
         match (index, id) {
             (DEVICE_INDEX_ANALOG_LEFT, DEVICE_ID_ANALOG_X) => self.left_stick_x,

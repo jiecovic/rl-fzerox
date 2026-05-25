@@ -52,6 +52,8 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("boost_pad_entered", "state/boost_pad_entry_step_rate"),
         _MetricLogSpec("boost_used", "action/boost_used_step_rate"),
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
+        _MetricLogSpec("spin_requested", "action/spin_requested_step_rate"),
+        _MetricLogSpec("spin_started", "action/spin_started_step_rate"),
         _MetricLogSpec("step_reward_clipped", "reward_clip/any_step_rate"),
         _MetricLogSpec("step_reward_clip_positive", "reward_clip/positive_step_rate"),
         _MetricLogSpec("step_reward_clip_negative", "reward_clip/negative_step_rate"),
@@ -61,6 +63,11 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
             numerator_key="airborne_frames",
             denominator_key="frames_run",
             log_key="state/airborne_frame_ratio",
+        ),
+        _FrameRatioLogSpec(
+            numerator_key="spin_macro_active_frames",
+            denominator_key="frames_run",
+            log_key="action/spin_macro_frame_ratio",
         ),
     ),
     episode_metrics=(
