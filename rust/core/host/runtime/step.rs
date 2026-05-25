@@ -7,7 +7,7 @@
 
 use crate::core::telemetry::TelemetrySnapshot;
 use crate::core::{
-    input::ControllerState,
+    input::RaceControlState,
     observation::{ObservationLayout, ObservationStackMode},
     video::VideoResizeFilter,
 };
@@ -354,8 +354,8 @@ pub struct NativeWatchStepResult<'a> {
 /// Native repeated-step request parameters.
 #[derive(Clone, Copy, Debug)]
 pub struct RepeatedStepConfig {
-    /// Held controller state for the full outer env step.
-    pub controller_state: ControllerState,
+    /// Held semantic race-control request for the full outer env step.
+    pub race_controls: RaceControlState,
     /// Number of internal emulator frames to execute.
     pub action_repeat: usize,
     /// Speed threshold used for low-speed counters and reward summaries.

@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from fzerox_emulator import ControllerState, Emulator, FZeroXTelemetry, ObservationImageRecipe
+from fzerox_emulator import Emulator, FZeroXTelemetry, ObservationImageRecipe, RaceControlState
 from fzerox_emulator.arrays import ObservationFrame
 from tests.support.native_objects import make_step_status, make_step_summary, make_telemetry
 
@@ -134,7 +134,7 @@ def test_step_repeat_raw_returns_native_summary_and_telemetry_objects() -> None:
     emulator.__dict__["_native"] = NativeStub()
 
     result = emulator.step_repeat_raw(
-        controller_state=ControllerState(),
+        control_state=RaceControlState(),
         action_repeat=2,
         preset="crop_84x84",
         frame_stack=2,
@@ -209,7 +209,7 @@ def test_step_repeat_watch_raw_returns_display_frames() -> None:
     emulator.__dict__["_native"] = NativeStub()
 
     result = emulator.step_repeat_watch_raw(
-        controller_state=ControllerState(),
+        control_state=RaceControlState(),
         action_repeat=2,
         preset="crop_84x84",
         frame_stack=2,
@@ -285,7 +285,7 @@ def test_step_repeat_multi_observation_raw_returns_multiple_validated_views() ->
     emulator.__dict__["_native"] = NativeStub()
 
     result = emulator.step_repeat_multi_observation_raw(
-        controller_state=ControllerState(),
+        control_state=RaceControlState(),
         action_repeat=2,
         observation_recipes=(
             ObservationImageRecipe(preset="crop_84x84", frame_stack=2),

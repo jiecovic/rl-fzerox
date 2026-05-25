@@ -58,7 +58,7 @@ class UnlockEverythingInput:
 UNLOCK_EVERYTHING_SEQUENCE: tuple[UnlockEverythingInput, ...] = (
     UnlockEverythingInput(
         "left_shoulder",
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.left_shoulder)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.select)),
     ),
     UnlockEverythingInput(
         "left_trigger",
@@ -66,7 +66,7 @@ UNLOCK_EVERYTHING_SEQUENCE: tuple[UnlockEverythingInput, ...] = (
     ),
     UnlockEverythingInput(
         "right_shoulder",
-        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right_shoulder)),
+        ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right_trigger)),
     ),
     UnlockEverythingInput("right_stick_up", ControllerState(right_stick_y=-1.0)),
     UnlockEverythingInput("right_stick_down", ControllerState(right_stick_y=1.0)),

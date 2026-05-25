@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, EmulatorBackend, SpinRequest
+from fzerox_emulator import ControllerState, EmulatorBackend, RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import (
     ActionValue,
@@ -135,7 +135,7 @@ class FZeroXEnvEngine:
         return self._observation_space
 
     @property
-    def last_requested_control_state(self) -> ControllerState:
+    def last_requested_control_state(self) -> RaceControlState:
         return self._episode.last_requested_control_state
 
     @property
@@ -218,7 +218,7 @@ class FZeroXEnvEngine:
         info = reset_result.info
         telemetry = reset_result.telemetry
         self._episode.uses_custom_baseline = reset_result.uses_custom_baseline
-        self.backend.set_controller_state(self._episode.held_controller_state)
+        self.backend.set_controller_state(ControllerState())
         self._control_state.reset()
         self._mask_controller.set_lean_allowed_values(
             self._control_state.lean_action_mask_override()
@@ -293,31 +293,31 @@ class FZeroXEnvEngine:
             ),
         )
 
-    def action_to_control_state(self, action: ActionValue) -> ControllerState:
-        """Decode one policy action into the held controller state it represents."""
+    def action_to_control_state(self, action: ActionValue) -> RaceControlState:
+        """Decode one policy action into the held semantic control state."""
 
         return self._action_adapter.decode(action)
 
     def step_control(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         return self._step_control_state(control_state, action_drive_axis=None)
 
-    def step_control_watch(self, control_state: ControllerState) -> WatchEnvStep:
+    def step_control_watch(self, control_state: RaceControlState) -> WatchEnvStep:
         """Step manual controls while collecting watch-only intermediate frames."""
 
         return self._step_control_state_watch(control_state, action_drive_axis=None)
 
     def _step_control_state(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_drive_axis: float | None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._episode.held_controller_state = applied_control_state
+        self._episode.held_control_state = applied_control_state
         return self._run_env_step(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -335,7 +335,7 @@ class FZeroXEnvEngine:
         requested_control_state = decoded_action.control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
         spin_request = self._apply_spin_semantics(decoded_action.spin_request)
-        self._episode.held_controller_state = applied_control_state
+        self._episode.held_control_state = applied_control_state
         return self._run_env_step(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -346,13 +346,13 @@ class FZeroXEnvEngine:
 
     def _step_control_state_watch(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_drive_axis: float | None,
     ) -> WatchEnvStep:
         requested_control_state = control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
-        self._episode.held_controller_state = applied_control_state
+        self._episode.held_control_state = applied_control_state
         return self._run_env_step_result(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -371,7 +371,7 @@ class FZeroXEnvEngine:
         requested_control_state = decoded_action.control_state
         applied_control_state = self._apply_control_semantics(requested_control_state)
         spin_request = self._apply_spin_semantics(decoded_action.spin_request)
-        self._episode.held_controller_state = applied_control_state
+        self._episode.held_control_state = applied_control_state
         return self._run_env_step_result(
             applied_control_state,
             action_repeat=self.config.action_repeat,
@@ -383,16 +383,16 @@ class FZeroXEnvEngine:
 
     def step_frame(
         self,
-        control_state: ControllerState | None = None,
+        control_state: RaceControlState | None = None,
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
         """Advance one frame through the same reward path used by step()."""
 
         requested_control_state = (
-            self._episode.held_controller_state if control_state is None else control_state
+            self._episode.held_control_state if control_state is None else control_state
         )
-        self._episode.held_controller_state = self._apply_control_semantics(requested_control_state)
+        self._episode.held_control_state = self._apply_control_semantics(requested_control_state)
         return self._run_env_step(
-            self._episode.held_controller_state,
+            self._episode.held_control_state,
             action_repeat=1,
             requested_control_state=requested_control_state,
             action_drive_axis=None,
@@ -409,10 +409,10 @@ class FZeroXEnvEngine:
 
     def _run_env_step(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
-        requested_control_state: ControllerState | None = None,
+        requested_control_state: RaceControlState | None = None,
         action_drive_axis: float | None = None,
         spin_request: SpinRequest = "none",
     ) -> tuple[ObservationValue, float, bool, bool, dict[str, object]]:
@@ -427,10 +427,10 @@ class FZeroXEnvEngine:
 
     def _run_env_step_result(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
-        requested_control_state: ControllerState | None,
+        requested_control_state: RaceControlState | None,
         action_drive_axis: float | None,
         spin_request: SpinRequest,
         capture_display_frames: bool,
@@ -463,7 +463,7 @@ class FZeroXEnvEngine:
         )
         return assembly.step
 
-    def _apply_control_semantics(self, control_state: ControllerState) -> ControllerState:
+    def _apply_control_semantics(self, control_state: RaceControlState) -> RaceControlState:
         """Apply telemetry gates and configured lean semantics."""
 
         gated_control_state = apply_dynamic_control_gates(

@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fzerox_emulator.base.observations import ObservationImageRecipe
-from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control import RaceControlState
 from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
 if TYPE_CHECKING:
@@ -40,9 +40,9 @@ def native_observation_recipe(recipe: ObservationImageRecipe) -> ObservationImag
 
 def native_repeat_step_request(
     config: RepeatStepConfig,
-    controller_state: ControllerState,
+    control_state: RaceControlState,
 ) -> RepeatStepRequestDict:
-    """Translate repeat-step config and controller state into a native payload."""
+    """Translate repeat-step config and semantic race controls into a native payload."""
 
     payload: RepeatStepRequestDict = {
         "action_repeat": config.action_repeat,
@@ -53,11 +53,13 @@ def native_repeat_step_request(
         "terminate_on_energy_depleted": config.terminate_on_energy_depleted,
         "lean_timer_assist": config.lean_timer_assist,
         "spin_request": config.spin_request,
-        "joypad_mask": controller_state.joypad_mask,
-        "left_stick_x": controller_state.left_stick_x,
-        "left_stick_y": controller_state.left_stick_y,
-        "right_stick_x": controller_state.right_stick_x,
-        "right_stick_y": controller_state.right_stick_y,
+        "gas": control_state.gas,
+        "air_brake": control_state.air_brake,
+        "boost": control_state.boost,
+        "lean_left": control_state.lean_left,
+        "lean_right": control_state.lean_right,
+        "stick_x": control_state.stick_x,
+        "pitch": control_state.pitch,
     }
     if config.progress_frontier_stall_limit_frames is not None:
         payload["progress_frontier_stall_limit_frames"] = (
@@ -68,25 +70,25 @@ def native_repeat_step_request(
 
 def native_repeat_observation_request(
     config: RepeatStepConfig,
-    controller_state: ControllerState,
+    control_state: RaceControlState,
     recipe: ObservationImageRecipe,
 ) -> RepeatObservationStepRequestDict:
     """Build the native request for one repeated step with one observation view."""
 
     return {
-        "step": native_repeat_step_request(config, controller_state),
+        "step": native_repeat_step_request(config, control_state),
         "observation": native_observation_recipe(recipe),
     }
 
 
 def native_repeat_multi_observation_request(
     config: RepeatStepConfig,
-    controller_state: ControllerState,
+    control_state: RaceControlState,
     recipes: Sequence[ObservationImageRecipe],
 ) -> RepeatMultiObservationStepRequestDict:
     """Build the native request for one repeated step with multiple observations."""
 
     return {
-        "step": native_repeat_step_request(config, controller_state),
+        "step": native_repeat_step_request(config, control_state),
         "observations": [native_observation_recipe(recipe) for recipe in recipes],
     }

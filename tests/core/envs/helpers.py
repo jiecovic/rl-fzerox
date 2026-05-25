@@ -5,9 +5,9 @@ import numpy as np
 
 from fzerox_emulator import (
     BackendStepResult,
-    ControllerState,
     FZeroXTelemetry,
     ObservationStackMode,
+    RaceControlState,
     StepStatus,
     StepSummary,
     stacked_observation_channels,
@@ -35,7 +35,7 @@ class ScriptedStepBackend(SyntheticBackend):
 
     def step_repeat_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -69,7 +69,7 @@ class ScriptedStepBackend(SyntheticBackend):
             height,
             width,
         )
-        self.set_controller_state(controller_state)
+        self._last_race_control_state = control_state
         self.last_lean_timer_assist = lean_timer_assist
         result = self._results.pop(0)
         frames_run = result.summary.frames_run

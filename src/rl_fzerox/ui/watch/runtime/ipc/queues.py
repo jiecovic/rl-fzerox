@@ -8,7 +8,7 @@ from multiprocessing.queues import Queue as ProcessQueue
 from queue import Empty, Full
 from typing import Protocol
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
 from rl_fzerox.ui.watch.input import ViewerInput
 from rl_fzerox.ui.watch.runtime.cnn import (
@@ -126,12 +126,12 @@ def drain_worker_commands(
     command_queue: _ReadableCommandQueue,
     *,
     paused: bool,
-    control_state: ControllerState,
+    control_state: RaceControlState,
     manual_control_enabled: bool = False,
     cnn_visualization_enabled: bool = False,
     auxiliary_visualization_enabled: bool = False,
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION,
-) -> tuple[WorkerCommandBatch, bool, ControllerState]:
+) -> tuple[WorkerCommandBatch, bool, RaceControlState]:
     next_paused = paused
     next_control_state = control_state
     next_manual_control_enabled = manual_control_enabled

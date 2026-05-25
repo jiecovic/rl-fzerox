@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from fzerox_emulator.base.observations import ObservationImageRecipe
 from fzerox_emulator.base.results import BackendMultiObservationStepResult
-from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control import RaceControlState
 from fzerox_emulator.repeat.requests import native_repeat_multi_observation_request
 from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 def run_repeat_multi_observation_step(
     native: NativeEmulator,
-    controller_state: ControllerState,
+    control_state: RaceControlState,
     *,
     config: RepeatStepConfig,
     recipes: Sequence[ObservationImageRecipe],
@@ -29,7 +29,7 @@ def run_repeat_multi_observation_step(
         raise ValueError("At least one observation recipe is required")
 
     observations, summary, status, telemetry = native.step_repeat_multi_observation_raw(
-        native_repeat_multi_observation_request(config, controller_state, recipes)
+        native_repeat_multi_observation_request(config, control_state, recipes)
     )
     return BackendMultiObservationStepResult(
         observations=tuple(observations),

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -64,7 +64,7 @@ class FrameRenderData:
     reset_info: dict[str, object]
     episode_reward: float
     paused: bool
-    control_state: ControllerState
+    control_state: RaceControlState
     gas_level: float
     thrust_warning_threshold: float | None
     thrust_deadzone_threshold: float | None

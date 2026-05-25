@@ -7,10 +7,9 @@ from typing import TypeGuard
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import ContinuousAction, DiscreteAction
 from rl_fzerox.core.envs.actions.base import ActionBranchValue, ActionValue
-from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 
 
 class ContinuousDriveDecoder:
@@ -33,8 +32,8 @@ class ContinuousDriveDecoder:
 
         self._pwm_phase = 0.0
 
-    def decode(self, drive: float) -> int:
-        return self._pwm_drive_mask(
+    def decode(self, drive: float) -> bool:
+        return self._pwm_drive_pressed(
             continuous_drive_gas_level(
                 drive,
                 deadzone=self._deadzone,
@@ -43,17 +42,17 @@ class ContinuousDriveDecoder:
             )
         )
 
-    def _pwm_drive_mask(self, duty: float) -> int:
+    def _pwm_drive_pressed(self, duty: float) -> bool:
         if duty <= 0.0:
             self._pwm_phase = 0.0
-            return 0
+            return False
 
         self._pwm_phase += duty
         if self._pwm_phase < 1.0:
-            return 0
+            return False
 
         self._pwm_phase -= 1.0
-        return RACE_CONTROL_MASKS.accelerate
+        return True
 
 
 class ContinuousButtonPwmDecoder:
@@ -76,7 +75,7 @@ class ContinuousButtonPwmDecoder:
 
         self._pwm_phase = 0.0
 
-    def decode(self, value: float, *, button_mask: int) -> int:
+    def decode(self, value: float) -> bool:
         duty = _positive_button_pwm_duty_cycle(
             value,
             deadzone=self._deadzone,
@@ -85,14 +84,14 @@ class ContinuousButtonPwmDecoder:
         )
         if duty <= 0.0:
             self._pwm_phase = 0.0
-            return 0
+            return False
 
         self._pwm_phase += duty
         if self._pwm_phase < 1.0:
-            return 0
+            return False
 
         self._pwm_phase -= 1.0
-        return button_mask
+        return True
 
 
 def continuous_action_array(
@@ -194,7 +193,7 @@ def continuous_drive_gas_level(
 
 def requested_gas_level(
     *,
-    control_state: ControllerState,
+    control_state: RaceControlState,
     drive_axis: float | None,
     continuous_drive_deadzone: float,
     continuous_drive_full_threshold: float = 1.0,
@@ -209,7 +208,7 @@ def requested_gas_level(
             full_threshold=continuous_drive_full_threshold,
             min_thrust=continuous_drive_min_thrust,
         )
-    return 1.0 if control_state.joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
+    return 1.0 if control_state.gas else 0.0
 
 
 def action_drive_axis(

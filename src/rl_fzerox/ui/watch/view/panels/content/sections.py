@@ -1,7 +1,7 @@
 # src/rl_fzerox/ui/watch/view/panels/content/sections.py
 from __future__ import annotations
 
-from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -49,7 +49,7 @@ def _build_panel_columns(
     reset_info: dict[str, object],
     episode_reward: float,
     paused: bool,
-    control_state: ControllerState,
+    control_state: RaceControlState,
     policy_label: str | None = None,
     policy_curriculum_stage: str | None,
     policy_action: ActionValue | None,

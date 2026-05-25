@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -44,7 +44,7 @@ class SidePanelData:
     reset_info: dict[str, object]
     episode_reward: float
     paused: bool
-    control_state: ControllerState
+    control_state: RaceControlState
     gas_level: float
     thrust_warning_threshold: float | None
     boost_active: bool

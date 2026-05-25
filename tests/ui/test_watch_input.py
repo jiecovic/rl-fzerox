@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.ui.watch.input import SpeedKeyRepeat, _poll_viewer_input, mouse_over_clickable
 from rl_fzerox.ui.watch.view.screen.types import RecordCourseHitbox, StateFeatureHitbox
 
@@ -329,10 +328,10 @@ def test_poll_viewer_input_maps_manual_keys_to_n64_controls() -> None:
     )
 
     state = viewer_input.control_state
-    assert state.left_stick_x == -1.0
-    assert state.left_stick_y == -1.0
-    assert state.joypad_mask & RACE_CONTROL_MASKS.accelerate
-    assert state.joypad_mask & RACE_CONTROL_MASKS.air_brake
-    assert state.joypad_mask & RACE_CONTROL_MASKS.boost
-    assert state.joypad_mask & RACE_CONTROL_MASKS.lean_left
-    assert state.joypad_mask & RACE_CONTROL_MASKS.lean_right
+    assert state.stick_x == -1.0
+    assert state.pitch == -1.0
+    assert state.gas
+    assert state.air_brake
+    assert state.boost
+    assert state.lean_left
+    assert state.lean_right

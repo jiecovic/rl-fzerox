@@ -20,7 +20,7 @@ from fzerox_emulator.base.results import (
     FrameStep,
     ResetState,
 )
-from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control import ControllerState, RaceControlState
 from fzerox_emulator.control.spin import SpinRequest
 
 if TYPE_CHECKING:
@@ -61,7 +61,7 @@ class EmulatorBackend(Protocol):
 
     def step_repeat_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -84,7 +84,7 @@ class EmulatorBackend(Protocol):
 
     def step_repeat_watch_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -107,7 +107,7 @@ class EmulatorBackend(Protocol):
 
     def step_repeat_multi_observation_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         observation_recipes: Sequence[ObservationImageRecipe],

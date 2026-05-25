@@ -3,9 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.domain.lean import DEFAULT_LEAN_MODE, LeanMode
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.engine.controls.action_history import ActionHistoryBuffer
 from rl_fzerox.core.envs.engine.controls.boost import BoostTimingState
 from rl_fzerox.core.envs.engine.controls.lean import LeanControlState
@@ -49,7 +48,7 @@ class ControlStateTracker:
         self._boost.reset()
         self._action_history.reset()
 
-    def apply_lean_semantics(self, control_state: ControllerState) -> ControllerState:
+    def apply_lean_semantics(self, control_state: RaceControlState) -> RaceControlState:
         """Apply the selected Z/R lean primitive semantics to one action."""
 
         return self._lean.apply_semantics(control_state)
@@ -57,17 +56,17 @@ class ControlStateTracker:
     def record_step(
         self,
         *,
-        control_state: ControllerState,
-        requested_control_state: ControllerState | None = None,
+        control_state: RaceControlState,
+        requested_control_state: RaceControlState | None = None,
         frames_run: int,
         gas_level: float | None = None,
     ) -> None:
         """Advance tracked control history by one env step."""
 
         frames_elapsed = max(int(frames_run), 0)
-        boost_requested = bool(control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
+        boost_requested = control_state.boost
         self._boost.record(boost_requested=boost_requested, frames_elapsed=frames_elapsed)
-        self._lean.record(joypad_mask=control_state.joypad_mask, frames_elapsed=frames_elapsed)
+        self._lean.record(control_state=control_state, frames_elapsed=frames_elapsed)
         self._action_history.record(
             control_state if requested_control_state is None else requested_control_state,
             gas_level=gas_level,

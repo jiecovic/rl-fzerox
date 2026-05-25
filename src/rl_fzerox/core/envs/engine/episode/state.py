@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 
 from ..reset import SelectedTrack
 
@@ -18,8 +18,8 @@ class EngineEpisodeState:
     return_value: float = 0.0
     boost_pad_entries: int = 0
     airborne_frames: int = 0
-    held_controller_state: ControllerState = field(default_factory=ControllerState)
-    last_requested_control_state: ControllerState = field(default_factory=ControllerState)
+    held_control_state: RaceControlState = field(default_factory=RaceControlState)
+    last_requested_control_state: RaceControlState = field(default_factory=RaceControlState)
     last_gas_level: float = 0.0
     last_info: dict[str, object] = field(default_factory=dict)
     last_telemetry: FZeroXTelemetry | None = None
@@ -32,15 +32,15 @@ class EngineEpisodeState:
         self.return_value = 0.0
         self.boost_pad_entries = 0
         self.airborne_frames = 0
-        self.held_controller_state = ControllerState()
-        self.last_requested_control_state = ControllerState()
+        self.held_control_state = RaceControlState()
+        self.last_requested_control_state = RaceControlState()
         self.last_gas_level = 0.0
 
     def record_step(
         self,
         *,
         telemetry: FZeroXTelemetry | None,
-        requested_control_state: ControllerState,
+        requested_control_state: RaceControlState,
         gas_level: float,
         return_value: float,
         boost_pad_entries: int,

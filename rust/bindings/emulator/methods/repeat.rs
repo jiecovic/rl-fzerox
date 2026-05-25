@@ -15,7 +15,7 @@ use crate::bindings::error::map_core_error;
 use crate::bindings::payload::{optional_item, required_dict, required_item};
 use crate::core::host::SpinRequest;
 use crate::core::host::{ObservationRenderConfig, RepeatedStepConfig};
-use crate::core::input::ControllerState;
+use crate::core::input::RaceControlState;
 use crate::core::observation::ObservationStackMode;
 
 const REPEAT_PAYLOAD: &str = "repeat request";
@@ -208,15 +208,9 @@ impl RepeatMultiObservationBindingRequest {
 }
 
 fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepConfig> {
-    let controller_state = ControllerState::from_normalized(
-        optional_item(request, "joypad_mask", 0)?,
-        optional_item(request, "left_stick_x", 0.0)?,
-        optional_item(request, "left_stick_y", 0.0)?,
-        optional_item(request, "right_stick_x", 0.0)?,
-        optional_item(request, "right_stick_y", 0.0)?,
-    );
+    let race_controls = race_control_state(request)?;
     Ok(RepeatedStepConfig {
-        controller_state,
+        race_controls,
         action_repeat: required_item(request, REPEAT_STEP_PAYLOAD, "action_repeat")?.extract()?,
         stuck_min_speed_kph: required_item(request, REPEAT_STEP_PAYLOAD, "stuck_min_speed_kph")?
             .extract()?,
@@ -237,6 +231,18 @@ fn repeated_step_config(request: &Bound<'_, PyDict>) -> PyResult<RepeatedStepCon
             "spin_request",
             String::from("none"),
         )?)?,
+    })
+}
+
+fn race_control_state(request: &Bound<'_, PyDict>) -> PyResult<RaceControlState> {
+    Ok(RaceControlState {
+        gas: optional_item(request, "gas", false)?,
+        air_brake: optional_item(request, "air_brake", false)?,
+        boost: optional_item(request, "boost", false)?,
+        lean_left: optional_item(request, "lean_left", false)?,
+        lean_right: optional_item(request, "lean_right", false)?,
+        stick_x: optional_item(request, "stick_x", 0.0)?,
+        pitch: optional_item(request, "pitch", 0.0)?,
     })
 }
 

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fzerox_emulator import JOYPAD_BUTTONS, ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.runtime_spec.schema import (
     PolicyConfig,
     TrainConfig,
@@ -16,7 +16,6 @@ from rl_fzerox.ui.watch.view.panels.content.state_vector import policy_state_sec
 from rl_fzerox.ui.watch.view.panels.core.format import (
     _format_policy_action,
     _format_reload_age,
-    _pressed_button_labels,
 )
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.screen.frame import (
@@ -35,16 +34,6 @@ from tests.ui.viewer_support import (
 from tests.ui.viewer_support import (
     sample_telemetry as _sample_telemetry,
 )
-
-
-def test_pressed_button_labels_are_human_readable() -> None:
-    assert _pressed_button_labels(0) == "none"
-    assert (
-        _pressed_button_labels(
-            (1 << JOYPAD_BUTTONS.up) | (1 << JOYPAD_BUTTONS.a) | (1 << JOYPAD_BUTTONS.start)
-        )
-        == "Up A Start"
-    )
 
 
 def test_macro_legend_includes_toggle_anchor_hotkey() -> None:
@@ -145,7 +134,7 @@ def test_side_panel_drops_cockpit_control_section() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -178,7 +167,7 @@ def test_train_tab_shows_current_training_hparams() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -219,7 +208,7 @@ def test_state_tab_shows_auxiliary_state_predictions_next_to_targets() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -290,7 +279,7 @@ def test_session_section_shows_episode_step_counter() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -327,7 +316,7 @@ def test_session_section_omits_reverse_and_stuck_counters() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=None,
@@ -380,7 +369,7 @@ def test_display_section_includes_action_repeat() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -420,7 +409,7 @@ def test_timing_section_shows_game_speed_multiplier() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -445,7 +434,7 @@ def test_macro_legend_replaces_side_panel_key_lines() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -515,7 +504,7 @@ def test_side_panel_can_show_policy_observation_state_vector() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -572,7 +561,7 @@ def test_side_panel_splits_component_action_history_from_state_vector() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
@@ -627,7 +616,7 @@ def test_side_panel_groups_component_state_vector_by_component() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
@@ -678,7 +667,7 @@ def test_side_panel_marks_zeroed_state_features_inside_track_position() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=None,
         policy_reload_age_seconds=0.0,
@@ -713,7 +702,7 @@ def test_session_section_shows_canonical_curriculum_stage_name() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage="lean_enabled",
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -741,7 +730,7 @@ def test_session_section_shows_checkpoint_experience_from_frames() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=660_000,
         policy_experience_frames=1_320_000,
@@ -771,7 +760,7 @@ def test_session_section_keeps_mixed_action_repeat_lineage_experience() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage="lean_enabled",
         policy_num_timesteps=10_000,
         policy_experience_frames=15_000,
@@ -798,7 +787,7 @@ def test_session_section_shows_policy_deterministic_mode() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
@@ -826,7 +815,7 @@ def test_session_section_shows_manual_driver_mode() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_label="latest",
         policy_curriculum_stage=None,
         policy_deterministic=False,
@@ -854,7 +843,7 @@ def test_session_section_formats_hybrid_action_value_with_fixed_digits() -> None
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_deterministic=False,
         policy_action={
@@ -887,7 +876,7 @@ def test_session_section_shows_reward_with_four_decimals() -> None:
         reset_info={},
         episode_reward=-12.34567,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,
@@ -914,7 +903,7 @@ def test_session_section_omits_global_best_finish_position() -> None:
         reset_info={},
         episode_reward=0.0,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         policy_curriculum_stage=None,
         policy_action=np.array([2, 1, 0], dtype=np.int64),
         policy_reload_age_seconds=5.0,

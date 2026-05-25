@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import gymnasium as gym
 
-from fzerox_emulator import ControllerState, EmulatorBackend
+from fzerox_emulator import EmulatorBackend, RaceControlState
 from fzerox_emulator.arrays import ActionMask, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
@@ -57,11 +57,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         return self._engine.step_watch(action)
 
-    def action_to_control_state(self, action: ActionValue) -> ControllerState:
+    def action_to_control_state(self, action: ActionValue) -> RaceControlState:
         return self._engine.action_to_control_state(action)
 
     @property
-    def last_requested_control_state(self) -> ControllerState:
+    def last_requested_control_state(self) -> RaceControlState:
         return self._engine.last_requested_control_state
 
     @property
@@ -136,15 +136,15 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
 
         return self._engine.auxiliary_state_targets()
 
-    def step_control(self, control_state: ControllerState):
+    def step_control(self, control_state: RaceControlState):
         return self._engine.step_control(control_state)
 
-    def step_control_watch(self, control_state: ControllerState):
+    def step_control_watch(self, control_state: RaceControlState):
         """Step manual controls and include watch-only intermediate display frames."""
 
         return self._engine.step_control_watch(control_state)
 
-    def step_frame(self, control_state: ControllerState | None = None):
+    def step_frame(self, control_state: RaceControlState | None = None):
         return self._engine.step_frame(control_state)
 
     def render(self) -> RgbFrame:

@@ -1,6 +1,6 @@
 // rust/core/host/tests/runtime_spin_tests.rs
 // Covers native spin macro sequencing without requiring a loaded core.
-use libretro_sys::{DEVICE_ID_JOYPAD_A, DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R};
+use libretro_sys::{DEVICE_ID_JOYPAD_A, DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2};
 
 use super::{SpinMacroState, SpinRequest};
 use crate::core::input::ControllerState;
@@ -52,7 +52,7 @@ fn left_spin_holds_right_lean_and_double_taps_left() {
 
     assert!(stats.started);
     assert_ne!(first.controller_state.joypad_state(DEVICE_ID_JOYPAD_A), 0);
-    assert_ne!(first.controller_state.joypad_state(DEVICE_ID_JOYPAD_R), 0);
+    assert_ne!(first.controller_state.joypad_state(DEVICE_ID_JOYPAD_R2), 0);
     assert_ne!(first.controller_state.joypad_state(DEVICE_ID_JOYPAD_L2), 0);
     assert_ne!(
         second_tap
@@ -60,7 +60,7 @@ fn left_spin_holds_right_lean_and_double_taps_left() {
             .joypad_state(DEVICE_ID_JOYPAD_L2),
         0
     );
-    assert_ne!(gap.controller_state.joypad_state(DEVICE_ID_JOYPAD_R), 0);
+    assert_ne!(gap.controller_state.joypad_state(DEVICE_ID_JOYPAD_R2), 0);
     assert_eq!(gap.controller_state.joypad_state(DEVICE_ID_JOYPAD_L2), 0);
     assert_eq!(stats.active_frames, 3);
     assert_eq!(stats.lean_owned_frames, 3);

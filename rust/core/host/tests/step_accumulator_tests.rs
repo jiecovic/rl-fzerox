@@ -2,7 +2,7 @@
 // Covers step-local aggregation for one repeated env step.
 use super::step_accumulator::StepAccumulator;
 use crate::core::host::{RepeatedStepConfig, SpinRequest};
-use crate::core::input::ControllerState;
+use crate::core::input::RaceControlState;
 use crate::core::telemetry::StepTelemetrySample;
 
 #[derive(Clone, Copy)]
@@ -273,7 +273,7 @@ fn step_accumulator_tracks_summary_needed_for_stop_state_derivation() {
 
 fn repeated_step_config(max_episode_steps: usize, _legacy_limit: usize) -> RepeatedStepConfig {
     RepeatedStepConfig {
-        controller_state: ControllerState::default(),
+        race_controls: RaceControlState::default(),
         action_repeat: 1,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,

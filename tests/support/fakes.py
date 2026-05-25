@@ -18,6 +18,7 @@ from fzerox_emulator import (
     ObservationImageRecipe,
     ObservationSpec,
     ObservationStackMode,
+    RaceControlState,
     ResetState,
     StepStatus,
     StepSummary,
@@ -57,6 +58,7 @@ class SyntheticBackend:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
+        self._last_race_control_state = RaceControlState()
         self._capture_video_flags: list[bool] = []
         self._observation_stacks: dict[_ObservationStackKey, tuple[list[RgbFrame], int | None]] = {}
         self.randomized_rng_seeds: list[int] = []
@@ -93,6 +95,10 @@ class SyntheticBackend:
         return self._last_controller_state
 
     @property
+    def last_race_control_state(self) -> RaceControlState:
+        return self._last_race_control_state
+
+    @property
     def capture_video_flags(self) -> list[bool]:
         return list(self._capture_video_flags)
 
@@ -100,6 +106,7 @@ class SyntheticBackend:
         self._state = SyntheticState()
         self._last_frame = self._build_frame()
         self._last_controller_state = ControllerState()
+        self._last_race_control_state = RaceControlState()
         self._capture_video_flags.clear()
         self._observation_stacks.clear()
         return ResetState(
@@ -274,7 +281,7 @@ class SyntheticBackend:
 
     def step_repeat_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -301,7 +308,7 @@ class SyntheticBackend:
             lean_timer_assist,
             spin_request,
         )
-        self.set_controller_state(controller_state)
+        self._last_race_control_state = control_state
         if action_repeat <= 0:
             raise ValueError("action_repeat must be positive")
 
@@ -376,7 +383,7 @@ class SyntheticBackend:
 
     def step_repeat_watch_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -403,7 +410,7 @@ class SyntheticBackend:
             lean_timer_assist,
             spin_request,
         )
-        self.set_controller_state(controller_state)
+        self._last_race_control_state = control_state
         if action_repeat <= 0:
             raise ValueError("action_repeat must be positive")
 
@@ -478,14 +485,14 @@ class SyntheticBackend:
             display_frames=np.stack(display_frames),
             display_controller_masks=np.full(
                 action_repeat,
-                controller_state.joypad_mask,
+                control_state.control_mask,
                 dtype=np.uint16,
             ),
         )
 
     def step_repeat_multi_observation_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         observation_recipes: Sequence[ObservationImageRecipe],
@@ -503,7 +510,7 @@ class SyntheticBackend:
 
         first_recipe = observation_recipes[0]
         result = self.step_repeat_raw(
-            controller_state,
+            control_state,
             action_repeat=action_repeat,
             preset=first_recipe.preset,
             height=first_recipe.height,

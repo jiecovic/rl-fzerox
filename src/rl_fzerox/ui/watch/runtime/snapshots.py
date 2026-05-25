@@ -5,10 +5,10 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from fzerox_emulator import ControllerState, FZeroXTelemetry
+from fzerox_emulator import FZeroXTelemetry, RaceControlState
 from fzerox_emulator.arrays import ControllerMaskBatch, DisplayFrames, RgbFrame, StateVector
 from rl_fzerox.core.envs import observations as observation_access
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.envs.observations import ObservationValue
 from rl_fzerox.core.policy.auxiliary_state import (
@@ -98,15 +98,15 @@ def _publish_step_snapshots(
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
-    previous_control_state: ControllerState | None = None,
+    previous_control_state: RaceControlState | None = None,
     previous_gas_level: float | None = None,
     previous_action_mask_branches: ActionMaskBranches | None = None,
     previous_policy_action: ActionValue | None = None,
-    final_control_state: ControllerState | None = None,
+    final_control_state: RaceControlState | None = None,
     final_gas_level: float | None = None,
     final_action_mask_branches: ActionMaskBranches | None = None,
     final_policy_action: ActionValue | None = None,
-    control_state: ControllerState | None = None,
+    control_state: RaceControlState | None = None,
     gas_level: float | None = None,
     action_mask_branches: ActionMaskBranches | None = None,
     policy_action: ActionValue | None = None,
@@ -234,9 +234,9 @@ def _display_controller_states(
     display_controller_masks: ControllerMaskBatch,
     *,
     frames: DisplayFrames,
-    fallback_previous: ControllerState,
-    fallback_final: ControllerState,
-) -> tuple[tuple[ControllerState, ...], bool]:
+    fallback_previous: RaceControlState,
+    fallback_final: RaceControlState,
+) -> tuple[tuple[RaceControlState, ...], bool]:
     frame_count = len(frames)
     masks = tuple(int(mask) for mask in display_controller_masks)
     if len(masks) != frame_count:
@@ -249,12 +249,10 @@ def _display_controller_states(
         )
     return (
         tuple(
-            ControllerState(
-                joypad_mask=mask,
-                left_stick_x=fallback_final.left_stick_x,
-                left_stick_y=fallback_final.left_stick_y,
-                right_stick_x=fallback_final.right_stick_x,
-                right_stick_y=fallback_final.right_stick_y,
+            RaceControlState.from_mask(
+                mask,
+                stick_x=fallback_final.stick_x,
+                pitch=fallback_final.pitch,
             )
             for mask in masks
         ),
@@ -275,7 +273,7 @@ def _build_snapshot(
     episode_reward: float,
     control_fps: float,
     target_control_fps: float | None,
-    control_state: ControllerState,
+    control_state: RaceControlState,
     gas_level: float,
     boost_lamp_level: float,
     action_mask_branches: ActionMaskBranches | None = None,
@@ -456,11 +454,11 @@ def _policy_auxiliary_state_targets(
 def _next_boost_lamp_level(
     *,
     previous: float,
-    control_state: ControllerState,
+    control_state: RaceControlState,
     boost_active: bool,
     action_repeat: int,
 ) -> float:
-    if control_state.joypad_mask & RACE_CONTROL_MASKS.boost:
+    if control_state.boost:
         return BOOST_LAMP_CONFIG.manual_level
 
     target = BOOST_LAMP_CONFIG.active_level if boost_active else 0.0

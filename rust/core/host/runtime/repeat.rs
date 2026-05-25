@@ -80,8 +80,9 @@ impl Host {
         let initial_sample = self.telemetry_sample()?;
         let mut spin_stats = self.spin_macro.begin_step(config.spin_request);
         let spin_controls_active = self.spin_controls_active(spin_stats.started);
+        let base_controller_state = config.race_controls.to_controller_state();
         if !spin_controls_active {
-            self.callbacks.set_controller_state(config.controller_state);
+            self.callbacks.set_controller_state(base_controller_state);
         }
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
@@ -91,11 +92,11 @@ impl Host {
             for _ in 0..config.action_repeat {
                 self.callbacks.set_capture_video(true);
                 let controller_state = self.controller_for_repeated_frame(
-                    config.controller_state,
+                    base_controller_state,
                     spin_controls_active,
                     &mut spin_stats,
                 );
-                display_controller_masks.push(controller_state.joypad_mask());
+                display_controller_masks.push(controller_state.race_control_mask());
                 if config.lean_timer_assist {
                     self.patch_lean_timers_for_slide_assist(controller_state)?;
                 }
@@ -151,8 +152,9 @@ impl Host {
         let initial_sample = self.telemetry_sample()?;
         let mut spin_stats = self.spin_macro.begin_step(config.spin_request);
         let spin_controls_active = self.spin_controls_active(spin_stats.started);
+        let base_controller_state = config.race_controls.to_controller_state();
         if !spin_controls_active {
-            self.callbacks.set_controller_state(config.controller_state);
+            self.callbacks.set_controller_state(base_controller_state);
         }
         let step_result = with_silenced_stdio(|| {
             let mut accumulator = StepAccumulator::new(&initial_sample, config, self.frame_index);
@@ -161,7 +163,7 @@ impl Host {
                 let capture_video = repeat_index + 1 == config.action_repeat;
                 self.callbacks.set_capture_video(capture_video);
                 let controller_state = self.controller_for_repeated_frame(
-                    config.controller_state,
+                    base_controller_state,
                     spin_controls_active,
                     &mut spin_stats,
                 );

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 from gymnasium.spaces import MultiDiscrete
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs import FZeroXEnv
 from rl_fzerox.core.envs.engine.reset import TrackBaselineCache
 from rl_fzerox.core.runtime_spec.schema import (
@@ -782,7 +782,7 @@ def test_reset_applies_configured_camera_setting_with_button_loop() -> None:
     assert info["camera_setting_sync"] == "changed"
     assert info["camera_setting_taps"] == 3
     assert info["frame_index"] == 6
-    assert backend.last_controller_state == ControllerState()
+    assert backend.last_race_control_state == RaceControlState()
 
 
 def test_reset_syncs_camera_and_then_returns_to_target_intro_timer() -> None:

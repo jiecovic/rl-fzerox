@@ -1,28 +1,39 @@
 # src/rl_fzerox/core/envs/engine/controls/gates.py
 from __future__ import annotations
 
-from fzerox_emulator import ControllerState
+from dataclasses import replace
+
+from fzerox_emulator import RaceControlState
 
 
-def without_joypad_mask(control_state: ControllerState, joypad_mask: int) -> ControllerState:
-    if not control_state.joypad_mask & joypad_mask:
+def without_controls(
+    control_state: RaceControlState,
+    *,
+    gas: bool = False,
+    air_brake: bool = False,
+    boost: bool = False,
+    lean_left: bool = False,
+    lean_right: bool = False,
+) -> RaceControlState:
+    """Return a copy with selected semantic buttons cleared."""
+
+    updates: dict[str, bool] = {}
+    if gas and control_state.gas:
+        updates["gas"] = False
+    if air_brake and control_state.air_brake:
+        updates["air_brake"] = False
+    if boost and control_state.boost:
+        updates["boost"] = False
+    if lean_left and control_state.lean_left:
+        updates["lean_left"] = False
+    if lean_right and control_state.lean_right:
+        updates["lean_right"] = False
+    if not updates:
         return control_state
-    return ControllerState(
-        joypad_mask=control_state.joypad_mask & ~joypad_mask,
-        left_stick_x=control_state.left_stick_x,
-        left_stick_y=control_state.left_stick_y,
-        right_stick_x=control_state.right_stick_x,
-        right_stick_y=control_state.right_stick_y,
-    )
+    return replace(control_state, **updates)
 
 
-def with_left_stick_y(control_state: ControllerState, left_stick_y: float) -> ControllerState:
-    if control_state.left_stick_y == left_stick_y:
+def with_pitch(control_state: RaceControlState, pitch: float) -> RaceControlState:
+    if control_state.pitch == pitch:
         return control_state
-    return ControllerState(
-        joypad_mask=control_state.joypad_mask,
-        left_stick_x=control_state.left_stick_x,
-        left_stick_y=left_stick_y,
-        right_stick_x=control_state.right_stick_x,
-        right_stick_y=control_state.right_stick_y,
-    )
+    return replace(control_state, pitch=pitch)

@@ -5,7 +5,7 @@
 //! other". The policy exposes that as one high-level request while this module
 //! owns the frame-level button sequence inside the native repeated-step loop.
 
-use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R};
+use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2};
 
 use crate::core::input::ControllerState;
 
@@ -75,7 +75,7 @@ impl SpinMacroTiming {
 
 const LEAN_BUTTONS: LeanButtonMasks = LeanButtonMasks {
     left: 1_u16 << DEVICE_ID_JOYPAD_L2,
-    right: 1_u16 << DEVICE_ID_JOYPAD_R,
+    right: 1_u16 << DEVICE_ID_JOYPAD_R2,
 };
 
 const SPIN_TIMING: SpinMacroTiming = SpinMacroTiming {

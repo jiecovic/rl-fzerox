@@ -5,8 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, joypad_mask
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from fzerox_emulator import RaceControlState
 from rl_fzerox.ui.watch.view.screen.types import (
     MouseRect,
     PygameModule,
@@ -40,7 +39,7 @@ class ViewerInput:
     record_tab_index: int | None = None
     toggle_current_course_lock: bool = False
     toggle_zeroed_state_feature_name: str | None = None
-    control_state: ControllerState = ControllerState()
+    control_state: RaceControlState = RaceControlState()
 
 
 @dataclass
@@ -184,35 +183,17 @@ def _poll_viewer_input(
                 control_fps_delta -= 1
 
     keys: _PressedKeyState = pygame.key.get_pressed()
-    manual_mask = 0
-    if keys[pygame.K_z]:
-        manual_mask |= RACE_CONTROL_MASKS.accelerate
-    if keys[pygame.K_x]:
-        manual_mask |= RACE_CONTROL_MASKS.air_brake
-    if keys[pygame.K_SPACE]:
-        manual_mask |= RACE_CONTROL_MASKS.boost
-    if keys[pygame.K_a]:
-        manual_mask |= RACE_CONTROL_MASKS.lean_left
-    if keys[pygame.K_s]:
-        manual_mask |= RACE_CONTROL_MASKS.lean_right
-    pressed_buttons: list[int] = []
-    if keys[pygame.K_RETURN]:
-        pressed_buttons.append(JOYPAD_BUTTONS.start)
-    if keys[pygame.K_BACKSPACE]:
-        pressed_buttons.append(JOYPAD_BUTTONS.select)
-    manual_mask |= joypad_mask(*pressed_buttons)
-
-    left_stick_x = 0.0
+    stick_x = 0.0
     if keys[pygame.K_LEFT] and not keys[pygame.K_RIGHT]:
-        left_stick_x = -1.0
+        stick_x = -1.0
     elif keys[pygame.K_RIGHT] and not keys[pygame.K_LEFT]:
-        left_stick_x = 1.0
+        stick_x = 1.0
 
-    left_stick_y = 0.0
+    pitch = 0.0
     if keys[pygame.K_UP] and not keys[pygame.K_DOWN]:
-        left_stick_y = -1.0
+        pitch = -1.0
     elif keys[pygame.K_DOWN] and not keys[pygame.K_UP]:
-        left_stick_y = 1.0
+        pitch = 1.0
 
     if speed_repeat is not None:
         control_fps_delta += speed_repeat.delta(
@@ -238,10 +219,14 @@ def _poll_viewer_input(
         record_tab_index=record_tab_index,
         toggle_current_course_lock=toggle_current_course_lock,
         toggle_zeroed_state_feature_name=toggle_zeroed_state_feature_name,
-        control_state=ControllerState(
-            joypad_mask=manual_mask,
-            left_stick_x=left_stick_x,
-            left_stick_y=left_stick_y,
+        control_state=RaceControlState(
+            gas=keys[pygame.K_z],
+            air_brake=keys[pygame.K_x],
+            boost=keys[pygame.K_SPACE],
+            lean_left=keys[pygame.K_a],
+            lean_right=keys[pygame.K_s],
+            stick_x=stick_x,
+            pitch=pitch,
         ),
     )
 

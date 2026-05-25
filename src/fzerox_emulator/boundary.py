@@ -72,7 +72,17 @@ class RaceStartRequestDict(TypedDict, total=False):
 
 
 class RepeatStepRequestDict(TypedDict, total=False):
-    """Controller and stopping-rule request for one repeated native step."""
+    """Gameplay control and stopping-rule request for one repeated native step.
+
+    The control fields are F-Zero X semantics. Rust maps them to the configured
+    Mupen64Plus-Next/libretro profile:
+
+    - ``gas`` -> N64 A
+    - ``air_brake`` -> N64 C-Down
+    - ``boost`` -> N64 B
+    - ``lean_left`` -> N64 L
+    - ``lean_right`` -> N64 R
+    """
 
     action_repeat: int
     stuck_min_speed_kph: float
@@ -83,11 +93,13 @@ class RepeatStepRequestDict(TypedDict, total=False):
     terminate_on_energy_depleted: bool
     lean_timer_assist: bool
     spin_request: SpinRequest
-    joypad_mask: int
-    left_stick_x: float
-    left_stick_y: float
-    right_stick_x: float
-    right_stick_y: float
+    gas: bool
+    air_brake: bool
+    boost: bool
+    lean_left: bool
+    lean_right: bool
+    stick_x: float
+    pitch: float
 
 
 class RepeatObservationStepRequestDict(TypedDict):
