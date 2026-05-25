@@ -258,6 +258,24 @@
         "ref": "joker/big_hand"
       }
     ],
+    "camera_settings": [
+      {
+        "label": "overhead",
+        "value": "overhead"
+      },
+      {
+        "label": "close behind",
+        "value": "close_behind"
+      },
+      {
+        "label": "regular",
+        "value": "regular"
+      },
+      {
+        "label": "wide",
+        "value": "wide"
+      }
+    ],
     "conv_profiles": [
       {
         "label": "Nature CNN",
@@ -1255,6 +1273,7 @@
       "steering_mode": "continuous"
     },
     "environment": {
+      "camera_setting": "close_behind",
       "max_episode_steps": 12000,
       "progress_frontier_epsilon": 100.0,
       "progress_frontier_stall_limit_frames": 900,

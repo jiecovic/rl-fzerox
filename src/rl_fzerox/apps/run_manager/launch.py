@@ -271,6 +271,7 @@ class ManagerRunLauncher:
         run_id: str,
         artifact: str,
         device: Literal["cpu", "cuda"],
+        renderer: Literal["angrylion", "gliden64"] | None,
     ) -> launching.WatchLaunchStatus:
         """Launch the desktop watch app against one saved artifact for one run."""
 
@@ -279,6 +280,7 @@ class ManagerRunLauncher:
             run_id=run_id,
             artifact=artifact,
             device=device,
+            renderer=renderer,
         )
 
     def _request_command(self, *, run_id: str, command: RunCommand) -> ManagedRun:

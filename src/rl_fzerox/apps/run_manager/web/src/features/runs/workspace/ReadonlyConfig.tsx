@@ -47,10 +47,11 @@ const SECTION_RENDERERS: Record<ConfigSection, (props: ReadonlySectionRendererPr
         setConfig={NOOP_SET_CONFIG}
       />
     ),
-    environment: ({ run }) => (
+    environment: ({ metadata, run }) => (
       <EnvironmentSection
         config={run.config}
         defaultConfig={run.config}
+        metadata={metadata}
         setConfig={NOOP_SET_CONFIG}
       />
     ),

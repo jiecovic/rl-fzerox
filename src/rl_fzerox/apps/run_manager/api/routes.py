@@ -21,6 +21,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     UpdateDraftRequest,
     UpdateLineageGroupsRequest,
     UpdateRunRequest,
+    WatchRenderer,
     WatchRunRequest,
 )
 from rl_fzerox.apps.run_manager.api.live import RunLiveBroadcaster
@@ -199,7 +200,15 @@ def create_manager_api_app(
         artifact: str = Query(default="latest"),
     ) -> dict[str, str]:
         device: Literal["cpu", "cuda"] = "cuda" if request is None else request.device
-        return await _run_sync(handlers.watch_run_payload, launcher, run_id, artifact, device)
+        renderer: WatchRenderer | None = None if request is None else request.renderer
+        return await _run_sync(
+            handlers.watch_run_payload,
+            launcher,
+            run_id,
+            artifact,
+            device,
+            renderer,
+        )
 
     @app.get("/api/config-metadata")
     async def config_metadata() -> dict[str, object]:

@@ -347,7 +347,12 @@ def test_watch_artifact_skips_duplicate_window(
         ),
     )
 
-    launcher.watch_artifact(run_id=run.id, artifact="latest", device="cuda")
+    launcher.watch_artifact(
+        run_id=run.id,
+        artifact="latest",
+        device="cuda",
+        renderer=None,
+    )
 
 
 def test_watch_artifact_passes_pid_file_to_watch_process(
@@ -395,7 +400,12 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         _fake_popen,
     )
 
-    status = launcher.watch_artifact(run_id=run.id, artifact="latest", device="cuda")
+    status = launcher.watch_artifact(
+        run_id=run.id,
+        artifact="latest",
+        device="cuda",
+        renderer="angrylion",
+    )
 
     assert status == "started"
     assert captured["command"] == [
@@ -412,5 +422,6 @@ def test_watch_artifact_passes_pid_file_to_watch_process(
         str(pid_path),
         "--",
         "watch.device=cuda",
+        "emulator.renderer=angrylion",
     ]
     assert pid_path.is_file()

@@ -28,6 +28,11 @@ export function environmentSummaryRows(config: ManagedRunConfig) {
       value: config.environment.renderer,
     },
     {
+      label: "Camera",
+      detail: "Camera mode synchronized when an episode resets.",
+      value: formatCameraSetting(config.environment.camera_setting),
+    },
+    {
       label: "Episode frame cap",
       detail: "Counted per emulated frame, not per policy step.",
       value: formatInteger(config.environment.max_episode_steps),
@@ -48,6 +53,10 @@ export function environmentSummaryRows(config: ManagedRunConfig) {
       value: `ε = ${formatDecimal(config.environment.progress_frontier_epsilon)}`,
     },
   ];
+}
+
+function formatCameraSetting(value: string) {
+  return value.replaceAll("_", " ");
 }
 
 function formatInteger(value: number) {

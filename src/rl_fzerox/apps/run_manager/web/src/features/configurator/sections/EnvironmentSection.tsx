@@ -13,19 +13,33 @@ import {
   episodeFrameSummary,
   noProgressSummary,
 } from "@/features/configurator/sections/environment/derived";
-import type { ManagedRunConfig } from "@/shared/api/contract";
+import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { rendererNames } from "@/shared/api/renderers";
 
 interface EnvironmentSectionProps {
   config: ManagedRunConfig;
   defaultConfig: ManagedRunConfig;
+  metadata: ConfigMetadata;
   setConfig: ConfigSetter;
 }
 
-export function EnvironmentSection({ config, defaultConfig, setConfig }: EnvironmentSectionProps) {
+export function EnvironmentSection({
+  config,
+  defaultConfig,
+  metadata,
+  setConfig,
+}: EnvironmentSectionProps) {
   const updateEnvironment = (patch: Partial<ManagedRunConfig["environment"]>) => {
     patchConfigSection(setConfig, "environment", patch);
   };
   const stallTruncationEnabled = config.environment.progress_frontier_stall_limit_frames !== null;
+  const rendererOptions = rendererNames(metadata, config.environment.renderer);
+  const cameraOptions = metadata.camera_settings.map(
+    (option) => option.value,
+  ) as ManagedRunConfig["environment"]["camera_setting"][];
+  const cameraOptionLabels = Object.fromEntries(
+    metadata.camera_settings.map((option) => [option.value, option.label]),
+  );
 
   return (
     <div className="config-stack training-panel-grid">
@@ -34,6 +48,7 @@ export function EnvironmentSection({ config, defaultConfig, setConfig }: Environ
         onReset={() =>
           updateEnvironment({
             renderer: defaultConfig.environment.renderer,
+            camera_setting: defaultConfig.environment.camera_setting,
           })
         }
       >
@@ -41,11 +56,19 @@ export function EnvironmentSection({ config, defaultConfig, setConfig }: Environ
           <SelectField
             help="Video backend requested from the Mupen core. gliden64 matches the established training runs; angrylion is slower and mainly useful for stricter software-rendering comparisons."
             label="Renderer"
-            optionLabels={{ angrylion: "angrylion", gliden64: "gliden64" }}
-            options={["gliden64", "angrylion"]}
+            options={rendererOptions}
             resetValue={defaultConfig.environment.renderer}
             value={config.environment.renderer}
             onChange={(value) => updateEnvironment({ renderer: value })}
+          />
+          <SelectField
+            help="Camera mode synchronized during reset. close behind matches the current manager default and most training runs."
+            label="Camera"
+            optionLabels={cameraOptionLabels}
+            options={cameraOptions}
+            resetValue={defaultConfig.environment.camera_setting}
+            value={config.environment.camera_setting}
+            onChange={(value) => updateEnvironment({ camera_setting: value })}
           />
         </div>
       </ConfigPanel>

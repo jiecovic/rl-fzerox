@@ -443,7 +443,12 @@ export function Configurator({
         />
       ) : null}
       {section === "environment" ? (
-        <EnvironmentSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />
+        <EnvironmentSection
+          config={config}
+          defaultConfig={baseConfig}
+          metadata={metadata}
+          setConfig={setConfig}
+        />
       ) : null}
       {section === "logging" ? (
         <LoggingSection config={config} defaultConfig={baseConfig} setConfig={setConfig} />

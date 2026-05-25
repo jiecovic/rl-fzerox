@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 import rl_fzerox.apps.run_manager.api.handlers.metrics as manager_api_metrics
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 from rl_fzerox.apps.run_manager.api import create_manager_api_app
+from rl_fzerox.apps.run_manager.api.contracts import WatchRenderer
 from rl_fzerox.core.manager import (
     ManagedRun,
     ManagedRunConfig,
@@ -69,8 +70,9 @@ class _LauncherStub:
         run_id: str,
         artifact: str,
         device: Literal["cpu", "cuda"],
+        renderer: WatchRenderer | None,
     ) -> Literal["started", "already_running"]:
-        del run_id, artifact, device
+        del run_id, artifact, device, renderer
         raise AssertionError("watch should not be called")
 
 
@@ -186,7 +188,7 @@ async def test_manager_api_launches_run(tmp_path: Path) -> None:
 async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Path) -> None:
     class FakeLauncher(_LauncherStub):
         def __init__(self) -> None:
-            self.calls: list[tuple[str, str, Literal["cpu", "cuda"]]] = []
+            self.calls: list[tuple[str, str, Literal["cpu", "cuda"], WatchRenderer | None]] = []
 
         def watch_artifact(
             self,
@@ -194,25 +196,30 @@ async def test_manager_api_watches_run_with_requested_policy_device(tmp_path: Pa
             run_id: str,
             artifact: str,
             device: Literal["cpu", "cuda"],
+            renderer: WatchRenderer | None,
         ) -> Literal["started", "already_running"]:
-            self.calls.append((run_id, artifact, device))
+            self.calls.append((run_id, artifact, device, renderer))
             return "started"
 
     launcher = FakeLauncher()
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     client = _ApiClient(create_manager_api_app(store, run_launcher=launcher))
 
-    response = await client.post("/api/runs/run-1/watch?artifact=best", json={"device": "cpu"})
+    response = await client.post(
+        "/api/runs/run-1/watch?artifact=best",
+        json={"device": "cpu", "renderer": "angrylion"},
+    )
 
     assert response.status_code == 200
     assert response.json() == {"status": "started"}
-    assert launcher.calls == [("run-1", "best", "cpu")]
+    assert launcher.calls == [("run-1", "best", "cpu", "angrylion")]
 
 
 async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> None:
     class FakeLauncher(_LauncherStub):
         def __init__(self) -> None:
             self.device: Literal["cpu", "cuda"] | None = None
+            self.renderer: WatchRenderer | None = None
 
         def watch_artifact(
             self,
@@ -220,9 +227,11 @@ async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> N
             run_id: str,
             artifact: str,
             device: Literal["cpu", "cuda"],
+            renderer: WatchRenderer | None,
         ) -> Literal["started", "already_running"]:
             del run_id, artifact
             self.device = device
+            self.renderer = renderer
             return "already_running"
 
     launcher = FakeLauncher()
@@ -234,6 +243,7 @@ async def test_manager_api_watches_run_with_cuda_by_default(tmp_path: Path) -> N
     assert response.status_code == 200
     assert response.json() == {"status": "already_running"}
     assert launcher.device == "cuda"
+    assert launcher.renderer is None
 
 
 async def test_manager_api_launch_preserves_non_default_clip_range(tmp_path: Path) -> None:

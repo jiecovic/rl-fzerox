@@ -11,6 +11,7 @@ import type {
   ManagedRun,
   ManagedRunDetail,
   WatchDevice,
+  WatchRenderer,
 } from "@/shared/api/contract";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
@@ -29,6 +30,7 @@ interface RunWorkspaceProps {
     runId: string,
     artifact: "latest" | "best",
     device: WatchDevice,
+    renderer: WatchRenderer,
   ) => Promise<"started" | "already_running">;
   run: ManagedRunDetail;
 }

@@ -14,6 +14,7 @@ from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.training.runs import resolve_model_artifact_path
 
 WatchLaunchStatus = Literal["started", "already_running"]
+WatchRenderer = Literal["angrylion", "gliden64"]
 
 
 def launch_watch_artifact(
@@ -22,6 +23,7 @@ def launch_watch_artifact(
     run_id: str,
     artifact: str,
     device: Literal["cpu", "cuda"],
+    renderer: WatchRenderer | None,
 ) -> WatchLaunchStatus:
     run = store.get_run(run_id)
     if run is None:
@@ -40,12 +42,13 @@ def launch_watch_artifact(
         is not None
     ):
         return "already_running"
+    overrides = watch_config_overrides(device=device, renderer=renderer)
     resolve_watch_app_config(
         policy_run_dir=None,
         policy_artifact="best" if artifact == "best" else "latest",
         manager_db_path=store.db_path,
         managed_run_id=run.id,
-        overrides=(f"watch.device={device}",),
+        overrides=overrides,
     )
     log_path = manager_watch_log_path(run.id, artifact=artifact)
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +65,7 @@ def launch_watch_artifact(
         "--watch-pid-file",
         str(pid_path),
         "--",
-        f"watch.device={device}",
+        *overrides,
     ]
     with log_path.open("ab") as log_handle:
         process = subprocess.Popen(
@@ -83,6 +86,17 @@ def launch_watch_artifact(
     raise_if_watch_exited_early(process=process, log_path=log_path, pid_path=pid_path)
     reap_child_when_done(process)
     return "started"
+
+
+def watch_config_overrides(
+    *,
+    device: Literal["cpu", "cuda"],
+    renderer: WatchRenderer | None,
+) -> tuple[str, ...]:
+    overrides = [f"watch.device={device}"]
+    if renderer is not None:
+        overrides.append(f"emulator.renderer={renderer}")
+    return tuple(overrides)
 
 
 def manager_watch_log_path(run_id: str, *, artifact: str) -> Path:

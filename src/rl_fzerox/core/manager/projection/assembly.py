@@ -59,7 +59,7 @@ def env_data(config: ManagedRunConfig) -> dict[str, object]:
         "boost_min_energy_fraction": config.action.boost_min_energy_fraction,
         "randomize_game_rng_on_reset": True,
         "randomize_game_rng_requires_race_mode": True,
-        "camera_setting": "close_behind",
+        "camera_setting": config.environment.camera_setting,
         "reset_to_race": True,
         "race_intro_target_timer": 39,
         "cache_track_baselines": True,

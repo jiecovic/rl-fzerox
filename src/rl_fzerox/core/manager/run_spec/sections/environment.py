@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, NonNegativeFloat, PositiveInt
 
+from rl_fzerox.core.domain.camera import CameraSettingName
 from rl_fzerox.core.runtime_spec.renderers import DEFAULT_RENDERER, RendererName
 
 
@@ -17,3 +18,4 @@ class ManagedEnvironmentConfig(BaseModel):
     progress_frontier_stall_limit_frames: PositiveInt | None = 900
     progress_frontier_epsilon: NonNegativeFloat = 100.0
     renderer: RendererName = DEFAULT_RENDERER
+    camera_setting: CameraSettingName = "close_behind"
