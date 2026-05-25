@@ -103,12 +103,16 @@ export function ObservationSection({
         : `${activeGeometry.height} x ${activeGeometry.width} x ${activeGeometry.channels}`;
   const pixelCountValue =
     activeGeometry === null ? "pending" : `${activeGeometry.height * activeGeometry.width} px`;
-  const aspectRatioValue =
+  const imageAspectRatioValue =
     activeGeometry === null
       ? "pending"
       : formatAspectRatio(activeGeometry.width, activeGeometry.height);
   const sourceCropValue =
     sourceGeometry === undefined ? "pending" : `${sourceGeometry.height} x ${sourceGeometry.width}`;
+  const sourceAspectRatioValue =
+    sourceGeometry === undefined
+      ? "pending"
+      : formatAspectRatio(sourceGeometry.width, sourceGeometry.height);
 
   function updateResolutionMode(mode: ObservationResolutionMode) {
     if (mode === "preset") {
@@ -260,8 +264,9 @@ export function ObservationSection({
           <div className="shape-summary-grid">
             <ShapeMetric label="Image" value={imageMetricValue} />
             <ShapeMetric label="Source crop" value={sourceCropValue} />
+            <ShapeMetric label="Image aspect" value={imageAspectRatioValue} />
+            <ShapeMetric label="Source aspect" value={sourceAspectRatioValue} />
             <ShapeMetric label="Pixels" value={pixelCountValue} />
-            <ShapeMetric label="Aspect" value={aspectRatioValue} />
             <ShapeMetric
               label="State width"
               value={preview !== null ? String(preview.state_dim) : "pending"}
