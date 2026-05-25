@@ -5,12 +5,11 @@ from dataclasses import dataclass
 
 from fzerox_emulator import (
     BackendStepResult,
-    ControllerState,
     EmulatorBackend,
     FZeroXTelemetry,
+    RaceControlState,
     SpinRequest,
 )
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.continuous_controls import requested_gas_level
 from rl_fzerox.core.envs.info import ensure_monitor_info_keys
 from rl_fzerox.core.envs.rewards import RewardActionContext, RewardSummaryConfig, RewardTracker
@@ -29,9 +28,9 @@ from .result import WatchEnvStep
 class EnvStepRequest:
     """Inputs for one outer env step after controller semantics were applied."""
 
-    control_state: ControllerState
+    control_state: RaceControlState
     action_repeat: int
-    requested_control_state: ControllerState | None
+    requested_control_state: RaceControlState | None
     action_drive_axis: float | None
     spin_request: SpinRequest
     capture_display_frames: bool
@@ -49,7 +48,7 @@ class EnvStepAssembly:
 
     step: WatchEnvStep
     telemetry: FZeroXTelemetry | None
-    requested_control_state: ControllerState
+    requested_control_state: RaceControlState
     gas_level: float
     episode_return: float
     episode_boost_pad_entries: int
@@ -90,15 +89,12 @@ class EngineStepAssembler:
             continuous_drive_min_thrust=float(self.action_config.continuous_drive_min_thrust),
         )
 
-        boost_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.boost)
-        lean_used = bool(
-            applied_control_state.joypad_mask
-            & (RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right)
-        )
+        boost_used = applied_control_state.boost
+        lean_used = applied_control_state.lean_left or applied_control_state.lean_right
         spin_requested = request.spin_request != "none"
         spin_started = bool(step_result.summary.spin_macro_started)
         spin_active_frames = int(step_result.summary.spin_macro_active_frames)
-        air_brake_used = bool(applied_control_state.joypad_mask & RACE_CONTROL_MASKS.air_brake)
+        air_brake_used = applied_control_state.air_brake
         reward_step = self.reward_tracker.step_summary(
             step_result.summary,
             step_result.status,
@@ -110,11 +106,11 @@ class EngineStepAssembler:
                 gas_level=gas_level,
                 steer_level=max(
                     -1.0,
-                    min(1.0, float(requested_control_state.left_stick_x)),
+                    min(1.0, float(requested_control_state.stick_x)),
                 ),
                 pitch_level=max(
                     -1.0,
-                    min(1.0, float(requested_control_state.left_stick_y)),
+                    min(1.0, float(requested_control_state.pitch)),
                 ),
                 pitch_deadzone=float(self.action_config.pitch_deadzone),
                 drive_axis=request.action_drive_axis,
@@ -150,6 +146,9 @@ class EngineStepAssembler:
         info["airborne_frames"] = int(step_result.summary.airborne_frames)
         info["episode_airborne_frames"] = episode_airborne_frames
         info["boost_pad_entered"] = boost_pad_entered
+        info["gas_level"] = gas_level
+        info["gas_used"] = gas_level > 0.0
+        info["air_brake_used"] = air_brake_used
         info["boost_used"] = boost_used
         info["lean_used"] = lean_used
         info["spin_requested"] = spin_requested
@@ -240,7 +239,7 @@ class EngineStepAssembler:
 
     def _native_step(
         self,
-        control_state: ControllerState,
+        control_state: RaceControlState,
         request: EnvStepRequest,
     ) -> BackendStepResult:
         lean_timer_assist = self.action_config.lean_mode == "timer_assist"

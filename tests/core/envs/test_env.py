@@ -5,9 +5,7 @@ import numpy as np
 import pytest
 from gymnasium.spaces import Box
 
-from fzerox_emulator import (
-    ControllerState,
-)
+from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame
 from rl_fzerox.core.domain.observation_image import PresetResolutionChoice
 from rl_fzerox.core.envs import FZeroXEnv
@@ -70,10 +68,7 @@ def test_step_advances_backend_by_action_repeat():
     assert backend.frame_index == 3
     assert backend.capture_video_flags == [False, False, True]
     assert info["repeat_index"] == 2
-    assert backend.last_controller_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate,
-        left_stick_x=0.0,
-    )
+    assert backend.last_race_control_state == RaceControlState(gas=True, stick_x=0.0)
 
 
 def test_watch_step_captures_each_repeated_display_frame():
@@ -176,7 +171,7 @@ def test_grounded_pitch_penalty_uses_requested_pitch_before_ground_gate() -> Non
     )
 
     # Ground gating protects the emulator while reward shaping still sees the request.
-    assert backend.last_controller_state.left_stick_y == 0.0
+    assert backend.last_race_control_state.pitch == 0.0
     expected = -0.5 * ((0.82 - 0.05) / (1.0 - 0.05))
     assert reward == pytest.approx(expected)
     reward_breakdown = info["reward_breakdown"]
@@ -206,28 +201,28 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
             "discrete": np.array([], dtype=np.int64),
         }
     )
-    assert backend.last_controller_state.joypad_mask == 0
+    assert backend.last_race_control_state.control_mask == 0
     env.step(
         {
             "continuous": np.array([0.0, -0.5], dtype=np.float32),
             "discrete": np.array([], dtype=np.int64),
         }
     )
-    assert backend.last_controller_state.joypad_mask == 0
+    assert backend.last_race_control_state.control_mask == 0
     env.step(
         {
             "continuous": np.array([0.0, -0.5], dtype=np.float32),
             "discrete": np.array([], dtype=np.int64),
         }
     )
-    assert backend.last_controller_state.joypad_mask == 0
+    assert backend.last_race_control_state.control_mask == 0
     env.step(
         {
             "continuous": np.array([0.0, -0.5], dtype=np.float32),
             "discrete": np.array([], dtype=np.int64),
         }
     )
-    assert backend.last_controller_state.joypad_mask == RACE_CONTROL_MASKS.accelerate
+    assert backend.last_race_control_state.control_mask == RACE_CONTROL_MASKS.accelerate
 
     env.reset(seed=8)
     env.step(
@@ -237,7 +232,7 @@ def test_reset_resets_continuous_drive_pwm_phase() -> None:
         }
     )
 
-    assert backend.last_controller_state.joypad_mask == 0
+    assert backend.last_race_control_state.control_mask == 0
 
 
 def test_step_updates_image_state_observation_from_step_telemetry() -> None:
@@ -471,7 +466,7 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
         }
     )
 
-    assert backend.last_controller_state.left_stick_y == 0.0
+    assert backend.last_race_control_state.pitch == 0.0
     assert isinstance(obs, dict)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)
@@ -757,10 +752,10 @@ def test_step_control_applies_manual_controller_state() -> None:
     )
 
     env.reset(seed=21)
-    control_state = ControllerState(joypad_mask=5, left_stick_x=-1.0)
+    control_state = RaceControlState.from_mask(5, stick_x=-1.0)
     env.step_control(control_state)
 
-    assert backend.last_controller_state == control_state
+    assert backend.last_race_control_state == control_state
 
 
 def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> None:
@@ -798,7 +793,7 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
         ),
         reward_config=RewardConfig(time_penalty_per_frame=0.0),
     )
-    air_brake_state = ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake)
+    air_brake_state = RaceControlState(air_brake=True)
 
     env.reset(seed=21)
     assert (
@@ -811,12 +806,12 @@ def test_step_control_suppresses_air_brake_until_airborne_when_configured() -> N
         == air_brake_state
     )
     _, reward, _, _, info = env.step_control(air_brake_state)
-    assert backend.last_controller_state == ControllerState()
+    assert backend.last_race_control_state == RaceControlState()
     assert reward == 0.0
     assert "reward_breakdown" not in info
 
     _, reward, _, _, info = env.step_control(air_brake_state)
-    assert backend.last_controller_state == air_brake_state
+    assert backend.last_race_control_state == air_brake_state
     assert reward == 0.0
     assert "reward_breakdown" not in info
 
@@ -850,12 +845,12 @@ def test_step_control_keeps_ground_air_brake_when_configured() -> None:
             impact_frame_penalty=0.0,
         ),
     )
-    air_brake_state = ControllerState(joypad_mask=RACE_CONTROL_MASKS.air_brake)
+    air_brake_state = RaceControlState(air_brake=True)
 
     env.reset(seed=21)
     _, reward, _, _, info = env.step_control(air_brake_state)
 
-    assert backend.last_controller_state == air_brake_state
+    assert backend.last_race_control_state == air_brake_state
     assert reward == pytest.approx(-0.2)
     reward_breakdown = info["reward_breakdown"]
     assert isinstance(reward_breakdown, dict)
@@ -903,14 +898,11 @@ def test_step_suppresses_air_only_controls_until_airborne() -> None:
     env.reset(seed=21)
     env.step(airborne_action)
 
-    assert backend.last_controller_state == ControllerState()
+    assert backend.last_race_control_state == RaceControlState()
 
     env.step(airborne_action)
 
-    assert backend.last_controller_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.air_brake,
-        left_stick_y=1.0,
-    )
+    assert backend.last_race_control_state == RaceControlState(air_brake=True, pitch=1.0)
 
 
 def test_step_forces_accelerate_when_min_thrust_is_full() -> None:
@@ -946,7 +938,7 @@ def test_step_forces_accelerate_when_min_thrust_is_full() -> None:
         }
     )
 
-    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.accelerate
+    assert backend.last_race_control_state.gas
     assert reward == 0.0
     assert "reward_breakdown" not in info
 
@@ -992,8 +984,8 @@ def test_step_tracks_raw_continuous_gas_level_before_pwm_button_output() -> None
     )
 
     assert env.last_gas_level == pytest.approx(0.25)
-    assert env.last_requested_control_state == ControllerState()
-    assert backend.last_controller_state == ControllerState()
+    assert env.last_requested_control_state == RaceControlState()
+    assert backend.last_race_control_state == RaceControlState()
     assert isinstance(obs, dict)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)

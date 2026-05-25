@@ -31,3 +31,13 @@ fn override_option_keeps_gliden64_at_native_resolution() {
         "320x240"
     );
 }
+
+#[test]
+fn override_option_enables_independent_c_buttons() {
+    let renderer = CString::new("gliden64").expect("renderer");
+
+    assert_eq!(
+        override_option("mupen64plus-alt-map", "False", renderer.as_c_str()),
+        "True"
+    );
+}

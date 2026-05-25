@@ -16,7 +16,6 @@ from fzerox_emulator import SpinRequest
 from fzerox_emulator.arrays import DiscreteAction
 from fzerox_emulator.control import spin_request_from_index
 from rl_fzerox.core.envs.actions.base import DiscreteActionDimension
-from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.runtime_spec.schema import ActionRuntimeConfig
 
 
@@ -87,16 +86,16 @@ def pitch_bucket_value(index: int, *, bucket_count: int) -> float:
     return float(index - neutral_index) / float(neutral_index)
 
 
-def categorical_lean_mask(index: int, *, four_way: bool) -> int:
-    """Translate one categorical lean branch value into joypad button bits."""
+def categorical_lean_state(index: int, *, four_way: bool) -> tuple[bool, bool]:
+    """Translate one categorical lean branch value into left/right intent."""
 
     if index == 1:
-        return RACE_CONTROL_MASKS.lean_left
+        return True, False
     if index == 2:
-        return RACE_CONTROL_MASKS.lean_right
+        return False, True
     if four_way and index == 3:
-        return RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
-    return 0
+        return True, True
+    return False, False
 
 
 def spin_request_value(index: int) -> SpinRequest:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from fzerox_emulator.base.observations import ObservationImageRecipe
 from fzerox_emulator.base.results import BackendStepResult
-from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control import RaceControlState
 from fzerox_emulator.repeat.requests import native_repeat_observation_request
 from fzerox_emulator.repeat.step_options import RepeatStepConfig
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def run_repeat_watch_step(
     native: NativeEmulator,
-    controller_state: ControllerState,
+    control_state: RaceControlState,
     *,
     config: RepeatStepConfig,
     recipe: ObservationImageRecipe,
@@ -32,7 +32,7 @@ def run_repeat_watch_step(
         status,
         telemetry,
     ) = native.step_repeat_watch_raw(
-        native_repeat_observation_request(config, controller_state, recipe)
+        native_repeat_observation_request(config, control_state, recipe)
     )
     return BackendStepResult(
         observation=observation,

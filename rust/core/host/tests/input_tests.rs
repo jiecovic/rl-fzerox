@@ -1,10 +1,12 @@
 // rust/core/host/tests/input_tests.rs
 // Covers normalized controller input clamping into libretro's integer range.
 use libretro_sys::{
-    DEVICE_ID_ANALOG_X, DEVICE_ID_ANALOG_Y, DEVICE_INDEX_ANALOG_LEFT, DEVICE_INDEX_ANALOG_RIGHT,
+    DEVICE_ID_ANALOG_X, DEVICE_ID_ANALOG_Y, DEVICE_ID_JOYPAD_A, DEVICE_ID_JOYPAD_B,
+    DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2, DEVICE_ID_JOYPAD_Y, DEVICE_INDEX_ANALOG_LEFT,
+    DEVICE_INDEX_ANALOG_RIGHT,
 };
 
-use super::ControllerState;
+use super::{ControllerState, RaceControlState};
 
 #[test]
 fn controller_state_clamps_normalized_axes_to_libretro_range() {
@@ -26,4 +28,24 @@ fn controller_state_clamps_normalized_axes_to_libretro_range() {
         state.analog_state(DEVICE_INDEX_ANALOG_RIGHT, DEVICE_ID_ANALOG_Y),
         -16384
     );
+}
+
+#[test]
+fn race_control_state_maps_semantics_to_pinned_mupen_buttons() {
+    let controls = RaceControlState {
+        gas: true,
+        air_brake: true,
+        boost: true,
+        lean_left: true,
+        lean_right: true,
+        stick_x: 0.0,
+        pitch: 0.0,
+    };
+    let state = controls.to_controller_state();
+
+    assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_B), 0);
+    assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_A), 0);
+    assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_Y), 0);
+    assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_L2), 0);
+    assert_ne!(state.joypad_state(DEVICE_ID_JOYPAD_R2), 0);
 }

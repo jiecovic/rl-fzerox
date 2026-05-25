@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 from gymnasium.spaces import Box, Dict, MultiDiscrete
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.actions import (
     RACE_CONTROL_MASKS,
     ConfiguredDiscreteActionAdapter,
@@ -80,14 +80,8 @@ def test_configured_discrete_gas_air_brake_layout_decodes_buttons() -> None:
     accelerate_state = adapter.decode(np.array([3, 1, 0], dtype=np.int64))
     air_brake_state = adapter.decode(np.array([3, 0, 1], dtype=np.int64))
 
-    assert accelerate_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate,
-        left_stick_x=0.0,
-    )
-    assert air_brake_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.air_brake,
-        left_stick_x=0.0,
-    )
+    assert accelerate_state == RaceControlState(gas=True, stick_x=0.0)
+    assert air_brake_state == RaceControlState(air_brake=True, stick_x=0.0)
 
 
 def test_configured_discrete_applies_steer_curve() -> None:
@@ -97,7 +91,7 @@ def test_configured_discrete_applies_steer_curve() -> None:
 
     control_state = adapter.decode(np.array([1, 0], dtype=np.int64))
 
-    assert control_state.left_stick_x == pytest.approx(-(0.5**0.5))
+    assert control_state.stick_x == pytest.approx(-(0.5**0.5))
 
 
 def test_configured_discrete_pitch_ignores_deadzone_for_controller_output() -> None:
@@ -108,8 +102,8 @@ def test_configured_discrete_pitch_ignores_deadzone_for_controller_output() -> N
     half_pitch = adapter.decode(np.array([1], dtype=np.int64))
     full_pitch = adapter.decode(np.array([0], dtype=np.int64))
 
-    assert half_pitch.left_stick_y == -0.5
-    assert full_pitch.left_stick_y == -1.0
+    assert half_pitch.pitch == -0.5
+    assert full_pitch.pitch == -1.0
 
 
 def test_configured_discrete_rejects_wrong_action_shape() -> None:
@@ -126,12 +120,12 @@ def test_configured_discrete_full_button_layout_decodes_parallel_buttons() -> No
 
     control_state = adapter.decode(np.array([0, 1, 1, 1, 2], dtype=np.int64))
 
-    assert control_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate
-        | RACE_CONTROL_MASKS.air_brake
-        | RACE_CONTROL_MASKS.boost
-        | RACE_CONTROL_MASKS.lean_right,
-        left_stick_x=-1.0,
+    assert control_state == RaceControlState(
+        gas=True,
+        air_brake=True,
+        boost=True,
+        lean_right=True,
+        stick_x=-1.0,
     )
 
 
@@ -140,7 +134,7 @@ def test_configured_discrete_spin_branch_decodes_macro_request_only() -> None:
 
     decoded = adapter.decode_request(np.array([0, 2], dtype=np.int64))
 
-    assert decoded.control_state == ControllerState()
+    assert decoded.control_state == RaceControlState()
     assert decoded.spin_request == "right"
 
 
@@ -154,7 +148,7 @@ def test_configured_discrete_four_way_lean_decodes_both_buttons() -> None:
 
     control_state = adapter.decode(np.array([3], dtype=np.int64))
 
-    assert control_state.joypad_mask == (
+    assert control_state.control_mask == (
         RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
     )
 
@@ -170,7 +164,7 @@ def test_configured_discrete_independent_lean_decodes_binary_buttons() -> None:
 
     control_state = adapter.decode(np.array([1, 1], dtype=np.int64))
 
-    assert control_state.joypad_mask == (
+    assert control_state.control_mask == (
         RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
     )
 
@@ -242,11 +236,11 @@ def test_configured_hybrid_steer_gas_boost_lean_decodes_discrete_buttons() -> No
         }
     )
 
-    assert control_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate
-        | RACE_CONTROL_MASKS.boost
-        | RACE_CONTROL_MASKS.lean_right,
-        left_stick_x=-0.75,
+    assert control_state == RaceControlState(
+        gas=True,
+        boost=True,
+        lean_right=True,
+        stick_x=-0.75,
     )
 
 
@@ -265,10 +259,7 @@ def test_configured_hybrid_spin_branch_decodes_macro_request() -> None:
         }
     )
 
-    assert decoded.control_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.lean_left,
-        left_stick_x=0.25,
-    )
+    assert decoded.control_state == RaceControlState(lean_left=True, stick_x=0.25)
     assert decoded.spin_request == "left"
 
 
@@ -293,8 +284,8 @@ def test_configured_hybrid_pitch_ignores_deadzone_for_controller_output() -> Non
         }
     )
 
-    assert small_pitch.left_stick_y == pytest.approx(0.2)
-    assert live_pitch.left_stick_y == pytest.approx(0.3)
+    assert small_pitch.pitch == pytest.approx(0.2)
+    assert live_pitch.pitch == pytest.approx(0.3)
 
 
 def test_configured_hybrid_steer_gas_air_brake_boost_lean_masks_heads() -> None:
@@ -349,7 +340,7 @@ def test_action_drive_axis_is_none_when_layout_has_no_drive_axis() -> None:
 
 def test_requested_gas_level_uses_discrete_accelerate_when_no_drive_axis_exists() -> None:
     gas_level = requested_gas_level(
-        control_state=ControllerState(joypad_mask=RACE_CONTROL_MASKS.accelerate, left_stick_y=0.6),
+        control_state=RaceControlState(gas=True, pitch=0.6),
         drive_axis=None,
         continuous_drive_deadzone=0.05,
         continuous_drive_full_threshold=0.85,
@@ -377,10 +368,7 @@ def test_configured_hybrid_decodes_continuous_air_brake_lane() -> None:
         }
     )
 
-    assert control_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.air_brake | RACE_CONTROL_MASKS.boost,
-        left_stick_x=0.25,
-    )
+    assert control_state == RaceControlState(air_brake=True, boost=True, stick_x=0.25)
 
 
 def test_configured_hybrid_steer_drive_action_space_uses_dict_branches() -> None:
@@ -419,11 +407,8 @@ def test_configured_hybrid_steer_drive_decodes_accelerate_and_coast() -> None:
         }
     )
 
-    assert accelerate_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate,
-        left_stick_x=0.5,
-    )
-    assert coast_state == ControllerState(joypad_mask=0, left_stick_x=-0.5)
+    assert accelerate_state == RaceControlState(gas=True, stick_x=0.5)
+    assert coast_state == RaceControlState(stick_x=-0.5)
 
 
 def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
@@ -443,14 +428,14 @@ def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
             "continuous": np.array([0.0, -1.0], dtype=np.float32),
             "discrete": np.array([], dtype=np.int64),
         }
-    ).joypad_mask
+    ).control_mask
     partial_masks = [
         adapter.decode(
             {
                 "continuous": np.array([0.0, -0.5], dtype=np.float32),
                 "discrete": np.array([], dtype=np.int64),
             }
-        ).joypad_mask
+        ).control_mask
         for _ in range(4)
     ]
     adapter.reset()
@@ -460,7 +445,7 @@ def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
                 "continuous": np.array([0.0, 0.0], dtype=np.float32),
                 "discrete": np.array([], dtype=np.int64),
             }
-        ).joypad_mask
+        ).control_mask
         for _ in range(4)
     ]
     adapter.reset()
@@ -470,7 +455,7 @@ def test_configured_hybrid_drive_pwm_defaults_to_full_throttle() -> None:
                 "continuous": np.array([0.0, 1.0], dtype=np.float32),
                 "discrete": np.array([], dtype=np.int64),
             }
-        ).joypad_mask
+        ).control_mask
         for _ in range(3)
     ]
 
@@ -548,7 +533,4 @@ def test_configured_hybrid_can_force_full_thrust() -> None:
         }
     )
 
-    assert control_state == ControllerState(
-        joypad_mask=RACE_CONTROL_MASKS.accelerate,
-        left_stick_x=-0.5,
-    )
+    assert control_state == RaceControlState(gas=True, stick_x=-0.5)

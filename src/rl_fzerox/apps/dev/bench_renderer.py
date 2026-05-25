@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from fzerox_emulator import JOYPAD_BUTTONS, ControllerState, Emulator, joypad_mask
+from fzerox_emulator import Emulator, RaceControlState
 from fzerox_emulator.base.results import BackendStepResult
 from rl_fzerox.core.runtime_spec.renderers import KNOWN_RENDERERS, RendererName
 
@@ -116,7 +116,7 @@ def _benchmark_renderer(
 ) -> RendererBenchResult:
     runtime_dir = (args.runtime_dir / renderer).expanduser().resolve()
     runtime_dir.mkdir(parents=True, exist_ok=True)
-    controller = ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.a))
+    control_state = RaceControlState(gas=True)
 
     try:
         emulator = Emulator(
@@ -133,10 +133,10 @@ def _benchmark_renderer(
     try:
         emulator.reset()
         for _ in range(args.warmup):
-            _step(emulator, controller, args)
+            _step(emulator, control_state, args)
         start = time.perf_counter()
         for _ in range(args.frames):
-            result = _step(emulator, controller, args)
+            result = _step(emulator, control_state, args)
             frames_run += int(result.summary.frames_run)
         elapsed = time.perf_counter() - start
         fps = frames_run / elapsed if elapsed > 0 else 0.0
@@ -207,10 +207,12 @@ def _benchmark_renderer_isolated(
 
 
 def _step(
-    emulator: Emulator, controller: ControllerState, args: argparse.Namespace
+    emulator: Emulator,
+    control_state: RaceControlState,
+    args: argparse.Namespace,
 ) -> BackendStepResult:
     return emulator.step_repeat_raw(
-        controller_state=controller,
+        control_state=control_state,
         action_repeat=args.action_repeat,
         preset=args.preset,
         frame_stack=args.frame_stack,

@@ -4,7 +4,6 @@ import pytest
 
 from fzerox_emulator.arrays import Float32Array, Int64Array
 from rl_fzerox.core.envs import FZeroXEnv
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.runtime_spec.schema import (
     ActionMaskConfig,
     CurriculumConfig,
@@ -453,7 +452,7 @@ def test_env_control_gates_suppress_masked_lean_request() -> None:
     env.reset(seed=1)
     env.step(_discrete_gas_boost_lean_action(lean_index=1))
 
-    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
+    assert not backend.last_race_control_state.lean_left
 
 
 def test_env_control_gates_suppress_masked_independent_lean_request() -> None:
@@ -489,7 +488,7 @@ def test_env_control_gates_suppress_masked_independent_lean_request() -> None:
     env.reset(seed=1)
     env.step(np.array([3, 0, 0, 1, 0], dtype=np.int64))
 
-    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.lean_left == 0
+    assert not backend.last_race_control_state.lean_left
 
 
 def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
@@ -540,8 +539,8 @@ def test_env_action_masks_keep_air_brake_and_pitch_airborne_only() -> None:
         }
     )
 
-    assert backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.air_brake == 0
-    assert backend.last_controller_state.left_stick_y == 0.0
+    assert not backend.last_race_control_state.air_brake
+    assert backend.last_race_control_state.pitch == 0.0
     assert env.action_masks().tolist() == [True] * 12
 
 
@@ -587,10 +586,7 @@ def test_env_action_masks_lock_boost_after_manual_request() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
 
     env.step(_discrete_gas_boost_action(boost_index=1))
-    assert (
-        backend.last_controller_state.joypad_mask & RACE_CONTROL_MASKS.boost
-        == RACE_CONTROL_MASKS.boost
-    )
+    assert backend.last_race_control_state.boost
     assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
 
     env.step(_discrete_gas_boost_action())

@@ -5,7 +5,7 @@ use super::{
     spin::SpinRequest,
     step::{RepeatedStepConfig, StepCounters, StepStatus, StepSummary},
 };
-use crate::core::input::ControllerState;
+use crate::core::input::RaceControlState;
 use crate::core::telemetry::{PlayerTelemetry, TelemetrySnapshot};
 
 #[test]
@@ -268,7 +268,7 @@ fn repeated_step_config(
     _legacy_reverse_limit: usize,
 ) -> RepeatedStepConfig {
     RepeatedStepConfig {
-        controller_state: ControllerState::default(),
+        race_controls: RaceControlState::default(),
         action_repeat: 1,
         stuck_min_speed_kph: 50.0,
         energy_loss_epsilon: 0.1,

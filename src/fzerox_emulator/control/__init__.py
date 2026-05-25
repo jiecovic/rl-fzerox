@@ -1,11 +1,16 @@
 # src/fzerox_emulator/control/__init__.py
-"""Controller-state and button constants for the emulator boundary."""
+"""Controller-state, race-control, and button constants for the emulator boundary."""
 
 from __future__ import annotations
 
 from importlib import import_module
 from typing import TYPE_CHECKING
 
+from fzerox_emulator.control.race import (
+    RACE_CONTROL_MASKS,
+    RaceControlMaskCatalog,
+    RaceControlState,
+)
 from fzerox_emulator.control.state import ControllerState
 
 if TYPE_CHECKING:
@@ -23,6 +28,9 @@ __all__ = [
     "ControllerState",
     "JOYPAD_BUTTONS",
     "JoypadButtons",
+    "RACE_CONTROL_MASKS",
+    "RaceControlMaskCatalog",
+    "RaceControlState",
     "SpinRequest",
     "spin_request_from_index",
 ]

@@ -6,8 +6,8 @@ from rl_fzerox.core.envs.engine.controls.availability import (
     sync_dynamic_action_masks,
 )
 from rl_fzerox.core.envs.engine.controls.gates import (
-    with_left_stick_y,
-    without_joypad_mask,
+    with_pitch,
+    without_controls,
 )
 from rl_fzerox.core.envs.engine.controls.history import ControlStateTracker
 from rl_fzerox.core.envs.engine.controls.mask_config import (
@@ -33,6 +33,6 @@ __all__ = [
     "apply_dynamic_control_gates",
     "selected_action_branches",
     "sync_dynamic_action_masks",
-    "with_left_stick_y",
-    "without_joypad_mask",
+    "with_pitch",
+    "without_controls",
 ]

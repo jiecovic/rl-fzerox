@@ -1,14 +1,13 @@
 # src/rl_fzerox/core/envs/engine/controls/lean.py
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.domain.lean import (
     DEFAULT_LEAN_MODE,
     LeanMode,
 )
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.observations import OBSERVATION_STATE_DEFAULTS
 
 
@@ -33,7 +32,7 @@ class LeanControlState:
         self._lock_remaining_frames = 0
         self._cooldown_remaining_frames = 0
 
-    def apply_semantics(self, control_state: ControllerState) -> ControllerState:
+    def apply_semantics(self, control_state: RaceControlState) -> RaceControlState:
         """Apply the configured lean primitive semantics to one requested action."""
 
         if self.mode == "minimum_hold":
@@ -42,16 +41,16 @@ class LeanControlState:
             return self._apply_release_cooldown(control_state)
         return control_state
 
-    def record(self, *, joypad_mask: int, frames_elapsed: int) -> None:
+    def record(self, *, control_state: RaceControlState, frames_elapsed: int) -> None:
         """Advance held-button and semantic-lock state."""
 
-        left_held = bool(joypad_mask & RACE_CONTROL_MASKS.lean_left)
-        right_held = bool(joypad_mask & RACE_CONTROL_MASKS.lean_right)
+        left_held = control_state.lean_left
+        right_held = control_state.lean_right
         previous_lean_index = held_lean_index(
             left_held=self.left_held,
             right_held=self.right_held,
         )
-        current_lean_index = lean_index_from_mask(joypad_mask)
+        current_lean_index = lean_index_from_control(control_state)
         self._update_semantics(
             previous_lean_index=previous_lean_index,
             current_lean_index=current_lean_index,
@@ -81,16 +80,16 @@ class LeanControlState:
             return None
         return (0, lean_index)
 
-    def _apply_minimum_hold(self, control_state: ControllerState) -> ControllerState:
+    def _apply_minimum_hold(self, control_state: RaceControlState) -> RaceControlState:
         if self._lock_remaining_frames <= 0 or self._lock_index == 0:
             return control_state
 
-        if lean_index_from_mask(control_state.joypad_mask) == self._lock_index:
+        if lean_index_from_control(control_state) == self._lock_index:
             return control_state
         return replace_lean_index(control_state, self._lock_index)
 
-    def _apply_release_cooldown(self, control_state: ControllerState) -> ControllerState:
-        requested_lean_index = lean_index_from_mask(control_state.joypad_mask)
+    def _apply_release_cooldown(self, control_state: RaceControlState) -> RaceControlState:
+        requested_lean_index = lean_index_from_control(control_state)
         if requested_lean_index == 0:
             return control_state
         if self._cooldown_remaining_frames > 0:
@@ -180,10 +179,10 @@ def held_lean_index(*, left_held: bool, right_held: bool) -> int:
     return 0
 
 
-def lean_index_from_mask(joypad_mask: int) -> int:
+def lean_index_from_control(control_state: RaceControlState) -> int:
     return held_lean_index(
-        left_held=bool(joypad_mask & RACE_CONTROL_MASKS.lean_left),
-        right_held=bool(joypad_mask & RACE_CONTROL_MASKS.lean_right),
+        left_held=control_state.lean_left,
+        right_held=control_state.lean_right,
     )
 
 
@@ -195,18 +194,9 @@ def signed_lean(lean_index: int) -> float:
     return 0.0
 
 
-def replace_lean_index(control_state: ControllerState, lean_index: int) -> ControllerState:
-    joypad_mask = control_state.joypad_mask & ~(
-        RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
-    )
-    if lean_index in {1, 3}:
-        joypad_mask |= RACE_CONTROL_MASKS.lean_left
-    if lean_index in {2, 3}:
-        joypad_mask |= RACE_CONTROL_MASKS.lean_right
-    return ControllerState(
-        joypad_mask=joypad_mask,
-        left_stick_x=control_state.left_stick_x,
-        left_stick_y=control_state.left_stick_y,
-        right_stick_x=control_state.right_stick_x,
-        right_stick_y=control_state.right_stick_y,
+def replace_lean_index(control_state: RaceControlState, lean_index: int) -> RaceControlState:
+    return replace(
+        control_state,
+        lean_left=lean_index in {1, 3},
+        lean_right=lean_index in {2, 3},
     )

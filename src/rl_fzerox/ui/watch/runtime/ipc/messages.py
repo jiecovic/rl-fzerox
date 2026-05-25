@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
@@ -33,7 +33,7 @@ class ViewerCommand:
     cnn_visualization_enabled: bool = False
     auxiliary_visualization_enabled: bool = False
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
-    control_state: ControllerState | None = None
+    control_state: RaceControlState | None = None
 
 
 @dataclass(frozen=True)
@@ -55,7 +55,7 @@ class WorkerCommandBatch:
     cnn_visualization_enabled: bool
     auxiliary_visualization_enabled: bool
     cnn_normalization: CnnActivationNormalizationMode
-    control_state: ControllerState
+    control_state: RaceControlState
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,7 @@ class WatchSnapshot:
     control_fps: float
     target_control_fps: float | None
     native_fps: float
-    control_state: ControllerState
+    control_state: RaceControlState
     gas_level: float
     boost_lamp_level: float
     action_mask_branches: ActionMaskBranches

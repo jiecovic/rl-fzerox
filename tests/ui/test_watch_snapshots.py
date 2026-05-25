@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
@@ -21,6 +21,19 @@ class _SnapshotQueue:
 
     def get_nowait(self) -> object:
         return self.messages.pop(0)
+
+
+def race_control_state(
+    *,
+    control_mask: int = 0,
+    stick_x: float = 0.0,
+    pitch: float = 0.0,
+) -> RaceControlState:
+    return RaceControlState.from_mask(
+        control_mask,
+        stick_x=stick_x,
+        pitch=pitch,
+    )
 
 
 class _Backend:
@@ -76,7 +89,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         control_fps=20.0,
         target_control_fps=20.0,
         target_control_seconds=None,
-        control_state=ControllerState(left_stick_x=0.5),
+        control_state=race_control_state(stick_x=0.5),
         gas_level=1.0,
         boost_lamp_level=0.0,
         action_mask_branches={"lean": (True, False, True)},
@@ -162,8 +175,8 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         control_fps=20.0,
         target_control_fps=20.0,
         target_control_seconds=None,
-        previous_control_state=ControllerState(joypad_mask=1, left_stick_x=-0.5),
-        final_control_state=ControllerState(joypad_mask=2, left_stick_x=0.5),
+        previous_control_state=race_control_state(control_mask=1, stick_x=-0.5),
+        final_control_state=race_control_state(control_mask=2, stick_x=0.5),
         previous_gas_level=0.0,
         final_gas_level=1.0,
         previous_action_mask_branches={"spin": (True, False, False)},
@@ -189,8 +202,8 @@ def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Pa
         assert isinstance(message, WatchSnapshot)
         snapshots.append(message)
 
-    assert [snapshot.control_state.joypad_mask for snapshot in snapshots] == [11, 12, 14]
-    assert [snapshot.control_state.left_stick_x for snapshot in snapshots] == [0.5, 0.5, 0.5]
+    assert [snapshot.control_state.control_mask for snapshot in snapshots] == [11, 12, 14]
+    assert [snapshot.control_state.stick_x for snapshot in snapshots] == [0.5, 0.5, 0.5]
     assert [snapshot.action_mask_branches for snapshot in snapshots] == [
         {"spin": (True, True, True)},
         {"spin": (True, True, True)},

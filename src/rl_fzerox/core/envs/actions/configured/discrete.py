@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 from gymnasium import spaces
 
-from fzerox_emulator import ControllerState, SpinRequest
+from fzerox_emulator import RaceControlState, SpinRequest
 from fzerox_emulator.arrays import ActionMask, DiscreteAction
 from rl_fzerox.core.envs.actions.base import (
     ActionValue,
@@ -17,9 +17,8 @@ from rl_fzerox.core.envs.actions.base import (
     parse_discrete_action,
     steer_values,
 )
-from rl_fzerox.core.envs.actions.buttons import RACE_CONTROL_MASKS
 from rl_fzerox.core.envs.actions.configured.layout import (
-    categorical_lean_mask,
+    categorical_lean_state,
     configured_dimensions,
     idle_discrete_values,
     pitch_bucket_value,
@@ -56,7 +55,7 @@ class ConfiguredDiscreteActionAdapter:
     def action_dimensions(self) -> tuple[DiscreteActionDimension, ...]:
         return self._dimensions
 
-    def decode(self, action: ActionValue) -> ControllerState:
+    def decode(self, action: ActionValue) -> RaceControlState:
         return self.decode_request(action).control_state
 
     def decode_request(self, action: ActionValue) -> DecodedAction:
@@ -67,39 +66,47 @@ class ConfiguredDiscreteActionAdapter:
         )
         steer = 0.0
         pitch = 0.0
-        joypad_mask = 0
+        gas = False
+        air_brake = False
+        boost = False
+        lean_left = False
+        lean_right = False
         spin_request: SpinRequest = "none"
         for dimension, value in zip(self._dimensions, parsed, strict=True):
             if dimension.label == "steer":
                 steer = float(self._steer_values[value])
             elif dimension.label == "gas" and value == 1:
-                joypad_mask |= RACE_CONTROL_MASKS.accelerate
+                gas = True
             elif dimension.label == "air_brake" and value == 1:
-                joypad_mask |= RACE_CONTROL_MASKS.air_brake
+                air_brake = True
             elif dimension.label == "boost" and value == 1:
-                joypad_mask |= RACE_CONTROL_MASKS.boost
+                boost = True
             elif dimension.label == "lean":
-                joypad_mask |= categorical_lean_mask(
+                lean_left, lean_right = categorical_lean_state(
                     value,
                     four_way=self._config.lean_output_mode == "four_way_categorical",
                 )
             elif dimension.label == "lean_left" and value == 1:
-                joypad_mask |= RACE_CONTROL_MASKS.lean_left
+                lean_left = True
             elif dimension.label == "lean_right" and value == 1:
-                joypad_mask |= RACE_CONTROL_MASKS.lean_right
+                lean_right = True
             elif dimension.label == "spin":
                 spin_request = spin_request_value(value)
             elif dimension.label == "pitch":
                 pitch = pitch_bucket_value(value, bucket_count=self._config.pitch_buckets)
 
         if self._config.force_full_throttle:
-            joypad_mask |= RACE_CONTROL_MASKS.accelerate
+            gas = True
 
         return DecodedAction(
-            control_state=ControllerState(
-                joypad_mask=joypad_mask,
-                left_stick_x=steer,
-                left_stick_y=pitch,
+            control_state=RaceControlState(
+                gas=gas,
+                air_brake=air_brake,
+                boost=boost,
+                lean_left=lean_left,
+                lean_right=lean_right,
+                stick_x=steer,
+                pitch=pitch,
             ),
             spin_request=spin_request,
         )

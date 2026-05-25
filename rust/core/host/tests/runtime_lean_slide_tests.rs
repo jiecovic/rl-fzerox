@@ -1,6 +1,6 @@
 // rust/core/host/tests/runtime_lean_slide_tests.rs
 
-use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R};
+use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2};
 
 use super::{SLIDE_ASSIST_RAM, patch_lean_timers};
 use crate::core::input::ControllerState;
@@ -27,7 +27,7 @@ fn held_left_lean_patches_both_slide_timers() {
 fn held_right_lean_patches_both_slide_timers() {
     let mut memory = timer_memory();
     let controller_state =
-        ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_R), 0.0, 0.0, 0.0, 0.0);
+        ControllerState::from_normalized(button_mask(DEVICE_ID_JOYPAD_R2), 0.0, 0.0, 0.0, 0.0);
 
     patch_lean_timers(&mut memory, controller_state).unwrap();
 

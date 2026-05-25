@@ -5,7 +5,7 @@ from queue import Empty
 
 from pytest import MonkeyPatch
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
 from rl_fzerox.ui.watch.runtime.ipc import (
     ViewerCommand,
@@ -76,12 +76,12 @@ def test_drain_worker_commands_coalesces_reset_mode() -> None:
     commands, paused, control_state = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.reset_mode == "current"
     assert paused is False
-    assert control_state == ControllerState()
+    assert control_state == RaceControlState()
 
 
 def test_drain_worker_commands_last_reset_mode_wins() -> None:
@@ -95,7 +95,7 @@ def test_drain_worker_commands_last_reset_mode_wins() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.reset_mode == "next"
@@ -136,12 +136,12 @@ def test_drain_worker_commands_coalesces_deterministic_toggle_parity() -> None:
     commands, paused, control_state = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.toggle_deterministic_policy is True
     assert paused is False
-    assert control_state == ControllerState()
+    assert control_state == RaceControlState()
 
 
 def test_drain_worker_commands_preserves_cnn_visualization_state_without_commands() -> None:
@@ -150,13 +150,13 @@ def test_drain_worker_commands_preserves_cnn_visualization_state_without_command
     commands, paused, control_state = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         cnn_visualization_enabled=True,
     )
 
     assert commands.cnn_visualization_enabled is True
     assert paused is False
-    assert control_state == ControllerState()
+    assert control_state == RaceControlState()
 
 
 def test_drain_worker_commands_updates_cnn_visualization_state() -> None:
@@ -165,7 +165,7 @@ def test_drain_worker_commands_updates_cnn_visualization_state() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         cnn_visualization_enabled=True,
     )
 
@@ -178,7 +178,7 @@ def test_drain_worker_commands_updates_cnn_normalization() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         cnn_normalization="channel",
     )
 
@@ -191,7 +191,7 @@ def test_drain_worker_commands_toggles_manual_control_state() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
         manual_control_enabled=False,
     )
 
@@ -209,7 +209,7 @@ def test_drain_worker_commands_coalesces_course_jump_selection() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.jump_course_id == "silence"
@@ -226,7 +226,7 @@ def test_drain_worker_commands_coalesces_current_course_lock_toggle() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.toggle_current_course_lock is True
@@ -243,7 +243,7 @@ def test_drain_worker_commands_coalesces_state_feature_toggle() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.toggle_zeroed_state_feature_name == "course_context"
@@ -260,7 +260,7 @@ def test_drain_worker_commands_coalesces_control_fps_reset() -> None:
     commands, _, _ = drain_worker_commands(
         command_queue,
         paused=False,
-        control_state=ControllerState(),
+        control_state=RaceControlState(),
     )
 
     assert commands.control_fps_delta == 1

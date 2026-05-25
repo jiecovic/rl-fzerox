@@ -17,6 +17,10 @@ pub fn override_option(key: &str, default_value: &str, renderer: &CStr) -> Strin
     let renderer_name = renderer.to_string_lossy();
     match key {
         "mupen64plus-rdp-plugin" => renderer_name.into_owned(),
+        // Use direct RetroPad buttons for N64 C-buttons. Without this, C-Down
+        // lives behind Mupen64Plus-Next's C-button mode/right-stick mapping,
+        // so the air-brake action can appear requested without reaching F-Zero X.
+        "mupen64plus-alt-map" => "True".to_owned(),
         // Keep GLideN64 readback close to native N64 resolution. Higher
         // viewport defaults move more pixels over the CPU/GPU boundary and are
         // counterproductive for RL observations.

@@ -33,6 +33,9 @@ if TYPE_CHECKING:
     ObservationSpec = _observations.ObservationSpec
     ObservationStackMode = _observations.ObservationStackMode
     PlayerTelemetry = _native.PlayerTelemetry
+    RACE_CONTROL_MASKS = _control.RACE_CONTROL_MASKS
+    RaceControlMaskCatalog = _control.RaceControlMaskCatalog
+    RaceControlState = _control.RaceControlState
     ResetState = _results.ResetState
     StepStatus = _native.StepStatus
     StepSummary = _native.StepSummary
@@ -64,6 +67,9 @@ _EXPORT_MODULES = {
     "stacked_observation_channels": "fzerox_emulator.base.observations",
     "JOYPAD_BUTTONS": "fzerox_emulator.control",
     "JoypadButtons": "fzerox_emulator.control",
+    "RACE_CONTROL_MASKS": "fzerox_emulator.control",
+    "RaceControlMaskCatalog": "fzerox_emulator.control",
+    "RaceControlState": "fzerox_emulator.control",
     "SpinRequest": "fzerox_emulator.control",
     "ControllerState": "fzerox_emulator.control",
     "Emulator": "fzerox_emulator.emulator",
@@ -86,6 +92,9 @@ __all__ = [
     "ObservationSpec",
     "ObservationStackMode",
     "PlayerTelemetry",
+    "RACE_CONTROL_MASKS",
+    "RaceControlMaskCatalog",
+    "RaceControlState",
     "ResetState",
     "StepStatus",
     "StepSummary",

@@ -4,8 +4,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 
-from fzerox_emulator import ControllerState
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS
+from fzerox_emulator import RaceControlState
 from rl_fzerox.core.envs.engine.controls.lean import signed_lean
 from rl_fzerox.core.envs.observations import ActionHistoryControl
 
@@ -38,22 +37,21 @@ class ActionHistoryBuffer:
     def reset(self) -> None:
         self._samples.clear()
 
-    def record(self, control_state: ControllerState, *, gas_level: float | None) -> None:
-        joypad = control_state.joypad_mask
+    def record(self, control_state: RaceControlState, *, gas_level: float | None) -> None:
         normalized_gas = (
-            (1.0 if joypad & RACE_CONTROL_MASKS.accelerate else 0.0)
+            (1.0 if control_state.gas else 0.0)
             if gas_level is None
             else clamp(float(gas_level), 0.0, 1.0)
         )
         self._samples.append(
             ActionHistorySample(
-                steer=clamp(float(control_state.left_stick_x), -1.0, 1.0),
+                steer=clamp(float(control_state.stick_x), -1.0, 1.0),
                 gas=normalized_gas,
-                air_brake=1.0 if joypad & RACE_CONTROL_MASKS.air_brake else 0.0,
-                boost=1.0 if joypad & RACE_CONTROL_MASKS.boost else 0.0,
-                lean_left=1.0 if joypad & RACE_CONTROL_MASKS.lean_left else 0.0,
-                lean_right=1.0 if joypad & RACE_CONTROL_MASKS.lean_right else 0.0,
-                pitch=clamp(float(control_state.left_stick_y), -1.0, 1.0),
+                air_brake=1.0 if control_state.air_brake else 0.0,
+                boost=1.0 if control_state.boost else 0.0,
+                lean_left=1.0 if control_state.lean_left else 0.0,
+                lean_right=1.0 if control_state.lean_right else 0.0,
+                pitch=clamp(float(control_state.pitch), -1.0, 1.0),
             )
         )
 

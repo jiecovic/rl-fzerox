@@ -8,7 +8,7 @@
 
 use std::mem::size_of;
 
-use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R, MEMORY_SYSTEM_RAM};
+use libretro_sys::{DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2, MEMORY_SYSTEM_RAM};
 
 use super::host::Host;
 use crate::core::error::CoreError;
@@ -23,7 +23,7 @@ struct SlideAssistRam {
 }
 
 const SLIDE_ASSIST_RAM: SlideAssistRam = SlideAssistRam {
-    lean_button_ids: [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R],
+    lean_button_ids: [DEVICE_ID_JOYPAD_L2, DEVICE_ID_JOYPAD_R2],
     timer_offsets: [
         player_z_button_timer_offset(),
         player_r_button_timer_offset(),

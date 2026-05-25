@@ -5,9 +5,9 @@ from collections.abc import Mapping
 
 import numpy as np
 
-from fzerox_emulator import ControllerState
+from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import Float32Array
-from rl_fzerox.core.envs.actions import RACE_CONTROL_MASKS, ActionValue
+from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import (
     ActionMaskBranches,
     action_branch_non_neutral_allowed,
@@ -27,7 +27,7 @@ from rl_fzerox.ui.watch.view.screen.types import (
 
 
 def _control_viz(
-    control_state: ControllerState,
+    control_state: RaceControlState,
     *,
     gas_level: float,
     thrust_warning_threshold: float | None = None,
@@ -55,7 +55,6 @@ def _control_viz(
     spin_macro_active: bool = False,
     spin_macro_cooldown_frames: int = 0,
 ) -> ControlViz:
-    joypad_mask = control_state.joypad_mask
     continuous_air_brake_enabled = continuous_air_brake_mode != "off"
     continuous_air_brake_exposed = _continuous_air_brake_axis_available_from_action(
         policy_action,
@@ -73,7 +72,7 @@ def _control_viz(
     if (
         air_brake_axis is None
         and continuous_air_brake_mode != "off"
-        and joypad_mask & RACE_CONTROL_MASKS.air_brake
+        and control_state.air_brake
     ):
         air_brake_axis = 1.0
     selected_branches = _selected_policy_branches(
@@ -84,12 +83,12 @@ def _control_viz(
     boost_pressed = _branch_pressed(
         selected_branches,
         "boost",
-        fallback=bool(joypad_mask & RACE_CONTROL_MASKS.boost),
+        fallback=control_state.boost,
     )
     lean_left_pressed, lean_right_pressed = _lean_buttons(
         {} if spin_direction != 0 or spin_macro_active else selected_branches,
-        fallback_left=bool(joypad_mask & RACE_CONTROL_MASKS.lean_left),
-        fallback_right=bool(joypad_mask & RACE_CONTROL_MASKS.lean_right),
+        fallback_left=control_state.lean_left,
+        fallback_right=control_state.lean_right,
     )
     normalized_boost_lamp_level = max(
         0.0,
@@ -103,14 +102,14 @@ def _control_viz(
         ),
     )
     displayed_gas_level = _displayed_gas_level(
-        joypad_mask=joypad_mask,
+        gas_pressed=control_state.gas,
         gas_level=gas_level,
         continuous_drive_enabled=continuous_drive_enabled,
         force_full_throttle=force_full_throttle,
     )
     return ControlViz(
-        steer_x=max(-1.0, min(1.0, control_state.left_stick_x)),
-        pitch_y=max(-1.0, min(1.0, control_state.left_stick_y)),
+        steer_x=max(-1.0, min(1.0, control_state.stick_x)),
+        pitch_y=max(-1.0, min(1.0, control_state.pitch)),
         gas_level=displayed_gas_level,
         thrust_warning_threshold=_normalize_optional_level(thrust_warning_threshold),
         thrust_deadzone_threshold=_normalize_optional_level(thrust_deadzone_threshold),
@@ -177,7 +176,7 @@ def _control_viz(
 
 def _displayed_gas_level(
     *,
-    joypad_mask: int,
+    gas_pressed: bool,
     gas_level: float,
     continuous_drive_enabled: bool,
     force_full_throttle: bool,
@@ -186,7 +185,7 @@ def _displayed_gas_level(
         return 1.0
     if continuous_drive_enabled:
         return max(0.0, min(1.0, gas_level))
-    return 1.0 if joypad_mask & RACE_CONTROL_MASKS.accelerate else 0.0
+    return 1.0 if gas_pressed else 0.0
 
 
 def _selected_policy_branches(

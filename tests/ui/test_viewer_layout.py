@@ -4,7 +4,7 @@ import os
 import numpy as np
 import pygame
 
-from fzerox_emulator import ControllerState, display_size
+from fzerox_emulator import RaceControlState, display_size
 from rl_fzerox.ui.watch.app import _next_panel_tab_index
 from rl_fzerox.ui.watch.input import ViewerInput, _point_in_rect
 from rl_fzerox.ui.watch.view.panels.core.model import (
@@ -220,7 +220,7 @@ def test_side_panel_fits_default_watch_window_height() -> None:
             },
             episode_reward=0.0,
             paused=False,
-            control_state=ControllerState(),
+            control_state=RaceControlState(),
             policy_curriculum_stage=None,
             policy_action=None,
             policy_reload_age_seconds=None,
@@ -267,7 +267,7 @@ def test_side_panel_fits_steer_history_observation_state_vector() -> None:
             reset_info={},
             episode_reward=0.0,
             paused=False,
-            control_state=ControllerState(),
+            control_state=RaceControlState(),
             policy_curriculum_stage=None,
             policy_action=np.array([1, 1, 0, 0, 0], dtype=np.int64),
             policy_reload_age_seconds=0.0,

@@ -20,7 +20,7 @@ from fzerox_emulator.base.results import (
     FrameStep,
     ResetState,
 )
-from fzerox_emulator.control import ControllerState
+from fzerox_emulator.control import ControllerState, RaceControlState
 from fzerox_emulator.control.spin import SpinRequest
 from fzerox_emulator.emulator.observations import ObservationRenderingMixin
 from fzerox_emulator.emulator.race_start import RaceStartMixin
@@ -149,7 +149,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
 
     def step_repeat_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -194,14 +194,14 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         )
         return run_repeat_step(
             self._native,
-            controller_state,
+            control_state,
             config=config,
             recipe=recipe,
         )
 
     def step_repeat_watch_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         preset: str | None = None,
@@ -246,14 +246,14 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         )
         return run_repeat_watch_step(
             self._native,
-            controller_state,
+            control_state,
             config=config,
             recipe=recipe,
         )
 
     def step_repeat_multi_observation_raw(
         self,
-        controller_state: ControllerState,
+        control_state: RaceControlState,
         *,
         action_repeat: int,
         observation_recipes: Sequence[ObservationImageRecipe],
@@ -281,7 +281,7 @@ class Emulator(RaceStartMixin, ObservationRenderingMixin):
         )
         return run_repeat_multi_observation_step(
             self._native,
-            controller_state,
+            control_state,
             config=config,
             recipes=observation_recipes,
         )
