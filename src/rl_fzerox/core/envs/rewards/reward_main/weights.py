@@ -13,15 +13,17 @@ class RewardMainWeights:
     progress_bucket_reward: float = 0.05
     progress_reward_interval_frames: int = 1
     suspend_progress_while_outside_track_bounds: bool = True
-    outside_bounds_reentry_progress_distance_cap: float | None = 10_000.0
+    progress_track_distance_tolerance: float = 1_000.0
+    progress_speed_min_kph: float = 0.0
+    progress_speed_min_multiplier: float = 1.0
+    progress_speed_reference_kph: float = 760.0
+    progress_speed_max_kph: float = 1_500.0
+    progress_speed_max_multiplier: float = 1.0
+    progress_speed_curve_power: float = 1.0
     outside_track_recovery_reward: float = 0.0
     outside_track_recovery_reward_cap: float = 0.1
     outside_track_recovery_airborne_grace_frames: int = 30
     time_penalty_per_frame: float = 0.0
-    reverse_time_penalty_scale: float = 2.0
-    slow_speed_time_penalty_scale: float = 3.0
-    slow_speed_time_penalty_start_kph: float = 760.0
-    slow_speed_time_penalty_power: float = 1.0
     lap_completion_bonus: float = 5.0
     lap_position_scale: float = 1.0
     ko_star_reward: float = 0.0
@@ -48,3 +50,9 @@ class RewardMainWeights:
     truncation_penalty: float = -30.0
     step_reward_clip_min: float | None = -100.0
     step_reward_clip_max: float | None = 100.0
+
+    def __post_init__(self) -> None:
+        if self.progress_speed_reference_kph <= self.progress_speed_min_kph:
+            raise ValueError("progress_speed_reference_kph must be greater than min kph")
+        if self.progress_speed_max_kph <= self.progress_speed_reference_kph:
+            raise ValueError("progress_speed_max_kph must be greater than reference kph")

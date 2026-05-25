@@ -338,6 +338,67 @@
   grid-column: span 2;
 }
 
+.progress-speed-preview {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.progress-speed-preview__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.progress-speed-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 900 / 190;
+}
+
+.progress-speed-preview line {
+  stroke: var(--border-strong);
+  stroke-width: 1;
+}
+
+.progress-speed-preview__guide {
+  stroke: var(--border);
+  stroke-dasharray: 4 5;
+}
+
+.progress-speed-preview__tick {
+  stroke: var(--border-strong);
+}
+
+.progress-speed-preview polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.progress-speed-preview circle {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.progress-speed-preview text {
+  fill: var(--muted);
+  font-size: 8px;
+  font-weight: 700;
+}
+
 .reward-accordion-stack .range-pair-field {
   grid-column: 1 / -1;
 }

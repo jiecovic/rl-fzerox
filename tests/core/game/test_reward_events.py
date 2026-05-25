@@ -514,9 +514,11 @@ def _status(
     truncation_reason: str | None = None,
 ) -> StepStatus:
     return StepStatus(
-        step_count=step_count,
-        stalled_steps=stalled_steps,
-        reverse_timer=reverse_timer,
-        termination_reason=termination_reason,
-        truncation_reason=truncation_reason,
+        {
+            "step_count": step_count,
+            "stalled_steps": stalled_steps,
+            "reverse_timer": reverse_timer,
+            "termination_reason": termination_reason,
+            "truncation_reason": truncation_reason,
+        }
     )

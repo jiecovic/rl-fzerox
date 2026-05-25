@@ -21,15 +21,17 @@ class ManagedRewardConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     time_penalty_per_frame: float = 0.0
-    reverse_time_penalty_scale: NonNegativeFloat = 2.0
-    slow_speed_time_penalty_scale: NonNegativeFloat = 3.0
-    slow_speed_time_penalty_start_kph: NonNegativeFloat = 760.0
-    slow_speed_time_penalty_power: PositiveFloat = 1.0
     progress_bucket_distance: PositiveFloat = 25.0
     progress_bucket_reward: NonNegativeFloat = 0.05
     progress_reward_interval_frames: PositiveInt = 1
     suspend_progress_while_outside_track_bounds: bool = True
-    outside_bounds_reentry_progress_distance_cap: NonNegativeFloat | None = 10_000.0
+    progress_track_distance_tolerance: NonNegativeFloat = 1_000.0
+    progress_speed_min_kph: NonNegativeFloat = 0.0
+    progress_speed_min_multiplier: NonNegativeFloat = 1.0
+    progress_speed_reference_kph: PositiveFloat = 760.0
+    progress_speed_max_kph: PositiveFloat = 1_500.0
+    progress_speed_max_multiplier: NonNegativeFloat = 1.0
+    progress_speed_curve_power: PositiveFloat = 1.0
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
@@ -62,11 +64,15 @@ class ManagedRewardConfig(BaseModel):
     step_reward_clip_max: float | None = 100.0
 
     @model_validator(mode="after")
-    def _validate_step_reward_clip_bounds(self) -> ManagedRewardConfig:
+    def _validate_reward_bounds(self) -> ManagedRewardConfig:
         if (
             self.step_reward_clip_min is not None
             and self.step_reward_clip_max is not None
             and self.step_reward_clip_min > self.step_reward_clip_max
         ):
             raise ValueError("step_reward_clip_min must be <= step_reward_clip_max")
+        if self.progress_speed_reference_kph <= self.progress_speed_min_kph:
+            raise ValueError("progress_speed_reference_kph must be greater than min kph")
+        if self.progress_speed_max_kph <= self.progress_speed_reference_kph:
+            raise ValueError("progress_speed_max_kph must be greater than reference kph")
         return self
