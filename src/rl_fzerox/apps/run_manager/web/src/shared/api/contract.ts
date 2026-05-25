@@ -15,6 +15,7 @@ const actionDriveModeSchema = z.enum(["pwm", "on_off"]);
 const leanOutputModeSchema = z.enum(["three_way", "four_way_categorical", "independent_buttons"]);
 const leanModeSchema = z.enum(["minimum_hold", "release_cooldown", "timer_assist", "raw"]);
 const rendererSchema = z.enum(["angrylion", "gliden64"]);
+const cameraSettingSchema = z.enum(["overhead", "close_behind", "regular", "wide"]);
 export const watchDeviceSchema = z.enum(["cpu", "cuda"]);
 const stateComponentNameSchema = z.enum([
   "vehicle_state",
@@ -195,6 +196,7 @@ const environmentConfigSchema = z.object({
   progress_frontier_stall_limit_frames: z.number().int().positive().nullable(),
   progress_frontier_epsilon: z.number().nonnegative(),
   renderer: rendererSchema,
+  camera_setting: cameraSettingSchema,
 });
 
 const stateComponentConfigSchema = z.object({
@@ -610,6 +612,7 @@ export const configMetadataSchema = z.object({
   observation_presets: z.array(observationPresetInfoSchema),
   observation_resolution_bounds: observationResolutionBoundsSchema,
   observation_source_geometries: z.array(observationSourceGeometryInfoSchema),
+  camera_settings: z.array(selectOptionSchema),
   track_pool_modes: z.array(selectOptionSchema),
   race_modes: z.array(selectOptionSchema),
   gp_difficulties: z.array(selectOptionSchema),
@@ -718,6 +721,7 @@ export type ManagedDraft = z.infer<typeof managedDraftSchema>;
 export type ManagedRun = z.infer<typeof managedRunSummarySchema>;
 export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
 export type WatchDevice = z.infer<typeof watchDeviceSchema>;
+export type WatchRenderer = z.infer<typeof rendererSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
 export type TrackSamplingRuntimeEntry = z.infer<typeof trackSamplingRuntimeEntrySchema>;
 export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeStateSchema>;

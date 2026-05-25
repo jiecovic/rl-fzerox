@@ -58,6 +58,7 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
     assert train_config.reward.suspend_progress_while_outside_track_bounds is True
     assert train_config.train.explicit_run_dir == tmp_path / "runs" / "bridge-default_0001"
     assert train_config.emulator.renderer == "gliden64"
+    assert train_config.env.camera_setting == "close_behind"
     assert train_config.env.action.runtime().name == "configured_hybrid"
     assert train_config.env.action.mask_air_brake_on_ground is False
     assert train_config.env.action.layout_continuous_axes == ("steer",)
@@ -311,6 +312,7 @@ def test_manager_training_bridge_supports_continuous_air_brake_lane(
 def test_manager_training_bridge_can_override_renderer(tmp_path: Path) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.environment.renderer = "angrylion"
+    config.environment.camera_setting = "regular"
 
     train_config = build_managed_train_app_config(
         config,
@@ -319,6 +321,7 @@ def test_manager_training_bridge_can_override_renderer(tmp_path: Path) -> None:
     )
 
     assert train_config.emulator.renderer == "angrylion"
+    assert train_config.env.camera_setting == "regular"
 
 
 def test_manager_training_bridge_uses_explicit_state_component_membership(

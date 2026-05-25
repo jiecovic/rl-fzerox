@@ -23,6 +23,7 @@ import {
   type TensorboardViewGroup,
   templatesResponseSchema,
   updateLineageGroupsResponseSchema,
+  type WatchRenderer,
   watchRunResponseSchema,
 } from "@/shared/api/contract";
 
@@ -185,13 +186,14 @@ export async function watchRun(
   runId: string,
   artifact: "latest" | "best",
   device: "cpu" | "cuda",
+  renderer: WatchRenderer,
 ): Promise<"started" | "already_running"> {
   const response = await fetch(
     `/api/runs/${encodeURIComponent(runId)}/watch?artifact=${encodeURIComponent(artifact)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device }),
+      body: JSON.stringify({ device, renderer }),
     },
   );
   const payload = parseApiPayload(watchRunResponseSchema, await parseJson(response));

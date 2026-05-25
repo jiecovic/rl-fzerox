@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict
 
 from rl_fzerox.core.manager import ManagedRun, ManagedRunConfig
 
+WatchDevice = Literal["cpu", "cuda"]
+WatchRenderer = Literal["angrylion", "gliden64"]
+
 
 class CreateDraftRequest(BaseModel):
     """Request body for creating one SQLite-backed draft."""
@@ -43,7 +46,8 @@ class WatchRunRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    device: Literal["cpu", "cuda"] = "cuda"
+    device: WatchDevice = "cuda"
+    renderer: WatchRenderer | None = None
 
 
 class UpdateLineageGroupsRequest(BaseModel):
@@ -107,5 +111,6 @@ class RunLauncher(Protocol):
         *,
         run_id: str,
         artifact: str,
-        device: Literal["cpu", "cuda"],
+        device: WatchDevice,
+        renderer: WatchRenderer | None,
     ) -> Literal["started", "already_running"]: ...

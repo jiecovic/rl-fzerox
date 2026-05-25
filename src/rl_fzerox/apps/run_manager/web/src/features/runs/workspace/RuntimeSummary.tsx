@@ -23,6 +23,7 @@ import type {
   ManagedRunDetail,
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
+import { rendererNames } from "@/shared/api/renderers";
 import { formatDate } from "@/shared/ui/format";
 import {
   ChartIcon,
@@ -56,6 +57,7 @@ export function RunRuntimeSummary({
   const runtime = run.runtime;
   const progressFraction = runtime?.progress_fraction ?? 0;
   const hasLineageTotals = showsLineageTotals(run);
+  const watchRendererOptions = rendererNames(metadata, actions.selectedWatchRenderer);
 
   return (
     <div className="run-runtime-summary">
@@ -218,6 +220,29 @@ export function RunRuntimeSummary({
             >
               <option value="cuda">cuda</option>
               <option value="cpu">cpu</option>
+            </select>
+          </label>
+          <label className="run-watch-select-shell">
+            <span className="run-watch-select-label">Renderer</span>
+            <select
+              aria-label="Watch renderer"
+              className="run-watch-select"
+              value={actions.selectedWatchRenderer}
+              disabled={actions.watchingArtifact !== null}
+              onChange={(event) =>
+                actions.setSelectedWatchRenderer(
+                  watchRendererOptions.find((renderer) => renderer === event.target.value) ??
+                    run.config.environment.renderer,
+                )
+              }
+            >
+              {watchRendererOptions.map((renderer) => (
+                <option key={renderer} value={renderer}>
+                  {renderer === run.config.environment.renderer
+                    ? `${renderer} (training)`
+                    : renderer}
+                </option>
+              ))}
             </select>
           </label>
           <button

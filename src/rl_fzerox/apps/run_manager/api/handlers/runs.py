@@ -9,6 +9,7 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     ForkRunRequest,
     LaunchRunRequest,
     RunLauncher,
+    WatchRenderer,
 )
 from rl_fzerox.apps.run_manager.api.handlers.common import require_run, run_response
 from rl_fzerox.apps.run_manager.api.payloads import run_summary_payload
@@ -152,9 +153,15 @@ def watch_run_payload(
     run_id: str,
     artifact: str,
     device: Literal["cpu", "cuda"],
+    renderer: WatchRenderer | None,
 ) -> dict[str, str]:
     try:
-        status = launcher.watch_artifact(run_id=run_id, artifact=artifact, device=device)
+        status = launcher.watch_artifact(
+            run_id=run_id,
+            artifact=artifact,
+            device=device,
+            renderer=renderer,
+        )
     except FileNotFoundError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     except RuntimeError as error:

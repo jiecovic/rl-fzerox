@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from rl_fzerox.core.domain.camera import CAMERA_SETTINGS
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES, built_in_course_refs_by_cup
 from rl_fzerox.core.domain.observation_components import (
     ObservationStateComponentName,
@@ -63,6 +64,10 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
                 width=geometry.width,
             )
             for geometry in OBSERVATION_IMAGE_GEOMETRY.source_geometries
+        ),
+        camera_settings=tuple(
+            SelectOption(value=setting.name, label=setting.name.replace("_", " "))
+            for setting in CAMERA_SETTINGS
         ),
         track_pool_modes=(
             SelectOption(value="built_in", label="Built-in cups"),
