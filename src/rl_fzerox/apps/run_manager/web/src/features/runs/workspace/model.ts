@@ -53,6 +53,11 @@ export function trainFpsLabel(run: ManagedRun): string {
   return formatRate(envStepRate * Math.max(run.action_repeat, 1));
 }
 
+export function timeLeftLabel(run: ManagedRun): string {
+  const seconds = timeLeftSeconds(run);
+  return seconds === null ? "n/a" : formatDurationSeconds(seconds);
+}
+
 export function localWallTimeLabel(run: ManagedRun, nowMs: number): string {
   const seconds = localWallTimeSeconds(run, nowMs);
   return seconds === null ? "n/a" : formatDurationSeconds(seconds);
@@ -190,6 +195,19 @@ function envStepRateValue(run: ManagedRun): number | null {
     return null;
   }
   return runtime.num_timesteps / ((updatedMs - startedMs) / 1000);
+}
+
+function timeLeftSeconds(run: ManagedRun): number | null {
+  const runtime = run.runtime;
+  if (runtime === null) {
+    return null;
+  }
+  const envStepRate = envStepRateValue(run);
+  if (envStepRate === null || envStepRate <= 0) {
+    return null;
+  }
+  const remainingSteps = Math.max(0, runtime.total_timesteps - runtime.num_timesteps);
+  return remainingSteps / envStepRate;
 }
 
 function localWallTimeSeconds(run: ManagedRun, nowMs: number): number | null {

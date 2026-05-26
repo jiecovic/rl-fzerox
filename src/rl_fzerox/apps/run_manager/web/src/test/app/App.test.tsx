@@ -580,6 +580,8 @@ describe("App", () => {
     expect(wallLocalMetric?.textContent).toContain("10s");
     const ratioLocalMetric = screen.getByText("Sim / wall · local").closest(".run-runtime-metric");
     expect(ratioLocalMetric?.textContent).toContain("2.00x");
+    const timeLeftMetric = screen.getByText("Time left").closest(".run-runtime-metric");
+    expect(timeLeftMetric?.textContent).toContain("9d 15h 28m");
   });
 
   it("shows lineage step fallback for failed forks without runtime samples", async () => {

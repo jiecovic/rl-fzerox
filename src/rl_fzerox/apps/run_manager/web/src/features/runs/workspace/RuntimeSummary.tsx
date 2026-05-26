@@ -14,6 +14,7 @@ import {
   progressHeadline,
   progressNote,
   showsLineageTotals,
+  timeLeftLabel,
   trainFpsLabel,
 } from "@/features/runs/workspace/model";
 import { useRunClock } from "@/features/runs/workspace/polling";
@@ -86,6 +87,10 @@ export function RunRuntimeSummary({
           <div className="run-runtime-metric">
             <span className="run-runtime-metric-label">Train fps</span>
             <div className="run-runtime-metric-value">{trainFpsLabel(run)}</div>
+          </div>
+          <div className="run-runtime-metric">
+            <span className="run-runtime-metric-label">Time left</span>
+            <div className="run-runtime-metric-value">{timeLeftLabel(run)}</div>
           </div>
           {hasLineageTotals ? (
             <>
