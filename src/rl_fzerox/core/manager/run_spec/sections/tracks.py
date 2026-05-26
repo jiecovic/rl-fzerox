@@ -14,10 +14,10 @@ from pydantic import (
 
 from rl_fzerox.core.domain.courses import BUILT_IN_COURSES
 from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.manager.run_spec.common import (
     GpDifficulty,
     RaceMode,
-    TrackPoolMode,
     TrackSamplingMode,
 )
 
@@ -37,9 +37,14 @@ class ManagedTracksConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    pool_mode: TrackPoolMode = "built_in"
     race_mode: RaceMode = "time_attack"
     gp_difficulty: GpDifficulty | None = None
+    include_x_cup: bool = False
+    x_cup_course_count: int = Field(
+        default=X_CUP_COURSE.default_generated_count,
+        ge=1,
+        le=X_CUP_COURSE.max_generated_count,
+    )
     sampling_mode: TrackSamplingMode = "step_balanced"
     step_balance_update_episodes: int = Field(default=5, ge=1)
     step_balance_ema_alpha: float = Field(default=0.1, gt=0.0, le=1.0)
@@ -52,11 +57,12 @@ class ManagedTracksConfig(BaseModel):
     def _validate_selected_course_ids(self) -> ManagedTracksConfig:
         if self.race_mode != "gp_race":
             self.gp_difficulty = None
+            self.include_x_cup = False
         elif self.gp_difficulty is None:
             self.gp_difficulty = default_gp_difficulty()
-        if self.pool_mode == "x_cup" and self.race_mode != "gp_race":
-            raise ValueError("tracks.pool_mode=x_cup requires tracks.race_mode=gp_race")
-        if self.pool_mode == "built_in" and not self.selected_course_ids:
+        if self.include_x_cup and self.race_mode != "gp_race":
+            raise ValueError("tracks.include_x_cup=true requires tracks.race_mode=gp_race")
+        if not self.selected_course_ids and not self.include_x_cup:
             raise ValueError("tracks.selected_course_ids must not be empty")
         if len(set(self.selected_course_ids)) != len(self.selected_course_ids):
             raise ValueError("tracks.selected_course_ids must not contain duplicates")

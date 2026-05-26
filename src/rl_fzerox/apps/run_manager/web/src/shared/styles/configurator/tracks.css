@@ -38,8 +38,7 @@
 }
 
 .track-pool-shell,
-.track-cup-stack,
-.track-xcup-shell {
+.track-cup-stack {
   display: grid;
   gap: 14px;
 }
@@ -112,6 +111,13 @@
 .course-minimap[data-cup="joker"],
 .track-cup-banner-fallback[data-cup="joker"] {
   --cup-accent: #bf6de8;
+}
+
+.track-cup-section[data-cup="x"],
+.course-card[data-cup="x"],
+.course-minimap[data-cup="x"],
+.track-cup-banner-fallback[data-cup="x"] {
+  --cup-accent: #d7dde7;
 }
 
 .track-cup-summary-label {
@@ -262,28 +268,7 @@
   text-align: center;
 }
 
-.track-xcup-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  padding: 16px;
-}
-
-.track-xcup-copy {
-  display: grid;
-  gap: 4px;
-}
-
-.track-xcup-copy strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.track-xcup-copy span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
+.track-xcup-course-card {
+  cursor: default;
+  min-height: 0;
 }

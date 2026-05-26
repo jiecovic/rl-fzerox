@@ -56,6 +56,32 @@ fn gp_race_setup_writes_expected_menu_and_live_fields_without_ta_ghost_state() {
 }
 
 #[test]
+fn gp_race_setup_accepts_x_cup_course_slot() {
+    let mut setup = sample_setup();
+    setup.course_index = 48;
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+
+    write_machine_settings(&mut memory, RaceStartMode::GpRace, setup)
+        .expect("x cup gp machine settings should write");
+    write_race_setup(&mut memory, RaceStartMode::GpRace, setup)
+        .expect("x cup gp race setup should write");
+
+    assert_eq!(read_i32(&memory, GLOBALS.course_index), 48);
+    validate_race_setup(&memory, RaceStartMode::GpRace, setup)
+        .expect("x cup gp validation should pass");
+}
+
+#[test]
+fn time_attack_setup_rejects_x_cup_course_slot() {
+    let mut setup = sample_setup();
+    setup.course_index = 48;
+    let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
+
+    write_machine_settings(&mut memory, RaceStartMode::TimeAttack, setup)
+        .expect_err("x cup slot is not a time attack course");
+}
+
+#[test]
 fn force_reinit_sets_expected_target_game_mode() {
     let mut memory = vec![0_u8; TELEMETRY_CONFIG.system_ram_size_min];
 

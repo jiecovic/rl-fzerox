@@ -21,6 +21,10 @@ from rl_fzerox.core.training.runs.race_start.models import (
     RaceStartMode,
     RaceStartVariant,
 )
+from rl_fzerox.core.training.runs.race_start.x_cup import (
+    XCupMaterializedCourse,
+    materialize_x_cup_race_start_from_boot,
+)
 
 __all__ = [
     "MENU_TIMING",
@@ -29,6 +33,7 @@ __all__ = [
     "RaceStartMenuTiming",
     "RaceStartMode",
     "RaceStartVariant",
+    "XCupMaterializedCourse",
     "materialize_generic_mode_seed",
     "materialize_gp_race_start_from_boot",
     "materialize_gp_race_start_from_menu_seed",
@@ -39,4 +44,5 @@ __all__ = [
     "materialize_time_attack_race_start_from_boot",
     "materialize_time_attack_race_start_from_menu_seed",
     "materialize_time_attack_menu_seed",
+    "materialize_x_cup_race_start_from_boot",
 ]

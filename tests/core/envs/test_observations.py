@@ -6,6 +6,7 @@ from gymnasium import spaces
 from fzerox_emulator import stacked_observation_channels
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.domain.observation_components import ObservationStateComponentSettings
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.envs.course_effects import CourseEffect
 from rl_fzerox.core.envs.observations import (
     action_history_settings_for_observation,
@@ -253,7 +254,7 @@ def test_component_course_context_ignores_non_builtin_course_index() -> None:
         ObservationStateComponentSettings(name="course_context", encoding="one_hot_builtin"),
     )
     vector = telemetry_state_vector(
-        make_telemetry(course_index=48),
+        make_telemetry(course_index=X_CUP_COURSE.course_index),
         state_components=components,
     )
     assert float(np.sum(vector[-24:])) == 0.0

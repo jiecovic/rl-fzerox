@@ -970,16 +970,6 @@
         "order": 3
       }
     ],
-    "track_pool_modes": [
-      {
-        "label": "Built-in cups",
-        "value": "built_in"
-      },
-      {
-        "label": "X Cup",
-        "value": "x_cup"
-      }
-    ],
     "track_sampling_modes": [
       {
         "label": "step balanced",
@@ -1449,7 +1439,7 @@
     "tracks": {
       "adaptive_step_balance_completion_weight": 0.35,
       "adaptive_step_balance_target_completion": 0.9,
-      "pool_mode": "built_in",
+      "include_x_cup": false,
       "race_mode": "time_attack",
       "sampling_mode": "step_balanced",
       "selected_course_ids": [
@@ -1480,7 +1470,8 @@
       ],
       "step_balance_ema_alpha": 0.1,
       "step_balance_max_weight_scale": 5.0,
-      "step_balance_update_episodes": 5
+      "step_balance_update_episodes": 5,
+      "x_cup_course_count": 6
     },
     "train": {
       "batch_size": 1024,

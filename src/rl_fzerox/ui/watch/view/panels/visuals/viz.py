@@ -69,11 +69,7 @@ def _control_viz(
         continuous_air_brake_min_duty=continuous_air_brake_min_duty,
         continuous_air_brake_enabled=continuous_air_brake_enabled,
     )
-    if (
-        air_brake_axis is None
-        and continuous_air_brake_mode != "off"
-        and control_state.air_brake
-    ):
+    if air_brake_axis is None and continuous_air_brake_mode != "off" and control_state.air_brake:
         air_brake_axis = 1.0
     selected_branches = _selected_policy_branches(
         action_mask_branches=action_mask_branches,

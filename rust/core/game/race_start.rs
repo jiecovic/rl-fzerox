@@ -54,7 +54,8 @@ struct RaceStartGameIds {
 
 #[derive(Clone, Copy)]
 struct RaceStartBounds {
-    course_count: i32,
+    built_in_course_count: i32,
+    x_cup_course_index: i32,
     engine_setting_min: i32,
     engine_setting_max: i32,
     minimum_lap_count: i32,
@@ -66,7 +67,8 @@ const GAME_IDS: RaceStartGameIds = RaceStartGameIds {
 };
 
 const BOUNDS: RaceStartBounds = RaceStartBounds {
-    course_count: 24,
+    built_in_course_count: 24,
+    x_cup_course_index: 48,
     engine_setting_min: 0,
     engine_setting_max: 100,
     minimum_lap_count: 1,
@@ -314,12 +316,7 @@ fn write_live_racer_setup(system_ram: &mut [u8], setup: RaceStartSetup) -> Resul
 }
 
 fn validate_setup(mode: RaceStartMode, setup: RaceStartSetup) -> Result<(), CoreError> {
-    if !(0..BOUNDS.course_count).contains(&setup.course_index) {
-        return Err(invalid_setup(format!(
-            "course_index must be in [0, {}), got {}",
-            BOUNDS.course_count, setup.course_index
-        )));
-    }
+    validate_course_index(mode, setup.course_index)?;
     validate_character_and_engine(setup.character_index, setup.engine_setting_raw_value)?;
     if setup.machine_skin_index < 0 && setup.machine_skin_index != SENTINELS.preserve_machine_skin {
         return Err(invalid_setup(format!(
@@ -343,6 +340,26 @@ fn validate_setup(mode: RaceStartMode, setup: RaceStartSetup) -> Result<(), Core
         )));
     }
     Ok(())
+}
+
+fn validate_course_index(mode: RaceStartMode, course_index: i32) -> Result<(), CoreError> {
+    if (0..BOUNDS.built_in_course_count).contains(&course_index) {
+        return Ok(());
+    }
+    if mode == RaceStartMode::GpRace && course_index == BOUNDS.x_cup_course_index {
+        return Ok(());
+    }
+
+    let supported_range = match mode {
+        RaceStartMode::TimeAttack => format!("[0, {})", BOUNDS.built_in_course_count),
+        RaceStartMode::GpRace => format!(
+            "[0, {}) or {} for X Cup",
+            BOUNDS.built_in_course_count, BOUNDS.x_cup_course_index
+        ),
+    };
+    Err(invalid_setup(format!(
+        "course_index must be {supported_range}, got {course_index}"
+    )))
 }
 
 fn validate_character_and_engine(

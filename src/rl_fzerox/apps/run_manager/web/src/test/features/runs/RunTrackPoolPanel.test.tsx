@@ -275,6 +275,36 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.getByText(/adaptive step-balanced/i)).toBeInTheDocument();
   });
 
+  it("shows generated X Cup courses from runtime sampling state", () => {
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: {
+            ...managedRunConfigFixture,
+            tracks: {
+              ...managedRunConfigFixture.tracks,
+              race_mode: "gp_race",
+              gp_difficulty: "novice",
+              include_x_cup: true,
+              x_cup_course_count: 2,
+              sampling_mode: "step_balanced",
+              selected_course_ids: [],
+            },
+          },
+        })}
+        state={xCupTrackSamplingState()}
+      />,
+    );
+
+    expect(screen.getByText("X Cup")).toBeInTheDocument();
+    expect(screen.getByText("X Cup abcd1234")).toBeInTheDocument();
+    expect(screen.getByText("X Cup ef567890")).toBeInTheDocument();
+  });
+
   it("shows the target env-step share in the env-steps bar tooltip", () => {
     const firstCup = configMetadataFixture.track_cups[0];
     if (firstCup?.course_ids[0] === undefined || firstCup.course_ids[1] === undefined) {
@@ -359,6 +389,38 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
       step_share: probability,
       ema_episode_frames: 600,
       ema_completion_fraction: 0,
+    })),
+  };
+}
+
+function xCupTrackSamplingState(): TrackSamplingRuntimeState {
+  return {
+    sampling_mode: "step_balanced",
+    action_repeat: 2,
+    update_episodes: 50,
+    ema_alpha: 0.1,
+    max_weight_scale: 5,
+    adaptive_completion_weight: 0.35,
+    adaptive_target_completion: 0.9,
+    update_count: 1,
+    episodes_since_update: 0,
+    entries: ["abcd1234", "ef567890"].map((hash, index) => ({
+      track_id: `x_cup_${hash}_gp_race_novice_blue_falcon_balanced`,
+      course_key: `x_cup_${hash}`,
+      label: `X Cup ${hash}`,
+      current_weight: 1,
+      current_probability: 0.5,
+      episode_count: index + 1,
+      finished_episode_count: index,
+      success_sample_count: index + 1,
+      episode_share: 0.5,
+      success_rate: index / Math.max(index + 1, 1),
+      target_step_share: 0.5,
+      completed_frames: (index + 1) * 600,
+      completed_env_steps: (index + 1) * 300,
+      step_share: 0.5,
+      ema_episode_frames: (index + 1) * 600,
+      ema_completion_fraction: Math.min(0.95, 0.3 + index * 0.1),
     })),
   };
 }

@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/race_start/validation.py
 from __future__ import annotations
 
-from fzerox_emulator import Emulator
+from fzerox_emulator import EmulatorBackend
 from rl_fzerox.core.domain.race_difficulty import race_difficulty_names
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
@@ -39,7 +39,7 @@ def validate_variant(variant: RaceStartVariant) -> None:
         raise ValueError(f"total_lap_count must be positive, got {variant.total_lap_count}")
 
 
-def validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
+def validate_materialized_setup(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.validate_race_start_setup(
         mode=variant.mode,
         course_index=variant.course_index,
@@ -51,7 +51,7 @@ def validate_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -
     _validate_machine_identity(emulator, variant)
 
 
-def validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
+def validate_boot_materialized_setup(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     mismatches: list[str] = []
     try:
         validate_materialized_setup(emulator, variant)
@@ -85,7 +85,7 @@ def validate_boot_materialized_setup(emulator: Emulator, variant: RaceStartVaria
         )
 
 
-def _validate_machine_identity(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _validate_machine_identity(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     vehicle_info = emulator.vehicle_setup_info()
     raw_character_index = vehicle_info.get("racer_character_index_ram")
     if isinstance(raw_character_index, bool) or not isinstance(raw_character_index, int):

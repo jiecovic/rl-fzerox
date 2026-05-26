@@ -5,10 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.manager.projection.assembly import (
-    train_config_payload,
-    validate_launch_support,
-)
+from rl_fzerox.core.manager.projection.assembly import train_config_payload
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
@@ -30,7 +27,6 @@ def build_managed_train_app_config(
     """Project one manager-owned run spec into the current training schema."""
 
     config = _validated_run_spec(config)
-    validate_launch_support(config)
     train_data = train_config_payload(
         config,
         run_id=run_id,

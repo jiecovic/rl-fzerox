@@ -48,6 +48,7 @@ class StepBalancedTrackSamplingController:
         track_course_keys: dict[str, str] | None = None,
         track_log_keys: dict[str, str] | None = None,
         track_labels: dict[str, str] | None = None,
+        track_log_enabled: dict[str, bool] | None = None,
         restored_state: TrackSamplingRuntimeState | None = None,
     ) -> None:
         self._entry_base_weights = {
@@ -65,6 +66,7 @@ class StepBalancedTrackSamplingController:
         course_entry_ids: dict[str, list[str]] = {}
         course_labels: dict[str, str] = {}
         course_log_keys: dict[str, str] = {}
+        course_log_enabled: dict[str, bool] = {}
         course_base_weight_sums: dict[str, float] = {}
         course_base_weight_counts: dict[str, int] = {}
 
@@ -79,6 +81,9 @@ class StepBalancedTrackSamplingController:
                 course_key,
                 sanitize_log_key((track_log_keys or {}).get(track_id, course_key)),
             )
+            course_log_enabled[course_key] = course_log_enabled.get(course_key, False) or (
+                (track_log_enabled or {}).get(track_id, True)
+            )
             course_base_weight_sums[course_key] = (
                 course_base_weight_sums.get(course_key, 0.0) + base_weight
             )
@@ -92,6 +97,7 @@ class StepBalancedTrackSamplingController:
             for course_key, entry_ids in self._course_entry_ids.items()
         }
         self._course_log_keys = course_log_keys
+        self._course_log_enabled = course_log_enabled
         self._course_labels = course_labels
         self._stats = {
             course_key: TrackStepStats(
@@ -132,6 +138,7 @@ class StepBalancedTrackSamplingController:
         base_weights: dict[str, float] = {}
         requested_course_keys: dict[str, str] = {}
         requested_log_keys: dict[str, str] = {}
+        requested_log_enabled: dict[str, bool] = {}
         requested_labels: dict[str, str] = {}
         for config in configs:
             for entry in config.entries:
@@ -139,6 +146,7 @@ class StepBalancedTrackSamplingController:
                 course_key = entry.course_id or entry.id
                 requested_course_keys.setdefault(entry.id, course_key)
                 requested_log_keys.setdefault(entry.id, course_key)
+                requested_log_enabled.setdefault(entry.id, entry.log_per_course)
                 requested_labels.setdefault(
                     entry.id,
                     entry.course_name or entry.course_id or entry.display_name or entry.id,
@@ -160,6 +168,7 @@ class StepBalancedTrackSamplingController:
             track_course_keys=requested_course_keys,
             track_log_keys=requested_log_keys,
             track_labels=requested_labels,
+            track_log_enabled=requested_log_enabled,
             restored_state=restored_state,
         )
 
@@ -210,6 +219,8 @@ class StepBalancedTrackSamplingController:
         total_expected_frame_weight = sum(expected_frame_weights.values())
         values: dict[str, float] = {}
         for course_key, stats in self._stats.items():
+            if not self._course_log_enabled[course_key]:
+                continue
             key = self._course_log_keys[course_key]
             values[f"track_sampling/{key}/prob"] = (
                 stats.current_weight / total_weight if total_weight > 0.0 else 0.0

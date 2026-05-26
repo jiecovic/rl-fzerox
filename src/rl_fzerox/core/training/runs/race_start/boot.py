@@ -4,7 +4,7 @@ from __future__ import annotations
 from fzerox_emulator import (
     JOYPAD_BUTTONS,
     ControllerState,
-    Emulator,
+    EmulatorBackend,
     joypad_mask,
 )
 from rl_fzerox.core.boot import UNLOCK_EVERYTHING_SEQUENCE
@@ -22,7 +22,7 @@ from rl_fzerox.core.training.runs.race_start.validation import (
 
 def materialize_race_start_from_boot(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Navigate from a cold boot and save a clean race-start setup."""
@@ -38,7 +38,7 @@ def materialize_race_start_from_boot(
 
 def materialize_generic_mode_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     mode: str,
 ) -> None:
     """Boot once into the stable menu state used to derive shared cache entries."""
@@ -54,7 +54,7 @@ def materialize_generic_mode_seed(
 
 def materialize_race_start_from_menu_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Derive one exact race-start baseline from a cached generic menu seed."""
@@ -70,7 +70,7 @@ def materialize_race_start_from_menu_seed(
 
 def materialize_time_attack_race_start_from_boot(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Navigate from a cold boot and save a clean Time Attack race-start setup."""
@@ -108,7 +108,7 @@ def materialize_time_attack_race_start_from_boot(
 
 def materialize_time_attack_menu_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
 ) -> None:
     """Navigate once to the Time Attack course-select menu and stop there."""
 
@@ -126,7 +126,7 @@ def materialize_time_attack_menu_seed(
 
 def materialize_time_attack_race_start_from_menu_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Navigate from a cached Time Attack course-select seed to the race start."""
@@ -157,7 +157,7 @@ def materialize_time_attack_race_start_from_menu_seed(
 
 def materialize_gp_race_start_from_boot(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Navigate from a cold boot and save a clean GP race-start setup."""
@@ -191,7 +191,7 @@ def materialize_gp_race_start_from_boot(
 
 def materialize_gp_race_menu_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
 ) -> None:
     """Navigate once to the GP machine-select menu and stop there."""
 
@@ -210,7 +210,7 @@ def materialize_gp_race_menu_seed(
 
 def materialize_gp_race_start_from_menu_seed(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Navigate from a cached GP machine-select seed to the race start."""
@@ -234,7 +234,7 @@ def materialize_gp_race_start_from_menu_seed(
     _step_until_ready_from_boot(emulator, variant)
 
 
-def _step_until_ready_from_boot(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _step_until_ready_from_boot(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     last_summary = "telemetry unavailable"
     saw_new_race_init = False
     target_timer = variant.race_intro_target_timer
@@ -268,7 +268,7 @@ def _step_until_ready_from_boot(emulator: Emulator, variant: RaceStartVariant) -
     )
 
 
-def _select_time_attack_course(emulator: Emulator, course_index: int) -> None:
+def _select_time_attack_course(emulator: EmulatorBackend, course_index: int) -> None:
     if not 0 <= course_index < 24:
         raise ValueError(
             "Boot-menu materialization currently supports built-in cup courses 0..23, "
@@ -286,7 +286,7 @@ def _select_time_attack_course(emulator: Emulator, course_index: int) -> None:
     _tap_start(emulator)
 
 
-def _select_machine(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _select_machine(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.step_frames(MENU_TIMING.menu_ready_frames, capture_video=False)
     row, column = _machine_select_row_and_column(variant)
     for _ in range(row):
@@ -303,7 +303,7 @@ def _machine_select_row_and_column(variant: RaceStartVariant) -> tuple[int, int]
     return vehicle_menu_row_and_column(variant.character_index)
 
 
-def _apply_exact_race_start_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _apply_exact_race_start_setup(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.patch_machine_settings(
         mode=variant.mode,
         course_index=variant.course_index,
@@ -324,7 +324,7 @@ def _apply_exact_race_start_setup(emulator: Emulator, variant: RaceStartVariant)
 
 
 def _press_until_mode(
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     *,
     target_mode: str,
     require_race_mode: bool = False,
@@ -344,7 +344,7 @@ def _press_until_mode(
 
 
 def _wait_until_mode(
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     *,
     target_mode: str,
     require_race_mode: bool = False,
@@ -363,7 +363,7 @@ def _wait_until_mode(
     )
 
 
-def _unlock_everything(emulator: Emulator) -> None:
+def _unlock_everything(emulator: EmulatorBackend) -> None:
     for unlock_input in UNLOCK_EVERYTHING_SEQUENCE:
         _tap_state(
             emulator,
@@ -373,7 +373,7 @@ def _unlock_everything(emulator: Emulator) -> None:
         )
 
 
-def _tap_start(emulator: Emulator, *, capture_video: bool = False) -> None:
+def _tap_start(emulator: EmulatorBackend, *, capture_video: bool = False) -> None:
     _tap_state(
         emulator,
         ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.start)),
@@ -383,7 +383,7 @@ def _tap_start(emulator: Emulator, *, capture_video: bool = False) -> None:
     )
 
 
-def _tap_menu_right(emulator: Emulator, *, capture_video: bool = False) -> None:
+def _tap_menu_right(emulator: EmulatorBackend, *, capture_video: bool = False) -> None:
     _tap_state(
         emulator,
         ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.right)),
@@ -393,7 +393,7 @@ def _tap_menu_right(emulator: Emulator, *, capture_video: bool = False) -> None:
     )
 
 
-def _tap_menu_down(emulator: Emulator, *, capture_video: bool = False) -> None:
+def _tap_menu_down(emulator: EmulatorBackend, *, capture_video: bool = False) -> None:
     _tap_state(
         emulator,
         ControllerState(joypad_mask=joypad_mask(JOYPAD_BUTTONS.down)),
@@ -404,7 +404,7 @@ def _tap_menu_down(emulator: Emulator, *, capture_video: bool = False) -> None:
 
 
 def _tap_state(
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     control_state: ControllerState,
     *,
     hold_frames: int,
@@ -417,5 +417,5 @@ def _tap_state(
     emulator.step_frames(settle_frames, capture_video=capture_video)
 
 
-def _release_input(emulator: Emulator) -> None:
+def _release_input(emulator: EmulatorBackend) -> None:
     emulator.set_controller_state(ControllerState())

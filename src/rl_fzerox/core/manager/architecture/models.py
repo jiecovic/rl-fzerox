@@ -106,7 +106,6 @@ class RunManagerConfigMetadata(BaseModel):
     observation_resolution_bounds: ObservationResolutionBounds
     observation_source_geometries: tuple[ObservationSourceGeometryInfo, ...]
     camera_settings: tuple[SelectOption, ...]
-    track_pool_modes: tuple[SelectOption, ...]
     race_modes: tuple[SelectOption, ...]
     gp_difficulties: tuple[SelectOption, ...]
     track_sampling_modes: tuple[SelectOption, ...]

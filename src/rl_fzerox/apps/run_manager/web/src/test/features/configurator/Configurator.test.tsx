@@ -309,7 +309,7 @@ describe("Configurator", () => {
     expect(screen.getByRole("button", { name: "Silence" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("switches the tracks tab into X Cup mode", async () => {
+  it("enables generated X Cup courses for GP race pools", async () => {
     const user = userEvent.setup();
 
     render(
@@ -325,20 +325,21 @@ describe("Configurator", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Tracks" }));
-    await user.click(screen.getByRole("button", { name: "X Cup" }));
+    expect(screen.getByRole("button", { name: "Enable X Cup" })).toBeDisabled();
 
-    expect(screen.getByRole("button", { name: "GP Race" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Time Attack" })).toHaveAttribute(
-      "aria-disabled",
+    await user.click(screen.getByRole("button", { name: "GP Race" }));
+    await user.click(screen.getByRole("button", { name: "Enable X Cup" }));
+
+    expect(screen.getByRole("button", { name: "Disable X Cup" })).toHaveAttribute(
+      "aria-pressed",
       "true",
     );
-    expect(screen.getByText("X Cup random generator")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "GP Race" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("textbox", { name: "Generated courses" })).toHaveValue("6");
     expect(
-      screen.getByText(
-        "The game generates six courses at runtime, so there is no fixed roster to toggle here.",
-      ),
+      screen.getByText("Deterministic GP X Cup baselines materialized at training start."),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Mute City" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mute City" })).toBeInTheDocument();
   });
 
   it("enables GP difficulty selection only in GP race mode", async () => {

@@ -8,6 +8,7 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pytest import MonkeyPatch, raises
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CurriculumConfig,
@@ -23,7 +24,6 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     WatchAppConfig,
     WatchConfig,
-    WatchXCupConfig,
 )
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
@@ -43,8 +43,12 @@ from rl_fzerox.core.training.runs import (
     resolve_policy_artifact_path,
     save_train_run_config,
 )
+from rl_fzerox.core.training.runs.baseline_materializer.materialization import (
+    baselines as baseline_materialization,
+)
 from rl_fzerox.core.training.runs.baseline_materializer.requests import request_from_track_entry
 from rl_fzerox.core.training.runs.race_start import RaceStartVariant
+from rl_fzerox.core.training.runs.race_start.x_cup import XCupMaterializedCourse
 from rl_fzerox.core.training.session.artifacts import (
     PolicyArtifactMetadata,
     cleanup_failed_run,
@@ -839,6 +843,101 @@ def test_materialize_train_run_config_rewrites_track_sampling_baselines(
     assert [variant.course_index for variant in capture.variants] == [0, 1]
 
 
+def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+
+    def fake_ensure_x_cup_baseline(
+        *,
+        label: str,
+        seed: int,
+        course_hash: str,
+        gp_difficulty: object,
+        vehicle_id: str,
+        camera_setting: str | None,
+        cache_root: Path,
+        context: object,
+        emulator_type: object,
+    ) -> tuple[Path, XCupMaterializedCourse]:
+        del label, gp_difficulty, vehicle_id, camera_setting, context, emulator_type
+        cache_state_path = cache_root / f"x-cup-{seed}-{course_hash}.state"
+        cache_state_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_state_path.write_bytes(b"x-cup-generated")
+        cache_state_path.with_suffix(".json").write_text(
+            json.dumps({"materialized_state_sha256": "fake-x-cup-sha"}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return cache_state_path, XCupMaterializedCourse(
+            segment_count=212,
+            course_length=91_234.5,
+        )
+
+    monkeypatch.setattr(
+        baseline_materialization,
+        "ensure_x_cup_baseline",
+        fake_ensure_x_cup_baseline,
+    )
+
+    config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="x_cup_abcd1234_gp_race_novice_blue_falcon_balanced",
+                        course_id="x_cup_abcd1234",
+                        course_name="X Cup abcd1234",
+                        course_index=X_CUP_COURSE.course_index,
+                        mode=X_CUP_COURSE.race_mode,
+                        gp_difficulty="novice",
+                        vehicle="blue_falcon",
+                        engine_setting="balanced",
+                        engine_setting_raw_value=50,
+                        generated_course_kind=X_CUP_COURSE.generated_kind,
+                        generated_course_seed=1234,
+                        generated_course_hash="abcd1234",
+                        log_per_course=False,
+                    ),
+                ),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="ppo_cnn"),
+    )
+    run_paths = build_run_paths(
+        output_root=config.train.output_root,
+        run_name=config.train.run_name,
+    )
+    ensure_run_dirs(run_paths)
+
+    materialized = materialize_train_run_config(
+        config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    entry = materialized.env.track_sampling.entries[0]
+    baseline_path = _required_baseline_path(entry)
+    metadata = json.loads(baseline_path.with_suffix(".json").read_text(encoding="utf-8"))
+    assert baseline_path.parent == run_paths.baselines_dir
+    assert baseline_path.read_bytes() == b"x-cup-generated"
+    assert entry.source_course_index == X_CUP_COURSE.course_index
+    assert entry.generated_course_segment_count == 212
+    assert entry.generated_course_length == 91_234.5
+    assert entry.log_per_course is False
+    assert metadata["materializer_mode"] == X_CUP_COURSE.materializer_mode
+    assert metadata["x_cup_seed"] == 1234
+    assert metadata["x_cup_course_hash"] == "abcd1234"
+
+
 def test_materialize_train_run_config_reports_track_sampling_progress(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -1211,38 +1310,6 @@ def test_materialize_watch_session_config_isolates_runtime_and_baseline(
     )
     assert materialized.emulator.baseline_state_path is not None
     assert materialized.emulator.baseline_state_path.read_bytes() == b"baseline"
-
-
-def test_materialize_watch_session_config_allocates_x_cup_baseline_path(
-    tmp_path: Path,
-) -> None:
-    core_path = tmp_path / "core.so"
-    rom_path = tmp_path / "rom.n64"
-    core_path.touch()
-    rom_path.touch()
-
-    watch_config = WatchAppConfig(
-        seed=7,
-        emulator=EmulatorConfig(
-            core_path=core_path,
-            rom_path=rom_path,
-            runtime_dir=tmp_path / "runtime",
-            baseline_state_path=None,
-        ),
-        watch=WatchConfig(x_cup=WatchXCupConfig(enabled=True)),
-    )
-
-    materialized = materialize_watch_session_config(
-        watch_config,
-        run_dir=tmp_path / "runs" / "ppo_cnn_0001",
-        session_name="session-001",
-    )
-
-    assert materialized.emulator.baseline_state_path == (
-        tmp_path / "runs" / "ppo_cnn_0001" / "watch" / "baseline.state"
-    )
-    assert materialized.emulator.baseline_state_path is not None
-    assert not materialized.emulator.baseline_state_path.exists()
 
 
 def test_ensure_watch_session_dirs_creates_runtime_root(tmp_path: Path) -> None:

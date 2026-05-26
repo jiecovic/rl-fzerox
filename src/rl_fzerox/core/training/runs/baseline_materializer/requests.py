@@ -84,6 +84,9 @@ def request_from_track_entry(
         source_engine_setting=entry.source_engine_setting,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
         camera_setting=camera_setting,
+        generated_course_kind=entry.generated_course_kind,
+        generated_course_seed=entry.generated_course_seed,
+        generated_course_hash=entry.generated_course_hash,
     )
 
 

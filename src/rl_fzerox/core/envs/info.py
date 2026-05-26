@@ -37,6 +37,7 @@ _MONITOR_INFO_FIELDS: tuple[_MonitorInfoField, ...] = (
     _MonitorInfoField("track_id", None),
     _MonitorInfoField("track_course_id", None),
     _MonitorInfoField("track_course_name", None),
+    _MonitorInfoField("track_log_per_course", True),
 )
 MONITOR_INFO_KEYS: tuple[str, ...] = tuple(field.key for field in _MONITOR_INFO_FIELDS)
 
