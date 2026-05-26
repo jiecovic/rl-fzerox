@@ -10,6 +10,7 @@ import {
 } from "@/features/runs/track_pool_panel/model";
 import { CupTabs, TrackPoolBody } from "@/features/runs/track_pool_panel/parts";
 import type { RunTrackPoolPanelProps } from "@/features/runs/track_pool_panel/types";
+import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 
 export function RunTrackPoolPanel({
@@ -46,33 +47,33 @@ export function RunTrackPoolPanel({
   const activeCup = poolView.cups.find((cup) => cup.id === selectedCupId) ?? null;
 
   return (
-    <div className="run-track-distribution-panel">
-      <div className="run-track-distribution-header">
+    <div className="col-span-full border border-app-border bg-app-surface">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 border-b border-app-border px-3.5 py-3 max-[760px]:grid-cols-1">
         <div>
           <strong>Track pool</strong>
-          <div className="run-track-distribution-note">
+          <div className="text-xs text-app-muted">
             {visibleState === null
               ? trackSamplingModeLabel(run.config.tracks.sampling_mode)
               : `${trackSamplingModeLabel(run.config.tracks.sampling_mode)} · updated ${trackSamplingUpdatedLabel(run)}`}
           </div>
         </div>
-        <div className="run-track-distribution-meta">
+        <div className="text-xs text-app-muted">
           {visibleState === null
             ? `${poolView.totalCourses} courses`
             : `${poolView.totalEpisodes.toLocaleString()} episodes · ${poolView.totalEnvSteps.toLocaleString()} env steps`}
         </div>
-        <button
-          className="secondary-button run-track-distribution-reset"
+        <Button
+          className="h-8 justify-self-end px-3 text-xs max-[760px]:justify-self-start"
           type="button"
           disabled={!canReset || isResetting}
           onClick={() => setConfirmResetOpen(true)}
         >
           {isResetting ? "Resetting..." : "Reset stats"}
-        </button>
+        </Button>
       </div>
       <CupTabs activeCup={activeCup} cups={poolView.cups} onSelectCup={selectCup} />
       {visibleState === null ? (
-        <div className="run-track-distribution-empty">{trackPoolEmptyMessage(run)}</div>
+        <div className="px-3.5 py-3 text-sm text-app-muted">{trackPoolEmptyMessage(run)}</div>
       ) : activeCup === null ? null : (
         <TrackPoolBody activeCup={activeCup} />
       )}
