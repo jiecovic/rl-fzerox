@@ -7,6 +7,7 @@ import {
   lineageSelectionState,
 } from "@/features/runs/charts_panel/model";
 import type { ManagedRun } from "@/shared/api/contract";
+import { cn } from "@/shared/ui/cn";
 import { ChevronIcon } from "@/shared/ui/icons";
 import { Notice } from "@/shared/ui/Panel";
 
@@ -32,30 +33,31 @@ export function RunChartSelectionPanel({
   totalRuns,
 }: RunChartSelectionPanelProps) {
   return (
-    <div className="run-chart-selection-panel">
-      <div className="run-chart-selection-header">
+    <div className="run-chart-selection-panel mb-[18px] grid gap-2.5 border border-app-border bg-app-surface-muted p-3.5">
+      <div className="flex items-baseline justify-between gap-3">
         <strong>Selected runs</strong>
-        <span>{selectedRunIds.length === 0 ? "none" : `${selectedRunIds.length} active`}</span>
+        <span className="text-xs text-app-muted">
+          {selectedRunIds.length === 0 ? "none" : `${selectedRunIds.length} active`}
+        </span>
       </div>
       {totalRuns === 0 ? (
         <Notice>No launched runs yet.</Notice>
       ) : (
-        <div className="run-chart-selection-list">
+        <div className="grid gap-2.5">
           {selectionLineageGroups.map((group) => {
             const selectionState = lineageSelectionState(group.runs, selectedRunIds);
             const lineageOpen = openLineageById[group.lineageId] ?? true;
             return (
               <section
                 aria-label={`${group.label} lineage runs`}
-                className="run-chart-lineage-group run-chart-selection-lineage-group"
-                data-selection-state={selectionState}
+                className={selectionLineageClass(selectionState)}
                 key={group.lineageId}
               >
-                <div className="run-chart-lineage-header">
+                <div className="flex items-center justify-between gap-3 border-b border-[color-mix(in_srgb,var(--border)_88%,transparent)] pb-1.5">
                   <button
                     aria-expanded={lineageOpen}
                     aria-label={`${lineageOpen ? "Collapse" : "Expand"} lineage ${group.label}`}
-                    className="run-chart-lineage-disclosure"
+                    className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-0 bg-transparent p-0 text-left text-app-text"
                     type="button"
                     onClick={() => onToggleCollapsedLineage(group.lineageId)}
                   >
@@ -67,16 +69,18 @@ export function RunChartSelectionPanel({
                     >
                       <ChevronIcon />
                     </span>
-                    <span className="run-chart-lineage-heading">
-                      <strong>{group.label}</strong>
-                      <span className="run-chart-lineage-meta">
+                    <span className="grid min-w-0 gap-0.5">
+                      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
+                        {group.label}
+                      </strong>
+                      <span className="text-xs text-app-muted">
                         {group.runs.length === group.totalRunCount
                           ? `${group.totalRunCount} runs`
                           : `${group.runs.length}/${group.totalRunCount} runs`}
                       </span>
                     </span>
                   </button>
-                  <div className="run-chart-lineage-header-actions">
+                  <div className="inline-flex items-center">
                     <LineageSelectionCheckbox
                       label={group.label}
                       state={selectionState}
@@ -85,12 +89,15 @@ export function RunChartSelectionPanel({
                   </div>
                 </div>
                 {lineageOpen ? (
-                  <div className="run-chart-lineage-run-grid">
+                  <div className="grid grid-cols-2 gap-2 pt-0.5 max-[1100px]:grid-cols-1">
                     {group.runs.map((run, index) => {
                       const checked = selectedRunIds.includes(run.id);
                       const stroke = colorByRunId.get(run.id) ?? chartSeriesColor(index);
                       return (
-                        <label className="run-chart-selection-row" key={run.id}>
+                        <label
+                          className="run-chart-selection-row grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-2.5 border border-app-border bg-app-surface px-3 py-2.5"
+                          key={run.id}
+                        >
                           <input
                             checked={checked}
                             type="checkbox"
@@ -98,12 +105,12 @@ export function RunChartSelectionPanel({
                           />
                           <span
                             aria-hidden="true"
-                            className="run-chart-selection-swatch"
+                            className="run-chart-selection-swatch mt-1 h-2.5 w-2.5"
                             style={{ background: stroke }}
                           />
-                          <span className="run-chart-selection-copy">
+                          <span className="run-chart-selection-copy grid min-w-0 gap-1">
                             <strong>{run.name}</strong>
-                            <span>
+                            <span className="text-xs tabular-nums text-app-muted">
                               {run.status}
                               {run.runtime === null
                                 ? ""
@@ -144,14 +151,30 @@ function LineageSelectionCheckbox({
   );
 
   return (
-    <label className="run-chart-lineage-toggle" title={label}>
+    <label
+      className="inline-flex h-[18px] w-[18px] cursor-pointer items-center justify-center"
+      title={label}
+    >
       <input
         aria-label={`Select lineage ${label}`}
+        className="m-0 h-3.5 w-3.5 accent-app-accent"
         checked={checked}
         ref={inputRef}
         type="checkbox"
         onChange={onChange}
       />
     </label>
+  );
+}
+
+function selectionLineageClass(state: LineageSelectionState) {
+  return cn(
+    "grid gap-2 border border-app-border bg-app-surface px-3 py-2.5 pb-3",
+    state === "partial"
+      ? "border-[color-mix(in_srgb,var(--accent)_30%,var(--border))] bg-[color-mix(in_srgb,var(--surface)_92%,var(--accent)_8%)]"
+      : undefined,
+    state === "all"
+      ? "border-[color-mix(in_srgb,var(--accent)_50%,var(--border))] bg-[color-mix(in_srgb,var(--surface)_86%,var(--accent)_14%)]"
+      : undefined,
   );
 }

@@ -27,6 +27,8 @@ import {
 import { useRunChartMetrics } from "@/features/runs/charts_panel/useRunChartMetrics";
 import type { RunMetricRangeMode } from "@/shared/api/client";
 import type { ManagedRun } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
+import { FieldSelect } from "@/shared/ui/Field";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
 
 interface ChartsPanelProps {
@@ -219,28 +221,24 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
     <Panel>
       <div className="panel-header-row">
         <PanelHeader title="Charts" subtitle="Sampled training metrics." />
-        <div className="section-actions">
-          <button
-            className="secondary-button"
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
             type="button"
             onClick={() => setSelectedRuns(defaultSelectedRunIds(visibleRuns, focusedRunId))}
           >
             Select latest
-          </button>
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => setSelectedRuns(visibleRuns.map((run) => run.id))}
-          >
+          </Button>
+          <Button type="button" onClick={() => setSelectedRuns(visibleRuns.map((run) => run.id))}>
             Select all
-          </button>
-          <button className="secondary-button" type="button" onClick={() => setSelectedRuns([])}>
+          </Button>
+          <Button type="button" onClick={() => setSelectedRuns([])}>
             Clear
-          </button>
-          <label className="run-chart-group-filter">
+          </Button>
+          <div className="inline-flex items-center gap-1.5 text-xs text-app-muted">
             <span>Group</span>
-            <select
+            <FieldSelect
               aria-label="Chart lineage group"
+              className="h-8 w-auto rounded-md px-2 text-xs"
               value={groupFilter}
               onChange={(event) => setGroupFilter(event.target.value)}
             >
@@ -249,8 +247,8 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
                   {option.label}
                 </option>
               ))}
-            </select>
-          </label>
+            </FieldSelect>
+          </div>
           <SegmentedChoiceStrip
             ariaLabel="Chart range"
             options={CHART_RANGE_OPTIONS.map((option) => ({
@@ -285,14 +283,14 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
       {selectedRuns.length === 0 ? (
         <Notice>Select at least one run to render comparison plots.</Notice>
       ) : (
-        <div className="run-chart-content">
+        <div className="grid gap-3.5">
           <RunChartLegend
             colorMode={chartColorMode}
             colorByRunId={colorByRunId}
             groups={selectedLineageGroups}
             onOpenRun={onOpenRun}
           />
-          <div className="run-chart-group-stack">
+          <div className="grid gap-3.5 [&_.config-disclosure-body]:pt-3.5">
             {chartGroups.map((group) => (
               <ConfigDisclosure
                 key={group.id}
@@ -301,7 +299,7 @@ export function ChartsPanel({ focusedRunId = null, onOpenRun, runs }: ChartsPane
                 onToggle={(open) => setGroupOpen((current) => ({ ...current, [group.id]: open }))}
               >
                 {groupOpen[group.id] ? (
-                  <div className="run-chart-grid">
+                  <div className="grid grid-cols-2 gap-3.5 max-[1100px]:grid-cols-1">
                     {group.charts.map((chart) => (
                       <RunComparisonChart
                         key={chart.id}
