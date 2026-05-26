@@ -3,6 +3,7 @@ import {
   CUP_BANNER_ASSETS,
   type CupBannerId,
 } from "@/features/configurator/sections/tracks/cup_banners";
+import { cn } from "@/shared/ui/cn";
 
 interface TrackCupBannerProps {
   cupId: string;
@@ -19,14 +20,18 @@ function isCupBannerId(cupId: string): cupId is CupBannerId {
 }
 
 export function TrackCupBanner({ cupId, label, large = false }: TrackCupBannerProps) {
-  const className = large ? "track-cup-banner-image large" : "track-cup-banner-image";
   if (!isCupBannerId(cupId)) {
     return (
       <div
         aria-hidden="true"
-        className={large ? "track-cup-banner-fallback large" : "track-cup-banner-fallback"}
+        className={cn(
+          "track-cup-banner-fallback grid flex-none place-items-center border border-[color-mix(in_srgb,var(--cup-accent)_44%,var(--border))] bg-[color-mix(in_srgb,var(--cup-accent)_12%,var(--surface))] px-2.5 text-app-text",
+          large ? "h-[62px] w-[45px]" : "h-11 w-8",
+        )}
       >
-        <span>{fallbackLabel(label)}</span>
+        <span className="text-[11px] font-bold tracking-[0.08em] uppercase">
+          {fallbackLabel(label)}
+        </span>
       </div>
     );
   }
@@ -34,7 +39,7 @@ export function TrackCupBanner({ cupId, label, large = false }: TrackCupBannerPr
     <img
       alt=""
       aria-hidden="true"
-      className={className}
+      className={cn("block flex-none", large ? "h-[62px] w-[45px]" : "h-11 w-8")}
       draggable={false}
       src={CUP_BANNER_ASSETS[cupId]}
     />
