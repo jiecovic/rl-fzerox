@@ -79,24 +79,27 @@ export function SegmentedChoiceStrip({
     onClick: () => void;
   }[];
 }) {
+  const activeOption = options.find((option) => option.active);
+
   return (
-    <SegmentedChoiceGroup>
-      <legend className="sr-only">{ariaLabel}</legend>
+    <SegmentedChoiceGroup
+      label={ariaLabel}
+      value={activeOption?.key ?? ""}
+      onValueChange={(nextValue) => {
+        const nextOption = options.find((option) => option.key === nextValue);
+        if (nextOption !== undefined && nextOption.disabled !== true) {
+          nextOption.onClick();
+        }
+      }}
+    >
       {options.map((option) => (
         <SegmentedChoiceButton
           active={option.active}
-          aria-label={option.label}
-          aria-disabled={option.disabled === true}
-          aria-pressed={option.active}
           className="tooltip-anchor"
           data-tooltip={option.tooltip}
           disabledChoice={option.disabled}
           key={option.key}
-          onClick={() => {
-            if (!option.disabled) {
-              option.onClick();
-            }
-          }}
+          value={option.key}
         >
           {option.label}
         </SegmentedChoiceButton>
