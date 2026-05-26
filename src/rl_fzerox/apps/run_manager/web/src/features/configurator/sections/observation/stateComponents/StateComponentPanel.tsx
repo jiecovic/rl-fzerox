@@ -91,7 +91,7 @@ export function StateComponentPanel({
       open={open}
       onToggle={(event) => onOpenChange(displayComponent.name, event.currentTarget.open)}
     >
-      <summary className="config-disclosure-summary state-component-summary">
+      <summary className="config-disclosure-summary text-sm font-bold text-app-text">
         <span className="config-disclosure-title">
           <span className="config-disclosure-copy">
             <strong>{componentInfo.label}</strong>
@@ -123,7 +123,7 @@ export function StateComponentPanel({
         />
       </summary>
 
-      <div className="config-disclosure-body state-component-body">
+      <div className="config-disclosure-body gap-3">
         <ComponentSettings
           checkpointLocked={checkpointLocked}
           component={displayComponent}

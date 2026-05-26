@@ -269,7 +269,7 @@ export function ObservationSection({
         </ConfigPanel>
 
         <ConfigPanel title="Derived shape">
-          <div className="shape-summary-grid">
+          <div className="grid grid-cols-2 gap-2.5 max-[560px]:grid-cols-1">
             <ShapeMetric label="Image" value={imageMetricValue} />
             <ShapeMetric label="Source crop" value={sourceCropValue} />
             <ShapeMetric label="Image aspect" value={imageAspectRatioValue} />
@@ -322,9 +322,9 @@ function gcd(left: number, right: number): number {
 
 function ShapeMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="shape-metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="border border-app-border bg-app-surface p-2.5">
+      <span className="mb-1 block text-xs text-app-muted">{label}</span>
+      <strong className="font-bold tabular-nums text-app-text">{value}</strong>
     </div>
   );
 }
