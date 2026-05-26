@@ -58,42 +58,6 @@ textarea::selection {
   min-width: 0;
 }
 
-.range-row,
-.optional-number-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 104px;
-  gap: 12px;
-  align-items: start;
-}
-
-.range-row > input:not([type="range"]) {
-  height: 34px;
-  background: var(--surface);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
-.range-readonly {
-  display: grid;
-  min-height: 34px;
-  place-items: center;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-}
-
-.optional-number-row {
-  grid-template-columns: 52px minmax(0, 1fr) 76px;
-  align-items: center;
-}
-
-.reward-accordion-stack .optional-number-row {
-  grid-template-columns: 52px minmax(0, 1fr) 96px;
-}
-
 .feature-dim-field {
   display: grid;
   gap: 10px;

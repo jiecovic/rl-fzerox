@@ -5,7 +5,7 @@ import { cn } from "@/shared/ui/cn";
 
 type ButtonVariant = "accentSoft" | "primary" | "secondary";
 type ButtonTone = "danger" | "default";
-type IconButtonSize = "compact" | "default" | "small" | "theme";
+type IconButtonSize = "compact" | "default" | "micro" | "small" | "theme";
 type IconButtonTone = "danger" | "default" | "muted";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -36,6 +36,7 @@ const iconButtonBaseClass =
 const iconButtonSizeClasses: Record<IconButtonSize, string> = {
   compact: "h-[30px] w-[30px] rounded-md",
   default: "h-10 w-10 rounded-lg",
+  micro: "h-4 w-4 rounded-full",
   small: "h-7 w-7 rounded-md",
   theme: "h-10 w-11 rounded-lg",
 };

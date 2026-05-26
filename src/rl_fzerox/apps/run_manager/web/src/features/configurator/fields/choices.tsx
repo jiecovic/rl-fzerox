@@ -1,6 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/choices.tsx
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
+import {
+  FieldSelect,
+  FieldShell,
+  SegmentedChoiceButton,
+  SegmentedChoiceGroup,
+  SwitchButton,
+} from "@/shared/ui/Field";
 
 export function BooleanField({
   help,
@@ -16,19 +23,10 @@ export function BooleanField({
   resetValue?: boolean;
 }) {
   return (
-    <div className="field-shell boolean-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <button
-        aria-label={label}
-        aria-pressed={value}
-        className={value ? "switch-button active" : "switch-button"}
-        type="button"
-        onClick={() => onChange(!value)}
-      >
-        <span aria-hidden="true" />
-        <strong>{value ? "On" : "Off"}</strong>
-      </button>
-    </div>
+      <SwitchButton active={value} label={label} onClick={() => onChange(!value)} />
+    </FieldShell>
   );
 }
 
@@ -50,9 +48,9 @@ export function SelectField<T extends string>({
   resetValue?: T;
 }) {
   return (
-    <div className="field-shell">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <select
+      <FieldSelect
         aria-label={label}
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
@@ -62,8 +60,8 @@ export function SelectField<T extends string>({
             {optionLabels[option] ?? option}
           </option>
         ))}
-      </select>
-    </div>
+      </FieldSelect>
+    </FieldShell>
   );
 }
 
@@ -82,25 +80,18 @@ export function SegmentedChoiceStrip({
   }[];
 }) {
   return (
-    <fieldset className="segmented-choice-strip">
-      <legend className="segmented-choice-strip-legend">{ariaLabel}</legend>
+    <SegmentedChoiceGroup>
+      <legend className="sr-only">{ariaLabel}</legend>
       {options.map((option) => (
-        <button
+        <SegmentedChoiceButton
+          active={option.active}
           aria-label={option.label}
           aria-disabled={option.disabled === true}
           aria-pressed={option.active}
-          className={
-            option.active
-              ? option.disabled
-                ? "segmented-choice-chip active disabled tooltip-anchor"
-                : "segmented-choice-chip active tooltip-anchor"
-              : option.disabled
-                ? "segmented-choice-chip disabled tooltip-anchor"
-                : "segmented-choice-chip tooltip-anchor"
-          }
+          className="tooltip-anchor"
           data-tooltip={option.tooltip}
+          disabledChoice={option.disabled}
           key={option.key}
-          type="button"
           onClick={() => {
             if (!option.disabled) {
               option.onClick();
@@ -108,8 +99,8 @@ export function SegmentedChoiceStrip({
           }}
         >
           {option.label}
-        </button>
+        </SegmentedChoiceButton>
       ))}
-    </fieldset>
+    </SegmentedChoiceGroup>
   );
 }

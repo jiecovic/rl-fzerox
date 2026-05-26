@@ -9,6 +9,8 @@ import {
 } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import type { SliderTick } from "@/features/configurator/fields/types";
+import { cn } from "@/shared/ui/cn";
+import { FieldInput, FieldShell, SwitchButton } from "@/shared/ui/Field";
 
 type RangeHandle = "min" | "max";
 
@@ -107,9 +109,9 @@ export function RangePairField({
   }
 
   return (
-    <div className="field-shell range-pair-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={fieldResetHandler} />
-      <div className="range-pair-row range-pair-row-bare">
+      <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
         <RangePairSlider
           disabled={false}
           label={label}
@@ -122,9 +124,10 @@ export function RangePairField({
           onMaxChange={updateMax}
           onMinChange={updateMin}
         />
-        <div className="range-pair-values">
-          <input
+        <div className="grid grid-cols-2 gap-2">
+          <FieldInput
             aria-label={`${label} minimum`}
+            className="h-[34px] indent-0 tabular-nums"
             max={valueMax}
             min={min}
             step={step}
@@ -138,8 +141,9 @@ export function RangePairField({
               }
             }}
           />
-          <input
+          <FieldInput
             aria-label={`${label} maximum`}
+            className="h-[34px] indent-0 tabular-nums"
             max={max}
             min={valueMin}
             step={step}
@@ -155,7 +159,7 @@ export function RangePairField({
           />
         </div>
       </div>
-    </div>
+    </FieldShell>
   );
 }
 
@@ -273,19 +277,17 @@ export function OptionalRangePairField({
   }
 
   return (
-    <div className="field-shell range-pair-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={fieldResetHandler} />
-      <div className={enabled ? "range-pair-row" : "range-pair-row disabled"}>
-        <button
-          aria-label={`${label} enabled`}
-          aria-pressed={enabled}
-          className={enabled ? "switch-button active" : "switch-button"}
-          type="button"
-          onClick={updateEnabled}
-        >
-          <span aria-hidden="true" />
-          <strong>{enabled ? "On" : "Off"}</strong>
-        </button>
+      <div
+        className={cn(
+          "grid grid-cols-[52px_minmax(0,1fr)_148px] items-center gap-3",
+          enabled
+            ? undefined
+            : "[&_.range-pair-slider]:pointer-events-none [&_input]:pointer-events-none",
+        )}
+      >
+        <SwitchButton active={enabled} label={`${label} enabled`} onClick={updateEnabled} />
         <RangePairSlider
           disabled={!enabled}
           label={label}
@@ -297,9 +299,10 @@ export function OptionalRangePairField({
           onMaxChange={updateMax}
           onMinChange={updateMin}
         />
-        <div className="range-pair-values">
-          <input
+        <div className="grid grid-cols-2 gap-2">
+          <FieldInput
             aria-label={`${label} minimum`}
+            className="h-[34px] indent-0 tabular-nums"
             disabled={!enabled}
             max={activeMax}
             min={min}
@@ -314,8 +317,9 @@ export function OptionalRangePairField({
               }
             }}
           />
-          <input
+          <FieldInput
             aria-label={`${label} maximum`}
+            className="h-[34px] indent-0 tabular-nums"
             disabled={!enabled}
             max={max}
             min={activeMin}
@@ -332,7 +336,7 @@ export function OptionalRangePairField({
           />
         </div>
       </div>
-    </div>
+    </FieldShell>
   );
 }
 
