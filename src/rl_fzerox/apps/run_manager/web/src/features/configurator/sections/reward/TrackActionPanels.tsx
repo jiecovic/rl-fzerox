@@ -175,22 +175,24 @@ export function TrackActionPanels({
             value={config.reward.grounded_pitch_penalty}
             onChange={(value) => updateReward({ grounded_pitch_penalty: value })}
           />
-          <RangeNumberField
-            help="Threshold used only by grounded pitch penalty. It does not alter the pitch sent to the controller."
-            label="Pitch penalty threshold"
-            max={0.5}
-            min={0}
-            rangeStep={0.01}
-            resetValue={defaultConfig.action.pitch_deadzone}
-            ticks={[
-              { label: "0", value: 0 },
-              { label: "0.1", value: 0.1 },
-              { label: "0.25", value: 0.25 },
-              { label: "0.5", value: 0.5 },
-            ]}
-            value={config.action.pitch_deadzone}
-            onChange={(value) => updateAction({ pitch_deadzone: value })}
-          />
+          <div className="reward-wide-field">
+            <RangeNumberField
+              help="Threshold used only by grounded pitch penalty. It does not alter the pitch sent to the controller."
+              label="Pitch penalty threshold"
+              max={0.5}
+              min={0}
+              rangeStep={0.01}
+              resetValue={defaultConfig.action.pitch_deadzone}
+              ticks={[
+                { label: "0", value: 0 },
+                { label: "0.1", value: 0.1 },
+                { label: "0.25", value: 0.25 },
+                { label: "0.5", value: 0.5 },
+              ]}
+              value={config.action.pitch_deadzone}
+              onChange={(value) => updateAction({ pitch_deadzone: value })}
+            />
+          </div>
         </div>
       </ConfigDisclosure>
     </>
