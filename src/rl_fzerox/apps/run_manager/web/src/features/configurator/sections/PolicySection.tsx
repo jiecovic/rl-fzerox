@@ -100,256 +100,263 @@ export function PolicySection({
   return (
     <ConfigStack>
       <ConfigGrid columns="two" className="items-start">
-        <ConfigPanel
-          title="Image extractor"
-          onReset={
-            checkpointLocked
-              ? undefined
-              : () =>
-                  updatePolicy({
-                    conv_profile: defaultConfig.policy.conv_profile,
-                    custom_conv_layers: defaultConfig.policy.custom_conv_layers,
-                    custom_cnn_final_relu: defaultConfig.policy.custom_cnn_final_relu,
-                    features_dim: defaultConfig.policy.features_dim,
-                    image_projection_activation: defaultConfig.policy.image_projection_activation,
-                  })
-          }
-        >
-          <ConfigFieldset disabled={checkpointLocked}>
-            <SelectField
-              help="Backend CNN profile used for the image branch. Preset layers are read-only until you copy them with Edit as custom in the preview."
-              label="CNN profile"
-              options={convProfileOptions}
-              resetValue={defaultConfig.policy.conv_profile}
-              value={config.policy.conv_profile}
-              onChange={updateConvProfile}
-            />
-            <Button className="justify-start gap-2" type="button" onClick={jumpToCnnConfigurator}>
-              <CnnConfigIcon />
-              {config.policy.conv_profile === "custom" ? "Edit CNN" : "View CNN"}
-            </Button>
-            <FeatureDimField
-              help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
-              label="Image features"
-              resetValue={defaultConfig.policy.features_dim}
-              value={config.policy.features_dim}
-              onChange={(value) => updatePolicy({ features_dim: value })}
-            />
-            <ConfigFieldset disabled={checkpointLocked || config.policy.features_dim === "auto"}>
+        <ConfigStack>
+          <ConfigPanel
+            title="Image extractor"
+            onReset={
+              checkpointLocked
+                ? undefined
+                : () =>
+                    updatePolicy({
+                      conv_profile: defaultConfig.policy.conv_profile,
+                      custom_conv_layers: defaultConfig.policy.custom_conv_layers,
+                      custom_cnn_final_relu: defaultConfig.policy.custom_cnn_final_relu,
+                      features_dim: defaultConfig.policy.features_dim,
+                      image_projection_activation: defaultConfig.policy.image_projection_activation,
+                    })
+            }
+          >
+            <ConfigFieldset disabled={checkpointLocked}>
               <SelectField
-                help="Activation after the optional image feature projection."
-                label="Image proj activation"
-                options={activationOptions}
-                resetValue={defaultConfig.policy.image_projection_activation}
-                value={config.policy.image_projection_activation}
-                onChange={(value) => updatePolicy({ image_projection_activation: value })}
+                help="Backend CNN profile used for the image branch. Preset layers are read-only until you copy them with Edit as custom in the preview."
+                label="CNN profile"
+                options={convProfileOptions}
+                resetValue={defaultConfig.policy.conv_profile}
+                value={config.policy.conv_profile}
+                onChange={updateConvProfile}
               />
-            </ConfigFieldset>
-            <ConfigFieldset disabled={checkpointLocked || config.policy.conv_profile !== "custom"}>
-              <BooleanField
-                help="Apply one ReLU after the last custom CNN layer before flattening. This is needed to preserve the IMPALA large trunk after copying it into custom layers."
-                label="Final CNN ReLU"
-                resetValue={defaultConfig.policy.custom_cnn_final_relu}
-                value={config.policy.custom_cnn_final_relu}
-                onChange={(value) => updatePolicy({ custom_cnn_final_relu: value })}
+              <Button className="justify-start gap-2" type="button" onClick={jumpToCnnConfigurator}>
+                <CnnConfigIcon />
+                {config.policy.conv_profile === "custom" ? "Edit CNN" : "View CNN"}
+              </Button>
+              <FeatureDimField
+                help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
+                label="Image features"
+                resetValue={defaultConfig.policy.features_dim}
+                value={config.policy.features_dim}
+                onChange={(value) => updatePolicy({ features_dim: value })}
               />
+              <ConfigFieldset disabled={checkpointLocked || config.policy.features_dim === "auto"}>
+                <SelectField
+                  help="Activation after the optional image feature projection."
+                  label="Image proj activation"
+                  options={activationOptions}
+                  resetValue={defaultConfig.policy.image_projection_activation}
+                  value={config.policy.image_projection_activation}
+                  onChange={(value) => updatePolicy({ image_projection_activation: value })}
+                />
+              </ConfigFieldset>
+              <ConfigFieldset
+                disabled={checkpointLocked || config.policy.conv_profile !== "custom"}
+              >
+                <BooleanField
+                  help="Apply one ReLU after the last custom CNN layer before flattening. This is needed to preserve the IMPALA large trunk after copying it into custom layers."
+                  label="Final CNN ReLU"
+                  resetValue={defaultConfig.policy.custom_cnn_final_relu}
+                  value={config.policy.custom_cnn_final_relu}
+                  onChange={(value) => updatePolicy({ custom_cnn_final_relu: value })}
+                />
+              </ConfigFieldset>
             </ConfigFieldset>
-          </ConfigFieldset>
-        </ConfigPanel>
+          </ConfigPanel>
 
-        <ConfigPanel
-          title="State and fusion"
-          onReset={
-            checkpointLocked
-              ? undefined
-              : () =>
-                  updatePolicy({
-                    state_net_arch: defaultConfig.policy.state_net_arch,
-                    state_activation: defaultConfig.policy.state_activation,
-                    fusion_features_dim: defaultConfig.policy.fusion_features_dim,
-                    fusion_activation: defaultConfig.policy.fusion_activation,
-                    layer_norm: defaultConfig.policy.layer_norm,
-                    layer_norm_activation: defaultConfig.policy.layer_norm_activation,
-                  })
-          }
-        >
-          <ConfigFieldset disabled={checkpointLocked}>
-            <LayerListField
-              help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
-              label="State MLP"
-              resetValue={defaultConfig.policy.state_net_arch}
-              value={config.policy.state_net_arch}
-              onChange={(value) => updatePolicy({ state_net_arch: value })}
-            />
-            <ConfigFieldset
-              disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
-            >
-              <SelectField
-                help="Activation after each state-branch MLP layer."
-                label="State activation"
-                options={activationOptions}
-                resetValue={defaultConfig.policy.state_activation}
-                value={config.policy.state_activation}
-                onChange={(value) => updatePolicy({ state_activation: value })}
-              />
-            </ConfigFieldset>
-            <BooleanField
-              help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
-              label="Fusion MLP"
-              resetValue={defaultConfig.policy.fusion_features_dim !== null}
-              value={fusionEnabled}
-              onChange={updateFusionEnabled}
-            />
-            <ConfigFieldset disabled={checkpointLocked || !fusionEnabled}>
-              <IntegerField
-                help="Feature width of the learned fusion MLP."
-                label="Fusion features"
-                min={1}
-                resetValue={defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim}
-                value={fusionFeaturesDim}
-                onChange={(value) => updatePolicy({ fusion_features_dim: value })}
-              />
-              <SelectField
-                help="Activation after the learned fusion projection."
-                label="Fusion activation"
-                options={activationOptions}
-                resetValue={defaultConfig.policy.fusion_activation}
-                value={config.policy.fusion_activation}
-                onChange={(value) => updatePolicy({ fusion_activation: value })}
-              />
-            </ConfigFieldset>
-            <BooleanField
-              help="Apply layer normalization after the fusion stage or direct concatenation."
-              label="Layer norm"
-              resetValue={defaultConfig.policy.layer_norm}
-              value={config.policy.layer_norm}
-              onChange={(value) => updatePolicy({ layer_norm: value })}
-            />
-            <ConfigFieldset disabled={checkpointLocked || !config.policy.layer_norm}>
-              <SelectField
-                help="Optional activation applied after layer normalization."
-                label="Post-LN activation"
-                optionLabels={{ none: "None" }}
-                options={optionalActivationOptions}
-                resetValue={defaultLayerNormActivationValue}
-                value={layerNormActivationValue}
-                onChange={(value) =>
-                  updatePolicy({ layer_norm_activation: value === "none" ? null : value })
-                }
-              />
-            </ConfigFieldset>
-          </ConfigFieldset>
-        </ConfigPanel>
-
-        <ConfigPanel
-          title="Recurrent core"
-          onReset={
-            checkpointLocked
-              ? undefined
-              : () =>
-                  updatePolicy({
-                    recurrent_enable_critic_lstm: defaultConfig.policy.recurrent_enable_critic_lstm,
-                    recurrent_enabled: defaultConfig.policy.recurrent_enabled,
-                    recurrent_hidden_size: defaultConfig.policy.recurrent_hidden_size,
-                    recurrent_n_lstm_layers: defaultConfig.policy.recurrent_n_lstm_layers,
-                    recurrent_shared_lstm: defaultConfig.policy.recurrent_shared_lstm,
-                  })
-          }
-        >
-          <ConfigFieldset disabled={checkpointLocked}>
-            <BooleanField
-              help="Insert LSTM actor/critic cores between extractor and heads."
-              label="Use LSTM"
-              resetValue={defaultConfig.policy.recurrent_enabled}
-              value={config.policy.recurrent_enabled}
-              onChange={(value) => updatePolicy({ recurrent_enabled: value })}
-            />
-            <ConfigFieldset disabled={checkpointLocked || !config.policy.recurrent_enabled}>
-              <IntegerField
-                help="Hidden width of the recurrent actor and critic."
-                label="LSTM hidden"
-                min={1}
-                resetValue={defaultConfig.policy.recurrent_hidden_size}
-                value={config.policy.recurrent_hidden_size}
-                onChange={(value) => updatePolicy({ recurrent_hidden_size: value })}
-              />
-              <IntegerField
-                help="Number of recurrent layers."
-                label="LSTM layers"
-                min={1}
-                resetValue={defaultConfig.policy.recurrent_n_lstm_layers}
-                value={config.policy.recurrent_n_lstm_layers}
-                onChange={(value) => updatePolicy({ recurrent_n_lstm_layers: value })}
-              />
-              <BooleanField
-                help="Share one LSTM between actor and critic."
-                label="Shared LSTM"
-                resetValue={defaultConfig.policy.recurrent_shared_lstm}
-                value={config.policy.recurrent_shared_lstm}
-                onChange={(value) => updatePolicy({ recurrent_shared_lstm: value })}
-              />
-              <BooleanField
-                help="Use a critic LSTM. If off, the critic uses non-recurrent features."
-                label="Critic LSTM"
-                resetValue={defaultConfig.policy.recurrent_enable_critic_lstm}
-                value={config.policy.recurrent_enable_critic_lstm}
-                onChange={(value) => updatePolicy({ recurrent_enable_critic_lstm: value })}
-              />
-            </ConfigFieldset>
-          </ConfigFieldset>
-        </ConfigPanel>
-
-        <ConfigPanel
-          title="Heads"
-          onReset={() =>
-            updatePolicy({
-              auxiliary_state_head_arch: defaultConfig.policy.auxiliary_state_head_arch,
-              pi_net_arch: checkpointLocked
-                ? config.policy.pi_net_arch
-                : defaultConfig.policy.pi_net_arch,
-              vf_net_arch: checkpointLocked
-                ? config.policy.vf_net_arch
-                : defaultConfig.policy.vf_net_arch,
-              activation: defaultConfig.policy.activation,
-            })
-          }
-        >
-          <ConfigFieldGroup>
-            <SelectField
-              help="Activation function used by policy/value MLP layers."
-              label="Activation"
-              options={activationOptions}
-              resetValue={defaultConfig.policy.activation}
-              value={config.policy.activation}
-              onChange={(value) => updatePolicy({ activation: value })}
-            />
-            <ConfigFieldset disabled={false}>
-              <LayerListField
-                help="Shared MLP trunk used by the grouped auxiliary-state heads before their scalar, binary, and categorical outputs."
-                label="Aux head"
-                resetValue={defaultConfig.policy.auxiliary_state_head_arch}
-                value={config.policy.auxiliary_state_head_arch}
-                onChange={(value) => updatePolicy({ auxiliary_state_head_arch: value })}
-              />
-            </ConfigFieldset>
+          <ConfigPanel
+            title="State and fusion"
+            onReset={
+              checkpointLocked
+                ? undefined
+                : () =>
+                    updatePolicy({
+                      state_net_arch: defaultConfig.policy.state_net_arch,
+                      state_activation: defaultConfig.policy.state_activation,
+                      fusion_features_dim: defaultConfig.policy.fusion_features_dim,
+                      fusion_activation: defaultConfig.policy.fusion_activation,
+                      layer_norm: defaultConfig.policy.layer_norm,
+                      layer_norm_activation: defaultConfig.policy.layer_norm_activation,
+                    })
+            }
+          >
             <ConfigFieldset disabled={checkpointLocked}>
               <LayerListField
-                help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
-                label="Policy head"
-                resetValue={defaultConfig.policy.pi_net_arch}
-                value={config.policy.pi_net_arch}
-                onChange={(value) => updatePolicy({ pi_net_arch: value })}
+                help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
+                label="State MLP"
+                resetValue={defaultConfig.policy.state_net_arch}
+                value={config.policy.state_net_arch}
+                onChange={(value) => updatePolicy({ state_net_arch: value })}
               />
-              <LayerListField
-                help="Value MLP layers after the recurrent core. Add or remove rows to change the head depth."
-                label="Value head"
-                resetValue={defaultConfig.policy.vf_net_arch}
-                value={config.policy.vf_net_arch}
-                onChange={(value) => updatePolicy({ vf_net_arch: value })}
+              <ConfigFieldset
+                disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
+              >
+                <SelectField
+                  help="Activation after each state-branch MLP layer."
+                  label="State activation"
+                  options={activationOptions}
+                  resetValue={defaultConfig.policy.state_activation}
+                  value={config.policy.state_activation}
+                  onChange={(value) => updatePolicy({ state_activation: value })}
+                />
+              </ConfigFieldset>
+              <BooleanField
+                help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
+                label="Fusion MLP"
+                resetValue={defaultConfig.policy.fusion_features_dim !== null}
+                value={fusionEnabled}
+                onChange={updateFusionEnabled}
               />
+              <ConfigFieldset disabled={checkpointLocked || !fusionEnabled}>
+                <IntegerField
+                  help="Feature width of the learned fusion MLP."
+                  label="Fusion features"
+                  min={1}
+                  resetValue={defaultConfig.policy.fusion_features_dim ?? fallbackFusionFeaturesDim}
+                  value={fusionFeaturesDim}
+                  onChange={(value) => updatePolicy({ fusion_features_dim: value })}
+                />
+                <SelectField
+                  help="Activation after the learned fusion projection."
+                  label="Fusion activation"
+                  options={activationOptions}
+                  resetValue={defaultConfig.policy.fusion_activation}
+                  value={config.policy.fusion_activation}
+                  onChange={(value) => updatePolicy({ fusion_activation: value })}
+                />
+              </ConfigFieldset>
+              <BooleanField
+                help="Apply layer normalization after the fusion stage or direct concatenation."
+                label="Layer norm"
+                resetValue={defaultConfig.policy.layer_norm}
+                value={config.policy.layer_norm}
+                onChange={(value) => updatePolicy({ layer_norm: value })}
+              />
+              <ConfigFieldset disabled={checkpointLocked || !config.policy.layer_norm}>
+                <SelectField
+                  help="Optional activation applied after layer normalization."
+                  label="Post-LN activation"
+                  optionLabels={{ none: "None" }}
+                  options={optionalActivationOptions}
+                  resetValue={defaultLayerNormActivationValue}
+                  value={layerNormActivationValue}
+                  onChange={(value) =>
+                    updatePolicy({ layer_norm_activation: value === "none" ? null : value })
+                  }
+                />
+              </ConfigFieldset>
             </ConfigFieldset>
-          </ConfigFieldGroup>
-        </ConfigPanel>
+          </ConfigPanel>
+        </ConfigStack>
+
+        <ConfigStack>
+          <ConfigPanel
+            title="Recurrent core"
+            onReset={
+              checkpointLocked
+                ? undefined
+                : () =>
+                    updatePolicy({
+                      recurrent_enable_critic_lstm:
+                        defaultConfig.policy.recurrent_enable_critic_lstm,
+                      recurrent_enabled: defaultConfig.policy.recurrent_enabled,
+                      recurrent_hidden_size: defaultConfig.policy.recurrent_hidden_size,
+                      recurrent_n_lstm_layers: defaultConfig.policy.recurrent_n_lstm_layers,
+                      recurrent_shared_lstm: defaultConfig.policy.recurrent_shared_lstm,
+                    })
+            }
+          >
+            <ConfigFieldset disabled={checkpointLocked}>
+              <BooleanField
+                help="Insert LSTM actor/critic cores between extractor and heads."
+                label="Use LSTM"
+                resetValue={defaultConfig.policy.recurrent_enabled}
+                value={config.policy.recurrent_enabled}
+                onChange={(value) => updatePolicy({ recurrent_enabled: value })}
+              />
+              <ConfigFieldset disabled={checkpointLocked || !config.policy.recurrent_enabled}>
+                <IntegerField
+                  help="Hidden width of the recurrent actor and critic."
+                  label="LSTM hidden"
+                  min={1}
+                  resetValue={defaultConfig.policy.recurrent_hidden_size}
+                  value={config.policy.recurrent_hidden_size}
+                  onChange={(value) => updatePolicy({ recurrent_hidden_size: value })}
+                />
+                <IntegerField
+                  help="Number of recurrent layers."
+                  label="LSTM layers"
+                  min={1}
+                  resetValue={defaultConfig.policy.recurrent_n_lstm_layers}
+                  value={config.policy.recurrent_n_lstm_layers}
+                  onChange={(value) => updatePolicy({ recurrent_n_lstm_layers: value })}
+                />
+                <BooleanField
+                  help="Share one LSTM between actor and critic."
+                  label="Shared LSTM"
+                  resetValue={defaultConfig.policy.recurrent_shared_lstm}
+                  value={config.policy.recurrent_shared_lstm}
+                  onChange={(value) => updatePolicy({ recurrent_shared_lstm: value })}
+                />
+                <BooleanField
+                  help="Use a critic LSTM. If off, the critic uses non-recurrent features."
+                  label="Critic LSTM"
+                  resetValue={defaultConfig.policy.recurrent_enable_critic_lstm}
+                  value={config.policy.recurrent_enable_critic_lstm}
+                  onChange={(value) => updatePolicy({ recurrent_enable_critic_lstm: value })}
+                />
+              </ConfigFieldset>
+            </ConfigFieldset>
+          </ConfigPanel>
+
+          <ConfigPanel
+            title="Heads"
+            onReset={() =>
+              updatePolicy({
+                auxiliary_state_head_arch: defaultConfig.policy.auxiliary_state_head_arch,
+                pi_net_arch: checkpointLocked
+                  ? config.policy.pi_net_arch
+                  : defaultConfig.policy.pi_net_arch,
+                vf_net_arch: checkpointLocked
+                  ? config.policy.vf_net_arch
+                  : defaultConfig.policy.vf_net_arch,
+                activation: defaultConfig.policy.activation,
+              })
+            }
+          >
+            <ConfigFieldGroup>
+              <SelectField
+                help="Activation function used by policy/value MLP layers."
+                label="Activation"
+                options={activationOptions}
+                resetValue={defaultConfig.policy.activation}
+                value={config.policy.activation}
+                onChange={(value) => updatePolicy({ activation: value })}
+              />
+              <ConfigFieldset disabled={false}>
+                <LayerListField
+                  help="Shared MLP trunk used by the grouped auxiliary-state heads before their scalar, binary, and categorical outputs."
+                  label="Aux head"
+                  resetValue={defaultConfig.policy.auxiliary_state_head_arch}
+                  value={config.policy.auxiliary_state_head_arch}
+                  onChange={(value) => updatePolicy({ auxiliary_state_head_arch: value })}
+                />
+              </ConfigFieldset>
+              <ConfigFieldset disabled={checkpointLocked}>
+                <LayerListField
+                  help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
+                  label="Policy head"
+                  resetValue={defaultConfig.policy.pi_net_arch}
+                  value={config.policy.pi_net_arch}
+                  onChange={(value) => updatePolicy({ pi_net_arch: value })}
+                />
+                <LayerListField
+                  help="Value MLP layers after the recurrent core. Add or remove rows to change the head depth."
+                  label="Value head"
+                  resetValue={defaultConfig.policy.vf_net_arch}
+                  value={config.policy.vf_net_arch}
+                  onChange={(value) => updatePolicy({ vf_net_arch: value })}
+                />
+              </ConfigFieldset>
+            </ConfigFieldGroup>
+          </ConfigPanel>
+        </ConfigStack>
       </ConfigGrid>
 
       <ConfigPanel title="Architecture preview" wide>
