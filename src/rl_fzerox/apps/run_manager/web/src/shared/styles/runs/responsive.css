@@ -22,14 +22,6 @@
     justify-content: flex-start;
   }
 
-  .run-runtime-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .run-runtime-metrics-grid {
-    grid-template-columns: 1fr;
-  }
-
   .run-track-distribution-header {
     flex-direction: column;
     align-items: flex-start;
@@ -52,12 +44,6 @@
   .run-track-distribution-columns {
     grid-template-columns: repeat(var(--track-column-count), minmax(0, 1fr));
     gap: 10px;
-  }
-
-  .run-runtime-actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-start;
   }
 }
 
@@ -90,16 +76,6 @@
   }
 
   .run-chart-lineage-legend-list {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-width: 900px) {
-  .run-runtime-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .run-runtime-actions {
     justify-content: flex-start;
   }
 }
