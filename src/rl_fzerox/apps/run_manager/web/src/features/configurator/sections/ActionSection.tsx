@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/ActionSection.tsx
+
+import { ConfigStack } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   type ConfigSectionPatch,
@@ -55,7 +57,7 @@ export function ActionSection({
   };
 
   return (
-    <div className="config-stack action-disclosure-stack">
+    <ConfigStack className="action-disclosure-stack">
       <DisclosureToolbar
         collapseLabel="Collapse all action sections"
         expandLabel="Expand all action sections"
@@ -95,6 +97,6 @@ export function ActionSection({
         </div>
         {compatibilityNote !== null ? <p className="action-note">{compatibilityNote}</p> : null}
       </ConfigPanel>
-    </div>
+    </ConfigStack>
   );
 }

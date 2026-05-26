@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/Configurator.tsx
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { ConfigGrid } from "@/features/configurator/ConfigLayout";
 import { ActionBar } from "@/features/configurator/configurator/ActionBar";
 import { configuratorDraftName } from "@/features/configurator/configurator/draftName";
 import {
@@ -25,6 +26,8 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { IconButton } from "@/shared/ui/Button";
+import { FieldInput, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
 import { RandomizeIcon } from "@/shared/ui/icons";
 import { Notice, Panel } from "@/shared/ui/Panel";
@@ -324,24 +327,24 @@ export function Configurator({
         </div>
       ) : null}
 
-      <div className="form-grid run-identity-grid">
-        <div className="field-shell">
+      <ConfigGrid className="mb-7 grid-cols-[minmax(0,1fr)_240px] items-end">
+        <FieldShell>
           <FieldLabel help="Run name used when this configuration is launched." label="Run name" />
-          <input
+          <FieldInput
             aria-invalid={nameError !== null}
             aria-label="Run name"
             spellCheck={false}
             value={draftName}
             onChange={(event) => setDraftName(event.target.value)}
           />
-        </div>
-        <div className="seed-control">
-          <div className="field-shell">
+        </FieldShell>
+        <div className="grid grid-cols-[minmax(0,1fr)_40px] items-end gap-2">
+          <FieldShell>
             <FieldLabel
               help="Base random seed used when the run config is generated."
               label="Seed"
             />
-            <input
+            <FieldInput
               aria-label="Seed"
               type="number"
               value={config.seed}
@@ -350,26 +353,32 @@ export function Configurator({
                 setConfig((currentConfig) => ({ ...currentConfig, seed }));
               }}
             />
-          </div>
-          <button
+          </FieldShell>
+          <IconButton
             aria-label="Randomize seed"
-            className="icon-button seed-randomize-button tooltip-anchor"
+            className="tooltip-anchor"
             data-tooltip="Randomize seed"
-            type="button"
             onClick={randomizeSeed}
           >
             <RandomizeIcon />
-          </button>
+          </IconButton>
         </div>
         {forkSourceRunLabel !== null && forkSourceArtifact !== null ? (
-          <section className="fork-context-card" aria-label="Fork source context">
-            <div className="fork-context-header">
-              <span className="fork-context-kicker">Forked from</span>
-              <strong>{forkSourceRunLabel}</strong>
-              <span className="fork-context-artifact">{forkSourceArtifact} checkpoint</span>
+          <section
+            aria-label="Fork source context"
+            className="col-span-full grid gap-2 border border-app-border bg-app-surface-muted px-3.5 py-3"
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="text-xs font-bold text-app-muted">Forked from</span>
+              <strong className="min-w-0 text-sm font-bold text-app-text">
+                {forkSourceRunLabel}
+              </strong>
+              <span className="inline-flex h-6 items-center border border-app-border bg-app-surface px-2 text-xs font-bold text-app-muted lowercase">
+                {forkSourceArtifact} checkpoint
+              </span>
             </div>
             {forkedAtLabel !== null || forkSourceStepCount !== null ? (
-              <div className="fork-context-meta">
+              <div className="flex flex-wrap gap-2.5 text-xs text-app-muted">
                 {forkedAtLabel !== null ? <span>forked {forkedAtLabel}</span> : null}
                 {forkSourceStepCount !== null ? (
                   <span>@ {forkSourceStepCount.toLocaleString()} steps</span>
@@ -378,7 +387,7 @@ export function Configurator({
             ) : null}
           </section>
         ) : null}
-      </div>
+      </ConfigGrid>
       {nameError !== null ? <Notice tone="error">{nameError}</Notice> : null}
 
       <div className="section-tabs-row">

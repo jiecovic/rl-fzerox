@@ -327,14 +327,14 @@ describe("Configurator", () => {
     await user.click(screen.getByRole("button", { name: "Tracks" }));
     expect(screen.getByRole("button", { name: "Enable X Cup" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "GP Race" }));
+    await user.click(screen.getByRole("radio", { name: "GP Race" }));
     await user.click(screen.getByRole("button", { name: "Enable X Cup" }));
 
     expect(screen.getByRole("button", { name: "Disable X Cup" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "GP Race" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("radio", { name: "GP Race" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("textbox", { name: "Generated courses" })).toHaveValue("6");
     expect(
       screen.getByText("Deterministic GP X Cup baselines materialized at training start."),
@@ -359,14 +359,14 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Tracks" }));
 
-    const masterDifficulty = screen.getByRole("button", { name: "Master" });
-    expect(masterDifficulty).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("radio", { name: "Master" })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "GP Race" }));
+    await user.click(screen.getByRole("radio", { name: "GP Race" }));
 
-    expect(masterDifficulty).toHaveAttribute("aria-disabled", "false");
+    const masterDifficulty = screen.getByRole("radio", { name: "Master" });
+    expect(masterDifficulty).toBeEnabled();
     await user.click(masterDifficulty);
-    expect(masterDifficulty).toHaveAttribute("aria-pressed", "true");
+    expect(masterDifficulty).toHaveAttribute("aria-checked", "true");
   });
 
   it("supports pooled vehicle selection and random engine ranges in the vehicle tab", async () => {
@@ -723,7 +723,7 @@ describe("Configurator", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "Policy" }));
-    await user.click(screen.getByRole("button", { name: "Custom" }));
+    await user.click(screen.getByRole("radio", { name: "Custom" }));
 
     const imageFeaturesInput = screen.getByRole("textbox", { name: "Image features" });
     await user.clear(imageFeaturesInput);
@@ -1078,7 +1078,7 @@ describe("Configurator", () => {
     expect(spinOutput).toBeChecked();
     expect(spinEnabled).toBeChecked();
 
-    await user.click(screen.getByRole("button", { name: "4-way categorical" }));
+    await user.click(screen.getByRole("radio", { name: "4-way categorical" }));
     await waitFor(() => {
       expect(spinOutput).toBeDisabled();
       expect(spinOutput).not.toBeChecked();
@@ -1086,7 +1086,7 @@ describe("Configurator", () => {
       expect(spinEnabled).not.toBeChecked();
     });
 
-    await user.click(screen.getByRole("button", { name: "Independent buttons" }));
+    await user.click(screen.getByRole("radio", { name: "Independent buttons" }));
     await waitFor(() => {
       expect(spinOutput).toBeDisabled();
       expect(spinOutput).not.toBeChecked();
@@ -1094,7 +1094,7 @@ describe("Configurator", () => {
       expect(spinEnabled).not.toBeChecked();
     });
 
-    await user.click(screen.getByRole("button", { name: "3-way axis" }));
+    await user.click(screen.getByRole("radio", { name: "3-way axis" }));
     await waitFor(() => {
       expect(spinOutput).toBeEnabled();
       expect(spinOutput).not.toBeChecked();
@@ -1119,7 +1119,7 @@ describe("Configurator", () => {
 
     await user.click(screen.getByRole("button", { name: "Policy" }));
     await user.click(
-      within(screen.getByRole("group", { name: "Image features mode" })).getByRole("button", {
+      within(screen.getByRole("group", { name: "Image features mode" })).getByRole("radio", {
         name: "Custom",
       }),
     );
@@ -1207,9 +1207,10 @@ describe("Configurator", () => {
     const progressSourceGroup = within(lapProgressRow).getByRole("group", {
       name: "Progress scalar source",
     });
-    await user.click(within(progressSourceGroup).getByRole("button", { name: "Lap segment" }));
-    expect(within(progressSourceGroup).getByRole("button", { name: "Lap segment" })).toHaveClass(
-      "active",
+    await user.click(within(progressSourceGroup).getByRole("radio", { name: "Lap segment" }));
+    expect(within(progressSourceGroup).getByRole("radio", { name: "Lap segment" })).toHaveAttribute(
+      "aria-checked",
+      "true",
     );
     const edgeRatioAuxToggle = within(trackPositionPanel).getByRole("checkbox", {
       name: "Edge ratio auxiliary loss enabled",
@@ -1235,7 +1236,7 @@ describe("Configurator", () => {
 
     const throttleModeGroup = screen.getByRole("group", { name: "Throttle mode" });
     expect(
-      within(throttleModeGroup).getByRole("button", {
+      within(throttleModeGroup).getByRole("radio", {
         name: configMetadataFixture.drive_modes[0].label,
       }),
     ).toBeDisabled();

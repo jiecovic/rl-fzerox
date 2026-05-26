@@ -1,4 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/LoggingSection.tsx
+
+import {
+  ConfigFieldGroup,
+  ConfigFieldset,
+  ConfigPanelGrid,
+} from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import { BooleanField, RangeIntegerField } from "@/features/configurator/fields";
@@ -21,7 +27,7 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
   };
 
   return (
-    <div className="config-stack training-panel-grid">
+    <ConfigPanelGrid>
       <ConfigPanel
         title="Checkpoints"
         onReset={() =>
@@ -34,7 +40,7 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
           })
         }
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <div className="field-with-note">
             <RangeIntegerField
               help="For PPO runs, periodic checkpoint writes happen after whole rollouts. One rollout equals env count times rollout steps."
@@ -75,7 +81,7 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
             value={config.train.save_recent_checkpoints}
             onChange={(value) => updateTrain({ save_recent_checkpoints: value })}
           />
-          <fieldset className="dependent-fieldset" disabled={!config.train.save_recent_checkpoints}>
+          <ConfigFieldset disabled={!config.train.save_recent_checkpoints}>
             <RecentRetentionField
               defaultTrain={defaultConfig.train}
               help="Slide right to keep the newest N numbered snapshots. The last stop keeps all numbered checkpoints without trimming."
@@ -83,8 +89,8 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
               train={config.train}
               onChange={(value) => updateTrain({ recent_checkpoint_limit: value })}
             />
-          </fieldset>
-        </div>
+          </ConfigFieldset>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel
@@ -95,7 +101,7 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
           })
         }
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <RangeIntegerField
             help="Window size used by SB3-style rolling training statistics."
             label="Stats window"
@@ -111,7 +117,7 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
             value={config.train.stats_window_size}
             onChange={(value) => updateTrain({ stats_window_size: value })}
           />
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel title="Checkpoint summary" wide>
@@ -127,6 +133,6 @@ export function LoggingSection({ config, defaultConfig, setConfig }: LoggingSect
           </tbody>
         </table>
       </ConfigPanel>
-    </div>
+    </ConfigPanelGrid>
   );
 }

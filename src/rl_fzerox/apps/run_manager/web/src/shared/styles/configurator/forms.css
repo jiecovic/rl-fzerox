@@ -7,77 +7,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.run-identity-grid {
-  grid-template-columns: minmax(0, 1fr) 240px;
-  align-items: end;
-  margin-bottom: 28px;
-}
-
-.fork-context-card {
-  grid-column: 1 / -1;
-  display: grid;
-  gap: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  padding: 12px 14px;
-}
-
-.fork-context-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.fork-context-kicker {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.fork-context-header strong {
-  min-width: 0;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.fork-context-artifact {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  padding: 0 8px;
-  text-transform: lowercase;
-}
-
-.fork-context-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.form-grid.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .config-stack {
   display: grid;
   gap: 14px;
 }
 
-.training-panel-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: stretch;
-}
-
-.training-field-grid,
 .config-field-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -171,32 +105,6 @@
   height: 20px;
 }
 
-.image-observation-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.image-observation-fieldset {
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-}
-
-.image-observation-fieldset > .range-field {
-  grid-column: 1 / -1;
-}
-
-.custom-resolution-grid {
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.image-observation-grid > .range-field,
-.image-observation-grid > .boolean-field {
-  grid-column: 1 / -1;
-}
-
 .reward-accordion-stack {
   display: grid;
   gap: 8px;
@@ -280,8 +188,9 @@
 }
 
 .reward-accordion-stack .config-field-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 196px), 1fr));
-  column-gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  align-items: end;
+  gap: 12px 16px;
 }
 
 .reward-accordion-stack .optional-number-field {
@@ -355,19 +264,4 @@
 
 .reward-accordion-stack .range-pair-field {
   grid-column: 1 / -1;
-}
-
-.seed-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
-}
-
-.seed-control label {
-  min-width: 0;
-}
-
-.seed-randomize-button {
-  margin-bottom: 0;
 }
