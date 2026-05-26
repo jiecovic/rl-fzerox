@@ -79,7 +79,7 @@ export function RunRow({
             </span>
             <span className="run-branch-copy">
               <span className="run-branch-header">
-                <span className="record-name">{run.name}</span>
+                <span className="font-semibold text-app-text">{run.name}</span>
                 <span
                   className={
                     entry.isRoot ? "run-branch-stage run-branch-stage-root" : "run-branch-stage"
