@@ -27,7 +27,7 @@ export function ScrollButtons() {
   }
 
   return (
-    <div className="fixed right-[max(18px,calc((100vw-1120px)/2-54px))] bottom-7 z-10 grid gap-2">
+    <div className="fixed right-[max(18px,calc((100vw-var(--app-shell-max-width))/2-54px))] bottom-7 z-10 grid gap-2">
       {!position.atTop ? (
         <IconButton
           aria-label="Scroll to top"

@@ -10,6 +10,7 @@ import {
   currentTooltipState,
   ensureUPlot,
   PLOT_HEIGHT,
+  plotSeriesKey,
   xRange,
 } from "@/features/runs/charts/run_plot_card/model";
 import type {
@@ -42,10 +43,7 @@ export function useRunPlot({
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const visibleSeries = useMemo(() => series.filter((entry) => entry.points.length > 0), [series]);
-  const seriesKey = useMemo(
-    () => visibleSeries.map((entry) => entry.runId).join("|"),
-    [visibleSeries],
-  );
+  const seriesKey = useMemo(() => plotSeriesKey(visibleSeries), [visibleSeries]);
   const plotData = useMemo(() => alignedDataFromSeries(visibleSeries), [visibleSeries]);
 
   formatValueRef.current = formatValue;
