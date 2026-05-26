@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/panel/RunRow.tsx
+import { runLineageMainGridClass, runLineageOuterGridClass } from "@/features/runs/panel/layout";
 import {
   deleteDisabledReason,
   progressLabel,
@@ -9,6 +10,7 @@ import {
 } from "@/features/runs/panel/model";
 import type { RunLineageRun } from "@/features/runs/panel/types";
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
+import { IconButton } from "@/shared/ui/Button";
 import { formatDate } from "@/shared/ui/format";
 import { BranchSourceIcon, ExportIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
 
@@ -54,14 +56,14 @@ export function RunRow({
   const deleteReason = deleteDisabledReason(entry, busy, isDeleting);
 
   return (
-    <div className="run-list-row run-lineage-row">
+    <div className={`${runLineageOuterGridClass} border-t border-app-border px-3 first:border-t-0`}>
       <button
         aria-label={`Open run ${run.name}`}
-        className="run-list-main"
+        className={`${runLineageMainGridClass} cursor-pointer border-0 bg-transparent p-0 text-left text-app-text`}
         type="button"
         onClick={onOpenRun}
       >
-        <span className="run-list-cell run-list-cell-name">
+        <span className="grid min-w-0 gap-0.5">
           <span className="run-branch-name">
             <span
               aria-hidden="true"
@@ -111,8 +113,8 @@ export function RunRow({
             </span>
           </span>
         </span>
-        <span className="run-list-cell run-list-progress">
-          <div className="run-list-progress-top">
+        <span className="grid min-w-0 gap-1">
+          <div className="flex items-baseline gap-2 max-[760px]:flex-col max-[760px]:items-start">
             <span className="run-record-progress-label">{progressLabel(run)}</span>
           </div>
           <span aria-hidden="true" className="run-record-progress-track">
@@ -121,64 +123,67 @@ export function RunRow({
               style={{ width: `${(run.runtime?.progress_fraction ?? 0) * 100}%` }}
             />
           </span>
-          <span className="run-record-subtle">{stepLabel(run)}</span>
+          <span className={runSubtleClass}>{stepLabel(run)}</span>
         </span>
-        <span className="run-list-cell run-list-live">
-          <span>{runtimePrimaryLabel(run)}</span>
-          <span className="run-record-subtle">{runtimeSecondaryLabel(run)}</span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+            {runtimePrimaryLabel(run)}
+          </span>
+          <span className={runSubtleClass}>{runtimeSecondaryLabel(run)}</span>
         </span>
-        <span className="run-list-cell run-list-status">
+        <span className="grid min-w-0 gap-0.5">
           <span className="run-status-chip">{statusLabel(run)}</span>
-          <span className="run-record-subtle">
+          <span className={runSubtleClass}>
             <RunActivityIndicator run={run} />
           </span>
         </span>
-        <span className="run-list-cell run-list-created">
-          <span className="run-record-subtle run-created-at">{formatDate(run.created_at)}</span>
+        <span className="grid min-w-0 gap-0.5">
+          <span className={`${runSubtleClass} whitespace-nowrap`}>
+            {formatDate(run.created_at)}
+          </span>
         </span>
       </button>
-      <div className="run-list-actions">
-        <button
+      <div className="flex w-[136px] flex-nowrap items-center justify-end gap-1 max-[760px]:justify-start">
+        <IconButton
           aria-label={`Stop run ${run.name}`}
-          className="icon-button compact-icon-button run-list-action-button"
           title={pendingCommand !== null ? `${pendingCommand} requested` : "Stop run"}
-          type="button"
           disabled={!canStop}
+          size="compact"
           onClick={() => void onRunAction(run.id, onStopRun)}
         >
           <StopIcon />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           aria-label={`Resume run ${run.name}`}
-          className="icon-button compact-icon-button run-list-action-button"
           title="Resume run"
-          type="button"
           disabled={!canResume}
+          size="compact"
           onClick={() => void onRunAction(run.id, onResumeRun)}
         >
           <ResumeIcon />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           aria-label={`Export run ${run.name}`}
-          className="icon-button compact-icon-button run-list-action-button"
           title={canExport ? "Export run" : "Stop the run before exporting"}
-          type="button"
           disabled={!canExport}
+          size="compact"
           onClick={() => void onRunAction(run.id, onExportRun)}
         >
           <ExportIcon />
-        </button>
-        <button
+        </IconButton>
+        <IconButton
           aria-label={`Delete run ${run.name}`}
-          className="icon-button compact-icon-button danger run-list-action-button"
           title={deleteReason}
-          type="button"
           disabled={!canDelete}
+          size="compact"
+          tone="danger"
           onClick={onRequestDelete}
         >
           <TrashIcon />
-        </button>
+        </IconButton>
       </div>
     </div>
   );
 }
+
+const runSubtleClass = "text-[11px] tabular-nums text-app-muted";

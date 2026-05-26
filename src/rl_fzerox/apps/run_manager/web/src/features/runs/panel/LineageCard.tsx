@@ -1,8 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/panel/LineageCard.tsx
 import { useEffect, useState } from "react";
+import { runLineageMainGridClass, runLineageOuterGridClass } from "@/features/runs/panel/layout";
 import { RunRow } from "@/features/runs/panel/RunRow";
 import type { RunLineageGroup } from "@/features/runs/panel/types";
 import type { ManagedRun } from "@/shared/api/contract";
+import { Button, IconButton } from "@/shared/ui/Button";
+import { FieldInput } from "@/shared/ui/Field";
 import { formatDate, formatRelativeTime } from "@/shared/ui/format";
 import { ChevronIcon, TrashIcon } from "@/shared/ui/icons";
 
@@ -71,12 +74,12 @@ export function LineageCard({
   }
 
   return (
-    <section className="run-lineage-card">
-      <div className="run-lineage-summary">
+    <section className="rounded-lg border border-app-border bg-app-surface">
+      <div className="grid min-h-[52px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3">
         <button
           aria-expanded={open}
           aria-label={`${open ? "Collapse" : "Expand"} lineage ${lineage.label}`}
-          className="run-lineage-toggle"
+          className="grid min-h-[52px] min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2.5 border-0 bg-transparent p-0 text-left text-app-text hover:bg-app-surface-muted"
           type="button"
           onClick={onToggle}
         >
@@ -86,67 +89,75 @@ export function LineageCard({
           >
             <ChevronIcon />
           </span>
-          <span className="run-lineage-copy">
+          <span className="grid min-w-0 gap-1">
             <strong>{lineage.label}</strong>
-            <span className="run-record-subtle">
+            <span className="text-[11px] tabular-nums text-app-muted">
               {lineage.runs.length} runs · created {formatDate(lineage.createdAt)} · updated{" "}
               {formatRelativeTime(lineage.latestUpdatedAt)}
             </span>
           </span>
         </button>
-        <div className="run-lineage-actions">
+        <div className="inline-flex items-center gap-1.5">
           <form
-            className="run-lineage-group-form"
+            className="inline-flex items-center gap-1.5"
             onSubmit={(event) => {
               event.preventDefault();
               void saveGroup();
             }}
           >
-            <input
+            <FieldInput
               aria-label={`Groups for lineage ${lineage.label}`}
+              className="h-8 w-[220px] min-w-0 rounded-md bg-app-surface-muted px-2 text-xs"
               placeholder="Ungrouped"
               type="text"
               value={groupInput}
               onChange={(event) => setGroupInput(event.target.value)}
             />
-            <button
-              className="secondary-button compact-lineage-group-button"
+            <Button
+              className="h-8 px-2 text-xs"
               disabled={!groupChanged || savingGroup}
               type="submit"
             >
               {savingGroup ? "Saving" : "Save"}
-            </button>
+            </Button>
           </form>
-          <button
+          <IconButton
             aria-label={`Delete lineage ${lineage.label}`}
-            className="icon-button compact-icon-button danger"
             title={
               lineage.canDeleteLineage
                 ? "Delete lineage"
                 : "Stop all runs and clear pending commands before deleting lineage"
             }
-            type="button"
             disabled={!lineage.canDeleteLineage || isDeleting || busyActionRunId !== null}
+            size="compact"
+            tone="danger"
             onClick={onDeleteLineage}
           >
             <TrashIcon />
-          </button>
+          </IconButton>
         </div>
       </div>
-      {groupError !== null ? <div className="run-lineage-group-error">{groupError}</div> : null}
+      {groupError !== null ? (
+        <div className="border-t border-app-border px-3 py-2 text-xs text-app-danger">
+          {groupError}
+        </div>
+      ) : null}
       {open ? (
-        <div className="run-lineage-body">
-          <div className="run-list-head run-lineage-head" role="presentation">
-            <div className="run-list-head-main">
+        <div className="border-t border-app-border pt-2 pb-1">
+          <div
+            className={`${runLineageOuterGridClass} hidden px-3 pb-1 text-[11px] font-bold tracking-[0.04em] text-app-muted uppercase min-[761px]:grid`}
+            role="presentation"
+          >
+            <div className={runLineageMainGridClass}>
               <span>Run</span>
               <span>Progress</span>
               <span>Reward · FPS</span>
               <span>Status</span>
               <span>Created at</span>
             </div>
-            <span className="run-list-head-actions">Actions</span>
+            <span className="w-[136px] justify-self-end text-right">Actions</span>
           </div>
-          <div className="run-lineage-runs">
+          <div className="grid border-t border-app-border">
             {lineage.runs.map((entry) => (
               <RunRow
                 busyActionRunId={busyActionRunId}
