@@ -204,6 +204,7 @@ def test_observation_extractor_impala_large_profile_uses_residual_conv_sequences
         ("pool10", (1, 32, 9, 12)),
         ("res-pre11", (1, 32, 9, 12)),
         ("res-pre12", (1, 32, 9, 12)),
+        ("act13", (1, 32, 9, 12)),
     ]
     cnn_modules = tuple(extractor._cnn.children())
     assert isinstance(cnn_modules[0], torch.nn.Conv2d)

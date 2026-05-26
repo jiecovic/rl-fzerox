@@ -34,7 +34,6 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
         features_dim: int | Literal["auto"] = 512,
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
-        custom_cnn_final_relu: bool = False,
         image_projection_activation: ActivationName = "relu",
         layer_norm: bool = False,
         layer_norm_activation: ActivationName | None = None,
@@ -55,8 +54,6 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
             conv_spec=self._conv_spec,
         )
         self._cnn_capture_indices = capture_indices
-        if conv_profile == "impala_large" or (conv_profile == "custom" and custom_cnn_final_relu):
-            cnn_layers.append(nn.ReLU())
         cnn = nn.Sequential(*cnn_layers, nn.Flatten())
 
         with torch.no_grad():
@@ -111,6 +108,8 @@ class FZeroXObservationCnnExtractor(BaseFeaturesExtractor):
                 layers.append(torch_pooling_layer(nn.MaxPool2d, layer_spec))
             elif layer_spec.kind == "avgpool":
                 layers.append(torch_pooling_layer(nn.AvgPool2d, layer_spec))
+            elif layer_spec.kind == "activation" and layer_spec.activation is not None:
+                layers.append(resolve_policy_activation_fn(layer_spec.activation)())
             else:
                 raise ValueError(f"Unsupported CNN layer kind: {layer_spec.kind!r}")
             capture_indices.append(len(layers) - 1)
@@ -180,7 +179,6 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
         fusion_activation: ActivationName = "relu",
         conv_profile: ConvProfile = "nature",
         custom_conv_layers: tuple[CustomConvLayerConfig, ...] | None = None,
-        custom_cnn_final_relu: bool = False,
         layer_norm: bool = False,
         layer_norm_activation: ActivationName | None = None,
     ) -> None:
@@ -233,7 +231,6 @@ class FZeroXImageStateExtractor(BaseFeaturesExtractor):
             features_dim=features_dim,
             conv_profile=conv_profile,
             custom_conv_layers=custom_conv_layers,
-            custom_cnn_final_relu=custom_cnn_final_relu,
             image_projection_activation=image_projection_activation,
             layer_norm=False,
         )

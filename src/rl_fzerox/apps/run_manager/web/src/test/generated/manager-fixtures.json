@@ -1346,9 +1346,9 @@
       "auxiliary_state_head_arch": [128],
       "auxiliary_state_losses": [],
       "conv_profile": "nature",
-      "custom_cnn_final_relu": false,
       "custom_conv_layers": [
         {
+          "activation": null,
           "kernel_size": 8,
           "kind": "conv",
           "out_channels": 32,
@@ -1357,6 +1357,7 @@
           "stride": 4
         },
         {
+          "activation": null,
           "kernel_size": 4,
           "kind": "conv",
           "out_channels": 64,
@@ -1365,6 +1366,7 @@
           "stride": 2
         },
         {
+          "activation": null,
           "kernel_size": 3,
           "kind": "conv",
           "out_channels": 128,
@@ -1665,6 +1667,7 @@
     "continuous_action_dims": 1,
     "conv_layers": [
       {
+        "activation": null,
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 6,
@@ -1682,6 +1685,7 @@
         "stride": 4
       },
       {
+        "activation": null,
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 32,
@@ -1699,6 +1703,7 @@
         "stride": 2
       },
       {
+        "activation": null,
         "dropped_height": 0,
         "dropped_width": 0,
         "in_channels": 64,

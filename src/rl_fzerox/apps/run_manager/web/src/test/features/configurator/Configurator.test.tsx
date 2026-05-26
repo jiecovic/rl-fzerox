@@ -97,6 +97,24 @@ function impalaLargePreviewFixture(): PolicyArchitecturePreview {
       dropped_width: 0,
       params: 4640,
     },
+    {
+      name: "act4",
+      kind: "activation",
+      in_channels: 16,
+      out_channels: 16,
+      kernel_size: 1,
+      stride: 1,
+      padding: 0,
+      post_activation: true,
+      activation: "relu",
+      input_height: 36,
+      input_width: 48,
+      output_height: 36,
+      output_width: 48,
+      dropped_height: 0,
+      dropped_width: 0,
+      params: 0,
+    },
   ];
   return {
     ...policyPreviewFixture,
@@ -729,7 +747,7 @@ describe("Configurator", () => {
     await user.clear(imageFeaturesInput);
     await user.type(imageFeaturesInput, "1024");
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "Image proj activation" }),
+      screen.getByRole("combobox", { name: "Projection activation" }),
       "gelu",
     );
     await user.selectOptions(screen.getByRole("combobox", { name: "State activation" }), "gelu");
@@ -897,7 +915,6 @@ describe("Configurator", () => {
         expect.objectContaining({
           policy: expect.objectContaining({
             conv_profile: "custom",
-            custom_cnn_final_relu: true,
             custom_conv_layers: expect.arrayContaining([
               expect.objectContaining({
                 kind: "conv",
@@ -905,6 +922,10 @@ describe("Configurator", () => {
               }),
               expect.objectContaining({
                 kind: "residual_pre",
+              }),
+              expect.objectContaining({
+                kind: "activation",
+                activation: "relu",
               }),
             ]),
           }),
@@ -1228,7 +1249,7 @@ describe("Configurator", () => {
     expect(screen.getByRole("combobox", { name: "CNN profile" })).toBeDisabled();
     expect(screen.getByLabelText("custom CNN layer 1 output channels")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add custom CNN conv layer" })).toBeDisabled();
-    expect(screen.getByRole("combobox", { name: "Activation" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Aux/policy/value activation" })).toBeEnabled();
 
     await user.click(screen.getByRole("button", { name: "Action" }));
     await user.click(screen.getByText("Control family"));

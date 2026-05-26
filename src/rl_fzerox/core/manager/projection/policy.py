@@ -13,7 +13,6 @@ def build_policy_data(config: ManagedRunConfig) -> dict[str, object]:
             "custom_conv_layers": [
                 layer.model_dump(mode="python") for layer in config.policy.custom_conv_layers
             ],
-            "custom_cnn_final_relu": config.policy.custom_cnn_final_relu,
             "features_dim": config.policy.features_dim,
             "image_projection_activation": config.policy.image_projection_activation,
             "state_net_arch": list(config.policy.state_net_arch),
@@ -64,7 +63,6 @@ def fork_policy_signature(train_config: TrainAppConfig) -> dict[str, object]:
             "custom_conv_layers": tuple(
                 layer.model_dump(mode="python") for layer in extractor.custom_conv_layers
             ),
-            "custom_cnn_final_relu": extractor.custom_cnn_final_relu,
             "features_dim": extractor.features_dim,
             "state_net_arch": tuple(extractor.state_net_arch or ()),
             "fusion_features_dim": extractor.fusion_features_dim,

@@ -27,6 +27,9 @@ export function formatLayerActivation(layer: ConvLayerPreview | null) {
   if (layer.kind === "conv") {
     return layer.post_activation ? "ReLU" : "none";
   }
+  if (layer.kind === "activation") {
+    return layer.activation ?? "relu";
+  }
   if (layer.kind === "residual_pre") {
     return "pre";
   }

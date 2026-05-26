@@ -9,7 +9,9 @@ from gymnasium import spaces
 from stable_baselines3.common.preprocessing import is_image_space_channels_first
 
 from rl_fzerox.core.domain.cnn import (
+    CnnActivationName,
     CnnLayerKind,
+    is_activation_cnn_layer,
     is_pooling_cnn_layer,
     is_residual_cnn_layer,
     normalize_cnn_layer_kind,
@@ -34,6 +36,7 @@ class ConvLayerSpec:
     stride: tuple[int, int]
     padding: tuple[int, int]
     post_activation: bool = True
+    activation: CnnActivationName | None = None
 
 
 ConvSpec = tuple[ConvLayerSpec, ...]
@@ -83,6 +86,22 @@ def _pool_layer(
     )
 
 
+def _activation_layer(
+    *,
+    out_channels: int,
+    activation: CnnActivationName,
+) -> ConvLayerSpec:
+    return ConvLayerSpec(
+        kind="activation",
+        out_channels=out_channels,
+        kernel_size=(1, 1),
+        stride=(1, 1),
+        padding=(0, 0),
+        post_activation=True,
+        activation=activation,
+    )
+
+
 def _residual_layer(
     out_channels: int,
     *,
@@ -127,7 +146,10 @@ def _impala_conv_sequence(out_channels: int) -> ConvSpec:
 
 
 IMPALA_LARGE_CNN_CONV_SPEC: ConvSpec = (
-    _impala_conv_sequence(16) + _impala_conv_sequence(32) + _impala_conv_sequence(32)
+    _impala_conv_sequence(16)
+    + _impala_conv_sequence(32)
+    + _impala_conv_sequence(32)
+    + (_activation_layer(out_channels=32, activation="relu"),)
 )
 
 
@@ -267,10 +289,20 @@ def _custom_conv_spec(
 
 def _custom_cnn_layer(layer: CustomConvLayerConfig) -> ConvLayerSpec:
     kind = _custom_cnn_layer_kind(layer.get("kind"))
+    if is_activation_cnn_layer(kind):
+        return _activation_layer(
+            out_channels=_custom_cnn_layer_int(layer, "out_channels", default=1),
+            activation=_custom_cnn_layer_activation(layer),
+        )
     kernel_size = _custom_cnn_layer_int(layer, "kernel_size")
     stride = _custom_cnn_layer_int(layer, "stride")
     padding = _custom_cnn_layer_int(layer, "padding", default=0)
-    validate_cnn_layer_geometry(kind=kind, kernel_size=kernel_size, padding=padding)
+    validate_cnn_layer_geometry(
+        kind=kind,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+    )
     return ConvLayerSpec(
         kind=kind,
         out_channels=_custom_cnn_layer_int(
@@ -316,6 +348,13 @@ def _custom_cnn_layer_bool(
     return value
 
 
+def _custom_cnn_layer_activation(layer: CustomConvLayerConfig) -> CnnActivationName:
+    value = layer.get("activation") or "relu"
+    if value == "relu" or value == "gelu":
+        return value
+    raise ValueError("custom CNN activation layers support activation='relu' or 'gelu'")
+
+
 def _custom_cnn_layer_kind(value: object) -> CnnLayerKind:
     if value is None:
         return "conv"
@@ -323,6 +362,8 @@ def _custom_cnn_layer_kind(value: object) -> CnnLayerKind:
 
 
 def cnn_layer_name(index: int, kind: CnnLayerKind) -> str:
+    if kind == "activation":
+        return f"act{index}"
     if kind == "residual_pre":
         return f"res-pre{index}"
     if kind == "residual_post":
@@ -335,7 +376,9 @@ def cnn_layer_name(index: int, kind: CnnLayerKind) -> str:
 
 
 def cnn_layer_output_channels(input_channels: int, layer_spec: ConvLayerSpec) -> int:
-    return input_channels if is_pooling_cnn_layer(layer_spec.kind) else layer_spec.out_channels
+    if is_pooling_cnn_layer(layer_spec.kind) or is_activation_cnn_layer(layer_spec.kind):
+        return input_channels
+    return layer_spec.out_channels
 
 
 def cnn_layer_output_shape(
@@ -344,6 +387,9 @@ def cnn_layer_output_shape(
     width: int,
     layer_spec: ConvLayerSpec,
 ) -> tuple[int, int]:
+    if is_activation_cnn_layer(layer_spec.kind):
+        return height, width
+
     first_height = _conv_output_size(
         height,
         layer_spec.kernel_size[0],

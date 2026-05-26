@@ -34,9 +34,10 @@ const actionHistoryControlSchema = z.enum([
   "pitch",
 ]);
 const convProfileSchema = z.enum(["nature", "impala_small", "impala_large", "custom"]);
+const customCnnActivationSchema = z.enum(["relu", "gelu"]);
 const customCnnLayerKindSchema = z.preprocess(
   (value) => (value === "residual" ? "residual_post" : value),
-  z.enum(["conv", "residual_pre", "residual_post", "maxpool", "avgpool"]),
+  z.enum(["conv", "residual_pre", "residual_post", "maxpool", "avgpool", "activation"]),
 );
 const auxiliaryStateTargetNameSchema = z.enum([
   "vehicle_state.speed_norm",
@@ -65,6 +66,7 @@ const customConvLayerSchema = z
     stride: z.number().int().positive(),
     padding: z.number().int().nonnegative(),
     post_activation: z.boolean().default(true),
+    activation: customCnnActivationSchema.nullable().optional(),
   })
   .refine(
     (layer) =>
@@ -73,6 +75,15 @@ const customConvLayerSchema = z
     {
       message: "residual CNN blocks require odd kernel_size and padding=kernel_size//2",
       path: ["padding"],
+    },
+  )
+  .refine(
+    (layer) =>
+      layer.kind !== "activation" ||
+      (layer.kernel_size === 1 && layer.stride === 1 && layer.padding === 0),
+    {
+      message: "activation CNN layers require kernel_size=1, stride=1, and padding=0",
+      path: ["kind"],
     },
   );
 
@@ -244,7 +255,6 @@ const observationConfigSchema = z.object({
 const policyConfigSchema = z.object({
   conv_profile: convProfileSchema,
   custom_conv_layers: z.array(customConvLayerSchema),
-  custom_cnn_final_relu: z.boolean(),
   features_dim: z.union([z.literal("auto"), z.number().int().positive()]),
   image_projection_activation: z.enum(["relu", "gelu", "tanh"]).default("relu"),
   state_net_arch: z.array(z.number().int().positive()),
@@ -659,6 +669,7 @@ const convLayerPreviewSchema = z.object({
   stride: z.number().int().positive(),
   padding: z.number().int().nonnegative(),
   post_activation: z.boolean(),
+  activation: customCnnActivationSchema.nullable().optional(),
   input_height: z.number().int().positive(),
   input_width: z.number().int().positive(),
   output_height: z.number().int().positive(),

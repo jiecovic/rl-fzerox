@@ -4,12 +4,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, TypeAlias
 
+CnnActivationName: TypeAlias = Literal["relu", "gelu"]
+
 CnnLayerKind: TypeAlias = Literal[
     "conv",
     "residual_pre",
     "residual_post",
     "maxpool",
     "avgpool",
+    "activation",
 ]
 
 
@@ -19,6 +22,7 @@ class _CnnLayerKindSpec:
     aliases: tuple[str, ...] = ()
     residual: bool = False
     pooling: bool = False
+    activation: bool = False
 
 
 _cnn_layer_kind_specs = (
@@ -27,6 +31,7 @@ _cnn_layer_kind_specs = (
     _CnnLayerKindSpec("residual_post", aliases=("residual",), residual=True),
     _CnnLayerKindSpec("maxpool", pooling=True),
     _CnnLayerKindSpec("avgpool", pooling=True),
+    _CnnLayerKindSpec("activation", activation=True),
 )
 
 
@@ -42,6 +47,10 @@ def is_residual_cnn_layer(kind: CnnLayerKind) -> bool:
 
 def is_pooling_cnn_layer(kind: CnnLayerKind) -> bool:
     return _cnn_layer_kind_spec(kind).pooling
+
+
+def is_activation_cnn_layer(kind: CnnLayerKind) -> bool:
+    return _cnn_layer_kind_spec(kind).activation
 
 
 def _cnn_layer_kind_spec(value: object) -> _CnnLayerKindSpec:
@@ -61,9 +70,19 @@ def residual_padding_for_kernel(kernel_size: int) -> int:
     return kernel_size // 2
 
 
-def validate_cnn_layer_geometry(*, kind: CnnLayerKind, kernel_size: int, padding: int) -> None:
+def validate_cnn_layer_geometry(
+    *,
+    kind: CnnLayerKind,
+    kernel_size: int,
+    stride: int,
+    padding: int,
+) -> None:
     """Validate layer-kind-specific shape constraints before PyTorch builds modules."""
 
+    if is_activation_cnn_layer(kind):
+        if kernel_size != 1 or stride != 1 or padding != 0:
+            raise ValueError("activation CNN layers require kernel_size=1, stride=1, padding=0")
+        return
     validate_residual_cnn_padding(kind=kind, kernel_size=kernel_size, padding=padding)
     if is_pooling_cnn_layer(kind) and padding > kernel_size // 2:
         raise ValueError("pooling CNN layers require padding<=kernel_size//2")

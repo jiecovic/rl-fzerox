@@ -7,11 +7,13 @@ import { ResetIcon } from "@/shared/ui/icons";
 
 export function ConfigPanel({
   children,
+  className,
   onReset,
   title,
   wide = false,
 }: {
   children: ReactNode;
+  className?: string;
   onReset?: () => void;
   title: string;
   wide?: boolean;
@@ -21,6 +23,7 @@ export function ConfigPanel({
       className={cn(
         "grid content-start items-start gap-3 border border-app-border bg-app-surface-muted p-3.5",
         wide ? "col-span-full" : undefined,
+        className,
       )}
     >
       <div className="flex items-center justify-between border-b border-app-border pb-2.5">
