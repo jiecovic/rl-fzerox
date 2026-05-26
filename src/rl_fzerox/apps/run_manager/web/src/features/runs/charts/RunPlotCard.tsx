@@ -8,6 +8,7 @@ import type {
 } from "@/features/runs/charts/run_plot_card/types";
 
 import { useRunPlot } from "@/features/runs/charts/run_plot_card/usePlot";
+import { IconButton } from "@/shared/ui/Button";
 import { ResetIcon } from "@/shared/ui/icons";
 
 export type { RunPlotPoint, RunPlotSeries };
@@ -20,29 +21,38 @@ export function RunPlotCard({ emptyText, formatValue, series, title }: RunPlotCa
     });
 
   return (
-    <div className="run-chart-card">
-      <div className="run-chart-card-header">
+    <div className="grid gap-3 border border-app-border bg-app-surface-muted p-3.5">
+      <div className="flex items-baseline justify-between gap-3">
         <strong>{title}</strong>
-        <div className="run-chart-card-actions">
+        <div className="inline-flex items-center gap-2">
           {hasZoom ? (
-            <button
+            <IconButton
               aria-label={`Reset ${title} zoom`}
-              className="icon-button compact-icon-button tooltip-anchor"
+              className="tooltip-anchor"
               data-tooltip="Reset zoom"
-              type="button"
+              size="compact"
               onClick={resetZoom}
             >
               <ResetIcon />
-            </button>
+            </IconButton>
           ) : null}
-          <span>{visibleSeries.length === 0 ? "n/a" : `${visibleSeries.length} runs`}</span>
+          <span className="text-xs text-app-muted">
+            {visibleSeries.length === 0 ? "n/a" : `${visibleSeries.length} runs`}
+          </span>
         </div>
       </div>
       {plotData === null ? (
-        <div className="run-chart-empty">{emptyText}</div>
+        <div className="border border-dashed border-app-border bg-app-surface px-3.5 py-5.5 text-xs text-app-muted">
+          {emptyText}
+        </div>
       ) : (
-        <div aria-label={title} className="run-chart-canvas-shell" ref={setShellNode} role="img">
-          <div className="run-chart-canvas" ref={plotRef} />
+        <div
+          aria-label={title}
+          className="relative min-h-[204px] pb-1.5"
+          ref={setShellNode}
+          role="img"
+        >
+          <div className="min-h-[204px] w-full" ref={plotRef} />
           {tooltip !== null ? (
             <div
               className="run-chart-tooltip"
