@@ -211,6 +211,12 @@ export function alignedDataFromSeries(series: readonly RunPlotSeries[]): PlotDat
   return [xValues, ...ySeries];
 }
 
+export function plotSeriesKey(series: readonly RunPlotSeries[]) {
+  return series
+    .map((entry) => [entry.runId, entry.name, entry.color].join("\u001f"))
+    .join("\u001e");
+}
+
 function cssColor(styles: CSSStyleDeclaration, variable: string, fallback: string) {
   const value = styles.getPropertyValue(variable).trim();
   return value === "" ? fallback : value;
