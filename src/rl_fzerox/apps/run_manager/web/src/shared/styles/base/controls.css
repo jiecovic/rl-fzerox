@@ -6,8 +6,7 @@ select {
 
 button:not(:disabled),
 select,
-[role="button"],
-.field-help {
+[role="button"] {
   cursor: pointer;
 }
 

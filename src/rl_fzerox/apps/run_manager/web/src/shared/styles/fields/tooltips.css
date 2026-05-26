@@ -1,35 +1,7 @@
-.field-help,
 .tooltip-anchor {
   position: relative;
 }
 
-.field-help {
-  display: inline-grid;
-  width: 16px;
-  height: 16px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--muted);
-  padding: 0;
-  cursor: help;
-  font-family: inherit;
-  font-size: 11px;
-  line-height: 1;
-}
-
-button.field-help:not(:disabled) {
-  cursor: help;
-}
-
-.field-help:hover,
-.field-help:focus-visible {
-  border-color: var(--border-strong);
-  color: var(--text);
-}
-
-.field-help::after,
 .tooltip-anchor::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -47,10 +19,6 @@ button.field-help:not(:disabled) {
   line-height: 1.35;
   pointer-events: none;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
-}
-
-.field-help::after {
-  width: 220px;
 }
 
 .tooltip-anchor::after {
@@ -72,8 +40,6 @@ button.field-help:not(:disabled) {
   transform: none;
 }
 
-.field-help:hover::after,
-.field-help:focus-visible::after,
 .tooltip-anchor:hover::after,
 .tooltip-anchor:focus-visible::after {
   display: block;
