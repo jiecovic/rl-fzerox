@@ -1,22 +1,3 @@
-.track-panel-grid {
-  align-items: stretch;
-}
-
-.track-choice-panel {
-  display: grid;
-  gap: 10px;
-}
-
-.track-sampling-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.track-choice-note,
-.track-pool-metric span,
-.track-pool-fragments span,
-.track-cup-header span,
 .course-card-copy span {
   margin: 0;
   color: var(--muted);
@@ -25,60 +6,19 @@
 }
 
 .course-card,
-.track-cup-header h4,
 .course-card-copy strong {
   text-align: left;
 }
 
-.course-card-copy strong,
-.track-cup-header h4 {
+.course-card-copy strong {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
 }
 
-.track-pool-shell,
 .track-cup-stack {
   display: grid;
   gap: 14px;
-}
-
-.track-pool-summary {
-  display: grid;
-  grid-template-columns: 140px 120px minmax(0, 1fr);
-  gap: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  padding: 12px 14px;
-}
-
-.track-pool-metric {
-  display: grid;
-  gap: 4px;
-}
-
-.track-pool-metric strong {
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.track-pool-fragments {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: center;
-  gap: 8px;
-}
-
-.track-pool-fragments span {
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  padding: 4px 8px;
-}
-
-.track-pool-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
 }
 
 .track-cup-section {
