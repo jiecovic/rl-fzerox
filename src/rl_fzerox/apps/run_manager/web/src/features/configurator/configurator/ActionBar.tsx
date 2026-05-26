@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/configurator/ActionBar.tsx
+import { Button, buttonClassName } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
 import { ResetIcon, SaveDraftIcon } from "@/shared/ui/icons";
 
 interface ActionBarProps {
@@ -33,8 +35,8 @@ export function ActionBar({
   onUpdateDraft,
 }: ActionBarProps) {
   return (
-    <div className="configurator-actions-row">
-      <div className="section-actions">
+    <div className="mb-4 flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <button
           className={saveButtonClass(hasLoadedDraft, isDirty)}
           type="button"
@@ -60,47 +62,61 @@ export function ActionBar({
           </button>
         ) : null}
         {hasLoadedDraft ? (
-          <button
-            className="secondary-button draft-action-button"
-            type="button"
+          <Button
+            className="gap-2 tabular-nums [&_svg]:shrink-0"
             disabled={isSaving || isUpdating || isTraining}
             onClick={onResetToDraft}
           >
             <ResetIcon />
             <span>Reset to draft</span>
-          </button>
+          </Button>
         ) : null}
-        <button
-          className="secondary-button draft-action-button"
-          type="button"
+        <Button
+          className="gap-2 tabular-nums [&_svg]:shrink-0"
           disabled={isSaving || isUpdating || isTraining}
           onClick={onResetToDefault}
         >
           <ResetIcon />
           <span>Reset to default</span>
-        </button>
-        <button className="primary-button" type="button" disabled={!canTrain} onClick={onTrain}>
+        </Button>
+        <Button variant="primary" disabled={!canTrain} onClick={onTrain}>
           {isTraining ? "Launching..." : "Train"}
-        </button>
+        </Button>
       </div>
     </div>
   );
 }
 
 function saveButtonClass(hasLoadedDraft: boolean, isDirty: boolean) {
-  return hasLoadedDraft || !isDirty
-    ? "secondary-button draft-action-button draft-commit-button draft-save-button"
-    : "secondary-button draft-action-button draft-commit-button draft-save-button dirty-action-button";
+  return buttonClassName({
+    className: cn(
+      "min-w-0 gap-2 tabular-nums [&_svg]:shrink-0",
+      hasLoadedDraft || !isDirty ? undefined : dirtyButtonClass,
+    ),
+  });
 }
 
 function updateButtonClass(isDirty: boolean) {
-  return isDirty
-    ? "secondary-button draft-action-button draft-commit-button draft-update-button dirty-action-button"
-    : "secondary-button draft-action-button draft-commit-button draft-update-button";
+  return buttonClassName({
+    className: cn(
+      "min-w-0 gap-2 tabular-nums [&_svg]:shrink-0",
+      isDirty ? dirtyButtonClass : undefined,
+    ),
+    variant: "accentSoft",
+  });
 }
 
 function UnsavedDot({ active }: { active: boolean }) {
   return (
-    <span aria-hidden="true" className={active ? "dirty-action-dot active" : "dirty-action-dot"} />
+    <span
+      aria-hidden="true"
+      className={cn(
+        "h-2 w-2 flex-none rounded-full bg-app-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_16%,transparent)]",
+        active ? "visible opacity-100" : "invisible opacity-0",
+      )}
+    />
   );
 }
+
+const dirtyButtonClass =
+  "border-app-accent shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_46%,transparent)]";

@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/ConfigDisclosure.tsx
 import type { ReactNode } from "react";
 
+import { IconButton } from "@/shared/ui/Button";
 import { ResetIcon } from "@/shared/ui/icons";
 
 export function ConfigDisclosure({
@@ -20,21 +21,25 @@ export function ConfigDisclosure({
 }) {
   return (
     <details
-      className="config-disclosure"
+      className="group border border-app-border bg-app-surface"
       open={open ?? defaultOpen}
       onToggle={(event) => onToggle?.(event.currentTarget.open)}
     >
-      <summary className="config-disclosure-summary">
-        <span className="config-disclosure-title">
-          <span className="config-disclosure-copy">
+      <summary className="grid min-h-12 cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 text-sm font-bold text-app-text [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="w-4 flex-none text-app-muted before:content-['▸'] group-open:before:content-['▾']"
+          />
+          <span className="grid min-w-0 gap-1">
             <strong>{title}</strong>
           </span>
         </span>
         {onReset !== undefined ? (
-          <button
+          <IconButton
             aria-label={`Reset ${title} defaults`}
-            className="reset-button"
-            type="button"
+            size="small"
+            tone="muted"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -42,10 +47,10 @@ export function ConfigDisclosure({
             }}
           >
             <ResetIcon />
-          </button>
+          </IconButton>
         ) : null}
       </summary>
-      <div className="config-disclosure-body">{children}</div>
+      <div className="grid gap-2.5 border-t border-app-border p-3">{children}</div>
     </details>
   );
 }

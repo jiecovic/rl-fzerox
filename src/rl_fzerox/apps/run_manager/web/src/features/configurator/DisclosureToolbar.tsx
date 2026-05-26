@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/DisclosureToolbar.tsx
+import { IconButton } from "@/shared/ui/Button";
 import { CollapseAllIcon, ExpandAllIcon } from "@/shared/ui/icons";
 
 interface DisclosureToolbarProps {
@@ -15,25 +16,25 @@ export function DisclosureToolbar({
   onCollapseAll,
 }: DisclosureToolbarProps) {
   return (
-    <div className="disclosure-toolbar">
-      <button
+    <div className="flex justify-end gap-2">
+      <IconButton
         aria-label={expandLabel}
-        className="icon-button compact-icon-button tooltip-anchor"
+        className="tooltip-anchor"
         data-tooltip="Expand all"
-        type="button"
+        size="compact"
         onClick={onExpandAll}
       >
         <ExpandAllIcon />
-      </button>
-      <button
+      </IconButton>
+      <IconButton
         aria-label={collapseLabel}
-        className="icon-button compact-icon-button tooltip-anchor"
+        className="tooltip-anchor"
         data-tooltip="Collapse all"
-        type="button"
+        size="compact"
         onClick={onCollapseAll}
       >
         <CollapseAllIcon />
-      </button>
+      </IconButton>
     </div>
   );
 }

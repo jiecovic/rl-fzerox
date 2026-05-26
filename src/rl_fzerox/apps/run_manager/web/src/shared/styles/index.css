@@ -4,3 +4,22 @@
 @import "./configurator/index.css";
 @import "./runs/index.css";
 @import "./shared/index.css";
+
+@theme inline {
+  --color-app-background: var(--background);
+  --color-app-surface: var(--surface);
+  --color-app-surface-muted: var(--surface-muted);
+  --color-app-border: var(--border);
+  --color-app-border-strong: var(--border-strong);
+  --color-app-grid: var(--grid);
+  --color-app-text: var(--text);
+  --color-app-muted: var(--muted);
+  --color-app-accent: var(--accent);
+  --color-app-run-accent: var(--run-accent);
+  --color-app-accent-text: var(--accent-text);
+  --color-app-danger: var(--danger);
+  --color-app-field-active: var(--field-active);
+  --color-app-focus-ring: var(--focus-ring);
+  --color-app-selection-background: var(--selection-background);
+  --color-app-selection-text: var(--selection-text);
+}
