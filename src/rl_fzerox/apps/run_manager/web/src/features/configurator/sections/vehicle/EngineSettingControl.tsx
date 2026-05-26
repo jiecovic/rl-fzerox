@@ -8,6 +8,7 @@ import type {
   EngineMode,
   SliderTick,
 } from "@/features/configurator/sections/vehicle/engineSetting/types";
+import { FieldInput, FieldShell } from "@/shared/ui/Field";
 
 interface EngineSettingControlProps {
   defaultFixedValue: number;
@@ -52,10 +53,10 @@ export function EngineSettingControl({
         : () => onRangeChange({ max: defaultRangeMax, min: defaultRangeMin });
 
   return (
-    <div className="field-shell vehicle-engine-control">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler} />
-      <div className="vehicle-engine-control-row">
-        <div className="vehicle-engine-slider-slot">
+      <div className="grid grid-cols-[minmax(0,1fr)_176px] items-center gap-3 max-[720px]:grid-cols-1">
+        <div className="min-w-0">
           {mode === "fixed" ? (
             <SingleSlider
               label={label}
@@ -79,12 +80,12 @@ export function EngineSettingControl({
             />
           )}
         </div>
-        <div className="vehicle-engine-value-slot">
+        <div className="w-[176px] max-[720px]:w-full">
           {mode === "fixed" ? (
-            <div className="vehicle-engine-value-shell">
-              <input
+            <div className="grid grid-cols-[repeat(2,84px)] justify-end gap-2 max-[720px]:justify-start">
+              <FieldInput
                 aria-label={label}
-                className="vehicle-engine-value-single"
+                className="col-span-2 !h-[34px] !w-[176px] text-center tabular-nums"
                 inputMode="numeric"
                 max={max}
                 min={min}
@@ -96,9 +97,10 @@ export function EngineSettingControl({
               />
             </div>
           ) : (
-            <div className="vehicle-engine-value-shell">
-              <input
+            <div className="grid grid-cols-[repeat(2,84px)] justify-end gap-2 max-[720px]:justify-start">
+              <FieldInput
                 aria-label={`${label} minimum`}
+                className="!h-[34px] !w-[84px] text-center tabular-nums"
                 inputMode="numeric"
                 max={rangeMax}
                 min={min}
@@ -113,8 +115,9 @@ export function EngineSettingControl({
                   })
                 }
               />
-              <input
+              <FieldInput
                 aria-label={`${label} maximum`}
+                className="!h-[34px] !w-[84px] text-center tabular-nums"
                 inputMode="numeric"
                 max={max}
                 min={rangeMin}
@@ -133,6 +136,6 @@ export function EngineSettingControl({
           )}
         </div>
       </div>
-    </div>
+    </FieldShell>
   );
 }

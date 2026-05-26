@@ -17,6 +17,7 @@ import {
 } from "@/features/configurator/sections/vehicle/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
 
 interface VehicleSectionProps {
   config: ManagedRunConfig;
@@ -164,11 +165,11 @@ export function VehicleSection({
           }
           title="Engine setting"
         >
-          <div className="vehicle-engine-panel">
-            <div className="vehicle-engine-mode-row">
-              <div className="vehicle-engine-mode-copy">
-                <strong>Random range</strong>
-                <small>
+          <div className="grid gap-3">
+            <div className="grid min-h-[34px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+              <div className="grid gap-1">
+                <strong className="text-[13px] text-app-text">Random range</strong>
+                <small className="m-0 text-xs leading-snug text-app-muted">
                   {config.vehicle.engine_mode === "fixed"
                     ? "Keep one global slider value for every selected machine."
                     : "Resample one global slider value inside the selected range on each reset."}
@@ -236,7 +237,7 @@ export function VehicleSection({
         title="Machine roster"
         wide
       >
-        <div className="vehicle-roster-shell">
+        <div className="grid gap-3">
           <div className="section-toolbar-row">
             <div className="flex flex-wrap gap-2">
               <Button
@@ -264,7 +265,7 @@ export function VehicleSection({
             />
           </div>
 
-          <div className="vehicle-row-stack">
+          <div className="grid gap-3">
             {rows.map((row) => {
               const rowSelectedCount = row.vehicles.filter((vehicle) =>
                 selectedVehicleSet.has(vehicle.id),
@@ -274,13 +275,13 @@ export function VehicleSection({
               const rowCollapsed = collapsedRowIdSet.has(row.id);
               return (
                 <details
-                  className="config-disclosure vehicle-row-section"
+                  className="config-disclosure"
                   key={row.id}
                   open={!rowCollapsed}
                   onToggle={(event) => setRowCollapsed(row.id, !event.currentTarget.open)}
                 >
-                  <summary className="config-disclosure-summary vehicle-row-summary">
-                    <span className="config-disclosure-title vehicle-row-summary-label">
+                  <summary className="config-disclosure-summary hover:border-app-border-strong">
+                    <span className="config-disclosure-title min-w-0">
                       <span className="config-disclosure-copy">
                         <strong>{row.label}</strong>
                         <small>
@@ -288,7 +289,7 @@ export function VehicleSection({
                         </small>
                       </span>
                     </span>
-                    <div className="vehicle-row-controls">
+                    <div className="inline-flex items-center gap-2">
                       <ToggleSwitch
                         checked={rowFullySelected}
                         hideLabel
@@ -299,7 +300,7 @@ export function VehicleSection({
                     </div>
                   </summary>
                   <div className="config-disclosure-body">
-                    <div className="vehicle-card-grid">
+                    <div className="grid grid-cols-6 gap-3 max-[1080px]:grid-cols-3">
                       {row.vehicles.map((vehicle) => {
                         const selected = selectedVehicleSet.has(vehicle.id);
                         const isOnlySelected = selected && selectedVehicleIds.length === 1;
@@ -308,13 +309,7 @@ export function VehicleSection({
                             aria-label={vehicle.display_name}
                             aria-disabled={isOnlySelected || undefined}
                             aria-pressed={selected}
-                            className={
-                              selected
-                                ? isOnlySelected
-                                  ? "vehicle-card selected blocked"
-                                  : "vehicle-card selected"
-                                : "vehicle-card"
-                            }
+                            className={vehicleCardClass(selected, isOnlySelected)}
                             key={vehicle.id}
                             type="button"
                             onClick={() => {
@@ -323,12 +318,23 @@ export function VehicleSection({
                               }
                             }}
                           >
-                            <span className="vehicle-card-mark">
+                            <span
+                              className={cn(
+                                "inline-flex w-fit min-w-[54px] items-center justify-center border border-app-border bg-app-surface px-2 py-1 text-[11px] tabular-nums text-app-muted uppercase",
+                                selected
+                                  ? "border-[color-mix(in_srgb,var(--accent)_52%,var(--border))] text-app-text"
+                                  : undefined,
+                              )}
+                            >
                               {vehicleSlotLabel(vehicle.machine_select_slot)}
                             </span>
-                            <div className="vehicle-card-copy">
-                              <strong>{vehicle.display_name}</strong>
-                              <span>Machine {vehicle.character_index + 1}</span>
+                            <div className="grid gap-1">
+                              <strong className="text-sm font-bold text-app-text">
+                                {vehicle.display_name}
+                              </strong>
+                              <span className="m-0 text-xs leading-snug text-app-muted">
+                                Machine {vehicle.character_index + 1}
+                              </span>
                             </div>
                           </button>
                         );
@@ -356,4 +362,14 @@ function VehicleMetric({ label, value }: { label: string; value: string }) {
 
 function arraysEqual(left: readonly string[], right: readonly string[]) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function vehicleCardClass(selected: boolean, blocked: boolean) {
+  return cn(
+    "vehicle-card grid min-h-[104px] gap-3 border border-app-border bg-app-surface-muted p-3 text-left hover:border-app-border-strong",
+    selected
+      ? "border-app-accent bg-[color-mix(in_srgb,var(--accent)_9%,var(--surface-muted))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]"
+      : undefined,
+    blocked ? "cursor-not-allowed" : undefined,
+  );
 }

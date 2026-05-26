@@ -11,6 +11,7 @@ import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCup
 import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinimap";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
+import { cn } from "@/shared/ui/cn";
 
 interface TracksSectionProps {
   config: ManagedRunConfig;
@@ -404,7 +405,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
             />
           </div>
 
-          <div className="track-cup-stack">
+          <div className="grid gap-3.5">
             {cups.map((cup) => {
               const selectedCount = cup.courses.filter((course) =>
                 selectedCourseSet.has(course.id),
@@ -423,15 +424,17 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                   open={!cupCollapsed}
                   onToggle={(event) => setCupCollapsed(cup.id, !event.currentTarget.open)}
                 >
-                  <summary className="config-disclosure-summary track-cup-summary">
-                    <span className="config-disclosure-title track-cup-summary-label">
+                  <summary className="config-disclosure-summary hover:border-app-border-strong">
+                    <span className="config-disclosure-title flex min-w-0 items-center gap-3">
                       <TrackCupBanner cupId={cup.id} label={cup.label} />
-                      <div className="track-cup-title-copy config-disclosure-copy">
-                        <strong>{cup.label}</strong>
-                        <small>{selectedCount} selected</small>
+                      <div className="grid min-w-0 gap-1">
+                        <strong className="block text-sm">{cup.label}</strong>
+                        <small className="text-xs font-medium text-app-muted">
+                          {selectedCount} selected
+                        </small>
                       </div>
                     </span>
-                    <div className="track-cup-controls">
+                    <div className={cupSwitchGroupClass}>
                       <button
                         aria-label={`${allCupCoursesSelected ? "Disable" : "Enable"} ${cup.label}`}
                         aria-pressed={allCupCoursesSelected}
@@ -455,7 +458,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                     </div>
                   </summary>
                   <div className="config-disclosure-body">
-                    <div className="track-card-grid">
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(164px,1fr))] gap-3">
                       {cup.courses.map((course) => {
                         const isSelected = selectedCourseSet.has(course.id);
                         const isOnlySelected =
@@ -464,7 +467,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                           <button
                             aria-label={course.display_name}
                             aria-pressed={isSelected}
-                            className={isSelected ? "course-card selected" : "course-card"}
+                            className={courseCardClass(isSelected)}
                             data-cup={cup.id}
                             disabled={isOnlySelected}
                             key={course.id}
@@ -472,9 +475,11 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                             onClick={() => toggleCourse(course.id)}
                           >
                             <TrackMinimap courseId={course.id} cup={course.cup} />
-                            <div className="course-card-copy">
-                              <strong>{course.display_name}</strong>
-                              <span>
+                            <div className="grid gap-1 text-left">
+                              <strong className="m-0 text-sm font-bold">
+                                {course.display_name}
+                              </strong>
+                              <span className="m-0 text-xs leading-snug text-app-muted">
                                 {cup.label} · Course {course.cup_order_index}
                               </span>
                             </div>
@@ -492,12 +497,12 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
               open={!xCupCollapsed}
               onToggle={(event) => setCupCollapsed("x", !event.currentTarget.open)}
             >
-              <summary className="config-disclosure-summary track-cup-summary">
-                <span className="config-disclosure-title track-cup-summary-label">
+              <summary className="config-disclosure-summary hover:border-app-border-strong">
+                <span className="config-disclosure-title flex min-w-0 items-center gap-3">
                   <TrackCupBanner cupId="x" label="X Cup" />
-                  <div className="track-cup-title-copy config-disclosure-copy">
-                    <strong>X Cup</strong>
-                    <small>
+                  <div className="grid min-w-0 gap-1">
+                    <strong className="block text-sm">X Cup</strong>
+                    <small className="text-xs font-medium text-app-muted">
                       {xCupEnabled
                         ? `${config.tracks.x_cup_course_count} generated`
                         : xCupAvailable
@@ -506,7 +511,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                     </small>
                   </div>
                 </span>
-                <div className="track-cup-controls">
+                <div className={cupSwitchGroupClass}>
                   <button
                     aria-label={`${xCupEnabled ? "Disable" : "Enable"} X Cup`}
                     aria-pressed={xCupEnabled}
@@ -536,21 +541,19 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                 </div>
               </summary>
               <div className="config-disclosure-body">
-                <div className="track-card-grid">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(164px,1fr))] gap-3">
                   <div
-                    className={
-                      xCupEnabled
-                        ? "course-card selected track-xcup-course-card"
-                        : "course-card track-xcup-course-card"
-                    }
+                    className={courseCardClass(xCupEnabled, "cursor-default min-h-0")}
                     data-cup="x"
                   >
                     <div className="course-minimap">
                       <TrackCupBanner cupId="x" label="X Cup" large />
                     </div>
-                    <div className="course-card-copy">
-                      <strong>Generated courses</strong>
-                      <span>Deterministic GP X Cup baselines materialized at training start.</span>
+                    <div className="grid gap-1 text-left">
+                      <strong className="m-0 text-sm font-bold">Generated courses</strong>
+                      <span className="m-0 text-xs leading-snug text-app-muted">
+                        Deterministic GP X Cup baselines materialized at training start.
+                      </span>
                     </div>
                     <IntegerField
                       help="Number of generated X Cup baselines materialized before training starts."
@@ -606,4 +609,17 @@ function formatTrackOptionLabel(value: string) {
 
 function shortCupLabel(label: string) {
   return label.replace(" Cup", "");
+}
+
+const cupSwitchGroupClass =
+  "inline-flex items-center gap-2 [&_.switch-button.active>span]:bg-app-surface [&_.switch-button.active]:border-[color:var(--cup-accent)] [&_.switch-button.active]:bg-[color-mix(in_srgb,var(--cup-accent)_88%,var(--surface))] [&_.switch-button]:w-[46px]";
+
+function courseCardClass(selected: boolean, className?: string) {
+  return cn(
+    "course-card grid min-h-[138px] gap-2 border border-app-border bg-app-surface-muted p-2.5 text-left hover:border-app-border-strong",
+    selected
+      ? "border-[color:var(--cup-accent)] bg-[color-mix(in_srgb,var(--cup-accent)_11%,var(--surface-muted))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--cup-accent)_24%,transparent)]"
+      : undefined,
+    className,
+  );
 }
