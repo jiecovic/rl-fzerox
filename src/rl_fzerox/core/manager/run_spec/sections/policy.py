@@ -14,7 +14,9 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.cnn import (
+    CnnActivationName,
     CnnLayerKind,
+    is_activation_cnn_layer,
     normalize_cnn_layer_kind,
     validate_cnn_layer_geometry,
 )
@@ -59,6 +61,7 @@ class ManagedPolicyConfig(BaseModel):
         stride: PositiveInt
         padding: NonNegativeInt = 0
         post_activation: bool = True
+        activation: CnnActivationName | None = None
 
         @field_validator("kind", mode="before")
         @classmethod
@@ -70,15 +73,21 @@ class ManagedPolicyConfig(BaseModel):
             validate_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
+                stride=int(self.stride),
                 padding=int(self.padding),
             )
+            return self
+
+        @model_validator(mode="after")
+        def _validate_activation_name(self) -> ManagedPolicyConfig.CustomConvLayer:
+            if is_activation_cnn_layer(self.kind) and self.activation is None:
+                self.activation = "relu"
             return self
 
     conv_profile: ConvProfile = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = Field(
         default_factory=lambda: default_custom_conv_layers()
     )
-    custom_cnn_final_relu: bool = False
     features_dim: FeatureDim = "auto"
     image_projection_activation: ActivationName = "relu"
     state_net_arch: tuple[PositiveInt, ...] = (64,)

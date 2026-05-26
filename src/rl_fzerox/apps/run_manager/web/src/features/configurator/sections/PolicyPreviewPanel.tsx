@@ -152,6 +152,7 @@ function customConvLayersFromPreview(
     stride: layer.stride,
     padding: layer.padding,
     post_activation: layer.post_activation,
+    activation: layer.activation,
   }));
 }
 

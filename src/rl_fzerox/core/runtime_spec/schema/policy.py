@@ -6,7 +6,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
 from rl_fzerox.core.domain.cnn import (
+    CnnActivationName,
     CnnLayerKind,
+    is_activation_cnn_layer,
     normalize_cnn_layer_kind,
     validate_cnn_layer_geometry,
 )
@@ -40,6 +42,7 @@ class ExtractorConfig(BaseModel):
         stride: PositiveInt
         padding: int = Field(default=0, ge=0)
         post_activation: bool = True
+        activation: CnnActivationName | None = None
 
         @field_validator("kind", mode="before")
         @classmethod
@@ -51,8 +54,15 @@ class ExtractorConfig(BaseModel):
             validate_cnn_layer_geometry(
                 kind=self.kind,
                 kernel_size=int(self.kernel_size),
+                stride=int(self.stride),
                 padding=int(self.padding),
             )
+            return self
+
+        @model_validator(mode="after")
+        def _validate_activation_name(self) -> ExtractorConfig.CustomConvLayer:
+            if is_activation_cnn_layer(self.kind) and self.activation is None:
+                self.activation = "relu"
             return self
 
     conv_profile: Literal[
@@ -62,7 +72,6 @@ class ExtractorConfig(BaseModel):
         "custom",
     ] = "nature"
     custom_conv_layers: tuple[CustomConvLayer, ...] = ()
-    custom_cnn_final_relu: bool = False
     features_dim: PositiveInt | Literal["auto"] = 512
     image_projection_activation: ActivationName = "relu"
     state_features_dim: PositiveInt = 64

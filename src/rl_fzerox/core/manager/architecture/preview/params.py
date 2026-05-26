@@ -1,7 +1,11 @@
 # src/rl_fzerox/core/manager/architecture/preview/params.py
 from __future__ import annotations
 
-from rl_fzerox.core.domain.cnn import is_pooling_cnn_layer, is_residual_cnn_layer
+from rl_fzerox.core.domain.cnn import (
+    is_activation_cnn_layer,
+    is_pooling_cnn_layer,
+    is_residual_cnn_layer,
+)
 from rl_fzerox.core.manager.architecture.models import ConvLayerPreview
 from rl_fzerox.core.manager.run_spec import ConvProfile, ManagedRunConfig
 from rl_fzerox.core.policy.extractors import (
@@ -69,6 +73,7 @@ def conv_layer_previews(
                 stride=stride,
                 padding=padding,
                 post_activation=layer.post_activation,
+                activation=layer.activation,
                 input_height=input_height,
                 input_width=input_width,
                 output_height=output_height,
@@ -107,6 +112,8 @@ def conv_params(*, in_channels: int, out_channels: int, kernel_size: int) -> int
 
 def cnn_layer_params(*, in_channels: int, layer: ConvLayerSpec) -> int:
     if is_pooling_cnn_layer(layer.kind):
+        return 0
+    if is_activation_cnn_layer(layer.kind):
         return 0
     kernel_size = int(layer.kernel_size[0])
     params = conv_params(

@@ -1176,6 +1176,7 @@ async def test_manager_api_previews_impala_large_cnn_profile(tmp_path: Path) -> 
         "maxpool",
         "residual_pre",
         "residual_pre",
+        "activation",
     ]
     assert [layer["post_activation"] for layer in payload["conv_layers"][:2]] == [False, True]
     layer_shapes = [
@@ -1198,8 +1199,9 @@ async def test_manager_api_previews_impala_large_cnn_profile(tmp_path: Path) -> 
         (32, 9, 12),
         (32, 9, 12),
         (32, 9, 12),
+        (32, 9, 12),
     ]
-    assert pixel_drops == [(0, 0)] * 12
+    assert pixel_drops == [(0, 0)] * 13
     assert payload["image_features_dim"] == 3_456
 
 
