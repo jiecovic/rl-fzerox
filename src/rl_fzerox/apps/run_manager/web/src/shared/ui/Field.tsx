@@ -1,8 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/ui/Field.tsx
+import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import type {
   ButtonHTMLAttributes,
   HTMLAttributes,
   InputHTMLAttributes,
+  ReactNode,
   SelectHTMLAttributes,
 } from "react";
 
@@ -15,9 +17,11 @@ interface SwitchButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   label: string;
 }
 
-interface SegmentedChoiceButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface SegmentedChoiceButtonProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "value"> {
   active: boolean;
   disabledChoice?: boolean;
+  value: string;
 }
 
 const fieldInputClass =
@@ -118,15 +122,38 @@ export function optionalNumberRowClass(disabled: boolean) {
   );
 }
 
-export function SegmentedChoiceGroup({ className, ...props }: HTMLAttributes<HTMLFieldSetElement>) {
+interface SegmentedChoiceGroupProps {
+  children: ReactNode;
+  className?: string;
+  label: string;
+  onValueChange: (value: string) => void;
+  value: string;
+}
+
+export function SegmentedChoiceGroup({
+  children,
+  className,
+  label,
+  onValueChange,
+  value,
+}: SegmentedChoiceGroupProps) {
   return (
-    <fieldset
+    <ToggleGroup.Root
+      aria-label={label}
       className={cn(
-        "m-0 inline-flex min-w-0 border border-app-border bg-app-surface-muted p-0",
+        "inline-flex w-fit max-w-full min-w-0 flex-wrap justify-self-start overflow-hidden rounded-lg border border-app-border bg-app-surface-muted p-0.5",
         className,
       )}
-      {...props}
-    />
+      type="single"
+      value={value}
+      onValueChange={(nextValue) => {
+        if (nextValue !== "") {
+          onValueChange(nextValue);
+        }
+      }}
+    >
+      {children}
+    </ToggleGroup.Root>
   );
 }
 
@@ -134,24 +161,21 @@ export function SegmentedChoiceButton({
   active,
   className,
   disabledChoice = false,
-  type = "button",
   ...props
 }: SegmentedChoiceButtonProps) {
   return (
-    <button
+    <ToggleGroup.Item
       className={cn(
-        "h-8 min-w-0 border-0 border-r border-app-border bg-transparent px-3.5 text-xs font-semibold whitespace-nowrap text-app-muted last:border-r-0",
-        active ? "bg-app-surface text-app-text shadow-[inset_0_2px_0_var(--accent)]" : undefined,
+        "min-h-8 min-w-0 rounded-md border border-transparent px-3.5 text-sm font-medium whitespace-nowrap text-app-muted transition-colors",
+        active ? "border-app-border-strong bg-app-surface text-app-text" : undefined,
+        disabledChoice ? "cursor-not-allowed opacity-55" : undefined,
         !active && !disabledChoice
-          ? "hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface))] hover:text-app-text"
+          ? "hover:bg-[color-mix(in_srgb,var(--accent)_8%,var(--surface-muted))] hover:text-app-text"
           : undefined,
-        disabledChoice
-          ? "cursor-not-allowed text-[color-mix(in_srgb,var(--muted)_78%,transparent)] hover:bg-transparent hover:text-[color-mix(in_srgb,var(--muted)_78%,transparent)]"
-          : undefined,
-        active && disabledChoice ? "hover:bg-app-surface hover:text-app-text" : undefined,
         className,
       )}
-      type={type}
+      data-disabled={disabledChoice ? "" : undefined}
+      disabled={disabledChoice}
       {...props}
     />
   );
