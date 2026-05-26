@@ -192,15 +192,17 @@
 }
 
 .state-feature-aux-weight-input {
-  width: 68px;
-  min-width: 68px;
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-  padding: 4px 6px;
+  padding: 4px;
   text-align: right;
+  text-indent: 0;
 }
 
 .state-feature-aux-weight-input:disabled {
@@ -210,6 +212,7 @@
 
 .state-feature-aux-weight {
   display: inline-flex;
+  flex: 0 0 64px;
   align-items: center;
   gap: 0;
   color: var(--muted);
