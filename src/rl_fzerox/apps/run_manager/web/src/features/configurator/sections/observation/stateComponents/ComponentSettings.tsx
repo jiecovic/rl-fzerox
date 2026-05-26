@@ -20,7 +20,7 @@ export function ComponentSettings({
     return null;
   }
   return (
-    <div className="state-component-settings">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,240px))] gap-3">
       {component.name === "control_history" ? (
         <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
           <IntegerField
@@ -32,7 +32,9 @@ export function ComponentSettings({
           />
         </fieldset>
       ) : null}
-      {disabled ? <span className="state-component-disabled">category disabled</span> : null}
+      {disabled ? (
+        <span className="self-end text-[13px] text-app-muted">category disabled</span>
+      ) : null}
     </div>
   );
 }

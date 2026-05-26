@@ -3,6 +3,7 @@ import { PolicyArchitectureDiagram } from "@/features/configurator/sections/Poli
 import { formatParamCount } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import { CustomConvTableRows } from "@/features/configurator/sections/policy/LayerEditors";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 
 export function PolicyPreviewPanel({
   checkpointLocked = false,
@@ -20,7 +21,11 @@ export function PolicyPreviewPanel({
   setCustomConvLayers: (value: ManagedRunConfig["policy"]["custom_conv_layers"]) => void;
 }) {
   if (preview === null) {
-    return <div className="preview-placeholder">Computing architecture preview...</div>;
+    return (
+      <div className="border border-app-border bg-app-surface p-4 text-app-muted">
+        Computing architecture preview...
+      </div>
+    );
   }
   const isCustomProfile = convProfile === "custom";
   const canConvertPreset = !checkpointLocked && !isCustomProfile;
@@ -32,13 +37,13 @@ export function PolicyPreviewPanel({
     : customConvLayersFromPreview(preview.conv_layers);
 
   return (
-    <div className="policy-preview-grid">
-      <section className="architecture-flow-panel">
-        <h3>Architecture</h3>
-        <div className="architecture-graph-shell">
-          <div className="architecture-total-summary-box">
-            <span className="architecture-total-label">total params</span>
-            <strong className="architecture-total-value">
+    <div className="grid gap-3">
+      <section className={previewPanelClass}>
+        <h3 className={previewHeadingClass}>Architecture</h3>
+        <div className="relative">
+          <div className="absolute left-3 top-3 z-[3] grid min-w-[132px] gap-1 border border-app-border-strong bg-app-surface px-2.5 py-2">
+            <span className="text-[9px] tabular-nums text-app-muted">total params</span>
+            <strong className="text-[13px] font-bold tabular-nums text-app-text">
               {formatParamCount(preview.total_params)}
             </strong>
           </div>
@@ -46,17 +51,13 @@ export function PolicyPreviewPanel({
         </div>
       </section>
 
-      <section className="conv-table-panel" id="policy-cnn-configurator">
-        <div className="conv-table-heading">
-          <h3>CNN layers</h3>
+      <section className={previewPanelClass} id="policy-cnn-configurator">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h3 className="m-0 text-[15px] font-semibold text-app-text">CNN layers</h3>
           {canConvertPreset ? (
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => convertPresetToCustom(editableConvLayers)}
-            >
+            <Button className="h-8 px-3" onClick={() => convertPresetToCustom(editableConvLayers)}>
               Edit as custom
-            </button>
+            </Button>
           ) : null}
         </div>
         <table className="derived-table conv-derived-table conv-derived-table-custom">
@@ -89,9 +90,9 @@ export function PolicyPreviewPanel({
         </table>
       </section>
 
-      <section className="shape-panel">
-        <h3>Feature dimensions</h3>
-        <div className="shape-summary-grid compact">
+      <section className={previewPanelClass}>
+        <h3 className={previewHeadingClass}>Feature dimensions</h3>
+        <div className="grid grid-cols-3 gap-2.5 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
           <ShapeMetric label="Flatten" value={preview.flatten_dim.toLocaleString()} />
           <ShapeMetric label="Image features" value={preview.image_features_dim.toLocaleString()} />
           <ShapeMetric
@@ -115,8 +116,8 @@ export function PolicyPreviewPanel({
         </div>
       </section>
 
-      <section className="shape-panel">
-        <h3>Action head</h3>
+      <section className={previewPanelClass}>
+        <h3 className={previewHeadingClass}>Action head</h3>
         <table className="derived-table">
           <thead>
             <tr>
@@ -173,9 +174,9 @@ function branchStatus(branch: PolicyArchitecturePreview["action_branches"][numbe
 
 function ShapeMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="shape-metric">
-      <span>{label}</span>
-      <strong>{formatPreviewText(value)}</strong>
+    <div className="border border-app-border bg-app-surface p-2.5">
+      <span className="mb-1 block text-xs text-app-muted">{label}</span>
+      <strong className="font-bold tabular-nums text-app-text">{formatPreviewText(value)}</strong>
     </div>
   );
 }
@@ -183,3 +184,6 @@ function ShapeMetric({ label, value }: { label: string; value: string }) {
 function formatPreviewText(value: string) {
   return value.replaceAll(" -> ", " → ");
 }
+
+const previewPanelClass = "col-span-full border border-app-border bg-app-surface p-3";
+const previewHeadingClass = "mb-3 text-[15px] font-semibold text-app-text";

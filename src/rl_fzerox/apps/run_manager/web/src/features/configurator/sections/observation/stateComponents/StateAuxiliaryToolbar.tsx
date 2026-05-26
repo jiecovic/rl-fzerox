@@ -8,10 +8,12 @@ interface StateAuxiliaryToolbarProps {
 
 export function StateAuxiliaryToolbar({ enabled, onChange }: StateAuxiliaryToolbarProps) {
   return (
-    <div className="state-auxiliary-toolbar">
-      <span className="state-auxiliary-toolbar-copy">
-        <strong>Auxiliary RAM supervision</strong>
-        <small>Optional supervised targets over the shared policy latent.</small>
+    <div className="flex items-center justify-between gap-3 border border-app-border bg-app-surface-muted px-3 py-2.5">
+      <span className="grid gap-0.5">
+        <strong className="text-[13px] text-app-text">Auxiliary RAM supervision</strong>
+        <small className="text-xs text-app-muted">
+          Optional supervised targets over the shared policy latent.
+        </small>
       </span>
       <ToggleSwitch
         checked={enabled}

@@ -129,7 +129,7 @@ export function StateComponentPanels({
   }
 
   return (
-    <div className="state-vector-editor">
+    <div className="grid gap-2.5">
       <StateAuxiliaryToolbar
         enabled={config.policy.auxiliary_state_enabled}
         onChange={setAuxiliaryStateEnabled}
