@@ -8,6 +8,7 @@ import {
   successSummary,
 } from "@/features/runs/track_pool_panel/model";
 import type { TrackPoolCourseView, TrackPoolCupView } from "@/features/runs/track_pool_panel/types";
+import { cn } from "@/shared/ui/cn";
 
 interface DistributionBarProps {
   kind: "sample" | "success" | "episodes" | "steps";
@@ -24,18 +25,21 @@ export function DistributionBar({ kind, label, targetValue, value }: Distributio
   return (
     <button
       aria-label={label}
-      className="run-track-distribution-bar-cell tooltip-anchor"
+      className="tooltip-anchor grid h-full items-end"
       data-tooltip={label}
       type="button"
     >
-      <div aria-hidden="true" className="run-track-distribution-bar">
+      <div
+        aria-hidden="true"
+        className="relative h-full overflow-hidden border border-app-border bg-app-surface-muted"
+      >
         <div
-          className={`run-track-distribution-bar-fill run-track-distribution-bar-fill-${kind}`}
+          className={`absolute inset-x-0 bottom-0 run-track-distribution-bar-fill-${kind}`}
           style={{ height: `${Math.max(0, Math.min(value, 1)) * 100}%` }}
         />
         {clampedTarget === null ? null : (
           <div
-            className={`run-track-distribution-bar-target run-track-distribution-bar-target-${kind}`}
+            className="run-track-distribution-bar-target pointer-events-none absolute -left-px -right-px z-[1] translate-y-1/2"
             style={{ bottom: `${clampedTarget * 100}%` }}
           />
         )}
@@ -51,10 +55,10 @@ interface LegendItemProps {
 
 export function LegendItem({ kind, label }: LegendItemProps) {
   return (
-    <span className="run-track-distribution-legend-item">
+    <span className="inline-flex items-center gap-1.5 text-xs text-app-muted">
       <span
         aria-hidden="true"
-        className={`run-track-distribution-legend-swatch run-track-distribution-legend-swatch-${kind}`}
+        className={`h-2.5 w-2.5 run-track-distribution-legend-swatch-${kind}`}
       />
       {label}
     </span>
@@ -74,22 +78,22 @@ export function CupTabs({
     return null;
   }
   return (
-    <div className="run-track-distribution-tabs" role="tablist" aria-label="Track pool cups">
+    <div
+      className="flex flex-wrap gap-1.5 border-b border-app-border px-3.5 py-2.5"
+      role="tablist"
+      aria-label="Track pool cups"
+    >
       {cups.map((cup) => (
         <button
           aria-selected={cup.id === activeCup?.id}
-          className={
-            cup.id === activeCup?.id
-              ? "run-track-distribution-tab active"
-              : "run-track-distribution-tab"
-          }
+          className={trackCupTabClass(cup.id === activeCup?.id)}
           key={cup.id}
           role="tab"
           type="button"
           onClick={() => onSelectCup(cup.id)}
         >
           <span>{shortCupLabel(cup.label)}</span>
-          <span className="run-track-distribution-tab-count">{cup.entries.length}</span>
+          <span className="text-[11px] text-app-muted">{cup.entries.length}</span>
         </button>
       ))}
     </div>
@@ -98,34 +102,36 @@ export function CupTabs({
 
 export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
   return (
-    <div className="run-track-distribution-body">
-      <div className="run-track-distribution-summary">
-        <div className="run-track-distribution-summary-title">
+    <div className="px-3.5 py-3">
+      <div className="mb-3 flex items-baseline justify-between gap-3 max-[760px]:grid">
+        <div className="grid gap-0.5">
           <strong>{activeCup.label}</strong>
-          <span>{activeCup.entries.length} courses</span>
+          <span className="text-xs tabular-nums text-app-muted">
+            {activeCup.entries.length} courses
+          </span>
         </div>
-        <div className="run-track-distribution-summary-metrics">
+        <div className="flex flex-wrap justify-end gap-x-3 gap-y-1 text-xs tabular-nums text-app-muted max-[760px]:justify-start">
           <span>Sample {formatPercent(activeCup.currentProbability)}</span>
           <span>Finish {formatOptionalPercent(activeCup.successRate)}</span>
           <span>Episodes {formatPercent(activeCup.episodeShare)}</span>
           <span>Env steps {formatPercent(activeCup.stepShare)}</span>
         </div>
       </div>
-      <div className="run-track-distribution-legend">
+      <div className="mb-3 flex flex-wrap gap-3">
         <LegendItem kind="sample" label="Sample" />
         <LegendItem kind="success" label="Finish" />
         <LegendItem kind="episodes" label="Episodes" />
         <LegendItem kind="steps" label="Env steps" />
         <LegendItem kind="target" label="Step target" />
       </div>
-      <div className="run-track-distribution-chart">
-        <div className="run-track-distribution-axis">
-          <span>100%</span>
-          <span>50%</span>
-          <span>0%</span>
+      <div className="grid grid-cols-[32px_minmax(0,1fr)] gap-2.5">
+        <div className="grid h-44 items-stretch text-[11px] tabular-nums text-app-muted">
+          <span className="flex items-start justify-end">100%</span>
+          <span className="flex items-center justify-end">50%</span>
+          <span className="flex items-end justify-end">0%</span>
         </div>
         <div
-          className="run-track-distribution-columns"
+          className="run-track-distribution-columns grid gap-2.5"
           style={{ ["--track-column-count" as string]: `${activeCup.entries.length}` }}
         >
           {activeCup.entries.map((entry) => (
@@ -140,8 +146,8 @@ export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
 function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
   const completion = completionSummary(entry);
   return (
-    <div className="run-track-distribution-column">
-      <div className="run-track-distribution-column-bars">
+    <div className="grid min-w-0 gap-2">
+      <div className="grid h-44 grid-cols-4 items-center gap-1.5">
         <DistributionBar
           kind="sample"
           label={`Sample ${formatPercent(entry.currentProbability ?? 0)}`}
@@ -164,9 +170,11 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
           value={entry.stepShare ?? 0}
         />
       </div>
-      <div className="run-track-distribution-column-label">
-        <strong>{entry.label}</strong>
-        <span>
+      <div className="grid gap-0.5">
+        <strong className="block text-[13px] leading-tight [overflow-wrap:anywhere]">
+          {entry.label}
+        </strong>
+        <span className="text-[11px] tabular-nums text-app-muted [overflow-wrap:anywhere]">
           {successSummary(entry)}
           {completion === null ? "" : ` · ${completion}`}
           {" · "}
@@ -174,5 +182,14 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
         </span>
       </div>
     </div>
+  );
+}
+
+function trackCupTabClass(active: boolean) {
+  return cn(
+    "inline-flex min-h-[30px] items-center gap-2 border border-app-border bg-app-surface px-2.5 text-xs font-semibold tabular-nums text-app-muted hover:border-app-border-strong hover:text-app-text",
+    active
+      ? "border-[color-mix(in_srgb,var(--accent)_48%,var(--border-strong))] bg-[color-mix(in_srgb,var(--accent)_10%,var(--surface))] text-app-text"
+      : undefined,
   );
 }
