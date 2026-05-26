@@ -34,6 +34,7 @@ export type RunLineageBucket = {
   groupName: string | null;
   id: string;
   label: string;
+  latestUpdatedAt: string;
   lineages: RunLineageGroup[];
   slug: string;
 };
