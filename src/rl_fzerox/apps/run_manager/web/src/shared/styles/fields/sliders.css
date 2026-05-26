@@ -139,35 +139,6 @@ input[type="range"]:focus {
   white-space: nowrap;
 }
 
-.range-pair-row {
-  display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) 148px;
-  gap: 12px;
-  align-items: center;
-}
-
-.range-pair-row-bare {
-  grid-template-columns: minmax(0, 1fr) 148px;
-}
-
-.range-pair-values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.range-pair-values input {
-  height: 34px;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  text-indent: 0;
-}
-
-.optional-number-row.disabled .slider-control,
-.optional-number-row.disabled input {
-  pointer-events: none;
-}
-
 .range-pair-slider {
   --slider-thumb-size: 14px;
   --slider-thumb-radius: calc(var(--slider-thumb-size) / 2);
@@ -178,11 +149,6 @@ input[type="range"]:focus {
   padding-top: 4px;
   cursor: pointer;
   touch-action: none;
-}
-
-.range-pair-row.disabled .range-pair-slider,
-.range-pair-row.disabled input {
-  pointer-events: none;
 }
 
 .range-pair-rail,

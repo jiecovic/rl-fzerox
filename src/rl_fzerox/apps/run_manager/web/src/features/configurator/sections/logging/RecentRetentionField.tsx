@@ -14,6 +14,7 @@ import {
   recentRetentionValueFromSlider,
 } from "@/features/configurator/sections/logging/derived";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { FieldInput, FieldShell, RangeReadonly, RangeRow } from "@/shared/ui/Field";
 
 interface RecentRetentionFieldProps {
   help: string;
@@ -59,13 +60,13 @@ export function RecentRetentionField({
   }
 
   return (
-    <div className="field-shell range-field">
+    <FieldShell>
       <FieldLabel
         help={help}
         label={label}
         onReset={resetHandler(train.recent_checkpoint_limit, resetValue, onChange)}
       />
-      <div className="range-row">
+      <RangeRow>
         <Slider
           ariaLabel={`${label} slider`}
           max={sliderMax}
@@ -81,10 +82,11 @@ export function RecentRetentionField({
           onChange={(value) => onChange(recentRetentionValueFromSlider(Math.round(value)))}
         />
         {train.recent_checkpoint_limit === null ? (
-          <div className="range-readonly">{recentRetentionSummary(train)}</div>
+          <RangeReadonly>{recentRetentionSummary(train)}</RangeReadonly>
         ) : (
-          <input
+          <FieldInput
             aria-label={label}
+            className="h-[34px] indent-0 tabular-nums"
             inputMode="numeric"
             spellCheck={false}
             value={rawValue}
@@ -97,7 +99,7 @@ export function RecentRetentionField({
             }}
           />
         )}
-      </div>
-    </div>
+      </RangeRow>
+    </FieldShell>
   );
 }

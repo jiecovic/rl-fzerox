@@ -18,6 +18,13 @@ import {
   Slider,
 } from "@/features/configurator/fields/slider";
 import type { SliderTick } from "@/features/configurator/fields/types";
+import {
+  FieldInput,
+  FieldShell,
+  optionalNumberRowClass,
+  RangeRow,
+  SwitchButton,
+} from "@/shared/ui/Field";
 
 export function RangeNumberField({
   help,
@@ -75,9 +82,9 @@ export function RangeNumberField({
   }
 
   return (
-    <div className="field-shell range-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <div className="range-row">
+      <RangeRow>
         <Slider
           ariaLabel={`${label} slider`}
           max={max}
@@ -88,8 +95,9 @@ export function RangeNumberField({
           valueLabel={formatDecimalInput(value, numberStep)}
           onChange={updateFromSlider}
         />
-        <input
+        <FieldInput
           aria-label={label}
+          className="h-[34px] indent-0 tabular-nums"
           max={max}
           min={min}
           step={numberStep}
@@ -103,8 +111,8 @@ export function RangeNumberField({
             }
           }}
         />
-      </div>
-    </div>
+      </RangeRow>
+    </FieldShell>
   );
 }
 
@@ -152,13 +160,13 @@ export function RangeIntegerField({
   }
 
   return (
-    <div className="field-shell range-field">
+    <FieldShell>
       <FieldLabel
         help={help}
         label={label}
         onReset={resetHandler(value, resetValue, updateFromSlider)}
       />
-      <div className="range-row">
+      <RangeRow>
         <Slider
           ariaLabel={`${label} slider`}
           max={max}
@@ -169,16 +177,17 @@ export function RangeIntegerField({
           valueLabel={formatInteger(value)}
           onChange={updateFromSlider}
         />
-        <input
+        <FieldInput
           aria-label={label}
+          className="h-[34px] indent-0 tabular-nums"
           inputMode="numeric"
           spellCheck={false}
           value={rawValue}
           onBlur={commitValue}
           onChange={(event) => setRawValue(event.target.value)}
         />
-      </div>
-    </div>
+      </RangeRow>
+    </FieldShell>
   );
 }
 
@@ -240,9 +249,9 @@ export function DiscreteSliderNumberField({
   }
 
   return (
-    <div className="field-shell range-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <div className="range-row">
+      <RangeRow>
         <Slider
           ariaLabel={`${label} slider`}
           max={sliderValues.length - 1}
@@ -253,8 +262,9 @@ export function DiscreteSliderNumberField({
           valueLabel={String(value)}
           onChange={updateFromSlider}
         />
-        <input
+        <FieldInput
           aria-label={label}
+          className="h-[34px] indent-0 tabular-nums"
           max={maxManual}
           min={minManual}
           inputMode="numeric"
@@ -270,8 +280,8 @@ export function DiscreteSliderNumberField({
             }
           }}
         />
-      </div>
-    </div>
+      </RangeRow>
+    </FieldShell>
   );
 }
 
@@ -318,9 +328,9 @@ export function LogRangeNumberField({
   }
 
   return (
-    <div className="field-shell range-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <div className="range-row">
+      <RangeRow>
         <Slider
           ariaLabel={`${label} slider`}
           max={logMax}
@@ -331,16 +341,17 @@ export function LogRangeNumberField({
           valueLabel={rawValue}
           onChange={updateFromSlider}
         />
-        <input
+        <FieldInput
           aria-label={label}
+          className="h-[34px] indent-0 tabular-nums"
           inputMode="decimal"
           spellCheck={false}
           value={rawValue}
           onBlur={commitValue}
           onChange={(event) => setRawValue(event.target.value)}
         />
-      </div>
-    </div>
+      </RangeRow>
+    </FieldShell>
   );
 }
 
@@ -432,14 +443,14 @@ export function OptionalNumberField({
   }
 
   return (
-    <div className="field-shell optional-number-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <div className={sliderDisabled ? "optional-number-row disabled" : "optional-number-row"}>
-        <button
-          aria-label={`${label} enabled`}
-          aria-pressed={enabled}
-          className={enabled ? "switch-button active" : "switch-button"}
-          type="button"
+      <div className={optionalNumberRowClass(sliderDisabled)}>
+        <SwitchButton
+          active={enabled}
+          activeLabel={enabledLabel}
+          inactiveLabel={nullLabel}
+          label={`${label} enabled`}
           onClick={() => {
             if (enabled) {
               onChange(null);
@@ -449,10 +460,7 @@ export function OptionalNumberField({
             onChange(normalized);
             setRawValue(formatDecimalInput(normalized, step));
           }}
-        >
-          <span aria-hidden="true" />
-          <strong>{enabled ? enabledLabel : nullLabel}</strong>
-        </button>
+        />
         <Slider
           ariaLabel={`${label} slider`}
           disabled={sliderDisabled}
@@ -464,8 +472,9 @@ export function OptionalNumberField({
           valueLabel={enabled ? formatDecimalInput(value, step) : nullLabel}
           onChange={updateFromSlider}
         />
-        <input
+        <FieldInput
           aria-label={label}
+          className="h-[34px] indent-0 tabular-nums"
           disabled={!enabled}
           max={max}
           min={min}
@@ -481,6 +490,6 @@ export function OptionalNumberField({
           }}
         />
       </div>
-    </div>
+    </FieldShell>
   );
 }

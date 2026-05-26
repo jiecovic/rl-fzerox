@@ -218,8 +218,6 @@
     .field-shell select,
     .field-shell textarea,
     .switch-button,
-    .segmented-choice-chip,
-    .state-switch,
     .slider-track-shell,
     .range-pair-slider,
     .vehicle-engine-slider,
@@ -237,8 +235,6 @@
 .readonly-config-shell
   :is(
     .switch-button,
-    .segmented-choice-chip,
-    .state-switch,
     .slider-track-shell,
     .range-pair-slider,
     .vehicle-engine-slider,

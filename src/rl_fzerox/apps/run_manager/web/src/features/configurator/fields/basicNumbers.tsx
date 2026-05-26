@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { formatEditableDecimal, formatInteger } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
+import { FieldInput, FieldShell } from "@/shared/ui/Field";
 
 export function NumberField({
   help,
@@ -42,17 +43,18 @@ export function NumberField({
   }
 
   return (
-    <div className="field-shell compact-value-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <input
+      <FieldInput
         aria-label={label}
+        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
         inputMode="decimal"
         spellCheck={false}
         value={rawValue}
         onBlur={commitValue}
         onChange={(event) => setRawValue(event.target.value)}
       />
-    </div>
+    </FieldShell>
   );
 }
 
@@ -90,17 +92,18 @@ export function IntegerField({
   }
 
   return (
-    <div className="field-shell compact-value-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <input
+      <FieldInput
         aria-label={label}
+        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
         inputMode="numeric"
         spellCheck={false}
         value={rawValue}
         onBlur={commitValue}
         onChange={(event) => setRawValue(event.target.value)}
       />
-    </div>
+    </FieldShell>
   );
 }
 
@@ -134,16 +137,17 @@ export function ScientificNumberField({
   }
 
   return (
-    <div className="field-shell compact-value-field">
+    <FieldShell>
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
-      <input
+      <FieldInput
         aria-label={label}
+        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
         inputMode="decimal"
         spellCheck={false}
         value={rawValue}
         onBlur={commitValue}
         onChange={(event) => setRawValue(event.target.value)}
       />
-    </div>
+    </FieldShell>
   );
 }

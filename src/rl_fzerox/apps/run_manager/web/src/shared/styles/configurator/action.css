@@ -135,10 +135,6 @@
   padding: 10px;
 }
 
-.action-toggle-row .state-switch {
-  justify-self: center;
-}
-
 .action-aux-stack {
   gap: 24px;
 }
