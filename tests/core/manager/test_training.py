@@ -10,6 +10,7 @@ from rl_fzerox.core.domain.observation_image import (
     CustomResolutionChoice,
     SourceCropResolutionChoice,
 )
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.envs.observations.state import state_feature_names
 from rl_fzerox.core.manager import ManagedRunConfig, default_managed_run_config
 from rl_fzerox.core.manager.architecture.preview import policy_architecture_preview
@@ -588,6 +589,37 @@ def test_manager_training_bridge_supports_built_in_gp_race_launch(
         "mute_city",
         "silence",
     }
+    assert {entry.course_index for entry in train_config.env.track_sampling.entries} == {0, 1}
+    assert {entry.source_course_index for entry in train_config.env.track_sampling.entries} == {
+        0,
+        1,
+    }
+
+
+def test_manager_training_bridge_adds_generated_x_cup_entries(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.tracks.race_mode = "gp_race"
+    config.tracks.include_x_cup = True
+    config.tracks.x_cup_course_count = 2
+    config.tracks.selected_course_ids = ()
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-x-cup",
+        run_dir=tmp_path / "runs" / "bridge-x-cup_0001",
+    )
+
+    entries = train_config.env.track_sampling.entries
+    assert len(entries) == 2
+    assert {entry.generated_course_kind for entry in entries} == {X_CUP_COURSE.generated_kind}
+    assert {entry.course_index for entry in entries} == {X_CUP_COURSE.course_index}
+    assert {entry.source_course_index for entry in entries} == {X_CUP_COURSE.course_index}
+    assert {entry.log_per_course for entry in entries} == {False}
+    assert len({entry.course_id for entry in entries}) == 2
+    assert all(entry.generated_course_seed is not None for entry in entries)
+    assert all(entry.generated_course_hash is not None for entry in entries)
 
 
 def test_manager_config_omits_gp_difficulty_outside_gp_race() -> None:

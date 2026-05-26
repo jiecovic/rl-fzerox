@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
 from rl_fzerox.core.training.runs.paths import RunPaths
 
@@ -67,6 +68,36 @@ def course_vehicle_cache_payload(
     }
 
 
+def x_cup_cache_payload(
+    *,
+    seed: int,
+    course_hash: str,
+    gp_difficulty: str | None,
+    vehicle_id: str,
+    camera_setting: str | None,
+    race_intro_target_timer: int | None,
+    context: BaselineMaterializerContext,
+) -> dict[str, object]:
+    defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
+    vehicle = vehicle_by_id(vehicle_id)
+    return {
+        "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
+        "materializer_mode": X_CUP_COURSE.materializer_mode,
+        "mode": X_CUP_COURSE.race_mode,
+        "gp_difficulty": gp_difficulty,
+        "renderer": context.renderer,
+        "course_index": X_CUP_COURSE.course_index,
+        "x_cup_seed": seed,
+        "x_cup_course_hash": course_hash,
+        "vehicle": vehicle_id,
+        "vehicle_character_index": vehicle.character_index,
+        "vehicle_menu_slot": vehicle.machine_select_slot,
+        "engine_setting_raw_value": defaults.engine_setting_raw_value,
+        "camera_setting": camera_setting,
+        "race_intro_target_timer": race_intro_target_timer,
+    }
+
+
 def generic_mode_cache_payload(
     *,
     mode: str,
@@ -93,6 +124,11 @@ def generic_mode_state_path(cache_root: Path, *, mode: str, cache_key: str) -> P
 def course_vehicle_state_path(cache_root: Path, *, label: str, cache_key: str) -> Path:
     safe_label = safe_filename(label or "course_vehicle")
     return cache_root / "course_vehicle" / f"{safe_label}__{cache_key[:12]}.state"
+
+
+def x_cup_state_path(cache_root: Path, *, label: str, cache_key: str) -> Path:
+    safe_label = safe_filename(label or X_CUP_COURSE.cache_dir)
+    return cache_root / X_CUP_COURSE.cache_dir / f"{safe_label}__{cache_key[:12]}.state"
 
 
 def link_or_copy_file(source_path: Path, destination_path: Path) -> None:

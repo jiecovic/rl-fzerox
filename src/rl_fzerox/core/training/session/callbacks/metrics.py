@@ -347,6 +347,8 @@ def _episode_was_airborne(episode: dict[str, object]) -> bool:
 
 
 def course_log_key(episode: dict[str, object]) -> str | None:
+    if episode.get("track_log_per_course") is False:
+        return None
     for key in ("track_course_id", "track_id", "track_course_name", "course_index"):
         value = episode.get(key)
         if isinstance(value, int):

@@ -21,15 +21,6 @@ from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 
 
-def validate_launch_support(config: ManagedRunConfig) -> None:
-    unsupported: list[str] = []
-    if config.tracks.pool_mode != "built_in":
-        unsupported.append("x cup launch is not wired into training")
-    if unsupported:
-        joined = "; ".join(unsupported)
-        raise ValueError(f"Cannot launch this config yet: {joined}")
-
-
 def train_config_payload(
     config: ManagedRunConfig,
     *,

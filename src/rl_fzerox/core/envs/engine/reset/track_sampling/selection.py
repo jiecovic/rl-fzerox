@@ -267,6 +267,12 @@ def _selected_track_from_entry(
         source_gp_difficulty=entry.source_gp_difficulty,
         source_engine_setting=entry.source_engine_setting,
         source_engine_setting_raw_value=entry.source_engine_setting_raw_value,
+        generated_course_kind=entry.generated_course_kind,
+        generated_course_seed=entry.generated_course_seed,
+        generated_course_hash=entry.generated_course_hash,
+        generated_course_segment_count=entry.generated_course_segment_count,
+        generated_course_length=entry.generated_course_length,
+        log_per_course=entry.log_per_course,
         records=entry.records,
         sampling_mode=sampling_mode,
         cycle_position=cycle_position,
@@ -376,6 +382,10 @@ def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ..
                 entry.vehicle,
                 entry.vehicle_name,
                 entry.engine_setting,
+                entry.generated_course_kind,
+                entry.generated_course_seed,
+                entry.generated_course_hash,
+                entry.log_per_course,
             )
             for entry in config.entries
         ),
@@ -395,6 +405,10 @@ def _sequential_track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple
                     entry.engine_setting_raw_value,
                     entry.engine_setting_min_raw_value,
                     entry.engine_setting_max_raw_value,
+                    entry.generated_course_kind,
+                    entry.generated_course_seed,
+                    entry.generated_course_hash,
+                    entry.log_per_course,
                 )
                 for entry in entries
             ),

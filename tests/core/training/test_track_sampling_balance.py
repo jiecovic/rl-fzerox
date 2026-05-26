@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
@@ -315,6 +316,56 @@ def test_step_balance_controller_logs_unique_courses_by_course_id() -> None:
     assert "track_sampling/big_blue/prob" in values
     assert "track_sampling/silence/prob" in values
     assert "track_sampling/big_blue_time_attack_blue_falcon_balanced/prob" not in values
+
+
+def test_step_balance_controller_can_suppress_generated_course_logs() -> None:
+    controller = StepBalancedTrackSamplingController.from_configs(
+        env_config=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="x_cup_a_blue_falcon_balanced",
+                        course_id="x_cup_a",
+                        course_index=X_CUP_COURSE.course_index,
+                        mode=X_CUP_COURSE.race_mode,
+                        generated_course_kind=X_CUP_COURSE.generated_kind,
+                        generated_course_seed=1,
+                        generated_course_hash="a",
+                        log_per_course=False,
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="x_cup_b_blue_falcon_balanced",
+                        course_id="x_cup_b",
+                        course_index=X_CUP_COURSE.course_index,
+                        mode=X_CUP_COURSE.race_mode,
+                        generated_course_kind=X_CUP_COURSE.generated_kind,
+                        generated_course_seed=2,
+                        generated_course_hash="b",
+                        log_per_course=False,
+                        weight=1.0,
+                    ),
+                ),
+                step_balance_log_details=True,
+                step_balance_update_episodes=2,
+            ),
+        ),
+        curriculum_config=CurriculumConfig(),
+    )
+
+    assert controller is not None
+    weights = controller.record_episodes(
+        (
+            {"track_id": "x_cup_a_blue_falcon_balanced", "episode_step": 100},
+            {"track_id": "x_cup_b_blue_falcon_balanced", "episode_step": 300},
+        )
+    )
+
+    assert weights is not None
+    assert set(weights) == {"x_cup_a_blue_falcon_balanced", "x_cup_b_blue_falcon_balanced"}
+    assert controller.log_values() == {}
 
 
 def test_step_balance_controller_aggregates_duplicate_courses() -> None:

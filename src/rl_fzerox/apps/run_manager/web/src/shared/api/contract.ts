@@ -4,7 +4,6 @@ import { z } from "zod";
 const runStatusSchema = z.enum(["created", "running", "paused", "stopped", "finished", "failed"]);
 const runCommandSchema = z.enum(["pause", "stop"]);
 const observationPresetSchema = z.enum(["crop_72x96", "crop_84x84"]);
-const trackPoolModeSchema = z.enum(["built_in", "x_cup"]);
 const raceModeSchema = z.enum(["time_attack", "gp_race"]);
 const gpDifficultySchema = z.enum(["novice", "standard", "expert", "master"]);
 const trackSamplingModeSchema = z.enum(["equal", "step_balanced", "adaptive_step_balanced"]);
@@ -106,9 +105,10 @@ const trainConfigSchema = z.object({
 });
 
 const tracksConfigSchema = z.object({
-  pool_mode: trackPoolModeSchema,
   race_mode: raceModeSchema,
   gp_difficulty: gpDifficultySchema.nullable().optional(),
+  include_x_cup: z.boolean(),
+  x_cup_course_count: z.number().int().positive(),
   sampling_mode: trackSamplingModeSchema,
   step_balance_update_episodes: z.number().int().positive(),
   step_balance_ema_alpha: z.number().gt(0).max(1),
@@ -613,7 +613,6 @@ export const configMetadataSchema = z.object({
   observation_resolution_bounds: observationResolutionBoundsSchema,
   observation_source_geometries: z.array(observationSourceGeometryInfoSchema),
   camera_settings: z.array(selectOptionSchema),
-  track_pool_modes: z.array(selectOptionSchema),
   race_modes: z.array(selectOptionSchema),
   gp_difficulties: z.array(selectOptionSchema),
   track_sampling_modes: z.array(selectOptionSchema),

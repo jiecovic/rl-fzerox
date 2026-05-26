@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.envs.engine.info import read_live_telemetry
 from rl_fzerox.core.envs.engine.reset.session import sync_reset_presentation
 from rl_fzerox.core.runtime_spec.vehicle_catalog import vehicle_by_id
@@ -19,6 +20,8 @@ from rl_fzerox.core.training.runs.baseline_materializer.cache import (
     generic_mode_state_path,
     sha256_file,
     sha256_json,
+    x_cup_cache_payload,
+    x_cup_state_path,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.models import (
     BaselineMaterializerContext,
@@ -31,6 +34,10 @@ from rl_fzerox.core.training.runs.baseline_materializer.settings import (
 )
 from rl_fzerox.core.training.runs.race_start import RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.models import RaceStartMode
+from rl_fzerox.core.training.runs.race_start.x_cup import (
+    XCupMaterializedCourse,
+    materialize_x_cup_race_start_from_boot,
+)
 
 
 def ensure_course_vehicle_baseline(
@@ -158,6 +165,76 @@ def ensure_generic_mode_baseline(
     return cache_state_path
 
 
+def ensure_x_cup_baseline(
+    *,
+    label: str,
+    seed: int,
+    course_hash: str,
+    gp_difficulty: RaceDifficultyName | None,
+    vehicle_id: str,
+    camera_setting: str | None,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+) -> tuple[Path, XCupMaterializedCourse]:
+    payload = x_cup_cache_payload(
+        seed=seed,
+        course_hash=course_hash,
+        gp_difficulty=gp_difficulty,
+        vehicle_id=vehicle_id,
+        camera_setting=camera_setting,
+        race_intro_target_timer=context.race_intro_target_timer,
+        context=context,
+    )
+    cache_key = sha256_json(payload)
+    cache_state_path = x_cup_state_path(cache_root, label=label, cache_key=cache_key)
+    cache_metadata_path = cache_state_path.with_suffix(".json")
+    if cache_entry_is_current(
+        cache_state_path=cache_state_path,
+        cache_metadata_path=cache_metadata_path,
+        expected_kind=X_CUP_COURSE.baseline_cache_kind,
+        expected_cache_key=cache_key,
+    ):
+        return cache_state_path, _read_x_cup_metadata(cache_metadata_path)
+
+    with cache_write_lock(cache_state_path):
+        if not cache_entry_is_current(
+            cache_state_path=cache_state_path,
+            cache_metadata_path=cache_metadata_path,
+            expected_kind=X_CUP_COURSE.baseline_cache_kind,
+            expected_cache_key=cache_key,
+        ):
+            cache_state_path.unlink(missing_ok=True)
+            cache_metadata_path.unlink(missing_ok=True)
+            cache_state_path.parent.mkdir(parents=True, exist_ok=True)
+            materialized_sha256, course = generate_x_cup_state(
+                seed=seed,
+                gp_difficulty=gp_difficulty,
+                vehicle_id=vehicle_id,
+                camera_setting=camera_setting,
+                cache_state_path=cache_state_path,
+                cache_root=cache_root,
+                context=context,
+                emulator_type=emulator_type,
+            )
+        else:
+            materialized_sha256 = _required_materialized_state_sha256(cache_metadata_path)
+            course = _read_x_cup_metadata(cache_metadata_path)
+        if not cache_metadata_path.is_file():
+            atomic_write_json(
+                cache_metadata_path,
+                {
+                    **payload,
+                    "cache_key": cache_key,
+                    "cache_kind": X_CUP_COURSE.baseline_cache_kind,
+                    "materialized_state_sha256": materialized_sha256,
+                    "generated_course_segment_count": course.segment_count,
+                    "generated_course_length": course.course_length,
+                },
+            )
+    return cache_state_path, course
+
+
 def cache_entry_is_current(
     *,
     cache_state_path: Path,
@@ -273,6 +350,77 @@ def generate_course_vehicle_state(
         emulator.close()
     os.replace(tmp_state_path, cache_state_path)
     return sha256_file(cache_state_path)
+
+
+def generate_x_cup_state(
+    *,
+    seed: int,
+    gp_difficulty: RaceDifficultyName | None,
+    vehicle_id: str,
+    camera_setting: str | None,
+    cache_state_path: Path,
+    cache_root: Path,
+    context: BaselineMaterializerContext,
+    emulator_type: Callable[..., StateSavingEmulator],
+) -> tuple[str, XCupMaterializedCourse]:
+    defaults = BASELINE_MATERIALIZER_SETTINGS.generic_mode_baseline
+    vehicle = vehicle_by_id(vehicle_id)
+    runtime_dir = cache_root / "runtime" / X_CUP_COURSE.cache_dir / cache_state_path.stem
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    tmp_state_path = cache_state_path.with_name(
+        f".{cache_state_path.stem}.{os.getpid()}.tmp{cache_state_path.suffix}"
+    )
+    emulator = emulator_type(
+        core_path=context.core_path,
+        rom_path=context.rom_path,
+        runtime_dir=runtime_dir,
+        baseline_state_path=None,
+        renderer=context.renderer,
+    )
+    try:
+        course = materialize_x_cup_race_start_from_boot(
+            emulator=emulator,
+            variant=RaceStartVariant(
+                course_index=X_CUP_COURSE.course_index,
+                mode=X_CUP_COURSE.race_mode,
+                gp_difficulty=gp_difficulty,
+                character_index=vehicle.character_index,
+                machine_select_slot=vehicle.machine_select_slot,
+                engine_setting_raw_value=defaults.engine_setting_raw_value,
+                race_intro_target_timer=context.race_intro_target_timer,
+            ),
+            rng_seed=seed,
+        )
+        telemetry = read_live_telemetry(emulator)
+        sync_reset_presentation(
+            emulator,
+            camera_setting=camera_setting,
+            race_intro_target_timer=context.race_intro_target_timer,
+            telemetry=telemetry,
+            info={},
+        )
+        emulator.save_state(tmp_state_path)
+    finally:
+        emulator.close()
+    os.replace(tmp_state_path, cache_state_path)
+    return sha256_file(cache_state_path), course
+
+
+def _read_x_cup_metadata(metadata_path: Path) -> XCupMaterializedCourse:
+    metadata = read_metadata(metadata_path)
+    segment_count = metadata.get("generated_course_segment_count")
+    course_length = metadata.get("generated_course_length")
+    if (
+        isinstance(segment_count, int)
+        and not isinstance(segment_count, bool)
+        and isinstance(course_length, int | float)
+        and not isinstance(course_length, bool)
+    ):
+        return XCupMaterializedCourse(
+            segment_count=segment_count,
+            course_length=float(course_length),
+        )
+    raise ValueError(f"X Cup metadata is incomplete: {metadata_path}")
 
 
 def _required_materialized_state_sha256(metadata_path: Path) -> str:

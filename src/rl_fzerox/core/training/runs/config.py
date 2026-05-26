@@ -37,8 +37,6 @@ def materialize_watch_session_config(
         if watch_config.env.track_sampling.enabled
         else watch_config.emulator.baseline_state_path
     )
-    if watch_config.watch.x_cup.enabled and baseline_source_path is None:
-        baseline_source_path = Path("watch-x-cup.state")
     paths = build_watch_session_paths(
         run_dir=run_dir,
         runtime_dir=watch_config.emulator.runtime_dir,

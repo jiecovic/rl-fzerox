@@ -318,6 +318,10 @@ def _materialized_request_update(
         update["source_engine_setting_raw_value"] = artifact.source_engine_setting_raw_value
     elif request.engine_setting_raw_value is not None:
         update["source_engine_setting_raw_value"] = request.engine_setting_raw_value
+    if artifact.generated_course_segment_count is not None:
+        update["generated_course_segment_count"] = artifact.generated_course_segment_count
+    if artifact.generated_course_length is not None:
+        update["generated_course_length"] = artifact.generated_course_length
     return update
 
 

@@ -94,7 +94,6 @@ def resolve_watch_app_config(
     elif cli_override_delta:
         config = apply_watch_config_delta(config, cli_override_delta)
 
-    config = apply_x_cup_watch_overrides(config)
     return materialize_watch_session_config(
         config,
         run_dir=config.watch.policy_run_dir,
@@ -169,21 +168,3 @@ def _lineage_frame_offset(store: ManagerStore, run: ManagedRun) -> int | None:
         total_frames += source_steps * max(1, int(parent_run.config.action.action_repeat))
         current_run = parent_run
     return total_frames
-
-
-def apply_x_cup_watch_overrides(config: WatchAppConfig) -> WatchAppConfig:
-    """Disable track-sampling inheritance for watch-only X Cup bootstraps."""
-
-    if not config.watch.x_cup.enabled or not config.env.track_sampling.enabled:
-        return config
-    return config.model_copy(
-        update={
-            "env": config.env.model_copy(
-                update={
-                    "track_sampling": config.env.track_sampling.model_copy(
-                        update={"enabled": False}
-                    )
-                }
-            )
-        }
-    )

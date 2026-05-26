@@ -15,7 +15,6 @@ from rl_fzerox.ui.watch.runtime.policy import (
     _sync_policy_curriculum_stage,
 )
 from rl_fzerox.ui.watch.runtime.timing import _resolve_control_fps, _target_seconds
-from rl_fzerox.ui.watch.runtime.x_cup import materialize_x_cup_watch_baseline
 
 if TYPE_CHECKING:
     from rl_fzerox.core.policy.auxiliary_state import AuxiliaryStateTargetName
@@ -29,7 +28,6 @@ class WatchRuntimeSession:
     emulator: Emulator
     env: FZeroXEnv
     policy_runner: PolicyRunner | None
-    x_cup_info: dict[str, object] | None
     native_control_fps: float
     target_control_fps: float | None
     target_control_seconds: float | None
@@ -45,7 +43,6 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
     """Create the runtime resources that are stable across watch episodes."""
 
     seed_process(config.seed)
-    x_cup_info = materialize_x_cup_watch_baseline(config) if config.watch.x_cup.enabled else None
     emulator = Emulator(
         core_path=config.emulator.core_path,
         rom_path=config.emulator.rom_path,
@@ -82,7 +79,6 @@ def open_watch_runtime_session(config: WatchAppConfig) -> WatchRuntimeSession:
         emulator=emulator,
         env=env,
         policy_runner=policy_runner,
-        x_cup_info=x_cup_info,
         native_control_fps=native_control_fps,
         target_control_fps=target_control_fps,
         target_control_seconds=_target_seconds(target_control_fps),

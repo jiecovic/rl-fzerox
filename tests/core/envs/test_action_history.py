@@ -11,9 +11,7 @@ def test_action_history_records_split_lean_history_separately() -> None:
     )
 
     history.record(
-        RaceControlState.from_mask(
-            RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right
-        ),
+        RaceControlState.from_mask(RACE_CONTROL_MASKS.lean_left | RACE_CONTROL_MASKS.lean_right),
         gas_level=None,
     )
 

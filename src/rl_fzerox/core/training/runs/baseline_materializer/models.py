@@ -8,6 +8,7 @@ from typing import Protocol
 
 from fzerox_emulator import EmulatorBackend, ResetState
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.x_cup import XCupGeneratedCourseKind
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +32,9 @@ class BaselineRequest:
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
     camera_setting: str | None = None
+    generated_course_kind: XCupGeneratedCourseKind | None = None
+    generated_course_seed: int | None = None
+    generated_course_hash: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +49,8 @@ class BaselineArtifact:
     source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: int | None = None
+    generated_course_segment_count: int | None = None
+    generated_course_length: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

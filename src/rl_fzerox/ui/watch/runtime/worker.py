@@ -105,7 +105,6 @@ def _run_simulation_loop(
     emulator = session.emulator
     env = session.env
     policy_runner = session.policy_runner
-    x_cup_info = session.x_cup_info
     try:
         native_control_fps = session.native_control_fps
         target_control_fps = session.target_control_fps
@@ -177,8 +176,6 @@ def _run_simulation_loop(
             env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
-            if x_cup_info is not None:
-                raw_info.update(x_cup_info)
             observation, info = apply_watch_state_feature_zeroing(
                 raw_observation,
                 raw_info,
@@ -397,8 +394,6 @@ def _run_simulation_loop(
                 if manual_control_enabled:
                     raw_observation = observation
                     raw_info = info
-                if x_cup_info is not None:
-                    raw_info.update(x_cup_info)
                 observation, info = apply_watch_state_feature_zeroing(
                     raw_observation,
                     raw_info,

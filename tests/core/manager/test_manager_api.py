@@ -994,7 +994,6 @@ async def test_manager_api_exposes_config_metadata(tmp_path: Path) -> None:
     assert "impala_small" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "impala_large" in {profile["value"] for profile in payload["conv_profiles"]}
     assert "custom" in {profile["value"] for profile in payload["conv_profiles"]}
-    assert "x_cup" in {mode["value"] for mode in payload["track_pool_modes"]}
     assert "time_attack" in {mode["value"] for mode in payload["race_modes"]}
     assert "master" in {mode["value"] for mode in payload["gp_difficulties"]}
     assert "step_balanced" in {mode["value"] for mode in payload["track_sampling_modes"]}

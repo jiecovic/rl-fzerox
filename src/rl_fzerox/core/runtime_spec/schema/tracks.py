@@ -15,6 +15,7 @@ from pydantic import (
 )
 
 from rl_fzerox.core.domain.race_difficulty import RaceDifficultyName
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, XCupGeneratedCourseKind
 from rl_fzerox.core.runtime_spec.schema.common import TrackSamplingMode
 
 
@@ -90,7 +91,35 @@ class TrackSamplingEntryConfig(BaseModel):
     source_gp_difficulty: RaceDifficultyName | None = None
     source_engine_setting: str | None = None
     source_engine_setting_raw_value: NonNegativeInt | None = None
+    generated_course_kind: XCupGeneratedCourseKind | None = None
+    generated_course_seed: NonNegativeInt | None = None
+    generated_course_hash: str | None = None
+    generated_course_segment_count: NonNegativeInt | None = None
+    generated_course_length: PositiveFloat | None = None
+    log_per_course: bool = True
     records: TrackRecordsConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_generated_course_fields(self) -> TrackSamplingEntryConfig:
+        if self.generated_course_kind is None:
+            return self
+        if self.generated_course_seed is None:
+            raise ValueError("generated_course_seed is required for generated course entries")
+        if not self.generated_course_hash:
+            raise ValueError("generated_course_hash is required for generated course entries")
+        if (
+            self.generated_course_kind == X_CUP_COURSE.generated_kind
+            and self.mode != X_CUP_COURSE.race_mode
+        ):
+            raise ValueError(f"generated X Cup entries must use mode={X_CUP_COURSE.race_mode}")
+        if (
+            self.generated_course_kind == X_CUP_COURSE.generated_kind
+            and self.course_index != X_CUP_COURSE.course_index
+        ):
+            raise ValueError(
+                f"generated X Cup entries must use course_index={X_CUP_COURSE.course_index}"
+            )
+        return self
 
 
 class TrackSamplingConfig(BaseModel):

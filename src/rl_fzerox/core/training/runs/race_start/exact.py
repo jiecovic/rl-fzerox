@@ -1,7 +1,7 @@
 # src/rl_fzerox/core/training/runs/race_start/exact.py
 from __future__ import annotations
 
-from fzerox_emulator import Emulator
+from fzerox_emulator import EmulatorBackend
 from rl_fzerox.core.training.runs.race_start.boundary import (
     race_start_gp_difficulty_raw_value,
 )
@@ -15,7 +15,7 @@ from rl_fzerox.core.training.runs.race_start.validation import (
 
 def materialize_race_start_state(
     *,
-    emulator: Emulator,
+    emulator: EmulatorBackend,
     variant: RaceStartVariant,
 ) -> None:
     """Patch race setup globals and let the game rebuild a clean race start."""
@@ -30,14 +30,14 @@ def materialize_race_start_state(
     _step_until_ready(emulator, variant)
 
 
-def write_engine_settings(emulator: Emulator, variant: RaceStartVariant) -> None:
+def write_engine_settings(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.patch_engine_settings(
         mode=variant.mode,
         engine_setting_raw_value=variant.engine_setting_raw_value,
     )
 
 
-def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _write_race_setup(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.patch_race_start_setup(
         mode=variant.mode,
         course_index=variant.course_index,
@@ -48,7 +48,7 @@ def _write_race_setup(emulator: Emulator, variant: RaceStartVariant) -> None:
     )
 
 
-def _write_full_machine_settings(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _write_full_machine_settings(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.patch_machine_settings(
         mode=variant.mode,
         course_index=variant.course_index,
@@ -59,11 +59,11 @@ def _write_full_machine_settings(emulator: Emulator, variant: RaceStartVariant) 
     )
 
 
-def _force_race_reinit(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _force_race_reinit(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     emulator.force_race_reinit(mode=variant.mode)
 
 
-def _step_until_ready(emulator: Emulator, variant: RaceStartVariant) -> None:
+def _step_until_ready(emulator: EmulatorBackend, variant: RaceStartVariant) -> None:
     last_summary = "telemetry unavailable"
     saw_new_race_init = False
     target_timer = variant.race_intro_target_timer

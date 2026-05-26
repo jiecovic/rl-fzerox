@@ -69,10 +69,6 @@ def run_manager_config_metadata() -> RunManagerConfigMetadata:
             SelectOption(value=setting.name, label=setting.name.replace("_", " "))
             for setting in CAMERA_SETTINGS
         ),
-        track_pool_modes=(
-            SelectOption(value="built_in", label="Built-in cups"),
-            SelectOption(value="x_cup", label="X Cup"),
-        ),
         race_modes=_options(("time_attack", "gp_race")),
         gp_difficulties=tuple(
             SelectOption(value=name, label=name.title()) for name in race_difficulty_names()

@@ -19,11 +19,6 @@ interface TracksSectionProps {
 type BuiltInCourse = ConfigMetadata["built_in_courses"][number];
 type GpDifficulty = NonNullable<ManagedRunConfig["tracks"]["gp_difficulty"]>;
 
-const TRACK_POOL_MODE_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["pool_mode"], string> = {
-  built_in: "Fixed cup courses grouped by the original roster.",
-  x_cup: "Use F-Zero X's random track generator instead of fixed courses.",
-};
-
 const RACE_MODE_DESCRIPTIONS: Record<ManagedRunConfig["tracks"]["race_mode"], string> = {
   time_attack: "Single-course time-trial episodes.",
   gp_race: "Grand Prix race rules across the selected pool.",
@@ -69,12 +64,14 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       }))
       .filter((cup) => cup.courses.length > 0);
   }, [metadata.built_in_courses, metadata.track_cups]);
+  const collapsibleCupIds = useMemo(() => [...cups.map((cup) => cup.id), "x"], [cups]);
   const [collapsedCupIds, setCollapsedCupIds] = usePersistentCollapsedIds(
     "run-manager:tracks:cups",
-    cups.map((cup) => cup.id),
+    collapsibleCupIds,
   );
   const selectedCourseIds = config.tracks.selected_course_ids;
-  const usingXCup = config.tracks.pool_mode === "x_cup";
+  const xCupEnabled = config.tracks.include_x_cup;
+  const xCupAvailable = config.tracks.race_mode === "gp_race";
   const usesDynamicStepBalancing = config.tracks.sampling_mode !== "equal";
   const usesAdaptiveStepBalancing = config.tracks.sampling_mode === "adaptive_step_balanced";
   const selectedCourseSet = useMemo(() => new Set(selectedCourseIds), [selectedCourseIds]);
@@ -82,6 +79,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   const selectedCupCount = cups.filter((cup) =>
     cup.courses.some((course) => selectedCourseSet.has(course.id)),
   ).length;
+  const xCupCollapsed = collapsedCupIdSet.has("x");
   const selectionSummary = cups
     .map((cup) => {
       const selectedCount = cup.courses.filter((course) => selectedCourseSet.has(course.id)).length;
@@ -92,14 +90,15 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     .filter((value): value is string => value !== null);
   const normalizedTracks = (tracks: ManagedRunConfig["tracks"]) => {
     const nextTracks = { ...tracks };
-    if (nextTracks.pool_mode === "x_cup") {
-      nextTracks.race_mode = "gp_race";
-    }
     if (nextTracks.race_mode === "gp_race" && nextTracks.gp_difficulty == null) {
       nextTracks.gp_difficulty = defaultGpDifficulty;
     }
     if (nextTracks.race_mode !== "gp_race") {
       nextTracks.gp_difficulty = null;
+      nextTracks.include_x_cup = false;
+      if (nextTracks.selected_course_ids.length === 0) {
+        nextTracks.selected_course_ids = defaultCourseIds;
+      }
     }
     return nextTracks;
   };
@@ -137,7 +136,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
     setConfig((currentConfig) => {
       const nextSet = new Set(currentConfig.tracks.selected_course_ids);
       if (nextSet.has(courseId)) {
-        if (nextSet.size === 1) {
+        if (nextSet.size === 1 && !currentConfig.tracks.include_x_cup) {
           return currentConfig;
         }
         nextSet.delete(courseId);
@@ -145,7 +144,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
         nextSet.add(courseId);
       }
       const ordered = orderedSelectedCourseIds(nextSet);
-      if (ordered.length === 0) {
+      if (ordered.length === 0 && !currentConfig.tracks.include_x_cup) {
         return currentConfig;
       }
       return {
@@ -163,7 +162,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       const nextSet = new Set(currentConfig.tracks.selected_course_ids);
       const allSelected = courseIds.every((courseId) => nextSet.has(courseId));
       if (allSelected) {
-        if (nextSet.size === courseIds.length) {
+        if (nextSet.size === courseIds.length && !currentConfig.tracks.include_x_cup) {
           return currentConfig;
         }
         for (const courseId of courseIds) {
@@ -175,7 +174,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
         }
       }
       const ordered = orderedSelectedCourseIds(nextSet);
-      if (ordered.length === 0) {
+      if (ordered.length === 0 && !currentConfig.tracks.include_x_cup) {
         return currentConfig;
       }
       return {
@@ -200,28 +199,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
 
   return (
     <div className="config-stack">
-      <div className="form-grid three track-panel-grid">
-        <ConfigPanel
-          onReset={() => updateTracks({ pool_mode: defaultConfig.tracks.pool_mode })}
-          title="Track source"
-        >
-          <ChoiceStrip
-            description={
-              TRACK_POOL_MODE_DESCRIPTIONS[config.tracks.pool_mode] ??
-              TRACK_POOL_MODE_DESCRIPTIONS.built_in
-            }
-            options={metadata.track_pool_modes.map((option) => ({
-              active: config.tracks.pool_mode === option.value,
-              key: option.value,
-              label: option.label,
-              onClick: () =>
-                updateTracks({
-                  pool_mode: option.value as ManagedRunConfig["tracks"]["pool_mode"],
-                }),
-            }))}
-          />
-        </ConfigPanel>
-
+      <div className="form-grid two track-panel-grid">
         <ConfigPanel
           onReset={() => updateTracks({ race_mode: defaultConfig.tracks.race_mode })}
           title="Race mode"
@@ -232,13 +210,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
             }
             options={metadata.race_modes.map((option) => ({
               active: config.tracks.race_mode === option.value,
-              disabled: usingXCup && option.value !== "gp_race",
               key: option.value,
               label: formatTrackOptionLabel(option.value),
-              tooltip:
-                usingXCup && option.value !== "gp_race"
-                  ? "X Cup is currently only supported under GP race."
-                  : undefined,
               onClick: () =>
                 updateTracks({
                   race_mode: option.value as ManagedRunConfig["tracks"]["race_mode"],
@@ -360,150 +333,225 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
       </div>
 
       <ConfigPanel
-        onReset={() => updateTracks({ selected_course_ids: defaultCourseIds })}
+        onReset={() =>
+          updateTracks({
+            include_x_cup: defaultConfig.tracks.include_x_cup,
+            selected_course_ids: defaultCourseIds,
+            x_cup_course_count: defaultConfig.tracks.x_cup_course_count,
+          })
+        }
         title="Course pool"
         wide
       >
-        {usingXCup ? (
-          <div className="track-xcup-shell">
-            <div className="track-xcup-card">
-              <TrackCupBanner cupId="x" label="X Cup" large />
-              <div className="track-xcup-copy">
-                <strong>X Cup random generator</strong>
-                <span>
-                  The game generates six courses at runtime, so there is no fixed roster to toggle
-                  here.
-                </span>
-              </div>
+        <div className="track-pool-shell">
+          <div className="track-pool-summary">
+            <div className="track-pool-metric">
+              <span>Selected courses</span>
+              <strong>
+                {selectedCourseIds.length + (xCupEnabled ? config.tracks.x_cup_course_count : 0)}
+              </strong>
+            </div>
+            <div className="track-pool-metric">
+              <span>Cups covered</span>
+              <strong>{selectedCupCount + (xCupEnabled ? 1 : 0)}</strong>
+            </div>
+            <div className="track-pool-fragments">
+              {selectionSummary.map((summary) => (
+                <span key={summary}>{summary}</span>
+              ))}
+              {xCupEnabled ? <span>X {config.tracks.x_cup_course_count}</span> : null}
             </div>
           </div>
-        ) : (
-          <div className="track-pool-shell">
-            <div className="track-pool-summary">
-              <div className="track-pool-metric">
-                <span>Selected courses</span>
-                <strong>{selectedCourseIds.length}</strong>
-              </div>
-              <div className="track-pool-metric">
-                <span>Cups covered</span>
-                <strong>{selectedCupCount}</strong>
-              </div>
-              <div className="track-pool-fragments">
-                {selectionSummary.map((summary) => (
-                  <span key={summary}>{summary}</span>
-                ))}
-              </div>
-            </div>
 
-            <div className="section-toolbar-row">
-              <div className="track-pool-actions">
-                <button
-                  className="secondary-button"
-                  disabled={selectedCourseIds.length === allCourseIds.length}
-                  type="button"
-                  onClick={() => updateTracks({ selected_course_ids: allCourseIds })}
-                >
-                  Select all
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={arraysEqual(selectedCourseIds, defaultCourseIds)}
-                  type="button"
-                  onClick={() => updateTracks({ selected_course_ids: defaultCourseIds })}
-                >
-                  Restore defaults
-                </button>
-              </div>
-              <DisclosureToolbar
-                collapseLabel="Collapse all cups"
-                expandLabel="Expand all cups"
-                onCollapseAll={() => setCollapsedCupIds(cups.map((cup) => cup.id))}
-                onExpandAll={() => setCollapsedCupIds([])}
-              />
+          <div className="section-toolbar-row">
+            <div className="track-pool-actions">
+              <button
+                className="secondary-button"
+                disabled={selectedCourseIds.length === allCourseIds.length}
+                type="button"
+                onClick={() => updateTracks({ selected_course_ids: allCourseIds })}
+              >
+                Select all
+              </button>
+              <button
+                className="secondary-button"
+                disabled={arraysEqual(selectedCourseIds, defaultCourseIds)}
+                type="button"
+                onClick={() => updateTracks({ selected_course_ids: defaultCourseIds })}
+              >
+                Restore defaults
+              </button>
             </div>
+            <DisclosureToolbar
+              collapseLabel="Collapse all cups"
+              expandLabel="Expand all cups"
+              onCollapseAll={() => setCollapsedCupIds(collapsibleCupIds)}
+              onExpandAll={() => setCollapsedCupIds([])}
+            />
+          </div>
 
-            <div className="track-cup-stack">
-              {cups.map((cup) => {
-                const selectedCount = cup.courses.filter((course) =>
-                  selectedCourseSet.has(course.id),
-                ).length;
-                const allCupCoursesSelected = selectedCount === cup.courses.length;
-                const cupCollapsed = collapsedCupIdSet.has(cup.id);
-                const disablingWouldClearPool =
-                  allCupCoursesSelected && selectedCourseIds.length === cup.courses.length;
-                return (
-                  <details
-                    className="config-disclosure track-cup-section"
-                    data-cup={cup.id}
-                    key={cup.id}
-                    open={!cupCollapsed}
-                    onToggle={(event) => setCupCollapsed(cup.id, !event.currentTarget.open)}
-                  >
-                    <summary className="config-disclosure-summary track-cup-summary">
-                      <span className="config-disclosure-title track-cup-summary-label">
-                        <TrackCupBanner cupId={cup.id} label={cup.label} />
-                        <div className="track-cup-title-copy config-disclosure-copy">
-                          <strong>{cup.label}</strong>
-                          <small>{selectedCount} selected</small>
-                        </div>
-                      </span>
-                      <div className="track-cup-controls">
-                        <button
-                          aria-label={`${allCupCoursesSelected ? "Disable" : "Enable"} ${cup.label}`}
-                          aria-pressed={allCupCoursesSelected}
-                          className={
-                            allCupCoursesSelected
-                              ? "switch-button active tooltip-anchor"
-                              : "switch-button tooltip-anchor"
-                          }
-                          data-tooltip={allCupCoursesSelected ? "Included" : "Excluded"}
-                          disabled={disablingWouldClearPool}
-                          type="button"
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            toggleCup(cup.course_ids);
-                          }}
-                        >
-                          <span aria-hidden="true" />
-                          <strong>{allCupCoursesSelected ? "On" : "Off"}</strong>
-                        </button>
+          <div className="track-cup-stack">
+            {cups.map((cup) => {
+              const selectedCount = cup.courses.filter((course) =>
+                selectedCourseSet.has(course.id),
+              ).length;
+              const allCupCoursesSelected = selectedCount === cup.courses.length;
+              const cupCollapsed = collapsedCupIdSet.has(cup.id);
+              const disablingWouldClearPool =
+                allCupCoursesSelected &&
+                selectedCourseIds.length === cup.courses.length &&
+                !xCupEnabled;
+              return (
+                <details
+                  className="config-disclosure track-cup-section"
+                  data-cup={cup.id}
+                  key={cup.id}
+                  open={!cupCollapsed}
+                  onToggle={(event) => setCupCollapsed(cup.id, !event.currentTarget.open)}
+                >
+                  <summary className="config-disclosure-summary track-cup-summary">
+                    <span className="config-disclosure-title track-cup-summary-label">
+                      <TrackCupBanner cupId={cup.id} label={cup.label} />
+                      <div className="track-cup-title-copy config-disclosure-copy">
+                        <strong>{cup.label}</strong>
+                        <small>{selectedCount} selected</small>
                       </div>
-                    </summary>
-                    <div className="config-disclosure-body">
-                      <div className="track-card-grid">
-                        {cup.courses.map((course) => {
-                          const isSelected = selectedCourseSet.has(course.id);
-                          const isOnlySelected = isSelected && selectedCourseIds.length === 1;
-                          return (
-                            <button
-                              aria-label={course.display_name}
-                              aria-pressed={isSelected}
-                              className={isSelected ? "course-card selected" : "course-card"}
-                              data-cup={cup.id}
-                              disabled={isOnlySelected}
-                              key={course.id}
-                              type="button"
-                              onClick={() => toggleCourse(course.id)}
-                            >
-                              <TrackMinimap courseId={course.id} cup={course.cup} />
-                              <div className="course-card-copy">
-                                <strong>{course.display_name}</strong>
-                                <span>
-                                  {cup.label} · Course {course.cup_order_index}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                    </span>
+                    <div className="track-cup-controls">
+                      <button
+                        aria-label={`${allCupCoursesSelected ? "Disable" : "Enable"} ${cup.label}`}
+                        aria-pressed={allCupCoursesSelected}
+                        className={
+                          allCupCoursesSelected
+                            ? "switch-button active tooltip-anchor"
+                            : "switch-button tooltip-anchor"
+                        }
+                        data-tooltip={allCupCoursesSelected ? "Included" : "Excluded"}
+                        disabled={disablingWouldClearPool}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          toggleCup(cup.course_ids);
+                        }}
+                      >
+                        <span aria-hidden="true" />
+                        <strong>{allCupCoursesSelected ? "On" : "Off"}</strong>
+                      </button>
                     </div>
-                  </details>
-                );
-              })}
-            </div>
+                  </summary>
+                  <div className="config-disclosure-body">
+                    <div className="track-card-grid">
+                      {cup.courses.map((course) => {
+                        const isSelected = selectedCourseSet.has(course.id);
+                        const isOnlySelected =
+                          isSelected && selectedCourseIds.length === 1 && !xCupEnabled;
+                        return (
+                          <button
+                            aria-label={course.display_name}
+                            aria-pressed={isSelected}
+                            className={isSelected ? "course-card selected" : "course-card"}
+                            data-cup={cup.id}
+                            disabled={isOnlySelected}
+                            key={course.id}
+                            type="button"
+                            onClick={() => toggleCourse(course.id)}
+                          >
+                            <TrackMinimap courseId={course.id} cup={course.cup} />
+                            <div className="course-card-copy">
+                              <strong>{course.display_name}</strong>
+                              <span>
+                                {cup.label} · Course {course.cup_order_index}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </details>
+              );
+            })}
+            <details
+              className="config-disclosure track-cup-section"
+              data-cup="x"
+              open={!xCupCollapsed}
+              onToggle={(event) => setCupCollapsed("x", !event.currentTarget.open)}
+            >
+              <summary className="config-disclosure-summary track-cup-summary">
+                <span className="config-disclosure-title track-cup-summary-label">
+                  <TrackCupBanner cupId="x" label="X Cup" />
+                  <div className="track-cup-title-copy config-disclosure-copy">
+                    <strong>X Cup</strong>
+                    <small>
+                      {xCupEnabled
+                        ? `${config.tracks.x_cup_course_count} generated`
+                        : xCupAvailable
+                          ? "0 selected"
+                          : "GP race only"}
+                    </small>
+                  </div>
+                </span>
+                <div className="track-cup-controls">
+                  <button
+                    aria-label={`${xCupEnabled ? "Disable" : "Enable"} X Cup`}
+                    aria-pressed={xCupEnabled}
+                    className={
+                      xCupEnabled
+                        ? "switch-button active tooltip-anchor"
+                        : "switch-button tooltip-anchor"
+                    }
+                    data-tooltip={
+                      !xCupAvailable
+                        ? "GP race only"
+                        : xCupEnabled && selectedCourseIds.length === 0
+                          ? "Select a built-in course before disabling X Cup"
+                          : "Generated GP courses"
+                    }
+                    disabled={!xCupAvailable || (xCupEnabled && selectedCourseIds.length === 0)}
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      updateTracks({ include_x_cup: !xCupEnabled });
+                    }}
+                  >
+                    <span aria-hidden="true" />
+                    <strong>{xCupEnabled ? "On" : "Off"}</strong>
+                  </button>
+                </div>
+              </summary>
+              <div className="config-disclosure-body">
+                <div className="track-card-grid">
+                  <div
+                    className={
+                      xCupEnabled
+                        ? "course-card selected track-xcup-course-card"
+                        : "course-card track-xcup-course-card"
+                    }
+                    data-cup="x"
+                  >
+                    <div className="course-minimap">
+                      <TrackCupBanner cupId="x" label="X Cup" large />
+                    </div>
+                    <div className="course-card-copy">
+                      <strong>Generated courses</strong>
+                      <span>Deterministic GP X Cup baselines materialized at training start.</span>
+                    </div>
+                    <IntegerField
+                      help="Number of generated X Cup baselines materialized before training starts."
+                      label="Generated courses"
+                      min={1}
+                      resetValue={defaultConfig.tracks.x_cup_course_count}
+                      value={config.tracks.x_cup_course_count}
+                      onChange={(value) => updateTracks({ x_cup_course_count: value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </details>
           </div>
-        )}
+        </div>
       </ConfigPanel>
     </div>
   );

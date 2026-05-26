@@ -34,6 +34,7 @@ def track_config_from_sampling_entry(
             "course_name": entry.course_name,
             "course_index": entry.course_index,
             "mode": entry.mode,
+            "gp_difficulty": entry.gp_difficulty,
             "vehicle": entry.vehicle,
             "vehicle_name": entry.vehicle_name,
             "source_vehicle": entry.source_vehicle,
@@ -42,9 +43,15 @@ def track_config_from_sampling_entry(
             "engine_setting_min_raw_value": entry.engine_setting_min_raw_value,
             "engine_setting_max_raw_value": entry.engine_setting_max_raw_value,
             "source_course_index": entry.source_course_index,
+            "source_gp_difficulty": entry.source_gp_difficulty,
             "source_engine_setting": entry.source_engine_setting,
             "source_engine_setting_raw_value": entry.source_engine_setting_raw_value,
             "baseline_state_path": entry.baseline_state_path,
             "records": entry.records,
+            "notes": (
+                None
+                if entry.generated_course_kind is None
+                else f"generated {entry.generated_course_kind} course {entry.generated_course_hash}"
+            ),
         }
     )

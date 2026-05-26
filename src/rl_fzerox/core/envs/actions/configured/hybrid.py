@@ -124,9 +124,7 @@ class ConfiguredHybridActionAdapter:
         lean_right = False
         spin_request: SpinRequest = "none"
         if drive is not None:
-            gas = self._drive_decoder.decode(
-                1.0 if self._config.force_full_throttle else drive
-            )
+            gas = self._drive_decoder.decode(1.0 if self._config.force_full_throttle else drive)
         if air_brake is not None and self._config.continuous_air_brake_mode != "off":
             air_brake_pressed = self._air_brake_decoder.decode(air_brake)
 
