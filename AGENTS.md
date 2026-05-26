@@ -82,6 +82,11 @@ extending, and reviewing.
 - In the run-manager frontend, use configured path aliases such as `@/...` for
   project-local source and asset imports instead of relative `./` or `../`
   imports.
+- In the run-manager frontend, use Tailwind theme utilities and shared UI
+  primitives for ordinary layout, spacing, borders, typography, and simple
+  states. Keep CSS files for global tokens and complex visuals such as charts,
+  sliders, minimaps, dense tables, and SVG diagrams when utility classes would
+  make the component harder to read.
 - Treat pyright warnings about missing parameter annotations as work to clean up
   on touched code, but avoid broad type-hardening refactors unless the task is
   explicitly about typing.
