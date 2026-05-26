@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -13,7 +14,12 @@ if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
 
 
-RUN_WORKER_HEARTBEAT_TIMEOUT = timedelta(seconds=90)
+@dataclass(frozen=True, slots=True)
+class RunWorkerLeasePolicy:
+    heartbeat_timeout: timedelta = timedelta(seconds=90)
+
+
+RUN_WORKER_LEASE_POLICY = RunWorkerLeasePolicy()
 
 
 def reconcile_orphaned_runs(store: ManagerStore) -> None:
@@ -41,11 +47,11 @@ def reconcile_orphaned_runs(store: ManagerStore) -> None:
             worker = worker_by_run_id.get(run_id)
             if worker is None:
                 continue
+            heartbeat_at = datetime.fromisoformat(worker.heartbeat_at)
+            if now - heartbeat_at <= RUN_WORKER_LEASE_POLICY.heartbeat_timeout:
+                continue
             if not pid_exists(worker.pid):
                 _mark_orphaned_run_failed(connection, run_id=run_id)
-                continue
-            heartbeat_at = datetime.fromisoformat(worker.heartbeat_at)
-            if now - heartbeat_at <= RUN_WORKER_HEARTBEAT_TIMEOUT:
                 continue
 
 

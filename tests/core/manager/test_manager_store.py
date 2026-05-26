@@ -771,7 +771,7 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
     assert worker_row is None
 
 
-def test_manager_store_reconciles_dead_worker_even_with_fresh_heartbeat(
+def test_manager_store_keeps_fresh_worker_lease_when_pid_is_not_visible(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -809,17 +809,17 @@ def test_manager_store_reconciles_dead_worker_even_with_fresh_heartbeat(
     monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
 
     store.reconcile_orphaned_runs()
-    failed = store.get_run(run.id)
+    refreshed = store.get_run(run.id)
 
-    assert failed is not None
-    assert failed.status == "failed"
-    assert failed.pending_command is None
+    assert refreshed is not None
+    assert refreshed.status == "running"
+    assert refreshed.pending_command == "stop"
     with sqlite3.connect(store.db_path) as connection:
         worker_row = connection.execute(
             "SELECT 1 FROM run_workers WHERE run_id = ?",
             (run.id,),
         ).fetchone()
-    assert worker_row is None
+    assert worker_row is not None
 
 
 def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
