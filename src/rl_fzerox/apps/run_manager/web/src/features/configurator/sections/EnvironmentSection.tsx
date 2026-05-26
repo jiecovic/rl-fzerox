@@ -1,4 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/EnvironmentSection.tsx
+
+import {
+  ConfigFieldGroup,
+  ConfigFieldset,
+  ConfigPanelGrid,
+} from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import {
@@ -42,7 +48,7 @@ export function EnvironmentSection({
   );
 
   return (
-    <div className="config-stack training-panel-grid">
+    <ConfigPanelGrid>
       <ConfigPanel
         title="Runtime"
         onReset={() =>
@@ -52,7 +58,7 @@ export function EnvironmentSection({
           })
         }
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <SelectField
             help="Video backend requested from the Mupen core. gliden64 matches the established training runs; angrylion is slower and mainly useful for stricter software-rendering comparisons."
             label="Renderer"
@@ -70,7 +76,7 @@ export function EnvironmentSection({
             value={config.environment.camera_setting}
             onChange={(value) => updateEnvironment({ camera_setting: value })}
           />
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel
@@ -81,7 +87,7 @@ export function EnvironmentSection({
           })
         }
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <div className="field-with-note environment-note-field">
             <RangeIntegerField
               help="Hard cap on one episode, counted per native emulated frame. Policy decisions are fewer when action repeat is greater than one."
@@ -103,7 +109,7 @@ export function EnvironmentSection({
               {episodeFrameSummary(config)}. {episodeDecisionSummary(config)}
             </div>
           </div>
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel
@@ -116,7 +122,7 @@ export function EnvironmentSection({
           })
         }
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <BooleanField
             help="Stop an episode that keeps running without meaningfully advancing the best race-distance frontier."
             label="Enable no-progress truncation"
@@ -132,7 +138,7 @@ export function EnvironmentSection({
               })
             }
           />
-          <fieldset className="dependent-fieldset" disabled={!stallTruncationEnabled}>
+          <ConfigFieldset disabled={!stallTruncationEnabled}>
             <div className="field-with-note environment-note-field">
               <RangeIntegerField
                 help="Maximum internal frames allowed without beating the previous progress frontier by at least epsilon."
@@ -165,8 +171,8 @@ export function EnvironmentSection({
               value={config.environment.progress_frontier_epsilon}
               onChange={(value) => updateEnvironment({ progress_frontier_epsilon: value })}
             />
-          </fieldset>
-        </div>
+          </ConfigFieldset>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel title="Episode summary" wide>
@@ -182,6 +188,6 @@ export function EnvironmentSection({
           </tbody>
         </table>
       </ConfigPanel>
-    </div>
+    </ConfigPanelGrid>
   );
 }

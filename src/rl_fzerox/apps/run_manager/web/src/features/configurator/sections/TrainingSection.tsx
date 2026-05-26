@@ -1,4 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/TrainingSection.tsx
+
+import { ConfigFieldGroup, ConfigPanelGrid } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import {
@@ -26,12 +28,12 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
   const rolloutStepValues = compatibleRolloutSteps(config.train);
 
   return (
-    <div className="config-stack training-panel-grid">
+    <ConfigPanelGrid>
       <ConfigPanel
         title="Rollout"
         onReset={() => updateTrain(rolloutDefaults(defaultConfig.train))}
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <RangeNumberField
             help="Parallel emulator environments used for rollout collection."
             label="Env count"
@@ -114,14 +116,14 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
             value={config.train.gamma}
             onChange={(value) => updateTrain({ gamma: value })}
           />
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel
         title="Optimization"
         onReset={() => updateTrain(optimizationDefaults(defaultConfig.train))}
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <LogRangeNumberField
             help="Optimizer step size."
             label="Learning rate"
@@ -212,14 +214,14 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
             value={config.train.vf_coef}
             onChange={(value) => updateTrain({ vf_coef: value })}
           />
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel
         title="Stability"
         onReset={() => updateTrain(stabilityDefaults(defaultConfig.train))}
       >
-        <div className="training-field-grid">
+        <ConfigFieldGroup>
           <RangeNumberField
             help="Gradient norm clipping threshold."
             label="Max grad norm"
@@ -254,7 +256,7 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
             value={config.train.target_kl}
             onChange={(value) => updateTrain({ target_kl: value })}
           />
-        </div>
+        </ConfigFieldGroup>
       </ConfigPanel>
 
       <ConfigPanel title="PPO update summary" wide>
@@ -287,7 +289,7 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
           </tbody>
         </table>
       </ConfigPanel>
-    </div>
+    </ConfigPanelGrid>
   );
 }
 

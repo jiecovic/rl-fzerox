@@ -109,7 +109,7 @@ export function RangePairField({
   }
 
   return (
-    <FieldShell>
+    <FieldShell className="range-pair-field">
       <FieldLabel help={help} label={label} onReset={fieldResetHandler} />
       <div className="grid grid-cols-[minmax(0,1fr)_148px] items-center gap-3">
         <RangePairSlider
@@ -277,7 +277,7 @@ export function OptionalRangePairField({
   }
 
   return (
-    <FieldShell>
+    <FieldShell className="range-pair-field">
       <FieldLabel help={help} label={label} onReset={fieldResetHandler} />
       <div
         className={cn(

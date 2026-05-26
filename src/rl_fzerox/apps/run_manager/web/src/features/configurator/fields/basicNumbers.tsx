@@ -47,7 +47,7 @@ export function NumberField({
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <FieldInput
         aria-label={label}
-        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
+        className="min-w-[9ch] max-w-[14ch] justify-self-start"
         inputMode="decimal"
         spellCheck={false}
         value={rawValue}
@@ -96,7 +96,7 @@ export function IntegerField({
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <FieldInput
         aria-label={label}
-        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
+        className="min-w-[9ch] max-w-[14ch] justify-self-start"
         inputMode="numeric"
         spellCheck={false}
         value={rawValue}
@@ -141,7 +141,7 @@ export function ScientificNumberField({
       <FieldLabel help={help} label={label} onReset={resetHandler(value, resetValue, onChange)} />
       <FieldInput
         aria-label={label}
-        className="w-[min(100%,14ch)] min-w-[9ch] justify-self-start"
+        className="min-w-[9ch] max-w-[14ch] justify-self-start"
         inputMode="decimal"
         spellCheck={false}
         value={rawValue}

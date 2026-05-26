@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/observation/ProgressSourceToggle.tsx
-
 import {
   progressOptionLabel,
   progressSourceOptions,
 } from "@/features/configurator/sections/observation/featureRows";
 import type { StateComponentConfig } from "@/shared/api/contract";
+import { SegmentedChoiceButton, SegmentedChoiceGroup } from "@/shared/ui/Field";
 
 interface ProgressSourceToggleProps {
   disabled: boolean;
@@ -14,18 +14,33 @@ interface ProgressSourceToggleProps {
 
 export function ProgressSourceToggle({ disabled, value, onChange }: ProgressSourceToggleProps) {
   return (
-    <fieldset className="state-progress-toggle" disabled={disabled}>
-      <legend>Progress scalar source</legend>
+    <SegmentedChoiceGroup
+      className="rounded-md p-px"
+      label="Progress scalar source"
+      value={value}
+      onValueChange={(nextValue) => {
+        if (isProgressSource(nextValue)) {
+          onChange(nextValue);
+        }
+      }}
+    >
       {progressSourceOptions.map((option) => (
-        <button
-          className={option === value ? "active" : undefined}
+        <SegmentedChoiceButton
+          active={option === value}
+          className="min-h-7 px-2.5 text-xs"
+          disabledChoice={disabled}
           key={option}
-          type="button"
-          onClick={() => onChange(option)}
+          value={option}
         >
           {progressOptionLabel(option)}
-        </button>
+        </SegmentedChoiceButton>
       ))}
-    </fieldset>
+    </SegmentedChoiceGroup>
   );
+}
+
+function isProgressSource(
+  value: string,
+): value is NonNullable<StateComponentConfig["progress_source"]> {
+  return progressSourceOptions.some((option) => option === value);
 }

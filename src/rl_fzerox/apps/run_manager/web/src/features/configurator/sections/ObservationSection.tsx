@@ -1,4 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/ObservationSection.tsx
+
+import {
+  ConfigFieldGroup,
+  ConfigFieldset,
+  ConfigGrid,
+  ConfigStack,
+} from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   type ConfigSectionPatch,
@@ -17,6 +24,7 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { FieldNote, FieldShell } from "@/shared/ui/Field";
 
 type ObservationResolution = ManagedRunConfig["observation"]["resolution"];
 type ObservationResolutionMode = ObservationResolution["mode"];
@@ -137,12 +145,12 @@ export function ObservationSection({
   }
 
   return (
-    <div className="config-stack">
-      <div className="form-grid two">
+    <ConfigStack>
+      <ConfigGrid columns="two">
         <ConfigPanel title="Image observation">
-          <div className="config-field-grid image-observation-grid">
-            <fieldset
-              className="fork-lock-fieldset image-observation-fieldset"
+          <ConfigFieldGroup className="grid-cols-2">
+            <ConfigFieldset
+              className="col-span-full grid-cols-2 items-start [&>.range-field]:col-span-full"
               disabled={checkpointLocked}
             >
               <SelectField
@@ -169,7 +177,7 @@ export function ObservationSection({
                   }
                 />
               ) : resolution.mode === "custom" ? (
-                <div className="custom-resolution-grid">
+                <div className="col-span-full grid grid-cols-2 gap-3">
                   <IntegerField
                     help={`Custom target height after crop. Allowed range: ${metadata.observation_resolution_bounds.min_dimension}-${metadata.observation_resolution_bounds.max_height}px.`}
                     label="Custom height"
@@ -206,14 +214,14 @@ export function ObservationSection({
                   />
                 </div>
               ) : (
-                <div className="field-shell">
-                  <span className="field-label">Input resolution</span>
-                  <span className="derived-value-note">
+                <FieldShell>
+                  <span>Input resolution</span>
+                  <FieldNote className="grid min-h-10 items-center border border-app-border bg-app-surface px-2.5 text-app-text">
                     {sourceGeometry === undefined
                       ? "pending"
                       : `${sourceGeometry.height} x ${sourceGeometry.width}`}
-                  </span>
-                </div>
+                  </FieldNote>
+                </FieldShell>
               )}
               <SelectField
                 help="Image channel encoding used by the frame stack."
@@ -240,7 +248,7 @@ export function ObservationSection({
                 value={config.observation.minimap_layer}
                 onChange={(value) => updateObservation({ minimap_layer: value })}
               />
-            </fieldset>
+            </ConfigFieldset>
             <SelectField
               help="Resize filter used for the main image crop."
               label="Resize filter"
@@ -257,7 +265,7 @@ export function ObservationSection({
               value={config.observation.minimap_resize_filter}
               onChange={(value) => updateObservation({ minimap_resize_filter: value })}
             />
-          </div>
+          </ConfigFieldGroup>
         </ConfigPanel>
 
         <ConfigPanel title="Derived shape">
@@ -280,7 +288,7 @@ export function ObservationSection({
             />
           </div>
         </ConfigPanel>
-      </div>
+      </ConfigGrid>
 
       <ConfigPanel title="State vector components" wide>
         <StateComponentPanels
@@ -292,7 +300,7 @@ export function ObservationSection({
           updatePolicy={updatePolicy}
         />
       </ConfigPanel>
-    </div>
+    </ConfigStack>
   );
 }
 

@@ -1,4 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/PolicySection.tsx
+
+import {
+  ConfigFieldGroup,
+  ConfigFieldset,
+  ConfigGrid,
+  ConfigStack,
+} from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import {
   type ConfigSectionPatch,
@@ -14,6 +21,7 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 import { CnnConfigIcon } from "@/shared/ui/icons";
 
 interface PolicySectionProps {
@@ -90,10 +98,10 @@ export function PolicySection({
   };
 
   return (
-    <div className="config-stack">
-      <div className="form-grid three training-panel-grid">
+    <ConfigStack>
+      <ConfigGrid columns="two" className="items-start">
         <ConfigPanel
-          title="CNN extractor"
+          title="Image extractor"
           onReset={
             checkpointLocked
               ? undefined
@@ -104,6 +112,58 @@ export function PolicySection({
                     custom_cnn_final_relu: defaultConfig.policy.custom_cnn_final_relu,
                     features_dim: defaultConfig.policy.features_dim,
                     image_projection_activation: defaultConfig.policy.image_projection_activation,
+                  })
+          }
+        >
+          <ConfigFieldset disabled={checkpointLocked}>
+            <SelectField
+              help="Backend CNN profile used for the image branch. Preset layers are read-only until you copy them with Edit as custom in the preview."
+              label="CNN profile"
+              options={convProfileOptions}
+              resetValue={defaultConfig.policy.conv_profile}
+              value={config.policy.conv_profile}
+              onChange={updateConvProfile}
+            />
+            <Button className="justify-start gap-2" type="button" onClick={jumpToCnnConfigurator}>
+              <CnnConfigIcon />
+              {config.policy.conv_profile === "custom" ? "Edit CNN" : "View CNN"}
+            </Button>
+            <FeatureDimField
+              help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
+              label="Image features"
+              resetValue={defaultConfig.policy.features_dim}
+              value={config.policy.features_dim}
+              onChange={(value) => updatePolicy({ features_dim: value })}
+            />
+            <ConfigFieldset disabled={checkpointLocked || config.policy.features_dim === "auto"}>
+              <SelectField
+                help="Activation after the optional image feature projection."
+                label="Image proj activation"
+                options={activationOptions}
+                resetValue={defaultConfig.policy.image_projection_activation}
+                value={config.policy.image_projection_activation}
+                onChange={(value) => updatePolicy({ image_projection_activation: value })}
+              />
+            </ConfigFieldset>
+            <ConfigFieldset disabled={checkpointLocked || config.policy.conv_profile !== "custom"}>
+              <BooleanField
+                help="Apply one ReLU after the last custom CNN layer before flattening. This is needed to preserve the IMPALA large trunk after copying it into custom layers."
+                label="Final CNN ReLU"
+                resetValue={defaultConfig.policy.custom_cnn_final_relu}
+                value={config.policy.custom_cnn_final_relu}
+                onChange={(value) => updatePolicy({ custom_cnn_final_relu: value })}
+              />
+            </ConfigFieldset>
+          </ConfigFieldset>
+        </ConfigPanel>
+
+        <ConfigPanel
+          title="State and fusion"
+          onReset={
+            checkpointLocked
+              ? undefined
+              : () =>
+                  updatePolicy({
                     state_net_arch: defaultConfig.policy.state_net_arch,
                     state_activation: defaultConfig.policy.state_activation,
                     fusion_features_dim: defaultConfig.policy.fusion_features_dim,
@@ -113,55 +173,7 @@ export function PolicySection({
                   })
           }
         >
-          <fieldset className="fork-lock-fieldset training-field-grid" disabled={checkpointLocked}>
-            <SelectField
-              help="Backend CNN profile used for the image branch. Preset layers are read-only until you copy them with Edit as custom in the preview."
-              label="CNN profile"
-              options={convProfileOptions}
-              resetValue={defaultConfig.policy.conv_profile}
-              value={config.policy.conv_profile}
-              onChange={updateConvProfile}
-            />
-            <button
-              className="secondary-button button-with-icon"
-              type="button"
-              onClick={jumpToCnnConfigurator}
-            >
-              <CnnConfigIcon />
-              {config.policy.conv_profile === "custom" ? "Edit CNN" : "View CNN"}
-            </button>
-            <FeatureDimField
-              help="Image feature width after CNN flatten. Auto keeps the raw flatten size."
-              label="Image features"
-              resetValue={defaultConfig.policy.features_dim}
-              value={config.policy.features_dim}
-              onChange={(value) => updatePolicy({ features_dim: value })}
-            />
-            <fieldset
-              className="dependent-fieldset"
-              disabled={checkpointLocked || config.policy.features_dim === "auto"}
-            >
-              <SelectField
-                help="Activation after the optional image feature projection."
-                label="Image proj activation"
-                options={activationOptions}
-                resetValue={defaultConfig.policy.image_projection_activation}
-                value={config.policy.image_projection_activation}
-                onChange={(value) => updatePolicy({ image_projection_activation: value })}
-              />
-            </fieldset>
-            <fieldset
-              className="dependent-fieldset"
-              disabled={checkpointLocked || config.policy.conv_profile !== "custom"}
-            >
-              <BooleanField
-                help="Apply one ReLU after the last custom CNN layer before flattening. This is needed to preserve the IMPALA large trunk after copying it into custom layers."
-                label="Final CNN ReLU"
-                resetValue={defaultConfig.policy.custom_cnn_final_relu}
-                value={config.policy.custom_cnn_final_relu}
-                onChange={(value) => updatePolicy({ custom_cnn_final_relu: value })}
-              />
-            </fieldset>
+          <ConfigFieldset disabled={checkpointLocked}>
             <LayerListField
               help="State branch MLP layers before image/state fusion. Remove all layers to concatenate the raw state vector."
               label="State MLP"
@@ -169,8 +181,7 @@ export function PolicySection({
               value={config.policy.state_net_arch}
               onChange={(value) => updatePolicy({ state_net_arch: value })}
             />
-            <fieldset
-              className="dependent-fieldset"
+            <ConfigFieldset
               disabled={checkpointLocked || config.policy.state_net_arch.length === 0}
             >
               <SelectField
@@ -181,7 +192,7 @@ export function PolicySection({
                 value={config.policy.state_activation}
                 onChange={(value) => updatePolicy({ state_activation: value })}
               />
-            </fieldset>
+            </ConfigFieldset>
             <BooleanField
               help="Insert a learned MLP after image/state concatenation. Turn off to feed the concatenated features directly to the recurrent core or heads."
               label="Fusion MLP"
@@ -189,7 +200,7 @@ export function PolicySection({
               value={fusionEnabled}
               onChange={updateFusionEnabled}
             />
-            <fieldset className="dependent-fieldset" disabled={checkpointLocked || !fusionEnabled}>
+            <ConfigFieldset disabled={checkpointLocked || !fusionEnabled}>
               <IntegerField
                 help="Feature width of the learned fusion MLP."
                 label="Fusion features"
@@ -206,7 +217,7 @@ export function PolicySection({
                 value={config.policy.fusion_activation}
                 onChange={(value) => updatePolicy({ fusion_activation: value })}
               />
-            </fieldset>
+            </ConfigFieldset>
             <BooleanField
               help="Apply layer normalization after the fusion stage or direct concatenation."
               label="Layer norm"
@@ -214,10 +225,7 @@ export function PolicySection({
               value={config.policy.layer_norm}
               onChange={(value) => updatePolicy({ layer_norm: value })}
             />
-            <fieldset
-              className="dependent-fieldset"
-              disabled={checkpointLocked || !config.policy.layer_norm}
-            >
+            <ConfigFieldset disabled={checkpointLocked || !config.policy.layer_norm}>
               <SelectField
                 help="Optional activation applied after layer normalization."
                 label="Post-LN activation"
@@ -229,8 +237,8 @@ export function PolicySection({
                   updatePolicy({ layer_norm_activation: value === "none" ? null : value })
                 }
               />
-            </fieldset>
-          </fieldset>
+            </ConfigFieldset>
+          </ConfigFieldset>
         </ConfigPanel>
 
         <ConfigPanel
@@ -248,7 +256,7 @@ export function PolicySection({
                   })
           }
         >
-          <fieldset className="fork-lock-fieldset training-field-grid" disabled={checkpointLocked}>
+          <ConfigFieldset disabled={checkpointLocked}>
             <BooleanField
               help="Insert LSTM actor/critic cores between extractor and heads."
               label="Use LSTM"
@@ -256,10 +264,7 @@ export function PolicySection({
               value={config.policy.recurrent_enabled}
               onChange={(value) => updatePolicy({ recurrent_enabled: value })}
             />
-            <fieldset
-              className="dependent-fieldset"
-              disabled={checkpointLocked || !config.policy.recurrent_enabled}
-            >
+            <ConfigFieldset disabled={checkpointLocked || !config.policy.recurrent_enabled}>
               <IntegerField
                 help="Hidden width of the recurrent actor and critic."
                 label="LSTM hidden"
@@ -290,8 +295,8 @@ export function PolicySection({
                 value={config.policy.recurrent_enable_critic_lstm}
                 onChange={(value) => updatePolicy({ recurrent_enable_critic_lstm: value })}
               />
-            </fieldset>
-          </fieldset>
+            </ConfigFieldset>
+          </ConfigFieldset>
         </ConfigPanel>
 
         <ConfigPanel
@@ -309,7 +314,7 @@ export function PolicySection({
             })
           }
         >
-          <div className="training-field-grid">
+          <ConfigFieldGroup>
             <SelectField
               help="Activation function used by policy/value MLP layers."
               label="Activation"
@@ -318,7 +323,7 @@ export function PolicySection({
               value={config.policy.activation}
               onChange={(value) => updatePolicy({ activation: value })}
             />
-            <fieldset className="fork-lock-fieldset" disabled={false}>
+            <ConfigFieldset disabled={false}>
               <LayerListField
                 help="Shared MLP trunk used by the grouped auxiliary-state heads before their scalar, binary, and categorical outputs."
                 label="Aux head"
@@ -326,8 +331,8 @@ export function PolicySection({
                 value={config.policy.auxiliary_state_head_arch}
                 onChange={(value) => updatePolicy({ auxiliary_state_head_arch: value })}
               />
-            </fieldset>
-            <fieldset className="fork-lock-fieldset" disabled={checkpointLocked}>
+            </ConfigFieldset>
+            <ConfigFieldset disabled={checkpointLocked}>
               <LayerListField
                 help="Policy MLP layers after the recurrent core. Add or remove rows to change the head depth."
                 label="Policy head"
@@ -342,10 +347,10 @@ export function PolicySection({
                 value={config.policy.vf_net_arch}
                 onChange={(value) => updatePolicy({ vf_net_arch: value })}
               />
-            </fieldset>
-          </div>
+            </ConfigFieldset>
+          </ConfigFieldGroup>
         </ConfigPanel>
-      </div>
+      </ConfigGrid>
 
       <ConfigPanel title="Architecture preview" wide>
         <PolicyPreviewPanel
@@ -380,6 +385,6 @@ export function PolicySection({
           }}
         />
       </ConfigPanel>
-    </div>
+    </ConfigStack>
   );
 }
