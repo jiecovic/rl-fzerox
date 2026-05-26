@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/ui/ScrollButtons.tsx
 import { useEffect, useState } from "react";
+import { IconButton } from "@/shared/ui/Button";
 import { ArrowDownIcon, ArrowUpIcon } from "@/shared/ui/icons";
 
 export function ScrollButtons() {
@@ -26,26 +27,26 @@ export function ScrollButtons() {
   }
 
   return (
-    <div className="scroll-buttons">
+    <div className="fixed right-[max(18px,calc((100vw-1120px)/2-54px))] bottom-7 z-10 grid gap-2">
       {!position.atTop ? (
-        <button
+        <IconButton
           aria-label="Scroll to top"
-          className="icon-button compact-icon-button tooltip-anchor"
+          className="tooltip-anchor shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
           data-tooltip="Scroll to top"
           data-tooltip-position="left"
-          type="button"
+          size="compact"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         >
           <ArrowUpIcon />
-        </button>
+        </IconButton>
       ) : null}
       {!position.atBottom ? (
-        <button
+        <IconButton
           aria-label="Scroll to bottom"
-          className="icon-button compact-icon-button tooltip-anchor"
+          className="tooltip-anchor shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
           data-tooltip="Scroll to bottom"
           data-tooltip-position="left"
-          type="button"
+          size="compact"
           onClick={() =>
             window.scrollTo({
               top: document.documentElement.scrollHeight,
@@ -54,7 +55,7 @@ export function ScrollButtons() {
           }
         >
           <ArrowDownIcon />
-        </button>
+        </IconButton>
       ) : null}
     </div>
   );
