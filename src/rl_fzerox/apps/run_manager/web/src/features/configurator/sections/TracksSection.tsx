@@ -1,5 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/TracksSection.tsx
 import { useMemo } from "react";
+
+import { ConfigGrid, ConfigStack } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import type { ConfigSetter } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
@@ -8,6 +10,7 @@ import { IntegerField, NumberField, SegmentedChoiceStrip } from "@/features/conf
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
 import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinimap";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 
 interface TracksSectionProps {
   config: ManagedRunConfig;
@@ -198,8 +201,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   };
 
   return (
-    <div className="config-stack">
-      <div className="form-grid two track-panel-grid">
+    <ConfigStack>
+      <ConfigGrid columns="two" className="items-stretch">
         <ConfigPanel
           onReset={() => updateTracks({ race_mode: defaultConfig.tracks.race_mode })}
           title="Race mode"
@@ -247,9 +250,9 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
             }))}
           />
         </ConfigPanel>
-      </div>
+      </ConfigGrid>
 
-      <div className="form-grid track-panel-grid">
+      <ConfigGrid className="items-stretch">
         <ConfigPanel
           wide
           onReset={() =>
@@ -260,7 +263,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
           }
           title="Course sampling"
         >
-          <div className="track-choice-panel">
+          <div className="grid gap-3">
             <ChoiceStrip
               description={
                 TRACK_SAMPLING_DESCRIPTIONS[config.tracks.sampling_mode] ??
@@ -277,7 +280,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
               }))}
             />
             {usesDynamicStepBalancing ? (
-              <div className="track-sampling-grid">
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
                 <IntegerField
                   help="Episodes collected before recomputing course weights."
                   label="Update episodes"
@@ -330,7 +333,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
             ) : null}
           </div>
         </ConfigPanel>
-      </div>
+      </ConfigGrid>
 
       <ConfigPanel
         onReset={() =>
@@ -343,44 +346,55 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
         title="Course pool"
         wide
       >
-        <div className="track-pool-shell">
-          <div className="track-pool-summary">
-            <div className="track-pool-metric">
-              <span>Selected courses</span>
-              <strong>
+        <div className="grid gap-3.5">
+          <div className="grid grid-cols-[140px_120px_minmax(0,1fr)] gap-3 border border-app-border bg-app-surface p-3.5">
+            <div className="grid gap-1">
+              <span className="text-xs leading-snug text-app-muted">Selected courses</span>
+              <strong className="text-lg tabular-nums">
                 {selectedCourseIds.length + (xCupEnabled ? config.tracks.x_cup_course_count : 0)}
               </strong>
             </div>
-            <div className="track-pool-metric">
-              <span>Cups covered</span>
-              <strong>{selectedCupCount + (xCupEnabled ? 1 : 0)}</strong>
+            <div className="grid gap-1">
+              <span className="text-xs leading-snug text-app-muted">Cups covered</span>
+              <strong className="text-lg tabular-nums">
+                {selectedCupCount + (xCupEnabled ? 1 : 0)}
+              </strong>
             </div>
-            <div className="track-pool-fragments">
+            <div className="flex flex-wrap content-center gap-2">
               {selectionSummary.map((summary) => (
-                <span key={summary}>{summary}</span>
+                <span
+                  className="border border-app-border bg-app-surface-muted px-2 py-1 text-xs leading-snug text-app-muted"
+                  key={summary}
+                >
+                  {summary}
+                </span>
               ))}
-              {xCupEnabled ? <span>X {config.tracks.x_cup_course_count}</span> : null}
+              {xCupEnabled ? (
+                <span className="border border-app-border bg-app-surface-muted px-2 py-1 text-xs leading-snug text-app-muted">
+                  X {config.tracks.x_cup_course_count}
+                </span>
+              ) : null}
             </div>
           </div>
 
           <div className="section-toolbar-row">
-            <div className="track-pool-actions">
-              <button
-                className="secondary-button"
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="h-9 px-3"
                 disabled={selectedCourseIds.length === allCourseIds.length}
                 type="button"
                 onClick={() => updateTracks({ selected_course_ids: allCourseIds })}
               >
                 Select all
-              </button>
-              <button
-                className="secondary-button"
+              </Button>
+              <Button
+                className="h-9 px-3"
                 disabled={arraysEqual(selectedCourseIds, defaultCourseIds)}
                 type="button"
                 onClick={() => updateTracks({ selected_course_ids: defaultCourseIds })}
               >
                 Restore defaults
-              </button>
+              </Button>
             </div>
             <DisclosureToolbar
               collapseLabel="Collapse all cups"
@@ -553,7 +567,7 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
           </div>
         </div>
       </ConfigPanel>
-    </div>
+    </ConfigStack>
   );
 }
 
@@ -572,9 +586,9 @@ function ChoiceStrip({
   }[];
 }) {
   return (
-    <div className="track-choice-panel">
+    <div className="grid gap-2.5">
       <SegmentedChoiceStrip ariaLabel="Selection" options={options} />
-      <p className="track-choice-note">{description}</p>
+      <p className="m-0 text-xs leading-snug text-app-muted">{description}</p>
     </div>
   );
 }

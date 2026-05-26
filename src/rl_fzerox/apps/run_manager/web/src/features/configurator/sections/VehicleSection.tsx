@@ -1,6 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/VehicleSection.tsx
 import { useMemo } from "react";
 
+import { ConfigGrid, ConfigStack } from "@/features/configurator/ConfigLayout";
 import { ConfigPanel } from "@/features/configurator/ConfigPanel";
 import { type ConfigSetter, patchConfigSection } from "@/features/configurator/configurator/state";
 import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
@@ -15,6 +16,7 @@ import {
   vehicleSlotLabel,
 } from "@/features/configurator/sections/vehicle/model";
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 
 interface VehicleSectionProps {
   config: ManagedRunConfig;
@@ -149,8 +151,8 @@ export function VehicleSection({
   };
 
   return (
-    <div className="config-stack">
-      <div className="form-grid two vehicle-panel-grid">
+    <ConfigStack>
+      <ConfigGrid columns="two" className="items-stretch">
         <ConfigPanel
           onReset={() =>
             updateVehicle({
@@ -213,14 +215,16 @@ export function VehicleSection({
         </ConfigPanel>
 
         <ConfigPanel title="Selection summary">
-          <div className="vehicle-summary-grid">
+          <div className="grid grid-cols-3 gap-2.5">
             <VehicleMetric label="Selected machines" value={String(selectedVehicleIds.length)} />
             <VehicleMetric label="Rows covered" value={String(selectedRowCount)} />
             <VehicleMetric label="Engine setting" value={engineSettingSummary(config.vehicle)} />
           </div>
-          <p className="vehicle-note">{selectionSummary(selectedVehicles)}</p>
+          <p className="min-h-[34px] text-xs leading-snug text-app-muted">
+            {selectionSummary(selectedVehicles)}
+          </p>
         </ConfigPanel>
-      </div>
+      </ConfigGrid>
 
       <ConfigPanel
         onReset={() =>
@@ -234,23 +238,23 @@ export function VehicleSection({
       >
         <div className="vehicle-roster-shell">
           <div className="section-toolbar-row">
-            <div className="vehicle-roster-actions">
-              <button
-                className="secondary-button"
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="h-9 px-3"
                 disabled={selectedVehicleIds.length === allVehicleIds.length}
                 type="button"
                 onClick={() => setSelectedVehicles(allVehicleIds)}
               >
                 Select all
-              </button>
-              <button
-                className="secondary-button"
+              </Button>
+              <Button
+                className="h-9 px-3"
                 disabled={arraysEqual(selectedVehicleIds, defaultVehicleIds)}
                 type="button"
                 onClick={() => setSelectedVehicles(defaultVehicleIds)}
               >
                 Restore defaults
-              </button>
+              </Button>
             </div>
             <DisclosureToolbar
               collapseLabel="Collapse all machine rows"
@@ -337,15 +341,15 @@ export function VehicleSection({
           </div>
         </div>
       </ConfigPanel>
-    </div>
+    </ConfigStack>
   );
 }
 
 function VehicleMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="vehicle-metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className="grid min-h-[72px] gap-1 border border-app-border bg-app-surface p-2.5">
+      <span className="text-xs leading-snug text-app-muted">{label}</span>
+      <strong className="text-base tabular-nums text-app-text">{value}</strong>
     </div>
   );
 }

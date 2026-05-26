@@ -1,17 +1,10 @@
-.vehicle-panel-grid {
-  align-items: stretch;
-}
-
 .vehicle-engine-panel,
-.vehicle-preset-panel,
 .vehicle-roster-shell,
 .vehicle-row-stack {
   display: grid;
   gap: 12px;
 }
 
-.vehicle-note,
-.vehicle-metric span,
 .vehicle-card-copy span,
 .vehicle-row-summary small,
 .vehicle-row-fixed-note,
@@ -22,34 +15,9 @@
   line-height: 1.35;
 }
 
-.vehicle-note {
-  min-height: 34px;
-}
-
-.vehicle-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.vehicle-metric {
-  display: grid;
-  gap: 4px;
-  min-height: 72px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  padding: 10px;
-}
-
-.vehicle-metric strong,
 .vehicle-card-copy strong,
 .vehicle-row-summary strong {
   color: var(--text);
-}
-
-.vehicle-metric strong {
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
 }
 
 .vehicle-engine-range-grid {
@@ -214,12 +182,6 @@
   white-space: nowrap;
 }
 
-.vehicle-roster-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .vehicle-row-summary-label {
   min-width: 0;
 }
@@ -292,10 +254,6 @@
 }
 
 @media (max-width: 1080px) {
-  .vehicle-summary-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .vehicle-card-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
