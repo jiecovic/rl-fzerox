@@ -13,6 +13,7 @@ import {
   disclosureStateFor,
 } from "@/features/runs/panel/model";
 import type { ManagedDraft, ManagedRun } from "@/shared/api/contract";
+import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { ChevronIcon, ImportIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
@@ -95,7 +96,7 @@ export function RunsPanel({
       <Panel>
         <div className="panel-header-row">
           <PanelHeader title="Runs" subtitle="Fork chains grouped by lineage." />
-          <div className="run-panel-actions">
+          <div className="flex items-center gap-2">
             <input
               ref={importInputRef}
               accept=".zip,application/zip"
@@ -110,15 +111,15 @@ export function RunsPanel({
                 }
               }}
             />
-            <button
-              className="secondary-button button-with-icon"
+            <Button
+              className="gap-2"
               disabled={isImporting}
               type="button"
               onClick={() => importInputRef.current?.click()}
             >
               <ImportIcon />
               {isImporting ? "Importing" : "Import"}
-            </button>
+            </Button>
             {runs.length > 0 ? (
               <DisclosureToolbar
                 collapseLabel="Collapse all lineages"
@@ -134,19 +135,19 @@ export function RunsPanel({
         {runs.length === 0 ? (
           <Notice>No launched runs yet.</Notice>
         ) : (
-          <div className="run-lineage-bucket-list">
+          <div className="grid gap-3.5">
             {lineageBuckets.map((bucket) => {
               const isBucketOpen = bucketOpen[bucket.id] ?? true;
               return (
                 <section
                   aria-label={`${bucket.label} lineage group`}
-                  className="run-lineage-bucket"
+                  className="grid gap-2"
                   key={bucket.id}
                 >
                   <button
                     aria-expanded={isBucketOpen}
                     aria-label={`${isBucketOpen ? "Collapse" : "Expand"} group ${bucket.label}`}
-                    className="run-lineage-bucket-header"
+                    className="grid w-full grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 border-0 bg-transparent px-0.5 text-left text-app-text"
                     type="button"
                     onClick={() =>
                       setBucketOpen((current) => ({
@@ -164,13 +165,13 @@ export function RunsPanel({
                       <ChevronIcon />
                     </span>
                     <strong>{bucket.label}</strong>
-                    <span className="run-lineage-bucket-meta">
+                    <span className="min-w-0 justify-self-end overflow-hidden text-ellipsis whitespace-nowrap text-[11px] tabular-nums text-app-muted">
                       {bucket.lineages.length} lineages · tensorboard: local/tensorboard_views/
                       {bucket.slug}
                     </span>
                   </button>
                   {isBucketOpen ? (
-                    <div className="run-lineage-list">
+                    <div className="grid gap-2.5">
                       {bucket.lineages.map((lineage) => (
                         <LineageCard
                           busyActionRunId={busyActionRunId}
