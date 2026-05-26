@@ -57,21 +57,28 @@ export function buildLineageBuckets(lineages: readonly RunLineageGroup[]): RunLi
           groupName,
           id,
           label: groupName ?? "Ungrouped",
+          latestUpdatedAt: lineage.latestUpdatedAt,
           lineages: [lineage],
           slug: id,
         });
       } else {
+        if (compareIso(lineage.latestUpdatedAt, existing.latestUpdatedAt) > 0) {
+          existing.latestUpdatedAt = lineage.latestUpdatedAt;
+        }
         existing.lineages.push(lineage);
       }
     }
   }
   return [...bucketsById.values()].sort((left, right) => {
-    if (left.groupName === null || right.groupName === null) {
-      return left.groupName === null && right.groupName === null
-        ? 0
-        : left.groupName === null
-          ? 1
-          : -1;
+    const activityDelta = compareIso(right.latestUpdatedAt, left.latestUpdatedAt);
+    if (activityDelta !== 0) {
+      return activityDelta;
+    }
+    if (left.groupName === null && right.groupName !== null) {
+      return 1;
+    }
+    if (left.groupName !== null && right.groupName === null) {
+      return -1;
     }
     return left.label.localeCompare(right.label);
   });
