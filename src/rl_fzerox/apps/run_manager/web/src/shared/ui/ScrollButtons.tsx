@@ -1,7 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/ui/ScrollButtons.tsx
 import { useEffect, useState } from "react";
-import { IconButton } from "@/shared/ui/Button";
 import { ArrowDownIcon, ArrowUpIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export function ScrollButtons() {
   const [position, setPosition] = useState(scrollPosition());
@@ -29,24 +29,24 @@ export function ScrollButtons() {
   return (
     <div className="fixed right-[max(18px,calc((100vw-var(--app-shell-max-width))/2-54px))] bottom-7 z-10 grid gap-2">
       {!position.atTop ? (
-        <IconButton
+        <TooltipIconButton
           aria-label="Scroll to top"
-          className="tooltip-anchor shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
-          data-tooltip="Scroll to top"
-          data-tooltip-position="left"
+          className="shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
+          side="left"
           size="compact"
+          tooltip="Scroll to top"
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
         >
           <ArrowUpIcon />
-        </IconButton>
+        </TooltipIconButton>
       ) : null}
       {!position.atBottom ? (
-        <IconButton
+        <TooltipIconButton
           aria-label="Scroll to bottom"
-          className="tooltip-anchor shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
-          data-tooltip="Scroll to bottom"
-          data-tooltip-position="left"
+          className="shadow-[0_6px_18px_rgba(0,0,0,0.2)]"
+          side="left"
           size="compact"
+          tooltip="Scroll to bottom"
           onClick={() =>
             window.scrollTo({
               top: document.documentElement.scrollHeight,
@@ -55,7 +55,7 @@ export function ScrollButtons() {
           }
         >
           <ArrowDownIcon />
-        </IconButton>
+        </TooltipIconButton>
       ) : null}
     </div>
   );

@@ -13,6 +13,21 @@ Object.defineProperty(window, "localStorage", {
   value: testLocalStorage,
 });
 
+class TestResizeObserver implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+Object.defineProperty(globalThis, "ResizeObserver", {
+  configurable: true,
+  value: TestResizeObserver,
+});
+Object.defineProperty(window, "ResizeObserver", {
+  configurable: true,
+  value: TestResizeObserver,
+});
+
 beforeEach(() => {
   testLocalStorage.clear();
 });

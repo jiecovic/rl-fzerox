@@ -1,5 +1,6 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/toggleSwitch.tsx
 import { cn } from "@/shared/ui/cn";
+import { OptionalAppTooltip } from "@/shared/ui/Tooltip";
 
 interface ToggleSwitchProps {
   checked: boolean;
@@ -18,13 +19,12 @@ export function ToggleSwitch({
   tooltip,
   onChange,
 }: ToggleSwitchProps) {
-  return (
+  const control = (
     <label
       className={cn(
-        "tooltip-anchor inline-flex items-center gap-2 text-xs font-semibold text-app-muted",
+        "inline-flex items-center gap-2 text-xs font-semibold text-app-muted",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
       )}
-      data-tooltip={tooltip}
     >
       <input
         aria-label={label}
@@ -41,4 +41,5 @@ export function ToggleSwitch({
       {hideLabel ? null : <strong className="font-semibold">{label}</strong>}
     </label>
   );
+  return <OptionalAppTooltip content={tooltip}>{control}</OptionalAppTooltip>;
 }

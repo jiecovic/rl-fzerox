@@ -12,6 +12,7 @@ import { TrackMinimap } from "@/features/configurator/sections/tracks/TrackMinim
 import type { ConfigMetadata, ManagedRunConfig } from "@/shared/api/contract";
 import { Button } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
+import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface TracksSectionProps {
   config: ManagedRunConfig;
@@ -435,26 +436,27 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                       </div>
                     </span>
                     <div className={cupSwitchGroupClass}>
-                      <button
-                        aria-label={`${allCupCoursesSelected ? "Disable" : "Enable"} ${cup.label}`}
-                        aria-pressed={allCupCoursesSelected}
-                        className={
-                          allCupCoursesSelected
-                            ? "switch-button active tooltip-anchor"
-                            : "switch-button tooltip-anchor"
-                        }
-                        data-tooltip={allCupCoursesSelected ? "Included" : "Excluded"}
-                        disabled={disablingWouldClearPool}
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          toggleCup(cup.course_ids);
-                        }}
-                      >
-                        <span aria-hidden="true" />
-                        <strong>{allCupCoursesSelected ? "On" : "Off"}</strong>
-                      </button>
+                      <AppTooltip content={allCupCoursesSelected ? "Included" : "Excluded"}>
+                        <span className="inline-flex">
+                          <button
+                            aria-label={`${allCupCoursesSelected ? "Disable" : "Enable"} ${cup.label}`}
+                            aria-pressed={allCupCoursesSelected}
+                            className={
+                              allCupCoursesSelected ? "switch-button active" : "switch-button"
+                            }
+                            disabled={disablingWouldClearPool}
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              toggleCup(cup.course_ids);
+                            }}
+                          >
+                            <span aria-hidden="true" />
+                            <strong>{allCupCoursesSelected ? "On" : "Off"}</strong>
+                          </button>
+                        </span>
+                      </AppTooltip>
                     </div>
                   </summary>
                   <div className="config-disclosure-body">
@@ -512,32 +514,33 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
                   </div>
                 </span>
                 <div className={cupSwitchGroupClass}>
-                  <button
-                    aria-label={`${xCupEnabled ? "Disable" : "Enable"} X Cup`}
-                    aria-pressed={xCupEnabled}
-                    className={
-                      xCupEnabled
-                        ? "switch-button active tooltip-anchor"
-                        : "switch-button tooltip-anchor"
-                    }
-                    data-tooltip={
+                  <AppTooltip
+                    content={
                       !xCupAvailable
                         ? "GP race only"
                         : xCupEnabled && selectedCourseIds.length === 0
                           ? "Select a built-in course before disabling X Cup"
                           : "Generated GP courses"
                     }
-                    disabled={!xCupAvailable || (xCupEnabled && selectedCourseIds.length === 0)}
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      updateTracks({ include_x_cup: !xCupEnabled });
-                    }}
                   >
-                    <span aria-hidden="true" />
-                    <strong>{xCupEnabled ? "On" : "Off"}</strong>
-                  </button>
+                    <span className="inline-flex">
+                      <button
+                        aria-label={`${xCupEnabled ? "Disable" : "Enable"} X Cup`}
+                        aria-pressed={xCupEnabled}
+                        className={xCupEnabled ? "switch-button active" : "switch-button"}
+                        disabled={!xCupAvailable || (xCupEnabled && selectedCourseIds.length === 0)}
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          updateTracks({ include_x_cup: !xCupEnabled });
+                        }}
+                      >
+                        <span aria-hidden="true" />
+                        <strong>{xCupEnabled ? "On" : "Off"}</strong>
+                      </button>
+                    </span>
+                  </AppTooltip>
                 </div>
               </summary>
               <div className="config-disclosure-body">

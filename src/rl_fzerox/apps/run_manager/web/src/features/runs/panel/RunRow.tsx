@@ -10,9 +10,9 @@ import {
 } from "@/features/runs/panel/model";
 import type { RunLineageRun } from "@/features/runs/panel/types";
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
-import { IconButton } from "@/shared/ui/Button";
 import { formatDate } from "@/shared/ui/format";
 import { BranchSourceIcon, ExportIcon, ResumeIcon, StopIcon, TrashIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface RunRowProps {
   busyActionRunId: string | null;
@@ -144,43 +144,43 @@ export function RunRow({
         </span>
       </button>
       <div className="flex w-[136px] flex-nowrap items-center justify-end gap-1 max-[760px]:justify-start">
-        <IconButton
+        <TooltipIconButton
           aria-label={`Stop run ${run.name}`}
-          title={pendingCommand !== null ? `${pendingCommand} requested` : "Stop run"}
           disabled={!canStop}
           size="compact"
+          tooltip={pendingCommand !== null ? `${pendingCommand} requested` : "Stop run"}
           onClick={() => void onRunAction(run.id, onStopRun)}
         >
           <StopIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label={`Resume run ${run.name}`}
-          title="Resume run"
           disabled={!canResume}
           size="compact"
+          tooltip="Resume run"
           onClick={() => void onRunAction(run.id, onResumeRun)}
         >
           <ResumeIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label={`Export run ${run.name}`}
-          title={canExport ? "Export run" : "Stop the run before exporting"}
           disabled={!canExport}
           size="compact"
+          tooltip={canExport ? "Export run" : "Stop the run before exporting"}
           onClick={() => void onRunAction(run.id, onExportRun)}
         >
           <ExportIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label={`Delete run ${run.name}`}
-          title={deleteReason}
           disabled={!canDelete}
           size="compact"
           tone="danger"
+          tooltip={deleteReason}
           onClick={onRequestDelete}
         >
           <TrashIcon />
-        </IconButton>
+        </TooltipIconButton>
       </div>
     </div>
   );

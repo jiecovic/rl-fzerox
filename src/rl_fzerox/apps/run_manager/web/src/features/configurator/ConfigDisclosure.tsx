@@ -1,8 +1,8 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/ConfigDisclosure.tsx
 import type { ReactNode } from "react";
 
-import { IconButton } from "@/shared/ui/Button";
 import { ResetIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export function ConfigDisclosure({
   children,
@@ -36,10 +36,11 @@ export function ConfigDisclosure({
           </span>
         </span>
         {onReset !== undefined ? (
-          <IconButton
+          <TooltipIconButton
             aria-label={`Reset ${title} defaults`}
             size="small"
             tone="muted"
+            tooltip="Reset defaults"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -47,7 +48,7 @@ export function ConfigDisclosure({
             }}
           >
             <ResetIcon />
-          </IconButton>
+          </TooltipIconButton>
         ) : null}
       </summary>
       <div className="grid gap-2.5 border-t border-app-border p-3">{children}</div>

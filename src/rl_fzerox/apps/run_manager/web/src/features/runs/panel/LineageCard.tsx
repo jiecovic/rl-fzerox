@@ -4,10 +4,11 @@ import { runLineageMainGridClass, runLineageOuterGridClass } from "@/features/ru
 import { RunRow } from "@/features/runs/panel/RunRow";
 import type { RunLineageGroup } from "@/features/runs/panel/types";
 import type { ManagedRun } from "@/shared/api/contract";
-import { Button, IconButton } from "@/shared/ui/Button";
+import { Button } from "@/shared/ui/Button";
 import { FieldInput } from "@/shared/ui/Field";
 import { formatDate, formatRelativeTime } from "@/shared/ui/format";
 import { ChevronIcon, TrashIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface LineageCardProps {
   busyActionRunId: string | null;
@@ -121,9 +122,9 @@ export function LineageCard({
               {savingGroup ? "Saving" : "Save"}
             </Button>
           </form>
-          <IconButton
+          <TooltipIconButton
             aria-label={`Delete lineage ${lineage.label}`}
-            title={
+            tooltip={
               lineage.canDeleteLineage
                 ? "Delete lineage"
                 : "Stop all runs and clear pending commands before deleting lineage"
@@ -134,7 +135,7 @@ export function LineageCard({
             onClick={onDeleteLineage}
           >
             <TrashIcon />
-          </IconButton>
+          </TooltipIconButton>
         </div>
       </div>
       {groupError !== null ? (

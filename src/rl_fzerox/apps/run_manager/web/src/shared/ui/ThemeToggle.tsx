@@ -1,7 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/ui/ThemeToggle.tsx
 
-import { IconButton } from "@/shared/ui/Button";
 import { MoonIcon, SunIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export type Theme = "light" | "dark";
 
@@ -11,14 +11,11 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ theme, onToggle }: ThemeToggleProps) {
+  const label = theme === "light" ? "Switch to dark mode" : "Switch to light mode";
   return (
-    <IconButton
-      aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-      size="theme"
-      onClick={onToggle}
-    >
+    <TooltipIconButton aria-label={label} size="theme" tooltip={label} onClick={onToggle}>
       <ThemeIcon theme={theme} />
-    </IconButton>
+    </TooltipIconButton>
   );
 }
 
