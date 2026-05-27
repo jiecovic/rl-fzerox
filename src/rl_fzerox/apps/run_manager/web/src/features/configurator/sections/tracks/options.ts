@@ -1,0 +1,36 @@
+// src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/options.ts
+import type { GpDifficulty, TracksConfig } from "@/features/configurator/sections/tracks/types";
+
+export const X_CUP = {
+  id: "x",
+  label: "X Cup",
+} as const;
+
+export const RACE_MODE_DESCRIPTIONS: Record<TracksConfig["race_mode"], string> = {
+  time_attack: "Single-course time-trial episodes.",
+  gp_race: "Grand Prix race rules across the selected pool.",
+};
+
+export const GP_DIFFICULTY_DESCRIPTIONS: Record<GpDifficulty, string> = {
+  novice: "Lightest GP difficulty and the current default.",
+  standard: "Standard GP AI and race pressure.",
+  expert: "More aggressive GP field behavior.",
+  master: "Highest GP difficulty tier.",
+};
+
+export const TRACK_SAMPLING_DESCRIPTIONS: Record<TracksConfig["sampling_mode"], string> = {
+  equal: "Sample courses uniformly by episode.",
+  step_balanced: "Bias toward courses with fewer recent frames.",
+  adaptive_step_balanced: "Keep step balance, then tilt a bit toward lower-completion courses.",
+};
+
+export function formatTrackOptionLabel(value: string) {
+  return value
+    .split("_")
+    .map((word) => (word === "gp" ? "GP" : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
+export function shortCupLabel(label: string) {
+  return label.replace(" Cup", "");
+}
