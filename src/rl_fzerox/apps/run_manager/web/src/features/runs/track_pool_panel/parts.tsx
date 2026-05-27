@@ -1,4 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/track_pool_panel/parts.tsx
+import type { KeyboardEvent } from "react";
 import {
   completionSummary,
   formatOptionalPercent,
@@ -77,18 +78,49 @@ export function CupTabs({
   if (cups.length <= 1) {
     return null;
   }
+  const activeIndex = Math.max(
+    0,
+    cups.findIndex((cup) => cup.id === activeCup?.id),
+  );
+
+  function selectCupByIndex(index: number, event: KeyboardEvent<HTMLDivElement>) {
+    const cup = cups[index];
+    if (cup === undefined) {
+      return;
+    }
+    event.preventDefault();
+    onSelectCup(cup.id);
+    const tab = [...event.currentTarget.querySelectorAll<HTMLButtonElement>("[role='tab']")].find(
+      (candidate) => candidate.dataset.cupId === cup.id,
+    );
+    tab?.focus();
+  }
+
   return (
     <div
       className="flex flex-wrap gap-1.5 border-b border-app-border px-3.5 py-2.5"
       role="tablist"
       aria-label="Track pool cups"
+      onKeyDown={(event) => {
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          selectCupByIndex((activeIndex + 1) % cups.length, event);
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          selectCupByIndex((activeIndex - 1 + cups.length) % cups.length, event);
+        } else if (event.key === "Home") {
+          selectCupByIndex(0, event);
+        } else if (event.key === "End") {
+          selectCupByIndex(cups.length - 1, event);
+        }
+      }}
     >
       {cups.map((cup) => (
         <button
           aria-selected={cup.id === activeCup?.id}
           className={trackCupTabClass(cup.id === activeCup?.id)}
+          data-cup-id={cup.id}
           key={cup.id}
           role="tab"
+          tabIndex={cup.id === activeCup?.id ? 0 : -1}
           type="button"
           onClick={() => onSelectCup(cup.id)}
         >
