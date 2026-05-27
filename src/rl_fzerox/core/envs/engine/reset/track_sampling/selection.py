@@ -368,27 +368,7 @@ def _balanced_repetition_counts(weights: Iterable[float]) -> tuple[int, ...]:
 def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
     return (
         config.sampling_mode,
-        tuple(
-            (
-                entry.id,
-                entry.display_name,
-                entry.course_ref,
-                entry.course_id,
-                entry.course_name,
-                entry.baseline_state_path,
-                float(entry.weight),
-                entry.course_index,
-                entry.mode,
-                entry.vehicle,
-                entry.vehicle_name,
-                entry.engine_setting,
-                entry.generated_course_kind,
-                entry.generated_course_seed,
-                entry.generated_course_hash,
-                entry.log_per_course,
-            )
-            for entry in config.entries
-        ),
+        tuple(_entry_fingerprint(entry) for entry in config.entries),
     )
 
 
@@ -396,24 +376,42 @@ def _sequential_track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple
     return tuple(
         (
             course_key,
-            tuple(
-                (
-                    entry.id,
-                    entry.baseline_state_path,
-                    entry.vehicle,
-                    entry.engine_setting,
-                    entry.engine_setting_raw_value,
-                    entry.engine_setting_min_raw_value,
-                    entry.engine_setting_max_raw_value,
-                    entry.generated_course_kind,
-                    entry.generated_course_seed,
-                    entry.generated_course_hash,
-                    entry.log_per_course,
-                )
-                for entry in entries
-            ),
+            tuple(_entry_fingerprint(entry) for entry in entries),
         )
         for course_key, entries in _group_entries_by_course(config.entries)
+    )
+
+
+def _entry_fingerprint(entry: TrackSamplingEntryConfig) -> tuple[object, ...]:
+    return (
+        entry.id,
+        entry.display_name,
+        entry.course_ref,
+        entry.course_id,
+        entry.course_name,
+        entry.baseline_state_path,
+        float(entry.weight),
+        entry.course_index,
+        entry.mode,
+        entry.gp_difficulty,
+        entry.vehicle,
+        entry.vehicle_name,
+        entry.source_vehicle,
+        entry.engine_setting,
+        entry.engine_setting_raw_value,
+        entry.engine_setting_min_raw_value,
+        entry.engine_setting_max_raw_value,
+        entry.source_course_index,
+        entry.source_gp_difficulty,
+        entry.source_engine_setting,
+        entry.source_engine_setting_raw_value,
+        entry.generated_course_kind,
+        entry.generated_course_seed,
+        entry.generated_course_hash,
+        entry.generated_course_segment_count,
+        entry.generated_course_length,
+        entry.log_per_course,
+        entry.records.model_dump(mode="json") if entry.records is not None else None,
     )
 
 
