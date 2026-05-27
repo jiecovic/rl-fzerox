@@ -368,7 +368,7 @@ def _balanced_repetition_counts(weights: Iterable[float]) -> tuple[int, ...]:
 def _track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple[object, ...]:
     return (
         config.sampling_mode,
-        tuple(_entry_fingerprint(entry) for entry in config.entries),
+        tuple(_entry_fingerprint(entry, include_weight=True) for entry in config.entries),
     )
 
 
@@ -376,13 +376,17 @@ def _sequential_track_sampling_fingerprint(config: TrackSamplingConfig) -> tuple
     return tuple(
         (
             course_key,
-            tuple(_entry_fingerprint(entry) for entry in entries),
+            tuple(_entry_fingerprint(entry, include_weight=False) for entry in entries),
         )
         for course_key, entries in _group_entries_by_course(config.entries)
     )
 
 
-def _entry_fingerprint(entry: TrackSamplingEntryConfig) -> tuple[object, ...]:
+def _entry_fingerprint(
+    entry: TrackSamplingEntryConfig,
+    *,
+    include_weight: bool,
+) -> tuple[object, ...]:
     return (
         entry.id,
         entry.display_name,
@@ -390,7 +394,7 @@ def _entry_fingerprint(entry: TrackSamplingEntryConfig) -> tuple[object, ...]:
         entry.course_id,
         entry.course_name,
         entry.baseline_state_path,
-        float(entry.weight),
+        float(entry.weight) if include_weight else None,
         entry.course_index,
         entry.mode,
         entry.gp_difficulty,
