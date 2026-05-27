@@ -159,6 +159,51 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.queryByText(selectedCourses[0]?.display_name ?? "")).not.toBeInTheDocument();
   });
 
+  it("supports keyboard navigation across cup tabs", async () => {
+    const user = userEvent.setup();
+    const firstCup = configMetadataFixture.track_cups[0];
+    const secondCup = configMetadataFixture.track_cups[1];
+    if (firstCup === undefined || secondCup === undefined) {
+      throw new Error("fixture must provide at least two cups");
+    }
+    const selectedCourseIds = [
+      firstCup.course_ids[0],
+      firstCup.course_ids[1],
+      secondCup.course_ids[0],
+      secondCup.course_ids[1],
+    ];
+    if (selectedCourseIds.some((courseId) => courseId === undefined)) {
+      throw new Error("fixture cups must provide at least two courses each");
+    }
+    const selectedCourses = configMetadataFixture.built_in_courses.filter((course) =>
+      selectedCourseIds.includes(course.id),
+    );
+
+    render(
+      <RunTrackPoolPanel
+        canReset={false}
+        isResetting={false}
+        metadata={configMetadataFixture}
+        onReset={() => undefined}
+        run={runFixture({
+          config: runConfigWithSelectedCourses(selectedCourseIds as string[]),
+        })}
+        state={trackSamplingStateForCourses(selectedCourseIds as string[])}
+      />,
+    );
+
+    screen.getByRole("tab", { name: /jack/i }).focus();
+    await user.keyboard("{ArrowRight}");
+
+    expect(screen.getByRole("tab", { name: /queen/i })).toHaveFocus();
+    expect(screen.getByText(selectedCourses[2]?.display_name ?? "")).toBeInTheDocument();
+
+    await user.keyboard("{Home}");
+
+    expect(screen.getByRole("tab", { name: /jack/i })).toHaveFocus();
+    expect(screen.getByText(selectedCourses[0]?.display_name ?? "")).toBeInTheDocument();
+  });
+
   it("requires confirmation before resetting track-pool stats", async () => {
     const user = userEvent.setup();
     const firstCup = configMetadataFixture.track_cups[0];
