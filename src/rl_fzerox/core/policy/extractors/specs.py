@@ -349,9 +349,11 @@ def _custom_cnn_layer_bool(
 
 
 def _custom_cnn_layer_activation(layer: CustomConvLayerConfig) -> CnnActivationName:
-    value = layer.get("activation") or "relu"
-    if value == "relu" or value == "gelu":
-        return value
+    value = layer.get("activation")
+    if value is None or value == "relu":
+        return "relu"
+    if value == "gelu":
+        return "gelu"
     raise ValueError("custom CNN activation layers support activation='relu' or 'gelu'")
 
 
