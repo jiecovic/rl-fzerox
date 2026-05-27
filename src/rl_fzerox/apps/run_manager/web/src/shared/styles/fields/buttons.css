@@ -1,0 +1,19 @@
+/* src/rl_fzerox/apps/run_manager/web/src/shared/styles/fields/buttons.css */
+.field-reset-button {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+}
+
+.field-reset-button:hover,
+.field-reset-button:focus-visible {
+  border-color: var(--border-strong);
+  color: var(--text);
+  outline: none;
+}

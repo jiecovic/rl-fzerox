@@ -27,7 +27,6 @@ import type {
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
 import { rendererNames } from "@/shared/api/renderers";
-import { IconButton } from "@/shared/ui/Button";
 import { cn } from "@/shared/ui/cn";
 import { FieldSelect } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
@@ -41,6 +40,7 @@ import {
   StopIcon,
   WatchIcon,
 } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface RunRuntimeSummaryProps {
   actions: RunWorkspaceActionState;
@@ -129,30 +129,29 @@ export function RunRuntimeSummary({
               <code className="font-mono text-[13px] leading-normal break-words whitespace-normal text-app-text">
                 {run.id}
               </code>
-              <IconButton
+              <TooltipIconButton
                 aria-label={actions.copiedRunId ? "Run id copied" : "Copy run id"}
-                className="tooltip-anchor justify-self-end"
-                data-tooltip={actions.copiedRunId ? "Copied" : "Copy run id"}
-                data-tooltip-position="top"
+                className="justify-self-end"
                 size="compact"
+                tooltip={actions.copiedRunId ? "Copied" : "Copy run id"}
                 onClick={() => void actions.copyRunId()}
               >
                 <CopyIcon />
-              </IconButton>
+              </TooltipIconButton>
             </div>
           </RunMetric>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-start gap-2">
-        <IconButton
+        <TooltipIconButton
           aria-label={actions.isOpeningDirectory ? "Opening run folder" : "Open run folder"}
-          title={actions.isOpeningDirectory ? "Opening..." : "Open folder"}
           disabled={actions.isOpeningDirectory}
+          tooltip={actions.isOpeningDirectory ? "Opening..." : "Open folder"}
           onClick={() => void actions.openRunDirectoryInBrowser()}
         >
           <FolderIcon />
-        </IconButton>
+        </TooltipIconButton>
         <div className="run-watch-control relative inline-grid auto-cols-max grid-flow-col items-center gap-1.5">
           {actions.watchToast !== null ? (
             <div
@@ -216,59 +215,59 @@ export function RunRuntimeSummary({
               ))}
             </FieldSelect>
           </div>
-          <IconButton
+          <TooltipIconButton
             aria-label={
               actions.watchingArtifact === actions.selectedArtifact
                 ? `Opening ${actions.selectedArtifact} checkpoint watch`
                 : `Watch ${actions.selectedArtifact} checkpoint`
             }
-            title={
+            disabled={actions.watchingArtifact !== null}
+            tooltip={
               actions.watchingArtifact === actions.selectedArtifact
                 ? `Opening ${actions.selectedArtifact}...`
                 : `Watch ${actions.selectedArtifact}`
             }
-            disabled={actions.watchingArtifact !== null}
             onClick={() => void actions.watchRunArtifact(actions.selectedArtifact)}
           >
             <WatchIcon />
-          </IconButton>
-          <IconButton
+          </TooltipIconButton>
+          <TooltipIconButton
             aria-label={
               actions.isForking
                 ? `Forking ${actions.selectedArtifact} checkpoint`
                 : `Fork ${actions.selectedArtifact} checkpoint`
             }
-            title={
+            disabled={actions.isForking}
+            tooltip={
               actions.isForking
                 ? `Forking ${actions.selectedArtifact}...`
                 : `Fork ${actions.selectedArtifact}`
             }
-            disabled={actions.isForking}
             onClick={() => void actions.forkRunArtifact(actions.selectedArtifact)}
           >
             <ForkIcon />
-          </IconButton>
+          </TooltipIconButton>
         </div>
-        <IconButton
+        <TooltipIconButton
           aria-label={
             actions.isCreatingDraftFromRun
               ? "Creating draft from run"
               : "Create editable draft from run"
           }
-          title={actions.isCreatingDraftFromRun ? "Creating draft..." : "Create editable draft"}
           disabled={actions.isCreatingDraftFromRun}
+          tooltip={actions.isCreatingDraftFromRun ? "Creating draft..." : "Create editable draft"}
           onClick={() => void actions.createDraftFromRun()}
         >
           <SaveDraftIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label="Show run charts"
-          title="Charts"
+          tooltip="Charts"
           onClick={() => onShowCharts(run.id)}
         >
           <ChartIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label={
             actions.isStopping
               ? "Stopping run"
@@ -276,26 +275,26 @@ export function RunRuntimeSummary({
                 ? "Stop requested"
                 : "Stop run"
           }
-          title={
+          disabled={!actions.canStop}
+          tooltip={
             actions.isStopping
               ? "Stopping..."
               : run.pending_command === "stop"
                 ? "Stop requested"
                 : "Stop"
           }
-          disabled={!actions.canStop}
           onClick={() => void actions.stopRun()}
         >
           <StopIcon />
-        </IconButton>
-        <IconButton
+        </TooltipIconButton>
+        <TooltipIconButton
           aria-label={actions.isResuming ? "Resuming run" : "Resume run"}
-          title={actions.isResuming ? "Resuming..." : "Resume"}
           disabled={!actions.canResume}
+          tooltip={actions.isResuming ? "Resuming..." : "Resume"}
           onClick={() => void actions.resumeRun()}
         >
           <ResumeIcon />
-        </IconButton>
+        </TooltipIconButton>
       </div>
 
       <RunTrackPoolPanel

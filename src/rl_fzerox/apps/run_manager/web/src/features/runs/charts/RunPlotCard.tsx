@@ -8,8 +8,8 @@ import type {
 } from "@/features/runs/charts/run_plot_card/types";
 
 import { useRunPlot } from "@/features/runs/charts/run_plot_card/usePlot";
-import { IconButton } from "@/shared/ui/Button";
 import { ResetIcon } from "@/shared/ui/icons";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 export type { RunPlotPoint, RunPlotSeries };
 
@@ -26,15 +26,14 @@ export function RunPlotCard({ emptyText, formatValue, series, title }: RunPlotCa
         <strong>{title}</strong>
         <div className="inline-flex items-center gap-2">
           {hasZoom ? (
-            <IconButton
+            <TooltipIconButton
               aria-label={`Reset ${title} zoom`}
-              className="tooltip-anchor"
-              data-tooltip="Reset zoom"
               size="compact"
+              tooltip="Reset zoom"
               onClick={resetZoom}
             >
               <ResetIcon />
-            </IconButton>
+            </TooltipIconButton>
           ) : null}
           <span className="text-xs text-app-muted">
             {visibleSeries.length === 0 ? "n/a" : `${visibleSeries.length} runs`}

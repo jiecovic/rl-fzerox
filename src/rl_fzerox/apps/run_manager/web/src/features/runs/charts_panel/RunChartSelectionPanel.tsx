@@ -10,6 +10,7 @@ import type { ManagedRun } from "@/shared/api/contract";
 import { cn } from "@/shared/ui/cn";
 import { ChevronIcon } from "@/shared/ui/icons";
 import { Notice } from "@/shared/ui/Panel";
+import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface RunChartSelectionPanelProps {
   colorByRunId: ReadonlyMap<string, string>;
@@ -151,19 +152,18 @@ function LineageSelectionCheckbox({
   );
 
   return (
-    <label
-      className="inline-flex h-[18px] w-[18px] cursor-pointer items-center justify-center"
-      title={label}
-    >
-      <input
-        aria-label={`Select lineage ${label}`}
-        className="m-0 h-3.5 w-3.5 accent-app-accent"
-        checked={checked}
-        ref={inputRef}
-        type="checkbox"
-        onChange={onChange}
-      />
-    </label>
+    <AppTooltip content={`Select lineage ${label}`}>
+      <label className="inline-flex h-[18px] w-[18px] cursor-pointer items-center justify-center">
+        <input
+          aria-label={`Select lineage ${label}`}
+          className="m-0 h-3.5 w-3.5 accent-app-accent"
+          checked={checked}
+          ref={inputRef}
+          type="checkbox"
+          onChange={onChange}
+        />
+      </label>
+    </AppTooltip>
   );
 }
 

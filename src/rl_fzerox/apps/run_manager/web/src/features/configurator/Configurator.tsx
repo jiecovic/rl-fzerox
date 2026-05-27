@@ -26,12 +26,12 @@ import type {
   ManagedRunConfig,
   PolicyArchitecturePreview,
 } from "@/shared/api/contract";
-import { IconButton } from "@/shared/ui/Button";
 import { FieldInput, FieldShell } from "@/shared/ui/Field";
 import { formatDate } from "@/shared/ui/format";
 import { RandomizeIcon } from "@/shared/ui/icons";
 import { Notice, Panel } from "@/shared/ui/Panel";
 import { Tabs } from "@/shared/ui/Tabs";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface ConfiguratorProps {
   active?: boolean;
@@ -354,14 +354,13 @@ export function Configurator({
               }}
             />
           </FieldShell>
-          <IconButton
+          <TooltipIconButton
             aria-label="Randomize seed"
-            className="tooltip-anchor"
-            data-tooltip="Randomize seed"
+            tooltip="Randomize seed"
             onClick={randomizeSeed}
           >
             <RandomizeIcon />
-          </IconButton>
+          </TooltipIconButton>
         </div>
         {forkSourceRunLabel !== null && forkSourceArtifact !== null ? (
           <section

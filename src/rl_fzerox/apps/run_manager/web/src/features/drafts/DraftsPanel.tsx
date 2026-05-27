@@ -1,12 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/drafts/DraftsPanel.tsx
 import { useEffect, useMemo, useState } from "react";
 import type { ManagedDraft } from "@/shared/api/contract";
-import { Button, IconButton } from "@/shared/ui/Button";
+import { Button } from "@/shared/ui/Button";
 import { ConfirmDialog } from "@/shared/ui/ConfirmDialog";
 import { cn } from "@/shared/ui/cn";
 import { formatDate } from "@/shared/ui/format";
 import { PlusIcon, TrashIcon } from "@/shared/ui/icons";
 import { Notice, Panel, PanelHeader } from "@/shared/ui/Panel";
+import { TooltipIconButton } from "@/shared/ui/TooltipIconButton";
 
 interface DraftsPanelProps {
   drafts: ManagedDraft[];
@@ -173,16 +174,17 @@ export function DraftsPanel({
                   <span>{draft.config.policy.conv_profile}</span>
                   <span className="whitespace-nowrap">{formatDate(draft.created_at)}</span>
                 </button>
-                <IconButton
+                <TooltipIconButton
                   aria-label={`Delete draft ${draft.name}`}
                   className="mr-2.5 justify-self-end"
                   disabled={isDeleting}
                   size="compact"
                   tone="danger"
+                  tooltip="Delete draft"
                   onClick={() => queueSingleDelete(draft)}
                 >
                   <TrashIcon />
-                </IconButton>
+                </TooltipIconButton>
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ import {
   SegmentedChoiceGroup,
   SwitchButton,
 } from "@/shared/ui/Field";
+import { OptionalAppTooltip } from "@/shared/ui/Tooltip";
 
 export function BooleanField({
   help,
@@ -93,16 +94,15 @@ export function SegmentedChoiceStrip({
       }}
     >
       {options.map((option) => (
-        <SegmentedChoiceButton
-          active={option.active}
-          className="tooltip-anchor"
-          data-tooltip={option.tooltip}
-          disabledChoice={option.disabled}
-          key={option.key}
-          value={option.key}
-        >
-          {option.label}
-        </SegmentedChoiceButton>
+        <OptionalAppTooltip content={option.tooltip} key={option.key}>
+          <SegmentedChoiceButton
+            active={option.active}
+            disabledChoice={option.disabled}
+            value={option.key}
+          >
+            {option.label}
+          </SegmentedChoiceButton>
+        </OptionalAppTooltip>
       ))}
     </SegmentedChoiceGroup>
   );

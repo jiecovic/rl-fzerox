@@ -10,6 +10,7 @@ import {
 } from "@/features/configurator/sections/policy/convPreviewFormatting";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 import { AddLayerIcon, RemoveLayerIcon } from "@/shared/ui/icons";
+import { AppTooltip } from "@/shared/ui/Tooltip";
 
 type CustomConvLayer = ManagedRunConfig["policy"]["custom_conv_layers"][number];
 type CustomCnnLayerKind = CustomConvLayer["kind"];
@@ -67,15 +68,16 @@ export function LayerListField({
               value={layer}
               onChange={(event) => setLayer(index, Number(event.target.value))}
             />
-            <button
-              aria-label={`Remove ${label} layer ${index + 1}`}
-              className="field-reset-button tooltip-anchor"
-              data-tooltip="Remove layer"
-              type="button"
-              onClick={() => removeLayer(index)}
-            >
-              <RemoveLayerIcon />
-            </button>
+            <AppTooltip content="Remove layer">
+              <button
+                aria-label={`Remove ${label} layer ${index + 1}`}
+                className="field-reset-button"
+                type="button"
+                onClick={() => removeLayer(index)}
+              >
+                <RemoveLayerIcon />
+              </button>
+            </AppTooltip>
           </div>
         ))}
         <div className="layer-list-row layer-add-row">
@@ -83,15 +85,16 @@ export function LayerListField({
           <button className="layer-add-placeholder" type="button" onClick={addLayer}>
             Add layer
           </button>
-          <button
-            aria-label={`Add ${label} layer`}
-            className="field-reset-button layer-add-button tooltip-anchor"
-            data-tooltip="Add layer"
-            type="button"
-            onClick={addLayer}
-          >
-            <AddLayerIcon />
-          </button>
+          <AppTooltip content="Add layer">
+            <button
+              aria-label={`Add ${label} layer`}
+              className="field-reset-button layer-add-button"
+              type="button"
+              onClick={addLayer}
+            >
+              <AddLayerIcon />
+            </button>
+          </AppTooltip>
         </div>
       </div>
     </div>
@@ -427,22 +430,27 @@ export function CustomConvTableRows({
             <td>{formatPixelDrop(preview)}</td>
             <td>{preview === null ? "…" : formatParamCount(preview.params)}</td>
             <td className="conv-actions-cell">
-              <button
-                aria-label={`Remove custom CNN layer ${index + 1}`}
-                className="field-reset-button tooltip-anchor"
-                data-tooltip={
+              <AppTooltip
+                content={
                   disabled
                     ? disabledReason
                     : value.length <= 1
                       ? "Keep at least one layer"
                       : "Remove layer"
                 }
-                disabled={disabled || value.length <= 1}
-                type="button"
-                onClick={() => removeLayer(index)}
               >
-                <RemoveLayerIcon />
-              </button>
+                <span className="inline-flex">
+                  <button
+                    aria-label={`Remove custom CNN layer ${index + 1}`}
+                    className="field-reset-button"
+                    disabled={disabled || value.length <= 1}
+                    type="button"
+                    onClick={() => removeLayer(index)}
+                  >
+                    <RemoveLayerIcon />
+                  </button>
+                </span>
+              </AppTooltip>
             </td>
           </tr>
         );
@@ -502,16 +510,19 @@ export function CustomConvTableRows({
           </div>
         </td>
         <td className="conv-actions-cell">
-          <button
-            aria-label="Add custom CNN conv layer"
-            className="field-reset-button layer-add-button tooltip-anchor"
-            data-tooltip={disabled ? disabledReason : "Add layer"}
-            disabled={disabled}
-            type="button"
-            onClick={duplicateLastConvLayer}
-          >
-            <AddLayerIcon />
-          </button>
+          <AppTooltip content={disabled ? disabledReason : "Add layer"}>
+            <span className="inline-flex">
+              <button
+                aria-label="Add custom CNN conv layer"
+                className="field-reset-button layer-add-button"
+                disabled={disabled}
+                type="button"
+                onClick={duplicateLastConvLayer}
+              >
+                <AddLayerIcon />
+              </button>
+            </span>
+          </AppTooltip>
         </td>
       </tr>
       <tr className="custom-conv-flatten-row">

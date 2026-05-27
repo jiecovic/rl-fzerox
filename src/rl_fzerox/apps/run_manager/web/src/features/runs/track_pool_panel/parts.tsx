@@ -10,6 +10,7 @@ import {
 } from "@/features/runs/track_pool_panel/model";
 import type { TrackPoolCourseView, TrackPoolCupView } from "@/features/runs/track_pool_panel/types";
 import { cn } from "@/shared/ui/cn";
+import { AppTooltip } from "@/shared/ui/Tooltip";
 
 interface DistributionBarProps {
   kind: "sample" | "success" | "episodes" | "steps";
@@ -24,28 +25,25 @@ export function DistributionBar({ kind, label, targetValue, value }: Distributio
       ? null
       : Math.max(0, Math.min(targetValue, 1));
   return (
-    <button
-      aria-label={label}
-      className="tooltip-anchor grid h-full items-end"
-      data-tooltip={label}
-      type="button"
-    >
-      <div
-        aria-hidden="true"
-        className="relative h-full overflow-hidden border border-app-border bg-app-surface-muted"
-      >
+    <AppTooltip content={label}>
+      <button aria-label={label} className="grid h-full items-end" type="button">
         <div
-          className={`absolute inset-x-0 bottom-0 run-track-distribution-bar-fill-${kind}`}
-          style={{ height: `${Math.max(0, Math.min(value, 1)) * 100}%` }}
-        />
-        {clampedTarget === null ? null : (
+          aria-hidden="true"
+          className="relative h-full overflow-hidden border border-app-border bg-app-surface-muted"
+        >
           <div
-            className="run-track-distribution-bar-target pointer-events-none absolute -left-px -right-px z-[1] translate-y-1/2"
-            style={{ bottom: `${clampedTarget * 100}%` }}
+            className={`absolute inset-x-0 bottom-0 run-track-distribution-bar-fill-${kind}`}
+            style={{ height: `${Math.max(0, Math.min(value, 1)) * 100}%` }}
           />
-        )}
-      </div>
-    </button>
+          {clampedTarget === null ? null : (
+            <div
+              className="run-track-distribution-bar-target pointer-events-none absolute -left-px -right-px z-[1] translate-y-1/2"
+              style={{ bottom: `${clampedTarget * 100}%` }}
+            />
+          )}
+        </div>
+      </button>
+    </AppTooltip>
   );
 }
 

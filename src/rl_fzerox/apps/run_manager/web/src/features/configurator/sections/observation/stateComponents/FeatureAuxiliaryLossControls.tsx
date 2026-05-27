@@ -47,7 +47,7 @@ export function FeatureAuxiliaryLossControls({
         tooltip={lossEnabled ? "Disable aux loss" : "Enable aux loss"}
         onChange={onToggle}
       />
-      <div className="state-feature-aux-weight" title="Auxiliary loss weight">
+      <div className="state-feature-aux-weight">
         <BoundedDecimalInput
           className="state-feature-aux-weight-input"
           disabled={!weightEnabled}

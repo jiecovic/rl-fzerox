@@ -2,15 +2,21 @@
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 
+export type AppTooltipSide = "bottom" | "left" | "right" | "top";
+
 interface AppTooltipProps {
   children: ReactNode;
-  content: string;
-  side?: "left" | "top";
+  content: ReactNode;
+  side?: AppTooltipSide;
+}
+
+interface OptionalAppTooltipProps extends Omit<AppTooltipProps, "content"> {
+  content?: ReactNode;
 }
 
 export function AppTooltip({ children, content, side = "top" }: AppTooltipProps) {
   return (
-    <TooltipPrimitive.Provider delayDuration={160} skipDelayDuration={100}>
+    <TooltipPrimitive.Provider delayDuration={0} skipDelayDuration={250}>
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
@@ -20,10 +26,21 @@ export function AppTooltip({ children, content, side = "top" }: AppTooltipProps)
             sideOffset={8}
           >
             {content}
-            <TooltipPrimitive.Arrow className="fill-app-surface" />
+            <TooltipPrimitive.Arrow className="fill-app-surface [filter:drop-shadow(0_1px_0_var(--border-strong))] [stroke-width:1px] [stroke:var(--border-strong)]" />
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>
       </TooltipPrimitive.Root>
     </TooltipPrimitive.Provider>
+  );
+}
+
+export function OptionalAppTooltip({ children, content, side }: OptionalAppTooltipProps) {
+  if (content === undefined || content === null || content === "") {
+    return <>{children}</>;
+  }
+  return (
+    <AppTooltip content={content} side={side}>
+      {children}
+    </AppTooltip>
   );
 }
