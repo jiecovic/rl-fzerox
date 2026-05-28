@@ -41,7 +41,11 @@ export function ConfigFieldset({
 }: FieldsetHTMLAttributes<HTMLFieldSetElement>) {
   return (
     <fieldset
-      className={cn("m-0 grid min-w-0 gap-3 border-0 p-0 disabled:opacity-[0.52]", className)}
+      className={cn(
+        "m-0 grid min-w-0 gap-3 border-0 p-0 disabled:opacity-[0.52]",
+        "disabled:[&_.range-pair-slider]:pointer-events-none",
+        className,
+      )}
       {...props}
     />
   );
