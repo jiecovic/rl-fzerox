@@ -1,8 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/app/App.test.tsx
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { App } from "@/app/App";
 import { ApiSchemaMismatchError } from "@/shared/api/client";
 import {
@@ -13,6 +12,7 @@ import {
   runFixture,
   runMetricSampleFixture,
 } from "@/test/fixtures";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@/test/render";
 
 const loadManagerDataMock = vi.fn();
 const createDraftWithSourceMock = vi.fn();

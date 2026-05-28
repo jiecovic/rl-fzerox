@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/LayerEditors.test.tsx
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { CustomConvTableRows } from "@/features/configurator/sections/policy/LayerEditors";
 import type { ManagedRunConfig } from "@/shared/api/contract";
+import { cleanup, fireEvent, render, screen } from "@/test/render";
 
 type CustomConvLayer = ManagedRunConfig["policy"]["custom_conv_layers"][number];
 

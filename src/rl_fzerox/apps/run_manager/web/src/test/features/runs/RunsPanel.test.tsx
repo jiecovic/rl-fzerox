@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/runs/RunsPanel.test.tsx
-import { render, screen, within } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-
 import { RunsPanel } from "@/features/runs/RunsPanel";
 import { draftFixture, runFixture } from "@/test/fixtures";
+import { render, screen, within } from "@/test/render";
 
 describe("RunsPanel", () => {
   it("opens runs and exposes row actions with delete confirmation", async () => {

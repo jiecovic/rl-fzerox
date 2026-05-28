@@ -1,8 +1,7 @@
-import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
 import { runFixture } from "@/test/fixtures";
+import { cleanup, render, screen } from "@/test/render";
 
 describe("RunActivityIndicator", () => {
   beforeEach(() => {

@@ -1,13 +1,13 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/FieldInputs.test.tsx
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   OptionalNumberField,
   OptionalRangePairField,
   RangeNumberField,
   RangePairField,
 } from "@/features/configurator/fields";
+import { cleanup, fireEvent, render, screen } from "@/test/render";
 
 describe("Configurator field inputs", () => {
   afterEach(() => {

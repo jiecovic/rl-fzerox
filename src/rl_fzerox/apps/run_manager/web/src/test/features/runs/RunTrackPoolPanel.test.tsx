@@ -1,11 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/runs/RunTrackPoolPanel.test.tsx
-import { cleanup, render, screen, within } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { RunTrackPoolPanel } from "@/features/runs/RunTrackPoolPanel";
 import type { TrackSamplingRuntimeState } from "@/shared/api/contract";
 import { configMetadataFixture, managedRunConfigFixture, runFixture } from "@/test/fixtures";
+import { cleanup, render, screen, within } from "@/test/render";
 
 function enabledResetButton() {
   const button = screen

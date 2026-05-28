@@ -7,6 +7,7 @@ import { useManagerData } from "@/app/workspace/useManagerData";
 import { ScrollButtons } from "@/shared/ui/ScrollButtons";
 import { Tabs } from "@/shared/ui/Tabs";
 import { type Theme, ThemeToggle } from "@/shared/ui/ThemeToggle";
+import { AppTooltipProvider } from "@/shared/ui/Tooltip";
 
 export function App() {
   const [theme, setTheme] = useState<Theme>("dark");
@@ -31,45 +32,47 @@ export function App() {
   }, [theme]);
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div className="brand-lockup">
-          <div className="brand-mark">FX</div>
-          <div>
-            <h1>F-Zero X runs</h1>
-            <p>Local training configuration and run control.</p>
+    <AppTooltipProvider>
+      <main className="app-shell">
+        <header className="app-header">
+          <div className="brand-lockup">
+            <div className="brand-mark">FX</div>
+            <div>
+              <h1>F-Zero X runs</h1>
+              <p>Local training configuration and run control.</p>
+            </div>
           </div>
+          <ThemeToggle
+            theme={theme}
+            onToggle={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
+          />
+        </header>
+
+        <div className="navigation-strip">
+          <Tabs
+            label="Run manager sections"
+            activeId={sessions.activeTabId}
+            items={sessions.workspaceTabs}
+            variant="workspace"
+            onClose={(id) => sessions.closeWorkspaceTab(id)}
+            onSelect={(id) => sessions.setActiveTabId(id)}
+          />
         </div>
-        <ThemeToggle
-          theme={theme}
-          onToggle={() => setTheme((current) => (current === "light" ? "dark" : "light"))}
-        />
-      </header>
 
-      <div className="navigation-strip">
-        <Tabs
-          label="Run manager sections"
-          activeId={sessions.activeTabId}
-          items={sessions.workspaceTabs}
-          variant="workspace"
-          onClose={(id) => sessions.closeWorkspaceTab(id)}
-          onSelect={(id) => sessions.setActiveTabId(id)}
+        <WorkspaceBody
+          actions={actions}
+          defaultConfig={managerData.defaultConfig}
+          drafts={managerData.drafts}
+          error={managerData.error}
+          isLoading={managerData.isLoading}
+          loadRunDetail={managerData.loadRunDetail}
+          metadata={managerData.metadata}
+          runs={managerData.runs}
+          runDetailsById={managerData.runDetailsById}
+          sessions={sessions}
         />
-      </div>
-
-      <WorkspaceBody
-        actions={actions}
-        defaultConfig={managerData.defaultConfig}
-        drafts={managerData.drafts}
-        error={managerData.error}
-        isLoading={managerData.isLoading}
-        loadRunDetail={managerData.loadRunDetail}
-        metadata={managerData.metadata}
-        runs={managerData.runs}
-        runDetailsById={managerData.runDetailsById}
-        sessions={sessions}
-      />
-      <ScrollButtons />
-    </main>
+        <ScrollButtons />
+      </main>
+    </AppTooltipProvider>
   );
 }

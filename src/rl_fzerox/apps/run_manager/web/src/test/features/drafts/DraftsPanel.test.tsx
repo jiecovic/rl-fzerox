@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/drafts/DraftsPanel.test.tsx
-import { cleanup, render, screen } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-
 import { DraftsPanel } from "@/features/drafts/DraftsPanel";
 import { draftFixture } from "@/test/fixtures";
+import { cleanup, render, screen } from "@/test/render";
 
 describe("DraftsPanel", () => {
   afterEach(() => {
