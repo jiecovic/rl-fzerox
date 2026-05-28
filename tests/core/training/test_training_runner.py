@@ -57,6 +57,32 @@ class _CapturingLogger:
         self.records[key] = value
 
 
+class _TrainingStepModel:
+    def __init__(self, num_timesteps: object) -> None:
+        self.num_timesteps = num_timesteps
+
+
+class _RunTrainingEnv:
+    def __init__(self) -> None:
+        self.closed = False
+        self.env_method_calls: list[tuple[str, tuple[object, ...]]] = []
+
+    def env_method(self, method_name: str, *args: object) -> None:
+        self.env_method_calls.append((method_name, args))
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class _RunTrainingModel:
+    def __init__(self, num_timesteps: int) -> None:
+        self.num_timesteps = num_timesteps
+        self.logger: object | None = None
+
+    def set_logger(self, logger: object) -> None:
+        self.logger = logger
+
+
 def test_validate_training_baseline_state_requires_existing_file(
     tmp_path: Path,
 ) -> None:
@@ -478,6 +504,130 @@ def test_weights_only_resume_does_not_restore_curriculum_stage(tmp_path: Path) -
     )
 
     assert runner._resume_curriculum_stage_index(config) is None
+
+
+def test_learn_total_timesteps_uses_full_target_when_resetting_counter() -> None:
+    model = _TrainingStepModel(num_timesteps=900)
+
+    total_timesteps = runner._learn_total_timesteps(
+        model=model,
+        configured_total_timesteps=1_000,
+        reset_num_timesteps=True,
+    )
+
+    assert total_timesteps == 1_000
+
+
+def test_learn_total_timesteps_uses_remaining_steps_for_full_model_resume() -> None:
+    model = _TrainingStepModel(num_timesteps=900)
+
+    total_timesteps = runner._learn_total_timesteps(
+        model=model,
+        configured_total_timesteps=1_000,
+        reset_num_timesteps=False,
+    )
+
+    assert total_timesteps == 100
+
+
+def test_learn_total_timesteps_clamps_completed_full_model_resume() -> None:
+    model = _TrainingStepModel(num_timesteps=1_020)
+
+    total_timesteps = runner._learn_total_timesteps(
+        model=model,
+        configured_total_timesteps=1_000,
+        reset_num_timesteps=False,
+    )
+
+    assert total_timesteps == 0
+
+
+def test_run_training_full_model_resume_learns_remaining_timesteps(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _full_model_resume_config(tmp_path, total_timesteps=1_000)
+    env = _RunTrainingEnv()
+    model = _RunTrainingModel(num_timesteps=900)
+    captured_learn_kwargs: dict[str, object] = {}
+
+    _stub_run_training_dependencies(monkeypatch, config=config, env=env, model=model)
+
+    def capture_learn_model(**kwargs: object) -> None:
+        captured_learn_kwargs.update(kwargs)
+
+    monkeypatch.setattr(runner, "_learn_model", capture_learn_model)
+
+    runner.run_training(config)
+
+    assert captured_learn_kwargs["model"] is model
+    assert captured_learn_kwargs["total_timesteps"] == 100
+    assert captured_learn_kwargs["reset_num_timesteps"] is False
+    assert env.closed
+
+
+def test_run_training_full_model_resume_skips_completed_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _full_model_resume_config(tmp_path, total_timesteps=1_000)
+    env = _RunTrainingEnv()
+    model = _RunTrainingModel(num_timesteps=1_000)
+    learn_called = False
+
+    _stub_run_training_dependencies(monkeypatch, config=config, env=env, model=model)
+
+    def capture_learn_model(**_: object) -> None:
+        nonlocal learn_called
+        learn_called = True
+
+    monkeypatch.setattr(runner, "_learn_model", capture_learn_model)
+
+    runner.run_training(config)
+
+    assert not learn_called
+    assert env.closed
+
+
+def _full_model_resume_config(tmp_path: Path, *, total_timesteps: int) -> TrainAppConfig:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    run_dir = tmp_path / "runs" / "ppo_cnn_0001"
+    core_path.touch()
+    rom_path.touch()
+    run_dir.mkdir(parents=True)
+    return TrainAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(),
+        policy=PolicyConfig(),
+        curriculum=CurriculumConfig(),
+        train=TrainConfig(
+            continue_run_dir=run_dir,
+            resume_run_dir=run_dir,
+            resume_mode="full_model",
+            save_latest_checkpoint=False,
+            total_timesteps=total_timesteps,
+        ),
+    )
+
+
+def _stub_run_training_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    config: TrainAppConfig,
+    env: _RunTrainingEnv,
+    model: _RunTrainingModel,
+) -> None:
+    monkeypatch.setattr(runner, "resolve_train_run_config", lambda **_: config)
+    monkeypatch.setattr(runner, "build_training_env", lambda *_, **__: env)
+    monkeypatch.setattr(runner, "build_training_model", lambda **_: model)
+    monkeypatch.setattr(runner, "maybe_resume_training_model", lambda **_: model)
+    monkeypatch.setattr(runner, "_resume_curriculum_stage_index", lambda _: None)
+    monkeypatch.setattr(runner, "build_callbacks", lambda **_: object())
+    monkeypatch.setattr(runner, "build_tensorboard_logger", lambda *_, **__: object())
+    monkeypatch.setattr(runner, "print_training_startup", lambda **_: None)
+    monkeypatch.setattr(runner, "current_policy_artifact_metadata", lambda *_, **__: None)
+    monkeypatch.setattr(runner, "save_artifacts_atomically", lambda **_: None)
 
 
 def test_resolve_policy_activation_fn_supports_known_names() -> None:

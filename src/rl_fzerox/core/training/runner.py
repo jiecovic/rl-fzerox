@@ -162,15 +162,22 @@ def run_training(
             "startup_training",
             "Starting training loop",
         )
+        reset_num_timesteps = run_config.train.resume_mode != "full_model"
+        learn_total_timesteps = _learn_total_timesteps(
+            model=model,
+            configured_total_timesteps=run_config.train.total_timesteps,
+            reset_num_timesteps=reset_num_timesteps,
+        )
         try:
-            _learn_model(
-                model=model,
-                total_timesteps=run_config.train.total_timesteps,
-                callback=callbacks,
-                use_masking=masking_required,
-                progress_bar=True,
-                reset_num_timesteps=run_config.train.resume_mode != "full_model",
-            )
+            if learn_total_timesteps > 0:
+                _learn_model(
+                    model=model,
+                    total_timesteps=learn_total_timesteps,
+                    callback=callbacks,
+                    use_masking=masking_required,
+                    progress_bar=True,
+                    reset_num_timesteps=reset_num_timesteps,
+                )
         except Exception:
             if model.num_timesteps > 0 and run_config.train.save_latest_checkpoint:
                 save_latest_artifacts(
@@ -235,6 +242,30 @@ def _resume_curriculum_stage_index(config: TrainAppConfig) -> int | None:
     if metadata is None:
         return None
     return metadata.curriculum_stage_index
+
+
+def _learn_total_timesteps(
+    *,
+    model: object,
+    configured_total_timesteps: int,
+    reset_num_timesteps: bool,
+) -> int:
+    """Return the SB3 learn target for this process invocation.
+
+    With `reset_num_timesteps=False`, SB3 treats `total_timesteps` as steps to
+    add on top of the loaded model counter. Manager resumes configure an
+    absolute run target, so they must pass only the remaining local steps.
+    """
+
+    if reset_num_timesteps:
+        return configured_total_timesteps
+    current_num_timesteps = _model_num_timesteps(model)
+    return max(0, configured_total_timesteps - current_num_timesteps)
+
+
+def _model_num_timesteps(model: object) -> int:
+    value = getattr(model, "num_timesteps", 0)
+    return value if isinstance(value, int) and not isinstance(value, bool) else 0
 
 
 def _learn_model(
