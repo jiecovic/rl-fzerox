@@ -14,6 +14,7 @@ from rl_fzerox.apps.run_manager.training_monitor import (
 )
 from rl_fzerox.core.manager import ManagerStore, default_manager_db_path
 from rl_fzerox.core.manager.models import ManagedRun
+from rl_fzerox.core.manager.registry.runs.maintenance import RUN_WORKER_LEASE_POLICY
 from rl_fzerox.core.manager.training import (
     build_managed_fork_train_app_config,
     build_managed_resume_train_app_config,
@@ -23,7 +24,6 @@ from rl_fzerox.core.training.runner import run_training
 from rl_fzerox.core.training.runs import RUN_LAYOUT, RunPaths, continue_run_paths
 
 LOGGER = logging.getLogger(__name__)
-WORKER_HEARTBEAT_INTERVAL_SECONDS = 3.0
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -320,12 +320,16 @@ class _WorkerHeartbeatLoop:
         store: ManagerStore,
         run_id: str,
         launch_token: str,
-        interval_seconds: float = WORKER_HEARTBEAT_INTERVAL_SECONDS,
+        interval_seconds: float | None = None,
     ) -> None:
         self._store = store
         self._run_id = run_id
         self._launch_token = launch_token
-        self._interval_seconds = interval_seconds
+        self._interval_seconds = (
+            RUN_WORKER_LEASE_POLICY.heartbeat_interval.total_seconds()
+            if interval_seconds is None
+            else interval_seconds
+        )
         self._stop_event = threading.Event()
         self._thread = threading.Thread(
             target=self._run,
