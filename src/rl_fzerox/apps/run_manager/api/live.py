@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 RunSnapshotPayload = dict[str, list[dict[str, object]]]
-RunSnapshotUpdate = RunSnapshotPayload | None
+RunLiveUpdate = RunSnapshotPayload | dict[str, str]
+
+LOGGER = logging.getLogger(__name__)
 
 
 class RunLiveBroadcaster:
@@ -23,14 +26,14 @@ class RunLiveBroadcaster:
     ) -> None:
         self._load_snapshot = load_snapshot
         self._interval_seconds = interval_seconds
-        self._subscribers: set[asyncio.Queue[RunSnapshotUpdate]] = set()
+        self._subscribers: set[asyncio.Queue[RunLiveUpdate]] = set()
         self._last_snapshot_key: str | None = None
         self._last_snapshot: RunSnapshotPayload | None = None
         self._poll_task: asyncio.Task[None] | None = None
 
     async def serve(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        queue: asyncio.Queue[RunSnapshotUpdate] = asyncio.Queue(maxsize=1)
+        queue: asyncio.Queue[RunLiveUpdate] = asyncio.Queue(maxsize=1)
         already_polling = len(self._subscribers) > 0
         if not already_polling:
             self._last_snapshot_key = None
@@ -55,11 +58,11 @@ class RunLiveBroadcaster:
                 if disconnect_task in done:
                     disconnect_task.result()
                     continue
-                snapshot = snapshot_task.result()
-                if snapshot is None:
-                    await websocket.close(code=1011)
-                    return
-                await websocket.send_json({"type": "runs_snapshot", **snapshot})
+                update = snapshot_task.result()
+                if "runs" in update:
+                    await websocket.send_json({"type": "runs_snapshot", **update})
+                    continue
+                await websocket.send_json({"type": "runs_error", **update})
         except (RuntimeError, WebSocketDisconnect):
             return
         finally:
@@ -73,9 +76,11 @@ class RunLiveBroadcaster:
         while self._subscribers:
             try:
                 snapshot = await self._load_snapshot()
-            except Exception:
+            except Exception as exc:
+                LOGGER.exception("failed to poll live run snapshot")
+                message = f"{type(exc).__name__}: {exc}"
                 for queue in tuple(self._subscribers):
-                    _queue_latest(queue, None)
+                    _queue_latest(queue, {"message": message})
                 await asyncio.sleep(self._interval_seconds)
                 continue
             snapshot_key = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
@@ -88,8 +93,8 @@ class RunLiveBroadcaster:
 
 
 def _queue_latest(
-    queue: asyncio.Queue[RunSnapshotUpdate],
-    snapshot: RunSnapshotUpdate,
+    queue: asyncio.Queue[RunLiveUpdate],
+    snapshot: RunLiveUpdate,
 ) -> None:
     if queue.full():
         with suppress(asyncio.QueueEmpty):

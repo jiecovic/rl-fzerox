@@ -1,7 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/shared/api/client/live.ts
 
 import { parseApiPayload } from "@/shared/api/client/http";
-import { type ManagedRun, runsLiveMessageSchema } from "@/shared/api/contract";
+import { type ManagedRun, runsLiveUpdateSchema } from "@/shared/api/contract";
 
 const RUN_LIVE_RECONNECT_DELAY_MS = 1_500;
 
@@ -30,7 +30,11 @@ export function subscribeRunLiveUpdates({
     });
     socket.addEventListener("message", (event) => {
       try {
-        const parsed = parseApiPayload(runsLiveMessageSchema, JSON.parse(String(event.data)));
+        const parsed = parseApiPayload(runsLiveUpdateSchema, JSON.parse(String(event.data)));
+        if (parsed.type === "runs_error") {
+          onError?.(new Error(`live run refresh failed: ${parsed.message}`));
+          return;
+        }
         onRuns(parsed.runs);
       } catch (caught) {
         onError?.(caught instanceof Error ? caught : new Error("invalid run update payload"));
