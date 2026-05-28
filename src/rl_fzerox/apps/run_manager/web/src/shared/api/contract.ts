@@ -491,6 +491,16 @@ export const runsLiveMessageSchema = runsResponseSchema.extend({
   type: z.literal("runs_snapshot"),
 });
 
+export const runsLiveErrorMessageSchema = z.object({
+  type: z.literal("runs_error"),
+  message: z.string(),
+});
+
+export const runsLiveUpdateSchema = z.discriminatedUnion("type", [
+  runsLiveMessageSchema,
+  runsLiveErrorMessageSchema,
+]);
+
 export const runResponseSchema = z.object({
   run: managedRunSchema,
 });
