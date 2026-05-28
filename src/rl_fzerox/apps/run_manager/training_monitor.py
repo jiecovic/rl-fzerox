@@ -84,6 +84,10 @@ def build_manager_training_callback(
                     self._write_resume_checkpoint()
                     self._flush_runtime()
                     raise RunControlSignal(pending_command)
+            if _target_reached(self.model, total_timesteps=total_timesteps):
+                self._flush_runtime()
+                self._last_runtime_flush = now
+                return False
             if now - self._last_runtime_flush >= 2.0:
                 self._flush_runtime()
                 self._last_runtime_flush = now
@@ -179,6 +183,15 @@ def _estimated_env_step_rate(
         return None
     progressed_steps = max(0, current_num_timesteps - started_num_timesteps)
     return progressed_steps / elapsed
+
+
+def _target_reached(model: object, *, total_timesteps: int) -> bool:
+    num_timesteps = getattr(model, "num_timesteps", 0)
+    return (
+        isinstance(num_timesteps, int)
+        and not isinstance(num_timesteps, bool)
+        and num_timesteps >= total_timesteps
+    )
 
 
 def _utc_now() -> str:
