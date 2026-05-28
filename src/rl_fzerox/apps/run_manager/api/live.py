@@ -4,43 +4,70 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from contextlib import suppress
+from dataclasses import dataclass
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-RunSnapshotPayload = dict[str, list[dict[str, object]]]
-RunLiveUpdate = RunSnapshotPayload | dict[str, str]
+LivePayload = Mapping[str, object]
 
 LOGGER = logging.getLogger(__name__)
 
 
-class RunLiveBroadcaster:
-    """Share one live run snapshot poller across all connected WebSocket clients."""
+@dataclass(frozen=True)
+class LiveMessageTypes:
+    snapshot: str
+    error: str
+
+
+@dataclass(frozen=True)
+class LiveSnapshotUpdate:
+    payload: LivePayload
+
+
+@dataclass(frozen=True)
+class LiveErrorUpdate:
+    message: str
+
+
+LiveUpdate = LiveSnapshotUpdate | LiveErrorUpdate
+
+
+class LiveSnapshotBroadcaster:
+    """Share one JSON snapshot poller across matching WebSocket clients."""
 
     def __init__(
         self,
-        load_snapshot: Callable[[], Awaitable[RunSnapshotPayload]],
+        load_snapshot: Callable[[], Awaitable[LivePayload]],
         *,
+        message_types: LiveMessageTypes,
+        error_log_message: str,
         interval_seconds: float = 2.0,
     ) -> None:
         self._load_snapshot = load_snapshot
+        self._message_types = message_types
+        self._error_log_message = error_log_message
         self._interval_seconds = interval_seconds
-        self._subscribers: set[asyncio.Queue[RunLiveUpdate]] = set()
+        self._subscribers: set[asyncio.Queue[LiveUpdate]] = set()
         self._last_snapshot_key: str | None = None
-        self._last_snapshot: RunSnapshotPayload | None = None
+        self._last_snapshot: LivePayload | None = None
         self._poll_task: asyncio.Task[None] | None = None
+
+    @property
+    def has_subscribers(self) -> bool:
+        return len(self._subscribers) > 0
 
     async def serve(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        queue: asyncio.Queue[RunLiveUpdate] = asyncio.Queue(maxsize=1)
+        queue: asyncio.Queue[LiveUpdate] = asyncio.Queue(maxsize=1)
         already_polling = len(self._subscribers) > 0
         if not already_polling:
             self._last_snapshot_key = None
             self._last_snapshot = None
         self._subscribers.add(queue)
         if already_polling and self._last_snapshot is not None:
-            _queue_latest(queue, self._last_snapshot)
+            _queue_latest(queue, LiveSnapshotUpdate(self._last_snapshot))
         self._ensure_polling()
         try:
             while True:
@@ -59,10 +86,12 @@ class RunLiveBroadcaster:
                     disconnect_task.result()
                     continue
                 update = snapshot_task.result()
-                if "runs" in update:
-                    await websocket.send_json({"type": "runs_snapshot", **update})
+                if isinstance(update, LiveErrorUpdate):
+                    await websocket.send_json(
+                        {"type": self._message_types.error, "message": update.message}
+                    )
                     continue
-                await websocket.send_json({"type": "runs_error", **update})
+                await websocket.send_json({"type": self._message_types.snapshot, **update.payload})
         except (RuntimeError, WebSocketDisconnect):
             return
         finally:
@@ -77,10 +106,10 @@ class RunLiveBroadcaster:
             try:
                 snapshot = await self._load_snapshot()
             except Exception as exc:
-                LOGGER.exception("failed to poll live run snapshot")
+                LOGGER.exception(self._error_log_message)
                 message = f"{type(exc).__name__}: {exc}"
                 for queue in tuple(self._subscribers):
-                    _queue_latest(queue, {"message": message})
+                    _queue_latest(queue, LiveErrorUpdate(message))
                 await asyncio.sleep(self._interval_seconds)
                 continue
             snapshot_key = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
@@ -88,13 +117,52 @@ class RunLiveBroadcaster:
                 self._last_snapshot_key = snapshot_key
                 self._last_snapshot = snapshot
                 for queue in tuple(self._subscribers):
-                    _queue_latest(queue, snapshot)
+                    _queue_latest(queue, LiveSnapshotUpdate(snapshot))
             await asyncio.sleep(self._interval_seconds)
 
 
+class KeyedLiveSnapshotBroadcaster:
+    """Keep one live snapshot broadcaster per active subscription key."""
+
+    def __init__(
+        self,
+        load_snapshot: Callable[[str], Awaitable[LivePayload]],
+        *,
+        message_types: LiveMessageTypes,
+        error_log_message: str,
+        interval_seconds: float = 2.0,
+    ) -> None:
+        self._load_snapshot = load_snapshot
+        self._message_types = message_types
+        self._error_log_message = error_log_message
+        self._interval_seconds = interval_seconds
+        self._broadcasters: dict[str, LiveSnapshotBroadcaster] = {}
+
+    async def serve(self, key: str, websocket: WebSocket) -> None:
+        broadcaster = self._broadcaster(key)
+        try:
+            await broadcaster.serve(websocket)
+        finally:
+            if not broadcaster.has_subscribers:
+                self._broadcasters.pop(key, None)
+
+    def _broadcaster(self, key: str) -> LiveSnapshotBroadcaster:
+        broadcaster = self._broadcasters.get(key)
+        if broadcaster is not None:
+            return broadcaster
+        broadcaster = LiveSnapshotBroadcaster(
+            lambda: self._load_snapshot(key),
+            message_types=self._message_types,
+            error_log_message=self._error_log_message,
+            interval_seconds=self._interval_seconds,
+        )
+        self._broadcasters[key] = broadcaster
+        return broadcaster
+
+
 def _queue_latest(
-    queue: asyncio.Queue[RunLiveUpdate],
-    snapshot: RunLiveUpdate,
+    queue: asyncio.Queue[LiveUpdate],
+    snapshot: LiveUpdate,
 ) -> None:
     if queue.full():
         with suppress(asyncio.QueueEmpty):

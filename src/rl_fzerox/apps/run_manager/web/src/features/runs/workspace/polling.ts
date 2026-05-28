@@ -1,7 +1,11 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/polling.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { fetchPolicyPreview, fetchRunTrackSamplingState } from "@/shared/api/client";
+import {
+  fetchPolicyPreview,
+  fetchRunTrackSamplingState,
+  subscribeRunTrackSamplingUpdates,
+} from "@/shared/api/client";
 import type {
   ManagedRun,
   ManagedRunConfig,
@@ -9,6 +13,10 @@ import type {
   TrackSamplingRuntimeState,
 } from "@/shared/api/contract";
 import { useDocumentVisible } from "@/shared/browser/useDocumentVisible";
+
+const TRACK_SAMPLING_LIVE = {
+  fallbackPollMs: 5_000,
+} as const;
 
 export function useRunClock(status: ManagedRun["status"]): number {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -104,12 +112,15 @@ export function useRunTrackSamplingState(
       return undefined;
     }
 
+    let unsubscribe: (() => void) | null = null;
+    let fallbackPollInterval: number | null = null;
     let ignore = false;
     let inFlight = false;
+    let liveConnected = false;
     let activeController: AbortController | null = null;
 
     async function loadTrackSamplingState() {
-      if (inFlight) {
+      if (inFlight || liveConnected || document.visibilityState === "hidden") {
         return;
       }
       inFlight = true;
@@ -139,22 +150,61 @@ export function useRunTrackSamplingState(
       }
     }
 
-    void loadTrackSamplingState();
+    function startFallbackPolling() {
+      if (fallbackPollInterval !== null) {
+        return;
+      }
+      void loadTrackSamplingState();
+      if (status !== "running") {
+        return;
+      }
+      fallbackPollInterval = window.setInterval(() => {
+        void loadTrackSamplingState();
+      }, TRACK_SAMPLING_LIVE.fallbackPollMs);
+    }
+
+    function stopFallbackPolling() {
+      if (fallbackPollInterval === null) {
+        return;
+      }
+      window.clearInterval(fallbackPollInterval);
+      fallbackPollInterval = null;
+    }
+
     if (status !== "running") {
+      void loadTrackSamplingState();
       return () => {
         ignore = true;
         activeController?.abort();
       };
     }
-    const intervalId = window.setInterval(() => {
-      void loadTrackSamplingState();
-    }, 2_000);
+
+    unsubscribe = subscribeRunTrackSamplingUpdates(runId, {
+      onConnectionChange: (connected) => {
+        liveConnected = connected;
+        if (connected) {
+          stopFallbackPolling();
+          setTrackSamplingError(null);
+          return;
+        }
+        startFallbackPolling();
+      },
+      onError: (caught) => {
+        setTrackSamplingError(caught.message);
+      },
+      onState: (state) => {
+        commitTrackSamplingState(state);
+        setTrackSamplingError(null);
+      },
+    });
+
     return () => {
       ignore = true;
       activeController?.abort();
-      window.clearInterval(intervalId);
+      unsubscribe?.();
+      stopFallbackPolling();
     };
-  }, [documentVisible, runId, status]);
+  }, [commitTrackSamplingState, documentVisible, runId, status]);
 
   return {
     setTrackSamplingState: commitTrackSamplingState,

@@ -501,6 +501,21 @@ export const runsLiveUpdateSchema = z.discriminatedUnion("type", [
   runsLiveErrorMessageSchema,
 ]);
 
+export const runTrackSamplingLiveMessageSchema = z.object({
+  type: z.literal("track_sampling_snapshot"),
+  state: trackSamplingRuntimeStateSchema.nullable(),
+});
+
+export const runTrackSamplingLiveErrorMessageSchema = z.object({
+  type: z.literal("track_sampling_error"),
+  message: z.string(),
+});
+
+export const runTrackSamplingLiveUpdateSchema = z.discriminatedUnion("type", [
+  runTrackSamplingLiveMessageSchema,
+  runTrackSamplingLiveErrorMessageSchema,
+]);
+
 export const runResponseSchema = z.object({
   run: managedRunSchema,
 });
@@ -743,6 +758,8 @@ export type ManagedRunDetail = z.infer<typeof managedRunSchema>;
 export type WatchDevice = z.infer<typeof watchDeviceSchema>;
 export type WatchRenderer = z.infer<typeof rendererSchema>;
 export type ManagedRunMetricSample = z.infer<typeof managedRunMetricSampleSchema>;
+export type RunsLiveUpdate = z.infer<typeof runsLiveUpdateSchema>;
+export type RunTrackSamplingLiveUpdate = z.infer<typeof runTrackSamplingLiveUpdateSchema>;
 export type TrackSamplingRuntimeEntry = z.infer<typeof trackSamplingRuntimeEntrySchema>;
 export type TrackSamplingRuntimeState = z.infer<typeof trackSamplingRuntimeStateSchema>;
 export type TensorboardViewGroup = z.infer<typeof tensorboardViewGroupSchema>;

@@ -24,7 +24,11 @@ from rl_fzerox.apps.run_manager.api.contracts import (
     WatchRenderer,
     WatchRunRequest,
 )
-from rl_fzerox.apps.run_manager.api.live import RunLiveBroadcaster
+from rl_fzerox.apps.run_manager.api.live import (
+    KeyedLiveSnapshotBroadcaster,
+    LiveMessageTypes,
+    LiveSnapshotBroadcaster,
+)
 from rl_fzerox.apps.run_manager.launch import ManagerRunLauncher
 from rl_fzerox.core.manager import ManagedRunConfig, ManagerStore
 
@@ -43,7 +47,19 @@ def create_manager_api_app(
     store.rebuild_tensorboard_views()
     app = FastAPI(title="F-Zero X Run Manager", version="0.1.0")
     launcher = run_launcher or ManagerRunLauncher(store)
-    live_broadcaster = RunLiveBroadcaster(lambda: _run_sync(handlers.runs_payload, store))
+    live_broadcaster = LiveSnapshotBroadcaster(
+        lambda: _run_sync(handlers.runs_payload, store),
+        message_types=LiveMessageTypes(snapshot="runs_snapshot", error="runs_error"),
+        error_log_message="failed to poll live run snapshot",
+    )
+    track_sampling_live_broadcaster = KeyedLiveSnapshotBroadcaster(
+        lambda run_id: _run_sync(handlers.run_track_sampling_payload, store, run_id),
+        message_types=LiveMessageTypes(
+            snapshot="track_sampling_snapshot",
+            error="track_sampling_error",
+        ),
+        error_log_message="failed to poll live track-pool snapshot",
+    )
 
     @app.exception_handler(HTTPException)
     async def handle_http_exception(_request: Request, exc: HTTPException) -> JSONResponse:
@@ -75,6 +91,13 @@ def create_manager_api_app(
     @app.websocket("/api/runs/live")
     async def live_runs(websocket: WebSocket) -> None:
         await live_broadcaster.serve(websocket)
+
+    @app.websocket("/api/runs/{run_id}/track-sampling/live")
+    async def live_run_track_sampling(
+        websocket: WebSocket,
+        run_id: Annotated[str, Path(min_length=1)],
+    ) -> None:
+        await track_sampling_live_broadcaster.serve(run_id, websocket)
 
     @app.get("/api/runs/{run_id}")
     async def run_detail(
