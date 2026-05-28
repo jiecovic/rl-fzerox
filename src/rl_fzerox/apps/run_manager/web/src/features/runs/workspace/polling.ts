@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/runs/workspace/polling.ts
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { fetchPolicyPreview, fetchRunTrackSamplingState } from "@/shared/api/client";
 import type {
@@ -83,7 +83,21 @@ export function useRunTrackSamplingState(
     null,
   );
   const [trackSamplingError, setTrackSamplingError] = useState<string | null>(null);
+  const trackSamplingStateKeyRef = useRef<string | null>(null);
   const documentVisible = useDocumentVisible();
+  const commitTrackSamplingState = useCallback(
+    (state: TrackSamplingRuntimeState | null) => {
+      const key = trackSamplingStateKey(runId, state);
+      trackSamplingStateKeyRef.current = key;
+      setTrackSamplingState(state);
+    },
+    [runId],
+  );
+
+  useEffect(() => {
+    commitTrackSamplingState(null);
+    setTrackSamplingError(null);
+  }, [commitTrackSamplingState]);
 
   useEffect(() => {
     if (!documentVisible) {
@@ -104,7 +118,11 @@ export function useRunTrackSamplingState(
       try {
         const state = await fetchRunTrackSamplingState(runId, { signal: controller.signal });
         if (!ignore) {
-          setTrackSamplingState(state);
+          const key = trackSamplingStateKey(runId, state);
+          if (trackSamplingStateKeyRef.current !== key) {
+            trackSamplingStateKeyRef.current = key;
+            setTrackSamplingState(state);
+          }
           setTrackSamplingError(null);
         }
       } catch (caught) {
@@ -138,5 +156,13 @@ export function useRunTrackSamplingState(
     };
   }, [documentVisible, runId, status]);
 
-  return { setTrackSamplingState, trackSamplingError, trackSamplingState };
+  return {
+    setTrackSamplingState: commitTrackSamplingState,
+    trackSamplingError,
+    trackSamplingState,
+  };
+}
+
+function trackSamplingStateKey(runId: string, state: TrackSamplingRuntimeState | null) {
+  return `${runId}:${JSON.stringify(state)}`;
 }

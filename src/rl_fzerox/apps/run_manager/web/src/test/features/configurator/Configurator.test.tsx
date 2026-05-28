@@ -1,8 +1,7 @@
 // src/rl_fzerox/apps/run_manager/web/src/test/features/configurator/Configurator.test.tsx
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { Configurator } from "@/features/configurator/Configurator";
 import type { ManagedRunConfig, PolicyArchitecturePreview } from "@/shared/api/contract";
 import {
@@ -12,6 +11,7 @@ import {
   policyPreviewFixture,
   runFixture,
 } from "@/test/fixtures";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@/test/render";
 
 const fetchPolicyPreviewMock = vi.fn();
 
