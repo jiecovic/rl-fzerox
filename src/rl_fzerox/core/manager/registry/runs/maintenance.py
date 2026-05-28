@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class RunWorkerLeasePolicy:
+    heartbeat_interval: timedelta = timedelta(seconds=3)
     heartbeat_timeout: timedelta = timedelta(seconds=90)
 
 
