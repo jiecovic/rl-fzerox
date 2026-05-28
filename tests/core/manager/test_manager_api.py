@@ -478,49 +478,7 @@ async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) ->
         stopped_at=None,
         message="worker launched",
     )
-    state_path = run.run_dir / "runtime" / "track_sampling_state.json"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "sampling_mode": "step_balanced",
-                "action_repeat": 2,
-                "update_episodes": 4,
-                "ema_alpha": 0.5,
-                "max_weight_scale": 5.0,
-                "update_count": 3,
-                "episodes_since_update": 1,
-                "entries": [
-                    {
-                        "track_id": "mute",
-                        "course_key": "mute_city",
-                        "label": "Mute City",
-                        "base_weight": 1.0,
-                        "current_weight": 1.5,
-                        "completed_frames": 1200,
-                        "episode_count": 3,
-                        "finished_episode_count": 2,
-                        "success_sample_count": 2,
-                        "ema_episode_frames": 400.0,
-                    },
-                    {
-                        "track_id": "silence",
-                        "course_key": "silence",
-                        "label": "Silence",
-                        "base_weight": 1.0,
-                        "current_weight": 0.5,
-                        "completed_frames": 800,
-                        "episode_count": 1,
-                        "finished_episode_count": 1,
-                        "success_sample_count": 1,
-                        "ema_episode_frames": 800.0,
-                    },
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_track_sampling_state(run.run_dir)
 
     client = _client(tmp_path, store=store)
 
@@ -537,6 +495,33 @@ async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) ->
     assert payload["entries"][0]["success_sample_count"] == 2
     assert payload["entries"][0]["success_rate"] == pytest.approx(1.0)
     assert payload["entries"][0]["step_share"] == pytest.approx(0.6)
+
+
+def test_manager_api_live_track_sampling_sends_initial_snapshot(tmp_path: Path) -> None:
+    store = ManagerStore(tmp_path / "manager" / "runs.db")
+    run = store.create_run(
+        run_id="run-with-live-track-pool",
+        name="Live Track Pool Run",
+        config=default_managed_run_config(),
+        explicit_run_dir=tmp_path / "runs" / "run-with-live-track-pool",
+    )
+    store.update_run_status(
+        run_id=run.id,
+        status="running",
+        started_at="2026-05-04T12:00:00+00:00",
+        stopped_at=None,
+        message="worker launched",
+    )
+    _write_track_sampling_state(run.run_dir)
+
+    app = create_manager_api_app(store, run_launcher=_LauncherStub())
+
+    with TestClient(app) as client:
+        with client.websocket_connect(f"/api/runs/{run.id}/track-sampling/live") as websocket:
+            payload = websocket.receive_json()
+
+    assert payload["type"] == "track_sampling_snapshot"
+    assert payload["state"]["entries"][0]["label"] == "Mute City"
 
 
 async def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path: Path) -> None:
@@ -1256,6 +1241,52 @@ async def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path:
     assert payload["discrete_action_logits"] == 12
     branch_names = {branch["name"] for branch in payload["action_branches"]}
     assert "boost" not in branch_names
+
+
+def _write_track_sampling_state(run_dir: Path) -> None:
+    state_path = run_dir / "runtime" / "track_sampling_state.json"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "sampling_mode": "step_balanced",
+                "action_repeat": 2,
+                "update_episodes": 4,
+                "ema_alpha": 0.5,
+                "max_weight_scale": 5.0,
+                "update_count": 3,
+                "episodes_since_update": 1,
+                "entries": [
+                    {
+                        "track_id": "mute",
+                        "course_key": "mute_city",
+                        "label": "Mute City",
+                        "base_weight": 1.0,
+                        "current_weight": 1.5,
+                        "completed_frames": 1200,
+                        "episode_count": 3,
+                        "finished_episode_count": 2,
+                        "success_sample_count": 2,
+                        "ema_episode_frames": 400.0,
+                    },
+                    {
+                        "track_id": "silence",
+                        "course_key": "silence",
+                        "label": "Silence",
+                        "base_weight": 1.0,
+                        "current_weight": 0.5,
+                        "completed_frames": 800,
+                        "episode_count": 1,
+                        "finished_episode_count": 1,
+                        "success_sample_count": 1,
+                        "ema_episode_frames": 800.0,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _client(tmp_path: Path, *, store: ManagerStore | None = None) -> _ApiClient:

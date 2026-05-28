@@ -7,7 +7,9 @@ export {
 export type { RequestOptions } from "@/shared/api/client/http";
 export {
   type RunLiveSubscriptionOptions,
+  type RunTrackSamplingLiveSubscriptionOptions,
   subscribeRunLiveUpdates,
+  subscribeRunTrackSamplingUpdates,
 } from "@/shared/api/client/live";
 export {
   fetchFreshRunMetrics,
