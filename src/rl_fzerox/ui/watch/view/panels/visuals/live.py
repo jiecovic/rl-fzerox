@@ -302,12 +302,41 @@ def _draw_chart_block(
     summary_y = inner_y + title_surface.get_height() + LIVE_CHART_STYLE.title_gap
     screen.blit(summary_surface, (inner_x, summary_y))
 
+    series = (_PlotSeries(y_values=y_values, color=color, label=series_label), *extra_series)
+    plot_width = max(
+        LIVE_CHART_STYLE.plot_min_width,
+        inner_width - LIVE_CHART_STYLE.plot_axis_width,
+    )
+    legend_rows = _plot_legend_rows(
+        fonts=fonts,
+        rect_width=plot_width,
+        series=series,
+    )
+    legend_height = _plot_legend_height(fonts=fonts, rows=legend_rows)
+    legend_area_height = legend_height + LIVE_CHART_STYLE.legend_margin if legend_rows else 0
+    legend_gap = LIVE_CHART_STYLE.plot_gap if legend_rows else 0
     plot_y = summary_y + summary_surface.get_height() + LIVE_CHART_STYLE.plot_gap
+    if legend_rows:
+        legend_rect = pygame.Rect(
+            inner_x + LIVE_CHART_STYLE.plot_axis_width,
+            plot_y,
+            plot_width,
+            legend_area_height,
+        )
+        _draw_plot_legend(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            rect=legend_rect,
+            rows=legend_rows,
+        )
+        plot_y += legend_area_height + legend_gap
+    visible_plot_height = max(60, plot_height - legend_area_height - legend_gap)
     plot_rect = pygame.Rect(
         inner_x + LIVE_CHART_STYLE.plot_axis_width,
         plot_y,
-        max(LIVE_CHART_STYLE.plot_min_width, inner_width - LIVE_CHART_STYLE.plot_axis_width),
-        plot_height,
+        plot_width,
+        visible_plot_height,
     )
     _draw_plot_background(pygame=pygame, screen=screen, rect=plot_rect)
     if not x_values or not y_values:
@@ -326,7 +355,7 @@ def _draw_chart_block(
         fonts=fonts,
         rect=plot_rect,
         x_values=x_values,
-        series=(_PlotSeries(y_values=y_values, color=color, label=series_label), *extra_series),
+        series=series,
         fixed_range=fixed_range,
         zero_line=zero_line,
     )
@@ -412,13 +441,6 @@ def _draw_plot_series(
             pygame.draw.circle(screen, line.color, points[0], 3)
         else:
             pygame.draw.lines(screen, line.color, False, points, LIVE_CHART_STYLE.line_width)
-    _draw_plot_legend(
-        pygame=pygame,
-        screen=screen,
-        fonts=fonts,
-        rect=rect,
-        series=valid_series,
-    )
 
 
 def _draw_plot_legend(
@@ -427,9 +449,8 @@ def _draw_plot_legend(
     screen: PygameSurface,
     fonts: ViewerFonts,
     rect: PygameRect,
-    series: tuple[_PlotSeries, ...],
+    rows: tuple[tuple[_PlotLegendItem, ...], ...],
 ) -> None:
-    rows = _plot_legend_rows(fonts=fonts, rect_width=rect.width, series=series)
     if not rows:
         return
 
@@ -476,6 +497,21 @@ def _draw_plot_legend(
             screen.blit(label_surface, (label_x, row_y))
             item_x += item.width + LIVE_CHART_STYLE.legend_item_gap
         row_y += label_height + LIVE_CHART_STYLE.legend_row_gap
+
+
+def _plot_legend_height(
+    *,
+    fonts: ViewerFonts,
+    rows: tuple[tuple[_PlotLegendItem, ...], ...],
+) -> int:
+    if not rows:
+        return 0
+    label_height = fonts.small.render("Hg", True, PALETTE.text_primary).get_height()
+    return (
+        (2 * LIVE_CHART_STYLE.legend_padding)
+        + len(rows) * label_height
+        + max(0, len(rows) - 1) * LIVE_CHART_STYLE.legend_row_gap
+    )
 
 
 def _plot_legend_rows(
