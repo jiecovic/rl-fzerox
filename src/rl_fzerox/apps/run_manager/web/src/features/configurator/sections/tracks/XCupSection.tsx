@@ -2,6 +2,7 @@
 import { IntegerField } from "@/features/configurator/fields";
 import {
   courseCardClass,
+  courseSelectedBadgeClass,
   cupSwitchGroupClass,
 } from "@/features/configurator/sections/tracks/coursePoolStyle";
 import { X_CUP } from "@/features/configurator/sections/tracks/options";
@@ -80,6 +81,7 @@ export function XCupSection({
             className={courseCardClass(xCupEnabled, "cursor-default min-h-0")}
             data-cup={X_CUP.id}
           >
+            {xCupEnabled ? <span className={courseSelectedBadgeClass}>selected</span> : null}
             <div className="course-minimap">
               <TrackCupBanner cupId={X_CUP.id} label={X_CUP.label} large />
             </div>

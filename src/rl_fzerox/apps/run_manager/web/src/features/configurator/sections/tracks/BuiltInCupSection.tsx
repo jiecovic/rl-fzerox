@@ -2,6 +2,7 @@
 
 import {
   courseCardClass,
+  courseSelectedBadgeClass,
   cupSwitchGroupClass,
 } from "@/features/configurator/sections/tracks/coursePoolStyle";
 import { TrackCupBanner } from "@/features/configurator/sections/tracks/TrackCupBanner";
@@ -88,6 +89,7 @@ export function BuiltInCupSection({
                 type="button"
                 onClick={() => onToggleCourse(course.id)}
               >
+                {isSelected ? <span className={courseSelectedBadgeClass}>selected</span> : null}
                 <TrackMinimap courseId={course.id} cup={course.cup} />
                 <div className="grid gap-1 text-left">
                   <strong className="m-0 text-sm font-bold">{course.display_name}</strong>
