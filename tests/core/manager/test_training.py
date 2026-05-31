@@ -312,6 +312,7 @@ def test_manager_training_bridge_projects_boost_reward_energy_shaping(
     config = default_managed_run_config().model_copy(deep=True)
     config.reward.manual_boost_reward = 7.0
     config.reward.manual_boost_reward_energy_shaping = True
+    config.reward.manual_boost_reward_min_energy_fraction = 0.15
     config.reward.manual_boost_reward_min_energy_multiplier = 0.2
     config.reward.manual_boost_reward_full_energy_fraction = 0.75
     config.reward.manual_boost_reward_energy_curve = "smoothstep"
@@ -324,6 +325,7 @@ def test_manager_training_bridge_projects_boost_reward_energy_shaping(
 
     assert train_config.reward.manual_boost_reward == pytest.approx(7.0)
     assert train_config.reward.manual_boost_reward_energy_shaping is True
+    assert train_config.reward.manual_boost_reward_min_energy_fraction == pytest.approx(0.15)
     assert train_config.reward.manual_boost_reward_min_energy_multiplier == pytest.approx(0.2)
     assert train_config.reward.manual_boost_reward_full_energy_fraction == pytest.approx(0.75)
     assert train_config.reward.manual_boost_reward_energy_curve == "smoothstep"
@@ -774,7 +776,14 @@ def test_manager_training_bridge_preserves_tensorboard_offset_for_full_resume(
     assert train_config.train.explicit_run_dir == run_dir
     assert train_config.train.continue_run_dir == run_dir
     assert train_config.train.resume_run_dir == run_dir
-    assert train_config.train.resume_source_algorithm is None
+    assert train_config.train.resume_source_algorithm == train_config.train.algorithm
+    assert (
+        train_config.train.resume_source_auxiliary_state_enabled
+        == config.policy.auxiliary_state_enabled
+    )
+    assert train_config.train.resume_source_auxiliary_state_head_arch == (
+        config.policy.auxiliary_state_head_arch
+    )
     assert train_config.train.resume_mode == "full_model"
     assert train_config.train.tensorboard_step_offset == 816_040
 

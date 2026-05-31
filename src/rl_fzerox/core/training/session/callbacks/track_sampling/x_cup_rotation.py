@@ -45,6 +45,17 @@ class XCupRotationUpdate:
     train_config: TrainAppConfig
     replaced_course_key: str
     replacement_course_key: str
+    replacement_label: str
+    generated_course_slot: int | None
+    generated_course_generation: int | None
+    generated_entry_id: str | None
+    generated_course_id: str | None
+    generated_course_name: str | None
+    generated_course_hash: str | None
+    generated_course_seed: int | None
+    generated_baseline_state_path: str | None
+    generated_course_segment_count: int | None
+    generated_course_length: float | None
 
 
 class XCupRotationManager:
@@ -56,9 +67,11 @@ class XCupRotationManager:
         config: TrainAppConfig,
         run_paths: RunPaths,
         cache_root: Path | None = None,
+        persist_manifest_on_commit: bool = True,
     ) -> None:
         self._config = config
         self._run_paths = run_paths
+        self._persist_manifest_on_commit = persist_manifest_on_commit
         self._cache_root = (
             BASELINE_MATERIALIZER_SETTINGS.cache_root
             if cache_root is None
@@ -98,6 +111,11 @@ class XCupRotationManager:
         replacement_course_key = replacement_entries[0].course_id
         if replacement_course_key is None:
             return None
+        replacement_label = (
+            replacement_entries[0].course_name
+            or replacement_entries[0].display_name
+            or replacement_course_key
+        )
         next_track_sampling = track_sampling.model_copy(update={"entries": entries})
         next_env_config = env_config.model_copy(update={"track_sampling": next_track_sampling})
         next_train_config = self._config.model_copy(update={"env": next_env_config})
@@ -106,13 +124,31 @@ class XCupRotationManager:
             train_config=next_train_config,
             replaced_course_key=eligible.course_key,
             replacement_course_key=replacement_course_key,
+            replacement_label=replacement_label,
+            generated_course_slot=replacement_entries[0].generated_course_slot,
+            generated_course_generation=replacement_entries[0].generated_course_generation,
+            generated_entry_id=replacement_entries[0].id,
+            generated_course_id=replacement_entries[0].course_id,
+            generated_course_name=(
+                replacement_entries[0].course_name or replacement_entries[0].display_name
+            ),
+            generated_course_hash=replacement_entries[0].generated_course_hash,
+            generated_course_seed=replacement_entries[0].generated_course_seed,
+            generated_baseline_state_path=(
+                None
+                if replacement_entries[0].baseline_state_path is None
+                else str(replacement_entries[0].baseline_state_path)
+            ),
+            generated_course_segment_count=replacement_entries[0].generated_course_segment_count,
+            generated_course_length=replacement_entries[0].generated_course_length,
         )
 
     def commit(self, update: XCupRotationUpdate) -> None:
         """Persist one successful env replacement and prune inactive states."""
 
         self._config = update.train_config
-        save_train_run_config(config=update.train_config, run_dir=self._run_paths.run_dir)
+        if self._persist_manifest_on_commit:
+            save_train_run_config(config=update.train_config, run_dir=self._run_paths.run_dir)
         self._prune_inactive_x_cup_baselines(update.env_config.track_sampling)
 
     def _materialized_replacement_entries(
@@ -178,7 +214,7 @@ def _generated_x_cup_entry_groups(
             or entry.generated_course_slot is None
         ):
             continue
-        grouped.setdefault(entry.course_id, []).append(entry)
+        grouped.setdefault(_entry_runtime_course_key(entry), []).append(entry)
     return {
         course_key: tuple(group)
         for course_key, group in grouped.items()
@@ -192,19 +228,24 @@ def _first_eligible_course(
     groups: Mapping[str, Sequence[TrackSamplingEntryConfig]],
     rotation: XCupRotationConfig,
 ) -> TrackSamplingRuntimeEntry | None:
-    required_episodes = rotation.min_episodes + rotation.cooldown_episodes
     candidates = [
         entry
         for entry in entries
         if entry.course_key in groups
-        and entry.episode_count >= required_episodes
-        and entry.completed_frames >= rotation.min_completed_frames
-        and entry.ema_completion_fraction is not None
-        and entry.ema_completion_fraction >= rotation.completion_threshold
+        and entry.generation_episode_count >= rotation.min_episodes
+        and entry.generation_ema_completion_fraction is not None
+        and entry.generation_ema_completion_fraction >= rotation.completion_threshold
     ]
     if not candidates:
         return None
-    return sorted(candidates, key=lambda entry: (entry.course_key, entry.episode_count))[0]
+    return sorted(
+        candidates,
+        key=lambda entry: (entry.course_key, entry.generation_episode_count),
+    )[0]
+
+
+def _entry_runtime_course_key(entry: TrackSamplingEntryConfig) -> str:
+    return entry.runtime_course_key or entry.course_id or entry.id
 
 
 def _replacement_entry(

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,23 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class TrackSamplingRuntimePersistence:
+    """Load/save boundary for manager DB or standalone file-backed state."""
+
+    load: Callable[[], TrackSamplingRuntimeState | None]
+    save: Callable[[TrackSamplingRuntimeState], None]
+
+
+def file_track_sampling_runtime_persistence(path: Path) -> TrackSamplingRuntimePersistence:
+    """Return standalone file-backed persistence for non-manager runs."""
+
+    return TrackSamplingRuntimePersistence(
+        load=lambda: load_track_sampling_runtime_state(path),
+        save=lambda state: save_track_sampling_runtime_state(path, state),
+    )
+
+
 def save_track_sampling_runtime_state(
     path: Path,
     state: TrackSamplingRuntimeState,
@@ -24,6 +42,20 @@ def save_track_sampling_runtime_state(
 
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f".{path.stem}.{os.getpid()}.tmp{path.suffix}")
+    try:
+        tmp_path.write_text(
+            track_sampling_runtime_state_json(state),
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
+
+def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
+    """Serialize one sampler state snapshot for DB or file persistence."""
+
     data = {
         "version": 1,
         "sampling_mode": state.sampling_mode,
@@ -50,16 +82,26 @@ def save_track_sampling_runtime_state(
                 "success_sample_count": entry.success_sample_count,
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
+                "generation_episode_count": entry.generation_episode_count,
+                "generation_finished_episode_count": entry.generation_finished_episode_count,
+                "generation_success_sample_count": entry.generation_success_sample_count,
+                "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
+                "generated_course_slot": entry.generated_course_slot,
+                "generated_course_generation": entry.generated_course_generation,
+                "generated_replacement_count": entry.generated_replacement_count,
+                "generated_entry_id": entry.generated_entry_id,
+                "generated_course_id": entry.generated_course_id,
+                "generated_course_name": entry.generated_course_name,
+                "generated_course_hash": entry.generated_course_hash,
+                "generated_course_seed": entry.generated_course_seed,
+                "generated_baseline_state_path": entry.generated_baseline_state_path,
+                "generated_course_segment_count": entry.generated_course_segment_count,
+                "generated_course_length": entry.generated_course_length,
             }
             for entry in state.entries
         ],
     }
-    try:
-        tmp_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        os.replace(tmp_path, path)
-    finally:
-        if tmp_path.exists():
-            tmp_path.unlink()
+    return json.dumps(data, indent=2, sort_keys=True) + "\n"
 
 
 def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState | None:
@@ -67,7 +109,13 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
 
     if not path.is_file():
         return None
-    loaded = json.loads(path.read_text(encoding="utf-8"))
+    return load_track_sampling_runtime_state_json(path.read_text(encoding="utf-8"))
+
+
+def load_track_sampling_runtime_state_json(data: str) -> TrackSamplingRuntimeState | None:
+    """Load one persisted dynamic step-balanced sampler snapshot from JSON text."""
+
+    loaded = json.loads(data)
     if not isinstance(loaded, Mapping):
         return None
     sampling_mode = loaded.get("sampling_mode")
@@ -143,6 +191,42 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
         success_sample_count = _mapping_int(raw_entry, "success_sample_count")
         ema_episode_frames = _mapping_optional_float(raw_entry, "ema_episode_frames")
         ema_completion_fraction = _mapping_optional_float(raw_entry, "ema_completion_fraction")
+        generation_episode_count = _mapping_int(raw_entry, "generation_episode_count")
+        generation_finished_episode_count = _mapping_int(
+            raw_entry,
+            "generation_finished_episode_count",
+        )
+        generation_success_sample_count = _mapping_int(
+            raw_entry,
+            "generation_success_sample_count",
+        )
+        generation_ema_completion_fraction = _mapping_optional_float(
+            raw_entry,
+            "generation_ema_completion_fraction",
+        )
+        generated_course_slot = _mapping_optional_int(raw_entry, "generated_course_slot")
+        generated_course_generation = _mapping_optional_int(
+            raw_entry,
+            "generated_course_generation",
+        )
+        generated_replacement_count = _mapping_int(raw_entry, "generated_replacement_count")
+        generated_entry_id = _mapping_optional_str(raw_entry, "generated_entry_id")
+        generated_course_id = _mapping_optional_str(raw_entry, "generated_course_id")
+        generated_course_name = _mapping_optional_str(raw_entry, "generated_course_name")
+        generated_course_hash = _mapping_optional_str(raw_entry, "generated_course_hash")
+        generated_course_seed = _mapping_optional_int(raw_entry, "generated_course_seed")
+        generated_baseline_state_path = _mapping_optional_str(
+            raw_entry,
+            "generated_baseline_state_path",
+        )
+        generated_course_segment_count = _mapping_optional_int(
+            raw_entry,
+            "generated_course_segment_count",
+        )
+        generated_course_length = _mapping_optional_float(
+            raw_entry,
+            "generated_course_length",
+        )
         if (
             track_id is None
             or course_key is None
@@ -178,6 +262,64 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
                     if ema_completion_fraction is None
                     else max(0.0, min(1.0, ema_completion_fraction))
                 ),
+                generation_episode_count=(
+                    0 if generation_episode_count is None else max(0, generation_episode_count)
+                ),
+                generation_finished_episode_count=(
+                    0
+                    if generation_finished_episode_count is None
+                    else max(
+                        0,
+                        min(
+                            generation_finished_episode_count,
+                            0 if generation_episode_count is None else generation_episode_count,
+                        ),
+                    )
+                ),
+                generation_success_sample_count=(
+                    0
+                    if generation_success_sample_count is None
+                    else max(
+                        0,
+                        min(
+                            generation_success_sample_count,
+                            0 if generation_episode_count is None else generation_episode_count,
+                        ),
+                    )
+                ),
+                generation_ema_completion_fraction=(
+                    None
+                    if generation_ema_completion_fraction is None
+                    else max(0.0, min(1.0, generation_ema_completion_fraction))
+                ),
+                generated_course_slot=(
+                    None if generated_course_slot is None else max(0, generated_course_slot)
+                ),
+                generated_course_generation=(
+                    None
+                    if generated_course_generation is None
+                    else max(0, generated_course_generation)
+                ),
+                generated_replacement_count=_replacement_count(
+                    explicit_count=generated_replacement_count,
+                    generation=generated_course_generation,
+                ),
+                generated_entry_id=generated_entry_id,
+                generated_course_id=generated_course_id,
+                generated_course_name=generated_course_name,
+                generated_course_hash=generated_course_hash,
+                generated_course_seed=(
+                    None if generated_course_seed is None else max(0, generated_course_seed)
+                ),
+                generated_baseline_state_path=generated_baseline_state_path,
+                generated_course_segment_count=(
+                    None
+                    if generated_course_segment_count is None
+                    else max(0, generated_course_segment_count)
+                ),
+                generated_course_length=(
+                    None if generated_course_length is None else max(0.0, generated_course_length)
+                ),
             )
         )
     return entries
@@ -195,6 +337,20 @@ def _mapping_int(mapping: Mapping[str, Any], key: str) -> int | None:
     return int(value)
 
 
+def _mapping_optional_int(mapping: Mapping[str, Any], key: str) -> int | None:
+    value = mapping.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    return int(value)
+
+
+def _mapping_optional_str(mapping: Mapping[str, Any], key: str) -> str | None:
+    value = mapping.get(key)
+    return value if isinstance(value, str) and value else None
+
+
 def _mapping_float(mapping: Mapping[str, Any], key: str) -> float | None:
     value = mapping.get(key)
     if isinstance(value, bool) or not isinstance(value, int | float):
@@ -209,3 +365,11 @@ def _mapping_optional_float(mapping: Mapping[str, Any], key: str) -> float | Non
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
+
+
+def _replacement_count(*, explicit_count: int | None, generation: int | None) -> int:
+    if explicit_count is not None:
+        return max(0, explicit_count)
+    if generation is None:
+        return 0
+    return max(0, generation - 1)

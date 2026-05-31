@@ -21,6 +21,14 @@ export type TrackPoolCourseView = {
   episodeCount: number | null;
   episodeShare: number | null;
   finishedEpisodeCount: number | null;
+  generationEmaCompletionFraction: number | null;
+  generationEpisodeCount: number | null;
+  generationFinishedEpisodeCount: number | null;
+  generationSuccessRate: number | null;
+  generationSuccessSampleCount: number | null;
+  generatedCourseGeneration: number | null;
+  generatedReplacementCount: number;
+  generatedCourseSlot: number | null;
   id: string;
   label: string;
   stepShare: number | null;

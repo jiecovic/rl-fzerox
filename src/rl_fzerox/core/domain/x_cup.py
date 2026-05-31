@@ -7,6 +7,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
+from rl_fzerox.core.seed import derive_seed
+
 XCupGeneratedCourseKind: TypeAlias = Literal["x_cup"]
 XCupRaceMode: TypeAlias = Literal["gp_race"]
 
@@ -17,8 +19,7 @@ class XCupRotationDefaults:
 
     completion_threshold: float = 0.9
     min_episodes: int = 24
-    min_completed_frames: int = 10_000
-    cooldown_episodes: int = 0
+    ema_alpha: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,16 +103,23 @@ def generated_x_cup_course_identity(
     )
 
 
+def generated_x_cup_slot_key(slot: int) -> str:
+    """Return the stable runtime sampling key for one generated X Cup slot."""
+
+    return f"{X_CUP_COURSE.id_prefix}_slot_{int(slot) + 1}"
+
+
 def _x_cup_seed(master_seed: int, *, slot: int, generation: int) -> int:
-    payload = {
-        "generator_version": X_CUP_COURSE.generator_version,
-        "index": int(slot),
-        "master_seed": int(master_seed),
-        "source_course_index": X_CUP_COURSE.course_index,
-    }
-    if generation > 0:
-        payload["generation"] = int(generation)
-    return int.from_bytes(_sha256_json(payload)[:8], byteorder="big", signed=False)
+    seed = derive_seed(
+        master_seed,
+        X_CUP_COURSE.generator_version,
+        X_CUP_COURSE.course_index,
+        int(slot),
+        int(generation),
+    )
+    if seed is None:
+        raise ValueError("X Cup seed derivation requires a concrete master seed")
+    return seed
 
 
 def _x_cup_course_hash(*, seed: int, gp_difficulty: str) -> str:

@@ -8,7 +8,7 @@ import sqlite3
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -87,6 +87,13 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             entropy_loss REAL,
             value_loss REAL,
             policy_gradient_loss REAL,
+            FOREIGN KEY(run_id) REFERENCES runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS run_track_sampling_state (
+            run_id TEXT PRIMARY KEY,
+            state_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
             FOREIGN KEY(run_id) REFERENCES runs(id)
         );
 

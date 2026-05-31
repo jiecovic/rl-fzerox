@@ -22,10 +22,11 @@ from .checkpoints import CheckpointPolicy, resolve_checkpoint_policy
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
 from .track_sampling import (
     StepBalancedTrackSamplingController,
+    TrackSamplingRuntimePersistence,
     TrackSamplingRuntimeState,
     XCupRotationManager,
-    load_track_sampling_runtime_state,
-    save_track_sampling_runtime_state,
+    file_track_sampling_runtime_persistence,
+    replace_runtime_generation,
 )
 from .tuning import apply_stage_train_overrides, record_stage_train_overrides
 
@@ -38,6 +39,7 @@ def build_callbacks(
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
     initial_curriculum_stage_index: int | None = None,
+    track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None = None,
     extra_callbacks: Sequence[object] = (),
 ):
     """Construct the SB3 callback list used during training."""
@@ -233,22 +235,21 @@ def build_callbacks(
             env_config: EnvConfig,
             curriculum_config: CurriculumConfig,
             rotation_manager: XCupRotationManager | None,
+            runtime_persistence: TrackSamplingRuntimePersistence,
         ) -> None:
             super().__init__(verbose=0)
             self._controller = controller
             self._env_config = env_config
             self._curriculum_config = curriculum_config
             self._rotation_manager = rotation_manager
+            self._runtime_persistence = runtime_persistence
 
         def _on_training_start(self) -> None:
             self.training_env.env_method(
                 "set_track_sampling_weights",
                 self._controller.current_weights(),
             )
-            save_track_sampling_runtime_state(
-                run_paths.track_sampling_state_path,
-                self._controller.runtime_state(),
-            )
+            self._runtime_persistence.save(self._controller.runtime_state())
 
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
@@ -270,6 +271,21 @@ def build_callbacks(
                 )
             )
             if rotation_update is not None:
+                runtime_state = replace_runtime_generation(
+                    runtime_state,
+                    course_key=rotation_update.replaced_course_key,
+                    replacement_label=rotation_update.replacement_label,
+                    generated_course_slot=rotation_update.generated_course_slot,
+                    generated_course_generation=rotation_update.generated_course_generation,
+                    generated_entry_id=rotation_update.generated_entry_id,
+                    generated_course_id=rotation_update.generated_course_id,
+                    generated_course_name=rotation_update.generated_course_name,
+                    generated_course_hash=rotation_update.generated_course_hash,
+                    generated_course_seed=rotation_update.generated_course_seed,
+                    generated_baseline_state_path=rotation_update.generated_baseline_state_path,
+                    generated_course_segment_count=(rotation_update.generated_course_segment_count),
+                    generated_course_length=rotation_update.generated_course_length,
+                )
                 self._env_config = rotation_update.env_config
                 self.training_env.env_method(
                     "set_track_sampling_config",
@@ -286,10 +302,7 @@ def build_callbacks(
                     rotation_manager.commit(rotation_update)
             elif weights is not None:
                 self.training_env.env_method("set_track_sampling_weights", weights)
-            save_track_sampling_runtime_state(
-                run_paths.track_sampling_state_path,
-                self._controller.runtime_state(),
-            )
+            self._runtime_persistence.save(self._controller.runtime_state())
             return True
 
         def _on_rollout_end(self) -> None:
@@ -305,10 +318,15 @@ def build_callbacks(
         InfoLoggingCallback(),
     ]
     if env_config is not None:
+        runtime_persistence = track_sampling_runtime_persistence
+        if runtime_persistence is None:
+            runtime_persistence = file_track_sampling_runtime_persistence(
+                run_paths.track_sampling_state_path
+            )
         track_balance_controller = StepBalancedTrackSamplingController.from_configs(
             env_config=env_config,
             curriculum_config=curriculum_config,
-            restored_state=load_track_sampling_runtime_state(run_paths.track_sampling_state_path),
+            restored_state=runtime_persistence.load(),
         )
         if track_balance_controller is not None:
             callbacks.append(
@@ -319,7 +337,9 @@ def build_callbacks(
                     rotation_manager=_x_cup_rotation_manager(
                         train_app_config=train_app_config,
                         run_paths=run_paths,
+                        persist_manifest_on_commit=track_sampling_runtime_persistence is None,
                     ),
+                    runtime_persistence=runtime_persistence,
                 )
             )
     if curriculum_config.enabled:
@@ -354,10 +374,12 @@ def _x_cup_rotation_manager(
     *,
     train_app_config: TrainAppConfig | None,
     run_paths: RunPaths,
+    persist_manifest_on_commit: bool,
 ) -> XCupRotationManager | None:
     if train_app_config is None or not train_app_config.env.track_sampling.x_cup_rotation.enabled:
         return None
     return XCupRotationManager(
         config=train_app_config,
         run_paths=run_paths,
+        persist_manifest_on_commit=persist_manifest_on_commit,
     )

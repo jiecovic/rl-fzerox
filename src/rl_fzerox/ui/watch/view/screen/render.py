@@ -57,6 +57,7 @@ def draw_watch_frame(
     track_pool_records = _track_pool_records(
         config,
         draw_info,
+        active_track_sampling=snapshot.active_track_sampling,
         policy_stage_name=snapshot.policy_curriculum_stage,
     )
     _add_config_track_info(draw_info, config, track_pool_records=track_pool_records)
@@ -176,9 +177,10 @@ def _track_pool_records(
     config: WatchAppConfig,
     info: dict[str, object] | None = None,
     *,
+    active_track_sampling: TrackSamplingConfig | None = None,
     policy_stage_name: str | None = None,
 ) -> tuple[dict[str, object], ...]:
-    track_sampling = _active_track_sampling(
+    track_sampling = active_track_sampling or _active_track_sampling(
         config,
         info,
         policy_stage_name=policy_stage_name,
@@ -251,12 +253,16 @@ def _track_sampling_record(entry: TrackSamplingEntryConfig) -> dict[str, object]
         "track_baseline_state_path": str(entry.baseline_state_path),
         "track_sampling_weight": float(entry.weight),
     }
+    if entry.runtime_course_key is not None:
+        info["track_runtime_course_key"] = entry.runtime_course_key
+        info["track_reset_course_key"] = entry.runtime_course_key
     if entry.display_name is not None:
         info["track_display_name"] = entry.display_name
     if entry.course_ref is not None:
         info["track_course_ref"] = entry.course_ref
     if entry.course_id is not None:
         info["track_course_id"] = entry.course_id
+        info.setdefault("track_reset_course_key", entry.course_id)
     if entry.course_name is not None:
         info["track_course_name"] = entry.course_name
     if entry.course_index is not None:
@@ -284,6 +290,7 @@ def _track_config_record(track: TrackConfig) -> dict[str, object]:
         info["track_course_ref"] = track.course_ref
     if track.course_id is not None:
         info["track_course_id"] = track.course_id
+        info["track_reset_course_key"] = track.course_id
     if track.course_name is not None:
         info["track_course_name"] = track.course_name
     if track.course_index is not None:
@@ -311,6 +318,12 @@ def _track_record_matching_info(
     if isinstance(track_id, str) and track_id:
         for record in track_pool_records:
             if record.get("track_id") == track_id:
+                return record
+
+    reset_course_key = info.get("track_reset_course_key")
+    if isinstance(reset_course_key, str) and reset_course_key:
+        for record in track_pool_records:
+            if record.get("track_reset_course_key") == reset_course_key:
                 return record
 
     course_index = info.get("track_course_index", info.get("course_index"))

@@ -44,9 +44,9 @@ def maybe_resume_training_model(
         return model
 
     resume_run_dir = train_config.resume_run_dir.resolve()
-    source_run_config = load_train_run_config(resume_run_dir)
-    source_auxiliary_state_signature = _auxiliary_state_signature_from_config(
-        source_run_config.policy
+    source_auxiliary_state_signature = _source_auxiliary_state_signature(
+        train_config=train_config,
+        resume_run_dir=resume_run_dir,
     )
     if train_config.resume_source_algorithm is not None:
         source_algorithm = train_config.resume_source_algorithm
@@ -98,6 +98,19 @@ def maybe_resume_training_model(
         ),
     )
     return model
+
+
+def _source_auxiliary_state_signature(
+    *,
+    train_config: TrainConfig,
+    resume_run_dir: Path,
+) -> _AuxiliaryStateSignature:
+    if train_config.resume_source_auxiliary_state_enabled is not None:
+        if not train_config.resume_source_auxiliary_state_enabled:
+            return None
+        return tuple(int(value) for value in train_config.resume_source_auxiliary_state_head_arch)
+    source_run_config = load_train_run_config(resume_run_dir)
+    return _auxiliary_state_signature_from_config(source_run_config.policy)
 
 
 def _is_full_model_loader(value: object) -> TypeGuard[_FullModelLoader]:

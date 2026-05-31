@@ -359,7 +359,7 @@ describe("Configurator", () => {
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Auto regenerate" }));
     expect(screen.getByRole("textbox", { name: "Completion threshold" })).toHaveValue("0.9");
-    expect(screen.getByRole("textbox", { name: "Min frames" })).toHaveValue("10000");
+    expect(screen.getByRole("textbox", { name: "Min episodes" })).toHaveValue("24");
     expect(screen.getByRole("button", { name: "Mute City" })).toBeInTheDocument();
   });
 

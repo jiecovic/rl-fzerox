@@ -22,6 +22,12 @@ def has_failed_attempt(
 
 
 def record_course_id(record: RecordInfo) -> str | None:
+    reset_course_key = record.get("track_reset_course_key")
+    if isinstance(reset_course_key, str) and reset_course_key:
+        return reset_course_key
+    runtime_course_key = record.get("track_runtime_course_key")
+    if isinstance(runtime_course_key, str) and runtime_course_key:
+        return runtime_course_key
     course_id = record.get("track_course_id")
     if isinstance(course_id, str) and course_id:
         return course_id

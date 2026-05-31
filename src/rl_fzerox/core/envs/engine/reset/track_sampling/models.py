@@ -36,6 +36,7 @@ class SelectedTrack:
     display_name: str | None
     course_ref: str | None
     course_id: str | None
+    runtime_course_key: str | None
     course_name: str | None
     baseline_state_path: Path
     weight: float
@@ -73,6 +74,8 @@ class SelectedTrack:
             "track_display_name": self.display_name,
             "track_course_ref": self.course_ref,
             "track_course_id": self.course_id,
+            "track_runtime_course_key": self.runtime_course_key,
+            "track_reset_course_key": self.runtime_course_key or self.course_id,
             "track_course_name": self.course_name,
             "track_baseline_state_path": str(self.baseline_state_path),
             "track_sampling_weight": self.weight,

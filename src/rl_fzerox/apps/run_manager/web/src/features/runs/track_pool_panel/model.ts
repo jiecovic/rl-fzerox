@@ -61,7 +61,7 @@ export function buildTrackPoolView(
         !consumedRuntimeCourseKeys.has(entry.course_key),
     );
     if (xCupRuntimeEntries.length > 0) {
-      for (const entry of xCupRuntimeEntries) {
+      for (const entry of [...xCupRuntimeEntries].sort(compareXcupEntries)) {
         addCourseToCup(
           xCup,
           courseViewFromRuntime({
@@ -124,12 +124,17 @@ export function formatOptionalPercent(value: number | null) {
 
 export function successLabel(entry: TrackPoolCourseView) {
   const completionLabel = completionSummary(entry);
-  if ((entry.successSampleCount ?? 0) <= 0 || entry.successRate === null) {
-    return completionLabel === null
-      ? "Finish rate not tracked yet"
-      : `Finish rate not tracked yet · ${completionLabel}`;
+  const generationLabel = xCupGenerationSummary(entry);
+  const prefix = generationLabel === null ? "" : `${generationLabel} · `;
+  const successSampleCount = entry.successSampleCount ?? 0;
+  if (successSampleCount <= 0 || entry.successRate === null) {
+    return `${prefix}${generationLabel === null ? "" : "sampling: "}${
+      completionLabel === null
+        ? "Finish rate not tracked yet"
+        : `Finish rate not tracked yet · ${completionLabel}`
+    }`;
   }
-  return `${(entry.finishedEpisodeCount ?? 0).toLocaleString()} of ${(entry.successSampleCount ?? 0).toLocaleString()} finished · ${formatPercent(entry.successRate)} finish${
+  return `${prefix}${generationLabel === null ? "" : "sampling: "}${(entry.finishedEpisodeCount ?? 0).toLocaleString()} of ${successSampleCount.toLocaleString()} finished · ${formatPercent(entry.successRate)} finish${
     completionLabel === null ? "" : ` · ${completionLabel}`
   }`;
 }
@@ -146,6 +151,55 @@ export function completionSummary(entry: TrackPoolCourseView) {
     return null;
   }
   return `${formatPercent(entry.emaCompletionFraction)} comp`;
+}
+
+export function xCupRegenerationSummary(
+  entry: TrackPoolCourseView,
+  threshold: number | null,
+  minEpisodes: number | null,
+) {
+  if (!isGeneratedXcupEntry(entry)) {
+    return null;
+  }
+  const sampleCount = entry.generationEpisodeCount ?? 0;
+  const successSampleCount = entry.generationSuccessSampleCount ?? 0;
+  const parts: string[] = [];
+  parts.push(
+    minEpisodes === null
+      ? `${sampleCount.toLocaleString()} regen episodes`
+      : `${sampleCount.toLocaleString()} / ${minEpisodes.toLocaleString()} regen episodes`,
+  );
+  if (successSampleCount <= 0 || entry.generationSuccessRate === null) {
+    parts.push("finish n/a");
+  } else {
+    parts.push(
+      `${(entry.generationFinishedEpisodeCount ?? 0).toLocaleString()} of ${successSampleCount.toLocaleString()} finished`,
+      `${formatPercent(entry.generationSuccessRate)} finish`,
+    );
+  }
+  if (entry.generationEmaCompletionFraction !== null) {
+    const thresholdLabel = threshold === null ? "" : ` / ${formatPercent(threshold)} threshold`;
+    parts.push(
+      `${formatPercent(entry.generationEmaCompletionFraction)} regen comp${thresholdLabel}`,
+    );
+  } else if (threshold !== null) {
+    parts.push(`${formatPercent(threshold)} threshold`);
+  }
+  return parts.join(" · ");
+}
+
+export function xCupGenerationSummary(entry: TrackPoolCourseView) {
+  if (entry.generatedCourseSlot === null && entry.generatedCourseGeneration === null) {
+    return null;
+  }
+  const parts: string[] = [];
+  if (entry.generatedCourseSlot !== null) {
+    parts.push(`slot ${entry.generatedCourseSlot + 1}`);
+  }
+  if (entry.generatedReplacementCount > 0) {
+    parts.push(`replaced ${entry.generatedReplacementCount}x`);
+  }
+  return parts.join(" · ");
 }
 
 export function shortCupLabel(label: string) {
@@ -168,6 +222,10 @@ export function trackSamplingModeLabel(
     return "step-balanced";
   }
   return samplingMode.replaceAll("_", " ");
+}
+
+export function displaySuccessRate(entry: TrackPoolCourseView) {
+  return entry.successRate;
 }
 
 function usesDynamicTrackSampling(
@@ -208,6 +266,14 @@ function courseViewFromRuntime({
     episodeCount: runtimeEntry?.episode_count ?? null,
     episodeShare: runtimeEntry?.episode_share ?? null,
     finishedEpisodeCount: runtimeEntry?.finished_episode_count ?? null,
+    generationEmaCompletionFraction: runtimeEntry?.generation_ema_completion_fraction ?? null,
+    generationEpisodeCount: runtimeEntry?.generation_episode_count ?? null,
+    generationFinishedEpisodeCount: runtimeEntry?.generation_finished_episode_count ?? null,
+    generationSuccessRate: runtimeEntry?.generation_success_rate ?? null,
+    generationSuccessSampleCount: runtimeEntry?.generation_success_sample_count ?? null,
+    generatedCourseGeneration: runtimeEntry?.generated_course_generation ?? null,
+    generatedReplacementCount: runtimeEntry?.generated_replacement_count ?? 0,
+    generatedCourseSlot: runtimeEntry?.generated_course_slot ?? null,
     id,
     label,
     stepShare: runtimeEntry?.step_share ?? null,
@@ -244,4 +310,17 @@ function cupIndex(cupOrder: string[], cupId: string) {
   }
   const index = cupOrder.indexOf(cupId);
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+}
+
+function compareXcupEntries(left: TrackSamplingRuntimeEntry, right: TrackSamplingRuntimeEntry) {
+  const leftSlot = left.generated_course_slot ?? Number.MAX_SAFE_INTEGER;
+  const rightSlot = right.generated_course_slot ?? Number.MAX_SAFE_INTEGER;
+  if (leftSlot !== rightSlot) {
+    return leftSlot - rightSlot;
+  }
+  return left.label.localeCompare(right.label);
+}
+
+function isGeneratedXcupEntry(entry: TrackPoolCourseView) {
+  return entry.generatedCourseSlot !== null || entry.generatedCourseGeneration !== null;
 }

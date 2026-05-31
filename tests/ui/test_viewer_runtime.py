@@ -473,6 +473,70 @@ def test_config_track_info_uses_active_curriculum_track_pool(tmp_path: Path) -> 
     assert info["track_non_agg_best_time_ms"] == 73_000
 
 
+def test_track_sampling_records_prefer_refreshed_watch_snapshot_state(tmp_path: Path) -> None:
+    core_path = tmp_path / "core.so"
+    rom_path = tmp_path / "rom.n64"
+    old_baseline_path = tmp_path / "old.state"
+    new_baseline_path = tmp_path / "new.state"
+    core_path.touch()
+    rom_path.touch()
+    old_baseline_path.write_bytes(b"old")
+    new_baseline_path.write_bytes(b"new")
+    config = WatchAppConfig(
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="old",
+                        course_id="x_cup_old",
+                        runtime_course_key="x_cup_slot_1",
+                        baseline_state_path=old_baseline_path,
+                    ),
+                ),
+            )
+        ),
+    )
+    refreshed = TrackSamplingConfig(
+        enabled=True,
+        entries=(
+            TrackSamplingEntryConfig(
+                id="new",
+                course_id="x_cup_new",
+                runtime_course_key="x_cup_slot_1",
+                baseline_state_path=new_baseline_path,
+            ),
+        ),
+    )
+
+    records = _track_pool_records(config, active_track_sampling=refreshed)
+
+    assert records[0]["track_id"] == "new"
+    assert records[0]["track_course_id"] == "x_cup_new"
+    assert records[0]["track_reset_course_key"] == "x_cup_slot_1"
+
+
+def test_record_rows_click_stable_runtime_course_key() -> None:
+    section = track_record_sections(
+        current_info={},
+        track_pool_records=(
+            {
+                "track_id": "generated",
+                "track_course_id": "x_cup_generated",
+                "track_reset_course_key": "x_cup_slot_1",
+            },
+        ),
+        best_finish_ranks={},
+        best_finish_times={},
+        latest_finish_times={},
+        latest_finish_deltas_ms={},
+        failed_track_attempts=frozenset(),
+    )[0]
+
+    assert section.lines[0].click_course_id == "x_cup_slot_1"
+
+
 def test_persist_reload_error_writes_full_message_once(tmp_path: Path) -> None:
     runtime_dir = tmp_path / "watch" / "runtime"
     runtime_dir.mkdir(parents=True)

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import threading
 from datetime import UTC, datetime
@@ -14,6 +13,9 @@ from rl_fzerox.apps.run_manager.training_monitor import (
 )
 from rl_fzerox.core.manager import ManagerStore, default_manager_db_path
 from rl_fzerox.core.manager.models import ManagedRun
+from rl_fzerox.core.manager.projection.x_cup_runtime import (
+    restore_generated_x_cup_entries_from_state,
+)
 from rl_fzerox.core.manager.registry.runs.maintenance import RUN_WORKER_LEASE_POLICY
 from rl_fzerox.core.manager.training import (
     build_managed_fork_train_app_config,
@@ -22,6 +24,9 @@ from rl_fzerox.core.manager.training import (
 )
 from rl_fzerox.core.training.runner import run_training
 from rl_fzerox.core.training.runs import RUN_LAYOUT, RunPaths, continue_run_paths
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingRuntimePersistence,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +102,10 @@ def main(argv: list[str] | None = None) -> None:
         LOGGER.info("starting run_training for run_id=%s", run.id)
         run_training(
             train_config,
+            track_sampling_runtime_persistence=_track_sampling_runtime_persistence(
+                store=store,
+                run_id=run.id,
+            ),
             extra_callbacks=(
                 build_manager_training_callback(
                     store=store,
@@ -116,7 +125,6 @@ def main(argv: list[str] | None = None) -> None:
         LOGGER.info("run_training returned normally for run_id=%s", run.id)
     except RunControlSignal as signal:
         LOGGER.info("manager requested controlled %s for run_id=%s", signal.command, run.id)
-        _write_manager_snapshot(run)
         store.clear_run_command(run.id, command=signal.command)
         store.update_run_status(
             run_id=run.id,
@@ -127,7 +135,6 @@ def main(argv: list[str] | None = None) -> None:
         return
     except Exception as exc:
         LOGGER.exception("training failed for run_id=%s", run.id)
-        _write_manager_snapshot(run)
         store.update_run_status(
             run_id=run.id,
             status="failed",
@@ -136,7 +143,6 @@ def main(argv: list[str] | None = None) -> None:
         )
         raise
     else:
-        _write_manager_snapshot(run)
         LOGGER.info("marking run finished run_id=%s", run.id)
         store.update_run_status(
             run_id=run.id,
@@ -148,6 +154,21 @@ def main(argv: list[str] | None = None) -> None:
         if heartbeat_loop is not None:
             heartbeat_loop.stop()
         store.clear_run_worker(run.id, launch_token=args.launch_token)
+
+
+def _track_sampling_runtime_persistence(
+    *,
+    store: ManagerStore,
+    run_id: str,
+) -> TrackSamplingRuntimePersistence:
+    return TrackSamplingRuntimePersistence(
+        load=lambda: store.get_run_track_sampling_state(run_id),
+        save=lambda state: store.upsert_run_track_sampling_state(
+            run_id=run_id,
+            state=state,
+            updated_at=_now(),
+        ),
+    )
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -165,19 +186,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool):
     if resume:
-        return build_managed_resume_train_app_config(
+        config = build_managed_resume_train_app_config(
             run.config,
             run_id=run.id,
             run_dir=run.run_dir,
             tensorboard_step_offset=run.lineage_step_offset,
         )
+        return restore_generated_x_cup_entries_from_state(
+            config,
+            state=store.get_run_track_sampling_state(run.id),
+        )
     if run.source_snapshot_dir is not None and run.source_artifact is not None:
+        source_run = None if run.source_run_id is None else store.get_run(run.source_run_id)
         return build_managed_fork_train_app_config(
             run.config,
             run_id=run.id,
             run_dir=run.run_dir,
             source_run_dir=run.source_snapshot_dir,
             source_artifact=run.source_artifact,
+            source_config=None if source_run is None else source_run.config,
             tensorboard_step_offset=run.lineage_step_offset,
         )
     if run.source_run_id is not None and run.source_artifact is not None:
@@ -190,6 +217,7 @@ def _resolved_train_config(*, store: ManagerStore, run: ManagedRun, resume: bool
             run_dir=run.run_dir,
             source_run_dir=source_run.run_dir,
             source_artifact=run.source_artifact,
+            source_config=source_run.config,
             tensorboard_step_offset=run.lineage_step_offset,
         )
     return build_managed_train_app_config(
@@ -222,19 +250,6 @@ def _run_paths(run: ManagedRun, *, resume: bool) -> RunPaths:
         / RUN_LAYOUT.baselines_dirname
         / RUN_LAYOUT.baseline_filename,
     )
-
-
-def _write_manager_snapshot(run: object) -> None:
-    if not isinstance(run, ManagedRun):
-        raise TypeError(f"Expected ManagedRun, got {type(run).__name__}")
-    if not run.run_dir.is_dir():
-        LOGGER.info("run directory does not exist yet; skipping manager snapshot: %s", run.run_dir)
-        return
-    snapshot_path = run.run_dir / "manager_config.json"
-    with snapshot_path.open("w", encoding="utf-8") as handle:
-        json.dump(run.config.model_dump(mode="json"), handle, indent=2, sort_keys=True)
-        handle.write("\n")
-    LOGGER.info("wrote manager snapshot: %s", snapshot_path)
 
 
 def _mark_worker_boot_failure(

@@ -12,10 +12,6 @@ from rl_fzerox.apps.run_manager.tensorboard_metrics import (
     load_run_metric_samples_from_tensorboard,
 )
 from rl_fzerox.core.manager import ManagedRun, ManagerStore
-from rl_fzerox.core.training.runs import RUN_LAYOUT
-from rl_fzerox.core.training.session.callbacks.track_sampling import (
-    load_track_sampling_runtime_state,
-)
 
 
 def run_metrics_payload(
@@ -30,10 +26,8 @@ def run_metrics_payload(
 
 
 def run_track_sampling_payload(store: ManagerStore, run_id: str) -> dict[str, object]:
-    run = require_run(store, run_id)
-    state = load_track_sampling_runtime_state(
-        run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename,
-    )
+    require_run(store, run_id)
+    state = store.get_run_track_sampling_state(run_id)
     return {"state": None if state is None else track_sampling_state_payload(state)}
 
 
@@ -49,9 +43,7 @@ def reset_run_track_sampling_payload(store: ManagerStore, run_id: str) -> dict[s
 
 
 def _reset_track_sampling_state(store: ManagerStore, run: ManagedRun) -> None:
-    state_path = run.run_dir / RUN_LAYOUT.runtime_dirname / RUN_LAYOUT.track_sampling_state_filename
-    if state_path.exists():
-        state_path.unlink()
+    store.clear_run_track_sampling_state(run.id)
     store.append_run_event(
         run_id=run.id,
         kind="track_sampling_reset",

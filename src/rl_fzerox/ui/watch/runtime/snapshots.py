@@ -15,7 +15,7 @@ from rl_fzerox.core.policy.auxiliary_state import (
     AuxiliaryStateTargetName,
     auxiliary_state_target_values,
 )
-from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
@@ -92,6 +92,7 @@ def _publish_step_snapshots(
     manual_control_enabled: bool,
     policy_reload_error: str | None,
     cnn_activations: CnnActivationSnapshot | None,
+    active_track_sampling: TrackSamplingConfig | None,
     best_finish_position: int | None,
     best_finish_ranks: dict[str, int],
     best_finish_times: dict[str, int],
@@ -205,6 +206,7 @@ def _publish_step_snapshots(
                 manual_control_enabled=manual_control_enabled,
                 policy_reload_error=policy_reload_error,
                 cnn_activations=cnn_activations,
+                active_track_sampling=active_track_sampling,
                 best_finish_position=best_finish_position,
                 best_finish_ranks=best_finish_ranks,
                 best_finish_times=best_finish_times,
@@ -289,6 +291,7 @@ def _build_snapshot(
     latest_finish_times: dict[str, int],
     latest_finish_deltas_ms: dict[str, int],
     failed_track_attempts: frozenset[str],
+    active_track_sampling: TrackSamplingConfig | None = None,
     telemetry: FZeroXTelemetry | None = None,
     policy_auxiliary_state_predictions: dict[str, object] | None = None,
     policy_auxiliary_state_targets: dict[str, object] | None = None,
@@ -349,6 +352,7 @@ def _build_snapshot(
         failed_track_attempts=failed_track_attempts,
         continuous_air_brake_disabled=_continuous_air_brake_disabled(config, telemetry),
         telemetry_data=_telemetry_to_data(telemetry),
+        active_track_sampling=active_track_sampling,
         policy_auxiliary_state_predictions=(
             _policy_auxiliary_state_predictions(
                 policy_runner=policy_runner,

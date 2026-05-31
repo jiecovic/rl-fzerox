@@ -515,6 +515,55 @@ def test_sequential_track_sampling_can_jump_to_requested_course_for_watch(
     assert first_info["track_sampling_mode"] == "sequential"
 
 
+def test_sequential_track_sampling_can_jump_to_runtime_course_key_for_watch(
+    tmp_path: Path,
+) -> None:
+    baseline_paths = _write_track_baselines(tmp_path, ("jack", "x1", "x2"))
+    env = FZeroXEnv(
+        backend=SyntheticBackend(),
+        config=EnvConfig(
+            action_repeat=1,
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="step_balanced",
+                entries=(
+                    TrackSamplingEntryConfig(
+                        id="jack",
+                        course_id="mute_city",
+                        baseline_state_path=baseline_paths["jack"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="x1",
+                        course_id="x_cup_aaa111",
+                        runtime_course_key="x_cup_slot_1",
+                        baseline_state_path=baseline_paths["x1"],
+                        weight=1.0,
+                    ),
+                    TrackSamplingEntryConfig(
+                        id="x2",
+                        course_id="x_cup_bbb222",
+                        runtime_course_key="x_cup_slot_2",
+                        baseline_state_path=baseline_paths["x2"],
+                        weight=1.0,
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    env.set_sequential_track_sampling(True)
+    first_info = env.reset(seed=123)[1]
+    env.set_next_sequential_reset_course("x_cup_slot_2")
+    second_info = env.reset(seed=124)[1]
+    third_info = env.reset(seed=125)[1]
+
+    assert first_info["track_course_id"] == "mute_city"
+    assert second_info["track_course_id"] == "x_cup_bbb222"
+    assert second_info["track_reset_course_key"] == "x_cup_slot_2"
+    assert third_info["track_course_id"] == "mute_city"
+
+
 @pytest.mark.parametrize("sampling_mode", ("step_balanced", "adaptive_step_balanced"))
 def test_dynamic_track_sampling_accepts_runtime_weight_updates(
     tmp_path: Path,

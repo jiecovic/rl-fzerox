@@ -2,11 +2,14 @@
 import type { KeyboardEvent } from "react";
 import {
   completionSummary,
+  displaySuccessRate,
   formatOptionalPercent,
   formatPercent,
   shortCupLabel,
   successLabel,
   successSummary,
+  xCupGenerationSummary,
+  xCupRegenerationSummary,
 } from "@/features/runs/track_pool_panel/model";
 import type { TrackPoolCourseView, TrackPoolCupView } from "@/features/runs/track_pool_panel/types";
 import { cn } from "@/shared/ui/cn";
@@ -130,7 +133,15 @@ export function CupTabs({
   );
 }
 
-export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
+export function TrackPoolBody({
+  activeCup,
+  xCupRegenerationMinEpisodes,
+  xCupRegenerationThreshold,
+}: {
+  activeCup: TrackPoolCupView;
+  xCupRegenerationMinEpisodes: number | null;
+  xCupRegenerationThreshold: number | null;
+}) {
   return (
     <div className="px-3.5 py-3">
       <div className="mb-3 flex items-baseline justify-between gap-3 max-[760px]:grid">
@@ -165,7 +176,12 @@ export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
           style={{ ["--track-column-count" as string]: `${activeCup.entries.length}` }}
         >
           {activeCup.entries.map((entry) => (
-            <TrackPoolColumn entry={entry} key={entry.id} />
+            <TrackPoolColumn
+              entry={entry}
+              key={entry.id}
+              xCupRegenerationMinEpisodes={xCupRegenerationMinEpisodes}
+              xCupRegenerationThreshold={xCupRegenerationThreshold}
+            />
           ))}
         </div>
       </div>
@@ -173,8 +189,22 @@ export function TrackPoolBody({ activeCup }: { activeCup: TrackPoolCupView }) {
   );
 }
 
-function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
+function TrackPoolColumn({
+  entry,
+  xCupRegenerationMinEpisodes,
+  xCupRegenerationThreshold,
+}: {
+  entry: TrackPoolCourseView;
+  xCupRegenerationMinEpisodes: number | null;
+  xCupRegenerationThreshold: number | null;
+}) {
   const completion = completionSummary(entry);
+  const generation = xCupGenerationSummary(entry);
+  const regeneration = xCupRegenerationSummary(
+    entry,
+    xCupRegenerationThreshold,
+    xCupRegenerationMinEpisodes,
+  );
   return (
     <div className="grid min-w-0 gap-2">
       <div className="grid h-44 grid-cols-4 items-center gap-1.5">
@@ -186,7 +216,7 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
         <DistributionBar
           kind="success"
           label={successLabel(entry)}
-          value={entry.successRate ?? 0}
+          value={displaySuccessRate(entry) ?? 0}
         />
         <DistributionBar
           kind="episodes"
@@ -205,11 +235,17 @@ function TrackPoolColumn({ entry }: { entry: TrackPoolCourseView }) {
           {entry.label}
         </strong>
         <span className="text-[11px] tabular-nums text-app-muted [overflow-wrap:anywhere]">
+          {generation === null ? "" : `${generation} · sampling: `}
           {successSummary(entry)}
           {completion === null ? "" : ` · ${completion}`}
           {" · "}
           {(entry.completedEnvSteps ?? 0).toLocaleString()} steps
         </span>
+        {regeneration === null ? null : (
+          <span className="text-[11px] tabular-nums text-app-muted [overflow-wrap:anywhere]">
+            regen: {regeneration}
+          </span>
+        )}
       </div>
     </div>
   );

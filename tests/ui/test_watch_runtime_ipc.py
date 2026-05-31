@@ -111,6 +111,28 @@ def test_watch_sequential_course_ids_follow_unique_course_order() -> None:
     assert _watch_sequential_course_ids(entries) == ("mute_city", "silence")
 
 
+def test_watch_sequential_course_ids_use_stable_runtime_course_keys() -> None:
+    entries = (
+        TrackSamplingEntryConfig(
+            id="generated_old",
+            course_id="x_cup_aaa111",
+            runtime_course_key="x_cup_slot_1",
+        ),
+        TrackSamplingEntryConfig(
+            id="generated_new",
+            course_id="x_cup_bbb222",
+            runtime_course_key="x_cup_slot_1",
+        ),
+        TrackSamplingEntryConfig(
+            id="generated_other",
+            course_id="x_cup_ccc333",
+            runtime_course_key="x_cup_slot_2",
+        ),
+    )
+
+    assert _watch_sequential_course_ids(entries) == ("x_cup_slot_1", "x_cup_slot_2")
+
+
 def test_adjacent_watch_course_id_wraps_to_previous_course() -> None:
     ordered_course_ids = ("mute_city", "silence", "devils_forest")
 

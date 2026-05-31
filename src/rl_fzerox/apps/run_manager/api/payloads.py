@@ -136,7 +136,9 @@ def run_metric_payload(sample: ManagedRunMetricSample) -> dict[str, object]:
     }
 
 
-def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, object]:
+def track_sampling_state_payload(
+    state: TrackSamplingRuntimeState,
+) -> dict[str, object]:
     total_weight = sum(entry.current_weight for entry in state.entries)
     target_step_shares = _target_step_shares(state)
     total_episodes = sum(entry.episode_count for entry in state.entries)
@@ -173,6 +175,16 @@ def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, 
                     if entry.success_sample_count <= 0
                     else entry.finished_episode_count / entry.success_sample_count
                 ),
+                "generation_episode_count": entry.generation_episode_count,
+                "generation_finished_episode_count": entry.generation_finished_episode_count,
+                "generation_success_sample_count": entry.generation_success_sample_count,
+                "generation_success_rate": (
+                    None
+                    if entry.generation_success_sample_count <= 0
+                    else entry.generation_finished_episode_count
+                    / entry.generation_success_sample_count
+                ),
+                "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
                 "target_step_share": target_step_shares.get(entry.course_key, 0.0),
                 "completed_frames": entry.completed_frames,
                 "completed_env_steps": (
@@ -181,6 +193,9 @@ def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, 
                 "step_share": (0.0 if total_frames <= 0 else entry.completed_frames / total_frames),
                 "ema_episode_frames": entry.ema_episode_frames,
                 "ema_completion_fraction": entry.ema_completion_fraction,
+                "generated_course_slot": entry.generated_course_slot,
+                "generated_course_generation": entry.generated_course_generation,
+                "generated_replacement_count": entry.generated_replacement_count,
             }
             for entry in state.entries
         ],
