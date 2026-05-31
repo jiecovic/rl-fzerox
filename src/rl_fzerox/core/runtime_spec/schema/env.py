@@ -104,6 +104,10 @@ class RewardCourseOverrideConfig(BaseModel):
     airborne_landing_grace_frames: NonNegativeInt | None = None
     airborne_landing_min_peak_height: NonNegativeFloat | None = None
     manual_boost_reward: NonNegativeFloat | None = None
+    manual_boost_reward_energy_shaping: bool | None = None
+    manual_boost_reward_min_energy_multiplier: float | None = Field(default=None, ge=0.0, le=1.0)
+    manual_boost_reward_full_energy_fraction: float | None = Field(default=None, gt=0.0, le=1.0)
+    manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] | None = None
     boost_pad_reward: NonNegativeFloat | None = None
     boost_pad_reward_progress_window: PositiveFloat | None = None
     failure_penalty: float | None = None
@@ -173,6 +177,10 @@ class RewardConfig(BaseModel):
     airborne_landing_grace_frames: NonNegativeInt = 50
     airborne_landing_min_peak_height: NonNegativeFloat = 50.0
     manual_boost_reward: NonNegativeFloat = 0.0
+    manual_boost_reward_energy_shaping: bool = False
+    manual_boost_reward_min_energy_multiplier: float = Field(default=0.0, ge=0.0, le=1.0)
+    manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
+    manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
     boost_pad_reward: NonNegativeFloat = 0.0
     boost_pad_reward_progress_window: PositiveFloat = 1_000.0
     failure_penalty: float = -20.0

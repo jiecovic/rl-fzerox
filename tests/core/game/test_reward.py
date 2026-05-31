@@ -8,6 +8,7 @@ import pytest
 from fzerox_emulator import FZeroXTelemetry, StepStatus, StepSummary
 from rl_fzerox.core.envs.rewards import (
     CANONICAL_REWARD_NAME,
+    RewardActionContext,
     RewardMainTracker,
     RewardMainWeights,
     build_reward_tracker,
@@ -66,6 +67,10 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "energy_loss_penalty": -0.01,
         "energy_gain_reward": 0.01,
         "manual_boost_reward": 0.25,
+        "manual_boost_reward_energy_shaping": True,
+        "manual_boost_reward_min_energy_multiplier": 0.1,
+        "manual_boost_reward_full_energy_fraction": 0.8,
+        "manual_boost_reward_energy_curve": "smoothstep",
         "boost_pad_reward": 10.0,
         "boost_pad_reward_progress_window": 800.0,
         "energy_refill_progress_multiplier": 3.0,
@@ -1054,6 +1059,55 @@ def test_reward_main_gates_energy_gain_reward_on_progress() -> None:
         "frontier_progress": 1.0,
         "energy_gain": pytest.approx(0.5),
     }
+
+
+def test_reward_main_keeps_manual_boost_reward_constant_when_energy_shaping_is_off() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+            manual_boost_reward=8.0,
+            manual_boost_reward_energy_shaping=False,
+        )
+    )
+    tracker.reset(_telemetry(energy=178.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(energy=44.5),
+        RewardActionContext(boost_requested=True),
+    )
+
+    assert step.reward == pytest.approx(8.0)
+    assert step.breakdown == {"manual_boost": pytest.approx(8.0)}
+
+
+def test_reward_main_scales_manual_boost_reward_by_energy_fraction() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+            manual_boost_reward=8.0,
+            manual_boost_reward_energy_shaping=True,
+            manual_boost_reward_min_energy_multiplier=0.25,
+            manual_boost_reward_full_energy_fraction=1.0,
+            manual_boost_reward_energy_curve="linear",
+        )
+    )
+    tracker.reset(_telemetry(energy=178.0))
+
+    step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(energy=89.0),
+        RewardActionContext(boost_requested=True),
+    )
+
+    assert step.reward == pytest.approx(5.0)
+    assert step.breakdown == {"manual_boost": pytest.approx(5.0)}
 
 
 def test_reward_main_suppresses_refill_multiplier_at_full_energy() -> None:

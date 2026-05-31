@@ -2,12 +2,12 @@
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
 import { BooleanField, IntegerField, NumberField } from "@/features/configurator/fields";
 import {
-  type ProgressSpeedPreviewPoint,
   progressBucketRewardFromDensity,
   progressRewardDensityPerThousand,
   progressSpeedPreviewPoints,
   progressSummaryRows,
 } from "@/features/configurator/sections/reward/progressDerived";
+import { RewardCurvePreview } from "@/features/configurator/sections/reward/RewardCurvePreview";
 import type { RewardPanelProps } from "@/features/configurator/sections/reward/types";
 import {
   boundsDefaults,
@@ -160,7 +160,15 @@ export function TimeProgressPanels({
             onChange={(value) => updateReward({ progress_speed_curve_power: value })}
           />
         </div>
-        <ProgressSpeedPreview points={speedPreviewPoints} />
+        <RewardCurvePreview
+          points={speedPreviewPoints.map((point) => ({
+            label: point.label,
+            xValue: point.speedKph,
+            yValue: point.multiplier,
+          }))}
+          title="Speed multiplier preview"
+          xAxisLabel="speed (kph)"
+        />
         <table className="derived-table">
           <tbody>
             {progressRows.map((row) => (
@@ -235,181 +243,4 @@ export function TimeProgressPanels({
       </ConfigDisclosure>
     </>
   );
-}
-
-function ProgressSpeedPreview({ points }: { points: readonly ProgressSpeedPreviewPoint[] }) {
-  if (points.length === 0) {
-    return null;
-  }
-  const maxSpeed = Math.max(...points.map((point) => point.speedKph), 1);
-  const multipliers = points.map((point) => point.multiplier);
-  const minMultiplier = Math.min(...multipliers);
-  const maxMultiplier = Math.max(...multipliers);
-  const axisMinMultiplier = Math.min(minMultiplier, 0);
-  const axisMaxMultiplier = Math.max(maxMultiplier, 1);
-  const multiplierSpan = Math.max(axisMaxMultiplier - axisMinMultiplier, 1e-9);
-  const viewBox = {
-    height: 190,
-    width: 900,
-  };
-  const plot = {
-    bottom: 138,
-    left: 70,
-    right: 830,
-    top: 24,
-  };
-  const plotWidth = plot.right - plot.left;
-  const plotHeight = plot.bottom - plot.top;
-  const plottedPoints = points.map((point) => ({
-    ...point,
-    x: plot.left + (point.speedKph / maxSpeed) * plotWidth,
-    y: plot.bottom - ((point.multiplier - axisMinMultiplier) / multiplierSpan) * plotHeight,
-  }));
-  const svgPoints = plottedPoints
-    .map((point) => {
-      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
-    })
-    .join(" ");
-  const plottedTickPoints = plottedPoints.filter((point) => point.label !== undefined);
-  const yTickPoints = visibleYTickPoints(plottedTickPoints, {
-    maxMultiplier,
-    minMultiplier,
-  });
-
-  return (
-    <div className="progress-speed-preview">
-      <div className="progress-speed-preview__header">
-        <span>Speed multiplier preview</span>
-        <span>
-          {formatPreviewNumber(minMultiplier)}x - {formatPreviewNumber(maxMultiplier)}x
-        </span>
-      </div>
-      <svg aria-hidden="true" viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}>
-        {plottedTickPoints.map((point) => (
-          <g key={`guide-${point.speedKph}`}>
-            <line
-              className="progress-speed-preview__guide"
-              x1={point.x}
-              x2={point.x}
-              y1={point.y}
-              y2={plot.bottom}
-            />
-            <line
-              className="progress-speed-preview__guide"
-              x1={plot.left}
-              x2={point.x}
-              y1={point.y}
-              y2={point.y}
-            />
-          </g>
-        ))}
-        <line x1={plot.left} x2={plot.right} y1={plot.bottom} y2={plot.bottom} />
-        <line x1={plot.left} x2={plot.left} y1={plot.top} y2={plot.bottom} />
-        {yTickPoints.map((point) => (
-          <g key={`multiplier-${point.multiplier}`}>
-            <line
-              className="progress-speed-preview__tick"
-              x1={plot.left - 7}
-              x2={plot.left}
-              y1={point.y}
-              y2={point.y}
-            />
-            <text textAnchor="end" x={plot.left - 12} y={point.y + 3}>
-              {formatPreviewNumber(point.multiplier)}x
-            </text>
-          </g>
-        ))}
-        {plottedTickPoints.map((point, index) => (
-          <g key={`tick-${point.speedKph}`}>
-            <line
-              className="progress-speed-preview__tick"
-              x1={point.x}
-              x2={point.x}
-              y1={plot.bottom}
-              y2={plot.bottom + 6}
-            />
-            <text
-              textAnchor={axisTickAnchor(index, plottedTickPoints.length)}
-              x={point.x}
-              y={plot.bottom + 28}
-            >
-              {point.label}
-            </text>
-          </g>
-        ))}
-        <text
-          className="progress-speed-preview__axis-label"
-          textAnchor="middle"
-          x={(plot.left + plot.right) / 2}
-          y={viewBox.height - 8}
-        >
-          speed (kph)
-        </text>
-        <polyline points={svgPoints} />
-        {plottedTickPoints.map((point) => (
-          <circle key={`${point.speedKph}-${point.multiplier}`} cx={point.x} cy={point.y} r="3" />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-interface PlottedProgressSpeedPreviewPoint extends ProgressSpeedPreviewPoint {
-  x: number;
-  y: number;
-}
-
-function visibleYTickPoints(
-  points: readonly PlottedProgressSpeedPreviewPoint[],
-  limits: { maxMultiplier: number; minMultiplier: number },
-) {
-  const minSpacing = 15;
-  const uniquePoints = points.filter((point, index, values) => {
-    return (
-      values.findIndex((otherPoint) => {
-        return Math.abs(otherPoint.multiplier - point.multiplier) < 1e-9;
-      }) === index
-    );
-  });
-  const selectedPoints: PlottedProgressSpeedPreviewPoint[] = [];
-  for (const point of [...uniquePoints].sort((left, right) => {
-    return yTickPriority(left, limits) - yTickPriority(right, limits);
-  })) {
-    if (
-      selectedPoints.every((selectedPoint) => Math.abs(selectedPoint.y - point.y) >= minSpacing)
-    ) {
-      selectedPoints.push(point);
-    }
-  }
-  return selectedPoints.sort((left, right) => left.y - right.y);
-}
-
-function yTickPriority(
-  point: PlottedProgressSpeedPreviewPoint,
-  limits: { maxMultiplier: number; minMultiplier: number },
-) {
-  if (
-    Math.abs(point.multiplier - limits.minMultiplier) < 1e-9 ||
-    Math.abs(point.multiplier - limits.maxMultiplier) < 1e-9
-  ) {
-    return 0;
-  }
-  if (Math.abs(point.multiplier - 1) < 1e-9) {
-    return 1;
-  }
-  return 2;
-}
-
-function axisTickAnchor(index: number, count: number) {
-  if (index === 0) {
-    return "start";
-  }
-  if (index === count - 1) {
-    return "end";
-  }
-  return "middle";
-}
-
-function formatPreviewNumber(value: number) {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
