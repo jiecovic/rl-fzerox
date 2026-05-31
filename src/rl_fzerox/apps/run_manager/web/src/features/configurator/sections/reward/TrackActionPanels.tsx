@@ -177,8 +177,18 @@ export function TrackActionPanels({
                       }
                     />
                     <NumberField
-                      help="Energy fraction where boost request reward reaches the full configured value."
-                      label="Full reward energy fraction"
+                      help="Energy fraction at and below which boost request reward stays at the minimum multiplier."
+                      label="Unsafe energy below"
+                      resetValue={defaultConfig.reward.manual_boost_reward_min_energy_fraction}
+                      step="0.05"
+                      value={config.reward.manual_boost_reward_min_energy_fraction}
+                      onChange={(value) =>
+                        updateReward({ manual_boost_reward_min_energy_fraction: value })
+                      }
+                    />
+                    <NumberField
+                      help="Energy fraction at and above which boost request reward reaches the full configured value."
+                      label="Full reward above"
                       resetValue={defaultConfig.reward.manual_boost_reward_full_energy_fraction}
                       step="0.05"
                       value={config.reward.manual_boost_reward_full_energy_fraction}
@@ -187,7 +197,7 @@ export function TrackActionPanels({
                       }
                     />
                     <SelectField
-                      help="Curve used between zero energy and the full-reward energy point."
+                      help="Curve used only between the unsafe and full-reward energy thresholds."
                       label="Energy reward curve"
                       optionLabels={{ linear: "Linear", smoothstep: "Smoothstep" }}
                       options={["linear", "smoothstep"]}

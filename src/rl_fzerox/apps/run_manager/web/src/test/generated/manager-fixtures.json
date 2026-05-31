@@ -1423,6 +1423,7 @@
       "manual_boost_reward_energy_curve": "linear",
       "manual_boost_reward_energy_shaping": false,
       "manual_boost_reward_full_energy_fraction": 1.0,
+      "manual_boost_reward_min_energy_fraction": 0.0,
       "manual_boost_reward_min_energy_multiplier": 0.0,
       "outside_track_recovery_airborne_grace_frames": 30,
       "outside_track_recovery_reward": 0.0,
@@ -1485,9 +1486,8 @@
       "step_balance_update_episodes": 5,
       "x_cup_auto_regeneration": {
         "completion_threshold": 0.9,
-        "cooldown_episodes": 0,
+        "ema_alpha": 0.3,
         "enabled": false,
-        "min_completed_frames": 10000,
         "min_episodes": 24
       },
       "x_cup_course_count": 6

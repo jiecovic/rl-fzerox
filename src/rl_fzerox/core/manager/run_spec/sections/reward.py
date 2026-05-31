@@ -52,6 +52,7 @@ class ManagedRewardConfig(BaseModel):
     air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     manual_boost_reward: NonNegativeFloat = 0.01
     manual_boost_reward_energy_shaping: bool = False
+    manual_boost_reward_min_energy_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
     manual_boost_reward_min_energy_multiplier: float = Field(default=0.0, ge=0.0, le=1.0)
     manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
@@ -86,5 +87,12 @@ class ManagedRewardConfig(BaseModel):
         if self.position_progress_min_multiplier > self.position_progress_max_multiplier:
             raise ValueError(
                 "position_progress_min_multiplier must be <= position_progress_max_multiplier"
+            )
+        if self.manual_boost_reward_min_energy_fraction >= (
+            self.manual_boost_reward_full_energy_fraction
+        ):
+            raise ValueError(
+                "manual_boost_reward_min_energy_fraction must be less than "
+                "manual_boost_reward_full_energy_fraction"
             )
         return self

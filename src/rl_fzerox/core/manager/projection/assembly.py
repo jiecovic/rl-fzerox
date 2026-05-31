@@ -107,6 +107,7 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "air_brake_request_penalty": reward.air_brake_request_penalty,
         "manual_boost_reward": reward.manual_boost_reward,
         "manual_boost_reward_energy_shaping": reward.manual_boost_reward_energy_shaping,
+        "manual_boost_reward_min_energy_fraction": (reward.manual_boost_reward_min_energy_fraction),
         "manual_boost_reward_min_energy_multiplier": (
             reward.manual_boost_reward_min_energy_multiplier
         ),

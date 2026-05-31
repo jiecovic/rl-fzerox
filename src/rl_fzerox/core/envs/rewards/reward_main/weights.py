@@ -34,6 +34,7 @@ class RewardMainWeights:
     energy_gain_reward: float = 0.01
     manual_boost_reward: float = 0.01
     manual_boost_reward_energy_shaping: bool = False
+    manual_boost_reward_min_energy_fraction: float = 0.0
     manual_boost_reward_min_energy_multiplier: float = 0.0
     manual_boost_reward_full_energy_fraction: float = 1.0
     manual_boost_reward_energy_curve: str = "linear"
@@ -68,7 +69,16 @@ class RewardMainWeights:
             )
         if not 0.0 <= self.manual_boost_reward_min_energy_multiplier <= 1.0:
             raise ValueError("manual_boost_reward_min_energy_multiplier must be in [0, 1]")
+        if not 0.0 <= self.manual_boost_reward_min_energy_fraction < 1.0:
+            raise ValueError("manual_boost_reward_min_energy_fraction must be in [0, 1)")
         if not 0.0 < self.manual_boost_reward_full_energy_fraction <= 1.0:
             raise ValueError("manual_boost_reward_full_energy_fraction must be in (0, 1]")
+        if self.manual_boost_reward_min_energy_fraction >= (
+            self.manual_boost_reward_full_energy_fraction
+        ):
+            raise ValueError(
+                "manual_boost_reward_min_energy_fraction must be less than "
+                "manual_boost_reward_full_energy_fraction"
+            )
         if self.manual_boost_reward_energy_curve not in {"linear", "smoothstep"}:
             raise ValueError("manual_boost_reward_energy_curve must be linear or smoothstep")
