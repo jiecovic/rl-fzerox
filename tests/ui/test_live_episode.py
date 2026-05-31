@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import pytest
 
 from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
+from rl_fzerox.ui.watch.view.panels.visuals.live import _plot_legend_rows, _PlotSeries
+from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 
 
 @dataclass(frozen=True)
@@ -15,6 +17,43 @@ class _Snapshot:
     info: dict[str, object]
     episode_reward: float
     telemetry_data: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class _TextSurface:
+    width: int
+    height: int = 10
+
+    def get_width(self) -> int:
+        return self.width
+
+    def get_height(self) -> int:
+        return self.height
+
+
+class _RenderFont:
+    def render(
+        self,
+        text: str,
+        antialias: bool,
+        color: tuple[int, int, int],
+    ) -> _TextSurface:
+        _ = (antialias, color)
+        return _TextSurface(width=len(text) * 7)
+
+
+@dataclass(frozen=True)
+class _Fonts:
+    font: _RenderFont
+
+    def viewer_fonts(self) -> ViewerFonts:
+        return ViewerFonts(
+            title=self.font,
+            section=self.font,
+            record_header=self.font,
+            body=self.font,
+            small=self.font,
+        )
 
 
 def test_live_episode_tracker_uses_decision_frames_only() -> None:
@@ -244,3 +283,17 @@ def test_live_episode_tracker_reports_step_reward() -> None:
     assert snapshot is not None
     assert snapshot.env_steps == (2, 6)
     assert snapshot.step_rewards == (0.25, 0.75)
+
+
+def test_plot_legend_rows_include_only_labeled_series() -> None:
+    rows = _plot_legend_rows(
+        fonts=_Fonts(font=_RenderFont()).viewer_fonts(),
+        rect_width=220,
+        series=(
+            _PlotSeries(y_values=(1.0,), color=(1, 2, 3), label="speed"),
+            _PlotSeries(y_values=(1.0,), color=(4, 5, 6)),
+            _PlotSeries(y_values=(1.0,), color=(7, 8, 9), label="total"),
+        ),
+    )
+
+    assert tuple(item.label for row in rows for item in row) == ("speed", "total")
