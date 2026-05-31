@@ -48,6 +48,15 @@ class TrainingAlgorithmRegistry:
         )
 
     @property
+    def hybrid(self) -> frozenset[TrainAlgorithmName]:
+        return frozenset(
+            (
+                self.maskable_hybrid_action_ppo,
+                self.maskable_hybrid_recurrent_ppo,
+            )
+        )
+
+    @property
     def sb3x(self) -> frozenset[TrainAlgorithmName]:
         return frozenset(
             (

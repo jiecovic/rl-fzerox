@@ -209,6 +209,7 @@ def _sync_loaded_ppo_training_config(model: object, *, train_config: TrainConfig
     _set_attr_if_present(model, "gamma", train_config.gamma)
     _set_attr_if_present(model, "gae_lambda", train_config.gae_lambda)
     _set_attr_if_present(model, "ent_coef", float(train_config.ent_coef))
+    _set_attr_if_present(model, "entropy_group_weights", dict(train_config.entropy_group_weights))
     _set_attr_if_present(model, "vf_coef", train_config.vf_coef)
     _set_attr_if_present(model, "max_grad_norm", train_config.max_grad_norm)
     _set_attr_if_present(model, "clip_range", FloatSchedule(train_config.clip_range))

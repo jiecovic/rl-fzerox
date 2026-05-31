@@ -14,3 +14,4 @@ export type AuxiliaryBranchesDisclosureProps = Omit<
 export type AuxiliaryActionConfig = ManagedRunConfig["action"];
 
 export type UpdateAction = ActionUpdateContext["updateAction"];
+export type UpdateTrain = ActionUpdateContext["updateTrain"];

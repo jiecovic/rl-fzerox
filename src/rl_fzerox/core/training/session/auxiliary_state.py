@@ -11,19 +11,31 @@ from rl_fzerox.core.policy.auxiliary_state.observations import (
     mapping_with_auxiliary_state_targets,
 )
 from rl_fzerox.core.policy.auxiliary_state.targets import auxiliary_state_target_vector_space
-from rl_fzerox.core.runtime_spec.schema import PolicyConfig
+from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
 
 
 def maybe_wrap_training_auxiliary_state_observation(
     env: gym.Env,
     *,
     policy_config: PolicyConfig,
+    train_config: TrainConfig | None = None,
 ) -> gym.Env:
-    """Expose hidden aux targets in dict observations when the head bank is enabled."""
+    """Expose hidden aux targets for policy-side losses that need state labels."""
 
-    if not policy_config.auxiliary_state.enabled:
+    resolved_train_config = train_config or TrainConfig()
+    if not _requires_auxiliary_state_targets(policy_config, resolved_train_config):
         return env
     return AuxiliaryStateObservationWrapper(env)
+
+
+def _requires_auxiliary_state_targets(
+    policy_config: PolicyConfig,
+    train_config: TrainConfig,
+) -> bool:
+    return (
+        policy_config.auxiliary_state.enabled
+        or train_config.actor_regularization.requires_auxiliary_targets()
+    )
 
 
 class AuxiliaryStateObservationWrapper(gym.Wrapper):

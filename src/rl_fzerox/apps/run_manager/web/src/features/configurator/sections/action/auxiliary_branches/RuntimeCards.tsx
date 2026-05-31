@@ -2,6 +2,7 @@
 import {
   FieldLabel,
   IntegerField,
+  NumberField,
   OptionalNumberField,
   RangeIntegerField,
   RangeNumberField,
@@ -10,6 +11,7 @@ import {
 import type {
   AuxiliaryActionConfig,
   UpdateAction,
+  UpdateTrain,
 } from "@/features/configurator/sections/action/auxiliary_branches/types";
 import {
   airBrakeModeDescription,
@@ -22,17 +24,25 @@ interface RuntimeCardsProps {
   action: AuxiliaryActionConfig;
   checkpointLocked: boolean;
   defaultAction: AuxiliaryActionConfig;
+  defaultTrain: ManagedRunConfig["train"];
   metadata: ConfigMetadata;
+  train: ManagedRunConfig["train"];
   updateAction: UpdateAction;
+  updateTrain: UpdateTrain;
 }
 
 export function RuntimeCards({
   action,
   checkpointLocked,
   defaultAction,
+  defaultTrain,
   metadata,
+  train,
   updateAction,
+  updateTrain,
 }: RuntimeCardsProps) {
+  const groundedPitchLossWeight = train.actor_regularization.grounded_pitch_neutral_loss_weight;
+
   return (
     <div className="action-behavior-grid">
       <section className="action-runtime-card">
@@ -377,10 +387,73 @@ export function RuntimeCards({
                 }
               />
             ) : (
-              <p className="action-note">
-                Continuous pitch maps the vertical stick axis directly, matching continuous steering
-                semantics.
-              </p>
+              <>
+                <p className="action-note">
+                  Continuous pitch maps the vertical stick axis directly, matching continuous
+                  steering semantics.
+                </p>
+                <div className="action-runtime-two-col">
+                  <div className="field-shell">
+                    <FieldLabel
+                      help="Add a policy-side loss that pulls continuous pitch toward neutral while the vehicle is grounded."
+                      label="Grounded neutral loss"
+                      onReset={() =>
+                        updateTrain({
+                          actor_regularization: {
+                            ...defaultTrain.actor_regularization,
+                          },
+                        })
+                      }
+                    />
+                    <SegmentedChoiceStrip
+                      ariaLabel="Grounded pitch neutral loss"
+                      options={[
+                        {
+                          active: groundedPitchLossWeight <= 0,
+                          key: "off",
+                          label: "Off",
+                          onClick: () =>
+                            updateTrain({
+                              actor_regularization: {
+                                grounded_pitch_neutral_loss_weight: 0,
+                              },
+                            }),
+                        },
+                        {
+                          active: groundedPitchLossWeight > 0,
+                          key: "on",
+                          label: "On",
+                          onClick: () =>
+                            updateTrain({
+                              actor_regularization: {
+                                grounded_pitch_neutral_loss_weight:
+                                  groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0.01,
+                              },
+                            }),
+                        },
+                      ]}
+                    />
+                  </div>
+                  {groundedPitchLossWeight > 0 ? (
+                    <NumberField
+                      help="Coefficient for squared continuous pitch mean while grounded. It affects the actor loss only and does not mask the action."
+                      label="Loss weight"
+                      resetValue={
+                        defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight
+                      }
+                      step="0.001"
+                      value={groundedPitchLossWeight}
+                      onChange={(value) =>
+                        updateTrain({
+                          actor_regularization: {
+                            grounded_pitch_neutral_loss_weight: Math.max(0, value),
+                          },
+                        })
+                      }
+                    />
+                  ) : null}
+                </div>
+              </>
             )}
           </fieldset>
         </fieldset>

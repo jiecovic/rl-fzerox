@@ -61,6 +61,7 @@ from rl_fzerox.core.runtime_spec.schema.tracks import (
 )
 from rl_fzerox.core.runtime_spec.schema.training import (
     StateFeatureDropoutGroupConfig,
+    TrainActorRegularizationConfig,
     TrainConfig,
 )
 
@@ -96,6 +97,7 @@ __all__ = [
     "TrackSamplingConfig",
     "TrackSamplingEntryConfig",
     "TrackSamplingMode",
+    "TrainActorRegularizationConfig",
     "TrainAppConfig",
     "TrainConfig",
     "WatchAppConfig",

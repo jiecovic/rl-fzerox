@@ -103,6 +103,10 @@ const trainConfigSchema = z.object({
   clip_range: z.number().positive(),
   clip_range_vf: z.number().positive().nullable(),
   ent_coef: z.number().nonnegative(),
+  entropy_group_weights: z.record(z.string(), z.number().nonnegative()),
+  actor_regularization: z.object({
+    grounded_pitch_neutral_loss_weight: z.number().nonnegative(),
+  }),
   vf_coef: z.number().positive(),
   max_grad_norm: z.number().positive(),
   normalize_advantage: z.boolean(),

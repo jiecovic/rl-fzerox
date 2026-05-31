@@ -99,6 +99,7 @@ def _make_env_factory(
         env = maybe_wrap_training_auxiliary_state_observation(
             env,
             policy_config=config.policy,
+            train_config=config.train,
         )
         env = maybe_wrap_training_observation_augmentation(
             env,

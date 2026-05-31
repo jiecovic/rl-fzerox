@@ -4,7 +4,8 @@ from __future__ import annotations
 import torch as th
 from stable_baselines3.common.vec_env import VecEnv
 
-from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.core.domain.training_algorithms import TRAINING_ALGORITHMS
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, PolicyConfig, TrainConfig
 from rl_fzerox.core.training.session.model.action_bias import apply_initial_action_biases
 from rl_fzerox.core.training.session.model.algorithms import (
     resolve_effective_training_algorithm,
@@ -26,6 +27,7 @@ def build_training_model(
     train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
+    env_config: EnvConfig | None = None,
     tensorboard_log: str | None,
 ):
     """Construct the configured SB3 model for the current run."""
@@ -37,6 +39,7 @@ def build_training_model(
         train_env=train_env,
         train_config=train_config,
         policy_config=policy_config,
+        env_config=env_config or EnvConfig(),
         tensorboard_log=tensorboard_log,
         effective_algorithm=effective_algorithm,
     )
@@ -47,6 +50,7 @@ def build_ppo_model(
     train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
+    env_config: EnvConfig | None = None,
     tensorboard_log: str | None,
 ):
     """Construct the configured PPO-family model for the current run."""
@@ -58,6 +62,7 @@ def build_ppo_model(
         train_env=train_env,
         train_config=train_config,
         policy_config=policy_config,
+        env_config=env_config or EnvConfig(),
         tensorboard_log=tensorboard_log,
         effective_algorithm=effective_algorithm,
     )
@@ -68,6 +73,7 @@ def _build_ppo_family_model(
     train_env: VecEnv,
     train_config: TrainConfig,
     policy_config: PolicyConfig,
+    env_config: EnvConfig,
     tensorboard_log: str | None,
     effective_algorithm: str,
 ):
@@ -94,11 +100,14 @@ def _build_ppo_family_model(
         train_env=train_env,
         effective_algorithm=effective_algorithm,
         policy_config=policy_config,
+        train_config=train_config,
         recurrent_enabled=recurrent_enabled,
     )
     policy_kwargs = build_policy_kwargs(
         train_env=train_env,
         policy_config=policy_config,
+        train_config=train_config,
+        env_config=env_config,
         value_head_key="vf",
     )
     if recurrent_enabled:
@@ -111,28 +120,32 @@ def _build_ppo_family_model(
             }
         )
 
-    model = algorithm_class(
-        policy=policy_entry,
-        env=train_env,
-        learning_rate=train_config.learning_rate,
-        n_steps=train_config.n_steps,
-        n_epochs=train_config.n_epochs,
-        batch_size=train_config.batch_size,
-        gamma=train_config.gamma,
-        gae_lambda=train_config.gae_lambda,
-        clip_range=train_config.clip_range,
-        clip_range_vf=train_config.clip_range_vf,
-        normalize_advantage=train_config.normalize_advantage,
-        ent_coef=_ppo_ent_coef(train_config),
-        vf_coef=train_config.vf_coef,
-        max_grad_norm=train_config.max_grad_norm,
-        target_kl=train_config.target_kl,
-        stats_window_size=train_config.stats_window_size,
-        policy_kwargs=policy_kwargs,
-        tensorboard_log=tensorboard_log,
-        verbose=train_config.verbose,
-        device=train_config.device,
-    )
+    model_kwargs: dict[str, object] = {
+        "policy": policy_entry,
+        "env": train_env,
+        "learning_rate": train_config.learning_rate,
+        "n_steps": train_config.n_steps,
+        "n_epochs": train_config.n_epochs,
+        "batch_size": train_config.batch_size,
+        "gamma": train_config.gamma,
+        "gae_lambda": train_config.gae_lambda,
+        "clip_range": train_config.clip_range,
+        "clip_range_vf": train_config.clip_range_vf,
+        "normalize_advantage": train_config.normalize_advantage,
+        "ent_coef": _ppo_ent_coef(train_config),
+        "vf_coef": train_config.vf_coef,
+        "max_grad_norm": train_config.max_grad_norm,
+        "target_kl": train_config.target_kl,
+        "stats_window_size": train_config.stats_window_size,
+        "policy_kwargs": policy_kwargs,
+        "tensorboard_log": tensorboard_log,
+        "verbose": train_config.verbose,
+        "device": train_config.device,
+    }
+    if effective_algorithm in TRAINING_ALGORITHMS.hybrid:
+        model_kwargs["entropy_group_weights"] = dict(train_config.entropy_group_weights)
+
+    model = algorithm_class(**model_kwargs)
     apply_initial_action_biases(
         model,
         train_env=train_env,
