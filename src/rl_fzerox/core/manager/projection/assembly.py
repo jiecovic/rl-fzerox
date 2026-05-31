@@ -10,6 +10,7 @@ from rl_fzerox.core.manager.artifacts.paths import manager_runs_root
 from rl_fzerox.core.manager.projection.actions import (
     build_action_data,
     continuous_action_axes,
+    discrete_action_axes,
 )
 from rl_fzerox.core.manager.projection.observations import (
     build_observation_data,
@@ -143,6 +144,8 @@ def train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict[
         "max_grad_norm": train.max_grad_norm,
         "normalize_advantage": train.normalize_advantage,
         "target_kl": train.target_kl,
+        "entropy_group_weights": _entropy_group_weights(config),
+        "actor_regularization": _actor_regularization_data(config),
         "stats_window_size": train.stats_window_size,
         "checkpoint_every_rollouts": train.checkpoint_every_rollouts,
         "save_latest_checkpoint": train.save_latest_checkpoint,
@@ -157,6 +160,22 @@ def train_data(config: ManagedRunConfig, *, run_id: str, run_dir: Path) -> dict[
         "run_name": run_id,
         "explicit_run_dir": run_dir,
     }
+
+
+def _entropy_group_weights(config: ManagedRunConfig) -> dict[str, float]:
+    action_groups = set(continuous_action_axes(config)) | set(discrete_action_axes(config))
+    return {
+        name: float(weight)
+        for name, weight in config.train.entropy_group_weights.items()
+        if name in action_groups
+    }
+
+
+def _actor_regularization_data(config: ManagedRunConfig) -> dict[str, float]:
+    weight = config.train.actor_regularization.grounded_pitch_neutral_loss_weight
+    if "pitch" not in continuous_action_axes(config):
+        weight = 0.0
+    return {"grounded_pitch_neutral_loss_weight": float(weight)}
 
 
 def effective_train_algorithm(config: ManagedRunConfig) -> str:

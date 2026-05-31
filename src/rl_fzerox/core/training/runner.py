@@ -91,6 +91,7 @@ def run_training(
             train_env=train_env,
             train_config=run_config.train,
             policy_config=run_config.policy,
+            env_config=run_config.env,
             tensorboard_log=None,
         )
         if run_config.train.resume_run_dir is not None:

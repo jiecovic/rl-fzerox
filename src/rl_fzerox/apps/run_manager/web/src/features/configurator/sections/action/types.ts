@@ -17,5 +17,6 @@ export interface ActionUpdateContext {
   metadata: ConfigMetadata;
   updateAction: (patch: ConfigSectionPatch<"action">) => void;
   updatePolicy: (patch: ConfigSectionPatch<"policy">) => void;
+  updateTrain: (patch: ConfigSectionPatch<"train">) => void;
   setConfig: ConfigSetter;
 }

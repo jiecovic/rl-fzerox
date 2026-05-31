@@ -13,20 +13,24 @@ export function AuxiliaryBranchesDisclosure({
   open,
   setOpen,
   updateAction,
+  updateTrain,
 }: AuxiliaryBranchesDisclosureProps) {
   const action = config.action;
 
   return (
     <ConfigDisclosure
-      onReset={() =>
+      onReset={() => {
         updateAction(
           resetAuxiliaryBranchesAction({
             action,
             checkpointLocked,
             defaultAction: defaultConfig.action,
           }),
-        )
-      }
+        );
+        updateTrain({
+          actor_regularization: defaultConfig.train.actor_regularization,
+        });
+      }}
       onToggle={setOpen}
       open={open}
       title="Auxiliary branches"
@@ -41,8 +45,11 @@ export function AuxiliaryBranchesDisclosure({
           action={action}
           checkpointLocked={checkpointLocked}
           defaultAction={defaultConfig.action}
+          defaultTrain={defaultConfig.train}
           metadata={metadata}
+          train={config.train}
           updateAction={updateAction}
+          updateTrain={updateTrain}
         />
       </div>
     </ConfigDisclosure>

@@ -10,7 +10,7 @@ from rl_fzerox.core.policy.auxiliary_state.policies import (
     AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy,
     AuxiliaryStateMaskableRecurrentMultiInputPolicy,
 )
-from rl_fzerox.core.runtime_spec.schema import PolicyConfig
+from rl_fzerox.core.runtime_spec.schema import EnvConfig, PolicyConfig, TrainConfig
 
 
 def resolve_policy_entry(
@@ -18,16 +18,27 @@ def resolve_policy_entry(
     train_env: VecEnv,
     effective_algorithm: str,
     policy_config: PolicyConfig,
+    train_config: TrainConfig,
     recurrent_enabled: bool,
 ):
     """Select the SB3 policy class name for the env observation shape."""
 
     from gymnasium import spaces
 
-    auxiliary_state_enabled = policy_config.auxiliary_state.enabled
+    actor_regularization_enabled = train_config.actor_regularization.requires_auxiliary_targets()
+    if actor_regularization_enabled and effective_algorithm not in TRAINING_ALGORITHMS.hybrid:
+        raise RuntimeError(
+            "train.actor_regularization.grounded_pitch_neutral_loss_weight requires "
+            "a hybrid action algorithm with continuous pitch"
+        )
+
+    auxiliary_state_enabled = _needs_auxiliary_policy(policy_config, train_config)
     if auxiliary_state_enabled:
         if not isinstance(train_env.observation_space, spaces.Dict):
-            raise RuntimeError("policy auxiliary state requires a dict observation space")
+            raise RuntimeError(
+                "policy auxiliary state or actor regularization requires "
+                "a dict observation space"
+            )
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
             return AuxiliaryStateMaskableRecurrentMultiInputPolicy
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_action_ppo:
@@ -35,7 +46,8 @@ def resolve_policy_entry(
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_hybrid_recurrent_ppo:
             return AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy
         raise RuntimeError(
-            f"policy auxiliary state is not supported for train.algorithm={effective_algorithm}"
+            "policy auxiliary state or actor regularization is not supported for "
+            f"train.algorithm={effective_algorithm}"
         )
 
     if isinstance(train_env.observation_space, spaces.Dict):
@@ -47,6 +59,8 @@ def build_policy_kwargs(
     *,
     train_env: VecEnv,
     policy_config: PolicyConfig,
+    train_config: TrainConfig,
+    env_config: EnvConfig,
     value_head_key: str,
 ) -> dict[str, object]:
     from gymnasium import spaces
@@ -96,4 +110,26 @@ def build_policy_kwargs(
     }
     if policy_config.auxiliary_state.enabled:
         policy_kwargs["auxiliary_state"] = policy_config.auxiliary_state.model_dump(mode="python")
+    if env_config.action.layout_continuous_axes:
+        policy_kwargs["hybrid_action_group_names"] = {
+            "continuous": tuple(env_config.action.layout_continuous_axes),
+            "discrete": tuple(env_config.action.layout_discrete_axes),
+        }
+    if train_config.actor_regularization.requires_auxiliary_targets():
+        policy_kwargs["actor_regularization"] = train_config.actor_regularization.model_dump(
+            mode="python"
+        )
+        policy_kwargs["continuous_action_group_names"] = tuple(
+            env_config.action.layout_continuous_axes
+        )
     return policy_kwargs
+
+
+def _needs_auxiliary_policy(
+    policy_config: PolicyConfig,
+    train_config: TrainConfig,
+) -> bool:
+    return (
+        policy_config.auxiliary_state.enabled
+        or train_config.actor_regularization.requires_auxiliary_targets()
+    )

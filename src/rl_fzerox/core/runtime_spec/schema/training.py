@@ -45,6 +45,17 @@ class StateFeatureDropoutGroupConfig(BaseModel):
         return value
 
 
+class TrainActorRegularizationConfig(BaseModel):
+    """Optional policy-side actor regularization terms."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    grounded_pitch_neutral_loss_weight: NonNegativeFloat = 0.0
+
+    def requires_auxiliary_targets(self) -> bool:
+        return self.grounded_pitch_neutral_loss_weight > 0.0
+
+
 class TrainConfig(BaseModel):
     """Training settings for the current run."""
 
@@ -67,6 +78,10 @@ class TrainConfig(BaseModel):
     max_grad_norm: PositiveFloat = 0.5
     normalize_advantage: bool = True
     target_kl: PositiveFloat | None = None
+    entropy_group_weights: dict[str, NonNegativeFloat] = Field(default_factory=dict)
+    actor_regularization: TrainActorRegularizationConfig = Field(
+        default_factory=TrainActorRegularizationConfig
+    )
     stats_window_size: PositiveInt = 100
     checkpoint_every_rollouts: PositiveInt | None = None
     save_latest_checkpoint: bool = True

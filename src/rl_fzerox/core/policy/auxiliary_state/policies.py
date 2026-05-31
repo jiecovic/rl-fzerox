@@ -6,7 +6,11 @@ import numpy as np
 import torch
 from gymnasium import spaces
 from sb3_contrib.common.recurrent.type_aliases import RNNStates
-from sb3x.common.auxiliary_losses import PolicyAuxiliaryLoss
+from sb3x.common.auxiliary_losses import (
+    PolicyActionEvaluation,
+    PolicyAuxiliaryLoss,
+    combine_policy_auxiliary_losses,
+)
 from sb3x.common.maskable import MaybeMasks
 from sb3x.common.recurrent import (
     count_vectorized_envs,
@@ -100,21 +104,42 @@ def _require_auxiliary_targets(obs: PyTorchObs) -> torch.Tensor:
 
 class _AuxiliaryStatePolicyMixin:
     _auxiliary_state_losses: tuple[AuxiliaryStateLossTerm, ...]
-    _auxiliary_state_heads: AuxiliaryStateHeadBank
+    _auxiliary_state_heads: AuxiliaryStateHeadBank | None
+    _grounded_pitch_neutral_loss_weight: float
+    _continuous_pitch_index: int | None
 
     def _init_auxiliary_state(
         self,
         *,
         input_dim: int,
         auxiliary_state: Mapping[str, object] | None,
+        actor_regularization: Mapping[str, object] | None,
+        continuous_action_group_names: Sequence[str] = (),
         activation_fn: type[nn.Module],
     ) -> None:
         self._auxiliary_state_losses = _auxiliary_state_loss_terms(auxiliary_state)
-        self._auxiliary_state_heads = AuxiliaryStateHeadBank(
-            input_dim=input_dim,
-            head_arch=_auxiliary_head_arch(auxiliary_state),
-            activation_fn=activation_fn,
+        self._auxiliary_state_heads = (
+            AuxiliaryStateHeadBank(
+                input_dim=input_dim,
+                head_arch=_auxiliary_head_arch(auxiliary_state),
+                activation_fn=activation_fn,
+            )
+            if auxiliary_state is not None
+            else None
         )
+        self._grounded_pitch_neutral_loss_weight = _grounded_pitch_neutral_loss_weight(
+            actor_regularization
+        )
+        self._continuous_pitch_index = _continuous_pitch_index(
+            continuous_action_group_names
+        )
+        if (
+            self._grounded_pitch_neutral_loss_weight > 0.0
+            and self._continuous_pitch_index is None
+        ):
+            raise ValueError(
+                "grounded pitch neutral loss requires a continuous pitch action group"
+            )
 
     def _auxiliary_state_loss(
         self,
@@ -123,11 +148,71 @@ class _AuxiliaryStatePolicyMixin:
         obs: PyTorchObs,
         sample_mask: torch.Tensor | None = None,
     ) -> PolicyAuxiliaryLoss | None:
+        if self._auxiliary_state_heads is None:
+            return None
         return self._auxiliary_state_heads.loss(
             latent,
             aux_targets=_require_auxiliary_targets(obs),
             losses=self._auxiliary_state_losses,
             sample_mask=sample_mask,
+        )
+
+    def _actor_regularization_loss(
+        self,
+        distribution: object,
+        *,
+        obs: PyTorchObs,
+        sample_mask: torch.Tensor | None = None,
+    ) -> PolicyAuxiliaryLoss | None:
+        if self._grounded_pitch_neutral_loss_weight <= 0.0:
+            return None
+        if self._continuous_pitch_index is None:
+            raise RuntimeError("continuous pitch action group was not initialized")
+
+        # Penalize the actor mean rather than sampled actions so the loss
+        # directly pulls the grounded pitch preference toward neutral.
+        continuous_mode = _continuous_action_mode(distribution)
+        pitch_mean = continuous_mode[:, self._continuous_pitch_index]
+        aux_targets = _require_auxiliary_targets(obs)
+        airborne_index = resolve_auxiliary_state_target("vehicle_state.airborne").vector_start
+        grounded = (aux_targets[:, airborne_index] < 0.5).to(dtype=pitch_mean.dtype)
+        per_sample = pitch_mean.square() * grounded
+        loss_value, has_active_samples = _masked_mean(per_sample, sample_mask)
+        if not has_active_samples:
+            return None
+
+        weighted_loss = self._grounded_pitch_neutral_loss_weight * loss_value
+        return PolicyAuxiliaryLoss(
+            total_loss=weighted_loss,
+            metrics={
+                "actor/grounded_pitch_neutral": float(loss_value.detach().cpu().item()),
+                "actor/grounded_pitch_neutral_weighted": float(
+                    weighted_loss.detach().cpu().item()
+                ),
+            },
+        )
+
+    def _combined_policy_auxiliary_loss(
+        self,
+        *,
+        source_latent: torch.Tensor,
+        distribution: object,
+        obs: PyTorchObs,
+        sample_mask: torch.Tensor | None = None,
+    ) -> PolicyAuxiliaryLoss | None:
+        return combine_policy_auxiliary_losses(
+            (
+                self._auxiliary_state_loss(
+                    source_latent,
+                    obs=obs,
+                    sample_mask=sample_mask,
+                ),
+                self._actor_regularization_loss(
+                    distribution,
+                    obs=obs,
+                    sample_mask=sample_mask,
+                ),
+            )
         )
 
     def _auxiliary_state_predictions(
@@ -136,8 +221,54 @@ class _AuxiliaryStatePolicyMixin:
         *,
         names: Sequence[AuxiliaryStateTargetName] | None = None,
     ) -> dict[str, object]:
+        if self._auxiliary_state_heads is None:
+            raise RuntimeError("Policy does not have auxiliary-state prediction heads")
         predictions = self._auxiliary_state_heads.predict_values(latent, names=names)
         return {str(name): value for name, value in predictions.items()}
+
+
+def _grounded_pitch_neutral_loss_weight(
+    config: Mapping[str, object] | None,
+) -> float:
+    if config is None:
+        return 0.0
+    value = config.get("grounded_pitch_neutral_loss_weight", 0.0)
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise TypeError("grounded pitch neutral loss weight must be numeric")
+    weight = float(value)
+    if weight < 0.0:
+        raise ValueError("grounded pitch neutral loss weight must be non-negative")
+    return weight
+
+
+def _continuous_pitch_index(names: Sequence[str]) -> int | None:
+    try:
+        return tuple(names).index("pitch")
+    except ValueError:
+        return None
+
+
+def _continuous_action_mode(distribution: object) -> torch.Tensor:
+    continuous_dist = getattr(distribution, "continuous_dist", None)
+    mode = getattr(continuous_dist, "mode", None)
+    if not callable(mode):
+        raise TypeError("Actor regularization requires a hybrid continuous distribution")
+    value = mode()
+    if not isinstance(value, torch.Tensor):
+        raise TypeError("Continuous distribution mode must return a tensor")
+    return value
+
+
+def _masked_mean(
+    values: torch.Tensor,
+    sample_mask: torch.Tensor | None,
+) -> tuple[torch.Tensor, bool]:
+    if sample_mask is None:
+        return values.mean(), values.numel() > 0
+    active_values = values[sample_mask]
+    if active_values.numel() == 0:
+        return values.new_zeros(()), False
+    return active_values.mean(), True
 
 
 def _recurrent_tensor_state(
@@ -182,6 +313,8 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         lr_schedule: Schedule,
         *,
         auxiliary_state: Mapping[str, object] | None = None,
+        actor_regularization: Mapping[str, object] | None = None,
+        continuous_action_group_names: Sequence[str] = (),
         **kwargs: object,
     ) -> None:
         MaskableHybridActionMultiInputActorCriticPolicy.__init__(
@@ -194,6 +327,8 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         self._init_auxiliary_state(
             input_dim=int(self.features_dim),
             auxiliary_state=auxiliary_state,
+            actor_regularization=actor_regularization,
+            continuous_action_group_names=continuous_action_group_names,
             activation_fn=self.activation_fn,
         )
 
@@ -204,7 +339,7 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         *,
         action_masks: MaybeMasks = None,
         auxiliary_mask: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, PolicyAuxiliaryLoss | None]:
+    ) -> PolicyActionEvaluation:
         features = self.extract_features(obs)
         if self.share_features_extractor:
             if not isinstance(features, torch.Tensor):
@@ -224,12 +359,19 @@ class AuxiliaryStateMaskableHybridActionMultiInputPolicy(
         log_prob = distribution.log_prob(actions)
         values = self.value_net(latent_vf)
         entropy = distribution.entropy()
-        aux_loss = self._auxiliary_state_loss(
-            source_latent,
+        aux_loss = self._combined_policy_auxiliary_loss(
+            source_latent=source_latent,
+            distribution=distribution,
             obs=obs,
             sample_mask=auxiliary_mask,
         )
-        return values, log_prob, entropy, aux_loss
+        return PolicyActionEvaluation(
+            values=values,
+            log_prob=log_prob,
+            entropy=entropy,
+            aux_loss=aux_loss,
+            entropy_components=distribution.entropy_components() or {},
+        )
 
     def predict_auxiliary_state(
         self,
@@ -266,6 +408,8 @@ class AuxiliaryStateMaskableRecurrentMultiInputPolicy(
         lr_schedule: Schedule,
         *,
         auxiliary_state: Mapping[str, object] | None = None,
+        actor_regularization: Mapping[str, object] | None = None,
+        continuous_action_group_names: Sequence[str] = (),
         **kwargs: object,
     ) -> None:
         MaskableRecurrentMultiInputActorCriticPolicy.__init__(
@@ -278,6 +422,8 @@ class AuxiliaryStateMaskableRecurrentMultiInputPolicy(
         self._init_auxiliary_state(
             input_dim=int(self.lstm_output_dim),
             auxiliary_state=auxiliary_state,
+            actor_regularization=actor_regularization,
+            continuous_action_group_names=continuous_action_group_names,
             activation_fn=self.activation_fn,
         )
 
@@ -372,6 +518,8 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         lr_schedule: Schedule,
         *,
         auxiliary_state: Mapping[str, object] | None = None,
+        actor_regularization: Mapping[str, object] | None = None,
+        continuous_action_group_names: Sequence[str] = (),
         **kwargs: object,
     ) -> None:
         MaskableHybridRecurrentMultiInputActorCriticPolicy.__init__(
@@ -384,6 +532,8 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         self._init_auxiliary_state(
             input_dim=int(self.lstm_output_dim),
             auxiliary_state=auxiliary_state,
+            actor_regularization=actor_regularization,
+            continuous_action_group_names=continuous_action_group_names,
             activation_fn=self.activation_fn,
         )
 
@@ -396,7 +546,7 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         *,
         action_masks: MaybeMasks = None,
         auxiliary_mask: torch.Tensor | None = None,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None, PolicyAuxiliaryLoss | None]:
+    ) -> PolicyActionEvaluation:
         features = self.extract_features(obs)
         pi_features, vf_features = split_actor_critic_features(
             features,
@@ -428,12 +578,19 @@ class AuxiliaryStateMaskableHybridRecurrentMultiInputPolicy(
         log_prob = distribution.log_prob(actions)
         values = self.value_net(latent_vf)
         entropy = distribution.entropy()
-        aux_loss = self._auxiliary_state_loss(
-            latent_pi_source,
+        aux_loss = self._combined_policy_auxiliary_loss(
+            source_latent=latent_pi_source,
+            distribution=distribution,
             obs=obs,
             sample_mask=auxiliary_mask,
         )
-        return values, log_prob, entropy, aux_loss
+        return PolicyActionEvaluation(
+            values=values,
+            log_prob=log_prob,
+            entropy=entropy,
+            aux_loss=aux_loss,
+            entropy_components=distribution.entropy_components() or {},
+        )
 
     def predict_auxiliary_state(
         self,

@@ -1482,11 +1482,15 @@
       "x_cup_course_count": 6
     },
     "train": {
+      "actor_regularization": {
+        "grounded_pitch_neutral_loss_weight": 0.0
+      },
       "batch_size": 1024,
       "checkpoint_every_rollouts": 5,
       "clip_range": 0.19,
       "clip_range_vf": null,
       "ent_coef": 0.01,
+      "entropy_group_weights": {},
       "gae_lambda": 0.95,
       "gamma": 0.995,
       "learning_rate": 8.5e-5,

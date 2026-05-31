@@ -40,6 +40,10 @@ export function ActionSection({
     patchConfigSection(setConfig, "policy", patch);
   };
 
+  const updateTrain = (patch: ConfigSectionPatch<"train">) => {
+    patchConfigSection(setConfig, "train", patch);
+  };
+
   const updateAction = (patch: ConfigSectionPatch<"action">) => {
     setConfig((currentConfig) => {
       const actionPatch = typeof patch === "function" ? patch(currentConfig) : patch;
@@ -74,6 +78,7 @@ export function ActionSection({
         setConfig={setConfig}
         updateAction={updateAction}
         updatePolicy={updatePolicy}
+        updateTrain={updateTrain}
       />
 
       <AuxiliaryBranchesDisclosure
@@ -84,6 +89,7 @@ export function ActionSection({
         open={openSections.auxiliary}
         setOpen={(open) => setSectionOpen("auxiliary", open)}
         updateAction={updateAction}
+        updateTrain={updateTrain}
       />
 
       <ConfigPanel title="Action surface" wide>

@@ -22,7 +22,10 @@ from rl_fzerox.core.manager.run_spec.sections.tracks import (
     ManagedTracksConfig,
     default_selected_course_ids,
 )
-from rl_fzerox.core.manager.run_spec.sections.training import ManagedTrainConfig
+from rl_fzerox.core.manager.run_spec.sections.training import (
+    ManagedTrainActorRegularizationConfig,
+    ManagedTrainConfig,
+)
 from rl_fzerox.core.manager.run_spec.sections.vehicle import ManagedVehicleConfig
 
 __all__ = [
@@ -34,6 +37,7 @@ __all__ = [
     "ManagedStateComponentConfig",
     "ManagedStateFeatureDropoutConfig",
     "ManagedTracksConfig",
+    "ManagedTrainActorRegularizationConfig",
     "ManagedTrainConfig",
     "ManagedVehicleConfig",
     "default_selected_course_ids",
