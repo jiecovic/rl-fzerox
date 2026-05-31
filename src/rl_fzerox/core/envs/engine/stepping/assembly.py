@@ -203,6 +203,7 @@ class EngineStepAssembler:
             control_state=self.control_state,
             telemetry=telemetry,
             boost_min_energy_fraction=self.config.boost_min_energy_fraction,
+            mask_boost_when_active=self.action_config.mask_boost_when_active,
         )
 
         image_observation = step_result.observation

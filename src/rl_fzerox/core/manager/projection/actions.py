@@ -21,6 +21,8 @@ def build_action_data(config: ManagedRunConfig) -> dict[str, object]:
         "continuous_air_brake_mode": _continuous_air_brake_mode(config),
         "lean_mode": config.action.lean_mode,
         "lean_output_mode": config.action.lean_output_mode,
+        "mask_boost_when_active": config.action.mask_boost_when_active,
+        "boost_request_lockout_frames": config.action.boost_request_lockout_frames,
         "boost_unmask_max_speed_kph": config.action.boost_unmask_max_speed_kph,
         "lean_unmask_min_speed_kph": config.action.lean_unmask_min_speed_kph,
         "lean_initial_lockout_frames": config.action.lean_initial_lockout_frames,

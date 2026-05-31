@@ -122,6 +122,10 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
         config.action.boost_min_energy_fraction > 0
           ? `≥ ${Math.round(config.action.boost_min_energy_fraction * 100)}% energy`
           : null,
+        config.action.mask_boost_when_active ? "idle only" : null,
+        config.action.boost_request_lockout_frames > 0
+          ? `${config.action.boost_request_lockout_frames}f cooldown`
+          : null,
       ].filter((value): value is string => value !== null);
       labels.push(boostGuards.length === 0 ? "boost" : `boost, ${boostGuards.join(", ")}`);
     }

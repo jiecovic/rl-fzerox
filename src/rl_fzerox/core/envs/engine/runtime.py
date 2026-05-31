@@ -229,6 +229,7 @@ class FZeroXEnvEngine:
             control_state=self._control_state,
             telemetry=telemetry,
             boost_min_energy_fraction=self.config.boost_min_energy_fraction,
+            mask_boost_when_active=self._action_config.mask_boost_when_active,
         )
         self._episode.last_telemetry = telemetry
         self._reward_tracker.reset(

@@ -1232,6 +1232,7 @@
       "action_repeat": 2,
       "air_brake_mode": "on_off",
       "boost_min_energy_fraction": 0.1,
+      "boost_request_lockout_frames": 5,
       "boost_unmask_max_speed_kph": null,
       "continuous_air_brake_deadzone": 0.05,
       "continuous_air_brake_full_threshold": 0.85,
@@ -1256,6 +1257,7 @@
       "lean_output_mode": "three_way",
       "lean_unmask_min_speed_kph": null,
       "mask_air_brake_on_ground": false,
+      "mask_boost_when_active": true,
       "pitch_buckets": 5,
       "pitch_deadzone": 0.1,
       "pitch_mode": "discrete",
@@ -1534,7 +1536,7 @@
       {
         "enabled": true,
         "kind": "discrete",
-        "mask_label": "\u2265 10% energy",
+        "mask_label": "\u2265 10% energy, idle only, 5f cooldown",
         "name": "boost",
         "size": 2
       },
@@ -1641,7 +1643,7 @@
             "tone": "normal"
           },
           {
-            "detail": "128 \u2192 1 continuous, 14 logits (steer 1, throttle 2, air_brake 2, boost 2 \u2265 10% energy, lean 3, pitch 5)",
+            "detail": "128 \u2192 1 continuous, 14 logits (steer 1, throttle 2, air_brake 2, boost 2 \u2265 10% energy, idle only, 5f cooldown, lean 3, pitch 5)",
             "id": "action_net",
             "label": "Action net",
             "params": 1935,
