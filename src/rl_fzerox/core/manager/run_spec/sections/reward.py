@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -49,6 +51,10 @@ class ManagedRewardConfig(BaseModel):
     energy_refill_collision_cooldown_frames: NonNegativeInt = 120
     air_brake_request_penalty: float = Field(default=0.0, le=0.0)
     manual_boost_reward: NonNegativeFloat = 0.01
+    manual_boost_reward_energy_shaping: bool = False
+    manual_boost_reward_min_energy_multiplier: float = Field(default=0.0, ge=0.0, le=1.0)
+    manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
+    manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
     boost_pad_reward: NonNegativeFloat = 10.0
     boost_pad_reward_progress_window: PositiveFloat = 800.0
     lean_request_penalty: float = Field(default=-0.003, le=0.0)

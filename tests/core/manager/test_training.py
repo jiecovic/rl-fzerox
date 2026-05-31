@@ -306,6 +306,29 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     assert train_config.reward.position_progress_max_multiplier == pytest.approx(1.15)
 
 
+def test_manager_training_bridge_projects_boost_reward_energy_shaping(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.reward.manual_boost_reward = 7.0
+    config.reward.manual_boost_reward_energy_shaping = True
+    config.reward.manual_boost_reward_min_energy_multiplier = 0.2
+    config.reward.manual_boost_reward_full_energy_fraction = 0.75
+    config.reward.manual_boost_reward_energy_curve = "smoothstep"
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-boost-reward-energy-shaping",
+        run_dir=tmp_path / "runs" / "bridge-boost-reward-energy-shaping_0001",
+    )
+
+    assert train_config.reward.manual_boost_reward == pytest.approx(7.0)
+    assert train_config.reward.manual_boost_reward_energy_shaping is True
+    assert train_config.reward.manual_boost_reward_min_energy_multiplier == pytest.approx(0.2)
+    assert train_config.reward.manual_boost_reward_full_energy_fraction == pytest.approx(0.75)
+    assert train_config.reward.manual_boost_reward_energy_curve == "smoothstep"
+
+
 def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
     tmp_path: Path,
 ) -> None:

@@ -1,6 +1,14 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/reward/TrackActionPanels.tsx
 import { ConfigDisclosure } from "@/features/configurator/ConfigDisclosure";
-import { IntegerField, NumberField, RangeNumberField } from "@/features/configurator/fields";
+import {
+  BooleanField,
+  IntegerField,
+  NumberField,
+  RangeNumberField,
+  SelectField,
+} from "@/features/configurator/fields";
+import { boostRequestRewardPreviewPoints } from "@/features/configurator/sections/reward/boostDerived";
+import { RewardCurvePreview } from "@/features/configurator/sections/reward/RewardCurvePreview";
 import type { RewardPanelProps } from "@/features/configurator/sections/reward/types";
 import {
   actionDefaults,
@@ -16,6 +24,8 @@ export function TrackActionPanels({
   updateAction,
   updateReward,
 }: RewardPanelProps) {
+  const boostRewardPreviewPoints = boostRequestRewardPreviewPoints(config);
+
   return (
     <>
       <ConfigDisclosure
@@ -136,13 +146,62 @@ export function TrackActionPanels({
       >
         <div className="config-field-grid">
           <NumberField
-            help="Reward added when the policy requests manual boost."
-            label="Boost use reward"
+            help="Base reward added when the policy requests manual boost. Energy shaping multiplies this configured value."
+            label="Boost request reward"
             resetValue={defaultConfig.reward.manual_boost_reward}
             step="0.01"
             value={config.reward.manual_boost_reward}
             onChange={(value) => updateReward({ manual_boost_reward: value })}
           />
+          <div className="reward-wide-field">
+            <BooleanField
+              help="Scale the boost request reward by current energy. Off keeps the request reward constant."
+              label="Energy-shaped boost reward"
+              resetValue={defaultConfig.reward.manual_boost_reward_energy_shaping}
+              value={config.reward.manual_boost_reward_energy_shaping}
+              onChange={(value) => updateReward({ manual_boost_reward_energy_shaping: value })}
+            />
+          </div>
+          {config.reward.manual_boost_reward_energy_shaping ? (
+            <>
+              <NumberField
+                help="Multiplier applied to boost request reward at zero energy."
+                label="Min energy multiplier"
+                resetValue={defaultConfig.reward.manual_boost_reward_min_energy_multiplier}
+                step="0.05"
+                value={config.reward.manual_boost_reward_min_energy_multiplier}
+                onChange={(value) =>
+                  updateReward({ manual_boost_reward_min_energy_multiplier: value })
+                }
+              />
+              <NumberField
+                help="Energy fraction where boost request reward reaches the full configured value."
+                label="Full reward energy fraction"
+                resetValue={defaultConfig.reward.manual_boost_reward_full_energy_fraction}
+                step="0.05"
+                value={config.reward.manual_boost_reward_full_energy_fraction}
+                onChange={(value) =>
+                  updateReward({ manual_boost_reward_full_energy_fraction: value })
+                }
+              />
+              <SelectField
+                help="Curve used between zero energy and the full-reward energy point."
+                label="Energy reward curve"
+                optionLabels={{ linear: "Linear", smoothstep: "Smoothstep" }}
+                options={["linear", "smoothstep"]}
+                resetValue={defaultConfig.reward.manual_boost_reward_energy_curve}
+                value={config.reward.manual_boost_reward_energy_curve}
+                onChange={(value) => updateReward({ manual_boost_reward_energy_curve: value })}
+              />
+              <div className="reward-wide-field">
+                <RewardCurvePreview
+                  points={boostRewardPreviewPoints}
+                  title="Boost request multiplier preview"
+                  xAxisLabel="energy (%)"
+                />
+              </div>
+            </>
+          ) : null}
           <NumberField
             help="Reward for entering a detected boost pad."
             label="Boost pad reward"

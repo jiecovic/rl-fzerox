@@ -201,7 +201,7 @@
   grid-column: span 2;
 }
 
-.progress-speed-preview {
+.reward-curve-preview {
   display: grid;
   gap: 8px;
   width: 100%;
@@ -212,7 +212,7 @@
   background: var(--surface-muted);
 }
 
-.progress-speed-preview__header {
+.reward-curve-preview__header {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
@@ -222,41 +222,41 @@
   font-weight: 700;
 }
 
-.progress-speed-preview svg {
+.reward-curve-preview svg {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 900 / 190;
 }
 
-.progress-speed-preview line {
+.reward-curve-preview line {
   stroke: var(--border-strong);
   stroke-width: 1;
 }
 
-.progress-speed-preview__guide {
+.reward-curve-preview__guide {
   stroke: var(--border);
   stroke-dasharray: 4 5;
 }
 
-.progress-speed-preview__tick {
+.reward-curve-preview__tick {
   stroke: var(--border-strong);
 }
 
-.progress-speed-preview polyline {
+.reward-curve-preview polyline {
   fill: none;
   stroke: var(--accent);
   stroke-linejoin: round;
   stroke-width: 2;
 }
 
-.progress-speed-preview circle {
+.reward-curve-preview circle {
   fill: var(--accent);
   stroke: var(--surface);
   stroke-width: 1.5;
 }
 
-.progress-speed-preview text {
+.reward-curve-preview text {
   fill: var(--muted);
   font-size: 8px;
   font-weight: 700;

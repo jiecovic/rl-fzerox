@@ -68,6 +68,10 @@ export function actionDefaults(reward: RewardConfig): RewardPatch {
     lean_activation_penalty: reward.lean_activation_penalty,
     lean_request_penalty: reward.lean_request_penalty,
     manual_boost_reward: reward.manual_boost_reward,
+    manual_boost_reward_energy_curve: reward.manual_boost_reward_energy_curve,
+    manual_boost_reward_energy_shaping: reward.manual_boost_reward_energy_shaping,
+    manual_boost_reward_full_energy_fraction: reward.manual_boost_reward_full_energy_fraction,
+    manual_boost_reward_min_energy_multiplier: reward.manual_boost_reward_min_energy_multiplier,
   };
 }
 

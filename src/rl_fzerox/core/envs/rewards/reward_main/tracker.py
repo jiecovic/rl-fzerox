@@ -298,7 +298,7 @@ class RewardMainTracker:
             reward += grounded_pitch
             breakdown["grounded_pitch"] = grounded_pitch
 
-        boost_reward = manual_boost_reward(action_context, weights=self._weights)
+        boost_reward = manual_boost_reward(action_context, telemetry, weights=self._weights)
         if boost_reward:
             reward += boost_reward
             breakdown["manual_boost"] = boost_reward

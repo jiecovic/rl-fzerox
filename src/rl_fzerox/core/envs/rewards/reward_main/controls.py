@@ -93,10 +93,33 @@ def grounded_pitch_penalty(
 
 def manual_boost_reward(
     action_context: RewardActionContext | None,
+    telemetry: FZeroXTelemetry,
     *,
     weights: RewardMainWeights,
 ) -> float:
     reward = weights.manual_boost_reward
     if reward <= 0.0 or action_context is None or not action_context.boost_requested:
         return 0.0
-    return reward
+    return reward * manual_boost_reward_energy_multiplier(telemetry, weights=weights)
+
+
+def manual_boost_reward_energy_multiplier(
+    telemetry: FZeroXTelemetry,
+    *,
+    weights: RewardMainWeights,
+) -> float:
+    if not weights.manual_boost_reward_energy_shaping:
+        return 1.0
+    min_multiplier = max(0.0, min(1.0, float(weights.manual_boost_reward_min_energy_multiplier)))
+    max_energy = float(telemetry.player.max_energy)
+    if max_energy <= 0.0:
+        return min_multiplier
+    energy_fraction = max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
+    full_reward_fraction = max(
+        1e-9,
+        min(1.0, float(weights.manual_boost_reward_full_energy_fraction)),
+    )
+    ratio = min(energy_fraction / full_reward_fraction, 1.0)
+    if weights.manual_boost_reward_energy_curve == "smoothstep":
+        ratio = ratio * ratio * (3.0 - 2.0 * ratio)
+    return min_multiplier + (1.0 - min_multiplier) * ratio
