@@ -1,5 +1,5 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/sections/tracks/XCupSection.tsx
-import { IntegerField } from "@/features/configurator/fields";
+import { BooleanField, IntegerField, NumberField } from "@/features/configurator/fields";
 import {
   courseCardClass,
   courseSelectedBadgeClass,
@@ -32,6 +32,16 @@ export function XCupSection({
   onCollapsedChange,
   updateTracks,
 }: XCupSectionProps) {
+  const rotation = config.tracks.x_cup_auto_regeneration;
+  const defaultRotation = defaultConfig.tracks.x_cup_auto_regeneration;
+  const updateRotation = (patch: Partial<typeof rotation>) =>
+    updateTracks({
+      x_cup_auto_regeneration: {
+        ...rotation,
+        ...patch,
+      },
+    });
+
   return (
     <details
       className="config-disclosure track-cup-section"
@@ -100,6 +110,62 @@ export function XCupSection({
               onChange={(value) => updateTracks({ x_cup_course_count: value })}
             />
           </div>
+          {xCupEnabled ? (
+            <div className="grid gap-4 border border-app-border bg-app-surface/40 p-4">
+              <div className="grid gap-1">
+                <strong className="text-sm font-bold text-app-text">Auto regeneration</strong>
+                <span className="text-xs leading-snug text-app-muted">
+                  Replace a generated slot after it has enough samples and reaches the completion
+                  threshold. Old inactive baselines are pruned after the storage cap.
+                </span>
+              </div>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
+                <BooleanField
+                  help="When enabled, solved generated X Cup slots are replaced with fresh deterministic courses during training."
+                  label="Auto regenerate"
+                  resetValue={defaultRotation.enabled}
+                  value={rotation.enabled}
+                  onChange={(value) => updateRotation({ enabled: value })}
+                />
+                {rotation.enabled ? (
+                  <>
+                    <NumberField
+                      help="EMA completion fraction required before replacing a generated slot."
+                      label="Completion threshold"
+                      resetValue={defaultRotation.completion_threshold}
+                      step="0.01"
+                      value={rotation.completion_threshold}
+                      onChange={(value) => updateRotation({ completion_threshold: value })}
+                    />
+                    <IntegerField
+                      help="Minimum sampled episodes before a generated slot can be replaced."
+                      label="Min episodes"
+                      min={1}
+                      resetValue={defaultRotation.min_episodes}
+                      value={rotation.min_episodes}
+                      onChange={(value) => updateRotation({ min_episodes: value })}
+                    />
+                    <IntegerField
+                      help="Minimum completed game frames before a generated slot can be replaced."
+                      label="Min frames"
+                      min={1}
+                      resetValue={defaultRotation.min_completed_frames}
+                      value={rotation.min_completed_frames}
+                      onChange={(value) => updateRotation({ min_completed_frames: value })}
+                    />
+                    <IntegerField
+                      help="Extra sampled episodes after the minimum before replacement is allowed."
+                      label="Cooldown episodes"
+                      min={0}
+                      resetValue={defaultRotation.cooldown_episodes}
+                      value={rotation.cooldown_episodes}
+                      onChange={(value) => updateRotation({ cooldown_episodes: value })}
+                    />
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     </details>

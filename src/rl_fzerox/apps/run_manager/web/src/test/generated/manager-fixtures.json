@@ -1483,6 +1483,13 @@
       "step_balance_ema_alpha": 0.1,
       "step_balance_max_weight_scale": 5.0,
       "step_balance_update_episodes": 5,
+      "x_cup_auto_regeneration": {
+        "completion_threshold": 0.9,
+        "cooldown_episodes": 0,
+        "enabled": false,
+        "min_completed_frames": 10000,
+        "min_episodes": 24
+      },
       "x_cup_course_count": 6
     },
     "train": {

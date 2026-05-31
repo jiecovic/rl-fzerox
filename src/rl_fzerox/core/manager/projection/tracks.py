@@ -1,26 +1,11 @@
 # src/rl_fzerox/core/manager/projection/tracks.py
 from __future__ import annotations
 
-import hashlib
-import json
-from collections.abc import Mapping
-from dataclasses import dataclass
-
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id
 from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_course_identity
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting, vehicle_by_id
-
-
-@dataclass(frozen=True, slots=True)
-class GeneratedXCupCourse:
-    """Stable generated-course identity used before materialization writes state."""
-
-    course_id: str
-    display_name: str
-    course_hash: str
-    seed: int
 
 
 def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
@@ -43,6 +28,13 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         "adaptive_step_balance_confidence_scale": (
             config.tracks.adaptive_step_balance_confidence_scale
         ),
+        "x_cup_rotation": {
+            "enabled": config.tracks.x_cup_auto_regeneration.enabled,
+            "completion_threshold": (config.tracks.x_cup_auto_regeneration.completion_threshold),
+            "min_episodes": config.tracks.x_cup_auto_regeneration.min_episodes,
+            "min_completed_frames": (config.tracks.x_cup_auto_regeneration.min_completed_frames),
+            "cooldown_episodes": config.tracks.x_cup_auto_regeneration.cooldown_episodes,
+        },
     }
 
 
@@ -93,7 +85,16 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
             )
     if config.tracks.include_x_cup:
         for x_cup_index in range(config.tracks.x_cup_course_count):
-            generated_course = _x_cup_generated_course(config, index=x_cup_index)
+            generated_course = generated_x_cup_course_identity(
+                master_seed=config.seed,
+                slot=x_cup_index,
+                generation=0,
+                gp_difficulty=(
+                    default_gp_difficulty()
+                    if config.tracks.gp_difficulty is None
+                    else config.tracks.gp_difficulty
+                ),
+            )
             for vehicle_id in config.vehicle.selected_vehicle_ids:
                 entries.append(
                     _track_sampling_entry(
@@ -127,6 +128,8 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                         generated_course_kind=X_CUP_COURSE.generated_kind,
                         generated_course_seed=generated_course.seed,
                         generated_course_hash=generated_course.course_hash,
+                        generated_course_slot=generated_course.slot,
+                        generated_course_generation=generated_course.generation,
                         log_per_course=False,
                     )
                 )
@@ -153,6 +156,8 @@ def _track_sampling_entry(
     generated_course_kind: str | None = None,
     generated_course_seed: int | None = None,
     generated_course_hash: str | None = None,
+    generated_course_slot: int | None = None,
+    generated_course_generation: int | None = None,
     log_per_course: bool = True,
 ) -> dict[str, object]:
     vehicle = vehicle_by_id(target_vehicle_id)
@@ -204,6 +209,8 @@ def _track_sampling_entry(
         "generated_course_kind": generated_course_kind,
         "generated_course_seed": generated_course_seed,
         "generated_course_hash": generated_course_hash,
+        "generated_course_slot": generated_course_slot,
+        "generated_course_generation": generated_course_generation,
         "log_per_course": log_per_course,
     }
     return {key: value for key, value in entry.items() if value is not None}
@@ -241,50 +248,3 @@ def _track_sampling_entry_id(
     if race_mode == "gp_race" and gp_difficulty is not None:
         return f"{course_id}_{race_mode}_{gp_difficulty}_{target_vehicle_id}_{engine_suffix}"
     return f"{course_id}_{race_mode}_{target_vehicle_id}_{engine_suffix}"
-
-
-def _x_cup_generated_course(config: ManagedRunConfig, *, index: int) -> GeneratedXCupCourse:
-    seed = _x_cup_seed(config.seed, index=index)
-    course_hash = _x_cup_course_hash(
-        seed=seed,
-        gp_difficulty=(
-            default_gp_difficulty()
-            if config.tracks.gp_difficulty is None
-            else config.tracks.gp_difficulty
-        ),
-    )
-    short_hash = course_hash[: X_CUP_COURSE.display_hash_chars]
-    return GeneratedXCupCourse(
-        course_id=f"{X_CUP_COURSE.id_prefix}_{short_hash}",
-        display_name=f"{X_CUP_COURSE.display_prefix} {short_hash}",
-        course_hash=course_hash,
-        seed=seed,
-    )
-
-
-def _x_cup_seed(master_seed: int, *, index: int) -> int:
-    payload = {
-        "generator_version": X_CUP_COURSE.generator_version,
-        "index": index,
-        "master_seed": int(master_seed),
-        "source_course_index": X_CUP_COURSE.course_index,
-    }
-    return int.from_bytes(_sha256_json(payload)[:8], byteorder="big", signed=False)
-
-
-def _x_cup_course_hash(*, seed: int, gp_difficulty: str) -> str:
-    return _sha256_json(
-        {
-            "generator_version": X_CUP_COURSE.generator_version,
-            "gp_difficulty": gp_difficulty,
-            "race_mode": X_CUP_COURSE.race_mode,
-            "rng_patch_timing": X_CUP_COURSE.rng_patch_timing,
-            "seed": seed,
-            "source_course_index": X_CUP_COURSE.course_index,
-        }
-    ).hex()
-
-
-def _sha256_json(payload: Mapping[str, object]) -> bytes:
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(encoded).digest()

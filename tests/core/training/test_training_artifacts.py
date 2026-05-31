@@ -24,6 +24,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrainConfig,
     WatchAppConfig,
     WatchConfig,
+    XCupRotationConfig,
 )
 from rl_fzerox.core.training.runs import (
     apply_train_run_to_watch_config,
@@ -47,6 +48,9 @@ from rl_fzerox.core.training.runs.baseline_materializer.materialization import (
     baselines as baseline_materialization,
 )
 from rl_fzerox.core.training.runs.baseline_materializer.requests import request_from_track_entry
+from rl_fzerox.core.training.runs.baseline_materializer.settings import (
+    BASELINE_MATERIALIZER_SETTINGS,
+)
 from rl_fzerox.core.training.runs.race_start import RaceStartVariant
 from rl_fzerox.core.training.runs.race_start.x_cup import XCupMaterializedCourse
 from rl_fzerox.core.training.session.artifacts import (
@@ -906,6 +910,8 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
                         generated_course_kind=X_CUP_COURSE.generated_kind,
                         generated_course_seed=1234,
                         generated_course_hash="abcd1234",
+                        generated_course_slot=0,
+                        generated_course_generation=2,
                         log_per_course=False,
                     ),
                 ),
@@ -938,6 +944,112 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
     assert metadata["materializer_mode"] == X_CUP_COURSE.materializer_mode
     assert metadata["x_cup_seed"] == 1234
     assert metadata["x_cup_course_hash"] == "abcd1234"
+    assert metadata["x_cup_slot"] == 0
+    assert metadata["x_cup_generation"] == 2
+
+
+def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_continue(
+    tmp_path: Path,
+) -> None:
+    core_path = tmp_path / "mupen64plus_next_libretro.so"
+    rom_path = tmp_path / "fzerox.n64"
+    core_path.touch()
+    rom_path.touch()
+    run_dir = tmp_path / "runs" / "x-cup-continue_0001"
+    run_dir.mkdir(parents=True)
+    run_paths = continue_run_paths(run_dir)
+    ensure_run_dirs(run_paths)
+
+    saved_state_path = run_paths.baselines_dir / "x_cup_rotated.state"
+    saved_state_path.write_bytes(b"rotated")
+    saved_state_path.with_suffix(".json").write_text(
+        json.dumps(
+            {
+                "schema_version": BASELINE_MATERIALIZER_SETTINGS.schema_version,
+                "cache_kind": "exact_run_baseline",
+                "cache_key": "rotated-cache",
+                "materializer_mode": X_CUP_COURSE.materializer_mode,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    saved_entry = TrackSamplingEntryConfig(
+        id="x_cup_rotated_gp_race_novice_blue_falcon_balanced",
+        course_id="x_cup_rotated",
+        course_name="X Cup rotated",
+        course_index=X_CUP_COURSE.course_index,
+        mode=X_CUP_COURSE.race_mode,
+        gp_difficulty="novice",
+        vehicle="blue_falcon",
+        engine_setting="balanced",
+        engine_setting_raw_value=50,
+        baseline_state_path=saved_state_path,
+        generated_course_kind=X_CUP_COURSE.generated_kind,
+        generated_course_seed=99,
+        generated_course_hash="rotated",
+        generated_course_slot=0,
+        generated_course_generation=3,
+        log_per_course=False,
+    )
+    saved_config = TrainAppConfig(
+        seed=123,
+        emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
+        env=EnvConfig(
+            track_sampling=TrackSamplingConfig(
+                enabled=True,
+                sampling_mode="adaptive_step_balanced",
+                entries=(saved_entry,),
+                x_cup_rotation=XCupRotationConfig(enabled=True),
+            ),
+        ),
+        policy=PolicyConfig(),
+        train=TrainConfig(output_root=tmp_path / "runs", run_name="x-cup-continue"),
+    )
+    save_train_run_config(config=saved_config, run_dir=run_paths.run_dir)
+
+    projected_entry = TrackSamplingEntryConfig(
+        id="x_cup_initial_gp_race_novice_blue_falcon_balanced",
+        course_id="x_cup_initial",
+        course_name="X Cup initial",
+        course_index=X_CUP_COURSE.course_index,
+        mode=X_CUP_COURSE.race_mode,
+        gp_difficulty="novice",
+        vehicle="blue_falcon",
+        engine_setting="balanced",
+        engine_setting_raw_value=50,
+        generated_course_kind=X_CUP_COURSE.generated_kind,
+        generated_course_seed=11,
+        generated_course_hash="initial",
+        generated_course_slot=0,
+        generated_course_generation=0,
+        log_per_course=False,
+    )
+    projected_config = saved_config.model_copy(
+        update={
+            "env": saved_config.env.model_copy(
+                update={
+                    "track_sampling": saved_config.env.track_sampling.model_copy(
+                        update={"entries": (projected_entry,)}
+                    )
+                }
+            )
+        }
+    )
+
+    materialized = materialize_train_run_config(
+        projected_config,
+        run_paths=run_paths,
+        baseline_cache_root=tmp_path / "cache",
+    )
+
+    entry = materialized.env.track_sampling.entries[0]
+    assert entry.course_id == "x_cup_rotated"
+    assert entry.generated_course_generation == 3
+    baseline_state_path = _required_baseline_path(entry)
+    assert baseline_state_path == saved_state_path.resolve()
+    assert baseline_state_path.read_bytes() == b"rotated"
 
 
 def test_materialize_train_run_config_reports_track_sampling_progress(

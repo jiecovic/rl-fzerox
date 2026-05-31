@@ -72,6 +72,12 @@ class EngineResetCoordinator:
         }
         self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
 
+    def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+        """Replace the base track-sampling config used at future episode resets."""
+
+        self._config = self._config.model_copy(update={"track_sampling": config})
+        self._active_track_sampling = self._stage_track_sampling_config(self._stage_index)
+
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""
 

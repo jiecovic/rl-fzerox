@@ -87,6 +87,8 @@ def request_from_track_entry(
         generated_course_kind=entry.generated_course_kind,
         generated_course_seed=entry.generated_course_seed,
         generated_course_hash=entry.generated_course_hash,
+        generated_course_slot=entry.generated_course_slot,
+        generated_course_generation=entry.generated_course_generation,
     )
 
 

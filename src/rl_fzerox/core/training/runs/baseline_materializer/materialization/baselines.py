@@ -149,6 +149,8 @@ def _materialize_x_cup_baseline(
         "source_cache_path": str(cache_state_path),
         "x_cup_seed": seed,
         "x_cup_course_hash": course_hash,
+        "x_cup_slot": request.generated_course_slot,
+        "x_cup_generation": request.generated_course_generation,
         "source_course_index": X_CUP_COURSE.course_index,
         "source_vehicle": source_vehicle_id,
         "source_gp_difficulty": source_gp_difficulty,

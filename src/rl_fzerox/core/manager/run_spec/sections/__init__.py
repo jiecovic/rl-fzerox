@@ -20,6 +20,7 @@ from rl_fzerox.core.manager.run_spec.sections.policy import ManagedPolicyConfig
 from rl_fzerox.core.manager.run_spec.sections.reward import ManagedRewardConfig
 from rl_fzerox.core.manager.run_spec.sections.tracks import (
     ManagedTracksConfig,
+    ManagedXCupAutoRegenerationConfig,
     default_selected_course_ids,
 )
 from rl_fzerox.core.manager.run_spec.sections.training import (
@@ -40,6 +41,7 @@ __all__ = [
     "ManagedTrainActorRegularizationConfig",
     "ManagedTrainConfig",
     "ManagedVehicleConfig",
+    "ManagedXCupAutoRegenerationConfig",
     "default_selected_course_ids",
     "default_state_components",
     "default_state_feature_dropouts",

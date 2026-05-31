@@ -94,6 +94,8 @@ class TrackSamplingEntryConfig(BaseModel):
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: NonNegativeInt | None = None
     generated_course_hash: str | None = None
+    generated_course_slot: NonNegativeInt | None = None
+    generated_course_generation: NonNegativeInt | None = None
     generated_course_segment_count: NonNegativeInt | None = None
     generated_course_length: PositiveFloat | None = None
     log_per_course: bool = True
@@ -122,6 +124,22 @@ class TrackSamplingEntryConfig(BaseModel):
         return self
 
 
+class XCupRotationConfig(BaseModel):
+    """Runtime policy for replacing solved generated X Cup slots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    completion_threshold: float = Field(
+        default=X_CUP_COURSE.rotation_defaults.completion_threshold,
+        ge=0.0,
+        le=1.0,
+    )
+    min_episodes: PositiveInt = X_CUP_COURSE.rotation_defaults.min_episodes
+    min_completed_frames: PositiveInt = X_CUP_COURSE.rotation_defaults.min_completed_frames
+    cooldown_episodes: NonNegativeInt = X_CUP_COURSE.rotation_defaults.cooldown_episodes
+
+
 class TrackSamplingConfig(BaseModel):
     """Optional weighted baseline sampling performed at episode reset."""
 
@@ -138,6 +156,7 @@ class TrackSamplingConfig(BaseModel):
     adaptive_step_balance_min_confidence_episodes: PositiveInt = 24
     adaptive_step_balance_confidence_scale: PositiveFloat = 4.0
     step_balance_log_details: bool = False
+    x_cup_rotation: XCupRotationConfig = Field(default_factory=XCupRotationConfig)
 
     @model_validator(mode="after")
     def _validate_entries_when_enabled(self) -> TrackSamplingConfig:

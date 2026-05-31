@@ -151,6 +151,7 @@ def run_training(
             )
         callbacks = build_callbacks(
             env_config=run_config.env,
+            train_app_config=run_config,
             train_config=run_config.train,
             curriculum_config=run_config.curriculum,
             run_paths=run_paths,

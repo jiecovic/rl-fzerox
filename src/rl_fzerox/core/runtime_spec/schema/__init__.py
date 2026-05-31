@@ -58,6 +58,7 @@ from rl_fzerox.core.runtime_spec.schema.tracks import (
     TrackRecordsConfig,
     TrackSamplingConfig,
     TrackSamplingEntryConfig,
+    XCupRotationConfig,
 )
 from rl_fzerox.core.runtime_spec.schema.training import (
     StateFeatureDropoutGroupConfig,
@@ -103,4 +104,5 @@ __all__ = [
     "WatchAppConfig",
     "WatchConfig",
     "WatchFpsSetting",
+    "XCupRotationConfig",
 ]
