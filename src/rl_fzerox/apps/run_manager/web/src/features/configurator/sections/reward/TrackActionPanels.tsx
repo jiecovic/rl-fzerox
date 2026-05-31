@@ -144,130 +144,147 @@ export function TrackActionPanels({
           updateAction({ pitch_deadzone: defaultConfig.action.pitch_deadzone });
         }}
       >
-        <div className="config-field-grid">
-          <NumberField
-            help="Base reward added when the policy requests manual boost. Energy shaping multiplies this configured value."
-            label="Boost request reward"
-            resetValue={defaultConfig.reward.manual_boost_reward}
-            step="0.01"
-            value={config.reward.manual_boost_reward}
-            onChange={(value) => updateReward({ manual_boost_reward: value })}
-          />
-          <div className="reward-wide-field">
-            <BooleanField
-              help="Scale the boost request reward by current energy. Off keeps the request reward constant."
-              label="Energy-shaped boost reward"
-              resetValue={defaultConfig.reward.manual_boost_reward_energy_shaping}
-              value={config.reward.manual_boost_reward_energy_shaping}
-              onChange={(value) => updateReward({ manual_boost_reward_energy_shaping: value })}
-            />
-          </div>
-          {config.reward.manual_boost_reward_energy_shaping ? (
-            <>
-              <NumberField
-                help="Multiplier applied to boost request reward at zero energy."
-                label="Min energy multiplier"
-                resetValue={defaultConfig.reward.manual_boost_reward_min_energy_multiplier}
-                step="0.05"
-                value={config.reward.manual_boost_reward_min_energy_multiplier}
-                onChange={(value) =>
-                  updateReward({ manual_boost_reward_min_energy_multiplier: value })
-                }
-              />
-              <NumberField
-                help="Energy fraction where boost request reward reaches the full configured value."
-                label="Full reward energy fraction"
-                resetValue={defaultConfig.reward.manual_boost_reward_full_energy_fraction}
-                step="0.05"
-                value={config.reward.manual_boost_reward_full_energy_fraction}
-                onChange={(value) =>
-                  updateReward({ manual_boost_reward_full_energy_fraction: value })
-                }
-              />
-              <SelectField
-                help="Curve used between zero energy and the full-reward energy point."
-                label="Energy reward curve"
-                optionLabels={{ linear: "Linear", smoothstep: "Smoothstep" }}
-                options={["linear", "smoothstep"]}
-                resetValue={defaultConfig.reward.manual_boost_reward_energy_curve}
-                value={config.reward.manual_boost_reward_energy_curve}
-                onChange={(value) => updateReward({ manual_boost_reward_energy_curve: value })}
-              />
-              <div className="reward-wide-field">
+        <div className="reward-action-stack">
+          <section className="reward-action-group">
+            <h4 className="reward-action-group__title">Manual boost</h4>
+            <div className="reward-action-boost-layout">
+              <div className="reward-action-boost-controls">
+                <NumberField
+                  help="Base reward added when the policy requests manual boost. Energy shaping multiplies this configured value."
+                  label="Boost request reward"
+                  resetValue={defaultConfig.reward.manual_boost_reward}
+                  step="0.01"
+                  value={config.reward.manual_boost_reward}
+                  onChange={(value) => updateReward({ manual_boost_reward: value })}
+                />
+                <BooleanField
+                  help="Scale the boost request reward by current energy. Off keeps the request reward constant."
+                  label="Energy-shaped boost reward"
+                  resetValue={defaultConfig.reward.manual_boost_reward_energy_shaping}
+                  value={config.reward.manual_boost_reward_energy_shaping}
+                  onChange={(value) => updateReward({ manual_boost_reward_energy_shaping: value })}
+                />
+                {config.reward.manual_boost_reward_energy_shaping ? (
+                  <>
+                    <NumberField
+                      help="Multiplier applied to boost request reward at zero energy."
+                      label="Min energy multiplier"
+                      resetValue={defaultConfig.reward.manual_boost_reward_min_energy_multiplier}
+                      step="0.05"
+                      value={config.reward.manual_boost_reward_min_energy_multiplier}
+                      onChange={(value) =>
+                        updateReward({ manual_boost_reward_min_energy_multiplier: value })
+                      }
+                    />
+                    <NumberField
+                      help="Energy fraction where boost request reward reaches the full configured value."
+                      label="Full reward energy fraction"
+                      resetValue={defaultConfig.reward.manual_boost_reward_full_energy_fraction}
+                      step="0.05"
+                      value={config.reward.manual_boost_reward_full_energy_fraction}
+                      onChange={(value) =>
+                        updateReward({ manual_boost_reward_full_energy_fraction: value })
+                      }
+                    />
+                    <SelectField
+                      help="Curve used between zero energy and the full-reward energy point."
+                      label="Energy reward curve"
+                      optionLabels={{ linear: "Linear", smoothstep: "Smoothstep" }}
+                      options={["linear", "smoothstep"]}
+                      resetValue={defaultConfig.reward.manual_boost_reward_energy_curve}
+                      value={config.reward.manual_boost_reward_energy_curve}
+                      onChange={(value) =>
+                        updateReward({ manual_boost_reward_energy_curve: value })
+                      }
+                    />
+                  </>
+                ) : null}
+              </div>
+              {config.reward.manual_boost_reward_energy_shaping ? (
                 <RewardCurvePreview
                   points={boostRewardPreviewPoints}
                   title="Boost request multiplier preview"
                   xAxisLabel="energy (%)"
                 />
-              </div>
-            </>
-          ) : null}
-          <NumberField
-            help="Reward for entering a detected boost pad."
-            label="Boost pad reward"
-            resetValue={defaultConfig.reward.boost_pad_reward}
-            step="0.5"
-            value={config.reward.boost_pad_reward}
-            onChange={(value) => updateReward({ boost_pad_reward: value })}
-          />
-          <NumberField
-            help="Progress window used to make boost-pad rewards one-way and non-farmable."
-            label="Boost pad progress window"
-            resetValue={defaultConfig.reward.boost_pad_reward_progress_window}
-            step="50"
-            value={config.reward.boost_pad_reward_progress_window}
-            onChange={(value) => updateReward({ boost_pad_reward_progress_window: value })}
-          />
-          <NumberField
-            help="Per-step penalty for requesting air brake."
-            label="Air brake request penalty"
-            resetValue={defaultConfig.reward.air_brake_request_penalty}
-            step="0.001"
-            value={config.reward.air_brake_request_penalty}
-            onChange={(value) => updateReward({ air_brake_request_penalty: value })}
-          />
-          <NumberField
-            help="Per-frame penalty while lean is held."
-            label="Lean hold penalty"
-            resetValue={defaultConfig.reward.lean_request_penalty}
-            step="0.001"
-            value={config.reward.lean_request_penalty}
-            onChange={(value) => updateReward({ lean_request_penalty: value })}
-          />
-          <NumberField
-            help="One-time penalty when lean changes from idle to active. This discourages lean chatter without making long holds expensive."
-            label="Lean activation penalty"
-            resetValue={defaultConfig.reward.lean_activation_penalty}
-            step="0.001"
-            value={config.reward.lean_activation_penalty}
-            onChange={(value) => updateReward({ lean_activation_penalty: value })}
-          />
-          <NumberField
-            help="Small penalty for grounded pitch requests above the penalty threshold. This does not clamp controller pitch."
-            label="Grounded pitch penalty"
-            resetValue={defaultConfig.reward.grounded_pitch_penalty}
-            step="0.001"
-            value={config.reward.grounded_pitch_penalty}
-            onChange={(value) => updateReward({ grounded_pitch_penalty: value })}
-          />
-          <div className="reward-wide-field">
-            <RangeNumberField
-              help="Threshold used only by grounded pitch penalty. It does not alter the pitch sent to the controller."
-              label="Pitch penalty threshold"
-              max={0.5}
-              min={0}
-              rangeStep={0.01}
-              resetValue={defaultConfig.action.pitch_deadzone}
-              ticks={[
-                { label: "0", value: 0 },
-                { label: "0.1", value: 0.1 },
-                { label: "0.25", value: 0.25 },
-                { label: "0.5", value: 0.5 },
-              ]}
-              value={config.action.pitch_deadzone}
-              onChange={(value) => updateAction({ pitch_deadzone: value })}
-            />
-          </div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="reward-action-group">
+            <h4 className="reward-action-group__title">Boost pads</h4>
+            <div className="reward-action-group__fields">
+              <NumberField
+                help="Reward for entering a detected boost pad."
+                label="Boost pad reward"
+                resetValue={defaultConfig.reward.boost_pad_reward}
+                step="0.5"
+                value={config.reward.boost_pad_reward}
+                onChange={(value) => updateReward({ boost_pad_reward: value })}
+              />
+              <NumberField
+                help="Progress window used to make boost-pad rewards one-way and non-farmable."
+                label="Boost pad progress window"
+                resetValue={defaultConfig.reward.boost_pad_reward_progress_window}
+                step="50"
+                value={config.reward.boost_pad_reward_progress_window}
+                onChange={(value) => updateReward({ boost_pad_reward_progress_window: value })}
+              />
+            </div>
+          </section>
+
+          <section className="reward-action-group">
+            <h4 className="reward-action-group__title">Action penalties</h4>
+            <div className="reward-action-group__fields">
+              <NumberField
+                help="Per-step penalty for requesting air brake."
+                label="Air brake request penalty"
+                resetValue={defaultConfig.reward.air_brake_request_penalty}
+                step="0.001"
+                value={config.reward.air_brake_request_penalty}
+                onChange={(value) => updateReward({ air_brake_request_penalty: value })}
+              />
+              <NumberField
+                help="Per-frame penalty while lean is held."
+                label="Lean hold penalty"
+                resetValue={defaultConfig.reward.lean_request_penalty}
+                step="0.001"
+                value={config.reward.lean_request_penalty}
+                onChange={(value) => updateReward({ lean_request_penalty: value })}
+              />
+              <NumberField
+                help="One-time penalty when lean changes from idle to active. This discourages lean chatter without making long holds expensive."
+                label="Lean activation penalty"
+                resetValue={defaultConfig.reward.lean_activation_penalty}
+                step="0.001"
+                value={config.reward.lean_activation_penalty}
+                onChange={(value) => updateReward({ lean_activation_penalty: value })}
+              />
+              <NumberField
+                help="Small penalty for grounded pitch requests above the penalty threshold. This does not clamp controller pitch."
+                label="Grounded pitch penalty"
+                resetValue={defaultConfig.reward.grounded_pitch_penalty}
+                step="0.001"
+                value={config.reward.grounded_pitch_penalty}
+                onChange={(value) => updateReward({ grounded_pitch_penalty: value })}
+              />
+              <RangeNumberField
+                help="Threshold used only by grounded pitch penalty. It does not alter the pitch sent to the controller."
+                label="Pitch penalty threshold"
+                max={0.5}
+                min={0}
+                rangeStep={0.01}
+                resetValue={defaultConfig.action.pitch_deadzone}
+                ticks={[
+                  { label: "0", value: 0 },
+                  { label: "0.1", value: 0.1 },
+                  { label: "0.25", value: 0.25 },
+                  { label: "0.5", value: 0.5 },
+                ]}
+                value={config.action.pitch_deadzone}
+                onChange={(value) => updateAction({ pitch_deadzone: value })}
+              />
+            </div>
+          </section>
         </div>
       </ConfigDisclosure>
     </>
