@@ -41,6 +41,9 @@ def test_live_episode_tracker_uses_decision_frames_only() -> None:
                 "episode_step": 6,
                 "episode_completion_fraction": 0.25,
                 "speed_kph": 420.0,
+                "progress_speed_multiplier": 0.95,
+                "position_progress_multiplier": 1.1,
+                "progress_speed_position_multiplier": 1.045,
             },
             episode_reward=1.5,
             telemetry_data={
@@ -62,6 +65,9 @@ def test_live_episode_tracker_uses_decision_frames_only() -> None:
     assert snapshot.env_steps == (3,)
     assert snapshot.speed_kph == (420.0,)
     assert snapshot.returns == (1.5,)
+    assert snapshot.progress_speed_multiplier == (0.95,)
+    assert snapshot.position_progress_multiplier == (1.1,)
+    assert snapshot.progress_speed_position_multiplier == (1.045,)
     assert snapshot.lateral_offset == (-8.25,)
     assert snapshot.outside_edge_excess_ratio == pytest.approx((0.1785714286,))
     assert snapshot.future_local_nearest_segment_distance == (32.5,)
@@ -120,6 +126,9 @@ def test_live_episode_tracker_resets_on_new_episode() -> None:
     assert snapshot.env_steps == (1,)
     assert snapshot.speed_kph == (180.0,)
     assert snapshot.returns == (0.1,)
+    assert snapshot.progress_speed_multiplier == (1.0,)
+    assert snapshot.position_progress_multiplier == (1.0,)
+    assert snapshot.progress_speed_position_multiplier == (1.0,)
     assert snapshot.lateral_offset == (0.0,)
     assert snapshot.outside_edge_excess_ratio == (0.0,)
     assert snapshot.future_local_nearest_segment_distance == (0.0,)

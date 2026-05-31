@@ -32,6 +32,8 @@ class ManagedRewardConfig(BaseModel):
     progress_speed_max_kph: PositiveFloat = 1_500.0
     progress_speed_max_multiplier: NonNegativeFloat = 1.0
     progress_speed_curve_power: PositiveFloat = 1.0
+    position_progress_min_multiplier: NonNegativeFloat = 1.0
+    position_progress_max_multiplier: NonNegativeFloat = 1.0
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
@@ -75,4 +77,8 @@ class ManagedRewardConfig(BaseModel):
             raise ValueError("progress_speed_reference_kph must be greater than min kph")
         if self.progress_speed_max_kph <= self.progress_speed_reference_kph:
             raise ValueError("progress_speed_max_kph must be greater than reference kph")
+        if self.position_progress_min_multiplier > self.position_progress_max_multiplier:
+            raise ValueError(
+                "position_progress_min_multiplier must be <= position_progress_max_multiplier"
+            )
         return self

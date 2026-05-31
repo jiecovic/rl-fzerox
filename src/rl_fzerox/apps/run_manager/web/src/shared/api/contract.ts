@@ -301,6 +301,8 @@ const rewardConfigSchema = z
     progress_speed_max_kph: z.number().positive(),
     progress_speed_max_multiplier: z.number().nonnegative(),
     progress_speed_curve_power: z.number().positive(),
+    position_progress_min_multiplier: z.number().nonnegative(),
+    position_progress_max_multiplier: z.number().nonnegative(),
     outside_track_recovery_reward: z.number().nonnegative(),
     outside_track_recovery_reward_cap: z.number().nonnegative(),
     outside_track_recovery_airborne_grace_frames: z.number().int().nonnegative(),
@@ -349,7 +351,14 @@ const rewardConfigSchema = z
   .refine((reward) => reward.progress_speed_max_kph > reward.progress_speed_reference_kph, {
     message: "progress_speed_max_kph must be greater than reference kph",
     path: ["progress_speed_max_kph"],
-  });
+  })
+  .refine(
+    (reward) => reward.position_progress_min_multiplier <= reward.position_progress_max_multiplier,
+    {
+      message: "position_progress_min_multiplier must be <= position_progress_max_multiplier",
+      path: ["position_progress_min_multiplier"],
+    },
+  );
 
 export const managedRunConfigSchema = z.object({
   version: z.literal(1),

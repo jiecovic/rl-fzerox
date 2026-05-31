@@ -1423,6 +1423,8 @@
       "outside_track_recovery_airborne_grace_frames": 30,
       "outside_track_recovery_reward": 0.0,
       "outside_track_recovery_reward_cap": 0.1,
+      "position_progress_max_multiplier": 1.0,
+      "position_progress_min_multiplier": 1.0,
       "progress_bucket_distance": 25.0,
       "progress_bucket_reward": 0.05,
       "progress_reward_interval_frames": 1,

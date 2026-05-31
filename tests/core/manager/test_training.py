@@ -57,6 +57,8 @@ def test_default_manager_training_bridge_uses_configured_hybrid_defaults(
     assert train_config.train.algorithm == "maskable_hybrid_recurrent_ppo"
     assert train_config.reward.name == "reward_main"
     assert train_config.reward.suspend_progress_while_outside_track_bounds is True
+    assert train_config.reward.position_progress_min_multiplier == pytest.approx(1.0)
+    assert train_config.reward.position_progress_max_multiplier == pytest.approx(1.0)
     assert train_config.train.explicit_run_dir == tmp_path / "runs" / "bridge-default_0001"
     assert train_config.emulator.renderer == "gliden64"
     assert train_config.env.camera_setting == "close_behind"
@@ -243,6 +245,8 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     config.reward.outside_track_recovery_reward_cap = 0.075
     config.reward.outside_track_recovery_airborne_grace_frames = 45
     config.reward.airborne_landing_grace_frames = 60
+    config.reward.position_progress_min_multiplier = 0.95
+    config.reward.position_progress_max_multiplier = 1.15
 
     train_config = build_managed_train_app_config(
         config,
@@ -254,6 +258,8 @@ def test_manager_training_bridge_projects_outside_track_recovery_reward(
     assert train_config.reward.outside_track_recovery_reward_cap == pytest.approx(0.075)
     assert train_config.reward.outside_track_recovery_airborne_grace_frames == 45
     assert train_config.reward.airborne_landing_grace_frames == 60
+    assert train_config.reward.position_progress_min_multiplier == pytest.approx(0.95)
+    assert train_config.reward.position_progress_max_multiplier == pytest.approx(1.15)
 
 
 def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
@@ -266,6 +272,8 @@ def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
     config.tracks.step_balance_max_weight_scale = 3.5
     config.tracks.adaptive_step_balance_completion_weight = 0.45
     config.tracks.adaptive_step_balance_target_completion = 0.85
+    config.tracks.adaptive_step_balance_min_confidence_episodes = 32
+    config.tracks.adaptive_step_balance_confidence_scale = 2.5
 
     train_config = build_managed_train_app_config(
         config,
@@ -282,6 +290,10 @@ def test_manager_training_bridge_projects_adaptive_track_sampling_settings(
     )
     assert train_config.env.track_sampling.adaptive_step_balance_target_completion == (
         pytest.approx(0.85)
+    )
+    assert train_config.env.track_sampling.adaptive_step_balance_min_confidence_episodes == 32
+    assert train_config.env.track_sampling.adaptive_step_balance_confidence_scale == (
+        pytest.approx(2.5)
     )
 
 

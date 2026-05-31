@@ -16,6 +16,7 @@ class FrontierReward:
     progress: float
     ground_effect_adjustment: float
     speed_adjustment: float
+    position_adjustment: float
     energy_refill_bonus: float
     energy_gain_reward: float
 
@@ -31,9 +32,11 @@ class FrontierProgressRewardTracker:
         self._pending_reward = 0.0
         self._pending_ground_effect_adjustment = 0.0
         self._pending_speed_adjustment = 0.0
+        self._pending_position_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
         self._pending_energy_gain_reward = 0.0
         self._pending_frames = 0
+        self._position_progress_total_racers: int | None = None
 
     @property
     def frontier_distance(self) -> float:
@@ -55,6 +58,7 @@ class FrontierProgressRewardTracker:
         self._progress.reset(telemetry)
         self._frontier_distance = 0.0
         self._frontier_bucket_index = 0
+        self._position_progress_total_racers = _telemetry_total_racers(telemetry)
         self._clear_pending()
 
     def reset_inactive(self) -> None:
@@ -62,6 +66,8 @@ class FrontierProgressRewardTracker:
 
     def ensure_origin(self, telemetry: FZeroXTelemetry) -> None:
         self._progress.ensure_origin(telemetry)
+        if self._position_progress_total_racers is None:
+            self._position_progress_total_racers = _telemetry_total_racers(telemetry)
 
     def relative_distance(self, race_distance: float) -> float:
         return self._progress.relative_distance(race_distance)
@@ -71,6 +77,7 @@ class FrontierProgressRewardTracker:
         summary: StepSummary,
         status: StepStatus,
         *,
+        telemetry: FZeroXTelemetry | None,
         weights: SharedRewardWeights,
         progress_multiplier: float,
         progress_suspended: bool = False,
@@ -99,6 +106,13 @@ class FrontierProgressRewardTracker:
             weights=weights,
         )
         speed_adjustment = surface_adjusted_progress * (speed_multiplier - 1.0)
+        speed_adjusted_progress = surface_adjusted_progress + speed_adjustment
+        position_multiplier = position_progress_multiplier(
+            telemetry,
+            weights=weights,
+            total_racers=self._position_progress_total_racers,
+        )
+        position_adjustment = speed_adjusted_progress * (position_multiplier - 1.0)
         energy_refill_bonus = energy_refill_bonus_for_progress(progress_reward)
         energy_gain_reward = energy_gain_reward_for_progress(progress_reward)
         interval_frames = max(int(weights.progress_reward_interval_frames), 1)
@@ -107,6 +121,7 @@ class FrontierProgressRewardTracker:
                 progress=progress_reward,
                 ground_effect_adjustment=ground_effect_adjustment,
                 speed_adjustment=speed_adjustment,
+                position_adjustment=position_adjustment,
                 energy_refill_bonus=energy_refill_bonus,
                 energy_gain_reward=energy_gain_reward,
             )
@@ -115,6 +130,7 @@ class FrontierProgressRewardTracker:
         self._pending_reward += progress_reward
         self._pending_ground_effect_adjustment += ground_effect_adjustment
         self._pending_speed_adjustment += speed_adjustment
+        self._pending_position_adjustment += position_adjustment
         self._pending_energy_refill_bonus += energy_refill_bonus
         self._pending_energy_gain_reward += energy_gain_reward
         self._pending_frames += max(int(summary.frames_run), 0)
@@ -127,6 +143,7 @@ class FrontierProgressRewardTracker:
                 progress=0.0,
                 ground_effect_adjustment=0.0,
                 speed_adjustment=0.0,
+                position_adjustment=0.0,
                 energy_refill_bonus=0.0,
                 energy_gain_reward=0.0,
             )
@@ -134,6 +151,7 @@ class FrontierProgressRewardTracker:
         pending_reward = self._pending_reward
         pending_ground_effect_adjustment = self._pending_ground_effect_adjustment
         pending_speed_adjustment = self._pending_speed_adjustment
+        pending_position_adjustment = self._pending_position_adjustment
         pending_refill_bonus = self._pending_energy_refill_bonus
         pending_gain_reward = self._pending_energy_gain_reward
         self._clear_pending()
@@ -141,6 +159,7 @@ class FrontierProgressRewardTracker:
             progress=pending_reward,
             ground_effect_adjustment=pending_ground_effect_adjustment,
             speed_adjustment=pending_speed_adjustment,
+            position_adjustment=pending_position_adjustment,
             energy_refill_bonus=pending_refill_bonus,
             energy_gain_reward=pending_gain_reward,
         )
@@ -167,6 +186,9 @@ class FrontierProgressRewardTracker:
             "progress_speed_max_kph": weights.progress_speed_max_kph,
             "progress_speed_max_multiplier": weights.progress_speed_max_multiplier,
             "progress_speed_curve_power": weights.progress_speed_curve_power,
+            "position_progress_min_multiplier": weights.position_progress_min_multiplier,
+            "position_progress_max_multiplier": weights.position_progress_max_multiplier,
+            "position_progress_total_racers": self._position_progress_total_racers,
             "pending_progress_reward_delta": self._pending_delta,
             "pending_progress_reward_frames": self._pending_frames,
         }
@@ -174,6 +196,15 @@ class FrontierProgressRewardTracker:
             return info
         self._progress.ensure_origin(telemetry)
         info["relative_progress"] = self._progress.relative_distance(telemetry.player.race_distance)
+        speed_multiplier = progress_speed_multiplier(telemetry.player.speed_kph, weights=weights)
+        position_multiplier = position_progress_multiplier(
+            telemetry,
+            weights=weights,
+            total_racers=self._position_progress_total_racers,
+        )
+        info["progress_speed_multiplier"] = speed_multiplier
+        info["position_progress_multiplier"] = position_multiplier
+        info["progress_speed_position_multiplier"] = speed_multiplier * position_multiplier
         return info
 
     def _clear_pending(self) -> None:
@@ -181,6 +212,7 @@ class FrontierProgressRewardTracker:
         self._pending_reward = 0.0
         self._pending_ground_effect_adjustment = 0.0
         self._pending_speed_adjustment = 0.0
+        self._pending_position_adjustment = 0.0
         self._pending_energy_refill_bonus = 0.0
         self._pending_energy_gain_reward = 0.0
         self._pending_frames = 0
@@ -202,6 +234,7 @@ def zero_frontier_reward() -> FrontierReward:
         progress=0.0,
         ground_effect_adjustment=0.0,
         speed_adjustment=0.0,
+        position_adjustment=0.0,
         energy_refill_bonus=0.0,
         energy_gain_reward=0.0,
     )
@@ -225,6 +258,33 @@ def progress_speed_multiplier(speed_kph: float, *, weights: SharedRewardWeights)
     shaped_ratio = 1.0 - ((1.0 - ratio) ** curve_power)
     max_multiplier = max(float(weights.progress_speed_max_multiplier), 0.0)
     return 1.0 + ((max_multiplier - 1.0) * shaped_ratio)
+
+
+def position_progress_multiplier(
+    telemetry: FZeroXTelemetry | None,
+    *,
+    weights: SharedRewardWeights,
+    total_racers: int | None = None,
+) -> float:
+    if telemetry is None:
+        return 1.0
+    resolved_total_racers = max(
+        int(telemetry.total_racers if total_racers is None else total_racers),
+        1,
+    )
+    if resolved_total_racers <= 1:
+        return 1.0
+    position = min(max(int(telemetry.player.position), 1), resolved_total_racers)
+    rank_score = (resolved_total_racers - position) / (resolved_total_racers - 1)
+    min_multiplier = max(float(weights.position_progress_min_multiplier), 0.0)
+    max_multiplier = max(float(weights.position_progress_max_multiplier), min_multiplier)
+    return min_multiplier + ((max_multiplier - min_multiplier) * rank_score)
+
+
+def _telemetry_total_racers(telemetry: FZeroXTelemetry | None) -> int | None:
+    if telemetry is None:
+        return None
+    return max(int(telemetry.total_racers), 1)
 
 
 def _suspend_progress_while_outside_track_bounds(*, weights: SharedRewardWeights) -> bool:

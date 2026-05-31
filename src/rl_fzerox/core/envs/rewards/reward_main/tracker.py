@@ -199,6 +199,9 @@ class RewardMainTracker:
         if frontier_reward.speed_adjustment:
             reward += frontier_reward.speed_adjustment
             breakdown["speed_progress"] = frontier_reward.speed_adjustment
+        if frontier_reward.position_adjustment:
+            reward += frontier_reward.position_adjustment
+            breakdown["position_progress"] = frontier_reward.position_adjustment
         if frontier_reward.energy_refill_bonus:
             reward += frontier_reward.energy_refill_bonus
             breakdown["energy_refill_progress"] = frontier_reward.energy_refill_bonus
@@ -412,6 +415,7 @@ class RewardMainTracker:
         return self._progress.step(
             summary,
             status,
+            telemetry=telemetry,
             weights=self._weights,
             progress_multiplier=progress_multiplier,
             progress_suspended=progress_suspended,

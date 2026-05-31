@@ -26,6 +26,9 @@ class EpisodeLiveSeriesSnapshot:
     env_steps: tuple[int, ...]
     speed_kph: tuple[float, ...]
     returns: tuple[float, ...]
+    progress_speed_multiplier: tuple[float, ...]
+    position_progress_multiplier: tuple[float, ...]
+    progress_speed_position_multiplier: tuple[float, ...]
     lateral_offset: tuple[float, ...]
     outside_edge_excess_ratio: tuple[float, ...]
     future_local_nearest_segment_distance: tuple[float, ...]
@@ -41,6 +44,9 @@ class EpisodeLiveSeriesTracker:
     env_steps: list[int] = field(default_factory=list)
     speed_kph: list[float] = field(default_factory=list)
     returns: list[float] = field(default_factory=list)
+    progress_speed_multiplier: list[float] = field(default_factory=list)
+    position_progress_multiplier: list[float] = field(default_factory=list)
+    progress_speed_position_multiplier: list[float] = field(default_factory=list)
     lateral_offset: list[float] = field(default_factory=list)
     outside_edge_excess_ratio: list[float] = field(default_factory=list)
     future_local_nearest_segment_distance: list[float] = field(default_factory=list)
@@ -60,6 +66,9 @@ class EpisodeLiveSeriesTracker:
             self.env_steps = []
             self.speed_kph = []
             self.returns = []
+            self.progress_speed_multiplier = []
+            self.position_progress_multiplier = []
+            self.progress_speed_position_multiplier = []
             self.lateral_offset = []
             self.outside_edge_excess_ratio = []
             self.future_local_nearest_segment_distance = []
@@ -72,6 +81,17 @@ class EpisodeLiveSeriesTracker:
         env_step = _env_step(snapshot.info, action_repeat=action_repeat)
         progress = _progress_fraction(snapshot.info)
         speed_kph = _speed_kph(snapshot.info)
+        speed_multiplier = _info_float(snapshot.info, "progress_speed_multiplier", default=1.0)
+        position_multiplier = _info_float(
+            snapshot.info,
+            "position_progress_multiplier",
+            default=1.0,
+        )
+        combined_multiplier = _info_float(
+            snapshot.info,
+            "progress_speed_position_multiplier",
+            default=speed_multiplier * position_multiplier,
+        )
         lateral_offset = _player_telemetry_float(snapshot, "signed_lateral_offset")
         outside_edge_excess_ratio = _outside_edge_excess_ratio(snapshot)
         future_distance = _player_telemetry_float(
@@ -89,6 +109,9 @@ class EpisodeLiveSeriesTracker:
         if self.env_steps and env_step == self.env_steps[-1]:
             self.speed_kph[-1] = speed_kph
             self.returns[-1] = self.current_return
+            self.progress_speed_multiplier[-1] = speed_multiplier
+            self.position_progress_multiplier[-1] = position_multiplier
+            self.progress_speed_position_multiplier[-1] = combined_multiplier
             self.lateral_offset[-1] = lateral_offset
             self.outside_edge_excess_ratio[-1] = outside_edge_excess_ratio
             self.future_local_nearest_segment_distance[-1] = future_distance
@@ -96,6 +119,9 @@ class EpisodeLiveSeriesTracker:
         self.env_steps.append(env_step)
         self.speed_kph.append(speed_kph)
         self.returns.append(self.current_return)
+        self.progress_speed_multiplier.append(speed_multiplier)
+        self.position_progress_multiplier.append(position_multiplier)
+        self.progress_speed_position_multiplier.append(combined_multiplier)
         self.lateral_offset.append(lateral_offset)
         self.outside_edge_excess_ratio.append(outside_edge_excess_ratio)
         self.future_local_nearest_segment_distance.append(future_distance)
@@ -108,6 +134,9 @@ class EpisodeLiveSeriesTracker:
             env_steps=tuple(self.env_steps),
             speed_kph=tuple(self.speed_kph),
             returns=tuple(self.returns),
+            progress_speed_multiplier=tuple(self.progress_speed_multiplier),
+            position_progress_multiplier=tuple(self.position_progress_multiplier),
+            progress_speed_position_multiplier=tuple(self.progress_speed_position_multiplier),
             lateral_offset=tuple(self.lateral_offset),
             outside_edge_excess_ratio=tuple(self.outside_edge_excess_ratio),
             future_local_nearest_segment_distance=tuple(self.future_local_nearest_segment_distance),
@@ -137,10 +166,14 @@ def _progress_fraction(info: dict[str, object]) -> float:
 
 
 def _speed_kph(info: dict[str, object]) -> float:
-    value = info.get("speed_kph")
+    return max(0.0, _info_float(info, "speed_kph"))
+
+
+def _info_float(info: dict[str, object], key: str, *, default: float = 0.0) -> float:
+    value = info.get(key)
     if isinstance(value, int | float) and not isinstance(value, bool):
-        return max(0.0, float(value))
-    return 0.0
+        return float(value)
+    return default
 
 
 def _player_telemetry_float(snapshot: _LiveEpisodeSnapshot, key: str) -> float:

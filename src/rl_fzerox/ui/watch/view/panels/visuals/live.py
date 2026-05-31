@@ -28,6 +28,8 @@ class _LiveChartStyle:
     line_width: int = 2
     return_color: tuple[int, int, int] = (111, 211, 255)
     progress_color: tuple[int, int, int] = PALETTE.text_accent
+    position_multiplier_color: tuple[int, int, int] = (255, 196, 91)
+    combined_multiplier_color: tuple[int, int, int] = (195, 165, 255)
     lateral_offset_color: tuple[int, int, int] = (255, 132, 132)
     outside_edge_excess_ratio_color: tuple[int, int, int] = (175, 220, 135)
     future_segment_distance_color: tuple[int, int, int] = (190, 165, 255)
@@ -37,6 +39,12 @@ class _LiveChartStyle:
 
 
 LIVE_CHART_STYLE = _LiveChartStyle()
+
+
+@dataclass(frozen=True, slots=True)
+class _PlotSeries:
+    y_values: tuple[float, ...]
+    color: tuple[int, int, int]
 
 
 def _draw_live_tab(
@@ -148,7 +156,7 @@ def _draw_live_tab(
         fonts=fonts,
         x=x,
         y=third_row_y,
-        width=width,
+        width=block_width,
         height=block_height,
         title="Future segment distance",
         summary=_future_segment_distance_summary(live_series),
@@ -158,6 +166,35 @@ def _draw_live_tab(
         fixed_range=None,
         zero_line=False,
         plot_height=plot_height,
+    )
+    _draw_chart_block(
+        pygame=pygame,
+        screen=screen,
+        fonts=fonts,
+        x=right_x,
+        y=third_row_y,
+        width=block_width,
+        height=block_height,
+        title="Progress multipliers",
+        summary=_multiplier_summary(live_series),
+        x_values=() if live_series is None else live_series.env_steps,
+        y_values=() if live_series is None else live_series.progress_speed_multiplier,
+        color=LIVE_CHART_STYLE.progress_color,
+        fixed_range=_multiplier_range(live_series),
+        zero_line=False,
+        plot_height=plot_height,
+        extra_series=(
+            _PlotSeries(
+                y_values=() if live_series is None else live_series.position_progress_multiplier,
+                color=LIVE_CHART_STYLE.position_multiplier_color,
+            ),
+            _PlotSeries(
+                y_values=(
+                    () if live_series is None else live_series.progress_speed_position_multiplier
+                ),
+                color=LIVE_CHART_STYLE.combined_multiplier_color,
+            ),
+        ),
     )
 
 
@@ -211,6 +248,7 @@ def _draw_chart_block(
     fixed_range: tuple[float, float] | None,
     zero_line: bool,
     plot_height: int,
+    extra_series: tuple[_PlotSeries, ...] = (),
 ) -> None:
     rect = pygame.Rect(x, y, width, height)
     pygame.draw.rect(
@@ -267,8 +305,7 @@ def _draw_chart_block(
         screen=screen,
         rect=plot_rect,
         x_values=x_values,
-        y_values=y_values,
-        color=color,
+        series=(_PlotSeries(y_values=y_values, color=color), *extra_series),
         fixed_range=fixed_range,
         zero_line=zero_line,
     )
@@ -290,18 +327,19 @@ def _draw_plot_series(
     screen: PygameSurface,
     rect: PygameRect,
     x_values: tuple[int, ...],
-    y_values: tuple[float, ...],
-    color: tuple[int, int, int],
+    series: tuple[_PlotSeries, ...],
     fixed_range: tuple[float, float] | None,
     zero_line: bool,
 ) -> None:
-    if len(x_values) != len(y_values):
+    valid_series = tuple(line for line in series if len(line.y_values) == len(x_values))
+    if not valid_series:
         return
     x_start = x_values[0]
     x_end = max(x_values[-1], x_start + 1)
     if fixed_range is None:
-        y_min = min(min(y_values), 0.0)
-        y_max = max(max(y_values), 0.0)
+        series_values = tuple(value for line in valid_series for value in line.y_values)
+        y_min = min(min(series_values), 0.0)
+        y_max = max(max(series_values), 0.0)
         if y_min == y_max:
             span = max(1.0, abs(y_min) * 0.1)
             y_min -= span
@@ -309,13 +347,6 @@ def _draw_plot_series(
     else:
         y_min, y_max = fixed_range
     span = max(1e-6, y_max - y_min)
-    points = [
-        (
-            rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
-            rect.y + rect.height - 1 - int(round((value - y_min) / span * max(1, rect.height - 1))),
-        )
-        for step, value in zip(x_values, y_values, strict=False)
-    ]
     mid_y = rect.y + rect.height // 2
     pygame.draw.line(
         screen,
@@ -335,10 +366,21 @@ def _draw_plot_series(
             (rect.x + rect.width, zero_y),
             width=1,
         )
-    if len(points) == 1:
-        pygame.draw.circle(screen, color, points[0], 3)
-        return
-    pygame.draw.lines(screen, color, False, points, LIVE_CHART_STYLE.line_width)
+    for line in valid_series:
+        points = [
+            (
+                rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
+                rect.y
+                + rect.height
+                - 1
+                - int(round((value - y_min) / span * max(1, rect.height - 1))),
+            )
+            for step, value in zip(x_values, line.y_values, strict=False)
+        ]
+        if len(points) == 1:
+            pygame.draw.circle(screen, line.color, points[0], 3)
+        else:
+            pygame.draw.lines(screen, line.color, False, points, LIVE_CHART_STYLE.line_width)
 
 
 def _speed_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
@@ -355,6 +397,34 @@ def _return_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     current_return = live_series.current_return
     max_progress = live_series.max_progress * 100.0
     return f"now {current_return:+.4f} · max progress {max_progress:.1f}%"
+
+
+def _multiplier_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
+    if live_series is None or not live_series.progress_speed_position_multiplier:
+        return "speed - · position - · total -"
+    speed = live_series.progress_speed_multiplier[-1]
+    position = live_series.position_progress_multiplier[-1]
+    total = live_series.progress_speed_position_multiplier[-1]
+    return f"speed {speed:.2f}x · position {position:.2f}x · total {total:.2f}x"
+
+
+def _multiplier_range(live_series: EpisodeLiveSeriesSnapshot | None) -> tuple[float, float] | None:
+    if live_series is None:
+        return None
+    values = (
+        *live_series.progress_speed_multiplier,
+        *live_series.position_progress_multiplier,
+        *live_series.progress_speed_position_multiplier,
+        1.0,
+    )
+    if not values:
+        return None
+    lower = max(0.0, min(values))
+    upper = max(values)
+    if lower == upper:
+        return (max(0.0, lower - 0.1), upper + 0.1)
+    padding = max(0.05, (upper - lower) * 0.1)
+    return (max(0.0, lower - padding), upper + padding)
 
 
 def _lateral_offset_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
