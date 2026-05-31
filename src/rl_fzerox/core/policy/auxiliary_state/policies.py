@@ -130,16 +130,9 @@ class _AuxiliaryStatePolicyMixin:
         self._grounded_pitch_neutral_loss_weight = _grounded_pitch_neutral_loss_weight(
             actor_regularization
         )
-        self._continuous_pitch_index = _continuous_pitch_index(
-            continuous_action_group_names
-        )
-        if (
-            self._grounded_pitch_neutral_loss_weight > 0.0
-            and self._continuous_pitch_index is None
-        ):
-            raise ValueError(
-                "grounded pitch neutral loss requires a continuous pitch action group"
-            )
+        self._continuous_pitch_index = _continuous_pitch_index(continuous_action_group_names)
+        if self._grounded_pitch_neutral_loss_weight > 0.0 and self._continuous_pitch_index is None:
+            raise ValueError("grounded pitch neutral loss requires a continuous pitch action group")
 
     def _auxiliary_state_loss(
         self,
@@ -186,9 +179,7 @@ class _AuxiliaryStatePolicyMixin:
             total_loss=weighted_loss,
             metrics={
                 "actor/grounded_pitch_neutral": float(loss_value.detach().cpu().item()),
-                "actor/grounded_pitch_neutral_weighted": float(
-                    weighted_loss.detach().cpu().item()
-                ),
+                "actor/grounded_pitch_neutral_weighted": float(weighted_loss.detach().cpu().item()),
             },
         )
 
