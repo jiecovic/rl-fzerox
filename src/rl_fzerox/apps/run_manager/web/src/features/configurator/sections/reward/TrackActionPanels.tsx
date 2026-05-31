@@ -42,6 +42,22 @@ export function TrackActionPanels({
             onChange={(value) => updateReward({ lap_position_scale: value })}
           />
           <NumberField
+            help="Progress reward multiplier at last place. Single-racer modes stay at 1x."
+            label="Position progress min"
+            resetValue={defaultConfig.reward.position_progress_min_multiplier}
+            step="0.01"
+            value={config.reward.position_progress_min_multiplier}
+            onChange={(value) => updateReward({ position_progress_min_multiplier: value })}
+          />
+          <NumberField
+            help="Progress reward multiplier at first place. Intermediate positions are linearly interpolated."
+            label="Position progress max"
+            resetValue={defaultConfig.reward.position_progress_max_multiplier}
+            step="0.01"
+            value={config.reward.position_progress_max_multiplier}
+            onChange={(value) => updateReward({ position_progress_max_multiplier: value })}
+          />
+          <NumberField
             help="Reward for each newly gained KO star in GP race. This is ignored outside GP race."
             label="KO star reward"
             resetValue={defaultConfig.reward.ko_star_reward}

@@ -78,6 +78,8 @@ class RewardCourseOverrideConfig(BaseModel):
     progress_speed_max_kph: PositiveFloat | None = None
     progress_speed_max_multiplier: NonNegativeFloat | None = None
     progress_speed_curve_power: PositiveFloat | None = None
+    position_progress_min_multiplier: NonNegativeFloat | None = None
+    position_progress_max_multiplier: NonNegativeFloat | None = None
     outside_track_recovery_reward: NonNegativeFloat | None = None
     outside_track_recovery_reward_cap: NonNegativeFloat | None = None
     outside_track_recovery_airborne_grace_frames: NonNegativeInt | None = None
@@ -120,6 +122,10 @@ class RewardCourseOverrideConfig(BaseModel):
             reference_kph=self.progress_speed_reference_kph,
             max_kph=self.progress_speed_max_kph,
         )
+        _validate_position_progress_bounds(
+            min_multiplier=self.position_progress_min_multiplier,
+            max_multiplier=self.position_progress_max_multiplier,
+        )
         return self
 
 
@@ -141,6 +147,8 @@ class RewardConfig(BaseModel):
     progress_speed_max_kph: PositiveFloat = 1_500.0
     progress_speed_max_multiplier: NonNegativeFloat = 1.0
     progress_speed_curve_power: PositiveFloat = 1.0
+    position_progress_min_multiplier: NonNegativeFloat = 1.0
+    position_progress_max_multiplier: NonNegativeFloat = 1.0
     outside_track_recovery_reward: NonNegativeFloat = 0.0
     outside_track_recovery_reward_cap: NonNegativeFloat = 0.1
     outside_track_recovery_airborne_grace_frames: NonNegativeInt = 30
@@ -184,6 +192,10 @@ class RewardConfig(BaseModel):
             reference_kph=self.progress_speed_reference_kph,
             max_kph=self.progress_speed_max_kph,
         )
+        _validate_position_progress_bounds(
+            min_multiplier=self.position_progress_min_multiplier,
+            max_multiplier=self.position_progress_max_multiplier,
+        )
         return self
 
 
@@ -206,6 +218,21 @@ def _validate_progress_speed_bounds(
         raise ValueError("progress_speed_reference_kph must be greater than min kph")
     if reference_kph is not None and max_kph is not None and max_kph <= reference_kph:
         raise ValueError("progress_speed_max_kph must be greater than reference kph")
+
+
+def _validate_position_progress_bounds(
+    *,
+    min_multiplier: float | None,
+    max_multiplier: float | None,
+) -> None:
+    if (
+        min_multiplier is not None
+        and max_multiplier is not None
+        and min_multiplier > max_multiplier
+    ):
+        raise ValueError(
+            "position_progress_min_multiplier must be <= position_progress_max_multiplier"
+        )
 
 
 class EmulatorConfig(BaseModel):

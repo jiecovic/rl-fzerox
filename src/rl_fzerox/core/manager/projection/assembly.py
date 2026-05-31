@@ -86,6 +86,8 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "progress_speed_max_kph": reward.progress_speed_max_kph,
         "progress_speed_max_multiplier": reward.progress_speed_max_multiplier,
         "progress_speed_curve_power": reward.progress_speed_curve_power,
+        "position_progress_min_multiplier": reward.position_progress_min_multiplier,
+        "position_progress_max_multiplier": reward.position_progress_max_multiplier,
         "outside_track_recovery_reward": reward.outside_track_recovery_reward,
         "outside_track_recovery_reward_cap": reward.outside_track_recovery_reward_cap,
         "outside_track_recovery_airborne_grace_frames": (

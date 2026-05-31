@@ -47,6 +47,8 @@ export function trackEventDefaults(reward: RewardConfig): RewardPatch {
     ko_star_reward: reward.ko_star_reward,
     lap_completion_bonus: reward.lap_completion_bonus,
     lap_position_scale: reward.lap_position_scale,
+    position_progress_max_multiplier: reward.position_progress_max_multiplier,
+    position_progress_min_multiplier: reward.position_progress_min_multiplier,
   };
 }
 

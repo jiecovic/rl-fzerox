@@ -53,6 +53,8 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "progress_speed_max_kph": 1_500.0,
         "progress_speed_max_multiplier": 1.5,
         "progress_speed_curve_power": 2.0,
+        "position_progress_min_multiplier": 0.8,
+        "position_progress_max_multiplier": 1.25,
         "outside_track_recovery_reward": 0.125,
         "outside_track_recovery_reward_cap": 0.75,
         "outside_track_recovery_airborne_grace_frames": 11,
@@ -844,6 +846,91 @@ def test_reward_main_speed_curve_can_start_above_zero_speed() -> None:
     }
 
 
+def test_reward_main_scales_progress_by_race_position() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            position_progress_min_multiplier=0.9,
+            position_progress_max_multiplier=1.2,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, position=30))
+
+    first_place = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, position=1),
+    )
+    last_place = tracker.step_summary(
+        _summary(max_race_distance=200.0),
+        _status(step_count=2),
+        _telemetry(race_distance=200.0, position=30),
+    )
+
+    assert first_place.reward == pytest.approx(1.2)
+    assert first_place.breakdown == {
+        "frontier_progress": 1.0,
+        "position_progress": pytest.approx(0.2),
+    }
+    assert last_place.reward == pytest.approx(0.9)
+    assert last_place.breakdown == {
+        "frontier_progress": 1.0,
+        "position_progress": pytest.approx(-0.1),
+    }
+
+
+def test_reward_main_position_progress_multiplier_is_neutral_for_single_racer() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            position_progress_min_multiplier=0.8,
+            position_progress_max_multiplier=1.2,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, position=1, total_racers=1))
+
+    reward = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, position=1, total_racers=1),
+    )
+
+    assert reward.reward == pytest.approx(1.0)
+    assert reward.breakdown == {"frontier_progress": 1.0}
+
+
+def test_reward_main_position_progress_uses_episode_start_racer_count() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_distance=100.0,
+            progress_bucket_reward=1.0,
+            position_progress_min_multiplier=0.9,
+            position_progress_max_multiplier=1.2,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+        )
+    )
+    tracker.reset(_telemetry(race_distance=0.0, position=30, total_racers=30))
+
+    after_one_racer_dropped = tracker.step_summary(
+        _summary(max_race_distance=100.0),
+        _status(step_count=1),
+        _telemetry(race_distance=100.0, position=29, total_racers=29),
+    )
+
+    assert after_one_racer_dropped.reward == pytest.approx(0.9103448276)
+    assert after_one_racer_dropped.breakdown == {
+        "frontier_progress": 1.0,
+        "position_progress": pytest.approx(-0.0896551724),
+    }
+
+
 def test_reward_main_does_not_repay_skipped_progress_after_reentry() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
@@ -1142,6 +1229,7 @@ def _telemetry(
     race_distance: float = 0.0,
     game_mode_name: str = "gp_race",
     state_labels: tuple[str, ...] = ("active",),
+    total_racers: int = 30,
     position: int = 30,
     energy: float = 178.0,
     ko_star_count: int = 0,
@@ -1167,6 +1255,7 @@ def _telemetry(
         state_flags |= _COURSE_EFFECT_PIT
     return make_telemetry(
         game_mode_name=game_mode_name,
+        total_racers=total_racers,
         race_distance=race_distance,
         state_labels=state_labels,
         state_flags=state_flags,
