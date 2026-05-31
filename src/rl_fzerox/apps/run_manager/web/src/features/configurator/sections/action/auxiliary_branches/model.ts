@@ -22,6 +22,8 @@ export function resetAuxiliaryBranchesAction({
     continuous_air_brake_min_duty: defaultAction.continuous_air_brake_min_duty,
     include_boost: checkpointLocked ? action.include_boost : defaultAction.include_boost,
     enable_boost: defaultAction.enable_boost,
+    mask_boost_when_active: defaultAction.mask_boost_when_active,
+    boost_request_lockout_frames: defaultAction.boost_request_lockout_frames,
     boost_unmask_max_speed_kph: defaultAction.boost_unmask_max_speed_kph,
     boost_min_energy_fraction: defaultAction.boost_min_energy_fraction,
     include_lean: checkpointLocked ? action.include_lean : defaultAction.include_lean,

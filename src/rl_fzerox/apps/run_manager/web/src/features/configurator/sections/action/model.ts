@@ -181,6 +181,12 @@ function boostOutputSummary(action: ManagedActionConfig): string {
   if (action.boost_min_energy_fraction > 0) {
     guards.push(`≥ ${Math.round(action.boost_min_energy_fraction * 100)}% energy`);
   }
+  if (action.mask_boost_when_active) {
+    guards.push("idle only");
+  }
+  if (action.boost_request_lockout_frames > 0) {
+    guards.push(`${action.boost_request_lockout_frames}f cooldown`);
+  }
   return guards.length > 0 ? `boost, ${guards.join(", ")}` : "boost";
 }
 

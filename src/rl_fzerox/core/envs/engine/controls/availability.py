@@ -21,6 +21,7 @@ def sync_dynamic_action_masks(
     control_state: ControlStateTracker,
     telemetry: FZeroXTelemetry | None,
     boost_min_energy_fraction: float,
+    mask_boost_when_active: bool,
 ) -> None:
     """Sync live telemetry-derived mask state into the action-mask controller."""
 
@@ -35,7 +36,8 @@ def sync_dynamic_action_masks(
     mask_controller.set_airborne(bool(telemetry.player.airborne))
 
     can_boost = telemetry_can_boost(telemetry)
-    can_boost = can_boost and not telemetry_boost_active(telemetry)
+    if mask_boost_when_active:
+        can_boost = can_boost and not telemetry_boost_active(telemetry)
     can_boost = can_boost and not telemetry.player.airborne
     can_boost = can_boost and telemetry.player.reverse_timer <= 0
     can_boost = can_boost and control_state.boost_action_allowed_by_timing()

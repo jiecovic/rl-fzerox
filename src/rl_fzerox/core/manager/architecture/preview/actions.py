@@ -74,6 +74,10 @@ def action_branch_previews(config: ManagedRunConfig) -> tuple[ActionBranchPrevie
                 boost_guards.insert(0, f"≤ {config.action.boost_unmask_max_speed_kph:g} kph")
             if config.action.boost_min_energy_fraction > 0:
                 boost_guards.append(f"≥ {config.action.boost_min_energy_fraction * 100:g}% energy")
+            if config.action.mask_boost_when_active:
+                boost_guards.append("idle only")
+            if config.action.boost_request_lockout_frames > 0:
+                boost_guards.append(f"{config.action.boost_request_lockout_frames:d}f cooldown")
             boost_mask_label = ", ".join(boost_guards) if boost_guards else None
         branches.append(
             ActionBranchPreview(

@@ -383,6 +383,84 @@ def test_env_action_masks_disable_boost_below_energy_threshold() -> None:
     assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
 
 
+def test_env_action_masks_disable_boost_while_dash_pad_boost_is_active_by_default() -> None:
+    env = FZeroXEnv(
+        backend=ScriptedStepBackend(
+            [],
+            reset_telemetry=_telemetry(
+                race_distance=0.0,
+                state_labels=("active", "can_boost", "dash_pad_boost"),
+            ),
+        ),
+        config=EnvConfig(action=configured_discrete_action("steer", "gas", "boost")),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
+
+
+def test_env_action_masks_can_allow_boost_while_dash_pad_boost_is_active() -> None:
+    env = FZeroXEnv(
+        backend=ScriptedStepBackend(
+            [],
+            reset_telemetry=_telemetry(
+                race_distance=0.0,
+                state_labels=("active", "can_boost", "dash_pad_boost"),
+            ),
+        ),
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                mask_boost_when_active=False,
+                boost_request_lockout_frames=0,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+
+    assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
+
+
+def test_env_action_masks_apply_boost_request_cooldown_without_active_boost_mask() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                status=make_step_status(step_count=1),
+            )
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                mask_boost_when_active=False,
+                boost_request_lockout_frames=5,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+    env.step(_discrete_gas_boost_action(boost_index=1))
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
+
+
 def test_env_action_masks_disable_boost_above_speed_threshold() -> None:
     backend = ScriptedStepBackend(
         [

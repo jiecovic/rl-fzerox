@@ -75,7 +75,6 @@ class ActionRuntimeDefaults:
     """Internal action timing defaults that are not exposed in YAML."""
 
     boost_decision_interval_frames: int = 1
-    boost_request_lockout_frames: int = 5
 
 
 ACTION_RUNTIME_DEFAULTS = ActionRuntimeDefaults()
@@ -159,6 +158,7 @@ class ActionRuntimeConfig:
     continuous_lean_deadzone: float
     lean_mode: LeanMode
     lean_output_mode: LeanOutputMode
+    mask_boost_when_active: bool
     boost_unmask_max_speed_kph: float | None
     boost_decision_interval_frames: int
     boost_request_lockout_frames: int
@@ -230,13 +230,14 @@ class ActionRuntimeConfig:
             continuous_lean_deadzone=float(config.continuous_lean_deadzone),
             lean_mode=config.lean_mode,
             lean_output_mode=config.lean_output_mode,
+            mask_boost_when_active=bool(config.mask_boost_when_active),
             boost_unmask_max_speed_kph=(
                 None
                 if config.boost_unmask_max_speed_kph is None
                 else float(config.boost_unmask_max_speed_kph)
             ),
             boost_decision_interval_frames=ACTION_RUNTIME_DEFAULTS.boost_decision_interval_frames,
-            boost_request_lockout_frames=ACTION_RUNTIME_DEFAULTS.boost_request_lockout_frames,
+            boost_request_lockout_frames=int(config.boost_request_lockout_frames),
             lean_unmask_min_speed_kph=(
                 None
                 if config.lean_unmask_min_speed_kph is None
@@ -270,6 +271,8 @@ class ActionConfig(BaseModel):
     continuous_lean_deadzone: float = Field(default=0.333333, ge=0.0, lt=1.0)
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     lean_output_mode: LeanOutputMode = "three_way"
+    mask_boost_when_active: bool = True
+    boost_request_lockout_frames: NonNegativeInt = 5
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None
     lean_initial_lockout_frames: NonNegativeInt = 0

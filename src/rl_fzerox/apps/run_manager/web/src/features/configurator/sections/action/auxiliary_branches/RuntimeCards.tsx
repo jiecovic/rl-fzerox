@@ -194,6 +194,41 @@ export function RuntimeCards({
               onChange={(value) => updateAction({ boost_min_energy_fraction: value / 100 })}
             />
           </div>
+          <div className="action-runtime-two-col">
+            <div className="field-shell">
+              <FieldLabel
+                help="When enabled, manual boost is masked while a manual boost or dash-pad boost effect is already active."
+                label="Mask while boosted"
+                onReset={() =>
+                  updateAction({ mask_boost_when_active: defaultAction.mask_boost_when_active })
+                }
+              />
+              <SegmentedChoiceStrip
+                ariaLabel="Boost active mask"
+                options={[
+                  {
+                    active: !action.mask_boost_when_active,
+                    key: "allow_while_boosted",
+                    label: "Off",
+                    onClick: () => updateAction({ mask_boost_when_active: false }),
+                  },
+                  {
+                    active: action.mask_boost_when_active,
+                    key: "mask_while_boosted",
+                    label: "On",
+                    onClick: () => updateAction({ mask_boost_when_active: true }),
+                  },
+                ]}
+              />
+            </div>
+            <IntegerField
+              help="After a manual boost request, keep the boost branch masked for this many native frames. Useful as the spam guard when the active-boost mask is off."
+              label="Request cooldown"
+              resetValue={defaultAction.boost_request_lockout_frames}
+              value={action.boost_request_lockout_frames}
+              onChange={(value) => updateAction({ boost_request_lockout_frames: value })}
+            />
+          </div>
         </fieldset>
       </section>
 

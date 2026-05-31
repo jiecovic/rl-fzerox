@@ -44,6 +44,8 @@ class ManagedActionConfig(BaseModel):
     continuous_air_brake_min_duty: float = Field(default=0.0, ge=0.0, le=1.0)
     include_boost: bool = True
     enable_boost: bool = True
+    mask_boost_when_active: bool = True
+    boost_request_lockout_frames: NonNegativeInt = 5
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     boost_min_energy_fraction: float = Field(default=0.1, ge=0.0, le=1.0)
     include_lean: bool = True
