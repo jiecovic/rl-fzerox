@@ -1442,6 +1442,8 @@
     "seed": 123,
     "tracks": {
       "adaptive_step_balance_completion_weight": 0.35,
+      "adaptive_step_balance_confidence_scale": 4.0,
+      "adaptive_step_balance_min_confidence_episodes": 24,
       "adaptive_step_balance_target_completion": 0.9,
       "include_x_cup": false,
       "race_mode": "time_attack",

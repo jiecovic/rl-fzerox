@@ -105,6 +105,8 @@ describe("RunTrackPoolPanel", () => {
       max_weight_scale: 5,
       adaptive_completion_weight: 0.35,
       adaptive_target_completion: 0.9,
+      adaptive_min_confidence_episodes: 24,
+      adaptive_confidence_scale: 4,
       update_count: 3,
       episodes_since_update: 17,
       entries: selectedCourses.map((course, index) => ({
@@ -222,6 +224,8 @@ describe("RunTrackPoolPanel", () => {
       max_weight_scale: 5,
       adaptive_completion_weight: 0.35,
       adaptive_target_completion: 0.9,
+      adaptive_min_confidence_episodes: 24,
+      adaptive_confidence_scale: 4,
       update_count: 1,
       episodes_since_update: 0,
       entries: selectedCourses.map((course) => ({
@@ -415,6 +419,8 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
     max_weight_scale: 5,
     adaptive_completion_weight: 0.35,
     adaptive_target_completion: 0.9,
+    adaptive_min_confidence_episodes: 24,
+    adaptive_confidence_scale: 4,
     update_count: 1,
     episodes_since_update: 0,
     entries: selectedCourses.map((course) => ({
@@ -447,6 +453,8 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
     max_weight_scale: 5,
     adaptive_completion_weight: 0.35,
     adaptive_target_completion: 0.9,
+    adaptive_min_confidence_episodes: 24,
+    adaptive_confidence_scale: 4,
     update_count: 1,
     episodes_since_update: 0,
     entries: ["abcd1234", "ef567890"].map((hash, index) => ({

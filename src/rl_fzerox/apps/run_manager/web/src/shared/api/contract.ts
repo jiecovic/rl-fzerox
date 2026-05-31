@@ -126,6 +126,8 @@ const tracksConfigSchema = z.object({
   step_balance_max_weight_scale: z.number().min(1),
   adaptive_step_balance_completion_weight: z.number().nonnegative(),
   adaptive_step_balance_target_completion: z.number().min(0).max(1),
+  adaptive_step_balance_min_confidence_episodes: z.number().int().positive(),
+  adaptive_step_balance_confidence_scale: z.number().min(1),
   selected_course_ids: z.array(z.string()),
 });
 
@@ -472,6 +474,8 @@ export const trackSamplingRuntimeStateSchema = z.object({
   max_weight_scale: z.number().min(1),
   adaptive_completion_weight: z.number().nonnegative(),
   adaptive_target_completion: z.number().min(0).max(1),
+  adaptive_min_confidence_episodes: z.number().int().positive(),
+  adaptive_confidence_scale: z.number().min(1),
   update_count: z.number().int().nonnegative(),
   episodes_since_update: z.number().int().nonnegative(),
   entries: z.array(trackSamplingRuntimeEntrySchema),

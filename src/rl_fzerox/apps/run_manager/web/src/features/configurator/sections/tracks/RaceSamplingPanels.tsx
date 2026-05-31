@@ -37,6 +37,8 @@ interface CourseSamplingPanelProps {
   samplingDefaults: Pick<
     TracksConfig,
     | "adaptive_step_balance_completion_weight"
+    | "adaptive_step_balance_confidence_scale"
+    | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
     | "step_balance_ema_alpha"
     | "step_balance_max_weight_scale"
@@ -224,6 +226,22 @@ function AdaptiveSamplingFields({
         step="0.1"
         value={config.tracks.step_balance_max_weight_scale}
         onChange={(value) => updateTracks({ step_balance_max_weight_scale: value })}
+      />
+      <IntegerField
+        help="Courses below this many sampled episodes receive extra pressure before difficulty takes over."
+        label="Min confidence episodes"
+        min={1}
+        resetValue={defaultConfig.tracks.adaptive_step_balance_min_confidence_episodes}
+        value={config.tracks.adaptive_step_balance_min_confidence_episodes}
+        onChange={(value) => updateTracks({ adaptive_step_balance_min_confidence_episodes: value })}
+      />
+      <NumberField
+        help="Maximum target-share multiplier for courses that have not reached the confidence sample count."
+        label="Confidence scale"
+        resetValue={defaultConfig.tracks.adaptive_step_balance_confidence_scale}
+        step="0.1"
+        value={config.tracks.adaptive_step_balance_confidence_scale}
+        onChange={(value) => updateTracks({ adaptive_step_balance_confidence_scale: value })}
       />
       <NumberField
         help="How strongly low completion raises a course's step-budget share."
