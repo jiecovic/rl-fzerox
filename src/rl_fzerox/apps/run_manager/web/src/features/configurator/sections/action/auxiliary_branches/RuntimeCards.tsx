@@ -233,7 +233,7 @@ export function RuntimeCards({
             </div>
             <IntegerField
               help="After a manual boost request, keep the boost branch masked for this many native frames. Useful as the spam guard when the active-boost mask is off."
-              label="Request cooldown"
+              label="Request cooldown frames"
               resetValue={defaultAction.boost_request_lockout_frames}
               value={action.boost_request_lockout_frames}
               onChange={(value) => updateAction({ boost_request_lockout_frames: value })}
@@ -386,76 +386,77 @@ export function RuntimeCards({
                   updateAction({ pitch_buckets: normalizeOddBucketCount(value) })
                 }
               />
-            ) : (
-              <>
-                <p className="action-note">
-                  Continuous pitch maps the vertical stick axis directly, matching continuous
-                  steering semantics.
-                </p>
-                <div className="action-runtime-two-col">
-                  <div className="field-shell">
-                    <FieldLabel
-                      help="Add a policy-side loss that pulls continuous pitch toward neutral while the vehicle is grounded."
-                      label="Grounded neutral loss"
-                      onReset={() =>
-                        updateTrain({
-                          actor_regularization: {
-                            ...defaultTrain.actor_regularization,
-                          },
-                        })
-                      }
-                    />
-                    <SegmentedChoiceStrip
-                      ariaLabel="Grounded pitch neutral loss"
-                      options={[
-                        {
-                          active: groundedPitchLossWeight <= 0,
-                          key: "off",
-                          label: "Off",
-                          onClick: () =>
-                            updateTrain({
-                              actor_regularization: {
-                                grounded_pitch_neutral_loss_weight: 0,
-                              },
-                            }),
-                        },
-                        {
-                          active: groundedPitchLossWeight > 0,
-                          key: "on",
-                          label: "On",
-                          onClick: () =>
-                            updateTrain({
-                              actor_regularization: {
-                                grounded_pitch_neutral_loss_weight:
-                                  groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0.01,
-                              },
-                            }),
-                        },
-                      ]}
-                    />
-                  </div>
-                  {groundedPitchLossWeight > 0 ? (
-                    <NumberField
-                      help="Coefficient for squared continuous pitch mean while grounded. It affects the actor loss only and does not mask the action."
-                      label="Loss weight"
-                      resetValue={
-                        defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight
-                      }
-                      step="0.001"
-                      value={groundedPitchLossWeight}
-                      onChange={(value) =>
-                        updateTrain({
-                          actor_regularization: {
-                            grounded_pitch_neutral_loss_weight: Math.max(0, value),
-                          },
-                        })
-                      }
-                    />
-                  ) : null}
-                </div>
-              </>
-            )}
+            ) : null}
           </fieldset>
+          {action.pitch_mode === "continuous" ? (
+            <>
+              <p className="action-note">
+                Continuous pitch maps the vertical stick axis directly, matching continuous steering
+                semantics.
+              </p>
+              <div className="action-runtime-two-col">
+                <div className="field-shell">
+                  <FieldLabel
+                    help="Add a policy-side loss that pulls continuous pitch toward neutral while the vehicle is grounded."
+                    label="Grounded neutral loss"
+                    onReset={() =>
+                      updateTrain({
+                        actor_regularization: {
+                          ...defaultTrain.actor_regularization,
+                        },
+                      })
+                    }
+                  />
+                  <SegmentedChoiceStrip
+                    ariaLabel="Grounded pitch neutral loss"
+                    options={[
+                      {
+                        active: groundedPitchLossWeight <= 0,
+                        key: "off",
+                        label: "Off",
+                        onClick: () =>
+                          updateTrain({
+                            actor_regularization: {
+                              grounded_pitch_neutral_loss_weight: 0,
+                            },
+                          }),
+                      },
+                      {
+                        active: groundedPitchLossWeight > 0,
+                        key: "on",
+                        label: "On",
+                        onClick: () =>
+                          updateTrain({
+                            actor_regularization: {
+                              grounded_pitch_neutral_loss_weight:
+                                groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0.01,
+                            },
+                          }),
+                      },
+                    ]}
+                  />
+                </div>
+                <fieldset className="dependent-fieldset" disabled={groundedPitchLossWeight <= 0}>
+                  <NumberField
+                    help="Coefficient for squared continuous pitch mean while grounded. It affects the actor loss only and does not mask the action."
+                    label="Loss weight"
+                    resetValue={
+                      defaultTrain.actor_regularization.grounded_pitch_neutral_loss_weight
+                    }
+                    step="0.001"
+                    value={groundedPitchLossWeight > 0 ? groundedPitchLossWeight : 0}
+                    onChange={(value) =>
+                      updateTrain({
+                        actor_regularization: {
+                          grounded_pitch_neutral_loss_weight: Math.max(0, value),
+                        },
+                      })
+                    }
+                  />
+                </fieldset>
+              </div>
+            </>
+          ) : null}
         </fieldset>
       </section>
     </div>

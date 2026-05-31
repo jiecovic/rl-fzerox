@@ -140,9 +140,9 @@
 }
 
 .state-feature-aux-weight-input {
-  width: 64px;
-  min-width: 64px;
-  max-width: 64px;
+  width: 82px;
+  min-width: 82px;
+  max-width: 82px;
   border: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text);
@@ -160,7 +160,7 @@
 
 .state-feature-aux-weight {
   display: inline-flex;
-  flex: 0 0 64px;
+  flex: 0 0 82px;
   align-items: center;
   gap: 0;
   color: var(--muted);

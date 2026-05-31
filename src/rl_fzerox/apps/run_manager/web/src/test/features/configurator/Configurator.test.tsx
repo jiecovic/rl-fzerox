@@ -1048,6 +1048,115 @@ describe("Configurator", () => {
     );
   });
 
+  it("stores action entropy group weights from the action tab", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        initialDraftName="entropy group draft"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Training" }));
+    expect(screen.queryByText("Entropy groups")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Action" }));
+    const entropyPanel = screen.getByText("Entropy groups").closest("section");
+    if (!(entropyPanel instanceof HTMLElement)) {
+      throw new Error("Missing entropy groups panel");
+    }
+
+    const pitchEntropy = within(entropyPanel).getByRole("button", { name: "Pitch" });
+    expect(pitchEntropy).toHaveAttribute("aria-pressed", "true");
+    await user.click(pitchEntropy);
+    expect(pitchEntropy).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "entropy group draft",
+        expect.objectContaining({
+          train: expect.objectContaining({
+            entropy_group_weights: expect.objectContaining({ pitch: 0 }),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("allows grounded pitch actor loss edits on checkpoint forks", async () => {
+    const user = userEvent.setup();
+    const onSaveDraft = vi.fn().mockResolvedValue(draftFixture());
+    const forkConfig: ManagedRunConfig = {
+      ...managedRunConfigFixture,
+      action: {
+        ...managedRunConfigFixture.action,
+        include_pitch: true,
+        pitch_mode: "continuous",
+      },
+    };
+
+    render(
+      <Configurator
+        baseConfig={managedRunConfigFixture}
+        existingNames={[]}
+        forkSourceArtifact="latest"
+        forkSourceRunLabel="source run"
+        initialConfig={forkConfig}
+        initialDraftName="pitch loss fork"
+        loadedDraft={null}
+        metadata={configMetadataFixture}
+        onLaunchRun={launchRunMock()}
+        onSaveDraft={onSaveDraft}
+        onUpdateDraft={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Action" }));
+    await user.click(screen.getByText("Auxiliary branches"));
+
+    const pitchPanel = screen.getByText("Pitch control").closest("section");
+    if (!(pitchPanel instanceof HTMLElement)) {
+      throw new Error("Missing pitch control panel");
+    }
+    expect(within(pitchPanel).getByRole("radio", { name: "Continuous" })).toBeDisabled();
+
+    const groundedLossGroup = within(pitchPanel).getByRole("group", {
+      name: "Grounded pitch neutral loss",
+    });
+    const enableLoss = within(groundedLossGroup).getByRole("radio", { name: "On" });
+    expect(enableLoss).toBeEnabled();
+    await user.click(enableLoss);
+
+    const lossWeight = within(pitchPanel).getByRole("textbox", { name: "Loss weight" });
+    expect(lossWeight).toBeEnabled();
+    expect(lossWeight).toHaveValue("0.01");
+
+    await user.click(screen.getByRole("button", { name: "Save draft" }));
+
+    await waitFor(() =>
+      expect(onSaveDraft).toHaveBeenCalledWith(
+        "pitch loss fork",
+        expect.objectContaining({
+          train: expect.objectContaining({
+            actor_regularization: {
+              grounded_pitch_neutral_loss_weight: 0.01,
+            },
+          }),
+        }),
+      ),
+    );
+  });
+
   it("separates head presence from runtime masking in the action tab", async () => {
     const user = userEvent.setup();
 

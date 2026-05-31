@@ -7,7 +7,6 @@ import {
   BooleanField,
   DiscreteSliderNumberField,
   LogRangeNumberField,
-  NumberField,
   OptionalNumberField,
   RangeIntegerField,
   RangeNumberField,
@@ -27,7 +26,6 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
   };
   const derived = trainingDerivedValues(config.train);
   const rolloutStepValues = compatibleRolloutSteps(config.train);
-  const entropyGroups = actionEntropyGroups(config.action);
 
   return (
     <ConfigPanelGrid>
@@ -200,11 +198,6 @@ export function TrainingSection({ config, defaultConfig, setConfig }: ConfigSect
             value={config.train.ent_coef}
             onChange={(value) => updateTrain({ ent_coef: value })}
           />
-          <EntropyGroupWeights
-            groups={entropyGroups}
-            train={config.train}
-            updateTrain={updateTrain}
-          />
           <RangeNumberField
             help="Value-loss coefficient."
             label="Value coefficient"
@@ -318,141 +311,10 @@ function optimizationDefaults(
     clip_range: train.clip_range,
     clip_range_vf: train.clip_range_vf,
     ent_coef: train.ent_coef,
-    entropy_group_weights: train.entropy_group_weights,
     gae_lambda: train.gae_lambda,
     learning_rate: train.learning_rate,
     vf_coef: train.vf_coef,
   };
-}
-
-interface EntropyGroup {
-  key: string;
-  label: string;
-}
-
-function EntropyGroupWeights({
-  groups,
-  train,
-  updateTrain,
-}: {
-  groups: EntropyGroup[];
-  train: ManagedRunConfig["train"];
-  updateTrain: (patch: Partial<ManagedRunConfig["train"]>) => void;
-}) {
-  if (groups.length === 0) {
-    return null;
-  }
-  const explicitWeights = train.entropy_group_weights;
-  const usesDefaultWeights = Object.keys(explicitWeights).length === 0;
-  const weightFor = (key: string) => explicitWeights[key] ?? 1;
-
-  function updateGroupWeight(key: string, value: number) {
-    updateTrain({
-      entropy_group_weights: normalizedEntropyWeights(groups, {
-        ...currentEntropyWeights(groups, train),
-        [key]: Math.max(0, value),
-      }),
-    });
-  }
-
-  return (
-    <div className="col-span-full grid gap-3 border-t border-[var(--color-border-subtle)] pt-3">
-      <div className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-        <strong className="text-[var(--color-text-primary)]">Entropy groups</strong>
-        <HelpTooltipButton
-          label="Entropy groups"
-          text="Optional per-action multipliers for the global entropy coefficient. Leave all at 1x to keep standard PPO entropy."
-        />
-        {usesDefaultWeights ? <span>standard PPO entropy</span> : <span>custom weights</span>}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {groups.map((group) => {
-          const weight = weightFor(group.key);
-          return (
-            <div className="grid gap-2" key={group.key}>
-              <BooleanField
-                help={`Include ${group.label} entropy in the PPO entropy bonus.`}
-                label={group.label}
-                value={weight > 0}
-                onChange={(enabled) => updateGroupWeight(group.key, enabled ? 1 : 0)}
-              />
-              {weight > 0 ? (
-                <NumberField
-                  help={`Multiplier for ${group.label} entropy before the global entropy coefficient is applied.`}
-                  label="Multiplier"
-                  step="0.1"
-                  value={weight}
-                  onChange={(value) => updateGroupWeight(group.key, value)}
-                />
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function currentEntropyWeights(
-  groups: EntropyGroup[],
-  train: ManagedRunConfig["train"],
-): Record<string, number> {
-  return Object.fromEntries(
-    groups.map((group) => [group.key, train.entropy_group_weights[group.key] ?? 1]),
-  );
-}
-
-function normalizedEntropyWeights(
-  groups: EntropyGroup[],
-  weights: Record<string, number>,
-): Record<string, number> {
-  const normalized = Object.fromEntries(
-    groups.map((group) => [group.key, Math.max(0, weights[group.key] ?? 0)]),
-  );
-  return Object.values(normalized).every((value) => value === 1) ? {} : normalized;
-}
-
-function actionEntropyGroups(action: ManagedRunConfig["action"]): EntropyGroup[] {
-  const groups: EntropyGroup[] = [];
-  if (action.steering_mode === "continuous") {
-    groups.push({ key: "steer", label: "Steer" });
-  }
-  if (action.drive_mode === "pwm") {
-    groups.push({ key: "drive", label: "Throttle" });
-  }
-  if (action.include_air_brake && action.air_brake_mode === "pwm") {
-    groups.push({ key: "air_brake", label: "Air brake" });
-  }
-  if (action.include_pitch && action.pitch_mode === "continuous") {
-    groups.push({ key: "pitch", label: "Pitch" });
-  }
-  if (action.steering_mode === "discrete") {
-    groups.push({ key: "steer", label: "Steer" });
-  }
-  if (action.drive_mode === "on_off") {
-    groups.push({ key: "gas", label: "Gas" });
-  }
-  if (action.include_air_brake && action.air_brake_mode === "on_off") {
-    groups.push({ key: "air_brake", label: "Air brake" });
-  }
-  if (action.include_boost) {
-    groups.push({ key: "boost", label: "Boost" });
-  }
-  if (action.include_lean) {
-    if (action.lean_output_mode === "independent_buttons") {
-      groups.push({ key: "lean_left", label: "Lean left" });
-      groups.push({ key: "lean_right", label: "Lean right" });
-    } else {
-      groups.push({ key: "lean", label: "Lean" });
-      if (action.include_spin) {
-        groups.push({ key: "spin", label: "Spin" });
-      }
-    }
-  }
-  if (action.include_pitch && action.pitch_mode === "discrete") {
-    groups.push({ key: "pitch", label: "Pitch" });
-  }
-  return groups;
 }
 
 function stabilityDefaults(train: ManagedRunConfig["train"]): Partial<ManagedRunConfig["train"]> {
