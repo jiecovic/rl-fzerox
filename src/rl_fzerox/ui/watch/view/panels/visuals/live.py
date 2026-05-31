@@ -38,11 +38,16 @@ class _LiveChartStyle:
     progress_color: tuple[int, int, int] = PALETTE.text_accent
     position_multiplier_color: tuple[int, int, int] = (255, 196, 91)
     combined_multiplier_color: tuple[int, int, int] = (195, 165, 255)
+    average_speed_color: tuple[int, int, int] = (255, 196, 91)
     edge_ratio_color: tuple[int, int, int] = (255, 132, 132)
     outside_edge_excess_ratio_color: tuple[int, int, int] = (175, 220, 135)
     height_above_ground_color: tuple[int, int, int] = (190, 165, 255)
     grid_color: tuple[int, int, int] = PALETTE.panel_border
     zero_line_color: tuple[int, int, int] = PALETTE.text_muted
+    reference_line_dash: int = 8
+    reference_line_gap: int = 5
+    reference_tick_length: int = 6
+    reference_label_padding: int = 2
     block_fill: tuple[int, int, int] = (16, 20, 26)
 
 
@@ -52,6 +57,13 @@ LIVE_CHART_STYLE = _LiveChartStyle()
 @dataclass(frozen=True, slots=True)
 class _PlotSeries:
     y_values: tuple[float, ...]
+    color: tuple[int, int, int]
+    label: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _PlotReferenceLine:
+    value: float
     color: tuple[int, int, int]
     label: str | None = None
 
@@ -114,6 +126,7 @@ def _draw_live_tab(
         fixed_range=None,
         zero_line=False,
         plot_height=plot_height,
+        reference_lines=_speed_reference_lines(live_series),
     )
     _draw_chart_block(
         pygame=pygame,
@@ -269,6 +282,7 @@ def _draw_chart_block(
     zero_line: bool,
     plot_height: int,
     extra_series: tuple[_PlotSeries, ...] = (),
+    reference_lines: tuple[_PlotReferenceLine, ...] = (),
 ) -> None:
     rect = pygame.Rect(x, y, width, height)
     pygame.draw.rect(
@@ -358,6 +372,7 @@ def _draw_chart_block(
         series=series,
         fixed_range=fixed_range,
         zero_line=zero_line,
+        reference_lines=reference_lines,
     )
 
 
@@ -381,6 +396,7 @@ def _draw_plot_series(
     series: tuple[_PlotSeries, ...],
     fixed_range: tuple[float, float] | None,
     zero_line: bool,
+    reference_lines: tuple[_PlotReferenceLine, ...],
 ) -> None:
     valid_series = tuple(line for line in series if len(line.y_values) == len(x_values))
     if not valid_series:
@@ -389,8 +405,10 @@ def _draw_plot_series(
     x_end = max(x_values[-1], x_start + 1)
     if fixed_range is None:
         series_values = tuple(value for line in valid_series for value in line.y_values)
-        y_min = min(min(series_values), 0.0)
-        y_max = max(max(series_values), 0.0)
+        reference_values = tuple(line.value for line in reference_lines)
+        plotted_values = (*series_values, *reference_values)
+        y_min = min(min(plotted_values), 0.0)
+        y_max = max(max(plotted_values), 0.0)
         if y_min == y_max:
             span = max(1.0, abs(y_min) * 0.1)
             y_min -= span
@@ -426,6 +444,21 @@ def _draw_plot_series(
             (rect.x + rect.width, zero_y),
             width=1,
         )
+    for line in reference_lines:
+        reference_y = (
+            rect.y
+            + rect.height
+            - 1
+            - int(round((line.value - y_min) / span * max(1, rect.height - 1)))
+        )
+        _draw_reference_line(
+            pygame=pygame,
+            screen=screen,
+            fonts=fonts,
+            rect=rect,
+            y=reference_y,
+            line=line,
+        )
     for line in valid_series:
         points = [
             (
@@ -441,6 +474,68 @@ def _draw_plot_series(
             pygame.draw.circle(screen, line.color, points[0], 3)
         else:
             pygame.draw.lines(screen, line.color, False, points, LIVE_CHART_STYLE.line_width)
+
+
+def _draw_reference_line(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    fonts: ViewerFonts,
+    rect: PygameRect,
+    y: int,
+    line: _PlotReferenceLine,
+) -> None:
+    _draw_horizontal_dashed_line(
+        pygame=pygame,
+        screen=screen,
+        y=y,
+        x_start=rect.x,
+        x_end=rect.x + rect.width,
+        color=line.color,
+    )
+    pygame.draw.line(
+        screen,
+        line.color,
+        (rect.x - LIVE_CHART_STYLE.reference_tick_length, y),
+        (rect.x, y),
+        width=2,
+    )
+    if line.label is None:
+        return
+    label_width = LIVE_CHART_STYLE.plot_axis_width - LIVE_CHART_STYLE.reference_tick_length - 3
+    label_surface = fonts.small.render(
+        _fit_text(fonts.small, line.label, label_width),
+        True,
+        line.color,
+    )
+    label_x = rect.x - LIVE_CHART_STYLE.plot_axis_width + 2
+    label_y = y - label_surface.get_height() // 2
+    label_y = max(rect.y, min(rect.bottom - label_surface.get_height(), label_y))
+    padding = LIVE_CHART_STYLE.reference_label_padding
+    label_backdrop = pygame.Rect(
+        label_x - padding,
+        label_y - padding,
+        label_surface.get_width() + (2 * padding),
+        label_surface.get_height() + (2 * padding),
+    )
+    pygame.draw.rect(screen, LIVE_CHART_STYLE.block_fill, label_backdrop, border_radius=3)
+    screen.blit(label_surface, (label_x, label_y))
+
+
+def _draw_horizontal_dashed_line(
+    *,
+    pygame: PygameModule,
+    screen: PygameSurface,
+    y: int,
+    x_start: int,
+    x_end: int,
+    color: tuple[int, int, int],
+) -> None:
+    x = x_start
+    while x < x_end:
+        dash_end = min(x + LIVE_CHART_STYLE.reference_line_dash, x_end)
+        pygame.draw.line(screen, color, (x, y), (dash_end, y), width=1)
+        x = dash_end + LIVE_CHART_STYLE.reference_line_gap
 
 
 def _draw_plot_legend(
@@ -623,10 +718,32 @@ def _format_axis_value(value: float) -> str:
 
 def _speed_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.speed_kph:
-        return "now - · progress -"
+        return "now - · avg - · progress -"
     current_speed = live_series.speed_kph[-1]
+    average_speed = _episode_average_speed(live_series)
     current_progress = live_series.current_progress * 100.0
-    return f"now {current_speed:.1f} km/h · progress {current_progress:.1f}%"
+    return (
+        f"now {current_speed:.1f} km/h · avg {average_speed:.1f} · progress {current_progress:.1f}%"
+    )
+
+
+def _speed_reference_lines(
+    live_series: EpisodeLiveSeriesSnapshot | None,
+) -> tuple[_PlotReferenceLine, ...]:
+    if live_series is None or not live_series.speed_kph:
+        return ()
+    average_speed = _episode_average_speed(live_series)
+    return (
+        _PlotReferenceLine(
+            value=average_speed,
+            color=LIVE_CHART_STYLE.average_speed_color,
+            label=_format_axis_value(average_speed),
+        ),
+    )
+
+
+def _episode_average_speed(live_series: EpisodeLiveSeriesSnapshot) -> float:
+    return sum(live_series.speed_kph) / len(live_series.speed_kph)
 
 
 def _step_reward_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:

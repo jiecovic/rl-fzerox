@@ -6,7 +6,11 @@ from dataclasses import dataclass
 import pytest
 
 from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
-from rl_fzerox.ui.watch.view.panels.visuals.live import _plot_legend_rows, _PlotSeries
+from rl_fzerox.ui.watch.view.panels.visuals.live import (
+    _plot_legend_rows,
+    _PlotSeries,
+    _speed_summary,
+)
 from rl_fzerox.ui.watch.view.screen.types import ViewerFonts
 
 
@@ -173,6 +177,29 @@ def test_live_episode_tracker_resets_on_new_episode() -> None:
     assert snapshot.current_return == 0.1
     assert snapshot.current_progress == 0.05
     assert snapshot.max_progress == 0.05
+
+
+def test_speed_summary_reports_current_episode_average() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+    for step, speed in ((2, 300.0), (4, 600.0), (6, 900.0)):
+        tracker.observe_snapshot(
+            _Snapshot(
+                episode=1,
+                policy_decision_frame=True,
+                info={
+                    "episode_step": step,
+                    "episode_completion_fraction": 0.2,
+                    "speed_kph": speed,
+                },
+                episode_reward=0.0,
+            ),
+            action_repeat=1,
+        )
+
+    summary = _speed_summary(tracker.snapshot())
+
+    assert "now 900.0 km/h" in summary
+    assert "avg 600.0" in summary
 
 
 def test_live_episode_tracker_computes_left_edge_excess_ratio() -> None:
