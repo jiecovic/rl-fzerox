@@ -146,9 +146,7 @@ class TrackSamplingConfig(BaseModel):
         if self.step_balance_max_weight_scale < 1.0:
             raise ValueError("track_sampling.step_balance_max_weight_scale must be >= 1.0")
         if self.adaptive_step_balance_confidence_scale < 1.0:
-            raise ValueError(
-                "track_sampling.adaptive_step_balance_confidence_scale must be >= 1.0"
-            )
+            raise ValueError("track_sampling.adaptive_step_balance_confidence_scale must be >= 1.0")
         return self
 
 

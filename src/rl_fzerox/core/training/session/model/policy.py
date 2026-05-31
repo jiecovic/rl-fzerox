@@ -36,8 +36,7 @@ def resolve_policy_entry(
     if auxiliary_state_enabled:
         if not isinstance(train_env.observation_space, spaces.Dict):
             raise RuntimeError(
-                "policy auxiliary state or actor regularization requires "
-                "a dict observation space"
+                "policy auxiliary state or actor regularization requires a dict observation space"
             )
         if effective_algorithm == TRAINING_ALGORITHMS.maskable_recurrent_ppo:
             return AuxiliaryStateMaskableRecurrentMultiInputPolicy
