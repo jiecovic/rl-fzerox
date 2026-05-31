@@ -123,6 +123,50 @@ def test_manager_training_bridge_supports_discrete_and_continuous_mixed_actions(
     assert train_config.env.action.runtime().split_lean_action_branches is True
 
 
+def test_manager_training_bridge_projects_action_entropy_and_actor_loss(
+    tmp_path: Path,
+) -> None:
+    config = default_managed_run_config().model_copy(deep=True)
+    config.action.steering_mode = "discrete"
+    config.action.drive_mode = "pwm"
+    config.action.force_full_throttle = True
+    config.action.include_air_brake = False
+    config.action.include_boost = False
+    config.action.include_lean = False
+    config.action.include_pitch = True
+    config.action.pitch_mode = "continuous"
+    config.train.entropy_group_weights = {
+        "drive": 1.5,
+        "ghost": 2.0,
+        "pitch": 0.25,
+    }
+    config.train.actor_regularization.grounded_pitch_neutral_loss_weight = 0.02
+
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-action-loss-controls",
+        run_dir=tmp_path / "runs" / "bridge-action-loss-controls_0001",
+    )
+
+    assert train_config.train.entropy_group_weights == {
+        "drive": pytest.approx(1.5),
+        "pitch": pytest.approx(0.25),
+    }
+    assert (
+        train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight
+        == pytest.approx(0.02)
+    )
+
+    config.action.pitch_mode = "discrete"
+    train_config = build_managed_train_app_config(
+        config,
+        run_id="bridge-action-loss-controls-discrete",
+        run_dir=tmp_path / "runs" / "bridge-action-loss-controls-discrete_0001",
+    )
+
+    assert train_config.train.actor_regularization.grounded_pitch_neutral_loss_weight == 0.0
+
+
 def test_manager_training_bridge_supports_four_way_categorical_lean(
     tmp_path: Path,
 ) -> None:

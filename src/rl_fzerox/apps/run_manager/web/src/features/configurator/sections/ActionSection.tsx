@@ -10,6 +10,7 @@ import { DisclosureToolbar } from "@/features/configurator/DisclosureToolbar";
 import { usePersistentDisclosureMap } from "@/features/configurator/disclosureState";
 import { AuxiliaryBranchesDisclosure } from "@/features/configurator/sections/action/AuxiliaryBranchesDisclosure";
 import { ControlFamilyDisclosure } from "@/features/configurator/sections/action/ControlFamilyDisclosure";
+import { EntropyGroupWeightsPanel } from "@/features/configurator/sections/action/EntropyGroupWeightsPanel";
 import {
   actionCompatibilityNote,
   actionSummaryRows,
@@ -89,6 +90,13 @@ export function ActionSection({
         open={openSections.auxiliary}
         setOpen={(open) => setSectionOpen("auxiliary", open)}
         updateAction={updateAction}
+        updateTrain={updateTrain}
+      />
+
+      <EntropyGroupWeightsPanel
+        action={config.action}
+        defaultTrain={defaultConfig.train}
+        train={config.train}
         updateTrain={updateTrain}
       />
 
