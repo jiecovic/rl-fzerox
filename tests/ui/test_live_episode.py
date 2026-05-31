@@ -41,6 +41,7 @@ def test_live_episode_tracker_uses_decision_frames_only() -> None:
                 "episode_step": 6,
                 "episode_completion_fraction": 0.25,
                 "speed_kph": 420.0,
+                "step_reward": 0.75,
                 "progress_speed_multiplier": 0.95,
                 "position_progress_multiplier": 1.1,
                 "progress_speed_position_multiplier": 1.045,
@@ -52,8 +53,7 @@ def test_live_episode_tracker_uses_decision_frames_only() -> None:
                     "signed_lateral_offset": -8.25,
                     "current_radius_left": 20.0,
                     "current_radius_right": 7.0,
-                    "future_local_nearest_segment_index": 14,
-                    "future_local_nearest_segment_distance": 32.5,
+                    "height_above_ground": 42.5,
                 }
             },
         ),
@@ -64,14 +64,13 @@ def test_live_episode_tracker_uses_decision_frames_only() -> None:
     assert snapshot is not None
     assert snapshot.env_steps == (3,)
     assert snapshot.speed_kph == (420.0,)
-    assert snapshot.returns == (1.5,)
+    assert snapshot.step_rewards == (0.75,)
     assert snapshot.progress_speed_multiplier == (0.95,)
     assert snapshot.position_progress_multiplier == (1.1,)
     assert snapshot.progress_speed_position_multiplier == (1.045,)
-    assert snapshot.lateral_offset == (-8.25,)
+    assert snapshot.edge_ratio == (-1.0,)
     assert snapshot.outside_edge_excess_ratio == pytest.approx((0.1785714286,))
-    assert snapshot.future_local_nearest_segment_distance == (32.5,)
-    assert snapshot.current_future_local_nearest_segment_index == 14
+    assert snapshot.height_above_ground == (42.5,)
     assert snapshot.current_return == 1.5
     assert snapshot.current_progress == 0.25
     assert snapshot.max_progress == 0.25
@@ -125,14 +124,13 @@ def test_live_episode_tracker_resets_on_new_episode() -> None:
     assert snapshot.episode == 2
     assert snapshot.env_steps == (1,)
     assert snapshot.speed_kph == (180.0,)
-    assert snapshot.returns == (0.1,)
+    assert snapshot.step_rewards == (0.0,)
     assert snapshot.progress_speed_multiplier == (1.0,)
     assert snapshot.position_progress_multiplier == (1.0,)
     assert snapshot.progress_speed_position_multiplier == (1.0,)
-    assert snapshot.lateral_offset == (0.0,)
+    assert snapshot.edge_ratio == (0.0,)
     assert snapshot.outside_edge_excess_ratio == (0.0,)
-    assert snapshot.future_local_nearest_segment_distance == (0.0,)
-    assert snapshot.current_future_local_nearest_segment_index is None
+    assert snapshot.height_above_ground == (0.0,)
     assert snapshot.current_return == 0.1
     assert snapshot.current_progress == 0.05
     assert snapshot.max_progress == 0.05
@@ -194,3 +192,55 @@ def test_live_episode_tracker_suppresses_edge_margin_spikes() -> None:
     snapshot = tracker.snapshot()
     assert snapshot is not None
     assert snapshot.outside_edge_excess_ratio == (0.0,)
+
+
+def test_live_episode_tracker_reports_step_reward() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+
+    tracker.observe_snapshot(
+        _Snapshot(
+            episode=1,
+            policy_decision_frame=True,
+            info={
+                "episode_step": 2,
+                "episode_completion_fraction": 0.1,
+                "speed_kph": 250.0,
+                "step_reward": 0.25,
+            },
+            episode_reward=0.5,
+        ),
+        action_repeat=1,
+    )
+    tracker.observe_snapshot(
+        _Snapshot(
+            episode=1,
+            policy_decision_frame=True,
+            info={
+                "episode_step": 6,
+                "episode_completion_fraction": 0.2,
+                "speed_kph": 320.0,
+                "step_reward": 0.5,
+            },
+            episode_reward=2.5,
+        ),
+        action_repeat=1,
+    )
+    tracker.observe_snapshot(
+        _Snapshot(
+            episode=1,
+            policy_decision_frame=True,
+            info={
+                "episode_step": 6,
+                "episode_completion_fraction": 0.2,
+                "speed_kph": 320.0,
+                "step_reward": 0.75,
+            },
+            episode_reward=3.5,
+        ),
+        action_repeat=1,
+    )
+
+    snapshot = tracker.snapshot()
+    assert snapshot is not None
+    assert snapshot.env_steps == (2, 6)
+    assert snapshot.step_rewards == (0.25, 0.75)
