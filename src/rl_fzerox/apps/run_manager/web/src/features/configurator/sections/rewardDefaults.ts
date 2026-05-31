@@ -71,6 +71,7 @@ export function actionDefaults(reward: RewardConfig): RewardPatch {
     manual_boost_reward_energy_curve: reward.manual_boost_reward_energy_curve,
     manual_boost_reward_energy_shaping: reward.manual_boost_reward_energy_shaping,
     manual_boost_reward_full_energy_fraction: reward.manual_boost_reward_full_energy_fraction,
+    manual_boost_reward_min_energy_fraction: reward.manual_boost_reward_min_energy_fraction,
     manual_boost_reward_min_energy_multiplier: reward.manual_boost_reward_min_energy_multiplier,
   };
 }

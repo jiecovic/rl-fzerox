@@ -115,11 +115,19 @@ def manual_boost_reward_energy_multiplier(
     if max_energy <= 0.0:
         return min_multiplier
     energy_fraction = max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
+    min_energy_fraction = max(
+        0.0,
+        min(1.0, float(weights.manual_boost_reward_min_energy_fraction)),
+    )
     full_reward_fraction = max(
         1e-9,
         min(1.0, float(weights.manual_boost_reward_full_energy_fraction)),
     )
-    ratio = min(energy_fraction / full_reward_fraction, 1.0)
+    if energy_fraction <= min_energy_fraction:
+        ratio = 0.0
+    else:
+        span = max(full_reward_fraction - min_energy_fraction, 1e-9)
+        ratio = min((energy_fraction - min_energy_fraction) / span, 1.0)
     if weights.manual_boost_reward_energy_curve == "smoothstep":
         ratio = ratio * ratio * (3.0 - 2.0 * ratio)
     return min_multiplier + (1.0 - min_multiplier) * ratio

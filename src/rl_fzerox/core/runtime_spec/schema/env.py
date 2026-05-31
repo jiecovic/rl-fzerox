@@ -105,6 +105,7 @@ class RewardCourseOverrideConfig(BaseModel):
     airborne_landing_min_peak_height: NonNegativeFloat | None = None
     manual_boost_reward: NonNegativeFloat | None = None
     manual_boost_reward_energy_shaping: bool | None = None
+    manual_boost_reward_min_energy_fraction: float | None = Field(default=None, ge=0.0, lt=1.0)
     manual_boost_reward_min_energy_multiplier: float | None = Field(default=None, ge=0.0, le=1.0)
     manual_boost_reward_full_energy_fraction: float | None = Field(default=None, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] | None = None
@@ -129,6 +130,10 @@ class RewardCourseOverrideConfig(BaseModel):
         _validate_position_progress_bounds(
             min_multiplier=self.position_progress_min_multiplier,
             max_multiplier=self.position_progress_max_multiplier,
+        )
+        _validate_manual_boost_energy_bounds(
+            min_fraction=self.manual_boost_reward_min_energy_fraction,
+            full_fraction=self.manual_boost_reward_full_energy_fraction,
         )
         return self
 
@@ -178,6 +183,7 @@ class RewardConfig(BaseModel):
     airborne_landing_min_peak_height: NonNegativeFloat = 50.0
     manual_boost_reward: NonNegativeFloat = 0.0
     manual_boost_reward_energy_shaping: bool = False
+    manual_boost_reward_min_energy_fraction: float = Field(default=0.0, ge=0.0, lt=1.0)
     manual_boost_reward_min_energy_multiplier: float = Field(default=0.0, ge=0.0, le=1.0)
     manual_boost_reward_full_energy_fraction: float = Field(default=1.0, gt=0.0, le=1.0)
     manual_boost_reward_energy_curve: Literal["linear", "smoothstep"] = "linear"
@@ -203,6 +209,10 @@ class RewardConfig(BaseModel):
         _validate_position_progress_bounds(
             min_multiplier=self.position_progress_min_multiplier,
             max_multiplier=self.position_progress_max_multiplier,
+        )
+        _validate_manual_boost_energy_bounds(
+            min_fraction=self.manual_boost_reward_min_energy_fraction,
+            full_fraction=self.manual_boost_reward_full_energy_fraction,
         )
         return self
 
@@ -240,6 +250,18 @@ def _validate_position_progress_bounds(
     ):
         raise ValueError(
             "position_progress_min_multiplier must be <= position_progress_max_multiplier"
+        )
+
+
+def _validate_manual_boost_energy_bounds(
+    *,
+    min_fraction: float | None,
+    full_fraction: float | None,
+) -> None:
+    if min_fraction is not None and full_fraction is not None and min_fraction >= full_fraction:
+        raise ValueError(
+            "manual_boost_reward_min_energy_fraction must be less than "
+            "manual_boost_reward_full_energy_fraction"
         )
 
 
