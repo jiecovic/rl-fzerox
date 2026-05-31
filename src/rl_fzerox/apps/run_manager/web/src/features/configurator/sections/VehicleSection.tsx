@@ -318,11 +318,16 @@ export function VehicleSection({
                               }
                             }}
                           >
+                            {selected ? (
+                              <span className="pointer-events-none absolute top-2 right-2 border border-app-accent bg-app-accent px-2 py-0.5 text-[10px] font-bold tracking-wide text-app-accent-text uppercase">
+                                selected
+                              </span>
+                            ) : null}
                             <span
                               className={cn(
                                 "inline-flex w-fit min-w-[54px] items-center justify-center border border-app-border bg-app-surface px-2 py-1 text-[11px] tabular-nums text-app-muted uppercase",
                                 selected
-                                  ? "border-[color-mix(in_srgb,var(--accent)_52%,var(--border))] text-app-text"
+                                  ? "border-app-accent bg-[color-mix(in_srgb,var(--accent)_18%,var(--surface))] text-app-text"
                                   : undefined,
                               )}
                             >
@@ -366,9 +371,9 @@ function arraysEqual(left: readonly string[], right: readonly string[]) {
 
 function vehicleCardClass(selected: boolean, blocked: boolean) {
   return cn(
-    "vehicle-card grid min-h-[104px] gap-3 border border-app-border bg-app-surface-muted p-3 text-left hover:border-app-border-strong",
+    "vehicle-card relative grid min-h-[104px] gap-3 border border-app-border bg-app-surface-muted p-3 text-left hover:border-app-border-strong",
     selected
-      ? "border-app-accent bg-[color-mix(in_srgb,var(--accent)_9%,var(--surface-muted))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]"
+      ? "border-app-accent bg-[color-mix(in_srgb,var(--accent)_18%,var(--surface-muted))] shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--accent)_52%,transparent),0_0_0_1px_color-mix(in_srgb,var(--accent)_36%,transparent)]"
       : undefined,
     blocked ? "cursor-not-allowed" : undefined,
   );
