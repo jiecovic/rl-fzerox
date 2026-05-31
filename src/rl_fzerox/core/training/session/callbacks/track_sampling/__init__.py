@@ -15,14 +15,18 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
     TrackSamplingRuntimeState,
 )
 from rl_fzerox.core.training.session.callbacks.track_sampling.weights import (
+    adaptive_confidence_bonus,
     adaptive_difficulty_bonus,
+    adaptive_target_bonus,
 )
 
 __all__ = (
     "StepBalancedTrackSamplingController",
     "TrackSamplingRuntimeEntry",
     "TrackSamplingRuntimeState",
+    "adaptive_confidence_bonus",
     "adaptive_difficulty_bonus",
+    "adaptive_target_bonus",
     "load_track_sampling_runtime_state",
     "save_track_sampling_runtime_state",
 )

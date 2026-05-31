@@ -63,6 +63,10 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   const samplingDefaults = {
     adaptive_step_balance_completion_weight:
       defaultConfig.tracks.adaptive_step_balance_completion_weight,
+    adaptive_step_balance_confidence_scale:
+      defaultConfig.tracks.adaptive_step_balance_confidence_scale,
+    adaptive_step_balance_min_confidence_episodes:
+      defaultConfig.tracks.adaptive_step_balance_min_confidence_episodes,
     adaptive_step_balance_target_completion:
       defaultConfig.tracks.adaptive_step_balance_target_completion,
     step_balance_ema_alpha: defaultConfig.tracks.step_balance_ema_alpha,
@@ -71,6 +75,8 @@ export function TracksSection({ config, defaultConfig, metadata, setConfig }: Tr
   } satisfies Pick<
     TracksConfig,
     | "adaptive_step_balance_completion_weight"
+    | "adaptive_step_balance_confidence_scale"
+    | "adaptive_step_balance_min_confidence_episodes"
     | "adaptive_step_balance_target_completion"
     | "step_balance_ema_alpha"
     | "step_balance_max_weight_scale"

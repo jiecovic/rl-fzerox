@@ -13,7 +13,7 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import TensorboardViewGr
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
-    adaptive_difficulty_bonus,
+    adaptive_target_bonus,
 )
 
 
@@ -149,6 +149,8 @@ def track_sampling_state_payload(state: TrackSamplingRuntimeState) -> dict[str, 
         "max_weight_scale": state.max_weight_scale,
         "adaptive_completion_weight": state.adaptive_completion_weight,
         "adaptive_target_completion": state.adaptive_target_completion,
+        "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
+        "adaptive_confidence_scale": state.adaptive_confidence_scale,
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -200,12 +202,14 @@ def _target_step_bonus(
     state: TrackSamplingRuntimeState,
     entry: TrackSamplingRuntimeEntry,
 ) -> float:
-    return adaptive_difficulty_bonus(
+    return adaptive_target_bonus(
         sampling_mode=state.sampling_mode,
         max_weight_scale=state.max_weight_scale,
         completion_weight=state.adaptive_completion_weight,
         target_completion=state.adaptive_target_completion,
         update_episodes=state.update_episodes,
+        min_confidence_episodes=state.adaptive_min_confidence_episodes,
+        confidence_scale=state.adaptive_confidence_scale,
         completion_fraction=entry.ema_completion_fraction,
         finished_episode_count=entry.finished_episode_count,
         success_sample_count=entry.success_sample_count,

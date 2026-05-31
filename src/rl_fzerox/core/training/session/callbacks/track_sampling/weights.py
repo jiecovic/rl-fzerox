@@ -108,6 +108,55 @@ def adaptive_difficulty_bonus(
     return min(bonus, max_weight_scale)
 
 
+def adaptive_confidence_bonus(
+    *,
+    sampling_mode: str,
+    min_confidence_episodes: int,
+    confidence_scale: float,
+    success_sample_count: int,
+) -> float:
+    """Raise target share for under-sampled courses before judging difficulty."""
+
+    if sampling_mode != "adaptive_step_balanced":
+        return 1.0
+    if min_confidence_episodes <= 0 or confidence_scale <= 1.0:
+        return 1.0
+    confidence = max(0.0, min(1.0, success_sample_count / min_confidence_episodes))
+    return 1.0 + (confidence_scale - 1.0) * (1.0 - confidence)
+
+
+def adaptive_target_bonus(
+    *,
+    sampling_mode: str,
+    max_weight_scale: float,
+    completion_weight: float,
+    target_completion: float,
+    update_episodes: int,
+    min_confidence_episodes: int,
+    confidence_scale: float,
+    completion_fraction: float | None,
+    finished_episode_count: int,
+    success_sample_count: int,
+) -> float:
+    """Combine coverage pressure and performance pressure into one target multiplier."""
+
+    return adaptive_confidence_bonus(
+        sampling_mode=sampling_mode,
+        min_confidence_episodes=min_confidence_episodes,
+        confidence_scale=confidence_scale,
+        success_sample_count=success_sample_count,
+    ) * adaptive_difficulty_bonus(
+        sampling_mode=sampling_mode,
+        max_weight_scale=max_weight_scale,
+        completion_weight=completion_weight,
+        target_completion=target_completion,
+        update_episodes=update_episodes,
+        completion_fraction=completion_fraction,
+        finished_episode_count=finished_episode_count,
+        success_sample_count=success_sample_count,
+    )
+
+
 def target_frame_debt(
     stats: TrackStepStats,
     *,

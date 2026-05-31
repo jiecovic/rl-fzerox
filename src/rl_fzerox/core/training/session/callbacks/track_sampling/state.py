@@ -29,6 +29,8 @@ class TrackSamplingRuntimeState:
     max_weight_scale: float
     adaptive_completion_weight: float
     adaptive_target_completion: float
+    adaptive_min_confidence_episodes: int
+    adaptive_confidence_scale: float
     update_count: int
     episodes_since_update: int
     entries: tuple[TrackSamplingRuntimeEntry, ...]

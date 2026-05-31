@@ -33,6 +33,8 @@ def save_track_sampling_runtime_state(
         "max_weight_scale": state.max_weight_scale,
         "adaptive_completion_weight": state.adaptive_completion_weight,
         "adaptive_target_completion": state.adaptive_target_completion,
+        "adaptive_min_confidence_episodes": state.adaptive_min_confidence_episodes,
+        "adaptive_confidence_scale": state.adaptive_confidence_scale,
         "update_count": state.update_count,
         "episodes_since_update": state.episodes_since_update,
         "entries": [
@@ -84,6 +86,8 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
     max_weight_scale = _mapping_float(loaded, "max_weight_scale")
     adaptive_completion_weight = _mapping_optional_float(loaded, "adaptive_completion_weight")
     adaptive_target_completion = _mapping_optional_float(loaded, "adaptive_target_completion")
+    adaptive_min_confidence_episodes = _mapping_int(loaded, "adaptive_min_confidence_episodes")
+    adaptive_confidence_scale = _mapping_optional_float(loaded, "adaptive_confidence_scale")
     update_count = _mapping_int(loaded, "update_count")
     episodes_since_update = _mapping_int(loaded, "episodes_since_update")
     if (
@@ -108,6 +112,14 @@ def load_track_sampling_runtime_state(path: Path) -> TrackSamplingRuntimeState |
             0.9
             if adaptive_target_completion is None
             else max(0.0, min(1.0, adaptive_target_completion))
+        ),
+        adaptive_min_confidence_episodes=(
+            24
+            if adaptive_min_confidence_episodes is None
+            else max(1, adaptive_min_confidence_episodes)
+        ),
+        adaptive_confidence_scale=(
+            4.0 if adaptive_confidence_scale is None else max(1.0, adaptive_confidence_scale)
         ),
         update_count=update_count,
         episodes_since_update=episodes_since_update,

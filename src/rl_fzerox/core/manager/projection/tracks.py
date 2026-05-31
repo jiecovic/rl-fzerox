@@ -37,6 +37,12 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
         "adaptive_step_balance_target_completion": (
             config.tracks.adaptive_step_balance_target_completion
         ),
+        "adaptive_step_balance_min_confidence_episodes": (
+            config.tracks.adaptive_step_balance_min_confidence_episodes
+        ),
+        "adaptive_step_balance_confidence_scale": (
+            config.tracks.adaptive_step_balance_confidence_scale
+        ),
     }
 
 

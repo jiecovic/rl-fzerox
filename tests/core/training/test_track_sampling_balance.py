@@ -227,6 +227,59 @@ def test_adaptive_step_balance_controller_can_create_large_target_spread() -> No
     assert weights_by_track["hard"] > 1.5 * weights_by_track["easy"]
 
 
+def test_adaptive_step_balance_prioritizes_low_confidence_courses() -> None:
+    controller = StepBalancedTrackSamplingController(
+        track_base_weights={"known": 1.0, "unknown": 1.0},
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=1,
+        update_episodes=2,
+        ema_alpha=1.0,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.0,
+        adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=4,
+        adaptive_confidence_scale=5.0,
+    )
+
+    weights = controller.record_episodes(
+        (
+            {
+                "track_id": "known",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "unknown",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "known",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "known",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+            {
+                "track_id": "known",
+                "episode_step": 100,
+                "episode_completion_fraction": 1.0,
+                "termination_reason": "finished",
+            },
+        )
+    )
+
+    assert weights is not None
+    assert weights["unknown"] > weights["known"]
+
+
 def test_adaptive_step_balance_converts_frame_target_to_reset_weight() -> None:
     controller = StepBalancedTrackSamplingController(
         track_base_weights={"easy_short": 1.0, "hard_long": 1.0},
@@ -507,6 +560,8 @@ def test_step_balance_controller_recomputes_restored_weights_from_ema_stats() ->
         max_weight_scale=5.0,
         adaptive_completion_weight=0.35,
         adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=24,
+        adaptive_confidence_scale=4.0,
         update_count=1,
         episodes_since_update=0,
         entries=(
@@ -562,6 +617,8 @@ def test_step_balance_controller_keeps_over_budget_courses_sampleable() -> None:
         max_weight_scale=5.0,
         adaptive_completion_weight=0.35,
         adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=24,
+        adaptive_confidence_scale=4.0,
         update_count=1,
         episodes_since_update=0,
         entries=(
@@ -621,6 +678,8 @@ def test_step_balance_controller_uses_steady_state_weights_when_no_course_has_de
         max_weight_scale=5.0,
         adaptive_completion_weight=0.35,
         adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=24,
+        adaptive_confidence_scale=4.0,
         update_count=1,
         episodes_since_update=0,
         entries=(

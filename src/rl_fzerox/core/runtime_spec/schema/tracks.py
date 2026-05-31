@@ -135,6 +135,8 @@ class TrackSamplingConfig(BaseModel):
     step_balance_max_weight_scale: PositiveFloat = 5.0
     adaptive_step_balance_completion_weight: float = Field(default=0.35, ge=0.0)
     adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
+    adaptive_step_balance_min_confidence_episodes: PositiveInt = 24
+    adaptive_step_balance_confidence_scale: PositiveFloat = 4.0
     step_balance_log_details: bool = False
 
     @model_validator(mode="after")
@@ -143,6 +145,10 @@ class TrackSamplingConfig(BaseModel):
             raise ValueError("env.track_sampling.entries must not be empty when enabled")
         if self.step_balance_max_weight_scale < 1.0:
             raise ValueError("track_sampling.step_balance_max_weight_scale must be >= 1.0")
+        if self.adaptive_step_balance_confidence_scale < 1.0:
+            raise ValueError(
+                "track_sampling.adaptive_step_balance_confidence_scale must be >= 1.0"
+            )
         return self
 
 

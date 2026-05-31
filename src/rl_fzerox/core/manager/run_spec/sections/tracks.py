@@ -51,6 +51,8 @@ class ManagedTracksConfig(BaseModel):
     step_balance_max_weight_scale: float = Field(default=5.0, ge=1.0)
     adaptive_step_balance_completion_weight: float = Field(default=0.35, ge=0.0)
     adaptive_step_balance_target_completion: float = Field(default=0.9, ge=0.0, le=1.0)
+    adaptive_step_balance_min_confidence_episodes: int = Field(default=24, ge=1)
+    adaptive_step_balance_confidence_scale: float = Field(default=4.0, ge=1.0)
     selected_course_ids: tuple[str, ...] = Field(default_factory=default_selected_course_ids)
 
     @model_validator(mode="after")
