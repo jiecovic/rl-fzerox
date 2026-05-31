@@ -124,6 +124,13 @@ const tracksConfigSchema = z.object({
   gp_difficulty: gpDifficultySchema.nullable().optional(),
   include_x_cup: z.boolean(),
   x_cup_course_count: z.number().int().positive(),
+  x_cup_auto_regeneration: z.object({
+    enabled: z.boolean(),
+    completion_threshold: z.number().min(0).max(1),
+    min_episodes: z.number().int().positive(),
+    min_completed_frames: z.number().int().positive(),
+    cooldown_episodes: z.number().int().nonnegative(),
+  }),
   sampling_mode: trackSamplingModeSchema,
   step_balance_update_episodes: z.number().int().positive(),
   step_balance_ema_alpha: z.number().gt(0).max(1),

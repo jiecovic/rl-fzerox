@@ -56,6 +56,8 @@ class SelectedTrack:
     generated_course_kind: str | None
     generated_course_seed: int | None
     generated_course_hash: str | None
+    generated_course_slot: int | None
+    generated_course_generation: int | None
     generated_course_segment_count: int | None
     generated_course_length: float | None
     log_per_course: bool
@@ -85,6 +87,8 @@ class SelectedTrack:
             "track_generated_course_kind": self.generated_course_kind,
             "track_generated_course_seed": self.generated_course_seed,
             "track_generated_course_hash": self.generated_course_hash,
+            "track_generated_course_slot": self.generated_course_slot,
+            "track_generated_course_generation": self.generated_course_generation,
             "track_generated_course_segment_count": self.generated_course_segment_count,
             "track_generated_course_length": self.generated_course_length,
             "track_log_per_course": self.log_per_course,

@@ -23,6 +23,7 @@ from rl_fzerox.core.runtime_spec.schema import (
     CurriculumConfig,
     EnvConfig,
     RewardConfig,
+    TrackSamplingConfig,
 )
 
 from .controls import (
@@ -173,6 +174,11 @@ class FZeroXEnvEngine:
         """Update adaptive reset weights used by step-balanced track sampling."""
 
         self._reset_coordinator.set_track_sampling_weights(weights_by_track_id)
+
+    def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+        """Replace reset candidates after generated-course rotation."""
+
+        self._reset_coordinator.set_track_sampling_config(config)
 
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""

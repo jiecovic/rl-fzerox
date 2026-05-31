@@ -8,7 +8,12 @@ from rl_fzerox.core.envs.actions import ActionValue, DiscreteActionDimension
 from rl_fzerox.core.envs.engine import FZeroXEnvEngine
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches, ActionMaskSnapshot
 from rl_fzerox.core.envs.observations import ObservationValue
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, RewardConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    RewardConfig,
+    TrackSamplingConfig,
+)
 
 
 class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
@@ -103,6 +108,11 @@ class FZeroXEnv(gym.Env[ObservationValue, ActionValue]):
         """Update adaptive reset weights used by step-balanced track sampling."""
 
         self._engine.set_track_sampling_weights(weights_by_track_id)
+
+    def set_track_sampling_config(self, config: TrackSamplingConfig) -> None:
+        """Replace the active reset candidates after generated-course rotation."""
+
+        self._engine.set_track_sampling_config(config)
 
     def set_locked_reset_course(self, course_id: str | None) -> None:
         """Lock subsequent sampled resets to one course for watch/manual inspection."""

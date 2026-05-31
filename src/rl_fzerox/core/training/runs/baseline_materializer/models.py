@@ -35,6 +35,8 @@ class BaselineRequest:
     generated_course_kind: XCupGeneratedCourseKind | None = None
     generated_course_seed: int | None = None
     generated_course_hash: str | None = None
+    generated_course_slot: int | None = None
+    generated_course_generation: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from rl_fzerox.core.runtime_spec.schema import CurriculumConfig, EnvConfig, TrainConfig
+from rl_fzerox.core.runtime_spec.schema import (
+    CurriculumConfig,
+    EnvConfig,
+    TrainAppConfig,
+    TrainConfig,
+)
 from rl_fzerox.core.training.runs import RunPaths
 from rl_fzerox.core.training.session.artifacts import (
     current_policy_artifact_metadata,
@@ -17,6 +22,8 @@ from .checkpoints import CheckpointPolicy, resolve_checkpoint_policy
 from .metrics import RolloutInfoAccumulator, episode_dicts, info_sequence
 from .track_sampling import (
     StepBalancedTrackSamplingController,
+    TrackSamplingRuntimeState,
+    XCupRotationManager,
     load_track_sampling_runtime_state,
     save_track_sampling_runtime_state,
 )
@@ -26,6 +33,7 @@ from .tuning import apply_stage_train_overrides, record_stage_train_overrides
 def build_callbacks(
     *,
     env_config: EnvConfig | None = None,
+    train_app_config: TrainAppConfig | None = None,
     train_config: TrainConfig,
     curriculum_config: CurriculumConfig,
     run_paths: RunPaths,
@@ -218,9 +226,19 @@ def build_callbacks(
     class StepBalancedTrackSamplingCallback(BaseCallback):
         """Refresh track sampling weights from completed-episode frame counts."""
 
-        def __init__(self, controller: StepBalancedTrackSamplingController) -> None:
+        def __init__(
+            self,
+            *,
+            controller: StepBalancedTrackSamplingController,
+            env_config: EnvConfig,
+            curriculum_config: CurriculumConfig,
+            rotation_manager: XCupRotationManager | None,
+        ) -> None:
             super().__init__(verbose=0)
             self._controller = controller
+            self._env_config = env_config
+            self._curriculum_config = curriculum_config
+            self._rotation_manager = rotation_manager
 
         def _on_training_start(self) -> None:
             self.training_env.env_method(
@@ -241,7 +259,32 @@ def build_callbacks(
             if not episodes:
                 return True
             weights = self._controller.record_episodes(episodes)
-            if weights is not None:
+            runtime_state = self._controller.runtime_state()
+            rotation_manager = self._rotation_manager
+            rotation_update = (
+                None
+                if rotation_manager is None
+                else rotation_manager.rotate_once(
+                    env_config=self._env_config,
+                    state=runtime_state,
+                )
+            )
+            if rotation_update is not None:
+                self._env_config = rotation_update.env_config
+                self.training_env.env_method(
+                    "set_track_sampling_config",
+                    self._env_config.track_sampling,
+                )
+                self._controller = _rebuild_track_sampling_controller(
+                    env_config=self._env_config,
+                    curriculum_config=self._curriculum_config,
+                    restored_state=runtime_state,
+                )
+                weights = self._controller.current_weights()
+                self.training_env.env_method("set_track_sampling_weights", weights)
+                if rotation_manager is not None:
+                    rotation_manager.commit(rotation_update)
+            elif weights is not None:
                 self.training_env.env_method("set_track_sampling_weights", weights)
             save_track_sampling_runtime_state(
                 run_paths.track_sampling_state_path,
@@ -268,7 +311,17 @@ def build_callbacks(
             restored_state=load_track_sampling_runtime_state(run_paths.track_sampling_state_path),
         )
         if track_balance_controller is not None:
-            callbacks.append(StepBalancedTrackSamplingCallback(track_balance_controller))
+            callbacks.append(
+                StepBalancedTrackSamplingCallback(
+                    controller=track_balance_controller,
+                    env_config=env_config,
+                    curriculum_config=curriculum_config,
+                    rotation_manager=_x_cup_rotation_manager(
+                        train_app_config=train_app_config,
+                        run_paths=run_paths,
+                    ),
+                )
+            )
     if curriculum_config.enabled:
         callbacks.append(
             CurriculumCallback(
@@ -279,3 +332,32 @@ def build_callbacks(
         )
     callbacks.extend(callback for callback in extra_callbacks if isinstance(callback, BaseCallback))
     return CallbackList(callbacks)
+
+
+def _rebuild_track_sampling_controller(
+    *,
+    env_config: EnvConfig,
+    curriculum_config: CurriculumConfig,
+    restored_state: TrackSamplingRuntimeState,
+) -> StepBalancedTrackSamplingController:
+    controller = StepBalancedTrackSamplingController.from_configs(
+        env_config=env_config,
+        curriculum_config=curriculum_config,
+        restored_state=restored_state,
+    )
+    if controller is None:
+        raise RuntimeError("X Cup rotation removed the dynamic track-sampling controller")
+    return controller
+
+
+def _x_cup_rotation_manager(
+    *,
+    train_app_config: TrainAppConfig | None,
+    run_paths: RunPaths,
+) -> XCupRotationManager | None:
+    if train_app_config is None or not train_app_config.env.track_sampling.x_cup_rotation.enabled:
+        return None
+    return XCupRotationManager(
+        config=train_app_config,
+        run_paths=run_paths,
+    )

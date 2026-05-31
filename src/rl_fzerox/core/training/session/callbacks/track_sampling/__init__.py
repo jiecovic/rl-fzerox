@@ -19,11 +19,17 @@ from rl_fzerox.core.training.session.callbacks.track_sampling.weights import (
     adaptive_difficulty_bonus,
     adaptive_target_bonus,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling.x_cup_rotation import (
+    XCupRotationManager,
+    XCupRotationUpdate,
+)
 
 __all__ = (
     "StepBalancedTrackSamplingController",
     "TrackSamplingRuntimeEntry",
     "TrackSamplingRuntimeState",
+    "XCupRotationManager",
+    "XCupRotationUpdate",
     "adaptive_confidence_bonus",
     "adaptive_difficulty_bonus",
     "adaptive_target_bonus",

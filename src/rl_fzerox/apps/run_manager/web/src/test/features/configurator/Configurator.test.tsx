@@ -357,6 +357,9 @@ describe("Configurator", () => {
     expect(
       screen.getByText("Deterministic GP X Cup baselines materialized at training start."),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Auto regenerate" }));
+    expect(screen.getByRole("textbox", { name: "Completion threshold" })).toHaveValue("0.9");
+    expect(screen.getByRole("textbox", { name: "Min frames" })).toHaveValue("10000");
     expect(screen.getByRole("button", { name: "Mute City" })).toBeInTheDocument();
   });
 

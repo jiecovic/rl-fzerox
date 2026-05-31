@@ -32,6 +32,31 @@ def built_in_course_id_set() -> frozenset[str]:
     return frozenset(course.id for course in BUILT_IN_COURSES)
 
 
+class ManagedXCupAutoRegenerationConfig(BaseModel):
+    """Manager-owned policy for rotating solved generated X Cup slots."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = False
+    completion_threshold: float = Field(
+        default=X_CUP_COURSE.rotation_defaults.completion_threshold,
+        ge=0.0,
+        le=1.0,
+    )
+    min_episodes: int = Field(
+        default=X_CUP_COURSE.rotation_defaults.min_episodes,
+        ge=1,
+    )
+    min_completed_frames: int = Field(
+        default=X_CUP_COURSE.rotation_defaults.min_completed_frames,
+        ge=1,
+    )
+    cooldown_episodes: int = Field(
+        default=X_CUP_COURSE.rotation_defaults.cooldown_episodes,
+        ge=0,
+    )
+
+
 class ManagedTracksConfig(BaseModel):
     """Track pool and race-mode knobs exposed by the run manager."""
 
@@ -44,6 +69,9 @@ class ManagedTracksConfig(BaseModel):
         default=X_CUP_COURSE.default_generated_count,
         ge=1,
         le=X_CUP_COURSE.max_generated_count,
+    )
+    x_cup_auto_regeneration: ManagedXCupAutoRegenerationConfig = Field(
+        default_factory=ManagedXCupAutoRegenerationConfig
     )
     sampling_mode: TrackSamplingMode = "step_balanced"
     step_balance_update_episodes: int = Field(default=5, ge=1)
@@ -60,10 +88,13 @@ class ManagedTracksConfig(BaseModel):
         if self.race_mode != "gp_race":
             self.gp_difficulty = None
             self.include_x_cup = False
+            self.x_cup_auto_regeneration.enabled = False
         elif self.gp_difficulty is None:
             self.gp_difficulty = default_gp_difficulty()
         if self.include_x_cup and self.race_mode != "gp_race":
             raise ValueError("tracks.include_x_cup=true requires tracks.race_mode=gp_race")
+        if self.x_cup_auto_regeneration.enabled and not self.include_x_cup:
+            raise ValueError("tracks.x_cup_auto_regeneration.enabled=true requires X Cup")
         if not self.selected_course_ids and not self.include_x_cup:
             raise ValueError("tracks.selected_course_ids must not be empty")
         if len(set(self.selected_course_ids)) != len(self.selected_course_ids):
