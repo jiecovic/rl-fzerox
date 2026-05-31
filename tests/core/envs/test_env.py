@@ -133,7 +133,7 @@ def test_step_clips_reward_and_exposes_raw_reward_diagnostics() -> None:
     assert info["episode_return"] == 5.0
 
 
-def test_grounded_pitch_penalty_uses_requested_pitch_before_ground_gate() -> None:
+def test_grounded_pitch_penalty_does_not_suppress_continuous_pitch() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -170,8 +170,7 @@ def test_grounded_pitch_penalty_uses_requested_pitch_before_ground_gate() -> Non
         }
     )
 
-    # Ground gating protects the emulator while reward shaping still sees the request.
-    assert backend.last_race_control_state.pitch == 0.0
+    assert backend.last_race_control_state.pitch == pytest.approx(0.82)
     expected = -0.5 * ((0.82 - 0.05) / (1.0 - 0.05))
     assert reward == pytest.approx(expected)
     reward_breakdown = info["reward_breakdown"]
@@ -428,7 +427,7 @@ def test_step_updates_component_state_with_action_history() -> None:
     assert values["control_history.prev_steer_3"] == 0.0
 
 
-def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_application() -> None:
+def test_action_history_records_requested_continuous_pitch() -> None:
     backend = ScriptedStepBackend(
         [
             _backend_step_result(
@@ -466,7 +465,7 @@ def test_action_history_preserves_requested_pitch_when_ground_gate_zeros_applica
         }
     )
 
-    assert backend.last_race_control_state.pitch == 0.0
+    assert backend.last_race_control_state.pitch == pytest.approx(0.5)
     assert isinstance(obs, dict)
     raw_feature_names = info["observation_state_features"]
     assert isinstance(raw_feature_names, tuple)

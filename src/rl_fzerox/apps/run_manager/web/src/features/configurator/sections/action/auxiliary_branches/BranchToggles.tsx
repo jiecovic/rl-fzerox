@@ -132,8 +132,8 @@ export function BranchToggles({ action, checkpointLocked, updateAction }: Branch
         <ActionToggleRow
           description={
             action.pitch_mode === "continuous"
-              ? "Expose one continuous airborne pitch lane."
-              : `Expose airborne pitch as a ${action.pitch_buckets}-logit branch.`
+              ? "Expose one continuous pitch lane."
+              : `Expose pitch as a ${action.pitch_buckets}-logit branch.`
           }
           enabled={action.enable_pitch}
           enabledDisabledReason={

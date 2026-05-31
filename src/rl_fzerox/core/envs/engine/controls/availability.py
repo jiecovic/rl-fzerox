@@ -107,11 +107,10 @@ def apply_dynamic_control_gates(
     if not pitch_non_neutral_allowed:
         control_state = with_pitch(control_state, 0.0)
 
-    if last_telemetry is None or last_telemetry.player.airborne:
-        return control_state
-    if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
-        control_state = without_controls(control_state, air_brake=True)
-    return with_pitch(control_state, 0.0)
+    if last_telemetry is not None and not last_telemetry.player.airborne:
+        if mask_air_brake_on_ground or continuous_air_brake_mode == "disable_on_ground":
+            control_state = without_controls(control_state, air_brake=True)
+    return control_state
 
 
 def _lean_button_allowed(
