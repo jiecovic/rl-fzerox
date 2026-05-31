@@ -64,6 +64,10 @@ extending, and reviewing.
 - Keep public interfaces narrow and well-defined.
 - Prefer composition over inheritance when either would work.
 - Make state transitions and side effects easy to trace.
+- When a touched area has mixed ownership, multiple sources of truth, legacy
+  compatibility paths, or other structural debt, call that out before extending
+  it. Prefer discussing and fixing the ownership boundary over silently building
+  new behavior on top of an unclear or unstable boundary.
 - Avoid loose “constant soup” for related literal values when a proper data
   structure would be clearer. Group RAM offsets, protocol ids, wire values, and
   enum constants in small immutable data structures when reasonable.
