@@ -8,11 +8,8 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pydantic import ValidationError
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
 from rl_fzerox.core.runtime_spec.paths import project_root_dir, resolve_config_data_paths
 from rl_fzerox.core.runtime_spec.schema import (
-    EnvConfig,
-    TrackSamplingEntryConfig,
     TrainAppConfig,
     TrainConfig,
     WatchAppConfig,
@@ -75,7 +72,6 @@ def materialize_train_run_config(
 
     from rl_fzerox.core.training.runs.baseline_materializer import materialize_run_baselines
 
-    config = _preserve_resumed_rotating_x_cup_entries(config, run_paths=run_paths)
     materialized_config = materialize_run_baselines(
         config,
         run_paths=run_paths,
@@ -142,88 +138,6 @@ def load_train_run_train_config(run_dir: Path) -> TrainConfig:
         train_section[key] = value
     _resolve_train_config_paths({"train": train_section}, config_dir=config_path.parent)
     return TrainConfig.model_validate(train_section)
-
-
-def _preserve_resumed_rotating_x_cup_entries(
-    config: TrainAppConfig,
-    *,
-    run_paths: RunPaths,
-) -> TrainAppConfig:
-    if run_paths.fresh_run or not config.env.track_sampling.x_cup_rotation.enabled:
-        return config
-    try:
-        saved_config = load_train_run_config(run_paths.run_dir)
-    except (FileNotFoundError, ValueError, ValidationError):
-        return config
-    if not saved_config.env.track_sampling.x_cup_rotation.enabled:
-        return config
-
-    saved_entries = _generated_x_cup_entries_by_slot_variant(
-        saved_config.env.track_sampling.entries,
-    )
-    if not saved_entries:
-        return config
-
-    next_entries: list[TrackSamplingEntryConfig] = []
-    changed = False
-    for entry in config.env.track_sampling.entries:
-        key = _generated_x_cup_entry_key(entry)
-        saved_entry = None if key is None else saved_entries.get(key)
-        if saved_entry is None:
-            next_entries.append(entry)
-            continue
-        changed = True
-        next_entries.append(saved_entry)
-    if not changed:
-        return config
-
-    return config.model_copy(
-        update={
-            "env": _env_with_track_sampling_entries(
-                config.env,
-                entries=tuple(next_entries),
-            )
-        }
-    )
-
-
-def _env_with_track_sampling_entries(
-    config: EnvConfig,
-    *,
-    entries: tuple[TrackSamplingEntryConfig, ...],
-) -> EnvConfig:
-    return config.model_copy(
-        update={
-            "track_sampling": config.track_sampling.model_copy(update={"entries": entries}),
-        }
-    )
-
-
-def _generated_x_cup_entries_by_slot_variant(
-    entries: tuple[TrackSamplingEntryConfig, ...],
-) -> dict[tuple[object, ...], TrackSamplingEntryConfig]:
-    saved_entries: dict[tuple[object, ...], TrackSamplingEntryConfig] = {}
-    for entry in entries:
-        key = _generated_x_cup_entry_key(entry)
-        if key is not None:
-            saved_entries[key] = entry
-    return saved_entries
-
-
-def _generated_x_cup_entry_key(
-    entry: TrackSamplingEntryConfig,
-) -> tuple[object, ...] | None:
-    slot = entry.generated_course_slot
-    if entry.generated_course_kind != X_CUP_COURSE.generated_kind or slot is None:
-        return None
-    return (
-        int(slot),
-        entry.mode,
-        entry.gp_difficulty,
-        entry.vehicle,
-        entry.engine_setting,
-        entry.engine_setting_raw_value,
-    )
 
 
 def _load_train_config_mapping(config_path: Path) -> dict[str, object]:

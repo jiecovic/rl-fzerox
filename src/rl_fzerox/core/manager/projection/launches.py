@@ -5,7 +5,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rl_fzerox.core.manager.projection.assembly import train_config_payload
+from rl_fzerox.core.manager.projection.assembly import (
+    effective_train_algorithm,
+    train_config_payload,
+)
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.paths import project_root_dir
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig
@@ -59,6 +62,13 @@ def build_managed_resume_train_app_config(
                 update={
                     "continue_run_dir": run_dir,
                     "resume_run_dir": run_dir,
+                    "resume_source_algorithm": train_config.train.algorithm,
+                    "resume_source_auxiliary_state_enabled": (
+                        train_config.policy.auxiliary_state.enabled
+                    ),
+                    "resume_source_auxiliary_state_head_arch": (
+                        train_config.policy.auxiliary_state.head_arch
+                    ),
                     "resume_artifact": "latest",
                     "resume_mode": "full_model",
                     "tensorboard_step_offset": tensorboard_step_offset,
@@ -75,6 +85,7 @@ def build_managed_fork_train_app_config(
     run_dir: Path,
     source_run_dir: Path,
     source_artifact: str,
+    source_config: ManagedRunConfig | None = None,
     tensorboard_step_offset: int = 0,
 ) -> TrainAppConfig:
     """Project one manager config into a child run warm-started from another run."""
@@ -84,15 +95,28 @@ def build_managed_fork_train_app_config(
         run_id=run_id,
         run_dir=run_dir,
     )
+    resume_updates: dict[str, object] = {
+        "resume_run_dir": source_run_dir,
+        "resume_artifact": source_artifact,
+        "resume_mode": "weights_only",
+        "tensorboard_step_offset": tensorboard_step_offset,
+    }
+    if source_config is not None:
+        resume_updates.update(
+            _managed_resume_source_metadata(source_config),
+        )
     return train_config.model_copy(
         update={
             "train": train_config.train.model_copy(
-                update={
-                    "resume_run_dir": source_run_dir,
-                    "resume_artifact": source_artifact,
-                    "resume_mode": "weights_only",
-                    "tensorboard_step_offset": tensorboard_step_offset,
-                }
+                update=resume_updates,
             )
         }
     )
+
+
+def _managed_resume_source_metadata(config: ManagedRunConfig) -> dict[str, object]:
+    return {
+        "resume_source_algorithm": effective_train_algorithm(config),
+        "resume_source_auxiliary_state_enabled": config.policy.auxiliary_state_enabled,
+        "resume_source_auxiliary_state_head_arch": config.policy.auxiliary_state_head_arch,
+    }

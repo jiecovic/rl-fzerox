@@ -47,13 +47,10 @@ class ManagedXCupAutoRegenerationConfig(BaseModel):
         default=X_CUP_COURSE.rotation_defaults.min_episodes,
         ge=1,
     )
-    min_completed_frames: int = Field(
-        default=X_CUP_COURSE.rotation_defaults.min_completed_frames,
-        ge=1,
-    )
-    cooldown_episodes: int = Field(
-        default=X_CUP_COURSE.rotation_defaults.cooldown_episodes,
-        ge=0,
+    ema_alpha: float = Field(
+        default=X_CUP_COURSE.rotation_defaults.ema_alpha,
+        gt=0.0,
+        le=1.0,
     )
 
 

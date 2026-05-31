@@ -5,6 +5,12 @@ from rl_fzerox.core.runtime_spec.schema import TrackSamplingEntryConfig
 
 
 def current_watch_course_id(info: dict[str, object]) -> str | None:
+    reset_course_key = info.get("track_reset_course_key")
+    if isinstance(reset_course_key, str) and reset_course_key:
+        return reset_course_key
+    runtime_course_key = info.get("track_runtime_course_key")
+    if isinstance(runtime_course_key, str) and runtime_course_key:
+        return runtime_course_key
     course_id = info.get("track_course_id")
     return course_id if isinstance(course_id, str) and course_id else None
 
@@ -19,12 +25,15 @@ def watch_sequential_course_ids(
         if course_key in seen_course_keys:
             continue
         seen_course_keys.add(course_key)
-        if entry.course_id:
-            ordered_course_ids.append(entry.course_id)
+        reset_course_key = _entry_reset_course_key(entry)
+        if reset_course_key is not None:
+            ordered_course_ids.append(reset_course_key)
     return tuple(ordered_course_ids)
 
 
 def watch_entry_course_key(entry: TrackSamplingEntryConfig) -> str:
+    if entry.runtime_course_key:
+        return f"runtime_course_key:{entry.runtime_course_key}"
     if entry.course_id:
         return f"course_id:{entry.course_id}"
     if entry.course_ref:
@@ -32,6 +41,10 @@ def watch_entry_course_key(entry: TrackSamplingEntryConfig) -> str:
     if entry.course_index is not None:
         return f"course_index:{int(entry.course_index)}"
     return f"entry:{entry.id}"
+
+
+def _entry_reset_course_key(entry: TrackSamplingEntryConfig) -> str | None:
+    return entry.runtime_course_key or entry.course_id
 
 
 def adjacent_watch_course_id(

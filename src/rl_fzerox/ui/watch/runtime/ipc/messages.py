@@ -7,6 +7,7 @@ from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
+from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationNormalizationMode,
@@ -105,6 +106,7 @@ class WatchSnapshot:
     failed_track_attempts: frozenset[str]
     continuous_air_brake_disabled: bool
     telemetry_data: dict[str, object] | None
+    active_track_sampling: TrackSamplingConfig | None = None
     policy_auxiliary_state_predictions: dict[str, object] | None = None
     policy_auxiliary_state_targets: dict[str, object] | None = None
     action_hold_frame: int = 1

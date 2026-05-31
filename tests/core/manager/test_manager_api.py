@@ -1,7 +1,6 @@
 # tests/core/manager/test_manager_api.py
 from __future__ import annotations
 
-import json
 import zipfile
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
@@ -24,6 +23,10 @@ from rl_fzerox.core.manager import (
     default_managed_run_config,
 )
 from rl_fzerox.core.manager.transfer import export_run_bundle
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingRuntimeEntry,
+    TrackSamplingRuntimeState,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -478,7 +481,7 @@ async def test_manager_api_reads_track_sampling_runtime_state(tmp_path: Path) ->
         stopped_at=None,
         message="worker launched",
     )
-    _write_track_sampling_state(run.run_dir)
+    _write_track_sampling_state(store, run.id)
 
     client = _client(tmp_path, store=store)
 
@@ -512,7 +515,7 @@ def test_manager_api_live_track_sampling_sends_initial_snapshot(tmp_path: Path) 
         stopped_at=None,
         message="worker launched",
     )
-    _write_track_sampling_state(run.run_dir)
+    _write_track_sampling_state(store, run.id)
 
     app = create_manager_api_app(store, run_launcher=_LauncherStub())
 
@@ -539,16 +542,14 @@ async def test_manager_api_resets_track_sampling_state_for_stopped_run(tmp_path:
         stopped_at="2026-05-04T12:30:00+00:00",
         message="stopped for reset",
     )
-    state_path = run.run_dir / "runtime" / "track_sampling_state.json"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text("{}", encoding="utf-8")
+    _write_track_sampling_state(store, run.id)
 
     client = _client(tmp_path, store=store)
     response = await client.post(f"/api/runs/{run.id}/track-sampling/reset")
 
     assert response.status_code == 200
     assert response.json() == {"reset": True}
-    assert not state_path.exists()
+    assert store.get_run_track_sampling_state(run.id) is None
 
 
 async def test_manager_api_rejects_track_sampling_reset_while_running(tmp_path: Path) -> None:
@@ -1243,49 +1244,50 @@ async def test_manager_api_preview_removes_logits_when_branch_excluded(tmp_path:
     assert "boost" not in branch_names
 
 
-def _write_track_sampling_state(run_dir: Path) -> None:
-    state_path = run_dir / "runtime" / "track_sampling_state.json"
-    state_path.parent.mkdir(parents=True, exist_ok=True)
-    state_path.write_text(
-        json.dumps(
-            {
-                "version": 1,
-                "sampling_mode": "step_balanced",
-                "action_repeat": 2,
-                "update_episodes": 4,
-                "ema_alpha": 0.5,
-                "max_weight_scale": 5.0,
-                "update_count": 3,
-                "episodes_since_update": 1,
-                "entries": [
-                    {
-                        "track_id": "mute",
-                        "course_key": "mute_city",
-                        "label": "Mute City",
-                        "base_weight": 1.0,
-                        "current_weight": 1.5,
-                        "completed_frames": 1200,
-                        "episode_count": 3,
-                        "finished_episode_count": 2,
-                        "success_sample_count": 2,
-                        "ema_episode_frames": 400.0,
-                    },
-                    {
-                        "track_id": "silence",
-                        "course_key": "silence",
-                        "label": "Silence",
-                        "base_weight": 1.0,
-                        "current_weight": 0.5,
-                        "completed_frames": 800,
-                        "episode_count": 1,
-                        "finished_episode_count": 1,
-                        "success_sample_count": 1,
-                        "ema_episode_frames": 800.0,
-                    },
-                ],
-            }
+def _write_track_sampling_state(store: ManagerStore, run_id: str) -> None:
+    store.upsert_run_track_sampling_state(
+        run_id=run_id,
+        state=TrackSamplingRuntimeState(
+            sampling_mode="step_balanced",
+            action_repeat=2,
+            update_episodes=4,
+            ema_alpha=0.5,
+            max_weight_scale=5.0,
+            adaptive_completion_weight=0.35,
+            adaptive_target_completion=0.9,
+            adaptive_min_confidence_episodes=24,
+            adaptive_confidence_scale=4.0,
+            update_count=3,
+            episodes_since_update=1,
+            entries=(
+                TrackSamplingRuntimeEntry(
+                    track_id="mute",
+                    course_key="mute_city",
+                    label="Mute City",
+                    base_weight=1.0,
+                    current_weight=1.5,
+                    completed_frames=1200,
+                    episode_count=3,
+                    finished_episode_count=2,
+                    success_sample_count=2,
+                    ema_episode_frames=400.0,
+                    ema_completion_fraction=None,
+                ),
+                TrackSamplingRuntimeEntry(
+                    track_id="silence",
+                    course_key="silence",
+                    label="Silence",
+                    base_weight=1.0,
+                    current_weight=0.5,
+                    completed_frames=800,
+                    episode_count=1,
+                    finished_episode_count=1,
+                    success_sample_count=1,
+                    ema_episode_frames=800.0,
+                    ema_completion_fraction=None,
+                ),
+            ),
         ),
-        encoding="utf-8",
     )
 
 

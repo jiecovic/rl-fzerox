@@ -11,6 +11,9 @@ from rl_fzerox.apps.watch_cli.delta import (
     watch_config_delta_from_dotlist,
 )
 from rl_fzerox.core.manager import ManagedRun, ManagerStore, default_manager_db_path
+from rl_fzerox.core.manager.projection.x_cup_runtime import (
+    restore_generated_x_cup_entries_from_state,
+)
 from rl_fzerox.core.manager.training import build_managed_train_app_config
 from rl_fzerox.core.runtime_spec.schema import TrainAppConfig, WatchAppConfig, WatchConfig
 from rl_fzerox.core.training.runs import (
@@ -94,6 +97,18 @@ def resolve_watch_app_config(
     elif cli_override_delta:
         config = apply_watch_config_delta(config, cli_override_delta)
 
+    if managed_run_id is not None:
+        config = config.model_copy(
+            update={
+                "watch": config.watch.model_copy(
+                    update={
+                        "manager_db_path": resolved_manager_db_path,
+                        "managed_run_id": managed_run_id,
+                    }
+                )
+            }
+        )
+
     return materialize_watch_session_config(
         config,
         run_dir=config.watch.policy_run_dir,
@@ -140,6 +155,10 @@ def _managed_watch_train_config(
         run.config,
         run_id=run.id,
         run_dir=run.run_dir,
+    )
+    train_config = restore_generated_x_cup_entries_from_state(
+        train_config,
+        state=store.get_run_track_sampling_state(run.id),
     )
     return (
         run.run_dir,

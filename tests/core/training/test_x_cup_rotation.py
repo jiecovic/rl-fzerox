@@ -7,7 +7,7 @@ from pathlib import Path
 
 from pytest import MonkeyPatch
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
 from rl_fzerox.core.runtime_spec.schema import (
     EmulatorConfig,
     EnvConfig,
@@ -50,9 +50,11 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
         _write_x_cup_state(run_paths.baselines_dir / f"stale_{index}.state", timestamp=index)
         for index in range(3)
     )
+    slot_key = generated_x_cup_slot_key(0)
     entry = TrackSamplingEntryConfig(
         id="x_cup_old_gp_race_novice_blue_falcon_balanced",
         course_id="x_cup_old",
+        runtime_course_key=slot_key,
         course_name="X Cup old",
         course_index=X_CUP_COURSE.course_index,
         mode=X_CUP_COURSE.race_mode,
@@ -77,7 +79,6 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
                 enabled=True,
                 completion_threshold=0.9,
                 min_episodes=1,
-                min_completed_frames=1,
             ),
         ),
     )
@@ -128,8 +129,8 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
         episodes_since_update=0,
         entries=(
             TrackSamplingRuntimeEntry(
-                track_id="x_cup_old",
-                course_key="x_cup_old",
+                track_id=slot_key,
+                course_key=slot_key,
                 label="X Cup old",
                 base_weight=1.0,
                 current_weight=1.0,
@@ -139,6 +140,18 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
                 success_sample_count=3,
                 ema_episode_frames=100.0,
                 ema_completion_fraction=0.95,
+                generation_episode_count=3,
+                generation_finished_episode_count=3,
+                generation_success_sample_count=3,
+                generation_ema_completion_fraction=0.95,
+                generated_course_slot=0,
+                generated_course_generation=0,
+                generated_entry_id="x_cup_old_gp_race_novice_blue_falcon_balanced",
+                generated_course_id="x_cup_old",
+                generated_course_name="X Cup old",
+                generated_course_hash="old",
+                generated_course_seed=1,
+                generated_baseline_state_path=str(old_state_path),
             ),
         ),
     )
@@ -149,6 +162,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     replacement = update.env_config.track_sampling.entries[0]
     assert replacement.course_id is not None
     assert replacement.course_id != "x_cup_old"
+    assert replacement.runtime_course_key == slot_key
     assert replacement.generated_course_slot == 0
     assert replacement.generated_course_generation == 1
     assert replacement.baseline_state_path == new_state_path
@@ -158,6 +172,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
 
     saved = load_train_run_config(run_paths.run_dir)
     assert saved.env.track_sampling.entries[0].course_id == replacement.course_id
+    assert saved.env.track_sampling.entries[0].runtime_course_key == slot_key
     assert not stale_paths[0].exists()
     assert not stale_paths[0].with_suffix(".json").exists()
     assert not stale_paths[1].exists()

@@ -58,6 +58,7 @@ from rl_fzerox.ui.watch.runtime.timing import (
     _adjust_control_fps,
     _target_seconds,
 )
+from rl_fzerox.ui.watch.runtime.track_sampling import ManagedTrackSamplingRefresh
 from rl_fzerox.ui.watch.runtime.visualization import (
     current_auxiliary_predictions as _current_auxiliary_predictions,
 )
@@ -130,6 +131,8 @@ def _run_simulation_loop(
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         persistent_locked_reset_course_id: str | None = None
         sequential_course_ids = session.sequential_course_ids
+        active_track_sampling = config.env.track_sampling
+        track_sampling_refresh = ManagedTrackSamplingRefresh.from_config(config)
         watch_zeroed_state_features = session.watch_zeroed_state_features
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
             session.auxiliary_target_names
@@ -163,6 +166,7 @@ def _run_simulation_loop(
                     manual_control_enabled=manual_control_enabled,
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
+                    active_track_sampling=active_track_sampling,
                     best_finish_position=best_finish_position,
                     best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,
@@ -172,7 +176,33 @@ def _run_simulation_loop(
                 ),
             )
 
+        def refresh_track_sampling(*, force: bool = False) -> bool:
+            nonlocal active_track_sampling
+            nonlocal persistent_locked_reset_course_id
+            nonlocal sequential_course_ids
+
+            if track_sampling_refresh is None:
+                return False
+            refreshed_track_sampling = track_sampling_refresh.refreshed_config(
+                active_track_sampling,
+                force=force,
+            )
+            if refreshed_track_sampling is None:
+                return False
+
+            env.set_track_sampling_config(refreshed_track_sampling)
+            active_track_sampling = refreshed_track_sampling
+            sequential_course_ids = _watch_sequential_course_ids(active_track_sampling.entries)
+            if (
+                persistent_locked_reset_course_id is not None
+                and persistent_locked_reset_course_id not in sequential_course_ids
+            ):
+                persistent_locked_reset_course_id = None
+                env.set_locked_reset_course(None)
+            return True
+
         while config.watch.episodes is None or episode < config.watch.episodes:
+            refresh_track_sampling(force=True)
             env.set_locked_reset_course(persistent_locked_reset_course_id)
             reset_seed = config.seed if episode == 0 else None
             raw_observation, raw_info = env.reset(seed=reset_seed)
@@ -232,6 +262,8 @@ def _run_simulation_loop(
                 cnn_normalization = commands.cnn_normalization
                 if commands.quit_requested:
                     return
+                if refresh_track_sampling() and commands.paused:
+                    publish_snapshot()
                 if commands.toggle_zeroed_state_feature_name is not None:
                     watch_zeroed_state_features = toggle_watch_state_feature(
                         watch_zeroed_state_features,
@@ -488,6 +520,7 @@ def _run_simulation_loop(
                     deterministic_policy=deterministic_policy,
                     policy_reload_error=policy_reload_error,
                     cnn_activations=cnn_activations,
+                    active_track_sampling=active_track_sampling,
                     best_finish_position=best_finish_position,
                     best_finish_ranks=best_finish_ranks,
                     best_finish_times=best_finish_times,

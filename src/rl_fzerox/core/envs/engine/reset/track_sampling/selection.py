@@ -83,7 +83,7 @@ class TrackResetSelector:
             return False
         self._sync_sequential_cycle(config)
         for index, bucket in enumerate(self._sequential_course_buckets):
-            if any(entry.course_id == course_id for entry in bucket):
+            if any(_entry_matches_course_request(entry, course_id) for entry in bucket):
                 self._cursor = index
                 return True
         return False
@@ -137,7 +137,9 @@ def select_reset_track_by_course_id(
 
     if not config.enabled:
         return None
-    matching_entries = tuple(entry for entry in config.entries if entry.course_id == course_id)
+    matching_entries = tuple(
+        entry for entry in config.entries if _entry_matches_course_request(entry, course_id)
+    )
     if matching_entries:
         return _selected_track_from_entry(
             _pick_track_entry(matching_entries, seed=seed),
@@ -248,6 +250,7 @@ def _selected_track_from_entry(
         display_name=entry.display_name,
         course_ref=entry.course_ref,
         course_id=entry.course_id,
+        runtime_course_key=entry.runtime_course_key,
         course_name=entry.course_name,
         baseline_state_path=entry.baseline_state_path,
         weight=float(entry.weight),
@@ -394,6 +397,7 @@ def _entry_fingerprint(
         entry.display_name,
         entry.course_ref,
         entry.course_id,
+        entry.runtime_course_key,
         entry.course_name,
         entry.baseline_state_path,
         float(entry.weight) if include_weight else None,
@@ -446,6 +450,8 @@ def _group_entries_by_course(
 
 
 def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
+    if entry.runtime_course_key:
+        return f"runtime_course_key:{entry.runtime_course_key}"
     if entry.course_id:
         return f"course_id:{entry.course_id}"
     if entry.course_ref:
@@ -453,6 +459,10 @@ def _entry_course_key(entry: TrackSamplingEntryConfig) -> str:
     if entry.course_index is not None:
         return f"course_index:{int(entry.course_index)}"
     return f"entry:{entry.id}"
+
+
+def _entry_matches_course_request(entry: TrackSamplingEntryConfig, course_id: str) -> bool:
+    return course_id in (entry.runtime_course_key, entry.course_id)
 
 
 def _entries_weight(entries: tuple[TrackSamplingEntryConfig, ...]) -> float:

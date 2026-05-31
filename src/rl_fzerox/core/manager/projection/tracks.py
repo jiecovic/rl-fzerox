@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from rl_fzerox.core.domain.courses import built_in_course_ref_by_id
 from rl_fzerox.core.domain.race_difficulty import default_gp_difficulty
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_course_identity
+from rl_fzerox.core.domain.x_cup import (
+    X_CUP_COURSE,
+    generated_x_cup_course_identity,
+    generated_x_cup_slot_key,
+)
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
 from rl_fzerox.core.runtime_spec.vehicle_catalog import resolve_engine_setting, vehicle_by_id
 
@@ -32,8 +36,7 @@ def build_track_sampling_data(config: ManagedRunConfig) -> dict[str, object]:
             "enabled": config.tracks.x_cup_auto_regeneration.enabled,
             "completion_threshold": (config.tracks.x_cup_auto_regeneration.completion_threshold),
             "min_episodes": config.tracks.x_cup_auto_regeneration.min_episodes,
-            "min_completed_frames": (config.tracks.x_cup_auto_regeneration.min_completed_frames),
-            "cooldown_episodes": config.tracks.x_cup_auto_regeneration.cooldown_episodes,
+            "ema_alpha": config.tracks.x_cup_auto_regeneration.ema_alpha,
         },
     }
 
@@ -99,6 +102,7 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
                 entries.append(
                     _track_sampling_entry(
                         course_id=generated_course.course_id,
+                        runtime_course_key=generated_x_cup_slot_key(generated_course.slot),
                         course_ref=None,
                         race_mode=config.tracks.race_mode,
                         gp_difficulty=config.tracks.gp_difficulty,
@@ -139,6 +143,7 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
 def _track_sampling_entry(
     *,
     course_id: str,
+    runtime_course_key: str | None = None,
     course_ref: str | None,
     race_mode: str,
     gp_difficulty: str | None,
@@ -191,6 +196,7 @@ def _track_sampling_entry(
         ),
         "course_ref": course_ref,
         "course_id": course_id,
+        "runtime_course_key": runtime_course_key,
         "course_name": course_name,
         "course_index": course_index,
         "display_name": display_name,

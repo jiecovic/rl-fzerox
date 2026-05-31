@@ -29,6 +29,8 @@ class WatchConfig(BaseModel):
     policy_artifact: Literal["latest", "best", "final"] = "latest"
     policy_algorithm: TrainAlgorithmName | None = None
     lineage_frame_offset: NonNegativeInt | None = None
+    manager_db_path: Path | None = None
+    managed_run_id: str | None = None
 
     @model_validator(mode="after")
     def _default_split_fps(self) -> WatchConfig:

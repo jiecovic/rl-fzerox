@@ -75,7 +75,19 @@ export function RunTrackPoolPanel({
       {visibleState === null ? (
         <div className="px-3.5 py-3 text-sm text-app-muted">{trackPoolEmptyMessage(run)}</div>
       ) : activeCup === null ? null : (
-        <TrackPoolBody activeCup={activeCup} />
+        <TrackPoolBody
+          activeCup={activeCup}
+          xCupRegenerationMinEpisodes={
+            run.config.tracks.x_cup_auto_regeneration.enabled
+              ? run.config.tracks.x_cup_auto_regeneration.min_episodes
+              : null
+          }
+          xCupRegenerationThreshold={
+            run.config.tracks.x_cup_auto_regeneration.enabled
+              ? run.config.tracks.x_cup_auto_regeneration.completion_threshold
+              : null
+          }
+        />
       )}
       <ConfirmDialog
         confirmLabel="Reset stats"

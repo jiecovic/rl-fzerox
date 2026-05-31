@@ -265,6 +265,8 @@ def test_resolve_watch_app_config_tracks_managed_lineage_frame_offset(
 
     assert config.env.action_repeat == 1
     assert config.watch.lineage_frame_offset == 2_000
+    assert config.watch.manager_db_path == db_path.resolve()
+    assert config.watch.managed_run_id == child.id
 
 
 def test_watch_allows_run_dir_without_config(

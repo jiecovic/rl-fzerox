@@ -31,6 +31,9 @@ from rl_fzerox.core.training.session import (
     validate_training_algorithm_config,
     validate_training_baseline_state,
 )
+from rl_fzerox.core.training.session.callbacks.track_sampling import (
+    TrackSamplingRuntimePersistence,
+)
 
 
 def run_training(
@@ -38,6 +41,7 @@ def run_training(
     *,
     extra_callbacks: Sequence[object] = (),
     startup_reporter: Callable[[str, str], None] | None = None,
+    track_sampling_runtime_persistence: TrackSamplingRuntimePersistence | None = None,
 ) -> None:
     """Run one training session from the composed train config."""
 
@@ -156,6 +160,7 @@ def run_training(
             curriculum_config=run_config.curriculum,
             run_paths=run_paths,
             initial_curriculum_stage_index=initial_curriculum_stage_index,
+            track_sampling_runtime_persistence=track_sampling_runtime_persistence,
             extra_callbacks=extra_callbacks,
         )
         masking_required = training_requires_action_masks(run_config)

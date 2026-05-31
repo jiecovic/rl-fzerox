@@ -17,6 +17,17 @@ function enabledResetButton() {
   return button;
 }
 
+const emptyGenerationStats = {
+  generation_episode_count: 0,
+  generation_finished_episode_count: 0,
+  generation_success_sample_count: 0,
+  generation_success_rate: null,
+  generation_ema_completion_fraction: null,
+  generated_course_slot: null,
+  generated_course_generation: null,
+  generated_replacement_count: 0,
+} as const;
+
 describe("RunTrackPoolPanel", () => {
   afterEach(() => {
     cleanup();
@@ -120,6 +131,7 @@ describe("RunTrackPoolPanel", () => {
         success_sample_count: index + 1,
         episode_share: 0.25,
         success_rate: index / Math.max(index + 1, 1),
+        ...emptyGenerationStats,
         target_step_share: 0.25,
         completed_frames: (index + 1) * 600,
         completed_env_steps: (index + 1) * 300,
@@ -239,6 +251,7 @@ describe("RunTrackPoolPanel", () => {
         success_sample_count: 1,
         episode_share: 0.5,
         success_rate: 1,
+        ...emptyGenerationStats,
         target_step_share: 0.5,
         completed_frames: 600,
         completed_env_steps: 300,
@@ -434,6 +447,7 @@ function trackSamplingStateForCourses(courseIds: readonly string[]): TrackSampli
       success_sample_count: 1,
       episode_share: probability,
       success_rate: 0,
+      ...emptyGenerationStats,
       target_step_share: probability,
       completed_frames: 600,
       completed_env_steps: 300,
@@ -468,6 +482,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
       success_sample_count: index + 1,
       episode_share: 0.5,
       success_rate: index / Math.max(index + 1, 1),
+      ...emptyGenerationStats,
       target_step_share: 0.5,
       completed_frames: (index + 1) * 600,
       completed_env_steps: (index + 1) * 300,

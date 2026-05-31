@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from rl_fzerox.core.manager.artifacts.paths import (
     manager_runs_root,
@@ -33,6 +33,11 @@ from rl_fzerox.core.manager.storage.schema import (
     initialize_manager_schema,
     refresh_default_template,
 )
+
+if TYPE_CHECKING:
+    from rl_fzerox.core.training.session.callbacks.track_sampling import (
+        TrackSamplingRuntimeState,
+    )
 
 
 def default_manager_db_path() -> Path:
@@ -198,6 +203,29 @@ class ManagerStore:
 
     def clear_run_runtime(self, run_id: str) -> None:
         run_registry.clear_run_runtime(self, run_id)
+
+    def clear_run_track_sampling_state(self, run_id: str) -> None:
+        run_registry.clear_run_track_sampling_state(self, run_id)
+
+    def get_run_track_sampling_state(
+        self,
+        run_id: str,
+    ) -> TrackSamplingRuntimeState | None:
+        return run_registry.get_run_track_sampling_state(self, run_id)
+
+    def upsert_run_track_sampling_state(
+        self,
+        *,
+        run_id: str,
+        state: TrackSamplingRuntimeState,
+        updated_at: str | None = None,
+    ) -> None:
+        run_registry.upsert_run_track_sampling_state(
+            self,
+            run_id=run_id,
+            state=state,
+            updated_at=updated_at,
+        )
 
     def register_run_worker(
         self,

@@ -8,7 +8,10 @@ from pathlib import Path
 from omegaconf import OmegaConf
 from pytest import MonkeyPatch, raises
 
-from rl_fzerox.core.domain.x_cup import X_CUP_COURSE
+from rl_fzerox.core.domain.x_cup import X_CUP_COURSE, generated_x_cup_slot_key
+from rl_fzerox.core.manager.projection.x_cup_runtime import (
+    restore_generated_x_cup_entries_from_state,
+)
 from rl_fzerox.core.runtime_spec.schema import (
     ActionConfig,
     CurriculumConfig,
@@ -61,6 +64,10 @@ from rl_fzerox.core.training.session.artifacts import (
     save_artifacts_atomically,
     save_recent_checkpoint_artifacts,
     trim_recent_checkpoint_artifacts,
+)
+from rl_fzerox.core.training.session.callbacks.track_sampling.state import (
+    TrackSamplingRuntimeEntry,
+    TrackSamplingRuntimeState,
 )
 
 
@@ -948,7 +955,7 @@ def test_materialize_train_run_config_rewrites_generated_x_cup_baselines(
     assert metadata["x_cup_generation"] == 2
 
 
-def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_continue(
+def test_runtime_state_restores_rotated_x_cup_entries_for_managed_continue(
     tmp_path: Path,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
@@ -978,6 +985,7 @@ def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_contin
     saved_entry = TrackSamplingEntryConfig(
         id="x_cup_rotated_gp_race_novice_blue_falcon_balanced",
         course_id="x_cup_rotated",
+        runtime_course_key=generated_x_cup_slot_key(0),
         course_name="X Cup rotated",
         course_index=X_CUP_COURSE.course_index,
         mode=X_CUP_COURSE.race_mode,
@@ -993,7 +1001,7 @@ def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_contin
         generated_course_generation=3,
         log_per_course=False,
     )
-    saved_config = TrainAppConfig(
+    config = TrainAppConfig(
         seed=123,
         emulator=EmulatorConfig(core_path=core_path, rom_path=rom_path),
         env=EnvConfig(
@@ -1007,11 +1015,51 @@ def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_contin
         policy=PolicyConfig(),
         train=TrainConfig(output_root=tmp_path / "runs", run_name="x-cup-continue"),
     )
-    save_train_run_config(config=saved_config, run_dir=run_paths.run_dir)
+    runtime_state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=5,
+        ema_alpha=0.1,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.35,
+        adaptive_target_completion=0.9,
+        adaptive_min_confidence_episodes=24,
+        adaptive_confidence_scale=4.0,
+        update_count=1,
+        episodes_since_update=0,
+        entries=(
+            TrackSamplingRuntimeEntry(
+                track_id=generated_x_cup_slot_key(0),
+                course_key=generated_x_cup_slot_key(0),
+                label="X Cup rotated",
+                base_weight=1.0,
+                current_weight=1.0,
+                completed_frames=100,
+                episode_count=1,
+                finished_episode_count=1,
+                success_sample_count=1,
+                ema_episode_frames=100.0,
+                ema_completion_fraction=1.0,
+                generation_episode_count=1,
+                generation_finished_episode_count=1,
+                generation_success_sample_count=1,
+                generation_ema_completion_fraction=1.0,
+                generated_course_slot=0,
+                generated_course_generation=3,
+                generated_entry_id=saved_entry.id,
+                generated_course_id="x_cup_rotated",
+                generated_course_name="X Cup rotated",
+                generated_course_hash="rotated",
+                generated_course_seed=99,
+                generated_baseline_state_path=str(saved_state_path),
+            ),
+        ),
+    )
 
     projected_entry = TrackSamplingEntryConfig(
         id="x_cup_initial_gp_race_novice_blue_falcon_balanced",
         course_id="x_cup_initial",
+        runtime_course_key=generated_x_cup_slot_key(0),
         course_name="X Cup initial",
         course_index=X_CUP_COURSE.course_index,
         mode=X_CUP_COURSE.race_mode,
@@ -1026,20 +1074,24 @@ def test_materialize_train_run_config_preserves_rotated_x_cup_entries_for_contin
         generated_course_generation=0,
         log_per_course=False,
     )
-    projected_config = saved_config.model_copy(
+    projected_config = config.model_copy(
         update={
-            "env": saved_config.env.model_copy(
+            "env": config.env.model_copy(
                 update={
-                    "track_sampling": saved_config.env.track_sampling.model_copy(
+                    "track_sampling": config.env.track_sampling.model_copy(
                         update={"entries": (projected_entry,)}
                     )
                 }
             )
         }
     )
+    restored_config = restore_generated_x_cup_entries_from_state(
+        projected_config,
+        state=runtime_state,
+    )
 
     materialized = materialize_train_run_config(
-        projected_config,
+        restored_config,
         run_paths=run_paths,
         baseline_cache_root=tmp_path / "cache",
     )

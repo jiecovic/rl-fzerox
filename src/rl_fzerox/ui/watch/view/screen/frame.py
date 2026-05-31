@@ -503,7 +503,11 @@ def _course_anchor_active(
     locked_course_id = reset_info.get("track_sampling_locked_course_id")
     if not isinstance(locked_course_id, str) or not locked_course_id:
         return False
-    course_id = info.get("track_course_id")
+    course_id = info.get("track_reset_course_key")
+    if not isinstance(course_id, str) or not course_id:
+        course_id = info.get("track_runtime_course_key")
+    if not isinstance(course_id, str) or not course_id:
+        course_id = info.get("track_course_id")
     if course_id is None:
         return True
     return course_id == locked_course_id

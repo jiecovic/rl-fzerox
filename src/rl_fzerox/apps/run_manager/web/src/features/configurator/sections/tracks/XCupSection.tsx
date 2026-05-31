@@ -116,7 +116,7 @@ export function XCupSection({
                 <strong className="text-sm font-bold text-app-text">Auto regeneration</strong>
                 <span className="text-xs leading-snug text-app-muted">
                   Replace a generated slot after it has enough samples and reaches the completion
-                  threshold. Old inactive baselines are pruned after the storage cap.
+                  threshold. Old inactive baselines are kept only as a small safety buffer.
                 </span>
               </div>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
@@ -145,21 +145,13 @@ export function XCupSection({
                       value={rotation.min_episodes}
                       onChange={(value) => updateRotation({ min_episodes: value })}
                     />
-                    <IntegerField
-                      help="Minimum completed game frames before a generated slot can be replaced."
-                      label="Min frames"
-                      min={1}
-                      resetValue={defaultRotation.min_completed_frames}
-                      value={rotation.min_completed_frames}
-                      onChange={(value) => updateRotation({ min_completed_frames: value })}
-                    />
-                    <IntegerField
-                      help="Extra sampled episodes after the minimum before replacement is allowed."
-                      label="Cooldown episodes"
-                      min={0}
-                      resetValue={defaultRotation.cooldown_episodes}
-                      value={rotation.cooldown_episodes}
-                      onChange={(value) => updateRotation({ cooldown_episodes: value })}
+                    <NumberField
+                      help="EMA smoothing for replacement eligibility completion stats. Higher values react faster to the latest generated course."
+                      label="EMA alpha"
+                      resetValue={defaultRotation.ema_alpha}
+                      step="0.01"
+                      value={rotation.ema_alpha}
+                      onChange={(value) => updateRotation({ ema_alpha: value })}
                     />
                   </>
                 ) : null}

@@ -99,6 +99,8 @@ class TrainConfig(BaseModel):
     continue_run_dir: Path | None = None
     resume_run_dir: Path | None = None
     resume_source_algorithm: TrainAlgorithmName | None = None
+    resume_source_auxiliary_state_enabled: bool | None = None
+    resume_source_auxiliary_state_head_arch: tuple[PositiveInt, ...] = ()
     resume_artifact: ResumeArtifact = "latest"
     resume_mode: ResumeMode = "weights_only"
 

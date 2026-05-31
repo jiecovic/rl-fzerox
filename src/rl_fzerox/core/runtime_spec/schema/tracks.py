@@ -74,6 +74,7 @@ class TrackSamplingEntryConfig(BaseModel):
     display_name: str | None = None
     course_ref: str | None = None
     course_id: str | None = None
+    runtime_course_key: str | None = None
     course_name: str | None = None
     baseline_state_path: Path | None = None
     weight: PositiveFloat = 1.0
@@ -136,8 +137,10 @@ class XCupRotationConfig(BaseModel):
         le=1.0,
     )
     min_episodes: PositiveInt = X_CUP_COURSE.rotation_defaults.min_episodes
-    min_completed_frames: PositiveInt = X_CUP_COURSE.rotation_defaults.min_completed_frames
-    cooldown_episodes: NonNegativeInt = X_CUP_COURSE.rotation_defaults.cooldown_episodes
+    ema_alpha: PositiveFloat = Field(
+        default=X_CUP_COURSE.rotation_defaults.ema_alpha,
+        le=1.0,
+    )
 
 
 class TrackSamplingConfig(BaseModel):
