@@ -243,13 +243,14 @@ def build_callbacks(
             self._curriculum_config = curriculum_config
             self._rotation_manager = rotation_manager
             self._runtime_persistence = runtime_persistence
+            self._runtime_state_dirty = False
 
         def _on_training_start(self) -> None:
             self.training_env.env_method(
                 "set_track_sampling_weights",
                 self._controller.current_weights(),
             )
-            self._runtime_persistence.save(self._controller.runtime_state())
+            self._save_runtime_state()
 
         def _on_step(self) -> bool:
             infos = info_sequence(self.locals.get("infos"))
@@ -260,6 +261,7 @@ def build_callbacks(
             if not episodes:
                 return True
             weights = self._controller.record_episodes(episodes)
+            self._runtime_state_dirty = True
             runtime_state = self._controller.runtime_state()
             rotation_manager = self._rotation_manager
             rotation_update = (
@@ -300,14 +302,24 @@ def build_callbacks(
                 self.training_env.env_method("set_track_sampling_weights", weights)
                 if rotation_manager is not None:
                     rotation_manager.commit(rotation_update)
+                self._save_runtime_state()
             elif weights is not None:
                 self.training_env.env_method("set_track_sampling_weights", weights)
-            self._runtime_persistence.save(self._controller.runtime_state())
+                self._save_runtime_state()
             return True
 
         def _on_rollout_end(self) -> None:
             for key, value in self._controller.log_values().items():
                 self.logger.record(key, value)
+            if self._runtime_state_dirty:
+                self._save_runtime_state()
+
+        def _on_training_end(self) -> None:
+            self._save_runtime_state()
+
+        def _save_runtime_state(self) -> None:
+            self._runtime_persistence.save(self._controller.runtime_state())
+            self._runtime_state_dirty = False
 
     checkpoint_policy = resolve_checkpoint_policy(train_config)
     callbacks: list[BaseCallback] = [
