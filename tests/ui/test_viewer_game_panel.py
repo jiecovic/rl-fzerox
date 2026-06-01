@@ -161,6 +161,29 @@ def test_game_section_shows_current_and_max_progress() -> None:
     assert values["Lap progress"] == "20,000.0 / 80,000.0"
 
 
+def test_game_section_shows_ko_star_ram_count() -> None:
+    columns = _build_panel_columns(
+        episode=0,
+        info={"frame_index": 0, "native_fps": 60.0},
+        reset_info={},
+        episode_reward=0.0,
+        paused=False,
+        control_state=race_control_state(),
+        policy_curriculum_stage=None,
+        policy_action=None,
+        policy_reload_age_seconds=None,
+        policy_reload_error=None,
+        action_repeat=3,
+        stuck_min_speed_kph=50.0,
+        game_display_size=(592, 444),
+        observation_shape=(84, 116, 12),
+        telemetry=_sample_telemetry(ko_star_count=4),
+    )
+
+    values = {line.label: line.value for line in _race_section(columns).lines}
+    assert values["KO stars"] == "4"
+
+
 def test_dirt_course_effect_lights_dirt_flag() -> None:
     columns = _build_panel_columns(
         episode=0,

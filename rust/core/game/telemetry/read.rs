@@ -47,7 +47,7 @@ pub fn read_snapshot(system_ram: &[u8]) -> Result<TelemetrySnapshot, CoreError> 
         speed_kph: read_f32(system_ram, player_base + RACER.speed)? * TELEMETRY_CONFIG.speed_to_kph,
         energy: read_f32(system_ram, player_base + RACER.energy)?,
         max_energy: read_f32(system_ram, player_base + RACER.max_energy)?,
-        ko_star_count: read_i16(system_ram, GLOBALS.racers_ko_count)?,
+        ko_star_count: read_word_swapped_u8(system_ram, GLOBALS.player_ko_stars)? as i16,
         boost_timer: read_i32(system_ram, player_base + RACER.boost_timer)?,
         recoil_tilt_magnitude: read_vec3_magnitude(system_ram, player_base + RACER.recoil_tilt)?,
         damage_rumble_counter: read_i32(system_ram, player_damage_rumble_counter_offset())?,
@@ -107,7 +107,7 @@ fn validate_snapshot_memory(system_ram: &[u8]) -> Result<usize, CoreError> {
     let player_end = player_base + RACER.position + size_of::<i32>();
     let camera_setting_end = player_camera_setting_offset() + size_of::<i32>();
     let reverse_timer_end = player_reverse_timer_offset() + size_of::<i32>();
-    let ko_star_count_end = GLOBALS.racers_ko_count + size_of::<i16>();
+    let ko_star_count_end = GLOBALS.player_ko_stars + size_of::<u8>();
     let required_end = player_end
         .max(camera_setting_end)
         .max(reverse_timer_end)
