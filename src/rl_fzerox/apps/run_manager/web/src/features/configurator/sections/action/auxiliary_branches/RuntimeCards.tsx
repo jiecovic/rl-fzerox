@@ -232,12 +232,16 @@ export function RuntimeCards({
               />
             </div>
             <IntegerField
-              help="Open the manual boost branch only once per this many native frames. The boost button pulse itself still lasts one env step."
-              label="Decision interval frames"
+              help="Allow a manual boost decision only once per this many env steps. The native-frame spacing is derived from action repeat."
+              label="Decision interval env steps"
               min={1}
-              resetValue={defaultAction.boost_decision_interval_frames}
-              value={action.boost_decision_interval_frames}
-              onChange={(value) => updateAction({ boost_decision_interval_frames: value })}
+              note={boostDecisionIntervalSummary(
+                action.action_repeat,
+                action.boost_decision_interval_steps,
+              )}
+              resetValue={defaultAction.boost_decision_interval_steps}
+              value={action.boost_decision_interval_steps}
+              onChange={(value) => updateAction({ boost_decision_interval_steps: value })}
             />
           </div>
           <div className="action-runtime-two-col">
@@ -249,12 +253,6 @@ export function RuntimeCards({
               onChange={(value) => updateAction({ boost_request_lockout_frames: value })}
             />
           </div>
-          <p className="action-note">
-            {boostDecisionIntervalSummary(
-              action.action_repeat,
-              action.boost_decision_interval_frames,
-            )}
-          </p>
         </fieldset>
       </section>
 
@@ -479,17 +477,15 @@ export function RuntimeCards({
   );
 }
 
-function boostDecisionIntervalSummary(actionRepeat: number, intervalFrames: number): string {
+function boostDecisionIntervalSummary(actionRepeat: number, intervalSteps: number): string {
   const repeatFrames = Math.max(1, Math.trunc(actionRepeat));
-  const requestedInterval = Math.max(1, Math.trunc(intervalFrames));
-  const envStepInterval = Math.max(1, Math.ceil(requestedInterval / repeatFrames));
-  const effectiveIntervalFrames = envStepInterval * repeatFrames;
-  const decisionsPerSecond = 60 / effectiveIntervalFrames;
-  const maxDelayFrames = Math.max(0, effectiveIntervalFrames - repeatFrames);
+  const envStepInterval = Math.max(1, Math.trunc(intervalSteps));
+  const nativeFrames = envStepInterval * repeatFrames;
+  const decisionsPerSecond = 60 / nativeFrames;
   return [
-    `Boost decision cadence: every ${envStepInterval} env step${envStepInterval === 1 ? "" : "s"}`,
+    envStepInterval === 1 ? "Every env step" : `Every ${envStepInterval} env steps`,
+    `${nativeFrames} native frames`,
     `${formatCadence(decisionsPerSecond)} decisions/s`,
-    `max extra delay about ${maxDelayFrames}f`,
   ].join(" · ");
 }
 

@@ -184,8 +184,8 @@ function boostOutputSummary(action: ManagedActionConfig): string {
   if (action.mask_boost_when_active) {
     guards.push("idle only");
   }
-  if (action.boost_decision_interval_frames > 1) {
-    guards.push(`${action.boost_decision_interval_frames}f cadence`);
+  if (action.boost_decision_interval_steps > 1) {
+    guards.push(`every ${action.boost_decision_interval_steps} env steps`);
   }
   if (action.boost_request_lockout_frames > 0) {
     guards.push(`${action.boost_request_lockout_frames}f cooldown`);

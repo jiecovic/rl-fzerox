@@ -1,10 +1,10 @@
 // src/rl_fzerox/apps/run_manager/web/src/features/configurator/fields/basicNumbers.tsx
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import { formatEditableDecimal, formatInteger } from "@/features/configurator/fields/format";
 import { FieldLabel } from "@/features/configurator/fields/label";
 import { resetHandler } from "@/features/configurator/fields/reset";
-import { FieldInput, FieldShell } from "@/shared/ui/Field";
+import { FieldInput, FieldNote, FieldShell } from "@/shared/ui/Field";
 
 export function NumberField({
   help,
@@ -61,6 +61,7 @@ export function NumberField({
 export function IntegerField({
   help,
   label,
+  note,
   min = 0,
   max,
   value,
@@ -69,6 +70,7 @@ export function IntegerField({
 }: {
   help: string;
   label: string;
+  note?: ReactNode;
   min?: number;
   max?: number;
   value: number;
@@ -103,6 +105,7 @@ export function IntegerField({
         onBlur={commitValue}
         onChange={(event) => setRawValue(event.target.value)}
       />
+      {note !== undefined ? <FieldNote>{note}</FieldNote> : null}
     </FieldShell>
   );
 }
