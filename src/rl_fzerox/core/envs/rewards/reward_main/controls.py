@@ -110,7 +110,7 @@ def manual_boost_reward_energy_multiplier(
 ) -> float:
     if not weights.manual_boost_reward_energy_shaping:
         return 1.0
-    min_multiplier = max(0.0, min(1.0, float(weights.manual_boost_reward_min_energy_multiplier)))
+    min_multiplier = max(-1.0, min(1.0, float(weights.manual_boost_reward_min_energy_multiplier)))
     max_energy = float(telemetry.player.max_energy)
     if max_energy <= 0.0:
         return min_multiplier

@@ -36,7 +36,10 @@ export function boostRequestRewardEnergyMultiplier(
   if (!config.reward.manual_boost_reward_energy_shaping) {
     return 1;
   }
-  const minMultiplier = clampFraction(config.reward.manual_boost_reward_min_energy_multiplier, 0);
+  const minMultiplier = clampSignedFactor(
+    config.reward.manual_boost_reward_min_energy_multiplier,
+    0,
+  );
   const minEnergyFraction = clampFraction(config.reward.manual_boost_reward_min_energy_fraction, 0);
   const fullRewardFraction = clampFraction(
     config.reward.manual_boost_reward_full_energy_fraction,
@@ -77,6 +80,10 @@ function energyTickLabel(
 
 function clampFraction(value: number, fallback: number) {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+}
+
+function clampSignedFactor(value: number, fallback: number) {
+  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : fallback;
 }
 
 function roundPreviewValue(value: number) {

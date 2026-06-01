@@ -1147,6 +1147,41 @@ def test_reward_main_holds_manual_boost_reward_at_low_energy_floor() -> None:
     assert ramp_step.breakdown == {"manual_boost": pytest.approx(5.0)}
 
 
+def test_reward_main_allows_low_energy_boost_request_penalty() -> None:
+    tracker = build_reward_tracker(
+        RewardConfig(
+            progress_bucket_reward=0.0,
+            time_penalty_per_frame=0.0,
+            impact_frame_penalty=0.0,
+            manual_boost_reward=8.0,
+            manual_boost_reward_energy_shaping=True,
+            manual_boost_reward_min_energy_fraction=0.5,
+            manual_boost_reward_min_energy_multiplier=-0.5,
+            manual_boost_reward_full_energy_fraction=1.0,
+            manual_boost_reward_energy_curve="linear",
+        )
+    )
+    tracker.reset(_telemetry(energy=178.0))
+
+    floor_step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=1),
+        _telemetry(energy=44.5),
+        RewardActionContext(boost_requested=True),
+    )
+    ramp_step = tracker.step_summary(
+        _summary(max_race_distance=0.0),
+        _status(step_count=2),
+        _telemetry(energy=133.5),
+        RewardActionContext(boost_requested=True),
+    )
+
+    assert floor_step.reward == pytest.approx(-4.0)
+    assert floor_step.breakdown == {"manual_boost": pytest.approx(-4.0)}
+    assert ramp_step.reward == pytest.approx(2.0)
+    assert ramp_step.breakdown == {"manual_boost": pytest.approx(2.0)}
+
+
 def test_reward_main_suppresses_refill_multiplier_at_full_energy() -> None:
     tracker = build_reward_tracker(
         RewardConfig(
