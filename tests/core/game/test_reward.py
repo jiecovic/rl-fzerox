@@ -69,7 +69,7 @@ def test_build_reward_tracker_wires_all_reward_main_weight_fields() -> None:
         "manual_boost_reward": 0.25,
         "manual_boost_reward_energy_shaping": True,
         "manual_boost_reward_min_energy_fraction": 0.2,
-        "manual_boost_reward_min_energy_multiplier": 0.1,
+        "manual_boost_reward_min_energy_value": 0.025,
         "manual_boost_reward_full_energy_fraction": 0.8,
         "manual_boost_reward_energy_curve": "smoothstep",
         "boost_pad_reward": 10.0,
@@ -1094,7 +1094,7 @@ def test_reward_main_scales_manual_boost_reward_by_energy_fraction() -> None:
             manual_boost_reward=8.0,
             manual_boost_reward_energy_shaping=True,
             manual_boost_reward_min_energy_fraction=0.0,
-            manual_boost_reward_min_energy_multiplier=0.25,
+            manual_boost_reward_min_energy_value=2.0,
             manual_boost_reward_full_energy_fraction=1.0,
             manual_boost_reward_energy_curve="linear",
         )
@@ -1121,7 +1121,7 @@ def test_reward_main_holds_manual_boost_reward_at_low_energy_floor() -> None:
             manual_boost_reward=8.0,
             manual_boost_reward_energy_shaping=True,
             manual_boost_reward_min_energy_fraction=0.5,
-            manual_boost_reward_min_energy_multiplier=0.25,
+            manual_boost_reward_min_energy_value=2.0,
             manual_boost_reward_full_energy_fraction=1.0,
             manual_boost_reward_energy_curve="linear",
         )
@@ -1156,7 +1156,7 @@ def test_reward_main_allows_low_energy_boost_request_penalty() -> None:
             manual_boost_reward=8.0,
             manual_boost_reward_energy_shaping=True,
             manual_boost_reward_min_energy_fraction=0.5,
-            manual_boost_reward_min_energy_multiplier=-0.5,
+            manual_boost_reward_min_energy_value=-4.0,
             manual_boost_reward_full_energy_fraction=1.0,
             manual_boost_reward_energy_curve="linear",
         )

@@ -331,7 +331,7 @@ const rewardConfigSchema = z
     manual_boost_reward: z.number().nonnegative(),
     manual_boost_reward_energy_shaping: z.boolean(),
     manual_boost_reward_min_energy_fraction: z.number().min(0).lt(1),
-    manual_boost_reward_min_energy_multiplier: z.number().min(-1).max(1),
+    manual_boost_reward_min_energy_value: z.number(),
     manual_boost_reward_full_energy_fraction: z.number().positive().max(1),
     manual_boost_reward_energy_curve: z.enum(["linear", "smoothstep"]),
     boost_pad_reward: z.number().nonnegative(),

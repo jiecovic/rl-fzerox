@@ -97,23 +97,23 @@ def manual_boost_reward(
     *,
     weights: RewardMainWeights,
 ) -> float:
-    reward = weights.manual_boost_reward
-    if reward <= 0.0 or action_context is None or not action_context.boost_requested:
+    if action_context is None or not action_context.boost_requested:
         return 0.0
-    return reward * manual_boost_reward_energy_multiplier(telemetry, weights=weights)
+    if not weights.manual_boost_reward_energy_shaping:
+        return weights.manual_boost_reward
+    return manual_boost_reward_energy_value(telemetry, weights=weights)
 
 
-def manual_boost_reward_energy_multiplier(
+def manual_boost_reward_energy_value(
     telemetry: FZeroXTelemetry,
     *,
     weights: RewardMainWeights,
 ) -> float:
-    if not weights.manual_boost_reward_energy_shaping:
-        return 1.0
-    min_multiplier = max(-1.0, min(1.0, float(weights.manual_boost_reward_min_energy_multiplier)))
+    low_reward = float(weights.manual_boost_reward_min_energy_value)
+    full_reward = float(weights.manual_boost_reward)
     max_energy = float(telemetry.player.max_energy)
     if max_energy <= 0.0:
-        return min_multiplier
+        return low_reward
     energy_fraction = max(0.0, min(1.0, float(telemetry.player.energy) / max_energy))
     min_energy_fraction = max(
         0.0,
@@ -130,4 +130,4 @@ def manual_boost_reward_energy_multiplier(
         ratio = min((energy_fraction - min_energy_fraction) / span, 1.0)
     if weights.manual_boost_reward_energy_curve == "smoothstep":
         ratio = ratio * ratio * (3.0 - 2.0 * ratio)
-    return min_multiplier + (1.0 - min_multiplier) * ratio
+    return low_reward + (full_reward - low_reward) * ratio

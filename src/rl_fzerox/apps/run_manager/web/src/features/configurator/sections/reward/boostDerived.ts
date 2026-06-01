@@ -25,21 +25,16 @@ export function boostRequestRewardPreviewPoints(
   return fractions.map((energyFraction) => ({
     label: energyTickLabel(energyFraction, { fullRewardFraction, minEnergyFraction }),
     xValue: roundPreviewValue(energyFraction * 100),
-    yValue: roundPreviewValue(boostRequestRewardEnergyMultiplier(config, energyFraction)),
+    yValue: roundPreviewValue(boostRequestRewardValue(config, energyFraction)),
   }));
 }
 
-export function boostRequestRewardEnergyMultiplier(
-  config: ManagedRunConfig,
-  energyFraction: number,
-): number {
+export function boostRequestRewardValue(config: ManagedRunConfig, energyFraction: number): number {
   if (!config.reward.manual_boost_reward_energy_shaping) {
-    return 1;
+    return config.reward.manual_boost_reward;
   }
-  const minMultiplier = clampSignedFactor(
-    config.reward.manual_boost_reward_min_energy_multiplier,
-    0,
-  );
+  const lowReward = finiteNumber(config.reward.manual_boost_reward_min_energy_value, 0);
+  const fullReward = finiteNumber(config.reward.manual_boost_reward, 0);
   const minEnergyFraction = clampFraction(config.reward.manual_boost_reward_min_energy_fraction, 0);
   const fullRewardFraction = clampFraction(
     config.reward.manual_boost_reward_full_energy_fraction,
@@ -57,7 +52,7 @@ export function boostRequestRewardEnergyMultiplier(
     config.reward.manual_boost_reward_energy_curve === "smoothstep"
       ? ratio * ratio * (3 - 2 * ratio)
       : ratio;
-  return minMultiplier + (1 - minMultiplier) * shapedRatio;
+  return lowReward + (fullReward - lowReward) * shapedRatio;
 }
 
 function energyTickLabel(
@@ -82,8 +77,8 @@ function clampFraction(value: number, fallback: number) {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
 }
 
-function clampSignedFactor(value: number, fallback: number) {
-  return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : fallback;
+function finiteNumber(value: number, fallback: number) {
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function roundPreviewValue(value: number) {

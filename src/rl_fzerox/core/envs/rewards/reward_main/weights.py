@@ -35,7 +35,7 @@ class RewardMainWeights:
     manual_boost_reward: float = 0.01
     manual_boost_reward_energy_shaping: bool = False
     manual_boost_reward_min_energy_fraction: float = 0.0
-    manual_boost_reward_min_energy_multiplier: float = 0.0
+    manual_boost_reward_min_energy_value: float = 0.0
     manual_boost_reward_full_energy_fraction: float = 1.0
     manual_boost_reward_energy_curve: str = "linear"
     boost_pad_reward: float = 10.0
@@ -67,8 +67,6 @@ class RewardMainWeights:
             raise ValueError(
                 "position_progress_min_multiplier must be <= position_progress_max_multiplier"
             )
-        if not -1.0 <= self.manual_boost_reward_min_energy_multiplier <= 1.0:
-            raise ValueError("manual_boost_reward_min_energy_multiplier must be in [-1, 1]")
         if not 0.0 <= self.manual_boost_reward_min_energy_fraction < 1.0:
             raise ValueError("manual_boost_reward_min_energy_fraction must be in [0, 1)")
         if not 0.0 < self.manual_boost_reward_full_energy_fraction <= 1.0:

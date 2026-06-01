@@ -150,7 +150,7 @@ export function TrackActionPanels({
             <div className="reward-action-boost-layout">
               <div className="reward-action-boost-controls">
                 <NumberField
-                  help="Base reward added when the policy requests manual boost. Energy shaping multiplies this configured value."
+                  help="Reward added when the policy requests manual boost. With energy shaping enabled, this is the high-energy reward."
                   label="Boost request reward"
                   resetValue={defaultConfig.reward.manual_boost_reward}
                   step="0.01"
@@ -167,13 +167,13 @@ export function TrackActionPanels({
                 {config.reward.manual_boost_reward_energy_shaping ? (
                   <>
                     <NumberField
-                      help="Factor applied at and below the unsafe energy threshold. Negative values turn the boost request reward into a penalty."
-                      label="Low energy factor"
-                      resetValue={defaultConfig.reward.manual_boost_reward_min_energy_multiplier}
-                      step="0.05"
-                      value={config.reward.manual_boost_reward_min_energy_multiplier}
+                      help="Reward used at and below the unsafe-energy threshold. Negative values make low-energy boost requests a penalty."
+                      label="Low energy reward"
+                      resetValue={defaultConfig.reward.manual_boost_reward_min_energy_value}
+                      step="0.1"
+                      value={config.reward.manual_boost_reward_min_energy_value}
                       onChange={(value) =>
-                        updateReward({ manual_boost_reward_min_energy_multiplier: value })
+                        updateReward({ manual_boost_reward_min_energy_value: value })
                       }
                     />
                     <NumberField
@@ -213,8 +213,9 @@ export function TrackActionPanels({
               {config.reward.manual_boost_reward_energy_shaping ? (
                 <RewardCurvePreview
                   points={boostRewardPreviewPoints}
-                  title="Boost request factor preview"
+                  title="Boost request reward preview"
                   xAxisLabel="energy (%)"
+                  ySuffix=""
                 />
               ) : null}
             </div>

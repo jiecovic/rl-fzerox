@@ -315,7 +315,7 @@ def test_manager_training_bridge_projects_boost_reward_energy_shaping(
     config.reward.manual_boost_reward = 7.0
     config.reward.manual_boost_reward_energy_shaping = True
     config.reward.manual_boost_reward_min_energy_fraction = 0.15
-    config.reward.manual_boost_reward_min_energy_multiplier = -0.2
+    config.reward.manual_boost_reward_min_energy_value = -1.4
     config.reward.manual_boost_reward_full_energy_fraction = 0.75
     config.reward.manual_boost_reward_energy_curve = "smoothstep"
 
@@ -328,7 +328,7 @@ def test_manager_training_bridge_projects_boost_reward_energy_shaping(
     assert train_config.reward.manual_boost_reward == pytest.approx(7.0)
     assert train_config.reward.manual_boost_reward_energy_shaping is True
     assert train_config.reward.manual_boost_reward_min_energy_fraction == pytest.approx(0.15)
-    assert train_config.reward.manual_boost_reward_min_energy_multiplier == pytest.approx(-0.2)
+    assert train_config.reward.manual_boost_reward_min_energy_value == pytest.approx(-1.4)
     assert train_config.reward.manual_boost_reward_full_energy_fraction == pytest.approx(0.75)
     assert train_config.reward.manual_boost_reward_energy_curve == "smoothstep"
 
