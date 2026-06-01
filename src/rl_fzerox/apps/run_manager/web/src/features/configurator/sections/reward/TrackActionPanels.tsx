@@ -167,8 +167,8 @@ export function TrackActionPanels({
                 {config.reward.manual_boost_reward_energy_shaping ? (
                   <>
                     <NumberField
-                      help="Multiplier applied to boost request reward at zero energy."
-                      label="Min energy multiplier"
+                      help="Factor applied at and below the unsafe energy threshold. Negative values turn the boost request reward into a penalty."
+                      label="Low energy factor"
                       resetValue={defaultConfig.reward.manual_boost_reward_min_energy_multiplier}
                       step="0.05"
                       value={config.reward.manual_boost_reward_min_energy_multiplier}
@@ -213,7 +213,7 @@ export function TrackActionPanels({
               {config.reward.manual_boost_reward_energy_shaping ? (
                 <RewardCurvePreview
                   points={boostRewardPreviewPoints}
-                  title="Boost request multiplier preview"
+                  title="Boost request factor preview"
                   xAxisLabel="energy (%)"
                 />
               ) : null}

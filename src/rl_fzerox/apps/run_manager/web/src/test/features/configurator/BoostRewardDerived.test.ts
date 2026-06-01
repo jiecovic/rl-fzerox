@@ -55,6 +55,19 @@ describe("boost reward derived values", () => {
     expect(boostRequestRewardEnergyMultiplier(config, 0.75)).toBeCloseTo(0.625);
   });
 
+  it("allows the low-energy factor to be negative", () => {
+    const config = configWithBoostShaping({
+      manual_boost_reward_energy_curve: "linear",
+      manual_boost_reward_energy_shaping: true,
+      manual_boost_reward_full_energy_fraction: 1,
+      manual_boost_reward_min_energy_fraction: 0.5,
+      manual_boost_reward_min_energy_multiplier: -0.5,
+    });
+
+    expect(boostRequestRewardEnergyMultiplier(config, 0.25)).toBeCloseTo(-0.5);
+    expect(boostRequestRewardEnergyMultiplier(config, 0.75)).toBeCloseTo(0.25);
+  });
+
   it("labels the full-reward energy point in the preview curve", () => {
     const config = configWithBoostShaping({
       manual_boost_reward_energy_shaping: true,
