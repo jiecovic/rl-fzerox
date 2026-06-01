@@ -365,6 +365,8 @@ describe("RunTrackPoolPanel", () => {
     expect(screen.getByText("X Cup")).toBeInTheDocument();
     expect(screen.getByText("X Cup abcd1234")).toBeInTheDocument();
     expect(screen.getByText("X Cup ef567890")).toBeInTheDocument();
+    expect(screen.getByText(/slot 1 · generated 1 · sampling:/i)).toBeInTheDocument();
+    expect(screen.getByText(/slot 2 · generated 2 · sampling:/i)).toBeInTheDocument();
   });
 
   it("shows the target env-step share in the env-steps bar tooltip", () => {
@@ -483,6 +485,8 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
       episode_share: 0.5,
       success_rate: index / Math.max(index + 1, 1),
       ...emptyGenerationStats,
+      generated_course_slot: index,
+      generated_course_generation: index,
       target_step_share: 0.5,
       completed_frames: (index + 1) * 600,
       completed_env_steps: (index + 1) * 300,
