@@ -69,7 +69,7 @@ lint: rust-lint py-lint
 
 test: rust-test py-test
 
-check: fmt-check lint test
+check: fmt-check lint test run-manager-check
 
 # Audit Rust dependencies for published advisories.
 audit:
