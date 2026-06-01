@@ -256,6 +256,8 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "race_distance": 10.0,
             "speed_kph": 100.0,
             "position": 5,
+            "ko_star_count": 3,
+            "ko_star_reward_event": True,
             "lap": 1,
             "race_laps_completed": 0,
             "step_reward_raw": 100.0,
@@ -292,6 +294,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
             "race_distance": 14.0,
             "speed_kph": 120.0,
             "position": 7,
+            "ko_star_count": 3,
             "lap": 1,
             "race_laps_completed": 0,
             "step_reward_raw": -50.0,
@@ -329,6 +332,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
 
     assert accumulator.state_metrics["race_distance"].mean() == 12.0
     assert accumulator.state_metrics["speed_kph"].mean() == 110.0
+    assert accumulator.state_metrics["ko_star_count"].mean() == 3.0
     assert accumulator.state_metrics["race_laps_completed"].mean() == 0.0
     assert accumulator.state_metrics["step_reward_raw"].mean() == 25.0
     assert accumulator.state_metrics["step_reward_clip_abs_excess"].mean() == 12.5
@@ -341,6 +345,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert accumulator.step_rates["lean_used"].rate() == 0.5
     assert accumulator.step_rates["spin_requested"].rate() == 0.5
     assert accumulator.step_rates["spin_started"].rate() == 0.5
+    assert accumulator.step_rates["ko_star_reward_event"].rate() == 0.5
     assert accumulator.step_rates["step_reward_clipped"].rate() == 0.5
     assert accumulator.step_rates["step_reward_clip_positive"].rate() == 0.5
     assert accumulator.step_rates["step_reward_clip_negative"].rate() == 0.0
@@ -367,6 +372,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["state/damage_taken_step_rate"] == 0.5
     assert logger.records["state/boost_pad_entry_step_rate"] == 0.5
     assert logger.records["state/airborne_frame_ratio"] == 0.8
+    assert logger.records["state/ko_star_count_mean"] == 3.0
     assert logger.records["action/gas_level_mean"] == 0.5
     assert logger.records["action/gas_used_step_rate"] == 0.5
     assert logger.records["action/air_brake_used_step_rate"] == 0.5
@@ -376,6 +382,7 @@ def test_rollout_info_accumulator_summarizes_state_and_episode_metrics() -> None
     assert logger.records["action/spin_started_step_rate"] == 0.5
     assert logger.records["action/spin_macro_frame_ratio"] == 0.2
     assert logger.records["reward/step_raw_mean"] == 25.0
+    assert logger.records["reward/ko_star_event_step_rate"] == 0.5
     assert logger.records["reward_clip/abs_excess_mean"] == 12.5
     assert logger.records["reward_clip/any_step_rate"] == 0.5
     assert logger.records["reward_clip/positive_step_rate"] == 0.5
