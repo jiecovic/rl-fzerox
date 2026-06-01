@@ -2,24 +2,45 @@
 from __future__ import annotations
 
 import json
-import sqlite3
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
+from sqlalchemy import event, inspect, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 import rl_fzerox.core.manager.artifacts.filesystem as filesystem_ops_module
 import rl_fzerox.core.manager.registry.drafts.fork_sources as draft_fork_sources
 import rl_fzerox.core.manager.registry.paths as registry_paths
 import rl_fzerox.core.manager.registry.runs.maintenance as run_maintenance
 import rl_fzerox.core.manager.store as store_module
-from rl_fzerox.core.manager import ManagerStore, default_managed_run_config, new_managed_run_id
+from rl_fzerox.core.manager import (
+    ManagedRunConfig,
+    ManagerStore,
+    default_managed_run_config,
+    new_managed_run_id,
+)
 from rl_fzerox.core.manager.artifacts.filesystem import FilesystemOperation
+from rl_fzerox.core.manager.db import manager_engine, manager_session
+from rl_fzerox.core.manager.db.models import (
+    ConfigSnapshotModel,
+    FilesystemOperationModel,
+    RunDraftModel,
+    RunModel,
+    RunTemplateModel,
+    RunWorkerModel,
+)
+from rl_fzerox.core.manager.storage.serialization import config_hash, config_json, load_config_json
 from rl_fzerox.core.training.session.callbacks.track_sampling import (
     TrackSamplingRuntimeEntry,
     TrackSamplingRuntimeState,
 )
+
+SnapshotKind = Literal["run", "draft", "template", "import"]
 
 
 def test_manager_store_seeds_default_template(tmp_path: Path) -> None:
@@ -39,10 +60,10 @@ def test_manager_store_initializes_schema_only_once_per_instance(
     call_count = 0
     original_initialize_schema = store_module.initialize_manager_schema
 
-    def wrapped_initialize_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
+    def wrapped_initialize_schema(db_path: Path, *, applied_at: str) -> None:
         nonlocal call_count
         call_count += 1
-        original_initialize_schema(connection, applied_at=applied_at)
+        original_initialize_schema(db_path, applied_at=applied_at)
 
     monkeypatch.setattr(store_module, "initialize_manager_schema", wrapped_initialize_schema)
 
@@ -54,32 +75,129 @@ def test_manager_store_initializes_schema_only_once_per_instance(
     assert call_count == 1
 
 
+def _insert_stale_draft_config(
+    store: ManagerStore,
+    *,
+    draft_id: str,
+    name: str,
+    config: dict[str, object],
+) -> None:
+    created_at = "2026-05-01T00:00:00+00:00"
+    with manager_session(store.db_path) as session:
+        snapshot_id = _insert_config_snapshot(
+            session=session,
+            snapshot_id=f"cfg_test_{draft_id}",
+            kind="draft",
+            raw_config_json=json.dumps(config),
+            stored_config_hash="stale",
+            created_at=created_at,
+        )
+        session.add(
+            RunDraftModel(
+                id=draft_id,
+                name=name,
+                config_snapshot_id=snapshot_id,
+                source_run_id=None,
+                source_artifact=None,
+                source_snapshot_dir=None,
+                source_num_timesteps=None,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        )
+
+
+def _insert_config_snapshot(
+    *,
+    session: Session,
+    snapshot_id: str,
+    kind: SnapshotKind,
+    raw_config_json: str,
+    stored_config_hash: str,
+    created_at: str,
+) -> str:
+    session.add(
+        ConfigSnapshotModel(
+            id=snapshot_id,
+            kind=kind,
+            schema_version=1,
+            created_at=created_at,
+            config_json=raw_config_json,
+            config_hash=stored_config_hash,
+        )
+    )
+    return snapshot_id
+
+
+def _config_snapshot_json(store: ManagerStore, snapshot_id: str) -> str:
+    with manager_session(store.db_path) as session:
+        snapshot = session.get(ConfigSnapshotModel, snapshot_id)
+        assert snapshot is not None
+        return snapshot.config_json
+
+
+def _table_columns(store: ManagerStore, table_name: str) -> set[str]:
+    engine = manager_engine(store.db_path)
+    try:
+        return {str(column["name"]) for column in inspect(engine).get_columns(table_name)}
+    finally:
+        engine.dispose()
+
+
+def _filesystem_operation_count(store: ManagerStore, *, kind: str | None = None) -> int:
+    with manager_session(store.db_path) as session:
+        statement = select(FilesystemOperationModel)
+        if kind is not None:
+            statement = statement.where(FilesystemOperationModel.kind == kind)
+        return len(tuple(session.scalars(statement)))
+
+
+def _set_worker_heartbeat(store: ManagerStore, *, run_id: str, heartbeat_at: str) -> None:
+    with manager_session(store.db_path) as session:
+        worker = session.get(RunWorkerModel, run_id)
+        assert worker is not None
+        worker.heartbeat_at = heartbeat_at
+
+
+def _worker_exists(store: ManagerStore, run_id: str) -> bool:
+    with manager_session(store.db_path) as session:
+        return session.get(RunWorkerModel, run_id) is not None
+
+
+def _stored_run_dir(store: ManagerStore, run_id: str) -> Path:
+    with manager_session(store.db_path) as session:
+        run = session.get(RunModel, run_id)
+        assert run is not None
+        return Path(run.run_dir)
+
+
 def test_manager_store_refreshes_system_template_to_current_defaults(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "runs.db")
     store.initialize()
 
     stale_config = default_managed_run_config().model_dump(mode="json")
     stale_config["reward"]["energy_refill_progress_multiplier"] = 1.0
+    stale_model = ManagedRunConfig.model_validate(stale_config)
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            UPDATE run_templates
-            SET config_json = ?, config_hash = ?, updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "all_cups_recurrent_ppo",
-            ),
+    with manager_session(store.db_path) as session:
+        snapshot_id = _insert_config_snapshot(
+            session=session,
+            snapshot_id="stale-template-config",
+            kind="template",
+            raw_config_json=config_json(stale_model),
+            stored_config_hash=config_hash(stale_model),
+            created_at="2026-05-01T00:00:00+00:00",
         )
+        template = session.get(RunTemplateModel, "all_cups_recurrent_ppo")
+        assert template is not None
+        template.config_snapshot_id = snapshot_id
+        template.updated_at = "2026-05-01T00:00:00+00:00"
 
     template = store.default_template()
 
     assert template.config == default_managed_run_config()
     assert template.config.reward.energy_refill_progress_multiplier == 3.0
+    assert load_config_json(_config_snapshot_json(store, "stale-template-config")) == stale_model
 
 
 def test_manager_store_saves_draft_without_filesystem_artifacts(tmp_path: Path) -> None:
@@ -237,28 +355,7 @@ def test_manager_store_normalizes_stale_draft_configs(tmp_path: Path) -> None:
     stale_config = default_managed_run_config().model_dump(mode="json")
     stale_config["reward"] = {"manual_boost_reward": 0.5}
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-draft",
-                "Old Draft",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(store, draft_id="old-draft", name="Old Draft", config=stale_config)
 
     draft = store.list_drafts()[0]
 
@@ -270,19 +367,15 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
 
-    with sqlite3.connect(store.db_path) as connection:
-        columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(runs)").fetchall()}
-        group_columns = {
-            str(row[1])
-            for row in connection.execute("PRAGMA table_info(lineage_groups)").fetchall()
-        }
+    columns = _table_columns(store, "runs")
+    group_columns = _table_columns(store, "lineage_groups")
+    snapshot_columns = _table_columns(store, "config_snapshots")
 
     assert columns == {
         "id",
         "name",
         "status",
-        "config_json",
-        "config_hash",
+        "config_snapshot_id",
         "run_dir",
         "lineage_id",
         "lineage_step_offset",
@@ -296,9 +389,17 @@ def test_manager_store_creates_current_runs_schema(tmp_path: Path) -> None:
         "stopped_at",
     }
     assert group_columns == {"lineage_id", "group_name", "updated_at"}
+    assert snapshot_columns == {
+        "id",
+        "kind",
+        "schema_version",
+        "created_at",
+        "config_json",
+        "config_hash",
+    }
 
 
-def test_manager_store_rejects_legacy_observation_fields(tmp_path: Path) -> None:
+def test_manager_store_rejects_removed_observation_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -312,34 +413,18 @@ def test_manager_store_rejects_legacy_observation_fields(tmp_path: Path) -> None
         "zero_outside_track_bounds": True,
     }
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-observation",
-                "Old Observation",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-observation",
+        name="Old Observation",
+        config=stale_config,
+    )
 
     with pytest.raises(ValidationError):
         store.list_drafts()
 
 
-def test_manager_store_rejects_legacy_state_modes(
+def test_manager_store_rejects_removed_state_modes(
     tmp_path: Path,
 ) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
@@ -355,34 +440,18 @@ def test_manager_store_rejects_legacy_state_modes(
         {"name": "track_position.edge_ratio", "mode": "exclude", "dropout_prob": 0.0},
     ]
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "legacy-state-modes",
-                "Legacy State Modes",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-state-modes",
+        name="Old State Modes",
+        config=stale_config,
+    )
 
     with pytest.raises(ValidationError):
         store.list_drafts()
 
 
-def test_manager_store_rejects_legacy_vehicle_fields(tmp_path: Path) -> None:
+def test_manager_store_rejects_removed_vehicle_fields(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -391,28 +460,12 @@ def test_manager_store_rejects_legacy_vehicle_fields(tmp_path: Path) -> None:
         "engine_setting_raw_value": 65,
     }
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-vehicle",
-                "Old Vehicle",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-vehicle",
+        name="Old Vehicle",
+        config=stale_config,
+    )
 
     with pytest.raises(ValidationError):
         store.list_drafts()
@@ -424,28 +477,7 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     stale_config = default_managed_run_config().model_dump(mode="json")
     stale_config.pop("action", None)
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-action",
-                "Old Action",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(store, draft_id="old-action", name="Old Action", config=stale_config)
 
     draft = store.list_drafts()[0]
 
@@ -467,7 +499,7 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     assert draft.config.action.pitch_buckets == 5
 
 
-def test_manager_store_rejects_legacy_progress_suspend_field(tmp_path: Path) -> None:
+def test_manager_store_rejects_removed_progress_suspend_field(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     store.initialize()
     stale_config = default_managed_run_config().model_dump(mode="json")
@@ -475,28 +507,12 @@ def test_manager_store_rejects_legacy_progress_suspend_field(tmp_path: Path) -> 
     stale_config["reward"].pop("suspend_progress_while_outside_track_bounds")
     stale_config["reward"]["suspend_progress_while_airborne"] = True
 
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            """
-            INSERT INTO run_drafts(
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            )
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                "old-progress-suspend",
-                "Old Progress Suspend",
-                json.dumps(stale_config),
-                "stale",
-                "2026-05-01T00:00:00+00:00",
-                "2026-05-01T00:00:00+00:00",
-            ),
-        )
+    _insert_stale_draft_config(
+        store,
+        draft_id="old-progress-suspend",
+        name="Old Progress Suspend",
+        config=stale_config,
+    )
 
     with pytest.raises(ValidationError):
         store.list_drafts()
@@ -719,95 +735,93 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
     assert store.get_run_track_sampling_state(run.id) is None
 
 
-def test_manager_store_migrates_track_sampling_state_json_to_typed_rows(
-    tmp_path: Path,
-) -> None:
+def test_manager_store_updates_track_sampling_rows_incrementally(tmp_path: Path) -> None:
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
-        name="Track Pool JSON Migration Run",
+        name="Incremental Track Pool State Run",
         config=default_managed_run_config(),
         managed_runs_root=tmp_path / "runs",
     )
-    old_state_json = json.dumps(
-        {
-            "version": 1,
-            "sampling_mode": "adaptive_step_balanced",
-            "action_repeat": 2,
-            "update_episodes": 5,
-            "ema_alpha": 0.1,
-            "max_weight_scale": 5.0,
-            "adaptive_completion_weight": 0.8,
-            "adaptive_target_completion": 0.5,
-            "adaptive_min_confidence_episodes": 12,
-            "adaptive_confidence_scale": 3.0,
-            "update_count": 7,
-            "episodes_since_update": 2,
-            "entries": [
-                {
-                    "track_id": "x_cup_slot_1",
-                    "course_key": "x_cup_slot_1",
-                    "label": "X Cup 1234abcd",
-                    "base_weight": 1.0,
-                    "current_weight": 2.0,
-                    "completed_frames": 1000,
-                    "episode_count": 4,
-                    "finished_episode_count": 1,
-                    "success_sample_count": 4,
-                    "ema_episode_frames": 250.0,
-                    "ema_completion_fraction": 0.75,
-                    "generation_episode_count": 2,
-                    "generation_finished_episode_count": 1,
-                    "generation_success_sample_count": 2,
-                    "generation_ema_completion_fraction": 0.8,
-                    "generated_course_slot": 1,
-                    "generated_course_generation": 2,
-                    "generated_replacement_count": 2,
-                    "generated_entry_id": "x_cup_1234abcd_gp_race_novice_blue_falcon_balanced",
-                    "generated_course_id": "x_cup_1234abcd",
-                    "generated_course_name": "X Cup 1234abcd",
-                    "generated_course_hash": "1234abcd",
-                    "generated_course_seed": 42,
-                    "generated_baseline_state_path": str(run.run_dir / "baselines" / "x.state"),
-                    "generated_course_segment_count": 128,
-                    "generated_course_length": 12345.0,
-                }
-            ],
-        }
+    entry = TrackSamplingRuntimeEntry(
+        track_id="mute",
+        course_key="mute",
+        label="Mute City",
+        base_weight=1.0,
+        current_weight=1.0,
+        completed_frames=100,
+        episode_count=1,
+        finished_episode_count=0,
+        success_sample_count=1,
+        ema_episode_frames=100.0,
+        ema_completion_fraction=0.4,
     )
-    with store._connect() as connection:
-        connection.execute(
-            """
-            CREATE TABLE run_track_sampling_state (
-                run_id TEXT PRIMARY KEY,
-                state_json TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            INSERT INTO run_track_sampling_state(run_id, state_json, updated_at)
-            VALUES (?, ?, ?)
-            """,
-            (run.id, old_state_json, "2026-06-01T00:00:00+00:00"),
-        )
+    state = TrackSamplingRuntimeState(
+        sampling_mode="adaptive_step_balanced",
+        action_repeat=2,
+        update_episodes=5,
+        ema_alpha=0.1,
+        max_weight_scale=5.0,
+        adaptive_completion_weight=0.8,
+        adaptive_target_completion=0.5,
+        adaptive_min_confidence_episodes=12,
+        adaptive_confidence_scale=3.0,
+        update_count=1,
+        episodes_since_update=1,
+        entries=(entry,),
+    )
+    store.upsert_run_track_sampling_state(run_id=run.id, state=state)
 
-    assert store.migrate_run_track_sampling_state_json() == 1
+    statements: list[str] = []
 
-    migrated = store.get_run_track_sampling_state(run.id)
+    def record_statement(
+        _connection: object,
+        _cursor: object,
+        statement: str,
+        _parameters: object,
+        _context: object,
+        _executemany: bool,
+    ) -> None:
+        statements.append(statement)
 
-    assert migrated is not None
-    assert migrated.entries[0].generated_course_generation == 3
-    assert migrated.entries[0].generated_course_hash == "1234abcd"
-    with store._connect() as connection:
-        old_table = connection.execute(
-            """
-            SELECT 1
-            FROM sqlite_master
-            WHERE type = 'table' AND name = 'run_track_sampling_state'
-            """
-        ).fetchone()
-    assert old_table is None
+    updated = replace(
+        state,
+        update_count=2,
+        entries=(
+            replace(
+                entry,
+                current_weight=1.5,
+                completed_frames=250,
+                episode_count=2,
+                ema_completion_fraction=0.55,
+            ),
+        ),
+    )
+    event.listen(Engine, "before_cursor_execute", record_statement)
+    try:
+        store.upsert_run_track_sampling_state(run_id=run.id, state=updated)
+    finally:
+        event.remove(Engine, "before_cursor_execute", record_statement)
+
+    normalized_statements = tuple(statement.strip().lower() for statement in statements)
+    entry_selects = tuple(
+        statement
+        for statement in normalized_statements
+        if statement.startswith("select") and "run_track_sampling_entries" in statement
+    )
+    entry_deletes = tuple(
+        statement
+        for statement in normalized_statements
+        if statement.startswith("delete from run_track_sampling_entries")
+    )
+    entry_upserts = tuple(
+        statement
+        for statement in normalized_statements
+        if statement.startswith("insert into run_track_sampling_entries")
+    )
+    assert not entry_selects
+    assert all("not in" in statement for statement in entry_deletes)
+    assert any("on conflict" in statement for statement in entry_upserts)
+    assert store.get_run_track_sampling_state(run.id) == updated
 
 
 def test_manager_store_deletes_non_running_runs_with_runtime_rows(tmp_path: Path) -> None:
@@ -893,24 +907,14 @@ def test_manager_store_delete_run_defers_failed_filesystem_cleanup(
     assert store.delete_run(run.id) is True
     assert store.get_run(run.id) is None
     assert run.run_dir.exists()
-    with sqlite3.connect(store.db_path) as connection:
-        pending = connection.execute(
-            "SELECT COUNT(*) FROM filesystem_operations",
-        ).fetchone()
-    assert pending is not None
-    assert pending[0] == 1
+    assert _filesystem_operation_count(store) == 1
 
     monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)
     recovered.initialize()
 
     assert not run.run_dir.exists()
-    with sqlite3.connect(store.db_path) as connection:
-        pending = connection.execute(
-            "SELECT COUNT(*) FROM filesystem_operations",
-        ).fetchone()
-    assert pending is not None
-    assert pending[0] == 0
+    assert _filesystem_operation_count(store) == 0
 
 
 def test_manager_store_reconciles_stale_dead_worker_lease(
@@ -940,11 +944,7 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
         launched_at=started_at,
     )
     stale_heartbeat = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
-            (stale_heartbeat, run.id),
-        )
+    _set_worker_heartbeat(store, run_id=run.id, heartbeat_at=stale_heartbeat)
     monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
 
     store.reconcile_orphaned_runs()
@@ -952,12 +952,7 @@ def test_manager_store_reconciles_stale_dead_worker_lease(
 
     assert failed is not None
     assert failed.status == "failed"
-    with sqlite3.connect(store.db_path) as connection:
-        worker_row = connection.execute(
-            "SELECT 1 FROM run_workers WHERE run_id = ?",
-            (run.id,),
-        ).fetchone()
-    assert worker_row is None
+    assert not _worker_exists(store, run.id)
 
 
 def test_manager_store_keeps_fresh_worker_lease_when_pid_is_not_visible(
@@ -990,11 +985,7 @@ def test_manager_store_keeps_fresh_worker_lease_when_pid_is_not_visible(
     assert requested is not None
     assert requested.pending_command == "stop"
     fresh_heartbeat = (datetime.now(UTC) + timedelta(minutes=5)).isoformat(timespec="seconds")
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
-            (fresh_heartbeat, run.id),
-        )
+    _set_worker_heartbeat(store, run_id=run.id, heartbeat_at=fresh_heartbeat)
     monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: False)
 
     store.reconcile_orphaned_runs()
@@ -1003,12 +994,7 @@ def test_manager_store_keeps_fresh_worker_lease_when_pid_is_not_visible(
     assert refreshed is not None
     assert refreshed.status == "running"
     assert refreshed.pending_command == "stop"
-    with sqlite3.connect(store.db_path) as connection:
-        worker_row = connection.execute(
-            "SELECT 1 FROM run_workers WHERE run_id = ?",
-            (run.id,),
-        ).fetchone()
-    assert worker_row is not None
+    assert _worker_exists(store, run.id)
 
 
 def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
@@ -1038,11 +1024,7 @@ def test_manager_store_keeps_running_run_when_worker_pid_is_alive(
         launched_at=started_at,
     )
     stale_heartbeat = (datetime.now(UTC) - timedelta(minutes=5)).isoformat(timespec="seconds")
-    with sqlite3.connect(store.db_path) as connection:
-        connection.execute(
-            "UPDATE run_workers SET heartbeat_at = ? WHERE run_id = ?",
-            (stale_heartbeat, run.id),
-        )
+    _set_worker_heartbeat(store, run_id=run.id, heartbeat_at=stale_heartbeat)
     monkeypatch.setattr(run_maintenance, "pid_exists", lambda pid: True)
 
     store.reconcile_orphaned_runs()
@@ -1206,32 +1188,22 @@ def test_manager_store_delete_lineage_defers_failed_filesystem_cleanup(
     assert store.get_run(parent.id) is None
     assert store.get_run(child.id) is None
     assert parent.run_dir.exists()
-    with sqlite3.connect(store.db_path) as connection:
-        pending = connection.execute(
-            "SELECT COUNT(*) FROM filesystem_operations",
-        ).fetchone()
-    assert pending is not None
-    assert pending[0] >= 2
+    assert _filesystem_operation_count(store) >= 2
 
     monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)
     recovered.initialize()
 
     assert not parent.run_dir.exists()
-    with sqlite3.connect(store.db_path) as connection:
-        pending = connection.execute(
-            "SELECT COUNT(*) FROM filesystem_operations",
-        ).fetchone()
-    assert pending is not None
-    assert pending[0] == 0
+    assert _filesystem_operation_count(store) == 0
 
 
-def test_manager_store_migration_replays_pending_directory_move(
+def test_manager_store_replays_pending_old_directory_move(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     managed_runs_root = tmp_path / "local" / "runs"
-    legacy_lineages_root = tmp_path / "local" / "lineages"
+    old_lineages_root = tmp_path / "local" / "lineages"
     monkeypatch.setattr(registry_paths, "manager_root", lambda output_root=None: managed_runs_root)
     monkeypatch.setattr(
         registry_paths,
@@ -1241,15 +1213,15 @@ def test_manager_store_migration_replays_pending_directory_move(
 
     store = ManagerStore(tmp_path / "manager" / "runs.db")
     run = store.create_run(
-        run_id="legacy-run",
-        name="Legacy Run",
+        run_id="old-run",
+        name="Old Run",
         config=default_managed_run_config(),
-        explicit_run_dir=legacy_lineages_root / "legacy-run" / "legacy-run",
-        lineage_id="legacy-run",
+        explicit_run_dir=old_lineages_root / "old-run" / "old-run",
+        lineage_id="old-run",
     )
     run.run_dir.mkdir(parents=True)
     (run.run_dir / "artifact.bin").write_text("payload", encoding="utf-8")
-    target_run_dir = managed_runs_root / "legacy-run" / "legacy-run"
+    target_run_dir = managed_runs_root / "old-run" / "old-run"
     original_apply = filesystem_ops_module.apply_filesystem_operation
     seen_move = False
 
@@ -1266,18 +1238,8 @@ def test_manager_store_migration_replays_pending_directory_move(
         store.migrate_lineage_layout()
 
     assert run.run_dir.exists()
-    with sqlite3.connect(store.db_path) as connection:
-        row = connection.execute(
-            "SELECT run_dir FROM runs WHERE id = ?",
-            (run.id,),
-        ).fetchone()
-        pending = connection.execute(
-            "SELECT COUNT(*) FROM filesystem_operations WHERE kind = 'move_tree'",
-        ).fetchone()
-    assert row is not None
-    assert Path(str(row[0])).resolve() == target_run_dir.resolve()
-    assert pending is not None
-    assert pending[0] == 1
+    assert _stored_run_dir(store, run.id).resolve() == target_run_dir.resolve()
+    assert _filesystem_operation_count(store, kind="move_tree") == 1
 
     monkeypatch.setattr(filesystem_ops_module, "apply_filesystem_operation", original_apply)
     recovered = ManagerStore(store.db_path)

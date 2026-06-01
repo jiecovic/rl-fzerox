@@ -1,25 +1,35 @@
 # src/rl_fzerox/core/manager/registry/drafts/store.py
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError as SqlAlchemyIntegrityError
+
+from rl_fzerox.core.manager.db.models import RunDraftModel, RunTemplateModel
+from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
+from rl_fzerox.core.manager.db.repositories.runs import (
+    assert_draft_name_available,
+    insert_draft,
+)
+from rl_fzerox.core.manager.db.repositories.runs import (
+    update_draft as update_draft_record,
+)
+from rl_fzerox.core.manager.errors import ManagerNameConflictError
 from rl_fzerox.core.manager.models import ManagedRunDraft, ManagedRunTemplate
 from rl_fzerox.core.manager.registry.common import (
-    assert_name_available,
     new_record_id,
-    raise_name_conflict,
+    optional_source_artifact,
     utc_now,
 )
 from rl_fzerox.core.manager.registry.drafts.fork_sources import (
     reset_draft_source,
     snapshot_draft_source,
 )
-from rl_fzerox.core.manager.registry.rows import draft_from_row, template_from_row
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
-from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
+from rl_fzerox.core.manager.storage.serialization import load_config_json
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -44,22 +54,29 @@ def create_draft(
     source_run = None if source_run_id is None else store.get_run(source_run_id)
     if source_run_id is not None and source_run is None:
         raise ValueError(f"run not found: {source_run_id}")
-    draft = ManagedRunDraft(
-        id=draft_id,
-        name=normalized_name,
-        config=config,
-        config_hash=config_hash(config),
-        source_run_id=source_run_id,
-        source_artifact=source_artifact,
-        source_snapshot_dir=source_snapshot_dir,
-        source_num_timesteps=source_num_timesteps,
-        created_at=created_at,
-        updated_at=created_at,
-    )
+    draft: ManagedRunDraft | None = None
 
     try:
-        with store._connect() as connection:
-            assert_name_available(connection, normalized_name)
+        with store._orm_session() as session:
+            assert_draft_name_available(session, normalized_name)
+            config_snapshot = create_config_snapshot(
+                session,
+                kind="draft",
+                config=config,
+                created_at=created_at,
+            )
+            draft = ManagedRunDraft(
+                id=draft_id,
+                name=normalized_name,
+                config=config,
+                config_hash=config_snapshot.config_hash,
+                source_run_id=source_run_id,
+                source_artifact=source_artifact,
+                source_snapshot_dir=source_snapshot_dir,
+                source_num_timesteps=source_num_timesteps,
+                created_at=created_at,
+                updated_at=created_at,
+            )
             if source_run_id is not None and source_artifact is not None:
                 assert source_run is not None
                 source_snapshot_dir, source_num_timesteps = snapshot_draft_source(
@@ -75,85 +92,48 @@ def create_draft(
                     source_snapshot_dir=source_snapshot_dir,
                     source_num_timesteps=source_num_timesteps,
                 )
-            connection.execute(
-                """
-                INSERT INTO run_drafts(
-                    id,
-                    name,
-                    config_json,
-                    config_hash,
-                    source_run_id,
-                    source_artifact,
-                    source_snapshot_dir,
-                    source_num_timesteps,
-                    created_at,
-                    updated_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    draft.id,
-                    draft.name,
-                    config_json(draft.config),
-                    draft.config_hash,
-                    draft.source_run_id,
-                    draft.source_artifact,
-                    None if draft.source_snapshot_dir is None else str(draft.source_snapshot_dir),
-                    draft.source_num_timesteps,
-                    draft.created_at,
-                    draft.updated_at,
-                ),
+            insert_draft(
+                session,
+                draft=draft,
+                config_snapshot_id=config_snapshot.id,
             )
-    except sqlite3.IntegrityError as error:
-        raise_name_conflict(error, table="run_drafts", kind="draft", name=normalized_name)
-        raise
+    except SqlAlchemyIntegrityError as error:
+        raise ManagerNameConflictError(kind="draft", name=normalized_name) from error
     except Exception:
         reset_draft_source(source_snapshot_dir)
         raise
+    if draft is None:
+        raise RuntimeError("managed draft creation failed before insert")
     return draft
 
 
 def list_drafts(store: ManagerStore) -> tuple[ManagedRunDraft, ...]:
     store.initialize()
-    with store._connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT
-                id,
-                name,
-                config_json,
-                config_hash,
-                source_run_id,
-                source_artifact,
-                source_snapshot_dir,
-                source_num_timesteps,
-                created_at,
-                updated_at
-            FROM run_drafts
-            ORDER BY updated_at DESC, id DESC
-            """
-        ).fetchall()
-    return tuple(draft_from_row(row) for row in rows)
+    with store._orm_session() as session:
+        drafts = tuple(
+            session.scalars(
+                select(RunDraftModel).order_by(
+                    RunDraftModel.updated_at.desc(),
+                    RunDraftModel.id.desc(),
+                )
+            )
+        )
+        return tuple(_draft_from_model(draft) for draft in drafts)
 
 
 def delete_draft(store: ManagerStore, draft_id: str) -> bool:
     store.initialize()
-    with store._connect() as connection:
-        row = connection.execute(
-            """
-            SELECT source_snapshot_dir
-            FROM run_drafts
-            WHERE id = ?
-            """,
-            (draft_id,),
-        ).fetchone()
-        cursor = connection.execute(
-            "DELETE FROM run_drafts WHERE id = ?",
-            (draft_id,),
-        )
-    if row is not None and isinstance(row["source_snapshot_dir"], str):
-        reset_draft_source(Path(str(row["source_snapshot_dir"])).expanduser().resolve())
-    return cursor.rowcount > 0
+    source_snapshot_dir: Path | None = None
+    with store._orm_session() as session:
+        draft = session.get(RunDraftModel, draft_id)
+        if draft is None:
+            return False
+        if draft.source_snapshot_dir is not None:
+            source_snapshot_dir = Path(draft.source_snapshot_dir).expanduser().resolve()
+        session.delete(draft)
+    if source_snapshot_dir is not None:
+        reset_draft_source(source_snapshot_dir)
+    return True
 
 
 def update_draft(
@@ -182,9 +162,14 @@ def update_draft(
     )
     if source_changed and current_draft.source_run_id is not None:
         raise ValueError("changing a fork draft source is not supported; create a new fork draft")
+    updated = False
     try:
-        with store._connect() as connection:
-            assert_name_available(connection, normalized_name, exclude_draft_id=draft_id)
+        with store._orm_session() as session:
+            assert_draft_name_available(
+                session,
+                normalized_name,
+                exclude_draft_id=draft_id,
+            )
             if source_changed:
                 next_snapshot_dir = None
                 next_source_num_timesteps = None
@@ -196,91 +181,40 @@ def update_draft(
                         source_run=source_run,
                         source_artifact=source_artifact,
                     )
-            update_params = (
-                normalized_name,
-                config_json(config),
-                config_hash(config),
-                source_run_id,
-                source_artifact,
-                None if next_snapshot_dir is None else str(next_snapshot_dir),
-                next_source_num_timesteps,
-                updated_at,
-                draft_id,
+            config_snapshot = create_config_snapshot(
+                session,
+                kind="draft",
+                config=config,
+                created_at=updated_at,
             )
-            row = connection.execute(
-                """
-                UPDATE run_drafts
-                SET
-                    name = ?,
-                    config_json = ?,
-                    config_hash = ?,
-                    source_run_id = ?,
-                    source_artifact = ?,
-                    source_snapshot_dir = ?,
-                    source_num_timesteps = ?,
-                    updated_at = ?
-                WHERE id = ?
-                RETURNING
-                    id,
-                    name,
-                    config_json,
-                    config_hash,
-                    source_run_id,
-                    source_artifact,
-                    source_snapshot_dir,
-                    source_num_timesteps,
-                    created_at,
-                    updated_at
-                """,
-                update_params,
-            ).fetchone()
-    except sqlite3.IntegrityError as error:
-        raise_name_conflict(error, table="run_drafts", kind="draft", name=normalized_name)
-        raise
-    return None if row is None else draft_from_row(row)
+            updated = update_draft_record(
+                session,
+                draft_id=draft_id,
+                name=normalized_name,
+                config_snapshot_id=config_snapshot.id,
+                source_run_id=source_run_id,
+                source_artifact=source_artifact,
+                source_snapshot_dir=None if next_snapshot_dir is None else str(next_snapshot_dir),
+                source_num_timesteps=next_source_num_timesteps,
+                updated_at=updated_at,
+            )
+    except SqlAlchemyIntegrityError as error:
+        raise ManagerNameConflictError(kind="draft", name=normalized_name) from error
+    return store.get_draft(draft_id) if updated else None
 
 
 def get_draft(store: ManagerStore, draft_id: str) -> ManagedRunDraft | None:
     store.initialize()
-    with store._connect() as connection:
-        row = connection.execute(
-            """
-            SELECT
-                id,
-                name,
-                config_json,
-                config_hash,
-                source_run_id,
-                source_artifact,
-                source_snapshot_dir,
-                source_num_timesteps,
-                created_at,
-                updated_at
-            FROM run_drafts
-            WHERE id = ?
-            """,
-            (draft_id,),
-        ).fetchone()
-    return None if row is None else draft_from_row(row)
+    with store._orm_session() as session:
+        draft = session.get(RunDraftModel, draft_id)
+        return None if draft is None else _draft_from_model(draft)
 
 
 def list_templates(store: ManagerStore) -> tuple[ManagedRunTemplate, ...]:
     store.initialize()
-    with store._connect() as connection:
-        rows = connection.execute(
-            """
-            SELECT
-                id,
-                name,
-                config_json,
-                config_hash,
-                created_at,
-                updated_at
-            FROM run_templates
-            ORDER BY name COLLATE NOCASE
-            """
-        ).fetchall()
-    return tuple(template_from_row(row) for row in rows)
+    with store._orm_session() as session:
+        templates = tuple(session.scalars(select(RunTemplateModel).order_by(RunTemplateModel.name)))
+        return tuple(_template_from_model(template) for template in templates)
 
 
 def default_template(store: ManagerStore) -> ManagedRunTemplate:
@@ -289,3 +223,31 @@ def default_template(store: ManagerStore) -> ManagedRunTemplate:
     if not templates:
         raise RuntimeError("Manager DB did not initialize a default run template")
     return templates[0]
+
+
+def _draft_from_model(draft: RunDraftModel) -> ManagedRunDraft:
+    return ManagedRunDraft(
+        id=draft.id,
+        name=draft.name,
+        config=load_config_json(draft.config_snapshot.config_json),
+        config_hash=draft.config_snapshot.config_hash,
+        created_at=draft.created_at,
+        updated_at=draft.updated_at,
+        source_run_id=draft.source_run_id,
+        source_artifact=optional_source_artifact(draft.source_artifact),
+        source_snapshot_dir=(
+            None if draft.source_snapshot_dir is None else Path(draft.source_snapshot_dir)
+        ),
+        source_num_timesteps=draft.source_num_timesteps,
+    )
+
+
+def _template_from_model(template: RunTemplateModel) -> ManagedRunTemplate:
+    return ManagedRunTemplate(
+        id=template.id,
+        name=template.name,
+        config=load_config_json(template.config_snapshot.config_json),
+        config_hash=template.config_snapshot.config_hash,
+        created_at=template.created_at,
+        updated_at=template.updated_at,
+    )

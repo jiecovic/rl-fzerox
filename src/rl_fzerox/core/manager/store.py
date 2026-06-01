@@ -4,8 +4,13 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
+
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from rl_fzerox.core.manager.artifacts.paths import (
     manager_runs_root,
@@ -15,6 +20,7 @@ from rl_fzerox.core.manager.artifacts.tensorboard_views import (
     TensorboardViewGroup,
     rebuild_tensorboard_views,
 )
+from rl_fzerox.core.manager.db import manager_engine
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunDraft,
@@ -64,6 +70,15 @@ class ManagerStore:
     def __init__(self, db_path: Path | None = None) -> None:
         self.db_path = (db_path or default_manager_db_path()).expanduser().resolve()
         self._schema_initialized = False
+        self._orm_engine: Engine | None = None
+
+    def close(self) -> None:
+        """Release database resources owned by this store instance."""
+
+        if self._orm_engine is None:
+            return
+        self._orm_engine.dispose()
+        self._orm_engine = None
 
     def initialize(self) -> None:
         """Create the manager database schema if needed."""
@@ -82,8 +97,8 @@ class ManagerStore:
         """Apply schema/bootstrap work to the manager database."""
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        initialize_manager_schema(self.db_path, applied_at=self.utc_now())
         with self._connect() as connection:
-            initialize_manager_schema(connection, applied_at=self.utc_now())
             lineage_registry.backfill_lineage_ids(connection)
             lineage_registry.migrate_lineage_layout_rows(
                 connection,
@@ -95,8 +110,7 @@ class ManagerStore:
         """Refresh built-in templates without re-running full schema bootstrap."""
 
         self._ensure_schema_initialized()
-        with self._connect() as connection:
-            refresh_default_template(connection, updated_at=self.utc_now())
+        refresh_default_template(self.db_path, updated_at=self.utc_now())
 
     def manager_runs_root(self, *, output_root: Path | None = None) -> Path:
         return manager_runs_root(output_root=output_root)
@@ -226,9 +240,6 @@ class ManagerStore:
             state=state,
             updated_at=updated_at,
         )
-
-    def migrate_run_track_sampling_state_json(self, run_id: str | None = None) -> int:
-        return run_registry.migrate_run_track_sampling_state_json(self, run_id)
 
     def register_run_worker(
         self,
@@ -428,3 +439,14 @@ class ManagerStore:
         connection.execute("PRAGMA busy_timeout = 30000")
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
+
+    def _manager_engine(self) -> Engine:
+        if self._orm_engine is None:
+            self._orm_engine = manager_engine(self.db_path)
+        return self._orm_engine
+
+    @contextmanager
+    def _orm_session(self) -> Iterator[Session]:
+        with Session(self._manager_engine(), expire_on_commit=False) as session:
+            with session.begin():
+                yield session

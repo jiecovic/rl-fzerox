@@ -145,6 +145,7 @@ class ManagerRunLauncher:
             run_dir=child_run_dir,
             source_run_dir=child_source_snapshot_dir,
             source_artifact=artifact,
+            source_config=source_run.config,
             tensorboard_step_offset=child_lineage_step_offset,
         )
         child_run = self._store.create_run(

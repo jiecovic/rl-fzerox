@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from rl_fzerox.core.manager.db.models import RunModel, RunWorkerModel
+
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
 
@@ -16,37 +18,25 @@ def register_run_worker(
     launched_at: str,
 ) -> bool:
     store._ensure_schema_initialized()
-    with store._connect() as connection:
-        row = connection.execute(
-            "SELECT 1 FROM runs WHERE id = ?",
-            (run_id,),
-        ).fetchone()
-        if row is None:
+    with store._orm_session() as session:
+        if session.get(RunModel, run_id) is None:
             return False
-        connection.execute(
-            """
-            INSERT INTO run_workers(
-                run_id,
-                launch_token,
-                pid,
-                launched_at,
-                heartbeat_at
+        worker = session.get(RunWorkerModel, run_id)
+        if worker is None:
+            session.add(
+                RunWorkerModel(
+                    run_id=run_id,
+                    launch_token=launch_token,
+                    pid=pid,
+                    launched_at=launched_at,
+                    heartbeat_at=launched_at,
+                )
             )
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(run_id) DO UPDATE SET
-                launch_token = excluded.launch_token,
-                pid = excluded.pid,
-                launched_at = excluded.launched_at,
-                heartbeat_at = excluded.heartbeat_at
-            """,
-            (
-                run_id,
-                launch_token,
-                pid,
-                launched_at,
-                launched_at,
-            ),
-        )
+        else:
+            worker.launch_token = launch_token
+            worker.pid = pid
+            worker.launched_at = launched_at
+            worker.heartbeat_at = launched_at
     return True
 
 
@@ -58,16 +48,12 @@ def heartbeat_run_worker(
     heartbeat_at: str,
 ) -> bool:
     store._ensure_schema_initialized()
-    with store._connect() as connection:
-        cursor = connection.execute(
-            """
-            UPDATE run_workers
-            SET heartbeat_at = ?
-            WHERE run_id = ? AND launch_token = ?
-            """,
-            (heartbeat_at, run_id, launch_token),
-        )
-    return cursor.rowcount > 0
+    with store._orm_session() as session:
+        worker = session.get(RunWorkerModel, run_id)
+        if worker is None or worker.launch_token != launch_token:
+            return False
+        worker.heartbeat_at = heartbeat_at
+    return True
 
 
 def clear_run_worker(
@@ -77,11 +63,9 @@ def clear_run_worker(
     launch_token: str | None = None,
 ) -> None:
     store._ensure_schema_initialized()
-    with store._connect() as connection:
-        if launch_token is None:
-            connection.execute("DELETE FROM run_workers WHERE run_id = ?", (run_id,))
-        else:
-            connection.execute(
-                "DELETE FROM run_workers WHERE run_id = ? AND launch_token = ?",
-                (run_id, launch_token),
-            )
+    with store._orm_session() as session:
+        worker = session.get(RunWorkerModel, run_id)
+        if worker is None:
+            return
+        if launch_token is None or worker.launch_token == launch_token:
+            session.delete(worker)

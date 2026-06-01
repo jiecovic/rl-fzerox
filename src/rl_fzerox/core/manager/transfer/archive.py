@@ -3,15 +3,23 @@ from __future__ import annotations
 
 import json
 import shutil
-import sqlite3
 import stat
 import zipfile
 from collections.abc import Iterable
 from pathlib import Path, PurePosixPath
 
+from sqlalchemy.exc import IntegrityError as SqlAlchemyIntegrityError
+from sqlalchemy.orm import Session
+
+from rl_fzerox.core.manager.db.models import (
+    LineageGroupModel,
+    RunModel,
+    RunRuntimeModel,
+)
+from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
+from rl_fzerox.core.manager.db.repositories.runs import append_run_event, insert_run
 from rl_fzerox.core.manager.models import ManagedRun, ManagedRunRuntime, RunStatus
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
-from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 from rl_fzerox.core.manager.store import ManagerStore
 from rl_fzerox.core.manager.transfer.models import (
     RunBundleEvent,
@@ -136,82 +144,68 @@ def import_run_bundle(
         )
 
         store.initialize()
-        with store._connect() as connection:
-            parent_run_id = _existing_run_id(connection, manifest.run.parent_run_id)
-            source_run_id = _existing_run_id(connection, manifest.run.source_run_id)
-            connection.execute(
-                """
-                INSERT INTO runs(
-                    id,
-                    name,
-                    status,
-                    config_json,
-                    config_hash,
-                    run_dir,
-                    lineage_id,
-                    lineage_step_offset,
-                    parent_run_id,
-                    source_run_id,
-                    source_artifact,
-                    source_snapshot_dir,
-                    source_num_timesteps,
-                    created_at,
-                    started_at,
-                    stopped_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    target_run_id,
-                    manifest.run.name,
-                    imported_status,
-                    config_json(imported_config),
-                    config_hash(imported_config),
-                    str(target_run_dir),
-                    target_lineage_id,
-                    manifest.run.lineage_step_offset,
-                    parent_run_id,
-                    source_run_id,
-                    manifest.run.source_artifact if source_run_id is not None else None,
-                    source_snapshot_dir,
-                    manifest.run.source_num_timesteps if source_run_id is not None else None,
-                    manifest.run.created_at,
-                    manifest.run.started_at,
+        with store._orm_session() as session:
+            parent_run_id = _existing_run_id(session, manifest.run.parent_run_id)
+            source_run_id = _existing_run_id(session, manifest.run.source_run_id)
+            config_snapshot = create_config_snapshot(
+                session,
+                kind="import",
+                config=imported_config,
+                created_at=imported_at,
+            )
+            imported_run = ManagedRun(
+                id=target_run_id,
+                name=manifest.run.name,
+                status=imported_status,
+                config=imported_config,
+                config_hash=config_snapshot.config_hash,
+                run_dir=target_run_dir,
+                lineage_id=target_lineage_id,
+                lineage_step_offset=manifest.run.lineage_step_offset,
+                parent_run_id=parent_run_id,
+                source_run_id=source_run_id,
+                source_artifact=manifest.run.source_artifact if source_run_id is not None else None,
+                source_snapshot_dir=None
+                if source_snapshot_dir is None
+                else Path(source_snapshot_dir),
+                source_num_timesteps=(
+                    manifest.run.source_num_timesteps if source_run_id is not None else None
+                ),
+                created_at=manifest.run.created_at,
+                started_at=manifest.run.started_at,
+                stopped_at=(
                     manifest.run.stopped_at
                     if imported_status == manifest.run.status
-                    else imported_at,
+                    else imported_at
                 ),
             )
+            insert_run(session, run=imported_run, config_snapshot_id=config_snapshot.id)
+            session.flush()
             for group_name in manifest.run.lineage_groups:
-                connection.execute(
-                    """
-                    INSERT OR IGNORE INTO lineage_groups(lineage_id, group_name, updated_at)
-                    VALUES (?, ?, ?)
-                    """,
-                    (target_lineage_id, group_name, imported_at),
+                session.merge(
+                    LineageGroupModel(
+                        lineage_id=target_lineage_id,
+                        group_name=group_name,
+                        updated_at=imported_at,
+                    )
                 )
-            _insert_runtime(connection, run_id=target_run_id, runtime=manifest.run.runtime)
+            _insert_runtime(session, run_id=target_run_id, runtime=manifest.run.runtime)
             for event in manifest.run.events:
-                connection.execute(
-                    """
-                    INSERT INTO run_events(run_id, created_at, kind, message)
-                    VALUES (?, ?, ?, ?)
-                    """,
-                    (target_run_id, event.created_at, event.kind, event.message),
+                append_run_event(
+                    session,
+                    run_id=target_run_id,
+                    created_at=event.created_at,
+                    kind=event.kind,
+                    message=event.message,
                 )
-            connection.execute(
-                """
-                INSERT INTO run_events(run_id, created_at, kind, message)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    target_run_id,
-                    imported_at,
-                    "imported",
-                    f"run imported from {archive_path.name}",
-                ),
+            append_run_event(
+                session,
+                run_id=target_run_id,
+                created_at=imported_at,
+                kind="imported",
+                message=f"run imported from {archive_path.name}",
             )
-    except sqlite3.IntegrityError as error:
+    except SqlAlchemyIntegrityError as error:
         if extracted_payload and target_run_dir is not None:
             shutil.rmtree(target_run_dir, ignore_errors=True)
         raise RunBundleError(f"could not import run bundle: {error}") from error
@@ -515,51 +509,34 @@ def _imported_status(status: RunStatus) -> RunStatus:
             return status
 
 
-def _existing_run_id(connection: sqlite3.Connection, run_id: str | None) -> str | None:
+def _existing_run_id(session: Session, run_id: str | None) -> str | None:
     if run_id is None:
         return None
-    row = connection.execute("SELECT id FROM runs WHERE id = ?", (run_id,)).fetchone()
-    return None if row is None else str(row["id"])
+    run = session.get(RunModel, run_id)
+    return None if run is None else run.id
 
 
 def _insert_runtime(
-    connection: sqlite3.Connection,
+    session: Session,
     *,
     run_id: str,
     runtime: RunBundleRuntime | None,
 ) -> None:
     if runtime is None:
         return
-    connection.execute(
-        """
-        INSERT INTO run_runtime(
-            run_id,
-            total_timesteps,
-            num_timesteps,
-            progress_fraction,
-            updated_at,
-            fps,
-            episode_reward_mean,
-            episode_length_mean,
-            approx_kl,
-            entropy_loss,
-            value_loss,
-            policy_gradient_loss
+    session.add(
+        RunRuntimeModel(
+            run_id=run_id,
+            total_timesteps=runtime.total_timesteps,
+            num_timesteps=runtime.num_timesteps,
+            progress_fraction=runtime.progress_fraction,
+            updated_at=runtime.updated_at,
+            fps=runtime.fps,
+            episode_reward_mean=runtime.episode_reward_mean,
+            episode_length_mean=runtime.episode_length_mean,
+            approx_kl=runtime.approx_kl,
+            entropy_loss=runtime.entropy_loss,
+            value_loss=runtime.value_loss,
+            policy_gradient_loss=runtime.policy_gradient_loss,
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            run_id,
-            runtime.total_timesteps,
-            runtime.num_timesteps,
-            runtime.progress_fraction,
-            runtime.updated_at,
-            runtime.fps,
-            runtime.episode_reward_mean,
-            runtime.episode_length_mean,
-            runtime.approx_kl,
-            runtime.entropy_loss,
-            runtime.value_loss,
-            runtime.policy_gradient_loss,
-        ),
     )

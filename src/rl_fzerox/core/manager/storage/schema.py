@@ -3,224 +3,134 @@
 
 from __future__ import annotations
 
-import sqlite3
+from pathlib import Path
 
+from sqlalchemy import inspect, select
+from sqlalchemy.engine import Engine
+from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.orm import Session
+
+from rl_fzerox.core.manager.db import manager_session
+from rl_fzerox.core.manager.db.models import ManagerBase, SchemaVersionModel
+from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
+from rl_fzerox.core.manager.db.repositories.runs import upsert_template
+from rl_fzerox.core.manager.db.session import manager_engine
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
-from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
+from rl_fzerox.core.manager.storage.serialization import config_hash
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
+
+CONFIG_OWNER_TABLES = ("runs", "run_drafts", "run_templates")
+RUN_CHILD_TABLES = (
+    "run_commands",
+    "run_events",
+    "run_runtime",
+    "run_track_sampling_entries",
+    "run_track_sampling_runtime",
+    "run_workers",
+)
 
 
-def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
+def initialize_manager_schema(db_path: Path, *, applied_at: str) -> None:
     """Create manager tables and seed the built-in first template."""
 
-    connection.executescript(
-        """
-        CREATE TABLE IF NOT EXISTS schema_version (
-            version INTEGER NOT NULL PRIMARY KEY,
-            applied_at TEXT NOT NULL
-        );
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    engine = manager_engine(db_path)
+    try:
+        table_names = set(inspect(engine).get_table_names())
+        if _has_manager_schema(table_names):
+            _assert_current_schema(engine=engine, table_names=table_names)
+        else:
+            ManagerBase.metadata.create_all(engine)
+    finally:
+        engine.dispose()
 
-        CREATE TABLE IF NOT EXISTS runs (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            status TEXT NOT NULL,
-            config_json TEXT NOT NULL,
-            config_hash TEXT NOT NULL,
-            run_dir TEXT NOT NULL UNIQUE,
-            lineage_id TEXT,
-            lineage_step_offset INTEGER NOT NULL DEFAULT 0,
-            parent_run_id TEXT,
-            source_run_id TEXT,
-            source_artifact TEXT,
-            source_snapshot_dir TEXT,
-            source_num_timesteps INTEGER,
-            created_at TEXT NOT NULL,
-            started_at TEXT,
-            stopped_at TEXT,
-            FOREIGN KEY(parent_run_id) REFERENCES runs(id),
-            FOREIGN KEY(source_run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_templates (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            config_json TEXT NOT NULL,
-            config_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS run_drafts (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            config_json TEXT NOT NULL,
-            config_hash TEXT NOT NULL,
-            source_run_id TEXT,
-            source_artifact TEXT,
-            source_snapshot_dir TEXT,
-            source_num_timesteps INTEGER,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY(source_run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            run_id TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            kind TEXT NOT NULL,
-            message TEXT NOT NULL,
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_runtime (
-            run_id TEXT PRIMARY KEY,
-            total_timesteps INTEGER NOT NULL,
-            num_timesteps INTEGER NOT NULL,
-            progress_fraction REAL NOT NULL,
-            updated_at TEXT NOT NULL,
-            fps REAL,
-            episode_reward_mean REAL,
-            episode_length_mean REAL,
-            approx_kl REAL,
-            entropy_loss REAL,
-            value_loss REAL,
-            policy_gradient_loss REAL,
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_track_sampling_runtime (
-            run_id TEXT PRIMARY KEY,
-            sampling_mode TEXT NOT NULL,
-            action_repeat INTEGER NOT NULL,
-            update_episodes INTEGER NOT NULL,
-            ema_alpha REAL NOT NULL,
-            max_weight_scale REAL NOT NULL,
-            adaptive_completion_weight REAL NOT NULL,
-            adaptive_target_completion REAL NOT NULL,
-            adaptive_min_confidence_episodes INTEGER NOT NULL,
-            adaptive_confidence_scale REAL NOT NULL,
-            update_count INTEGER NOT NULL,
-            episodes_since_update INTEGER NOT NULL,
-            updated_at TEXT NOT NULL,
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_track_sampling_entries (
-            run_id TEXT NOT NULL,
-            course_key TEXT NOT NULL,
-            track_id TEXT NOT NULL,
-            label TEXT NOT NULL,
-            base_weight REAL NOT NULL,
-            current_weight REAL NOT NULL,
-            completed_frames INTEGER NOT NULL,
-            episode_count INTEGER NOT NULL,
-            finished_episode_count INTEGER NOT NULL,
-            success_sample_count INTEGER NOT NULL,
-            ema_episode_frames REAL,
-            ema_completion_fraction REAL,
-            generation_episode_count INTEGER NOT NULL,
-            generation_finished_episode_count INTEGER NOT NULL,
-            generation_success_sample_count INTEGER NOT NULL,
-            generation_ema_completion_fraction REAL,
-            generated_course_slot INTEGER,
-            generated_course_generation INTEGER,
-            generated_entry_id TEXT,
-            generated_course_id TEXT,
-            generated_course_name TEXT,
-            generated_course_hash TEXT,
-            generated_course_seed TEXT,
-            generated_baseline_state_path TEXT,
-            generated_course_segment_count INTEGER,
-            generated_course_length REAL,
-            PRIMARY KEY(run_id, course_key),
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_commands (
-            run_id TEXT PRIMARY KEY,
-            command TEXT NOT NULL,
-            requested_at TEXT NOT NULL,
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS run_workers (
-            run_id TEXT PRIMARY KEY,
-            launch_token TEXT NOT NULL,
-            pid INTEGER NOT NULL,
-            launched_at TEXT NOT NULL,
-            heartbeat_at TEXT NOT NULL,
-            FOREIGN KEY(run_id) REFERENCES runs(id)
-        );
-
-        CREATE TABLE IF NOT EXISTS filesystem_operations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kind TEXT NOT NULL,
-            source_path TEXT NOT NULL,
-            target_path TEXT,
-            created_at TEXT NOT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS lineage_groups (
-            lineage_id TEXT NOT NULL,
-            group_name TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            PRIMARY KEY(lineage_id, group_name)
-        );
-
-        DROP INDEX IF EXISTS runs_name_unique_idx;
-
-        CREATE UNIQUE INDEX IF NOT EXISTS run_drafts_name_unique_idx
-        ON run_drafts(name COLLATE NOCASE);
-
-        CREATE INDEX IF NOT EXISTS run_events_run_id_created_idx
-        ON run_events(run_id, created_at DESC, id DESC);
-
-        CREATE INDEX IF NOT EXISTS runs_status_created_idx
-        ON runs(status, created_at DESC, id DESC);
-        """
-    )
-    connection.execute("DROP INDEX IF EXISTS run_metric_samples_run_id_created_at_idx")
-    connection.execute("DROP TABLE IF EXISTS run_metric_samples")
-    connection.execute("DELETE FROM schema_version")
-    connection.execute(
-        """
-        INSERT INTO schema_version(version, applied_at)
-        VALUES (?, ?)
-        """,
-        (SCHEMA_VERSION, applied_at),
-    )
-    refresh_default_template(connection, updated_at=applied_at)
+    with manager_session(db_path) as session:
+        for version in session.scalars(select(SchemaVersionModel)):
+            session.delete(version)
+        session.add(SchemaVersionModel(version=SCHEMA_VERSION, applied_at=applied_at))
+        _refresh_default_template(session=session, updated_at=applied_at)
 
 
-def refresh_default_template(connection: sqlite3.Connection, *, updated_at: str) -> None:
-    """Upsert the built-in template using the current code defaults."""
+def refresh_default_template(db_path: Path, *, updated_at: str) -> None:
+    """Refresh the built-in template without re-running schema creation."""
 
+    with manager_session(db_path) as session:
+        _refresh_default_template(session=session, updated_at=updated_at)
+
+
+def _refresh_default_template(
+    *,
+    session: Session,
+    updated_at: str,
+) -> None:
     config = default_managed_run_config()
-    connection.execute(
-        """
-        INSERT INTO run_templates(
-            id,
-            name,
-            config_json,
-            config_hash,
-            created_at,
-            updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-            name = excluded.name,
-            config_json = excluded.config_json,
-            config_hash = excluded.config_hash,
-            updated_at = excluded.updated_at
-        """,
-        (
-            "all_cups_recurrent_ppo",
-            "All cups recurrent PPO",
-            config_json(config),
-            config_hash(config),
-            updated_at,
-            updated_at,
-        ),
+    snapshot = create_config_snapshot(
+        session,
+        kind="template",
+        config=config,
+        created_at=updated_at,
+        snapshot_id=f"cfg_template_all_cups_recurrent_ppo_{config_hash(config)[:12]}",
     )
+    upsert_template(
+        session,
+        template_id="all_cups_recurrent_ppo",
+        name="All cups recurrent PPO",
+        config_snapshot_id=snapshot.id,
+        created_at=updated_at,
+        updated_at=updated_at,
+    )
+
+
+def _has_manager_schema(table_names: set[str]) -> bool:
+    return bool(
+        table_names
+        & {
+            "schema_version",
+            "runs",
+            "run_drafts",
+            "run_templates",
+            "run_runtime",
+        }
+    )
+
+
+def _assert_current_schema(
+    *,
+    engine: Engine,
+    table_names: set[str],
+) -> None:
+    inspector = inspect(engine)
+    for table_name in CONFIG_OWNER_TABLES:
+        if table_name not in table_names:
+            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if "config_json" in columns or "config_hash" in columns:
+            raise RuntimeError(
+                "manager DB is not current: config JSON must be stored in "
+                "config_snapshots only"
+            )
+        if "config_snapshot_id" not in columns:
+            raise RuntimeError(
+                f"manager DB is not current: {table_name} is missing config_snapshot_id"
+            )
+    if "config_snapshots" not in table_names:
+        raise RuntimeError("manager DB is not current: missing config_snapshots")
+    _assert_run_foreign_keys(inspector=inspector, table_names=table_names)
+
+
+def _assert_run_foreign_keys(
+    *,
+    inspector: Inspector,
+    table_names: set[str],
+) -> None:
+    for table_name in RUN_CHILD_TABLES:
+        if table_name not in table_names:
+            raise RuntimeError(f"manager DB is not current: missing {table_name}")
+        for foreign_key in inspector.get_foreign_keys(table_name):
+            if "run_id" not in foreign_key.get("constrained_columns", ()):
+                continue
+            if foreign_key.get("referred_table") != "runs":
+                raise RuntimeError(
+                    f"manager DB is not current: {table_name}.run_id must reference runs.id"
+                )
