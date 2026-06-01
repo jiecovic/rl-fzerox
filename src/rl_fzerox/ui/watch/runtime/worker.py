@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from multiprocessing.queues import Queue as ProcessQueue
 from typing import TYPE_CHECKING
 
@@ -81,6 +82,14 @@ __all__ = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class _LiveSeriesPublishPolicy:
+    interval_seconds: float = 0.10
+
+
+_LIVE_SERIES_PUBLISH_POLICY = _LiveSeriesPublishPolicy()
+
+
 def run_simulation_worker(
     config: WatchAppConfig,
     command_queue: ProcessQueue,
@@ -128,6 +137,7 @@ def _run_simulation_loop(
         committed_action_mask_branches = env.action_mask_branches()
         cnn_visualization_enabled = False
         auxiliary_visualization_enabled = False
+        live_visualization_enabled = False
         cnn_normalization = DEFAULT_CNN_ACTIVATION_NORMALIZATION
         cnn_sampler = CnnActivationSampler(refresh_interval_steps=1)
         persistent_locked_reset_course_id: str | None = None
@@ -136,11 +146,23 @@ def _run_simulation_loop(
         track_sampling_refresh = ManagedTrackSamplingRefresh.from_config(config)
         watch_zeroed_state_features = session.watch_zeroed_state_features
         live_series = EpisodeLiveSeriesTracker()
+        last_live_series_publish_time = 0.0
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
             session.auxiliary_target_names
         )
 
         def publish_snapshot() -> None:
+            nonlocal last_live_series_publish_time
+
+            live_episode_series = None
+            if live_visualization_enabled:
+                current_time = time.perf_counter()
+                if (
+                    current_time - last_live_series_publish_time
+                    >= _LIVE_SERIES_PUBLISH_POLICY.interval_seconds
+                ):
+                    live_episode_series = live_series.snapshot()
+                    last_live_series_publish_time = current_time
             publish_worker_message(
                 snapshot_queue,
                 _build_snapshot(
@@ -175,7 +197,7 @@ def _run_simulation_loop(
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
-                    live_episode_series=live_series.snapshot(),
+                    live_episode_series=live_episode_series,
                 ),
             )
 
@@ -252,6 +274,7 @@ def _run_simulation_loop(
             while not (terminated or truncated):
                 previous_cnn_visualization_enabled = cnn_visualization_enabled
                 previous_auxiliary_visualization_enabled = auxiliary_visualization_enabled
+                previous_live_visualization_enabled = live_visualization_enabled
                 previous_cnn_normalization = cnn_normalization
                 commands, paused, manual_control_state = drain_worker_commands(
                     command_queue,
@@ -260,6 +283,7 @@ def _run_simulation_loop(
                     manual_control_enabled=manual_control_enabled,
                     cnn_visualization_enabled=cnn_visualization_enabled,
                     auxiliary_visualization_enabled=auxiliary_visualization_enabled,
+                    live_visualization_enabled=live_visualization_enabled,
                     cnn_normalization=cnn_normalization,
                 )
                 manual_control_enabled = (
@@ -269,9 +293,13 @@ def _run_simulation_loop(
                 auxiliary_visualization_enabled = (
                     bool(auxiliary_target_names) and commands.auxiliary_visualization_enabled
                 )
+                live_visualization_enabled = commands.live_visualization_enabled
                 cnn_normalization = commands.cnn_normalization
                 if commands.quit_requested:
                     return
+                if live_visualization_enabled != previous_live_visualization_enabled:
+                    last_live_series_publish_time = 0.0
+                    publish_snapshot()
                 if refresh_track_sampling() and commands.paused:
                     publish_snapshot()
                 if commands.toggle_zeroed_state_feature_name is not None:
@@ -500,6 +528,15 @@ def _run_simulation_loop(
                     info,
                     episode_done=terminated or truncated,
                 )
+                live_episode_series = None
+                if live_visualization_enabled:
+                    current_time = time.perf_counter()
+                    if (
+                        current_time - last_live_series_publish_time
+                        >= _LIVE_SERIES_PUBLISH_POLICY.interval_seconds
+                    ):
+                        live_episode_series = live_series.snapshot()
+                        last_live_series_publish_time = current_time
                 _publish_step_snapshots(
                     config=config,
                     env=env,
@@ -545,7 +582,7 @@ def _run_simulation_loop(
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
                     manual_control_enabled=manual_control_enabled,
-                    live_episode_series=live_series.snapshot(),
+                    live_episode_series=live_episode_series,
                 )
                 committed_policy_action = current_policy_action
                 committed_action_mask_branches = final_action_mask_branches

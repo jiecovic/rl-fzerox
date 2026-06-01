@@ -9,6 +9,7 @@ from rl_fzerox.ui.watch.live_series import LIVE_SERIES_LIMITS, EpisodeLiveSeries
 from rl_fzerox.ui.watch.view.panels.visuals.live import (
     _ko_star_events_summary,
     _plot_legend_rows,
+    _plot_points,
     _PlotSeries,
     _speed_summary,
 )
@@ -22,6 +23,14 @@ class _Snapshot:
     info: dict[str, object]
     episode_reward: float
     telemetry_data: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
+class _Rect:
+    x: int
+    y: int
+    width: int
+    height: int
 
 
 @dataclass(frozen=True)
@@ -383,3 +392,22 @@ def test_plot_legend_rows_include_only_labeled_series() -> None:
     )
 
     assert tuple(item.label for row in rows for item in row) == ("speed", "total")
+
+
+def test_plot_points_buckets_preserve_single_sample_spikes() -> None:
+    rect = _Rect(x=10, y=20, width=4, height=101)
+    x_values = tuple(range(20))
+    y_values = tuple(10.0 if index == 5 else 0.0 for index in range(20))
+
+    points = _plot_points(
+        x_values=x_values,
+        y_values=y_values,
+        rect=rect,
+        x_start=0,
+        x_end=19,
+        y_min=0.0,
+        span=10.0,
+    )
+
+    assert len(points) <= rect.width * 4
+    assert (11, 20) in points
