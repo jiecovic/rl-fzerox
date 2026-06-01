@@ -13,31 +13,70 @@ from rl_fzerox.core.manager.architecture import (
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 
 
-def export_web_test_fixtures() -> Path:
-    """Write frontend test fixtures from backend-owned manager defaults."""
-
+def web_test_fixture_payload() -> dict[str, object]:
+    """Return frontend test fixtures from backend-owned manager defaults."""
     config = default_managed_run_config()
-    payload = {
+    return {
         "managed_run_config": config.model_dump(mode="json"),
         "config_metadata": run_manager_config_metadata().model_dump(mode="json"),
         "policy_preview": policy_architecture_preview(config).model_dump(mode="json"),
     }
-    # ``fixtures/web.py`` moved one level deeper than the old exporter module,
-    # so this intentionally walks to the repo root before targeting the web app.
-    output_path = (
+
+
+def web_test_fixture_text() -> str:
+    return json.dumps(web_test_fixture_payload(), indent=2, sort_keys=True) + "\n"
+
+
+def web_test_fixture_output_path() -> Path:
+    return (
         Path(__file__).resolve().parents[5]
         / "src/rl_fzerox/apps/run_manager/web/src/test/generated/manager-fixtures.json"
     )
+
+
+def export_web_test_fixtures() -> Path:
+    """Write frontend test fixtures from backend-owned manager defaults."""
+
+    output_path = web_test_fixture_output_path()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    output_path.write_text(web_test_fixture_text(), encoding="utf-8")
     return output_path
 
 
+def check_web_test_fixtures() -> bool:
+    """Return whether checked-in frontend fixtures match backend defaults."""
+
+    output_path = web_test_fixture_output_path()
+    if not output_path.exists():
+        return False
+    try:
+        checked_in_payload = json.loads(output_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return False
+    return checked_in_payload == web_test_fixture_payload()
+
+
 def main() -> None:
-    export_web_test_fixtures()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Export run-manager frontend fixtures")
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail if the checked-in generated fixture is stale",
+    )
+    args = parser.parse_args()
+
+    if not args.check:
+        export_web_test_fixtures()
+        return
+
+    if check_web_test_fixtures():
+        return
+    raise SystemExit(
+        "run-manager frontend fixtures are stale; run npm run sync-fixtures "
+        "--prefix src/rl_fzerox/apps/run_manager/web"
+    )
 
 
 if __name__ == "__main__":
