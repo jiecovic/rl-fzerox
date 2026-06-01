@@ -7,6 +7,7 @@ import pytest
 
 from rl_fzerox.ui.watch.live_series import LIVE_SERIES_LIMITS, EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.visuals.live import (
+    LIVE_CHART_STYLE,
     _ko_star_events_summary,
     _plot_legend_rows,
     _plot_points,
@@ -411,3 +412,21 @@ def test_plot_points_buckets_preserve_single_sample_spikes() -> None:
 
     assert len(points) <= rect.width * 4
     assert (11, 20) in points
+
+
+def test_plot_points_caps_wide_plot_buckets() -> None:
+    rect = _Rect(x=0, y=0, width=1_200, height=101)
+    x_values = tuple(range(8_000))
+    y_values = tuple(10.0 if index % 997 == 0 else 0.0 for index in x_values)
+
+    points = _plot_points(
+        x_values=x_values,
+        y_values=y_values,
+        rect=rect,
+        x_start=0,
+        x_end=7_999,
+        y_min=0.0,
+        span=10.0,
+    )
+
+    assert len(points) <= LIVE_CHART_STYLE.plot_max_buckets * 4
