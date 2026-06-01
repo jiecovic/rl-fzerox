@@ -25,7 +25,6 @@ const emptyGenerationStats = {
   generation_ema_completion_fraction: null,
   generated_course_slot: null,
   generated_course_generation: null,
-  generated_replacement_count: 0,
 } as const;
 
 describe("RunTrackPoolPanel", () => {
@@ -486,7 +485,7 @@ function xCupTrackSamplingState(): TrackSamplingRuntimeState {
       success_rate: index / Math.max(index + 1, 1),
       ...emptyGenerationStats,
       generated_course_slot: index,
-      generated_course_generation: index,
+      generated_course_generation: index + 1,
       target_step_share: 0.5,
       completed_frames: (index + 1) * 600,
       completed_env_steps: (index + 1) * 300,

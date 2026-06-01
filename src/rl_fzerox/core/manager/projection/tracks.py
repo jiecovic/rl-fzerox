@@ -91,7 +91,7 @@ def _track_sampling_entries(config: ManagedRunConfig) -> list[dict[str, object]]
             generated_course = generated_x_cup_course_identity(
                 master_seed=config.seed,
                 slot=x_cup_index,
-                generation=0,
+                generation=1,
                 gp_difficulty=(
                     default_gp_difficulty()
                     if config.tracks.gp_difficulty is None

@@ -494,8 +494,7 @@ export const trackSamplingRuntimeEntrySchema = z.object({
   ema_episode_frames: z.number().nonnegative().nullable(),
   ema_completion_fraction: z.number().min(0).max(1).nullable(),
   generated_course_slot: z.number().int().nonnegative().nullable(),
-  generated_course_generation: z.number().int().nonnegative().nullable(),
-  generated_replacement_count: z.number().int().nonnegative(),
+  generated_course_generation: z.number().int().positive().nullable(),
 });
 
 export const trackSamplingRuntimeStateSchema = z.object({

@@ -27,7 +27,6 @@ export type TrackPoolCourseView = {
   generationSuccessRate: number | null;
   generationSuccessSampleCount: number | null;
   generatedCourseGeneration: number | null;
-  generatedReplacementCount: number;
   generatedCourseSlot: number | null;
   id: string;
   label: string;

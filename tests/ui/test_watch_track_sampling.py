@@ -164,7 +164,6 @@ def _runtime_state(baseline_path: Path) -> TrackSamplingRuntimeState:
                 ema_completion_fraction=None,
                 generated_course_slot=0,
                 generated_course_generation=3,
-                generated_replacement_count=2,
                 generated_entry_id="x_cup_new",
                 generated_course_id="x_cup_new",
                 generated_course_name="X Cup new",

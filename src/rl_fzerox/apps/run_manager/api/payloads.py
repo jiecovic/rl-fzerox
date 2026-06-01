@@ -195,7 +195,6 @@ def track_sampling_state_payload(
                 "ema_completion_fraction": entry.ema_completion_fraction,
                 "generated_course_slot": entry.generated_course_slot,
                 "generated_course_generation": entry.generated_course_generation,
-                "generated_replacement_count": entry.generated_replacement_count,
             }
             for entry in state.entries
         ],

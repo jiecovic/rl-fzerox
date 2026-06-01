@@ -8,7 +8,7 @@ import sqlite3
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 15
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -90,10 +90,51 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             FOREIGN KEY(run_id) REFERENCES runs(id)
         );
 
-        CREATE TABLE IF NOT EXISTS run_track_sampling_state (
+        CREATE TABLE IF NOT EXISTS run_track_sampling_runtime (
             run_id TEXT PRIMARY KEY,
-            state_json TEXT NOT NULL,
+            sampling_mode TEXT NOT NULL,
+            action_repeat INTEGER NOT NULL,
+            update_episodes INTEGER NOT NULL,
+            ema_alpha REAL NOT NULL,
+            max_weight_scale REAL NOT NULL,
+            adaptive_completion_weight REAL NOT NULL,
+            adaptive_target_completion REAL NOT NULL,
+            adaptive_min_confidence_episodes INTEGER NOT NULL,
+            adaptive_confidence_scale REAL NOT NULL,
+            update_count INTEGER NOT NULL,
+            episodes_since_update INTEGER NOT NULL,
             updated_at TEXT NOT NULL,
+            FOREIGN KEY(run_id) REFERENCES runs(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS run_track_sampling_entries (
+            run_id TEXT NOT NULL,
+            course_key TEXT NOT NULL,
+            track_id TEXT NOT NULL,
+            label TEXT NOT NULL,
+            base_weight REAL NOT NULL,
+            current_weight REAL NOT NULL,
+            completed_frames INTEGER NOT NULL,
+            episode_count INTEGER NOT NULL,
+            finished_episode_count INTEGER NOT NULL,
+            success_sample_count INTEGER NOT NULL,
+            ema_episode_frames REAL,
+            ema_completion_fraction REAL,
+            generation_episode_count INTEGER NOT NULL,
+            generation_finished_episode_count INTEGER NOT NULL,
+            generation_success_sample_count INTEGER NOT NULL,
+            generation_ema_completion_fraction REAL,
+            generated_course_slot INTEGER,
+            generated_course_generation INTEGER,
+            generated_entry_id TEXT,
+            generated_course_id TEXT,
+            generated_course_name TEXT,
+            generated_course_hash TEXT,
+            generated_course_seed INTEGER,
+            generated_baseline_state_path TEXT,
+            generated_course_segment_count INTEGER,
+            generated_course_length REAL,
+            PRIMARY KEY(run_id, course_key),
             FOREIGN KEY(run_id) REFERENCES runs(id)
         );
 

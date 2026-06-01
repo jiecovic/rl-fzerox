@@ -702,7 +702,7 @@ def test_manager_training_bridge_adds_generated_x_cup_entries(
     assert all(entry.generated_course_seed is not None for entry in entries)
     assert all(entry.generated_course_hash is not None for entry in entries)
     assert {entry.generated_course_slot for entry in entries} == {0, 1}
-    assert {entry.generated_course_generation for entry in entries} == {0}
+    assert {entry.generated_course_generation for entry in entries} == {1}
 
 
 def test_manager_config_omits_gp_difficulty_outside_gp_race() -> None:

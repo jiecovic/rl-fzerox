@@ -88,7 +88,6 @@ def track_sampling_runtime_state_json(state: TrackSamplingRuntimeState) -> str:
                 "generation_ema_completion_fraction": entry.generation_ema_completion_fraction,
                 "generated_course_slot": entry.generated_course_slot,
                 "generated_course_generation": entry.generated_course_generation,
-                "generated_replacement_count": entry.generated_replacement_count,
                 "generated_entry_id": entry.generated_entry_id,
                 "generated_course_id": entry.generated_course_id,
                 "generated_course_name": entry.generated_course_name,
@@ -209,7 +208,6 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
             raw_entry,
             "generated_course_generation",
         )
-        generated_replacement_count = _mapping_int(raw_entry, "generated_replacement_count")
         generated_entry_id = _mapping_optional_str(raw_entry, "generated_entry_id")
         generated_course_id = _mapping_optional_str(raw_entry, "generated_course_id")
         generated_course_name = _mapping_optional_str(raw_entry, "generated_course_name")
@@ -298,11 +296,7 @@ def _runtime_entries_from_data(raw_entries: list[object]) -> list[TrackSamplingR
                 generated_course_generation=(
                     None
                     if generated_course_generation is None
-                    else max(0, generated_course_generation)
-                ),
-                generated_replacement_count=_replacement_count(
-                    explicit_count=generated_replacement_count,
-                    generation=generated_course_generation,
+                    else max(1, generated_course_generation)
                 ),
                 generated_entry_id=generated_entry_id,
                 generated_course_id=generated_course_id,
@@ -365,11 +359,3 @@ def _mapping_optional_float(mapping: Mapping[str, Any], key: str) -> float | Non
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value)
-
-
-def _replacement_count(*, explicit_count: int | None, generation: int | None) -> int:
-    if explicit_count is not None:
-        return max(0, explicit_count)
-    if generation is None:
-        return 0
-    return max(0, generation - 1)

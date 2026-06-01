@@ -211,7 +211,6 @@ def test_track_sampling_payload_uses_runtime_generated_x_cup_metadata() -> None:
                 ema_completion_fraction=0.2,
                 generated_course_slot=1,
                 generated_course_generation=4,
-                generated_replacement_count=3,
             ),
         ),
     )
@@ -224,7 +223,6 @@ def test_track_sampling_payload_uses_runtime_generated_x_cup_metadata() -> None:
     assert isinstance(entry_payload, dict)
     assert entry_payload["generated_course_slot"] == 1
     assert entry_payload["generated_course_generation"] == 4
-    assert entry_payload["generated_replacement_count"] == 3
 
 
 def test_replace_runtime_generation_keeps_slot_history_and_resets_current_generation() -> None:
@@ -259,7 +257,7 @@ def test_replace_runtime_generation_keeps_slot_history_and_resets_current_genera
                 generation_success_sample_count=20,
                 generation_ema_completion_fraction=0.95,
                 generated_course_slot=0,
-                generated_course_generation=0,
+                generated_course_generation=1,
             ),
         ),
     )
@@ -269,7 +267,7 @@ def test_replace_runtime_generation_keeps_slot_history_and_resets_current_genera
         course_key=slot_key,
         replacement_label="X Cup new",
         generated_course_slot=0,
-        generated_course_generation=1,
+        generated_course_generation=2,
         generated_entry_id="x_cup_new_gp_race",
         generated_course_id="x_cup_new",
         generated_course_name="X Cup new",
@@ -290,8 +288,7 @@ def test_replace_runtime_generation_keeps_slot_history_and_resets_current_genera
     assert entry.generation_episode_count == 0
     assert entry.generation_success_sample_count == 0
     assert entry.generation_ema_completion_fraction is None
-    assert entry.generated_course_generation == 1
-    assert entry.generated_replacement_count == 1
+    assert entry.generated_course_generation == 2
 
 
 def test_adaptive_step_balance_controller_tilts_weight_toward_lower_completion() -> None:

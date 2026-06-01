@@ -67,7 +67,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
         generated_course_seed=1,
         generated_course_hash="old",
         generated_course_slot=0,
-        generated_course_generation=0,
+        generated_course_generation=1,
         log_per_course=False,
     )
     env_config = EnvConfig(
@@ -145,7 +145,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
                 generation_success_sample_count=3,
                 generation_ema_completion_fraction=0.95,
                 generated_course_slot=0,
-                generated_course_generation=0,
+                generated_course_generation=1,
                 generated_entry_id="x_cup_old_gp_race_novice_blue_falcon_balanced",
                 generated_course_id="x_cup_old",
                 generated_course_name="X Cup old",
@@ -164,7 +164,7 @@ def test_x_cup_rotation_replaces_solved_slot_and_prunes_past_inactive_buffer(
     assert replacement.course_id != "x_cup_old"
     assert replacement.runtime_course_key == slot_key
     assert replacement.generated_course_slot == 0
-    assert replacement.generated_course_generation == 1
+    assert replacement.generated_course_generation == 2
     assert replacement.baseline_state_path == new_state_path
     assert replacement.generated_course_segment_count == 123
 

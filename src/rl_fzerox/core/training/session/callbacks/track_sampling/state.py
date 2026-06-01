@@ -24,7 +24,6 @@ class TrackSamplingRuntimeEntry:
     generation_ema_completion_fraction: float | None = None
     generated_course_slot: int | None = None
     generated_course_generation: int | None = None
-    generated_replacement_count: int = 0
     generated_entry_id: str | None = None
     generated_course_id: str | None = None
     generated_course_name: str | None = None
@@ -155,7 +154,6 @@ def aggregate_runtime_entries(
                 generation_ema_completion_fraction=entry.generation_ema_completion_fraction,
                 generated_course_slot=entry.generated_course_slot,
                 generated_course_generation=entry.generated_course_generation,
-                generated_replacement_count=entry.generated_replacement_count,
                 generated_entry_id=entry.generated_entry_id,
                 generated_course_id=entry.generated_course_id,
                 generated_course_name=entry.generated_course_name,
@@ -198,10 +196,6 @@ def aggregate_runtime_entries(
             generated_course_generation=_merged_optional_int(
                 existing.generated_course_generation,
                 entry.generated_course_generation,
-            ),
-            generated_replacement_count=max(
-                existing.generated_replacement_count,
-                entry.generated_replacement_count,
             ),
             generated_entry_id=_merged_optional_str(
                 existing.generated_entry_id,
@@ -303,7 +297,6 @@ def _replacement_runtime_entry(
         generation_ema_completion_fraction=None,
         generated_course_slot=generated_course_slot,
         generated_course_generation=generated_course_generation,
-        generated_replacement_count=entry.generated_replacement_count + 1,
         generated_entry_id=generated_entry_id,
         generated_course_id=generated_course_id,
         generated_course_name=generated_course_name,

@@ -54,7 +54,6 @@ class StepBalancedTrackSamplingController:
         track_log_enabled: dict[str, bool] | None = None,
         track_generated_course_slots: dict[str, int] | None = None,
         track_generated_course_generations: dict[str, int] | None = None,
-        track_generated_replacement_counts: dict[str, int] | None = None,
         track_generated_entry_ids: dict[str, str] | None = None,
         track_generated_course_ids: dict[str, str] | None = None,
         track_generated_course_names: dict[str, str] | None = None,
@@ -83,7 +82,6 @@ class StepBalancedTrackSamplingController:
         course_log_enabled: dict[str, bool] = {}
         course_generated_slots: dict[str, int] = {}
         course_generated_generations: dict[str, int] = {}
-        course_generated_replacement_counts: dict[str, int] = {}
         course_generated_entry_ids: dict[str, str] = {}
         course_generated_course_ids: dict[str, str] = {}
         course_generated_course_names: dict[str, str] = {}
@@ -99,7 +97,6 @@ class StepBalancedTrackSamplingController:
             course_key = course_keys[track_id]
             generated_slot = (track_generated_course_slots or {}).get(track_id)
             generated_generation = (track_generated_course_generations or {}).get(track_id)
-            generated_replacement_count = (track_generated_replacement_counts or {}).get(track_id)
             generated_entry_id = (track_generated_entry_ids or {}).get(track_id)
             generated_course_id = (track_generated_course_ids or {}).get(track_id)
             generated_course_name = (track_generated_course_names or {}).get(track_id)
@@ -128,11 +125,6 @@ class StepBalancedTrackSamplingController:
                 course_generated_slots.setdefault(course_key, generated_slot)
             if generated_generation is not None:
                 course_generated_generations.setdefault(course_key, generated_generation)
-            if generated_replacement_count is not None:
-                course_generated_replacement_counts.setdefault(
-                    course_key,
-                    max(0, generated_replacement_count),
-                )
             if generated_entry_id is not None:
                 course_generated_entry_ids.setdefault(course_key, generated_entry_id)
             if generated_course_id is not None:
@@ -171,7 +163,6 @@ class StepBalancedTrackSamplingController:
         self._course_log_enabled = course_log_enabled
         self._course_generated_slots = course_generated_slots
         self._course_generated_generations = course_generated_generations
-        self._course_generated_replacement_counts = course_generated_replacement_counts
         self._course_generated_entry_ids = course_generated_entry_ids
         self._course_generated_course_ids = course_generated_course_ids
         self._course_generated_course_names = course_generated_course_names
@@ -227,7 +218,6 @@ class StepBalancedTrackSamplingController:
         requested_labels: dict[str, str] = {}
         requested_generated_slots: dict[str, int] = {}
         requested_generated_generations: dict[str, int] = {}
-        requested_generated_replacement_counts: dict[str, int] = {}
         requested_generated_entry_ids: dict[str, str] = {}
         requested_generated_course_ids: dict[str, str] = {}
         requested_generated_course_names: dict[str, str] = {}
@@ -253,10 +243,6 @@ class StepBalancedTrackSamplingController:
                     requested_generated_generations.setdefault(
                         entry.id,
                         int(entry.generated_course_generation),
-                    )
-                    requested_generated_replacement_counts.setdefault(
-                        entry.id,
-                        max(0, int(entry.generated_course_generation) - 1),
                     )
                 if entry.generated_course_slot is not None:
                     requested_generated_entry_ids.setdefault(entry.id, entry.id)
@@ -316,7 +302,6 @@ class StepBalancedTrackSamplingController:
             track_log_enabled=requested_log_enabled,
             track_generated_course_slots=requested_generated_slots,
             track_generated_course_generations=requested_generated_generations,
-            track_generated_replacement_counts=requested_generated_replacement_counts,
             track_generated_entry_ids=requested_generated_entry_ids,
             track_generated_course_ids=requested_generated_course_ids,
             track_generated_course_names=requested_generated_course_names,
@@ -444,9 +429,6 @@ class StepBalancedTrackSamplingController:
                     generation_ema_completion_fraction=(stats.generation_ema_completion_fraction),
                     generated_course_slot=self._course_generated_slots.get(course_key),
                     generated_course_generation=self._course_generated_generations.get(course_key),
-                    generated_replacement_count=(
-                        self._course_generated_replacement_counts.get(course_key, 0)
-                    ),
                     generated_entry_id=self._course_generated_entry_ids.get(course_key),
                     generated_course_id=self._course_generated_course_ids.get(course_key),
                     generated_course_name=self._course_generated_course_names.get(course_key),
@@ -623,10 +605,6 @@ class StepBalancedTrackSamplingController:
                 self._course_generated_slots[course_key] = entry.generated_course_slot
             if entry.generated_course_generation is not None:
                 self._course_generated_generations[course_key] = entry.generated_course_generation
-            self._course_generated_replacement_counts[course_key] = max(
-                0,
-                int(entry.generated_replacement_count),
-            )
             if entry.generated_entry_id is not None:
                 self._course_generated_entry_ids[course_key] = entry.generated_entry_id
             if entry.generated_course_id is not None:
