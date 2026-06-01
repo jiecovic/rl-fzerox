@@ -24,6 +24,7 @@ class _LiveChartStyle:
     plot_gap: int = 8
     plot_height: int = 184
     plot_min_width: int = 120
+    plot_max_buckets: int = 240
     plot_axis_width: int = 42
     axis_label_gap: int = 3
     legend_margin: int = 6
@@ -73,6 +74,123 @@ class _PlotLegendItem:
     label: str
     color: tuple[int, int, int]
     width: int
+
+
+@dataclass(frozen=True, slots=True)
+class _FloatTupleStats:
+    minimum: float
+    maximum: float
+    average: float
+    max_abs: float
+
+
+@dataclass(slots=True)
+class _FloatTupleStatsCacheEntry:
+    values: tuple[float, ...]
+    stats: _FloatTupleStats
+
+
+@dataclass(slots=True)
+class _FloatTupleStatsCache:
+    max_entries: int
+    entries: list[_FloatTupleStatsCacheEntry]
+
+    def stats_for(self, values: tuple[float, ...]) -> _FloatTupleStats:
+        for entry in reversed(self.entries):
+            if entry.values is values:
+                return entry.stats
+        stats = _compute_float_tuple_stats(values)
+        self.entries.append(_FloatTupleStatsCacheEntry(values=values, stats=stats))
+        del self.entries[: max(0, len(self.entries) - self.max_entries)]
+        return stats
+
+
+@dataclass(frozen=True, slots=True)
+class _PlotGeometry:
+    rect_x: int
+    rect_y: int
+    rect_width: int
+    rect_height: int
+    x_start: int
+    x_end: int
+    y_min: float
+    span: float
+    bucket_count: int | None
+
+
+@dataclass(slots=True)
+class _PlotPointsCacheEntry:
+    x_values: tuple[int, ...]
+    y_values: tuple[float, ...]
+    geometry: _PlotGeometry
+    points: tuple[tuple[int, int], ...]
+
+
+@dataclass(slots=True)
+class _PlotPointsCache:
+    max_entries: int
+    entries: list[_PlotPointsCacheEntry]
+
+    def points_for(
+        self,
+        *,
+        x_values: tuple[int, ...],
+        y_values: tuple[float, ...],
+        geometry: _PlotGeometry,
+    ) -> tuple[tuple[int, int], ...] | None:
+        for entry in reversed(self.entries):
+            if (
+                entry.x_values is x_values
+                and entry.y_values is y_values
+                and entry.geometry == geometry
+            ):
+                return entry.points
+        return None
+
+    def store(
+        self,
+        *,
+        x_values: tuple[int, ...],
+        y_values: tuple[float, ...],
+        geometry: _PlotGeometry,
+        points: tuple[tuple[int, int], ...],
+    ) -> tuple[tuple[int, int], ...]:
+        self.entries.append(
+            _PlotPointsCacheEntry(
+                x_values=x_values,
+                y_values=y_values,
+                geometry=geometry,
+                points=points,
+            )
+        )
+        del self.entries[: max(0, len(self.entries) - self.max_entries)]
+        return points
+
+
+_FLOAT_TUPLE_STATS_CACHE = _FloatTupleStatsCache(max_entries=96, entries=[])
+_PLOT_POINTS_CACHE = _PlotPointsCache(max_entries=96, entries=[])
+
+
+def _compute_float_tuple_stats(values: tuple[float, ...]) -> _FloatTupleStats:
+    if not values:
+        return _FloatTupleStats(
+            minimum=0.0,
+            maximum=0.0,
+            average=0.0,
+            max_abs=0.0,
+        )
+    minimum = min(values)
+    maximum = max(values)
+    return _FloatTupleStats(
+        minimum=minimum,
+        maximum=maximum,
+        average=sum(values) / len(values),
+        max_abs=max(abs(value) for value in values),
+    )
+
+
+def _float_tuple_stats(values: tuple[float, ...]) -> _FloatTupleStats:
+    return _FLOAT_TUPLE_STATS_CACHE.stats_for(values)
 
 
 def _draw_live_tab(
@@ -490,8 +608,9 @@ def _plot_value_range(
     y_max = 0.0
     for line in series:
         if line.y_values:
-            y_min = min(y_min, min(line.y_values))
-            y_max = max(y_max, max(line.y_values))
+            stats = _float_tuple_stats(line.y_values)
+            y_min = min(y_min, stats.minimum)
+            y_max = max(y_max, stats.maximum)
     for line in reference_lines:
         y_min = min(y_min, line.value)
         y_max = max(y_max, line.value)
@@ -507,10 +626,30 @@ def _plot_points(
     x_end: int,
     y_min: float,
     span: float,
-) -> list[tuple[int, int]]:
+) -> tuple[tuple[int, int], ...]:
     point_count = min(len(x_values), len(y_values))
-    if point_count <= rect.width * 2:
-        return [
+    bucket_count = _plot_bucket_count(point_count=point_count, rect_width=rect.width)
+    geometry = _PlotGeometry(
+        rect_x=rect.x,
+        rect_y=rect.y,
+        rect_width=rect.width,
+        rect_height=rect.height,
+        x_start=x_start,
+        x_end=x_end,
+        y_min=y_min,
+        span=span,
+        bucket_count=bucket_count,
+    )
+    cached_points = _PLOT_POINTS_CACHE.points_for(
+        x_values=x_values,
+        y_values=y_values,
+        geometry=geometry,
+    )
+    if cached_points is not None:
+        return cached_points
+
+    if bucket_count is None:
+        points = tuple(
             _plot_point(
                 step=step,
                 value=value,
@@ -519,9 +658,16 @@ def _plot_points(
                 x_end=x_end,
                 y_min=y_min,
                 span=span,
+                bucket_count=None,
             )
             for step, value in zip(x_values, y_values, strict=False)
-        ]
+        )
+        return _PLOT_POINTS_CACHE.store(
+            x_values=x_values,
+            y_values=y_values,
+            geometry=geometry,
+            points=points,
+        )
 
     bucketed: list[tuple[int, int]] = []
     bucket: _PlotPixelBucket | None = None
@@ -534,6 +680,7 @@ def _plot_points(
             x_end=x_end,
             y_min=y_min,
             span=span,
+            bucket_count=bucket_count,
         )
         if bucket is None:
             bucket = _PlotPixelBucket.from_point(point_x, point_y)
@@ -546,7 +693,18 @@ def _plot_points(
 
     if bucket is not None:
         bucket.append_to(bucketed)
-    return bucketed
+    return _PLOT_POINTS_CACHE.store(
+        x_values=x_values,
+        y_values=y_values,
+        geometry=geometry,
+        points=tuple(bucketed),
+    )
+
+
+def _plot_bucket_count(*, point_count: int, rect_width: int) -> int | None:
+    if point_count <= rect_width * 2:
+        return None
+    return max(1, min(rect_width, LIVE_CHART_STYLE.plot_max_buckets))
 
 
 def _plot_point(
@@ -558,11 +716,35 @@ def _plot_point(
     x_end: int,
     y_min: float,
     span: float,
+    bucket_count: int | None,
 ) -> tuple[int, int]:
     return (
-        rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
+        _plot_x(
+            step=step,
+            rect=rect,
+            x_start=x_start,
+            x_end=x_end,
+            bucket_count=bucket_count,
+        ),
         rect.y + rect.height - 1 - int(round((value - y_min) / span * max(1, rect.height - 1))),
     )
+
+
+def _plot_x(
+    *,
+    step: int,
+    rect: PygameRect,
+    x_start: int,
+    x_end: int,
+    bucket_count: int | None,
+) -> int:
+    ratio = (step - x_start) / (x_end - x_start)
+    if bucket_count is None:
+        return rect.x + int(round(ratio * max(1, rect.width - 1)))
+    if bucket_count <= 1:
+        return rect.x
+    bucket_index = int(round(ratio * (bucket_count - 1)))
+    return rect.x + int(round(bucket_index / (bucket_count - 1) * max(1, rect.width - 1)))
 
 
 @dataclass(slots=True)
@@ -883,14 +1065,14 @@ def _speed_reference_lines(
 
 
 def _episode_average_speed(live_series: EpisodeLiveSeriesSnapshot) -> float:
-    return sum(live_series.speed_kph) / len(live_series.speed_kph)
+    return _float_tuple_stats(live_series.speed_kph).average
 
 
 def _step_reward_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.step_rewards:
         return "now - · avg - · max progress -"
     current_reward = live_series.step_rewards[-1]
-    average_reward = sum(live_series.step_rewards) / len(live_series.step_rewards)
+    average_reward = _float_tuple_stats(live_series.step_rewards).average
     max_progress = live_series.max_progress * 100.0
     return (
         f"now {current_reward:+.4f} · avg {average_reward:+.4f} · max progress {max_progress:.1f}%"
@@ -909,16 +1091,26 @@ def _multiplier_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
 def _multiplier_range(live_series: EpisodeLiveSeriesSnapshot | None) -> tuple[float, float] | None:
     if live_series is None:
         return None
-    values = (
-        *live_series.progress_speed_multiplier,
-        *live_series.position_progress_multiplier,
-        *live_series.progress_speed_position_multiplier,
+    if not live_series.progress_speed_multiplier:
+        return None
+    speed_stats = _float_tuple_stats(live_series.progress_speed_multiplier)
+    position_stats = _float_tuple_stats(live_series.position_progress_multiplier)
+    total_stats = _float_tuple_stats(live_series.progress_speed_position_multiplier)
+    lower = max(
+        0.0,
+        min(
+            speed_stats.minimum,
+            position_stats.minimum,
+            total_stats.minimum,
+            1.0,
+        ),
+    )
+    upper = max(
+        speed_stats.maximum,
+        position_stats.maximum,
+        total_stats.maximum,
         1.0,
     )
-    if not values:
-        return None
-    lower = max(0.0, min(values))
-    upper = max(values)
     if lower == upper:
         return (max(0.0, lower - 0.1), upper + 0.1)
     padding = max(0.05, (upper - lower) * 0.1)
@@ -929,7 +1121,7 @@ def _edge_ratio_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     if live_series is None or not live_series.edge_ratio:
         return "now - · max |ratio| -"
     current_ratio = live_series.edge_ratio[-1]
-    max_absolute_ratio = max(abs(value) for value in live_series.edge_ratio)
+    max_absolute_ratio = _float_tuple_stats(live_series.edge_ratio).max_abs
     return f"now {current_ratio:+.3f} · max |ratio| {max_absolute_ratio:.3f}"
 
 
@@ -939,7 +1131,7 @@ def _outside_edge_excess_ratio_summary(
     if live_series is None or not live_series.outside_edge_excess_ratio:
         return "now - · max -"
     current_excess = live_series.outside_edge_excess_ratio[-1]
-    max_excess = max(live_series.outside_edge_excess_ratio)
+    max_excess = _float_tuple_stats(live_series.outside_edge_excess_ratio).maximum
     return f"now {current_excess:.3f} · max {max_excess:.3f}"
 
 
@@ -947,5 +1139,5 @@ def _height_above_ground_summary(live_series: EpisodeLiveSeriesSnapshot | None) 
     if live_series is None or not live_series.height_above_ground:
         return "now - · max -"
     current_height = live_series.height_above_ground[-1]
-    max_height = max(live_series.height_above_ground)
+    max_height = _float_tuple_stats(live_series.height_above_ground).maximum
     return f"now {current_height:.1f} · max {max_height:.1f}"
