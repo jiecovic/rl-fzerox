@@ -23,7 +23,7 @@ export function resetAuxiliaryBranchesAction({
     include_boost: checkpointLocked ? action.include_boost : defaultAction.include_boost,
     enable_boost: defaultAction.enable_boost,
     mask_boost_when_active: defaultAction.mask_boost_when_active,
-    boost_decision_interval_frames: defaultAction.boost_decision_interval_frames,
+    boost_decision_interval_steps: defaultAction.boost_decision_interval_steps,
     boost_request_lockout_frames: defaultAction.boost_request_lockout_frames,
     boost_unmask_max_speed_kph: defaultAction.boost_unmask_max_speed_kph,
     boost_min_energy_fraction: defaultAction.boost_min_energy_fraction,

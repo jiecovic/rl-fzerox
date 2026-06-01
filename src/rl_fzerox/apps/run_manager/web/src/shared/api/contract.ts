@@ -178,7 +178,7 @@ const actionConfigSchema = z
     include_boost: z.boolean(),
     enable_boost: z.boolean(),
     mask_boost_when_active: z.boolean(),
-    boost_decision_interval_frames: z.number().int().positive(),
+    boost_decision_interval_steps: z.number().int().positive(),
     boost_request_lockout_frames: z.number().int().nonnegative(),
     boost_unmask_max_speed_kph: z.number().nonnegative().nullable(),
     boost_min_energy_fraction: z.number().min(0).max(1),
