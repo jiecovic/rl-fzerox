@@ -16,6 +16,7 @@ from rl_fzerox.core.policy.auxiliary_state import (
     auxiliary_state_target_values,
 )
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig, WatchAppConfig
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.runtime.episode import _update_best_finish_position
 from rl_fzerox.ui.watch.runtime.ipc import (
@@ -115,6 +116,7 @@ def _publish_step_snapshots(
     previous_auxiliary_targets: dict[str, object] | None = None,
     final_auxiliary_predictions: dict[str, object] | None = None,
     final_auxiliary_targets: dict[str, object] | None = None,
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
 ) -> None:
     resolved_control_state = control_state
     if previous_control_state is None:
@@ -216,6 +218,7 @@ def _publish_step_snapshots(
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),
                 policy_decision_frame=is_final_frame,
+                live_episode_series=live_episode_series,
             ),
         )
         if frame_interval_seconds is not None and not is_final_frame:
@@ -300,6 +303,7 @@ def _build_snapshot(
     action_hold_frame: int = 1,
     action_hold_frames: int = 1,
     policy_decision_frame: bool = True,
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None,
 ) -> WatchSnapshot:
     if telemetry is None:
         telemetry = _read_live_telemetry(emulator)
@@ -370,6 +374,7 @@ def _build_snapshot(
         action_hold_frame=max(1, int(action_hold_frame)),
         action_hold_frames=max(1, int(action_hold_frames)),
         policy_decision_frame=bool(policy_decision_frame),
+        live_episode_series=live_episode_series,
     )
 
 

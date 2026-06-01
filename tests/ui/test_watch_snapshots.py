@@ -8,6 +8,7 @@ import numpy as np
 from fzerox_emulator import RaceControlState
 from fzerox_emulator.arrays import RgbFrame
 from rl_fzerox.core.runtime_spec.schema import EmulatorConfig, WatchAppConfig
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.snapshots import _publish_step_snapshots
 
@@ -69,6 +70,23 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
     )
     queue = _SnapshotQueue()
     policy_action = np.array([7, 1], dtype=np.int64)
+    live_series = EpisodeLiveSeriesSnapshot(
+        episode=4,
+        env_steps=(1,),
+        speed_kph=(640.0,),
+        step_rewards=(12.5,),
+        progress_speed_multiplier=(1.0,),
+        position_progress_multiplier=(1.0,),
+        progress_speed_position_multiplier=(1.0,),
+        edge_ratio=(0.0,),
+        outside_edge_excess_ratio=(0.0,),
+        height_above_ground=(0.0,),
+        ko_star_events=(),
+        current_ko_star_count=0,
+        current_return=12.5,
+        current_progress=0.1,
+        max_progress=0.1,
+    )
 
     _publish_step_snapshots(
         config=config,
@@ -106,6 +124,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         latest_finish_times={"mute": 101_000},
         latest_finish_deltas_ms={"mute": 3_000},
         failed_track_attempts=frozenset({"silence"}),
+        live_episode_series=live_series,
     )
 
     snapshots: list[WatchSnapshot] = []
@@ -142,6 +161,7 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert snapshot.latest_finish_times == {"mute": 101_000}
         assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
         assert snapshot.failed_track_attempts == frozenset({"silence"})
+        assert snapshot.live_episode_series is live_series
 
 
 def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Path) -> None:

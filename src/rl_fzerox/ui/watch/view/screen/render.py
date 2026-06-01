@@ -11,11 +11,11 @@ from rl_fzerox.core.runtime_spec.schema import (
     TrackSamplingEntryConfig,
     WatchAppConfig,
 )
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.ipc import WatchSnapshot
 from rl_fzerox.ui.watch.runtime.telemetry import _telemetry_from_data
 from rl_fzerox.ui.watch.runtime.timing import RateMeter
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
-from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.screen.frame import FrameRenderData, _draw_frame
 from rl_fzerox.ui.watch.view.screen.types import (
     PygameModule,

@@ -1,6 +1,7 @@
-# src/rl_fzerox/ui/watch/view/live_episode.py
+# src/rl_fzerox/ui/watch/live_series.py
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -32,6 +33,29 @@ class KoStarRewardEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class LiveSeriesLimits:
+    """Bound watch chart history so video responsiveness stays independent."""
+
+    max_samples: int = 8_192
+    max_ko_events: int = 64
+
+
+LIVE_SERIES_LIMITS = LiveSeriesLimits()
+
+
+def _int_buffer() -> deque[int]:
+    return deque(maxlen=LIVE_SERIES_LIMITS.max_samples)
+
+
+def _float_buffer() -> deque[float]:
+    return deque(maxlen=LIVE_SERIES_LIMITS.max_samples)
+
+
+def _ko_star_event_buffer() -> deque[KoStarRewardEvent]:
+    return deque(maxlen=LIVE_SERIES_LIMITS.max_ko_events)
+
+
+@dataclass(frozen=True, slots=True)
 class EpisodeLiveSeriesSnapshot:
     episode: int
     env_steps: tuple[int, ...]
@@ -53,16 +77,16 @@ class EpisodeLiveSeriesSnapshot:
 @dataclass(slots=True)
 class EpisodeLiveSeriesTracker:
     episode: int | None = None
-    env_steps: list[int] = field(default_factory=list)
-    speed_kph: list[float] = field(default_factory=list)
-    step_rewards: list[float] = field(default_factory=list)
-    progress_speed_multiplier: list[float] = field(default_factory=list)
-    position_progress_multiplier: list[float] = field(default_factory=list)
-    progress_speed_position_multiplier: list[float] = field(default_factory=list)
-    edge_ratio: list[float] = field(default_factory=list)
-    outside_edge_excess_ratio: list[float] = field(default_factory=list)
-    height_above_ground: list[float] = field(default_factory=list)
-    ko_star_events: list[KoStarRewardEvent] = field(default_factory=list)
+    env_steps: deque[int] = field(default_factory=_int_buffer)
+    speed_kph: deque[float] = field(default_factory=_float_buffer)
+    step_rewards: deque[float] = field(default_factory=_float_buffer)
+    progress_speed_multiplier: deque[float] = field(default_factory=_float_buffer)
+    position_progress_multiplier: deque[float] = field(default_factory=_float_buffer)
+    progress_speed_position_multiplier: deque[float] = field(default_factory=_float_buffer)
+    edge_ratio: deque[float] = field(default_factory=_float_buffer)
+    outside_edge_excess_ratio: deque[float] = field(default_factory=_float_buffer)
+    height_above_ground: deque[float] = field(default_factory=_float_buffer)
+    ko_star_events: deque[KoStarRewardEvent] = field(default_factory=_ko_star_event_buffer)
     current_ko_star_count: int | None = None
     current_return: float = 0.0
     current_progress: float = 0.0
@@ -74,50 +98,53 @@ class EpisodeLiveSeriesTracker:
         *,
         action_repeat: int,
     ) -> None:
-        if self.episode != snapshot.episode:
-            self.episode = snapshot.episode
-            self.env_steps = []
-            self.speed_kph = []
-            self.step_rewards = []
-            self.progress_speed_multiplier = []
-            self.position_progress_multiplier = []
-            self.progress_speed_position_multiplier = []
-            self.edge_ratio = []
-            self.outside_edge_excess_ratio = []
-            self.height_above_ground = []
-            self.ko_star_events = []
-            self.current_ko_star_count = None
-            self.current_return = 0.0
-            self.current_progress = 0.0
-            self.max_progress = 0.0
         if not snapshot.policy_decision_frame:
             return
-        env_step = _env_step(snapshot.info, action_repeat=action_repeat)
-        progress = _progress_fraction(snapshot.info)
-        speed_kph = _speed_kph(snapshot.info)
-        step_reward = _info_float(snapshot.info, "step_reward")
-        speed_multiplier = _info_float(snapshot.info, "progress_speed_multiplier", default=1.0)
+        self.observe_decision(
+            episode=snapshot.episode,
+            info=snapshot.info,
+            episode_reward=snapshot.episode_reward,
+            telemetry_data=_snapshot_telemetry_data(snapshot),
+            action_repeat=action_repeat,
+        )
+
+    def observe_decision(
+        self,
+        *,
+        episode: int,
+        info: dict[str, object],
+        episode_reward: float,
+        telemetry_data: Mapping[str, object] | None,
+        action_repeat: int,
+    ) -> None:
+        if self.episode != episode:
+            self._reset_episode(episode)
+        env_step = _env_step(info, action_repeat=action_repeat)
+        progress = _progress_fraction(info)
+        speed_kph = _speed_kph(info)
+        step_reward = _info_float(info, "step_reward")
+        speed_multiplier = _info_float(info, "progress_speed_multiplier", default=1.0)
         position_multiplier = _info_float(
-            snapshot.info,
+            info,
             "position_progress_multiplier",
             default=1.0,
         )
         combined_multiplier = _info_float(
-            snapshot.info,
+            info,
             "progress_speed_position_multiplier",
             default=speed_multiplier * position_multiplier,
         )
-        edge_ratio = _edge_ratio(snapshot)
-        outside_edge_excess_ratio = _outside_edge_excess_ratio(snapshot)
-        height_above_ground = _player_telemetry_float(snapshot, "height_above_ground")
-        self.current_ko_star_count = _ko_star_count(snapshot)
-        ko_star_event = _ko_star_reward_event(snapshot.info, env_step=env_step)
+        edge_ratio = _edge_ratio(telemetry_data)
+        outside_edge_excess_ratio = _outside_edge_excess_ratio(telemetry_data)
+        height_above_ground = _player_telemetry_float(telemetry_data, "height_above_ground")
+        self.current_ko_star_count = _ko_star_count(info, telemetry_data)
+        ko_star_event = _ko_star_reward_event(info, env_step=env_step)
         if ko_star_event is not None:
             if self.ko_star_events and self.ko_star_events[-1].env_step == env_step:
                 self.ko_star_events[-1] = ko_star_event
             else:
                 self.ko_star_events.append(ko_star_event)
-        self.current_return = float(snapshot.episode_reward)
+        self.current_return = float(episode_reward)
         self.current_progress = progress
         self.max_progress = max(self.max_progress, progress)
         if self.env_steps and env_step == self.env_steps[-1]:
@@ -139,6 +166,23 @@ class EpisodeLiveSeriesTracker:
         self.edge_ratio.append(edge_ratio)
         self.outside_edge_excess_ratio.append(outside_edge_excess_ratio)
         self.height_above_ground.append(height_above_ground)
+
+    def _reset_episode(self, episode: int) -> None:
+        self.episode = episode
+        self.env_steps.clear()
+        self.speed_kph.clear()
+        self.step_rewards.clear()
+        self.progress_speed_multiplier.clear()
+        self.position_progress_multiplier.clear()
+        self.progress_speed_position_multiplier.clear()
+        self.edge_ratio.clear()
+        self.outside_edge_excess_ratio.clear()
+        self.height_above_ground.clear()
+        self.ko_star_events.clear()
+        self.current_ko_star_count = None
+        self.current_return = 0.0
+        self.current_progress = 0.0
+        self.max_progress = 0.0
 
     def snapshot(self) -> EpisodeLiveSeriesSnapshot | None:
         if self.episode is None:
@@ -189,8 +233,11 @@ def _info_float(info: dict[str, object], key: str, *, default: float = 0.0) -> f
     return default
 
 
-def _player_telemetry_float(snapshot: _LiveEpisodeSnapshot, key: str) -> float:
-    player_data = _player_telemetry_data(snapshot)
+def _player_telemetry_float(
+    telemetry_data: Mapping[str, object] | None,
+    key: str,
+) -> float:
+    player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return 0.0
     value = player_data.get(key)
@@ -199,11 +246,14 @@ def _player_telemetry_float(snapshot: _LiveEpisodeSnapshot, key: str) -> float:
     return 0.0
 
 
-def _ko_star_count(snapshot: _LiveEpisodeSnapshot) -> int | None:
-    value = snapshot.info.get("ko_star_count")
+def _ko_star_count(
+    info: dict[str, object],
+    telemetry_data: Mapping[str, object] | None,
+) -> int | None:
+    value = info.get("ko_star_count")
     if isinstance(value, int | float) and not isinstance(value, bool):
         return max(int(value), 0)
-    player_data = _player_telemetry_data(snapshot)
+    player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return None
     player_value = player_data.get("ko_star_count")
@@ -241,8 +291,8 @@ def _info_int(info: dict[str, object], key: str) -> int | None:
     return None
 
 
-def _edge_ratio(snapshot: _LiveEpisodeSnapshot) -> float:
-    player_data = _player_telemetry_data(snapshot)
+def _edge_ratio(telemetry_data: Mapping[str, object] | None) -> float:
+    player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return 0.0
     ratio = _raw_edge_ratio(player_data)
@@ -251,8 +301,8 @@ def _edge_ratio(snapshot: _LiveEpisodeSnapshot) -> float:
     return clamp(ratio, -1.0, 1.0)
 
 
-def _outside_edge_excess_ratio(snapshot: _LiveEpisodeSnapshot) -> float:
-    player_data = _player_telemetry_data(snapshot)
+def _outside_edge_excess_ratio(telemetry_data: Mapping[str, object] | None) -> float:
+    player_data = _player_telemetry_data(telemetry_data)
     if player_data is None:
         return 0.0
     ratio = _raw_edge_ratio(player_data)
@@ -276,9 +326,19 @@ def _raw_edge_ratio(player_data: Mapping[object, object]) -> float | None:
     return offset / side_radius
 
 
-def _player_telemetry_data(snapshot: _LiveEpisodeSnapshot) -> Mapping[object, object] | None:
+def _snapshot_telemetry_data(
+    snapshot: _LiveEpisodeSnapshot,
+) -> Mapping[str, object] | None:
     telemetry_data = getattr(snapshot, "telemetry_data", None)
     if not isinstance(telemetry_data, Mapping):
+        return None
+    return telemetry_data
+
+
+def _player_telemetry_data(
+    telemetry_data: Mapping[str, object] | None,
+) -> Mapping[object, object] | None:
+    if telemetry_data is None:
         return None
     player_data = telemetry_data.get("player")
     if not isinstance(player_data, Mapping):

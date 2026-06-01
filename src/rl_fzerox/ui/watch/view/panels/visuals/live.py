@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot, KoStarRewardEvent
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot, KoStarRewardEvent
 from rl_fzerox.ui.watch.view.panels.core.format import _int_info
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT

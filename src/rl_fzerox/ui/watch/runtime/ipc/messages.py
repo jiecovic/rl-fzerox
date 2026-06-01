@@ -8,6 +8,7 @@ from fzerox_emulator.arrays import ObservationFrame, RgbFrame, StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import TrackSamplingConfig
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
     CnnActivationNormalizationMode,
@@ -112,3 +113,4 @@ class WatchSnapshot:
     action_hold_frame: int = 1
     action_hold_frames: int = 1
     policy_decision_frame: bool = True
+    live_episode_series: EpisodeLiveSeriesSnapshot | None = None
