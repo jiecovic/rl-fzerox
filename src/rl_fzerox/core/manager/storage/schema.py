@@ -8,7 +8,7 @@ import sqlite3
 from rl_fzerox.core.manager.run_spec import default_managed_run_config
 from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
-SCHEMA_VERSION = 15
+SCHEMA_VERSION = 16
 
 
 def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str) -> None:
@@ -130,7 +130,7 @@ def initialize_manager_schema(connection: sqlite3.Connection, *, applied_at: str
             generated_course_id TEXT,
             generated_course_name TEXT,
             generated_course_hash TEXT,
-            generated_course_seed INTEGER,
+            generated_course_seed TEXT,
             generated_baseline_state_path TEXT,
             generated_course_segment_count INTEGER,
             generated_course_length REAL,

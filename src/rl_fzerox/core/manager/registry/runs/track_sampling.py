@@ -334,7 +334,7 @@ def _track_sampling_entry_values(
         entry.generated_course_id,
         entry.generated_course_name,
         entry.generated_course_hash,
-        entry.generated_course_seed,
+        _sqlite_optional_int_text(entry.generated_course_seed),
         entry.generated_baseline_state_path,
         entry.generated_course_segment_count,
         entry.generated_course_length,
@@ -363,6 +363,10 @@ def _optional_int(value: object) -> int | None:
 
 def _optional_str(value: object) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _sqlite_optional_int_text(value: int | None) -> str | None:
+    return None if value is None else str(value)
 
 
 def _table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
