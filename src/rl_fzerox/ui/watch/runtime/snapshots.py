@@ -218,7 +218,7 @@ def _publish_step_snapshots(
                 action_hold_frame=index + 1,
                 action_hold_frames=len(frames),
                 policy_decision_frame=is_final_frame,
-                live_episode_series=live_episode_series,
+                live_episode_series=live_episode_series if is_final_frame else None,
             ),
         )
         if frame_interval_seconds is not None and not is_final_frame:

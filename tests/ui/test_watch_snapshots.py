@@ -152,6 +152,11 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         {"mute": 1},
         {"mute": 1},
     ]
+    assert [snapshot.live_episode_series for snapshot in snapshots] == [
+        None,
+        None,
+        live_series,
+    ]
     for snapshot in snapshots:
         assert isinstance(snapshot.policy_action, np.ndarray)
         assert np.array_equal(snapshot.policy_action, policy_action)
@@ -161,7 +166,6 @@ def test_publish_step_snapshots_marks_action_repeat_hold_frames(tmp_path: Path) 
         assert snapshot.latest_finish_times == {"mute": 101_000}
         assert snapshot.latest_finish_deltas_ms == {"mute": 3_000}
         assert snapshot.failed_track_attempts == frozenset({"silence"})
-        assert snapshot.live_episode_series is live_series
 
 
 def test_publish_step_snapshots_uses_exact_display_controller_masks(tmp_path: Path) -> None:

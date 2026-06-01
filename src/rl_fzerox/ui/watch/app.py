@@ -68,6 +68,7 @@ def run_viewer(config: WatchAppConfig) -> None:
         speed_repeat = SpeedKeyRepeat()
         auxiliary_metrics = AuxiliaryEpisodeMetricsTracker.from_policy_config(config.policy)
         auxiliary_metrics.observe_snapshot(snapshot)
+        live_episode_series = getattr(snapshot, "live_episode_series", None)
 
         while True:
             render_limit = 0 if target_render_fps is None else max(1, int(target_render_fps))
@@ -97,6 +98,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 cnn_visualization_enabled=panel_tab_index == PANEL_TABS.cnn_index,
                 auxiliary_visualization_enabled=panel_tab_index
                 in {PANEL_TABS.state_index, PANEL_TABS.aux_index},
+                live_visualization_enabled=panel_tab_index == PANEL_TABS.live_index,
                 cnn_normalization=cnn_normalization,
             )
             if viewer_input.quit_requested:
@@ -109,6 +111,9 @@ def run_viewer(config: WatchAppConfig) -> None:
             if latest_snapshot is not None:
                 snapshot = latest_snapshot
                 auxiliary_metrics.observe_snapshot(snapshot)
+                latest_live_episode_series = getattr(snapshot, "live_episode_series", None)
+                if latest_live_episode_series is not None:
+                    live_episode_series = latest_live_episode_series
             elif worker_closed and not worker.process.is_alive():
                 return
             elif not worker.process.is_alive():
@@ -134,7 +139,7 @@ def run_viewer(config: WatchAppConfig) -> None:
                 render_rate=render_rate,
                 target_render_fps=target_render_fps,
                 auxiliary_episode_metrics=auxiliary_metrics.snapshot(),
-                live_episode_series=snapshot.live_episode_series,
+                live_episode_series=live_episode_series,
                 panel_tab_index=panel_tab_index,
                 cnn_layer_tab_index=cnn_layer_tab_index,
                 record_tab_index=record_tab_index,

@@ -36,7 +36,7 @@ class KoStarRewardEvent:
 class LiveSeriesLimits:
     """Bound watch chart history so video responsiveness stays independent."""
 
-    max_samples: int = 8_192
+    max_samples: int = 4_096
     max_ko_events: int = 64
 
 

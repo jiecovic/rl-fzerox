@@ -411,11 +411,10 @@ def _draw_plot_series(
     x_start = x_values[0]
     x_end = max(x_values[-1], x_start + 1)
     if fixed_range is None:
-        series_values = tuple(value for line in valid_series for value in line.y_values)
-        reference_values = tuple(line.value for line in reference_lines)
-        plotted_values = (*series_values, *reference_values)
-        y_min = min(min(plotted_values), 0.0)
-        y_max = max(max(plotted_values), 0.0)
+        y_min, y_max = _plot_value_range(
+            series=valid_series,
+            reference_lines=reference_lines,
+        )
         if y_min == y_max:
             span = max(1.0, abs(y_min) * 0.1)
             y_min -= span
@@ -467,20 +466,135 @@ def _draw_plot_series(
             line=line,
         )
     for line in valid_series:
-        points = [
-            (
-                rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
-                rect.y
-                + rect.height
-                - 1
-                - int(round((value - y_min) / span * max(1, rect.height - 1))),
-            )
-            for step, value in zip(x_values, line.y_values, strict=False)
-        ]
+        points = _plot_points(
+            x_values=x_values,
+            y_values=line.y_values,
+            rect=rect,
+            x_start=x_start,
+            x_end=x_end,
+            y_min=y_min,
+            span=span,
+        )
         if len(points) == 1:
             pygame.draw.circle(screen, line.color, points[0], 3)
         else:
             pygame.draw.lines(screen, line.color, False, points, LIVE_CHART_STYLE.line_width)
+
+
+def _plot_value_range(
+    *,
+    series: tuple[_PlotSeries, ...],
+    reference_lines: tuple[_PlotReferenceLine, ...],
+) -> tuple[float, float]:
+    y_min = 0.0
+    y_max = 0.0
+    for line in series:
+        if line.y_values:
+            y_min = min(y_min, min(line.y_values))
+            y_max = max(y_max, max(line.y_values))
+    for line in reference_lines:
+        y_min = min(y_min, line.value)
+        y_max = max(y_max, line.value)
+    return y_min, y_max
+
+
+def _plot_points(
+    *,
+    x_values: tuple[int, ...],
+    y_values: tuple[float, ...],
+    rect: PygameRect,
+    x_start: int,
+    x_end: int,
+    y_min: float,
+    span: float,
+) -> list[tuple[int, int]]:
+    point_count = min(len(x_values), len(y_values))
+    if point_count <= rect.width * 2:
+        return [
+            _plot_point(
+                step=step,
+                value=value,
+                rect=rect,
+                x_start=x_start,
+                x_end=x_end,
+                y_min=y_min,
+                span=span,
+            )
+            for step, value in zip(x_values, y_values, strict=False)
+        ]
+
+    bucketed: list[tuple[int, int]] = []
+    bucket: _PlotPixelBucket | None = None
+    for step, value in zip(x_values, y_values, strict=False):
+        point_x, point_y = _plot_point(
+            step=step,
+            value=value,
+            rect=rect,
+            x_start=x_start,
+            x_end=x_end,
+            y_min=y_min,
+            span=span,
+        )
+        if bucket is None:
+            bucket = _PlotPixelBucket.from_point(point_x, point_y)
+            continue
+        if point_x != bucket.x:
+            bucket.append_to(bucketed)
+            bucket = _PlotPixelBucket.from_point(point_x, point_y)
+            continue
+        bucket.observe(point_y)
+
+    if bucket is not None:
+        bucket.append_to(bucketed)
+    return bucketed
+
+
+def _plot_point(
+    *,
+    step: int,
+    value: float,
+    rect: PygameRect,
+    x_start: int,
+    x_end: int,
+    y_min: float,
+    span: float,
+) -> tuple[int, int]:
+    return (
+        rect.x + int(round((step - x_start) / (x_end - x_start) * max(1, rect.width - 1))),
+        rect.y + rect.height - 1 - int(round((value - y_min) / span * max(1, rect.height - 1))),
+    )
+
+
+@dataclass(slots=True)
+class _PlotPixelBucket:
+    x: int
+    first_y: int
+    min_y: int
+    max_y: int
+    last_y: int
+
+    @classmethod
+    def from_point(cls, x: int, y: int) -> _PlotPixelBucket:
+        return cls(
+            x=x,
+            first_y=y,
+            min_y=y,
+            max_y=y,
+            last_y=y,
+        )
+
+    def observe(self, y: int) -> None:
+        self.min_y = min(self.min_y, y)
+        self.max_y = max(self.max_y, y)
+        self.last_y = y
+
+    def append_to(self, points: list[tuple[int, int]]) -> None:
+        y_values = (self.first_y, self.min_y, self.max_y, self.last_y)
+        for y in y_values:
+            point = (self.x, y)
+            if points and points[-1] == point:
+                continue
+            points.append(point)
 
 
 def _draw_reference_line(

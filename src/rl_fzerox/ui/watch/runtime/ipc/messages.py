@@ -34,6 +34,7 @@ class ViewerCommand:
     reset_control_fps: bool = False
     cnn_visualization_enabled: bool = False
     auxiliary_visualization_enabled: bool = False
+    live_visualization_enabled: bool = False
     cnn_normalization: CnnActivationNormalizationMode = DEFAULT_CNN_ACTIVATION_NORMALIZATION
     control_state: RaceControlState | None = None
 
@@ -56,6 +57,7 @@ class WorkerCommandBatch:
     reset_control_fps: bool
     cnn_visualization_enabled: bool
     auxiliary_visualization_enabled: bool
+    live_visualization_enabled: bool
     cnn_normalization: CnnActivationNormalizationMode
     control_state: RaceControlState
 
