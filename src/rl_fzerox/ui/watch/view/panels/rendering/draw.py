@@ -8,9 +8,9 @@ from fzerox_emulator.arrays import StateVector
 from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import ActionMaskBranches
 from rl_fzerox.core.runtime_spec.schema import PolicyConfig, TrainConfig
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.runtime.cnn import CnnActivationSnapshot
 from rl_fzerox.ui.watch.view.auxiliary_metrics import AuxiliaryEpisodeMetricsSnapshot
-from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
 from rl_fzerox.ui.watch.view.panels.core.model import _build_panel_columns
 from rl_fzerox.ui.watch.view.panels.core.tabs import PANEL_TABS
 from rl_fzerox.ui.watch.view.panels.rendering.section_renderer import _draw_column

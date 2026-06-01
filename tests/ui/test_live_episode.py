@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
+from rl_fzerox.ui.watch.live_series import LIVE_SERIES_LIMITS, EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.visuals.live import (
     _ko_star_events_summary,
     _plot_legend_rows,
@@ -311,6 +311,29 @@ def test_live_episode_tracker_reports_step_reward() -> None:
     assert snapshot is not None
     assert snapshot.env_steps == (2, 6)
     assert snapshot.step_rewards == (0.25, 0.75)
+
+
+def test_live_episode_tracker_bounds_sample_history() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+
+    for index in range(LIVE_SERIES_LIMITS.max_samples + 3):
+        tracker.observe_decision(
+            episode=1,
+            info={
+                "episode_step": index + 1,
+                "step_reward": float(index),
+            },
+            episode_reward=float(index),
+            telemetry_data=None,
+            action_repeat=1,
+        )
+
+    snapshot = tracker.snapshot()
+    assert snapshot is not None
+    assert len(snapshot.env_steps) == LIVE_SERIES_LIMITS.max_samples
+    assert len(snapshot.step_rewards) == LIVE_SERIES_LIMITS.max_samples
+    assert snapshot.env_steps[0] == 4
+    assert snapshot.step_rewards[-1] == pytest.approx(float(LIVE_SERIES_LIMITS.max_samples + 2))
 
 
 def test_live_episode_tracker_reports_exact_ko_reward_events() -> None:

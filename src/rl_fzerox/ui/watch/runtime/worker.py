@@ -10,6 +10,7 @@ from rl_fzerox.core.envs.actions import ActionValue
 from rl_fzerox.core.envs.engine.controls import action_mask_violations
 from rl_fzerox.core.envs.telemetry import telemetry_boost_active
 from rl_fzerox.core.runtime_spec.schema import WatchAppConfig
+from rl_fzerox.ui.watch.live_series import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.runtime.baseline import _save_baseline_state
 from rl_fzerox.ui.watch.runtime.cnn import (
     DEFAULT_CNN_ACTIVATION_NORMALIZATION,
@@ -52,7 +53,7 @@ from rl_fzerox.ui.watch.runtime.snapshots import (
     _next_boost_lamp_level,
     _publish_step_snapshots,
 )
-from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry
+from rl_fzerox.ui.watch.runtime.telemetry import _read_live_telemetry, _telemetry_to_data
 from rl_fzerox.ui.watch.runtime.timing import (
     RateMeter,
     _adjust_control_fps,
@@ -134,6 +135,7 @@ def _run_simulation_loop(
         active_track_sampling = config.env.track_sampling
         track_sampling_refresh = ManagedTrackSamplingRefresh.from_config(config)
         watch_zeroed_state_features = session.watch_zeroed_state_features
+        live_series = EpisodeLiveSeriesTracker()
         auxiliary_target_names: tuple[AuxiliaryStateTargetName, ...] = (
             session.auxiliary_target_names
         )
@@ -173,6 +175,7 @@ def _run_simulation_loop(
                     latest_finish_times=latest_finish_times,
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
+                    live_episode_series=live_series.snapshot(),
                 ),
             )
 
@@ -236,6 +239,13 @@ def _run_simulation_loop(
             episode_reward = 0.0
             next_step_time = time.perf_counter()
             policy_reload_error = _policy_reload_error(policy_runner)
+            live_series.observe_decision(
+                episode=episode,
+                info=info,
+                episode_reward=episode_reward,
+                telemetry_data=_telemetry_to_data(current_telemetry),
+                action_repeat=config.env.action_repeat,
+            )
 
             publish_snapshot()
 
@@ -452,6 +462,13 @@ def _run_simulation_loop(
                 )
                 control_rate.tick()
                 episode_reward += reward
+                live_series.observe_decision(
+                    episode=episode,
+                    info=info,
+                    episode_reward=episode_reward,
+                    telemetry_data=_telemetry_to_data(live_telemetry),
+                    action_repeat=config.env.action_repeat,
+                )
                 best_finish_position = _update_best_finish_position(
                     best_finish_position,
                     info,
@@ -528,6 +545,7 @@ def _run_simulation_loop(
                     latest_finish_deltas_ms=latest_finish_deltas_ms,
                     failed_track_attempts=failed_track_attempts,
                     manual_control_enabled=manual_control_enabled,
+                    live_episode_series=live_series.snapshot(),
                 )
                 committed_policy_action = current_policy_action
                 committed_action_mask_branches = final_action_mask_branches

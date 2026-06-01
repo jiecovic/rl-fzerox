@@ -518,10 +518,6 @@ def test_run_viewer_exits_quietly_on_keyboard_interrupt(
         lambda _self, _snapshot: None,
     )
     monkeypatch.setattr(
-        "rl_fzerox.ui.watch.app.EpisodeLiveSeriesTracker.observe_snapshot",
-        lambda _self, _snapshot, **_kwargs: None,
-    )
-    monkeypatch.setattr(
         "rl_fzerox.ui.watch.app.wait_initial_snapshot",
         lambda _worker: (SimpleNamespace(native_fps=30.0), False),
     )
