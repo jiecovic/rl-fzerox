@@ -271,6 +271,7 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
 ) -> None:
     config = default_managed_run_config().model_copy(deep=True)
     config.action.mask_air_brake_on_ground = True
+    config.action.boost_decision_interval_frames = 8
 
     train_config = build_managed_train_app_config(
         config,
@@ -279,6 +280,7 @@ def test_manager_training_bridge_can_mask_air_brake_on_ground(
     )
 
     assert train_config.env.action.mask_air_brake_on_ground is True
+    assert train_config.env.action.boost_decision_interval_frames == 8
 
 
 def test_manager_training_bridge_projects_outside_track_recovery_reward(

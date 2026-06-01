@@ -123,6 +123,9 @@ function displayAuxiliarySummary(config: ManagedRunConfig) {
           ? `≥ ${Math.round(config.action.boost_min_energy_fraction * 100)}% energy`
           : null,
         config.action.mask_boost_when_active ? "idle only" : null,
+        config.action.boost_decision_interval_frames > 1
+          ? `${config.action.boost_decision_interval_frames}f cadence`
+          : null,
         config.action.boost_request_lockout_frames > 0
           ? `${config.action.boost_request_lockout_frames}f cooldown`
           : null,

@@ -215,7 +215,7 @@ def test_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> None:
         [
             _backend_step_result(
                 telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2, final_frame_index=2),
                 status=make_step_status(step_count=1),
             )
         ],
@@ -240,7 +240,7 @@ def test_hybrid_env_action_masks_disable_boost_until_telemetry_unlocks_it() -> N
         [
             _backend_step_result(
                 telemetry=_telemetry(race_distance=10.0, state_labels=("active", "can_boost")),
-                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2, final_frame_index=2),
                 status=make_step_status(step_count=1),
             )
         ],
@@ -274,7 +274,7 @@ def test_env_action_masks_disable_lean_below_speed_threshold() -> None:
                     state_labels=("active", "can_boost"),
                     speed_kph=650.0,
                 ),
-                summary=_step_summary(max_race_distance=10.0, final_frame_index=1),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2, final_frame_index=2),
                 status=make_step_status(step_count=1),
             )
         ],
@@ -459,6 +459,63 @@ def test_env_action_masks_apply_boost_request_cooldown_without_active_boost_mask
     env.step(_discrete_gas_boost_action(boost_index=1))
 
     assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
+
+
+def test_env_action_masks_apply_boost_decision_interval() -> None:
+    backend = ScriptedStepBackend(
+        [
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=10.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=10.0, frames_run=2, final_frame_index=2),
+                status=make_step_status(step_count=1),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=20.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=20.0, frames_run=2, final_frame_index=4),
+                status=make_step_status(step_count=2),
+            ),
+            _backend_step_result(
+                telemetry=_telemetry(
+                    race_distance=30.0,
+                    state_labels=("active", "can_boost"),
+                ),
+                summary=_step_summary(max_race_distance=30.0, frames_run=2, final_frame_index=6),
+                status=make_step_status(step_count=3),
+            ),
+        ],
+        reset_telemetry=_telemetry(
+            race_distance=0.0,
+            state_labels=("active", "can_boost"),
+        ),
+    )
+    env = FZeroXEnv(
+        backend=backend,
+        config=EnvConfig(
+            action=configured_discrete_action(
+                "steer",
+                "gas",
+                "boost",
+                boost_decision_interval_frames=4,
+                boost_request_lockout_frames=0,
+                mask_boost_when_active=False,
+            ),
+        ),
+    )
+
+    env.reset(seed=1)
+    env.step(_discrete_gas_boost_action(boost_index=0))
+
+    assert env.action_masks().tolist() == (([True] * 7) + ([True] * 2) + [True, False])
+
+    env.step(_discrete_gas_boost_action(boost_index=0))
+
+    assert env.action_masks().tolist() == ([True] * (7 + 2 + 2))
 
 
 def test_env_action_masks_disable_boost_above_speed_threshold() -> None:

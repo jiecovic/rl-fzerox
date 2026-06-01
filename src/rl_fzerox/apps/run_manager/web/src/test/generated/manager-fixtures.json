@@ -1231,6 +1231,7 @@
     "action": {
       "action_repeat": 2,
       "air_brake_mode": "on_off",
+      "boost_decision_interval_frames": 1,
       "boost_min_energy_fraction": 0.1,
       "boost_request_lockout_frames": 5,
       "boost_unmask_max_speed_kph": null,

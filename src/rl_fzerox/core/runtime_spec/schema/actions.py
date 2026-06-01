@@ -19,6 +19,7 @@ from pydantic import (
     NonNegativeFloat,
     NonNegativeInt,
     PositiveFloat,
+    PositiveInt,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -68,17 +69,6 @@ class ConfiguredActionLayoutCatalog:
 
 
 CONFIGURED_ACTION_LAYOUTS = ConfiguredActionLayoutCatalog()
-
-
-@dataclass(frozen=True, slots=True)
-class ActionRuntimeDefaults:
-    """Internal action timing defaults that are not exposed in YAML."""
-
-    boost_decision_interval_frames: int = 1
-
-
-ACTION_RUNTIME_DEFAULTS = ActionRuntimeDefaults()
-
 
 class ActionMaskConfig(BaseModel):
     """Optional branch-wise action-mask restrictions for MultiDiscrete actions."""
@@ -236,7 +226,7 @@ class ActionRuntimeConfig:
                 if config.boost_unmask_max_speed_kph is None
                 else float(config.boost_unmask_max_speed_kph)
             ),
-            boost_decision_interval_frames=ACTION_RUNTIME_DEFAULTS.boost_decision_interval_frames,
+            boost_decision_interval_frames=int(config.boost_decision_interval_frames),
             boost_request_lockout_frames=int(config.boost_request_lockout_frames),
             lean_unmask_min_speed_kph=(
                 None
@@ -272,6 +262,7 @@ class ActionConfig(BaseModel):
     lean_mode: LeanMode = DEFAULT_LEAN_MODE
     lean_output_mode: LeanOutputMode = "three_way"
     mask_boost_when_active: bool = True
+    boost_decision_interval_frames: PositiveInt = 1
     boost_request_lockout_frames: NonNegativeInt = 5
     boost_unmask_max_speed_kph: NonNegativeFloat | None = None
     lean_unmask_min_speed_kph: NonNegativeFloat | None = None

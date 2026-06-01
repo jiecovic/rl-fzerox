@@ -487,6 +487,7 @@ def test_manager_store_normalizes_missing_action_config(tmp_path: Path) -> None:
     assert draft.config.action.force_full_throttle is False
     assert draft.config.action.include_air_brake is True
     assert draft.config.action.enable_air_brake is True
+    assert draft.config.action.boost_decision_interval_frames == 1
     assert draft.config.action.boost_unmask_max_speed_kph is None
     assert draft.config.action.boost_min_energy_fraction == 0.1
     assert draft.config.action.lean_output_mode == "three_way"
