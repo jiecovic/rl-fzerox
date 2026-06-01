@@ -153,8 +153,8 @@ def run_select_sql(
             runs.id,
             runs.name,
             runs.status,
-            runs.config_json,
-            runs.config_hash,
+            config_snapshots.config_json,
+            config_snapshots.config_hash,
             runs.run_dir,
             runs.lineage_id,
             (
@@ -189,6 +189,8 @@ def run_select_sql(
             run_runtime.policy_gradient_loss AS runtime_policy_gradient_loss,
             run_commands.command AS pending_command
         FROM runs
+        JOIN config_snapshots
+            ON config_snapshots.id = runs.config_snapshot_id
         LEFT JOIN run_runtime
             ON run_runtime.run_id = runs.id
         LEFT JOIN run_workers
@@ -210,8 +212,8 @@ def run_summary_select_sql(
             runs.id,
             runs.name,
             runs.status,
-            runs.config_hash,
-            CAST(json_extract(runs.config_json, '$.action.action_repeat') AS INTEGER)
+            config_snapshots.config_hash,
+            CAST(json_extract(config_snapshots.config_json, '$.action.action_repeat') AS INTEGER)
                 AS config_action_repeat,
             runs.lineage_id,
             (
@@ -245,6 +247,8 @@ def run_summary_select_sql(
             run_runtime.policy_gradient_loss AS runtime_policy_gradient_loss,
             run_commands.command AS pending_command
         FROM runs
+        JOIN config_snapshots
+            ON config_snapshots.id = runs.config_snapshot_id
         LEFT JOIN run_runtime
             ON run_runtime.run_id = runs.id
         LEFT JOIN run_workers

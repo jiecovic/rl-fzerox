@@ -5,6 +5,16 @@ import sqlite3
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from sqlalchemy.exc import IntegrityError as SqlAlchemyIntegrityError
+
+from rl_fzerox.core.manager.db.repositories.configs import create_config_snapshot
+from rl_fzerox.core.manager.db.repositories.runs import (
+    append_run_event as insert_run_event,
+)
+from rl_fzerox.core.manager.db.repositories.runs import (
+    insert_run,
+    resolve_lineage_id,
+)
 from rl_fzerox.core.manager.models import (
     ManagedRun,
     ManagedRunEvent,
@@ -24,7 +34,6 @@ from rl_fzerox.core.manager.registry.rows import (
     run_summary_select_sql,
 )
 from rl_fzerox.core.manager.run_spec import ManagedRunConfig
-from rl_fzerox.core.manager.storage.serialization import config_hash, config_json
 
 if TYPE_CHECKING:
     from rl_fzerox.core.manager.store import ManagerStore
@@ -50,7 +59,6 @@ def create_run(
     """Create an immutable SQLite run record without filesystem side effects."""
 
     del exclude_draft_id
-    from rl_fzerox.core.manager.registry.lineages import resolve_lineage_id
     from rl_fzerox.core.manager.registry.paths import manager_run_dir
 
     store.initialize()
@@ -61,9 +69,9 @@ def create_run(
     run: ManagedRun | None = None
 
     try:
-        with store._connect() as connection:
+        with store._orm_session() as session:
             resolved_lineage_id = resolve_lineage_id(
-                connection,
+                session,
                 explicit_lineage_id=lineage_id,
                 parent_run_id=parent_run_id,
                 source_run_id=source_run_id,
@@ -81,12 +89,18 @@ def create_run(
                 .expanduser()
                 .resolve()
             )
+            config_snapshot = create_config_snapshot(
+                session,
+                kind="run",
+                config=config,
+                created_at=created_at,
+            )
             run = ManagedRun(
                 id=resolved_run_id,
                 name=normalized_name,
                 status="created",
                 config=config,
-                config_hash=config_hash(config),
+                config_hash=config_snapshot.config_hash,
                 run_dir=run_dir,
                 lineage_id=resolved_lineage_id,
                 lineage_step_offset=lineage_step_offset,
@@ -97,56 +111,26 @@ def create_run(
                 source_num_timesteps=source_num_timesteps,
                 created_at=created_at,
             )
-            connection.execute(
-                """
-                INSERT INTO runs(
-                    id,
-                    name,
-                    status,
-                    config_json,
-                    config_hash,
-                    run_dir,
-                    lineage_id,
-                    lineage_step_offset,
-                    parent_run_id,
-                    source_run_id,
-                    source_artifact,
-                    source_snapshot_dir,
-                    source_num_timesteps,
-                    created_at,
-                    started_at,
-                    stopped_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    run.id,
-                    run.name,
-                    run.status,
-                    config_json(run.config),
-                    run.config_hash,
-                    str(run.run_dir),
-                    run.lineage_id,
-                    run.lineage_step_offset,
-                    run.parent_run_id,
-                    run.source_run_id,
-                    run.source_artifact,
-                    None if run.source_snapshot_dir is None else str(run.source_snapshot_dir),
-                    run.source_num_timesteps,
-                    run.created_at,
-                    run.started_at,
-                    run.stopped_at,
-                ),
+            insert_run(
+                session,
+                run=run,
+                config_snapshot_id=config_snapshot.id,
             )
-            connection.execute(
-                """
-                INSERT INTO run_events(run_id, created_at, kind, message)
-                VALUES (?, ?, ?, ?)
-                """,
-                (run.id, created_at, "created", "run created from manager config"),
+            session.flush()
+            insert_run_event(
+                session,
+                run_id=run.id,
+                created_at=created_at,
+                kind="created",
+                message="run created from manager config",
             )
-    except sqlite3.IntegrityError as error:
-        raise_name_conflict(error, table="runs", kind="run", name=normalized_name)
+    except SqlAlchemyIntegrityError as error:
+        raise_name_conflict(
+            sqlite3.IntegrityError(str(error.orig)),
+            table="runs",
+            kind="run",
+            name=normalized_name,
+        )
         raise
     if run is None:
         raise RuntimeError("managed run creation failed before insert")
