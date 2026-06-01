@@ -699,7 +699,7 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
                 generated_course_id="x_cup_1234abcd",
                 generated_course_name="X Cup 1234abcd",
                 generated_course_hash="1234abcd",
-                generated_course_seed=42,
+                generated_course_seed=12_647_406_722_013_964_192,
                 generated_baseline_state_path=str(run.run_dir / "baselines" / "x.state"),
                 generated_course_segment_count=128,
                 generated_course_length=12345.0,
@@ -710,7 +710,9 @@ def test_manager_store_persists_track_sampling_runtime_state(tmp_path: Path) -> 
     store.upsert_run_track_sampling_state(run_id=run.id, state=state)
     recovered = ManagerStore(store.db_path).get_run_track_sampling_state(run.id)
 
+    assert recovered is not None
     assert recovered == state
+    assert recovered.entries[0].generated_course_seed == 12_647_406_722_013_964_192
 
     store.clear_run_track_sampling_state(run.id)
 
