@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "sync-fixtures": "PYTHON_BIN=${PYTHON:-$(if [ -x ../../../../../.venv/bin/python ]; then printf ../../../../../.venv/bin/python; else printf python; fi)}; PYTHONPATH=../../../.. \"$PYTHON_BIN\" -m rl_fzerox.core.manager.fixtures.web && biome format --write src/test/generated/manager-fixtures.json",
+    "fixtures": "PYTHON_BIN=${PYTHON:-$(if [ -x ../../../../../.venv/bin/python ]; then printf ../../../../../.venv/bin/python; else printf python; fi)}; PYTHONPATH=../../../.. \"$PYTHON_BIN\" -m rl_fzerox.core.manager.fixtures.web",
+    "sync-fixtures": "npm run fixtures && biome format --write src/test/generated/manager-fixtures.json",
+    "check-fixtures": "npm run fixtures -- --check",
     "build": "npm run sync-fixtures && tsc -b && vite build",
     "format": "biome format --write src index.html vite.config.ts package.json tsconfig.json",
     "lint": "biome lint src index.html vite.config.ts",
     "biome-check": "biome check src index.html vite.config.ts package.json tsconfig.json",
-    "check": "npm run sync-fixtures && tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json",
+    "check": "npm run check-fixtures && tsc -b && biome check src index.html vite.config.ts package.json tsconfig.json",
     "test": "npm run sync-fixtures && vitest run"
   },
   "dependencies": {
