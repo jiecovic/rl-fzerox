@@ -108,9 +108,7 @@ def reward_data(config: ManagedRunConfig) -> dict[str, object]:
         "manual_boost_reward": reward.manual_boost_reward,
         "manual_boost_reward_energy_shaping": reward.manual_boost_reward_energy_shaping,
         "manual_boost_reward_min_energy_fraction": (reward.manual_boost_reward_min_energy_fraction),
-        "manual_boost_reward_min_energy_multiplier": (
-            reward.manual_boost_reward_min_energy_multiplier
-        ),
+        "manual_boost_reward_min_energy_value": reward.manual_boost_reward_min_energy_value,
         "manual_boost_reward_full_energy_fraction": (
             reward.manual_boost_reward_full_energy_fraction
         ),
