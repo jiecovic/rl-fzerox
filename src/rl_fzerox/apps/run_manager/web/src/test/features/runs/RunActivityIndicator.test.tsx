@@ -1,3 +1,4 @@
+// src/rl_fzerox/apps/run_manager/web/src/test/features/runs/RunActivityIndicator.test.tsx
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RunActivityIndicator } from "@/features/runs/RunActivityIndicator";
 import { runFixture } from "@/test/fixtures";

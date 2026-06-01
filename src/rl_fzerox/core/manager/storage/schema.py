@@ -107,8 +107,7 @@ def _assert_current_schema(
         columns = {column["name"] for column in inspector.get_columns(table_name)}
         if "config_json" in columns or "config_hash" in columns:
             raise RuntimeError(
-                "manager DB is not current: config JSON must be stored in "
-                "config_snapshots only"
+                "manager DB is not current: config JSON must be stored in config_snapshots only"
             )
         if "config_snapshot_id" not in columns:
             raise RuntimeError(

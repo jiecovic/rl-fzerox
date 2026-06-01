@@ -80,9 +80,7 @@ def upsert_run_track_sampling_state(
             runtime_insert.on_conflict_do_update(
                 index_elements=("run_id",),
                 set_={
-                    key: runtime_insert.excluded[key]
-                    for key in runtime_values
-                    if key != "run_id"
+                    key: runtime_insert.excluded[key] for key in runtime_values if key != "run_id"
                 },
             )
         )
