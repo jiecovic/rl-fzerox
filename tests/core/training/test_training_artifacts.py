@@ -265,7 +265,7 @@ def test_recent_checkpoint_artifacts_use_timestep_directories_and_trim(
     assert load_policy_artifact_metadata(checkpoint_dirs[-1] / "policy.zip") == metadata
 
 
-def test_save_train_run_config_persists_configured_action_layout_without_runtime_fields(
+def test_save_train_run_config_persists_configured_action_layout(
     tmp_path: Path,
 ) -> None:
     core_path = tmp_path / "mupen64plus_next_libretro.so"
@@ -319,7 +319,7 @@ def test_save_train_run_config_persists_configured_action_layout_without_runtime
         "lean": [0, 1, 2],
     }
     assert "configured_mask_overrides" not in action_data
-    assert "boost_decision_interval_frames" not in action_data
+    assert action_data["boost_decision_interval_frames"] == 1
     assert action_data["mask_boost_when_active"] is True
     assert action_data["boost_request_lockout_frames"] == 5
 

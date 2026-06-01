@@ -232,6 +232,16 @@ export function RuntimeCards({
               />
             </div>
             <IntegerField
+              help="Open the manual boost branch only once per this many native frames. The boost button pulse itself still lasts one env step."
+              label="Decision interval frames"
+              min={1}
+              resetValue={defaultAction.boost_decision_interval_frames}
+              value={action.boost_decision_interval_frames}
+              onChange={(value) => updateAction({ boost_decision_interval_frames: value })}
+            />
+          </div>
+          <div className="action-runtime-two-col">
+            <IntegerField
               help="After a manual boost request, keep the boost branch masked for this many native frames. Useful as the spam guard when the active-boost mask is off."
               label="Request cooldown frames"
               resetValue={defaultAction.boost_request_lockout_frames}
@@ -239,6 +249,12 @@ export function RuntimeCards({
               onChange={(value) => updateAction({ boost_request_lockout_frames: value })}
             />
           </div>
+          <p className="action-note">
+            {boostDecisionIntervalSummary(
+              action.action_repeat,
+              action.boost_decision_interval_frames,
+            )}
+          </p>
         </fieldset>
       </section>
 
@@ -461,4 +477,25 @@ export function RuntimeCards({
       </section>
     </div>
   );
+}
+
+function boostDecisionIntervalSummary(actionRepeat: number, intervalFrames: number): string {
+  const repeatFrames = Math.max(1, Math.trunc(actionRepeat));
+  const requestedInterval = Math.max(1, Math.trunc(intervalFrames));
+  const envStepInterval = Math.max(1, Math.ceil(requestedInterval / repeatFrames));
+  const effectiveIntervalFrames = envStepInterval * repeatFrames;
+  const decisionsPerSecond = 60 / effectiveIntervalFrames;
+  const maxDelayFrames = Math.max(0, effectiveIntervalFrames - repeatFrames);
+  return [
+    `Boost decision cadence: every ${envStepInterval} env step${envStepInterval === 1 ? "" : "s"}`,
+    `${formatCadence(decisionsPerSecond)} decisions/s`,
+    `max extra delay about ${maxDelayFrames}f`,
+  ].join(" · ");
+}
+
+function formatCadence(value: number): string {
+  return value.toLocaleString(undefined, {
+    maximumFractionDigits: value >= 10 ? 1 : 2,
+    minimumFractionDigits: 0,
+  });
 }
