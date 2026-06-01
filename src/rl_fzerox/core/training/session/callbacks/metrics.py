@@ -11,6 +11,7 @@ class _MetricLogSpec:
     info_key: str
     log_key: str
     scale: float = 1.0
+    missing_value: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,7 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("race_distance", "state/race_distance_mean"),
         _MetricLogSpec("speed_kph", "state/speed_kph_mean"),
         _MetricLogSpec("position", "state/position_mean"),
+        _MetricLogSpec("ko_star_count", "state/ko_star_count_mean"),
         _MetricLogSpec("lap", "state/lap_mean"),
         _MetricLogSpec("race_laps_completed", "state/race_laps_completed_mean"),
         _MetricLogSpec("step_reward_raw", "reward/step_raw_mean"),
@@ -57,6 +59,11 @@ ROLLOUT_INFO_LOG_SPECS = _RolloutInfoLogSpecs(
         _MetricLogSpec("lean_used", "action/lean_used_step_rate"),
         _MetricLogSpec("spin_requested", "action/spin_requested_step_rate"),
         _MetricLogSpec("spin_started", "action/spin_started_step_rate"),
+        _MetricLogSpec(
+            "ko_star_reward_event",
+            "reward/ko_star_event_step_rate",
+            missing_value=False,
+        ),
         _MetricLogSpec("step_reward_clipped", "reward_clip/any_step_rate"),
         _MetricLogSpec("step_reward_clip_positive", "reward_clip/positive_step_rate"),
         _MetricLogSpec("step_reward_clip_negative", "reward_clip/negative_step_rate"),
@@ -203,7 +210,11 @@ class RolloutInfoAccumulator:
                 self.state_metrics[spec.info_key].add_many(values)
 
         for spec in ROLLOUT_INFO_LOG_SPECS.step_rates:
-            values = _positive_values(infos, spec.info_key)
+            values = _positive_values(
+                infos,
+                spec.info_key,
+                missing_value=spec.missing_value,
+            )
             if values:
                 self.step_rates[spec.info_key].add_many(values)
 
@@ -371,12 +382,21 @@ def _numeric_values(infos: Sequence[object], key: str) -> list[float]:
     return values
 
 
-def _positive_values(infos: Sequence[object], key: str) -> list[bool]:
+def _positive_values(
+    infos: Sequence[object],
+    key: str,
+    *,
+    missing_value: bool | None = None,
+) -> list[bool]:
     values: list[bool] = []
     for info in infos:
         if not isinstance(info, dict):
             continue
-        value = info.get(key)
+        if key not in info:
+            if missing_value is not None:
+                values.append(missing_value)
+            continue
+        value = info[key]
         if isinstance(value, bool):
             values.append(value)
         elif isinstance(value, int | float):
