@@ -44,7 +44,7 @@ from rl_fzerox.core.envs.rewards.reward_main.step_terms import (
     clip_step_reward,
     ground_effect_progress_modifier,
     ko_star_count,
-    ko_star_reward,
+    ko_star_reward_event,
 )
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
 from rl_fzerox.core.envs.track_bounds import (
@@ -175,6 +175,7 @@ class RewardMainTracker:
         self._energy.start_collision_cooldown(summary, telemetry, weights=self._weights)
         reward = summary.frames_run * self._weights.time_penalty_per_frame
         breakdown: dict[str, float] = {}
+        debug_info: dict[str, object] = {}
         if reward:
             breakdown["time"] = reward
 
@@ -233,14 +234,19 @@ class RewardMainTracker:
         if lap_reward:
             reward += lap_reward
 
-        ko_reward = ko_star_reward(
+        ko_event = ko_star_reward_event(
             previous_count=self._previous_ko_star_count,
             telemetry=telemetry,
             weights=self._weights,
         )
-        if ko_reward:
-            reward += ko_reward
-            breakdown["ko_star"] = ko_reward
+        if ko_event is not None:
+            reward += ko_event.reward
+            breakdown["ko_star"] = ko_event.reward
+            debug_info["ko_star_reward_event"] = True
+            debug_info["ko_star_reward_previous_count"] = ko_event.previous_count
+            debug_info["ko_star_reward_current_count"] = ko_event.current_count
+            debug_info["ko_star_reward_gain"] = ko_event.gained
+            debug_info["ko_star_reward_value"] = ko_event.reward
 
         boost_pad_reward = self._boost_pads.reward(
             summary.entered_dash_surface,
@@ -362,7 +368,12 @@ class RewardMainTracker:
         self._previous_lean_requested = (
             False if action_context is None else action_context.lean_requested
         )
-        return RewardStep(reward=reward, breakdown=breakdown, raw_reward=raw_reward)
+        return RewardStep(
+            reward=reward,
+            breakdown=breakdown,
+            raw_reward=raw_reward,
+            debug_info=debug_info,
+        )
 
     def info(self, telemetry: FZeroXTelemetry | None) -> dict[str, object]:
         """Expose lightweight frontier reward state for watch/logging."""

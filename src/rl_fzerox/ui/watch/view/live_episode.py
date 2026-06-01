@@ -23,6 +23,15 @@ class _LiveEpisodeSnapshot(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class KoStarRewardEvent:
+    env_step: int
+    previous_count: int
+    current_count: int
+    gained: int
+    reward: float
+
+
+@dataclass(frozen=True, slots=True)
 class EpisodeLiveSeriesSnapshot:
     episode: int
     env_steps: tuple[int, ...]
@@ -34,6 +43,8 @@ class EpisodeLiveSeriesSnapshot:
     edge_ratio: tuple[float, ...]
     outside_edge_excess_ratio: tuple[float, ...]
     height_above_ground: tuple[float, ...]
+    ko_star_events: tuple[KoStarRewardEvent, ...]
+    current_ko_star_count: int | None
     current_return: float
     current_progress: float
     max_progress: float
@@ -51,6 +62,8 @@ class EpisodeLiveSeriesTracker:
     edge_ratio: list[float] = field(default_factory=list)
     outside_edge_excess_ratio: list[float] = field(default_factory=list)
     height_above_ground: list[float] = field(default_factory=list)
+    ko_star_events: list[KoStarRewardEvent] = field(default_factory=list)
+    current_ko_star_count: int | None = None
     current_return: float = 0.0
     current_progress: float = 0.0
     max_progress: float = 0.0
@@ -72,6 +85,8 @@ class EpisodeLiveSeriesTracker:
             self.edge_ratio = []
             self.outside_edge_excess_ratio = []
             self.height_above_ground = []
+            self.ko_star_events = []
+            self.current_ko_star_count = None
             self.current_return = 0.0
             self.current_progress = 0.0
             self.max_progress = 0.0
@@ -95,6 +110,13 @@ class EpisodeLiveSeriesTracker:
         edge_ratio = _edge_ratio(snapshot)
         outside_edge_excess_ratio = _outside_edge_excess_ratio(snapshot)
         height_above_ground = _player_telemetry_float(snapshot, "height_above_ground")
+        self.current_ko_star_count = _ko_star_count(snapshot)
+        ko_star_event = _ko_star_reward_event(snapshot.info, env_step=env_step)
+        if ko_star_event is not None:
+            if self.ko_star_events and self.ko_star_events[-1].env_step == env_step:
+                self.ko_star_events[-1] = ko_star_event
+            else:
+                self.ko_star_events.append(ko_star_event)
         self.current_return = float(snapshot.episode_reward)
         self.current_progress = progress
         self.max_progress = max(self.max_progress, progress)
@@ -132,6 +154,8 @@ class EpisodeLiveSeriesTracker:
             edge_ratio=tuple(self.edge_ratio),
             outside_edge_excess_ratio=tuple(self.outside_edge_excess_ratio),
             height_above_ground=tuple(self.height_above_ground),
+            ko_star_events=tuple(self.ko_star_events),
+            current_ko_star_count=self.current_ko_star_count,
             current_return=self.current_return,
             current_progress=self.current_progress,
             max_progress=self.max_progress,
@@ -173,6 +197,48 @@ def _player_telemetry_float(snapshot: _LiveEpisodeSnapshot, key: str) -> float:
     if isinstance(value, int | float) and not isinstance(value, bool):
         return float(value)
     return 0.0
+
+
+def _ko_star_count(snapshot: _LiveEpisodeSnapshot) -> int | None:
+    value = snapshot.info.get("ko_star_count")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return max(int(value), 0)
+    player_data = _player_telemetry_data(snapshot)
+    if player_data is None:
+        return None
+    player_value = player_data.get("ko_star_count")
+    if isinstance(player_value, int | float) and not isinstance(player_value, bool):
+        return max(int(player_value), 0)
+    return None
+
+
+def _ko_star_reward_event(
+    info: dict[str, object],
+    *,
+    env_step: int,
+) -> KoStarRewardEvent | None:
+    if info.get("ko_star_reward_event") is not True:
+        return None
+    previous_count = _info_int(info, "ko_star_reward_previous_count")
+    current_count = _info_int(info, "ko_star_reward_current_count")
+    gained = _info_int(info, "ko_star_reward_gain")
+    reward = _info_float(info, "ko_star_reward_value")
+    if previous_count is None or current_count is None or gained is None:
+        return None
+    return KoStarRewardEvent(
+        env_step=env_step,
+        previous_count=previous_count,
+        current_count=current_count,
+        gained=gained,
+        reward=reward,
+    )
+
+
+def _info_int(info: dict[str, object], key: str) -> int | None:
+    value = info.get(key)
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return int(value)
+    return None
 
 
 def _edge_ratio(snapshot: _LiveEpisodeSnapshot) -> float:

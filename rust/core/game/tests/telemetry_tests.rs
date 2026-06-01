@@ -21,8 +21,7 @@ fn read_snapshot_decodes_player_one_race_values() {
         .copy_from_slice(&4_i16.to_le_bytes());
     memory[GLOBALS.player_engine..GLOBALS.player_engine + 4]
         .copy_from_slice(&0.7_f32.to_le_bytes());
-    memory[GLOBALS.racers_ko_count..GLOBALS.racers_ko_count + 2]
-        .copy_from_slice(&4_i16.to_le_bytes());
+    write_word_swapped_u8(&mut memory, GLOBALS.player_ko_stars, 4);
     memory[player_base + RACER.character] = 4_u8;
     let machine_base = MACHINE_TABLE.machines + (4 * MACHINE_TABLE.machine_size);
     write_machine_u8(&mut memory, machine_base + MACHINE_TABLE.body_stat, 4);
@@ -338,8 +337,12 @@ fn read_step_sample_decodes_player_damage_rumble_counter() {
     assert_eq!(telemetry.damage_rumble_counter, 1);
 }
 
-fn write_machine_u8(memory: &mut [u8], logical_offset: usize, value: u8) {
+fn write_word_swapped_u8(memory: &mut [u8], logical_offset: usize, value: u8) {
     memory[logical_offset ^ 0x03] = value;
+}
+
+fn write_machine_u8(memory: &mut [u8], logical_offset: usize, value: u8) {
+    write_word_swapped_u8(memory, logical_offset, value);
 }
 
 fn write_machine_i16(memory: &mut [u8], logical_offset: usize, value: i16) {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot
+from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesSnapshot, KoStarRewardEvent
 from rl_fzerox.ui.watch.view.panels.core.format import _int_info
 from rl_fzerox.ui.watch.view.panels.rendering.text import _fit_text
 from rl_fzerox.ui.watch.view.screen.layout import LAYOUT
@@ -97,7 +97,14 @@ def _draw_live_tab(
     screen.blit(title_surface, (x, y))
     subtitle_y = y + title_surface.get_height() + LIVE_CHART_STYLE.title_gap
     screen.blit(subtitle_surface, (x, subtitle_y))
-    chart_y = subtitle_y + subtitle_surface.get_height() + LAYOUT.section_gap
+    ko_events_y = subtitle_y + subtitle_surface.get_height() + LIVE_CHART_STYLE.title_gap
+    ko_events_surface = fonts.small.render(
+        _fit_text(fonts.small, _ko_star_events_summary(live_series), width),
+        True,
+        PALETTE.text_muted,
+    )
+    screen.blit(ko_events_surface, (x, ko_events_y))
+    chart_y = ko_events_y + ko_events_surface.get_height() + LAYOUT.section_gap
 
     header_height = chart_y - y
     plot_height = _plot_height_for_rows(
@@ -724,6 +731,25 @@ def _speed_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
     current_progress = live_series.current_progress * 100.0
     return (
         f"now {current_speed:.1f} km/h · avg {average_speed:.1f} · progress {current_progress:.1f}%"
+    )
+
+
+def _ko_star_events_summary(live_series: EpisodeLiveSeriesSnapshot | None) -> str:
+    if live_series is None:
+        return "KO stars - · reward events waiting"
+    count = (
+        "-" if live_series.current_ko_star_count is None else str(live_series.current_ko_star_count)
+    )
+    if not live_series.ko_star_events:
+        return f"KO stars {count} · reward events none"
+    event_text = "; ".join(_format_ko_star_event(event) for event in live_series.ko_star_events)
+    return f"KO stars {count} · reward events {event_text}"
+
+
+def _format_ko_star_event(event: KoStarRewardEvent) -> str:
+    return (
+        f"#{event.env_step} +{event.gained} "
+        f"{event.previous_count}->{event.current_count} ({event.reward:+.2f})"
     )
 
 

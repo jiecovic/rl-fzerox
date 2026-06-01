@@ -7,6 +7,7 @@ import pytest
 
 from rl_fzerox.ui.watch.view.live_episode import EpisodeLiveSeriesTracker
 from rl_fzerox.ui.watch.view.panels.visuals.live import (
+    _ko_star_events_summary,
     _plot_legend_rows,
     _PlotSeries,
     _speed_summary,
@@ -310,6 +311,41 @@ def test_live_episode_tracker_reports_step_reward() -> None:
     assert snapshot is not None
     assert snapshot.env_steps == (2, 6)
     assert snapshot.step_rewards == (0.25, 0.75)
+
+
+def test_live_episode_tracker_reports_exact_ko_reward_events() -> None:
+    tracker = EpisodeLiveSeriesTracker()
+
+    tracker.observe_snapshot(
+        _Snapshot(
+            episode=1,
+            policy_decision_frame=True,
+            info={
+                "episode_step": 4,
+                "ko_star_count": 3,
+                "ko_star_reward_event": True,
+                "ko_star_reward_previous_count": 1,
+                "ko_star_reward_current_count": 3,
+                "ko_star_reward_gain": 2,
+                "ko_star_reward_value": 5.0,
+            },
+            episode_reward=5.0,
+        ),
+        action_repeat=2,
+    )
+
+    snapshot = tracker.snapshot()
+
+    assert snapshot is not None
+    assert snapshot.current_ko_star_count == 3
+    assert len(snapshot.ko_star_events) == 1
+    event = snapshot.ko_star_events[0]
+    assert event.env_step == 2
+    assert event.previous_count == 1
+    assert event.current_count == 3
+    assert event.gained == 2
+    assert event.reward == 5.0
+    assert _ko_star_events_summary(snapshot) == "KO stars 3 · reward events #2 +2 1->3 (+5.00)"
 
 
 def test_plot_legend_rows_include_only_labeled_series() -> None:

@@ -160,6 +160,8 @@ class EngineStepAssembler:
         info["spin_macro_cooldown_frames"] = int(step_result.status.spin_macro_cooldown_frames)
         if reward_breakdown:
             info["reward_breakdown"] = reward_breakdown
+        if reward_step.debug_info:
+            info.update(reward_step.debug_info)
         info["episode_step"] = step_result.status.step_count
         info["stalled_steps"] = step_result.status.stalled_steps
         info["reverse_timer"] = step_result.status.reverse_timer

@@ -1,9 +1,19 @@
 # src/rl_fzerox/core/envs/rewards/reward_main/step_terms.py
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from fzerox_emulator import FZeroXTelemetry
 from rl_fzerox.core.envs.course_effects import CourseEffect, course_effect_raw
 from rl_fzerox.core.envs.rewards.reward_main.weights import RewardMainWeights
+
+
+@dataclass(frozen=True, slots=True)
+class KoStarRewardEvent:
+    previous_count: int
+    current_count: int
+    gained: int
+    reward: float
 
 
 def clip_step_reward(reward: float, *, weights: RewardMainWeights) -> float:
@@ -27,19 +37,26 @@ def ground_effect_progress_modifier(
     return "ground_effect", 1.0
 
 
-def ko_star_reward(
+def ko_star_reward_event(
     *,
     previous_count: int | None,
     telemetry: FZeroXTelemetry,
     weights: RewardMainWeights,
-) -> float:
+) -> KoStarRewardEvent | None:
     if weights.ko_star_reward <= 0.0 or telemetry.game_mode_name != "gp_race":
-        return 0.0
+        return None
     current_count = ko_star_count(telemetry)
     if current_count is None or previous_count is None:
-        return 0.0
+        return None
     gained = max(current_count - max(previous_count, 0), 0)
-    return gained * weights.ko_star_reward
+    if gained <= 0:
+        return None
+    return KoStarRewardEvent(
+        previous_count=max(previous_count, 0),
+        current_count=current_count,
+        gained=gained,
+        reward=gained * weights.ko_star_reward,
+    )
 
 
 def ko_star_count(telemetry: FZeroXTelemetry | None) -> int | None:

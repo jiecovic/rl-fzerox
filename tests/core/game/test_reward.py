@@ -127,7 +127,15 @@ def test_reward_main_rewards_new_gp_ko_stars_once() -> None:
 
     assert gained_two.reward == 5.0
     assert gained_two.breakdown == {"ko_star": 5.0}
+    assert gained_two.debug_info == {
+        "ko_star_reward_event": True,
+        "ko_star_reward_previous_count": 1,
+        "ko_star_reward_current_count": 3,
+        "ko_star_reward_gain": 2,
+        "ko_star_reward_value": 5.0,
+    }
     assert repeated_count.reward == 0.0
+    assert repeated_count.debug_info == {}
 
 
 def test_reward_main_ignores_ko_star_reward_outside_gp_race() -> None:
@@ -149,6 +157,7 @@ def test_reward_main_ignores_ko_star_reward_outside_gp_race() -> None:
 
     assert step.reward == 0.0
     assert step.breakdown == {}
+    assert step.debug_info == {}
 
 
 def test_reward_main_rewards_each_frontier_bucket_once() -> None:

@@ -15,6 +15,7 @@ class RewardStep:
     reward: float
     breakdown: dict[str, float] = field(default_factory=dict)
     raw_reward: float | None = None
+    debug_info: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

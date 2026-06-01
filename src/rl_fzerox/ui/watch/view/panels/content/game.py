@@ -51,6 +51,11 @@ def race_state_section(
         panel_line("Lap", str(telemetry.player.lap), PALETTE.text_primary),
         panel_line("Position", _format_position(telemetry), PALETTE.text_primary),
         panel_line(
+            "KO stars",
+            str(max(int(telemetry.player.ko_star_count), 0)),
+            PALETTE.text_primary,
+        ),
+        panel_line(
             "Total progress",
             _format_total_progress(telemetry),
             PALETTE.text_primary,
