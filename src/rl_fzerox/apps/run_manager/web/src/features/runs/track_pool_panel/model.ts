@@ -196,8 +196,9 @@ export function xCupGenerationSummary(entry: TrackPoolCourseView) {
   if (entry.generatedCourseSlot !== null) {
     parts.push(`slot ${entry.generatedCourseSlot + 1}`);
   }
-  if (entry.generatedReplacementCount > 0) {
-    parts.push(`replaced ${entry.generatedReplacementCount}x`);
+  if (entry.generatedCourseGeneration !== null) {
+    // Runtime generation is zero-based; display it as a human count.
+    parts.push(`generated ${entry.generatedCourseGeneration + 1}`);
   }
   return parts.join(" · ");
 }
